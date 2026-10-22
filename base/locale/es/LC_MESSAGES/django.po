@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-21 04:25+0200\n"
+"POT-Creation-Date: 2026-10-22 06:42+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -58,21 +58,9 @@ msgstr "Base"
 msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
 msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
 
-#: middleware.py:110 ws_print.py:218 ws_print.py:220
+#: middleware.py:107 registry.py:85 ws_print.py:244 ws_print.py:246
 msgid "Not found"
 msgstr "No encontrado."
-
-#: middleware.py:116
-msgid "This hub is no longer available."
-msgstr "Este hub ya no está disponible."
-
-#: middleware.py:124
-msgid "This business is suspended until its unpaid invoice is paid."
-msgstr "Este negocio está suspendido hasta que se pague su factura pendiente."
-
-#: middleware.py:132
-msgid "This hub is still being prepared; try again in a few seconds."
-msgstr "Este hub aún se está preparando; vuelve a intentarlo en unos segundos."
 
 #: models.py:37
 msgid "Owner"
@@ -315,15 +303,47 @@ msgstr "código de la demo"
 msgid "demo codes"
 msgstr "códigos de la demo"
 
-#: queries.py:87 services.py:396
+#: queries.py:100 services.py:407
 msgid "No hub has this id."
 msgstr "Ningún hub tiene este id."
 
-#: queries.py:106 services.py:636 services.py:707
+#: queries.py:119 services.py:685 services.py:756
 msgid "No demo has this address."
 msgstr "Ninguna demo tiene esta dirección."
 
-#: registry.py:64
+#: queries.py:166
+msgid "Your apps"
+msgstr "Tus apps"
+
+#: queries.py:167
+msgid "Turn on at least one business app so your till has something to sell."
+msgstr "Activa al menos una app de negocio para que el TPV tenga algo que vender."
+
+#: queries.py:179 tests/test_queries_home.py:361
+msgid "Your team"
+msgstr "Tu equipo"
+
+#: queries.py:180
+msgid "Add the people who will use the till, each with their own way in."
+msgstr "Añade a las personas que usarán el TPV, cada una con su forma de entrar."
+
+#: queries.py:216
+msgid "Failed events"
+msgstr "Eventos caídos"
+
+#: registry.py:87
+msgid "This hub is no longer available."
+msgstr "Este hub ya no está disponible."
+
+#: registry.py:89
+msgid "This hub is still being prepared; try again in a few seconds."
+msgstr "Este hub aún se está preparando; vuelve a intentarlo en unos segundos."
+
+#: registry.py:91
+msgid "This business is suspended until its unpaid invoice is paid."
+msgstr "Este negocio está suspendido hasta que se pague su factura pendiente."
+
+#: registry.py:98
 msgid "Only the platform may do this."
 msgstr "Solo la plataforma puede hacer esto."
 
@@ -336,64 +356,64 @@ msgstr "Content-Length tiene que ser una longitud."
 msgid "The request may weigh %(mb)s MB at most."
 msgstr "La petición puede pesar %(mb)s MB como máximo."
 
-#: services.py:402
+#: services.py:413
 msgid "This hub was purged: it cannot come back."
 msgstr "Este hub se purgó: no puede volver."
 
-#: services.py:406
+#: services.py:417
 msgid "Another hub has this address."
 msgstr "Otro hub ya tiene esta dirección."
 
-#: services.py:423
+#: services.py:434
 #, python-format
 msgid "This address cannot name a business (%(reason)s)."
 msgstr "Esta dirección no puede nombrar un negocio (%(reason)s)."
 
-#: services.py:453
+#: services.py:464
 msgid "This hub was cancelled: restore it first."
 msgstr "Este hub está cancelado: restáuralo primero."
 
-#: services.py:621
+#: services.py:670
 msgid "Every demo is taken right now; try again in a minute."
 msgstr ""
 "Ahora mismo todas las demos están ocupadas; vuelve a intentarlo en un minuto."
 
-#: services.py:688
+#: services.py:737
 msgid "No demo could be made right now; try again."
 msgstr "Ahora mismo no se ha podido crear la demo; vuelve a intentarlo."
 
-#: services.py:709
+#: services.py:758
 msgid "This demo has ended."
 msgstr "Esta demo ha terminado."
 
-#: services.py:711
+#: services.py:760
 msgid "This demo is another browser's."
 msgstr "Esta demo es de otro navegador."
 
-#: services.py:796
+#: services.py:845
 msgid "This demo has not ended yet."
 msgstr "Esta demo aún no ha terminado."
 
-#: templates/base/hub_gone.html:11 templates/base/hub_gone.html:16
+#: templates/base/hub_gone.html:12 templates/base/hub_gone.html:21
 msgid "This demo has ended"
 msgstr "La demo ha terminado"
 
-#: templates/base/hub_gone.html:11 templates/base/hub_gone.html:20
+#: templates/base/hub_gone.html:12 templates/base/hub_gone.html:25
 msgid "This business is no longer available"
 msgstr "Este negocio ya no está disponible"
 
-#: templates/base/hub_gone.html:17
+#: templates/base/hub_gone.html:22
 msgid ""
 "Everything typed in it is gone. You can start another one whenever you like."
 msgstr ""
 "Todo lo que escribiste en ella se ha borrado. Puedes empezar otra cuando "
 "quieras."
 
-#: templates/base/hub_gone.html:18
+#: templates/base/hub_gone.html:23
 msgid "Create another demo"
 msgstr "Crear otra demo"
 
-#: templates/base/hub_gone.html:21
+#: templates/base/hub_gone.html:26
 msgid ""
 "Its owner closed it in ERPlora. If it is yours, you can bring it back from "
 "your account."
@@ -401,23 +421,23 @@ msgstr ""
 "Su propietario lo cerró en ERPlora. Si es tuyo, puedes recuperarlo desde tu "
 "cuenta."
 
-#: templates/base/hub_gone.html:22 templates/base/hub_suspended.html:17
+#: templates/base/hub_gone.html:27 templates/base/hub_suspended.html:22
 msgid "Go to ERPlora"
 msgstr "Ir a ERPlora"
 
-#: templates/base/hub_preparing.html:12 templates/base/hub_preparing.html:16
+#: templates/base/hub_preparing.html:13 templates/base/hub_preparing.html:21
 msgid "Your business is being prepared"
 msgstr "Estamos preparando tu negocio"
 
-#: templates/base/hub_preparing.html:17
+#: templates/base/hub_preparing.html:22
 msgid "It takes a few seconds. This page refreshes by itself."
 msgstr "Tarda unos segundos. Esta página se actualiza sola."
 
-#: templates/base/hub_suspended.html:11 templates/base/hub_suspended.html:15
+#: templates/base/hub_suspended.html:12 templates/base/hub_suspended.html:20
 msgid "This business is suspended"
 msgstr "Este negocio está suspendido"
 
-#: templates/base/hub_suspended.html:16
+#: templates/base/hub_suspended.html:21
 msgid ""
 "An invoice of its plan is unpaid. Its data is safe: as soon as whoever pays "
 "it settles the invoice in ERPlora, it works again."
@@ -425,15 +445,15 @@ msgstr ""
 "Hay una factura de su plan sin pagar. Sus datos están a salvo: en cuanto "
 "quien lo paga abone la factura en ERPlora, vuelve a funcionar."
 
-#: templates/base/login_retry.html:10 templates/base/login_retry.html:16
+#: templates/base/login_retry.html:11 templates/base/login_retry.html:21
 msgid "Sign in again"
 msgstr "Volver a entrar"
 
-#: templates/base/login_retry.html:14
+#: templates/base/login_retry.html:19
 msgid "We could not finish signing you in"
 msgstr "No hemos podido terminar de iniciar tu sesión"
 
-#: templates/base/login_retry.html:15
+#: templates/base/login_retry.html:20
 msgid "The sign-in expired or started in another browser."
 msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
 
@@ -441,43 +461,43 @@ msgstr "El inicio de sesión ha caducado o empezó en otro navegador."
 msgid "January"
 msgstr ""
 
-#: ws_print.py:248
+#: ws_print.py:274
 #, python-format
 msgid "No hello within %(seconds)s seconds."
 msgstr "No ha llegado el hello en %(seconds)s segundos."
 
-#: ws_print.py:274
+#: ws_print.py:300
 msgid "Say hello with a deviceId before draining."
 msgstr "Envía hello con un deviceId antes de recoger trabajos."
 
-#: ws_print.py:328
+#: ws_print.py:364
 msgid ""
 "This channel speaks JSON text frames: hello, claim, done, failed and beat."
 msgstr ""
 "Este canal habla con mensajes de texto JSON: hello, claim, done, failed y "
 "beat."
 
-#: ws_print.py:333
+#: ws_print.py:369
 #, python-format
 msgid "A frame of %(size)s bytes is over this channel's cap of %(cap)s bytes."
 msgstr ""
 "Un mensaje de %(size)s bytes supera el tope de este canal, %(cap)s bytes."
 
-#: ws_print.py:342
+#: ws_print.py:378
 msgid "This channel speaks hello, claim, done, failed and beat."
 msgstr "Este canal habla hello, claim, done, failed y beat."
 
-#: ws_print.py:357
+#: ws_print.py:393
 msgid "This channel drains for one device: send its deviceId."
 msgstr "Este canal recoge trabajos para un dispositivo: envía su deviceId."
 
-#: ws_print.py:361
+#: ws_print.py:397
 msgid "printers is the list of the ids of the printers this device reaches."
 msgstr ""
 "printers es la lista de los id de las impresoras a las que llega este "
 "dispositivo."
 
-#: ws_print.py:389
+#: ws_print.py:408
 msgid ""
 "This device is not set up to print in this hub: someone who manages the "
 "printers sets it up in Printing → Devices."
@@ -485,7 +505,7 @@ msgstr ""
 "Este dispositivo no está dado de alta para imprimir en este hub: quien "
 "gestiona las impresoras lo da de alta en Impresión → Dispositivos."
 
-#: ws_print.py:371
+#: ws_print.py:416
 msgid ""
 "This device reaches no active printer of this hub: choose its printers "
 "before printing."
@@ -493,34 +513,34 @@ msgstr ""
 "Este dispositivo no llega a ninguna impresora activa de este hub: elige sus "
 "impresoras antes de imprimir."
 
-#: ws_print.py:382
+#: ws_print.py:427
 #, python-format
 msgid "This device does not print «%(role)s» for this hub."
 msgstr "Este dispositivo no imprime «%(role)s» para este hub."
 
-#: ws_print.py:448
+#: ws_print.py:497
 msgid "Sign in to this hub to print: this connection has no session."
 msgstr ""
 "Inicia sesión en este hub para imprimir: esta conexión no tiene sesión."
 
-#: ws_print.py:455
+#: ws_print.py:504
 msgid "This connection's session is not valid on this hub: sign in again."
 msgstr ""
 "La sesión de esta conexión no es válida en este hub: vuelve a iniciar sesión."
 
-#: ws_print.py:557
+#: ws_print.py:625
 msgid "jobId is the id of a job this hub handed out."
 msgstr "jobId es el id de un trabajo que entregó este hub."
 
-#: ws_print.py:585
+#: ws_print.py:653
 msgid "Printing is not on in this hub."
 msgstr "Impresión no está activada en este hub."
 
-#: ws_print.py:596
+#: ws_print.py:664
 msgid "Invalid frame."
 msgstr "Mensaje no válido."
 
-#: ws_print.py:622
+#: ws_print.py:690
 #, python-format
 msgid "%(field)s is text."
 msgstr "%(field)s es un texto."

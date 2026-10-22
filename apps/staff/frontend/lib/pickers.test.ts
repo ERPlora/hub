@@ -1,9 +1,10 @@
-// The server searches behind the staff pickers (SearchSelect): members by name, roles (all, or only
-// the active ones a record may take) and the accounts of the business. Each asks for the first 100
-// matches (the server's cap), sends the search only when there is one, and gives value + label.
+// The server searches behind the staff pickers (the Combo fields of the forms and the table filters):
+// members by name, roles (all, or only the active ones a record may take) and the accounts of the
+// business. Each asks for the first 100 matches (the server's cap), sends the search only when there is
+// one, and gives value + label (a table filter's option); `asCombo` turns one into a Combo's search.
 import { describe, expect, it, vi } from 'vitest';
 
-import { accountSearch, memberSearch, roleSearch } from './pickers';
+import { accountSearch, asCombo, memberSearch, roleSearch } from './pickers';
 
 function client(rows: unknown[]) {
   const call = vi.fn(async () => ({ rows, total: rows.length, limit: 100, offset: 0 }));
@@ -31,5 +32,25 @@ describe('pickers', () => {
     const c = client([{ user_id: 4, name: 'Ana López' }]);
     expect(await accountSearch(c)('')).toEqual([{ value: '4', label: 'Ana López' }]);
     expect(c.api.call).toHaveBeenLastCalledWith('staff.account.list', { limit: 100 });
+  });
+
+  it('asCombo: a Combo search, `{ id, label }`, the typing trimmed', async () => {
+    const search = vi.fn(async () => [{ value: 'm1', label: 'Ana López' }]);
+    expect(await asCombo(search)('  an ')).toEqual([{ id: 'm1', label: 'Ana López' }]);
+    expect(search).toHaveBeenLastCalledWith('an');
+  });
+
+  it('asCombo: the «none» choice (an empty id) comes first only while nothing is typed', async () => {
+    const search = vi.fn(async () => [{ value: 'r1', label: 'Stylist' }]);
+    const roles = asCombo(search, () => 'No role');
+    expect(await roles('')).toEqual([
+      { id: '', label: 'No role' },
+      { id: 'r1', label: 'Stylist' },
+    ]);
+    expect(await roles(' ')).toEqual([
+      { id: '', label: 'No role' },
+      { id: 'r1', label: 'Stylist' },
+    ]);
+    expect(await roles('sty')).toEqual([{ id: 'r1', label: 'Stylist' }]);
   });
 });

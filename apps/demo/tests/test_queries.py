@@ -10,7 +10,7 @@ from live.errors import NotFound, PermissionDenied
 from live.operations import get
 
 from apps.demo.models import Item, ItemLine
-from apps.demo.schemas import ByIdIn, ItemDetailOut, ItemListIn, ItemPage, ItemStatsIn, ItemStatsOut
+from apps.demo.schemas import ByIdIn, ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemStatsIn, ItemStatsOut
 
 from .conftest import ctx_for
 
@@ -42,6 +42,7 @@ def make(name, status="open", lines=0, minutes_ago=0):
         ("demo.item.list", "demo.view", ItemListIn, ItemPage, True),
         ("demo.item.detail", "demo.view", ByIdIn, ItemDetailOut, False),
         ("demo.item.stats", "demo.manage", ItemStatsIn, ItemStatsOut, False),
+        ("demo.item.open_count", "demo.view", ItemStatsIn, ItemCountOut, False),
     ],
 )
 def test_declarations(name, permission, input, output, expose_api):
@@ -136,3 +137,18 @@ def test_empty_stats():
 def test_an_employee_may_not_see_the_stats():
     with pytest.raises(PermissionDenied):
         run("demo.item.stats", ItemStatsIn(), "hub_employee")
+
+
+# demo.item.open_count (the bell's example counter, PLAN-HUB round 2026-10-21)
+
+
+def test_the_open_items_for_the_bell():
+    make("A")
+    make("B", status="done")
+    make("C")
+    assert run("demo.item.open_count", ItemStatsIn(), "hub_employee").model_dump() == {"count": 2}
+
+
+def test_no_open_item_is_a_zero():
+    make("A", status="done")
+    assert run("demo.item.open_count", ItemStatsIn()).model_dump() == {"count": 0}

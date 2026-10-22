@@ -34,7 +34,7 @@ export default [
     rules: { 'vue/no-deprecated-slot-attribute': ['error', { ignore: ['/^ion-/', 'HubIcon'] }] },
   },
   {
-    files: ['frontend/**/*.{ts,vue}', 'apps/*/frontend/**/*.{ts,vue}'],
+    files: ['frontend/**/*.{ts,vue}', 'base/frontend/**/*.{ts,vue}', 'apps/*/frontend/**/*.{ts,vue}'],
     rules: { 'no-restricted-globals': ['error', ...restricted] },
   },
 ];

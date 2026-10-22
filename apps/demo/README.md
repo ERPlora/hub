@@ -26,6 +26,11 @@ optimista e idempotente, permisos por papel) y es la que se copia para escribir 
   `/api/live`; el aviso de `a` no llega a `b`.
 - **Sin permiso** (F06): el empleado solo ve; la ficha deja de pintar el elemento si se borra en otro
   sitio o si le quitan el permiso con la pantalla abierta.
+- **Ejemplo de los ganchos del Inicio** (BASE-F01, F06, F10; PLAN-HUB, ronda 2026-10-21): un paso de «Termina de
+  configurar tu negocio» («Crea tu primer elemento»), un panel del tablero («Elementos abiertos») y un contador
+  de la campana («Elementos de demo abiertos»), el modelo que copian los módulos. Como Demo no está en la tienda,
+  `base` solo la enseña (menú, «Mis apps» y estos ejemplos) con `SHOW_UNLISTED_MODULES` (desarrollo, tests y e2e) o
+  en un hub de demo; nunca a un cliente.
 
 ## Ficha
 
@@ -36,8 +41,9 @@ optimista e idempotente, permisos por papel) y es la que se copia para escribir 
 | `requires` | ninguno; no lee ni llama a otras apps |
 | Permisos | `demo.view` (todos los papeles) y `demo.manage` (todos menos el empleado) |
 | Pantallas | `/demo/items`, `/demo/items/new`, `/demo/items/:id`, `/demo/items/:id/edit` |
-| Operaciones | 3 consultas (`queries.py`: `list`, `detail`, `stats`) y 4 acciones (`services.py`: `create`, `update`, `delete`, `add_line`), todas con `ai=` (`risk = "high"` solo en `delete`); rutas en `/api/demo/items…`, sin parámetros en la ruta |
+| Operaciones | 4 consultas (`queries.py`: `list`, `detail`, `stats` y `open_count`, la del contador de la campana) y 4 acciones (`services.py`: `create`, `update`, `delete`, `add_line`), todas con `ai=` (`risk = "high"` solo en `delete`); rutas en `/api/demo/items…`, sin parámetros en la ruta |
 | Eventos | 4, `demo.item.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
+| Ganchos del Inicio | `setup` (`first_item`), `widgets` (`open_items`, `kpi`) y `bell` (`open_items`) |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial` |
 | Admin | Django admin con CRUD sobre elementos y líneas en `hubs.erplora.com` (PLAN §17–§18), por el ORM y sin aviso, como el de las demás apps |

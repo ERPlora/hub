@@ -121,10 +121,14 @@ async function release(context: BrowserContext, id: string): Promise<void> {
   expect((await api(context, A, 'POST', '/staff/members/terminate', { id })).status).toBe(200);
 }
 
+/** Picks, in a staff `Combo`, the option that names `name`, searching the server by `text`. */
 async function pickMember(page: Page, field: string, text: string, name: string): Promise<void> {
-  await page.locator(`[data-testid=${field}]`).click();
-  await page.locator(`[data-testid=${field}-search] input`).fill(text);
-  await page.locator(`[data-testid=${field}-option]`, { hasText: name }).click();
+  const input = page.locator(`[data-testid=${field}] input`);
+  await input.click();
+  await input.fill(text);
+  await page.locator(`[data-testid^=${field}-option-]`, { hasText: name }).first().click();
+  // Choosing closes the list: nothing of it is left over the next field.
+  await expect(page.locator(`[data-testid^=${field}-option-]`)).toHaveCount(0);
 }
 
 // flow: STAFF-F01 · gh:pm#478, gh:staff#72 — a refused save is told under its field and in sight, also on a phone
@@ -179,10 +183,25 @@ test('STAFF-F03: «Hub user» links the record to an account of the business, se
     const bea = await member(context, { first_name: `${TAG} Bea` });
     await search(page, 'staff-members', bea.full_name.split(' ').at(-1)!);
     await rowOf(page, 'staff-members', bea.id).getByText(bea.full_name).click();
+    // The list opens under the field, «No Hub access» first, in sight at every width; Escape closes the
+    // list and leaves the dialog open.
+    const typed = page.locator('[data-testid=staff-member-form-user_id] input');
+    await expect(typed).toHaveValue('No Hub access');
+    const none = page.locator('[data-testid="staff-member-form-user_id-option-"]');
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await typed.click();
+      await expect(none).toContainText('No Hub access');
+      await expect(none).toBeInViewport();
+      await page.screenshot({ path: shot(`CLOSE-STAFF-member-form-list-${vp.label}`) });
+      await typed.press('Escape');
+      await expect(none).toHaveCount(0);
+      await expect(page.locator('ion-modal[data-testid=staff-member-form]')).toBeVisible();
+    }
     await pickMember(page, 'staff-member-form-user_id', 'employee', 'employee@example.com');
     const picked = page.locator('[data-testid=staff-member-form-user_id]');
     await expect(picked.locator('input')).toHaveValue('employee@example.com');
-    await threeShots(page, 'STAFF-F03', () => picked);
+    await threeShots(page, 'STAFF-F03', () => picked, 'CLOSE-STAFF-member-form');
     await page.locator('[data-testid=staff-member-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-member-form]')).toBeHidden();
     await expect.poll(() => psql(`select user_id from staff_member where id = '${bea.id}'`)).toBe(String(employeeUser()));
@@ -349,8 +368,11 @@ test('STAFF-F17: «+» in Time Off registers someone’s absence, Pending', asyn
     const ana = await member(context, {});
     await shown(page).locator('[data-testid=staff-time-off-add]').click();
     await pickMember(page, 'staff-time-off-form-member_id', ana.full_name.split(' ').at(-1)!, ana.full_name);
+    const picked = page.locator('[data-testid=staff-time-off-form-member_id]');
+    await expect(picked.locator('input')).toHaveValue(ana.full_name);
     await page.locator('[data-testid=staff-time-off-form-start_date] input').fill(day(40));
     await page.locator('[data-testid=staff-time-off-form-end_date] input').fill(day(42));
+    await threeShots(page, 'STAFF-F17-form', () => picked, 'CLOSE-STAFF-time-off-form');
     await page.locator('[data-testid=staff-time-off-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-time-off-form]')).toBeHidden();
     await search(page, 'staff-time-off', ana.full_name.split(' ').at(-1)!);

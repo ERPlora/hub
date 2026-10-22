@@ -3,11 +3,12 @@
 // Employee ID, Role («No role»), Hub user («No Hub access», with the hint of why to link one), Status
 // (only when editing), Bookable, Buffer between appointments, Hire date, Color, Specialties, Bio and,
 // for whoever may see the pay, Hourly rate, Commission (%) and the HR notes. Role and Hub user are
-// pickers with a server search (a business may have more than the 100 the server gives at once): the
+// Combo fields that search the server (a business may have more than the 100 it gives at once): the
 // active roles (`staff.role.list`) and the accounts with access to this business
-// (`staff.account.list`). Editing reads the full record and its pay when
+// (`staff.account.list`), «No role» / «No Hub access» first. Editing reads the full record and its pay when
 // it opens, and saves only what changed. The server judges: a 422 goes under its field, a 409 (the
 // Hub user already linked to someone else) on top, and the dialog stays open with what was typed.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MemberOut, RoleOut } from '../operations';
@@ -65,29 +66,37 @@ async function setup(member: MemberOut | null = null, options: MountOptions & { 
   await settle();
   const field = (name: string) => m.inDoc(`staff-member-form-${name}`) as Control;
   const options_ = (name: string) => [...field(name).querySelectorAll('ion-select-option')].map((o) => [(o as Control).value, o.textContent?.trim()]);
-  const root = () => (m.wrapper.element.parentElement ?? m.wrapper.element) as Element;
-  /** Opens a picker and gives its choices. */
-  async function choices(name: string) {
-    await click(field(name));
+  /** The Combo of a field (`role_id`, `user_id`). */
+  const combo = (name: string) => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === `staff-member-form-${name}`);
+  /** What a Combo offers for `query` (`''`: on opening), as [id, label]. */
+  async function choices(name: string, query = '') {
+    const search = combo(name)?.props('search') as ((q: string) => Promise<ComboOption[]>) | undefined;
+    if (!search) throw new Error(`${name} is not a Combo with a server search`);
+    const found = await search(query);
     await settle();
-    return [...root().querySelectorAll(`[data-testid="staff-member-form-${name}-option"]`)].map((o) => [o.getAttribute('data-value'), o.textContent?.trim()]);
+    return found.map((o) => [o.id, o.label]);
   }
-  /** Opens a picker and picks the choice of `value`. */
-  async function choose(name: string, value: string) {
-    await click(field(name));
+  /** Picks, in a Combo, the option of `id` it offers on opening. */
+  async function choose(name: string, id: string) {
+    const search = combo(name)?.props('search') as ((q: string) => Promise<ComboOption[]>) | undefined;
+    if (!search) throw new Error(`${name} is not a Combo with a server search`);
+    const option = (await search('')).find((o) => o.id === id);
+    if (!option) throw new Error(`${name} offers no ${id}`);
+    combo(name)!.vm.$emit('update:modelValue', option);
     await settle();
-    await click(root().querySelector(`[data-testid="staff-member-form-${name}-option"][data-value="${value}"]`));
   }
   const save = () => m.inDoc('staff-member-form-submit') as Control;
   const posts = () => m.sent().filter((c) => c.method === 'POST');
-  return { ...m, field, options: options_, choices, choose, save, posts };
+  return { ...m, field, options: options_, combo, choices, choose, save, posts };
 }
 
 describe('MemberFormModal: New (STAFF-F01)', () => {
   it('is «New», with the old fields in order and no Status (a new person is born Active)', async () => {
     const s = await setup();
     expect(s.inDoc('staff-member-form')?.getAttribute('aria-label')).toBe('New');
-    const labels = [...(s.inDoc('staff-member-form-fields') as HTMLElement).querySelectorAll('[data-field]')].map((el) => (el as Control).label ?? el.textContent?.trim());
+    // A Combo carries `data-field` on its wrapper, around its ion-input.
+    const label = (el: Element) => (el as Control).label ?? (el.querySelector('ion-input') as Control | null)?.label ?? el.textContent?.trim();
+    const labels = [...(s.inDoc('staff-member-form-fields') as HTMLElement).querySelectorAll('[data-field]')].map(label);
     expect(labels).toEqual([
       'First name',
       'Last name',
@@ -127,6 +136,43 @@ describe('MemberFormModal: New (STAFF-F01)', () => {
       ['9', 'Bea Ruiz'],
     ]);
     expect(s.sent()).toContainEqual({ method: 'GET', path: '/api/staff/accounts', query: { limit: '100' }, body: undefined });
+  });
+
+  it('asks the server again as the person types, without the «none» choice', async () => {
+    const s = await setup();
+    expect(await s.choices('role_id', 'sty')).toEqual([
+      ['r1', 'Stylist'],
+      ['r2', 'Receptionist'],
+    ]);
+    expect(s.sent()).toContainEqual({ method: 'GET', path: '/api/staff/roles', query: { is_active: 'true', sort: 'name', limit: '100', search: 'sty' }, body: undefined });
+    expect((await s.choices('user_id', 'bea')).map(([id]) => id)).toEqual(['4', '9']);
+  });
+
+  it('Role and Hub user empty with their «none» choice (no Clear button), and say «No results»', async () => {
+    const s = await setup();
+    for (const name of ['role_id', 'user_id']) {
+      expect([s.combo(name)?.props('label'), s.combo(name)?.props('clearable'), s.combo(name)?.props('emptyLabel')], name).toEqual([
+        name === 'role_id' ? 'Role' : 'Hub user',
+        false,
+        'No results',
+      ]);
+    }
+    await s.choose('role_id', 'r1');
+    expect(s.field('role_id').value).toBe('Stylist');
+    await s.choose('role_id', '');
+    expect(s.field('role_id').value).toBe('No role');
+  });
+
+  it('a 422 on the role goes under its field', async () => {
+    const s = await setup(null, {
+      routes: { '/api/staff/members': [422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { role_id: 'That role is not active.' } } }] },
+    });
+    await ionValue(s.field('first_name'), 'Bea', 'ionInput');
+    await ionValue(s.field('last_name'), 'Ruiz', 'ionInput');
+    await s.choose('role_id', 'r1');
+    await click(s.save());
+    expect(s.combo('role_id')?.props('errorText')).toBe('That role is not active.');
+    expect(s.field('role_id').classList.contains('ion-invalid')).toBe(true);
   });
 
   it('says why to link a Hub user while there is none, and stops saying it once one is chosen', async () => {
@@ -287,18 +333,6 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
-  it('Enter on the Role picker opens it and never saves the record (it stays inside the field)', async () => {
-    const s = await setup(ROW);
-    await ionValue(s.field('phone'), '611', 'ionInput');
-    // ion-input keeps its native input in the light DOM: that input is the target of the key.
-    const field = s.field('role_id');
-    const native = field.querySelector('input') ?? field.appendChild(document.createElement('input'));
-    native.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-    await settle();
-    expect(s.posts()).toEqual([]);
-    expect(s.inDoc('staff-member-form-role_id-search')).not.toBeNull();
-  });
-
   it('putting someone Inactive with live time off (409) is said on top', async () => {
     const message = 'That member has pending or approved time off that has not ended. Resolve it first.';
     const s = await setup(ROW, { routes: { '/api/staff/members/update': [409, { error: { code: 'staff.active_time_off', message } }] } });
@@ -321,6 +355,13 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
       'Usuario del Hub',
       'Margen entre citas (min)',
     ]);
+  });
+
+  it('a new record speaks Spanish in its pickers too', async () => {
+    const s = await setup(null, { locale: 'es' });
+    expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Sin rol', 'Sin acceso al Hub']);
+    expect((await s.choices('role_id'))[0]).toEqual(['', 'Sin rol']);
+    expect(s.combo('role_id')?.props('emptyLabel')).toBe('Sin resultados');
   });
 });
 

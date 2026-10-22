@@ -6,12 +6,14 @@
 // `vue-tsc` run), plant a `process.env` in SPA files in memory and prove the SPA's project reports it, and prove
 // the split left nothing the single project checked out of `pnpm typecheck`, nor out of the project an editor
 // opens each file in (the root tsconfig.json only references the projects).
-import { readFileSync } from 'node:fs';
+import { existsSync, globSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 import { expect, it } from 'vitest';
+
+import viteConfig from './vite.config';
 
 const root = dirname(fileURLToPath(import.meta.url));
 // vue-tsc's own extension: without it a project lists no .vue file.
@@ -104,7 +106,7 @@ it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA
   const single = ts.parseJsonConfigFileContent(
     {
       compilerOptions: { allowJs: true, resolveJsonModule: true },
-      include: ['frontend/**/*', 'apps/*/frontend/**/*', '*.ts', '*.js'],
+      include: ['frontend/**/*', 'base/frontend/**/*', 'apps/*/frontend/**/*', '*.ts', '*.js'],
       exclude: ['node_modules', 'frontend/dist'],
     },
     ts.sys,
@@ -203,3 +205,84 @@ it('type-checks the SPA in pnpm build too: the image runs it, and a run without 
   expect(files.filter((file) => !checked(spa).has(file)).map((file) => relative(root, file))).toEqual([]);
   expect(spa.options.types).not.toContain('node');
 });
+
+/** Relative paths a source names: `import … from`, `export … from`, a bare `import '…'` and `import('…')`. */
+const SPECIFIERS = [
+  /\bimport\s+(?:type\s+)?[^'"`;]*?\bfrom\s*['"](\.[^'"]+)['"]/g,
+  /\bimport\s*['"](\.[^'"]+)['"]/g,
+  /\bexport\s+(?:type\s+)?(?:\*(?:\s+as\s+\w+)?|\{[^}]*\})\s*from\s*['"](\.[^'"]+)['"]/g,
+  /\bimport\s*\(\s*['"](\.[^'"]+)['"]\s*\)/g,
+];
+/** `import.meta.glob(<pattern or [patterns]>)`, with or without its type argument. */
+const GLOBS = /\bimport\.meta\.glob(?:<[^>]*>)?\s*\(\s*(\[[^\]]*\]|['"][^'"]+['"])/g;
+const QUOTED = /['"]([^'"]+)['"]/g;
+
+/** The file an extensionless or folder import lands on (`.ts`, `.vue`, `index.ts`; a type-only one, `.d.ts`). */
+function landing(path: string): string {
+  for (const candidate of [path, `${path}.ts`, `${path}.vue`, `${path}.d.ts`, join(path, 'index.ts')]) {
+    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+  }
+  return path;
+}
+
+/**
+ * Every file of this repo `pnpm build` reads for the SPA: its type project's files (vue-tsc), what they import
+ * (also lazily), what their `import.meta.glob`s match, and Vite's entries. Paths relative to the repo; a glob
+ * that matches nothing here is reported, as it would match nothing in the image either, without an error.
+ */
+function spaBuildReads(): { files: Set<string>; emptyGlobs: string[] } {
+  const spa = vueTscProject(scripts.build.split('&&')[0], VUE);
+  const input = viteConfig.build?.rollupOptions?.input;
+  const entries = typeof input === 'string' ? [input] : Array.isArray(input) ? input : Object.values(input ?? {});
+  const files = new Set([...checked(spa)].map((file) => relative(root, file)).filter((file) => !file.startsWith('node_modules/')));
+  for (const entry of entries) files.add(relative(root, resolve(root, entry)));
+  const emptyGlobs: string[] = [];
+  for (const file of [...files].filter((name) => /\.(ts|vue)$/.test(name) && !name.endsWith('.d.ts'))) {
+    const source = readFileSync(join(root, file), 'utf8');
+    const folder = dirname(join(root, file));
+    for (const pattern of SPECIFIERS) {
+      for (const [, specifier] of source.matchAll(pattern)) files.add(relative(root, landing(resolve(folder, specifier))));
+    }
+    for (const [, argument] of source.matchAll(GLOBS)) {
+      for (const [, glob] of argument.matchAll(QUOTED)) {
+        const matched = globSync(glob, { cwd: folder }).map((match) => relative(root, resolve(folder, match)));
+        if (matched.length === 0) emptyGlobs.push(`${file}: ${glob}`);
+        for (const match of matched) files.add(match);
+      }
+    }
+  }
+  return { files, emptyGlobs };
+}
+
+/** `.dockerignore`'s patterns as matchers of repo paths (`**` any depth, `*` within one folder; a folder covers what is under it). */
+function dockerIgnored(): (file: string) => boolean {
+  const patterns = readFileSync(join(root, '.dockerignore'), 'utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+  if (patterns.some((pattern) => pattern.startsWith('!'))) throw new Error('.dockerignore has an exception (!): not read here');
+  const matchers = patterns.map((pattern) => {
+    const body = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*\//g, '\u0000')
+      .replace(/\*/g, '[^/]*')
+      .replace(/\u0000/g, '(?:.*/)?');
+    return new RegExp(`^${body}(?:/.*)?$`);
+  });
+  return (file) => matchers.some((matcher) => matcher.test(file));
+}
+
+it('copies into the image every file pnpm build reads for the SPA, and keeps none of them out by .dockerignore', () => {
+  // 2026-10-22: hub#168 gave base its own frontend/ (the Home, the bell, «Upgrade plan»), which main.ts imports and
+  // globs; the `web` stage copied frontend/ and apps/ only, so the image's `pnpm build` failed on the import (and a
+  // glob alone would have built a hub without its Home, silently). The CI's `pnpm build` runs on the whole checkout.
+  const sources = webStageCopies();
+  const ignored = dockerIgnored();
+  const { files, emptyGlobs } = spaBuildReads();
+
+  expect([...files]).toEqual(expect.arrayContaining(['frontend/main.ts', 'base/frontend/lib/home.ts', 'base/frontend/routes.ts']));
+  expect(emptyGlobs).toEqual([]);
+  expect([...files].filter((file) => !copiedBy(sources, file)).sort()).toEqual([]);
+  expect([...files].filter((file) => ignored(file)).sort()).toEqual([]);
+}, 60_000);
+
