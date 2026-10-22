@@ -122,14 +122,15 @@ Dos tablas, una debajo de otra, cada una con su título.
 - **Días especiales**: columnas **Fecha**, **Nombre**, **Estado** («Cerrado» o sus horas, tramo a tramo)
   y **Anual** («Sí»/«No»); buscador «Buscar día especial…», el embudo «Filtros de días especiales» con
   fecha (desde–hasta), nombre, estado y anual, orden por columna y 50 por página. **+** abre **Nuevo día
-  especial**: **Fecha**, **Nombre** («Nombre (p.ej. Navidad)»), **Estado** («Cerrado» o «Abierto (con horario)»; empieza en
-  Cerrado), el mismo editor de tramos, **Se repite cada año**, **Notas** y **Añadir día**. Acciones de
-  fila: **Editar** (o tocar la fila; el mismo formulario, «Editar · {nombre}», con **Guardar**) y **Eliminar**.
+  especial**: **Fecha**, **Nombre** («Nombre (p.ej. Navidad)»), **Estado** («Cerrado» o «Abierto (con
+  horario)»; empieza en Cerrado), el mismo editor de tramos, **Se repite cada año**, **Notas** y **Añadir
+  día**. Acciones de fila: **Editar** (o tocar la fila; el mismo formulario, «Editar · {nombre}», con
+  **Guardar**) y **Eliminar**.
 - **Cambios temporales**: columnas **Desde**, **Hasta**, **Motivo** y **Estado**; buscador «Buscar cambio
-  temporal…», el embudo «Filtros de cambios temporales» con fechas, motivo y estado, y los mismos controles.
-  Cada tabla nombra su embudo y sus botones de vista, para no confundirlos con los de la otra. **+** abre **Nuevo cambio
-  temporal**: **Desde**, **Hasta**, **Motivo**, **Estado**, el editor de tramos y **Añadir cambio
-  temporal**. Acciones de fila: **Editar** y **Eliminar**.
+  temporal…», el embudo «Filtros de cambios temporales» con fechas, motivo y estado, y los mismos
+  controles. Cada tabla nombra su embudo y sus botones de vista, para no confundirlos con los de la otra.
+  **+** abre **Nuevo cambio temporal**: **Desde**, **Hasta**, **Motivo**, **Estado**, el editor de tramos y
+  **Añadir cambio temporal**. Acciones de fila: **Editar** y **Eliminar**.
 - Eliminar pide confirmar: «Eliminar» · «Se eliminará «{nombre}». No se puede deshacer.» con
   **Cancelar** y **Eliminar**.
 
