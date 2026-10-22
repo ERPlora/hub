@@ -107,6 +107,35 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         assert text in response.content, url
 
 
+@pytest.mark.django_db
+def test_the_settings_page_edits_the_working_day_by_the_same_rules_as_the_screen(client, superuser):
+    # The eight retired settings (they changed nothing) are not offered; a working day that crosses
+    # midnight cannot propose a schedule's week (STAFF-F13), so the admin refuses it like the screen.
+    row = StaffSettings.objects.create()
+    client.force_login(superuser)
+    url = f"/admin/staff/staffsettings/{row.pk}/change/"
+    form = client.get(url, HTTP_HOST="hubs.localhost").context["adminform"].form
+    assert list(form.fields) == ["default_work_start", "default_work_end", "default_break_duration"]
+
+    refused = client.post(
+        url,
+        {"default_work_start": "22:00", "default_work_end": "06:00", "default_break_duration": 60},
+        HTTP_HOST="hubs.localhost",
+    )
+    assert refused.status_code == 200
+    assert refused.context["adminform"].form.errors == {
+        "default_work_end": ["The start time must be before the end time."]
+    }
+    saved = client.post(
+        url,
+        {"default_work_start": "08:00", "default_work_end": "16:00", "default_break_duration": 30},
+        HTTP_HOST="hubs.localhost",
+    )
+    assert saved.status_code == 302, saved.content[:500]
+    row.refresh_from_db()
+    assert (row.default_work_start.hour, row.default_work_end.hour, row.default_break_duration) == (8, 16, 30)
+
+
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("how", ["page", "list"])
 def test_a_record_is_deleted_with_what_hangs_from_it(client, superuser, how):

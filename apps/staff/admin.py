@@ -112,5 +112,6 @@ class TimeOffAdmin(admin.ModelAdmin):
 
 @admin.register(StaffSettings)
 class StaffSettingsAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "default_work_start", "default_work_end", "updated_at")
-    exclude = ("slot",)
+    # The default working day only: the other eight columns are retired settings that nothing reads.
+    list_display = ("__str__", "default_work_start", "default_work_end", "default_break_duration", "updated_at")
+    fields = ("default_work_start", "default_work_end", "default_break_duration")

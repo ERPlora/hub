@@ -850,7 +850,7 @@ def _name_approvers(rows: list[TimeOff]) -> None:
     input=SettingsGetIn,
     output=SettingsOut,
     ai={
-        "description": "Returns the settings of the staff app (working day, booking rules and notices)."
+        "description": "Returns the default working day that a new schedule proposes (start, end and break)."
     },
 )
 def get_settings(ctx: OperationContext, data: SettingsGetIn) -> dict:

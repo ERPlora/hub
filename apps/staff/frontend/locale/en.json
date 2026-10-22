@@ -312,28 +312,17 @@
       "title": "Settings",
       "loadError": "The settings could not be loaded",
       "saved": "Settings saved",
-      "workday": "Working day",
-      "visibility": "Visibility and notices",
+      "workday": "Default working day",
+      "workdayIntro": "A new schedule proposes this working day from Monday to Friday, with the break in the middle of the day.",
       "fields": {
         "default_work_start": "Working day starts (HH:MM)",
         "default_work_end": "Working day ends (HH:MM)",
-        "default_break_duration": "Break duration (minutes)",
-        "min_advance_booking": "Minimum booking notice (hours)",
-        "max_daily_hours": "Maximum hours per day",
-        "overtime_threshold": "Overtime threshold (hours/week)",
-        "show_staff_photos": "Show staff photos",
-        "show_staff_bio": "Show staff bio",
-        "allow_staff_selection": "Let customers choose the professional",
-        "notify_new_appointment": "Notify on a new appointment",
-        "notify_cancellation": "Notify on a cancellation"
+        "default_break_duration": "Break duration (minutes)"
       },
       "hints": {
-        "default_work_start": "Default start of the working day. A night shift (end before start) is valid.",
-        "default_work_end": "Default end of the working day. If it is earlier than the start, the shift is taken to cross midnight.",
-        "default_break_duration": "Between 0 and 480 minutes.",
-        "min_advance_booking": "Between 0 and 168 hours (one week).",
-        "max_daily_hours": "Between 1 and 24 hours.",
-        "overtime_threshold": "Between 1 and 168 hours per week."
+        "default_work_start": "When each working day of a new schedule starts.",
+        "default_work_end": "After the start: a schedule’s day does not cross midnight.",
+        "default_break_duration": "From 0 (no break) to 480 minutes, shorter than the working day."
       }
     },
     "picker": {

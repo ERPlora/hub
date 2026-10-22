@@ -132,9 +132,15 @@ describe('staff catalogues (en source + es)', () => {
       ['staff.schedules.form.notWorking', 'No trabaja'],
       ['staff.schedules.delete.message', '¿Eliminar el horario «{name}»? Sus horas dejan de contar para la disponibilidad.'],
       ['staff.settings.fields.default_work_start', 'Inicio de jornada (HH:MM)'],
-      ['staff.settings.fields.overtime_threshold', 'Umbral de horas extra (horas/semana)'],
-      ['staff.settings.fields.allow_staff_selection', 'Permitir elegir profesional'],
+      ['staff.settings.fields.default_work_end', 'Fin de jornada (HH:MM)'],
+      ['staff.settings.fields.default_break_duration', 'Duración del descanso (minutos)'],
     ];
     for (const [key, spanish] of words) expect(ES.get(key), key).toBe(spanish);
+  });
+
+  it('no longer carry the eight retired settings (FIX-STAFF-SETTINGS-ORPHANS: they changed nothing)', () => {
+    const settings = [...EN.keys()].filter((key) => key.startsWith('staff.settings.fields.') || key.startsWith('staff.settings.hints.'));
+    expect(new Set(settings.map((key) => key.split('.').at(-1)))).toEqual(new Set(['default_work_start', 'default_work_end', 'default_break_duration']));
+    expect(EN.has('staff.settings.visibility')).toBe(false);
   });
 });

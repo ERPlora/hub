@@ -1,12 +1,14 @@
 // STAFF-F13 «Crear el horario semanal» and STAFF-F14 «Editar un horario»: the old panel as a dialog —
 // Schedule (name; empty, the server calls it «Regular schedule»), Effective from, Effective until,
 // Default, and one row per weekday with «works» and Start «to» End «break» Start «to» End, or «Off».
-// A new one proposes Monday to Friday 09:00–18:00 and says «Create schedule»; editing replaces the
+// A new one proposes Monday to Friday with the business's default working day (Staff › Settings,
+// STAFF-F22: followed live; until it arrives, its own defaults, 09:00–18:00 with a break 13:00–14:00)
+// and says «Create schedule»; editing replaces the
 // whole week and says «Save». The server judges: a day's problem goes under that day's row, a week
 // without working days on top of the week, a date under its field.
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ScheduleOut } from '../operations';
+import type { ScheduleOut, SettingsOut } from '../operations';
 import { click, ionChecked, ionValue, mountStaff, settle } from '../__tests__/mount-staff';
 import ScheduleFormModal from './ScheduleFormModal.vue';
 
@@ -28,8 +30,14 @@ const SUMMER: ScheduleOut = {
   days: [{ weekday: 1, start_time: '08:00:00', end_time: '15:00:00', break_start: null, break_end: null }],
 };
 
-async function setup(schedule: ScheduleOut | null = null, locale: 'en' | 'es' = 'en', proposeDefault = true) {
+const EARLY: SettingsOut = { default_work_start: '08:00', default_work_end: '16:00', default_break_duration: 30 };
+
+async function setup(schedule: ScheduleOut | null = null, locale: 'en' | 'es' = 'en', proposeDefault = true, settings?: SettingsOut) {
   const m = await mountStaff(ScheduleFormModal, { props: { open: false, memberId: 'm1', schedule, proposeDefault }, locale, path: '/staff/schedules' });
+  if (settings) {
+    await m.live();
+    await m.result('staff.settings.get', settings);
+  }
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -40,8 +48,9 @@ async function setup(schedule: ScheduleOut | null = null, locale: 'en' | 'es' = 
 }
 
 describe('ScheduleFormModal: New (STAFF-F13)', () => {
-  it('proposes Monday to Friday from 09:00 to 18:00, default, and says «Create schedule»', async () => {
+  it('until the working day arrives, proposes Monday to Friday 09:00–18:00 with a break 13:00–14:00, default, and says «Create schedule»', async () => {
     const s = await setup();
+    expect(s.params('staff.settings.get')).toEqual([{}]);
     expect(s.inDoc('staff-schedule-form')?.getAttribute('aria-label')).toBe('New');
     expect([s.field('name').label, s.field('name').placeholder, s.field('effective_from').type, s.field('effective_until').label, s.field('is_default').checked]).toEqual([
       'Schedule',
@@ -50,19 +59,39 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
       'Effective until',
       true,
     ]);
-    const week = [0, 1, 2, 3, 4, 5, 6].map((d) => [s.day(d, 'working').textContent?.trim(), s.day(d, 'working').checked, s.day(d, 'start')?.value ?? null, s.day(d, 'end')?.value ?? null]);
+    const week = [0, 1, 2, 3, 4, 5, 6].map((d) => [
+      s.day(d, 'working').textContent?.trim(),
+      s.day(d, 'working').checked,
+      s.day(d, 'start')?.value ?? null,
+      s.day(d, 'end')?.value ?? null,
+      s.day(d, 'break_start')?.value ?? null,
+      s.day(d, 'break_end')?.value ?? null,
+    ]);
     expect(week).toEqual([
-      ['Monday', true, '09:00', '18:00'],
-      ['Tuesday', true, '09:00', '18:00'],
-      ['Wednesday', true, '09:00', '18:00'],
-      ['Thursday', true, '09:00', '18:00'],
-      ['Friday', true, '09:00', '18:00'],
-      ['Saturday', false, null, null],
-      ['Sunday', false, null, null],
+      ['Monday', true, '09:00', '18:00', '13:00', '14:00'],
+      ['Tuesday', true, '09:00', '18:00', '13:00', '14:00'],
+      ['Wednesday', true, '09:00', '18:00', '13:00', '14:00'],
+      ['Thursday', true, '09:00', '18:00', '13:00', '14:00'],
+      ['Friday', true, '09:00', '18:00', '13:00', '14:00'],
+      ['Saturday', false, null, null, null, null],
+      ['Sunday', false, null, null, null, null],
     ]);
     expect(s.day(5, 'off').textContent?.trim()).toBe('Off');
     expect([s.day(0, 'start').type, s.day(0, 'break_start').label]).toEqual(['time', 'Break start']);
     expect(s.save().textContent?.trim()).toBe('Create schedule');
+  });
+
+  it('proposes the business’s working day from Staff › Settings, its break in the middle of the day, and sends it', async () => {
+    const s = await setup(null, 'en', true, EARLY);
+    const monday = ['start', 'end', 'break_start', 'break_end'].map((part) => s.day(0, part).value);
+    expect(monday).toEqual(['08:00', '16:00', '11:45', '12:15']);
+    expect([1, 2, 3, 4].map((d) => s.day(d, 'start').value)).toEqual(['08:00', '08:00', '08:00', '08:00']);
+    s.answer(201, SUMMER);
+    await click(s.save());
+    const sent = (s.sent()[0].body as { days: unknown[] }).days;
+    expect(sent).toEqual(
+      [0, 1, 2, 3, 4].map((weekday) => ({ weekday, start_time: '08:00', end_time: '16:00', break_start: '11:45', break_end: '12:15' })),
+    );
   });
 
   it('for a member who has a default schedule already, a new one starts without «Default»', async () => {
@@ -98,7 +127,7 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
           is_default: true,
           effective_from: null,
           effective_until: null,
-          days: [day(0, '18:00', ['13:00', '14:00']), day(2), day(3), day(4), day(5, '14:00')],
+          days: [0, 2, 3, 4].map((weekday) => day(weekday, '18:00', ['13:00', '14:00'])).concat(day(5, '14:00', ['13:00', '14:00'])),
         },
       },
     ]);
