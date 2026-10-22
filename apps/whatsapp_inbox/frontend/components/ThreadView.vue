@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The thread of a conversation (WHATSAPP_INBOX-F05, F06, F08, F34, F36), as the product's panel painted
 // it: oldest first, the customer's messages on the left, the business's on the right with their
-// delivery status (Sending…, Sent, Delivered, Read, Not delivered and Meta's reason; «Not sent» with
+// delivery status (Sending…, Sent, Delivered, Read, Not delivered and Meta's reason, or the plan's cap of F13; «Not sent» with
 // «Retry» when erplora.com gave no final answer), the owner's replies from the phone marked «From the
 // phone», a message without text nor attachment named by its type in the reader's language, reactions on
 // the message they answer, and the team's internal notes in their own colour. An attachment is kept by
@@ -67,6 +67,13 @@ function unloadedText(message: MessageOut): string {
 /** Handed to erplora.com and no final answer: «Not sent», to retry with the same key. */
 function notSent(message: MessageOut): boolean {
   return message.status === 'sending' && !!message.error_code;
+}
+
+/** Why a message was not delivered: erplora.com's refusal for the plan's cap in the Hub's words (it is not Meta's,
+ *  and erplora.com says it in English), any other with Meta's reason. */
+function failedText(message: MessageOut): string {
+  if (message.error_code === 'whatsapp_inbox.cap_reached') return t('whatsapp_inbox.composer.blocked.cap_reached');
+  return t('whatsapp_inbox.thread.failedReason', { reason: message.error_message });
 }
 
 function statusLabel(message: MessageOut): string {
@@ -225,7 +232,9 @@ watch(
         <span
           v-if="item.message.status === 'failed' && item.message.error_message"
           class="wa-bubble__error"
-        >{{ $t('whatsapp_inbox.thread.failedReason', { reason: item.message.error_message }) }}</span>
+          data-testid="whatsapp-inbox-message-error"
+          :data-code="item.message.error_code"
+        >{{ failedText(item.message) }}</span>
         <span
           v-if="notSent(item.message)"
           class="wa-bubble__error"

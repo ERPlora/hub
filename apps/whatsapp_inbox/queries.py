@@ -53,6 +53,8 @@ CONVERSATION_AMBIGUOUS_CODE = "whatsapp_inbox.conversation_ambiguous"
 
 #: What a phone typed in the search box may hold besides digits.
 _PHONE_TEXT = re.compile(r"^[\d\s+().\-/]+$")
+#: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (ADR-0474: no packs).
+PLANS_PATH = "/store/plans"
 
 
 def business_country(ctx: OperationContext | None = None) -> str:
@@ -551,6 +553,7 @@ def template_out(row: Template) -> dict:
         "submit_error": row.submit_error,
         "editable": template_editable(row),
         "sendable": template_sendable(row),
+        "supported": row.supported,
         "deleting": row.delete_state == Template.DeleteState.PENDING,
     }
 
@@ -605,7 +608,14 @@ def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
         "cap_reached": row.cap_reached(month),
         "synced_at": row.synced_at,
         "manage_url": str(getattr(settings, "SAAS_URL", "") or ""),
+        "plans_url": plans_url(),
     }
+
+
+def plans_url() -> str:
+    """erplora.com's plans, where more WhatsApp messages are bought by upgrading; empty without erplora.com."""
+    saas = str(getattr(settings, "SAAS_URL", "") or "").rstrip("/")
+    return f"{saas}{PLANS_PATH}" if saas else ""
 
 
 def team(ctx: OperationContext) -> QuerySet:

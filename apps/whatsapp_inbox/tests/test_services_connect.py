@@ -100,6 +100,67 @@ def test_the_code_only_comes_back_through_erplora_s_own_return_page(redirect):
     assert (out.available, out.reason, out.redirect_uri) == (False, "window_unavailable", "")
 
 
+LOCAL_SAAS = "http://localhost:8241"
+LOCAL_RETURN_PAGE = f"{LOCAL_SAAS}/whatsapp/return"
+
+
+@respx.mock
+def test_in_development_erplora_s_own_http_return_page_opens_the_window(settings):
+    # Development and the e2e run erplora.com over plain http (its own rule allows it only with DEBUG).
+    settings.DEBUG, settings.SAAS_URL = True, LOCAL_SAAS
+    respx.post(CONFIG).mock(return_value=httpx.Response(200, json={**CONFIGURED, "redirect_uri": LOCAL_RETURN_PAGE}))
+    out = run("whatsapp_inbox.channel.prepare")
+    assert (out.available, out.reason, out.redirect_uri) == (True, None, LOCAL_RETURN_PAGE)
+
+
+@pytest.mark.parametrize(
+    "redirect",
+    [
+        "http://localhost:8242/whatsapp/return",  # another port
+        "http://127.0.0.1:8241/whatsapp/return",  # another host
+        "https://localhost:8241/whatsapp/return",  # another scheme than SAAS_URL's
+        f"{LOCAL_RETURN_PAGE}#done",  # a fragment
+    ],
+)
+@respx.mock
+def test_in_development_only_erplora_s_exact_origin_brings_the_code_back(settings, redirect):
+    settings.DEBUG, settings.SAAS_URL = True, LOCAL_SAAS
+    respx.post(CONFIG).mock(return_value=httpx.Response(200, json={**CONFIGURED, "redirect_uri": redirect}))
+    out = run("whatsapp_inbox.channel.prepare")
+    assert (out.available, out.reason, out.redirect_uri) == (False, "window_unavailable", "")
+
+
+@pytest.mark.parametrize(
+    "redirect",
+    [
+        "http://[x/whatsapp/return",  # an unclosed bracket: urlsplit cannot read it
+        "http://[::1/whatsapp/return",
+        "http://localhost:abc/whatsapp/return",  # a port that is not a number
+    ],
+)
+@respx.mock
+def test_a_return_page_that_cannot_be_read_opens_nothing_and_never_fails(settings, redirect):
+    settings.DEBUG, settings.SAAS_URL = True, LOCAL_SAAS
+    respx.post(CONFIG).mock(return_value=httpx.Response(200, json={**CONFIGURED, "redirect_uri": redirect}))
+    out = run("whatsapp_inbox.channel.prepare")
+    assert (out.available, out.reason, out.redirect_uri) == (False, "window_unavailable", "")
+
+
+@pytest.mark.parametrize(
+    ("debug", "saas_url", "redirect"),
+    [
+        (True, "https://erplora.com", "http://erplora.com/whatsapp/return"),  # erplora.com over https: never http
+        (False, LOCAL_SAAS, LOCAL_RETURN_PAGE),  # outside development, not even an http SAAS_URL's own page
+    ],
+)
+@respx.mock
+def test_production_never_takes_a_return_page_over_plain_http(settings, debug, saas_url, redirect):
+    settings.DEBUG, settings.SAAS_URL = debug, saas_url
+    respx.post(CONFIG).mock(return_value=httpx.Response(200, json={**CONFIGURED, "redirect_uri": redirect}))
+    out = run("whatsapp_inbox.channel.prepare")
+    assert (out.available, out.reason, out.redirect_uri) == (False, "window_unavailable", "")
+
+
 @respx.mock
 def test_a_hub_that_cuts_the_windows_it_opens_does_not_offer_meta_s(settings):
     # Django's default COOP (same-origin) leaves Meta's window without its opener: its answer would never arrive.

@@ -5,9 +5,9 @@ Estado de la app: hecha en el Hub (servidor y páginas), también las plantillas
 borran desde el Hub, y el número, que se conecta, se vuelve a conectar y se desconecta desde Ajustes. erplora.com
 tiene su mitad desde saas#63 (2026-10-21) y los flujos que cruzan con él están probados de punta a punta contra
 el erplora.com real con un número de pruebas (solo Meta se simula): recibir, el eco del móvil, los estados,
-la opción tocada, contestar, enviar una plantilla, editarla y borrarla, y olvidar un número. Quedan en parcial
-conectar el número (falta la página de erplora.com a la que Meta devuelve su código, F01 y F02), llegar al
-tope del mes (F13), la lista de plantillas de Meta (F27, F28) y la cabecera con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
+la opción tocada, contestar, enviar una plantilla, editarla y borrarla, olvidar un número, conectar el número,
+llegar al tope del mes (F13) y la lista de plantillas que erplora.com trae de Meta (F27, F28). Queda en parcial
+la cabecera con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
 esperan al asistente del Hub y a que Automatizaciones pueda mandar un mensaje a un cliente.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
@@ -108,7 +108,9 @@ conectar («WhatsApp no está conectado. Conecta el número del negocio en Ajust
 mensajes.») o por reconectar («WhatsApp pide volver a conectar el número en Ajustes: hasta entonces no se
 puede enviar nada.»), los dos con **Ir a Ajustes** para quien puede configurar; los mensajes del plan
 gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen
-llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.»).
+llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.») o un plan que
+no incluye ninguno («Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se
+puede enviar nada hasta que mejores el plan.»), los dos con **Mejorar el plan** para quien puede configurar.
 Vacía: «Sin conversaciones.», a la vista bajo el buscador también en el móvil; con búsqueda o filtro:
 «Sin resultados»; cargando: indicador; error de lista: el motivo con **Reintentar**; error del panel: el
 motivo que da el Hub o «No se pudo cargar la conversación»; una foto o una nota de voz que no carga: «No se ha
@@ -120,7 +122,10 @@ administrador. Tres bloques: **Tu número** («Conectado» con el número y el n
 conectar» o «Hay que reconectar»; sin conectar o por reconectar, «Comprobando con erplora.com…» y luego
 **Conectar WhatsApp** o **Volver a conectar**, o el motivo por el que todavía no se puede; conectado o por
 reconectar, **Desconectar**, que pregunta antes); **Este mes** (los mensajes
-enviados frente a los del plan, o «Sin límite»); y **Plantillas de Meta**: tabla con **Nombre**,
+enviados frente a los del plan, y en el tope «Has usado todos los mensajes de tu plan este mes.»; si el plan
+no incluye ninguno, «Tu plan no incluye mensajes de WhatsApp.»; antes de que erplora.com hable, «erplora.com
+todavía no ha informado de los mensajes de este mes.»; en el tope, **Mejorar el plan**, que abre los planes
+de erplora.com); y **Plantillas de Meta**: tabla con **Nombre**,
 **Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Sin enviar a Meta,
 Aprobada, En revisión, Rechazada, Pausada por Meta, Desactivada por Meta, Borrada en WhatsApp Manager;
 debajo, cuando toca, «Enviándose a Meta…», «No aceptada: …», «Cambios sin enviar: …» o «Borrándose en
@@ -155,8 +160,8 @@ categoría de una plantilla que ha rechazado.»).
 
 | ID | Flujo | Estado | Vertical |
 |---|---|---|---|
-| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | parcial — la ventana de Meta aún no puede devolver su código: falta la página de vuelta de erplora.com | comun |
-| WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | parcial — desconectar está hecho; volver a conectar abre la ventana de F01, que aún no puede devolver su código | comun |
+| WHATSAPP_INBOX-F01 | Conectar el número de WhatsApp del negocio | hecho | comun |
+| WHATSAPP_INBOX-F02 | Desconectar o volver a conectar el número | hecho | comun |
 | WHATSAPP_INBOX-F03 | Recibir un mensaje en la bandeja | hecho | comun |
 | WHATSAPP_INBOX-F04 | Reconocer a la clienta por su número | hecho | comun |
 | WHATSAPP_INBOX-F05 | Leer una conversación | hecho | comun |
@@ -167,8 +172,8 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F10 | Borrar los datos de un número sin ficha | hecho | comun |
 | WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | hecho | comun |
 | WHATSAPP_INBOX-F12 | Unir dos fichas de la misma clienta | hecho | comun |
-| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | parcial — el Hub enseña las cifras del mes que manda erplora.com y frena el envío en el tope, pero llegar al tope no se ha visto de punta a punta: erplora.com solo cuenta lo que Meta acepta, y su número de pruebas lleva un permiso inventado que Meta rechaza | comun |
-| WHATSAPP_INBOX-F14 | Activar «Reservar citas» | parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente, que aún no está en el Hub (sin él nadie lee lo que escribe la clienta), y su aviso de cita confirmada necesita que Automatizaciones pueda mandar un mensaje a un cliente (FLOW-F31) | peluqueria |
+| WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | hecho | comun |
+| WHATSAPP_INBOX-F14 | Activar «Reservar citas» | parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente, que aún no está en el Hub (sin él nadie lee lo que escribe la clienta) | peluqueria |
 | WHATSAPP_INBOX-F15 | Activar «Reservar mesa» | parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente, que aún no está en el Hub (sin él nadie lee lo que escribe el cliente) | restaurante |
 | WHATSAPP_INBOX-F16 | Decidir si las reservas por WhatsApp se confirman solas | parcial — el interruptor va en la tarjeta de F14 o F15, que todavía no aparece; mientras, la misma decisión se toma en Citas («Ajustar las reglas de reserva») y en Reservas («Elegir si las reservas se confirman solas») | comun |
 | WHATSAPP_INBOX-F17 | Desactivar una respuesta automática | parcial — sin las tarjetas de F14 y F15, que todavía no aparecen, no hay respuesta automática que desactivar | comun |
@@ -177,12 +182,12 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F20 | Cuando el asistente no puede contestar | parcial — la disculpa y la marca las pone la respuesta automática de F21 o F24, que necesita el asistente, que aún no está en el Hub; hoy el mensaje espera en la bandeja como sin leer (F09) | comun |
 | WHATSAPP_INBOX-F21 | La clienta pide cita por WhatsApp | parcial — el asistente, que lee el mensaje, busca el hueco y redacta la respuesta, todavía no está en el Hub; hoy el mensaje se contesta a mano desde la bandeja | peluqueria |
 | WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | parcial — el asistente, que entiende qué pide y busca su cita, todavía no está en el Hub; hoy se anula o se mueve a mano desde la Agenda | peluqueria |
-| WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): la clienta no recibe el aviso | peluqueria |
+| WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | hecho | peluqueria |
 | WHATSAPP_INBOX-F24 | El cliente pide mesa por WhatsApp | parcial — el asistente, que lee el mensaje, busca sitio y redacta la respuesta, todavía no está en el Hub; hoy la reserva se toma a mano en Reservas | restaurante |
 | WHATSAPP_INBOX-F25 | El cliente anula o cambia su mesa por WhatsApp | parcial — el asistente, que entiende qué pide y busca su reserva, todavía no está en el Hub; hoy se cambia o se anula a mano en Reservas | restaurante |
-| WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): el cliente no recibe el aviso | restaurante |
-| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | parcial — la tabla enseña lo que el Hub sabe y cambia sola; la lista que llega de erplora.com no se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del número, y el de su número de pruebas es inventado | comun |
-| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | parcial — el Hub guarda lo que le llega; la lista que llega de erplora.com no se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del número, y el de su número de pruebas es inventado | comun |
+| WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | parcial — Automatizaciones ya puede mandar el aviso (FLOW-F31), pero Reservas todavía no dice el día de la reserva en palabras, en el idioma del negocio: la automatización no se ofrece y el cliente no recibe el aviso | restaurante |
+| WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | hecho | comun |
+| WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | hecho | comun |
 | WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | parcial — la cabecera con foto, vídeo o documento no se ofrece (el Hub no guarda archivos: se hace en WhatsApp Manager) | comun |
 | WHATSAPP_INBOX-F30 | Editar una plantilla | hecho | comun |
 | WHATSAPP_INBOX-F31 | Borrar una plantilla | hecho | comun |
@@ -196,11 +201,7 @@ categoría de una plantilla que ha rechazado.»).
 
 ### WHATSAPP_INBOX-F01 Conectar el número de WhatsApp del negocio
 <!-- origen: old-hub:HUB_SHELL-F37 old-hub:HUB_SHELL-F170 old-saas:SAAS_WHATSAPP_INBOX-F02 fi:modules/whatsapp_inbox#query-whatsapp_inbox-settings-get old-hub:HUB-F260 old-hub:HUB-F261 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f01 wf:whatsapp-cita#rec_wa_cita-f01 wf:whatsapp-mesa#rec_wa_mesa-f01 -->
-Estado: parcial — **Tu número** ya pregunta a erplora.com con qué abrir la ventana de Meta, la abre sin
-programas de Facebook y conecta en erplora.com el número que esa ventana elige; falta que la ventana pueda
-devolver su código: erplora.com todavía no tiene la página a la que Meta lo devuelve (las páginas del Hub
-ya conservan las ventanas que abren). Mientras, **Tu número** dice «Todavía no se puede conectar el número desde
-aquí.» en vez de ofrecer **Conectar WhatsApp**
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -226,8 +227,7 @@ Implicados: erplora.com (la cuenta de WhatsApp Business del negocio), Meta
 
 ### WHATSAPP_INBOX-F02 Desconectar o volver a conectar el número
 <!-- origen: old-hub:HUB_SHELL-F171 old-hub:HUB_SHELL-F172 old-saas:SAAS_WHATSAPP_INBOX-F03 old-saas:SAAS_WHATSAPP_INBOX-F04 old-hub:HUB-F262 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f02 -->
-Estado: parcial — **Desconectar** funciona de punta a punta con erplora.com y los avisos se van solos;
-**Volver a conectar** abre la ventana de Meta de F01, que todavía no puede devolver su código
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Bandeja de entrada
 Pasos:
@@ -427,28 +427,34 @@ Implicados: Clientes
 
 ### WHATSAPP_INBOX-F13 Ver el consumo del mes y llegar al tope
 <!-- origen: old-hub:HUB_SHELL-F47 old-saas:SAAS_WHATSAPP_INBOX-F13 old-saas:SAAS_WHATSAPP_INBOX-F14 old-hub:HUB-F272 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f13 -->
-Estado: parcial — el Hub enseña las cifras del mes que manda erplora.com y frena el envío en el tope,
-pero llegar al tope no se ha visto de punta a punta: erplora.com solo cuenta lo que Meta acepta, y su
-número de pruebas lleva un permiso inventado que Meta rechaza
+Estado: hecho
 Actor: todos (aviso), propietario y administrador (Ajustes)
 Pantalla: Bandeja de entrada, Ajustes
 Pasos:
 1. **Ajustes → Este mes** enseña los mensajes enviados este mes frente a los del plan; los dos
-   números los pone erplora.com.
-2. En el tope, la bandeja lo avisa encima de la lista y **Enviar** lo explica en vez de enviar.
+   números los pone erplora.com. Si el plan no incluye mensajes de WhatsApp, lo dice («Tu plan no incluye
+   mensajes de WhatsApp.»), nunca que no tiene límite; en el tope, «Has usado todos los mensajes de tu plan este
+   mes.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este mes.».
+2. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
+   la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
+   enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve **Mejorar el plan**, que abre
+   los planes de erplora.com.
 3. Lo que escriben los clientes se sigue guardando.
-4. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado.
-Entra: el consumo y el tope del mes que manda erplora.com.
+4. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado; si el
+   plan no incluye mensajes, sigue.
+Entra: el consumo y el tope del mes que manda erplora.com (0: el plan no incluye ninguno).
 Sale: el aviso en la bandeja; nada se guarda.
-Si falla: si erplora.com rechaza un envío por el tope, el mensaje no sale y se dice por qué; si pide ir
-más despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
+Si falla: si erplora.com rechaza un envío por el tope (las cifras del Hub iban por detrás), el mensaje no
+llega a Meta ni se cuenta, queda «No entregado» y lo dice con «Los mensajes de WhatsApp de tu plan de este mes
+están gastados: no se puede enviar nada hasta el mes que viene.», nunca como motivo de Meta; si pide ir más
+despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f14 -->
 Estado: parcial — la tarjeta todavía no aparece: la respuesta automática que reserva necesita el asistente,
-que aún no está en el Hub (sin él nadie lee lo que escribe la clienta), y su aviso de cita confirmada
-necesita que Automatizaciones pueda mandar un mensaje a un cliente (FLOW-F31)
+que aún no está en el Hub (sin él nadie lee lo que escribe la clienta); su aviso de cita confirmada ya se
+enciende desde Automatizaciones (F23)
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -644,26 +650,35 @@ Implicados: APPOINTMENT-F04, APPOINTMENT-F06, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F23 La clienta recibe el aviso cuando el salón confirma
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f23 -->
-Estado: parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): la clienta no recibe el aviso
-Actor: responsable, cliente
-Pantalla: WhatsApp: chat del cliente
+Estado: hecho
+Actor: propietario, responsable, cliente
+Pantalla: Automatizaciones; WhatsApp: chat del cliente
 Pasos:
-1. Con «Las reviso yo antes», la encargada pulsa **Confirmar** en la Agenda.
-2. Si la clienta tiene conversación de WhatsApp con el negocio, recibe «¡Confirmada! Te esperamos el {día} a
+1. En Automatizaciones, debajo de la galería, en **Viene con «Bandeja de WhatsApp»**, enciende «Avisar por
+   WhatsApp a la clienta cuando se confirma su cita» (FLOW-F33). Para avisar pasadas las 24 horas, crea en
+   **Ajustes** la plantilla de Utilidad `appointment_confirmed` con cuatro datos (el día, la hora, el servicio
+   y el profesional) y espera a que Meta la apruebe (F29).
+2. Con «Las reviso yo antes», la encargada pulsa **Confirmar** en la Agenda.
+3. Si la clienta tiene conversación de WhatsApp con el negocio, recibe «¡Confirmada! Te esperamos el {día} a
    las {hora} para tu {servicio} con {profesional}.», con el día y la hora en el idioma y el reloj del
    negocio.
-3. La conversación se busca con el teléfono de la cita, y solo vale el número internacional exacto de una
-   conversación de este negocio: un teléfono escrito a mano incompleto no avisa a nadie, y el aviso nunca
-   sale a la conversación de otra persona.
-4. Fuera de las 24 horas desde el último mensaje de la clienta, el aviso sale con una plantilla de Utilidad
-   aprobada por Meta, porque WhatsApp no deja mandar texto libre.
-5. El aviso sale con cualquier confirmación de una cita con conversación, también la de una cita que nace ya
+4. La conversación se busca con el teléfono de la ficha de la clienta, y solo vale el número internacional
+   exacto de una conversación de este negocio: un teléfono incompleto no avisa a nadie, y el aviso nunca sale
+   a la conversación de otra persona.
+5. Fuera de las 24 horas desde el último mensaje de la clienta, el aviso sale con la plantilla de Utilidad
+   aprobada, porque WhatsApp no deja mandar texto libre.
+6. El aviso sale con cualquier confirmación de una cita con conversación, también la de una cita que nace ya
    confirmada porque «Las citas se confirman solas» está encendido (F16).
-Entra: la cita confirmada (Citas) y la conversación cuyo número es exactamente el de la cita.
-Sale: hoy, nada. Cuando exista, un WhatsApp a la clienta, que se ve en su conversación de la bandeja
-(`whatsapp_inbox.message.sent`).
-Si falla: el motivo queda en el historial de la automatización; nada se ve en la Agenda.
-Implicados: APPOINTMENT-F03, APPOINTMENT-F18, CUSTOMER-F11, FLOW-F31, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F33
+Entra: la cita confirmada (Citas), la ficha de la clienta (Clientes) y la conversación cuyo número es
+exactamente el de su ficha.
+Sale: un WhatsApp a la clienta, que se ve en su conversación de la bandeja (`whatsapp_inbox.message.sent`);
+el mismo aviso nunca sale dos veces.
+Si falla: el motivo queda en el historial de la automatización y nada se ve en la Agenda. Sin teléfono en la
+ficha o sin conversación con ese número, la automatización se para en su paso, sin error; fuera de las 24
+horas sin la plantilla aprobada, con el número sin conectar o con los mensajes del mes gastados, se para con
+el motivo. Lo que Meta rechace después se ve en la conversación («No entregado»).
+Implicados: APPOINTMENT-F03, APPOINTMENT-F18, CUSTOMER-F11, FLOW-F31, FLOW-F33, WHATSAPP_INBOX-F14,
+WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F24 El cliente pide mesa por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f24 -->
@@ -709,7 +724,7 @@ Implicados: RESERVATION-F09, RESERVATION-F18, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F26 El cliente recibe el aviso cuando el restaurante confirma
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f26 -->
-Estado: parcial — Automatizaciones todavía no puede mandar un mensaje a un cliente (FLOW-F31): el cliente no recibe el aviso
+Estado: parcial — Automatizaciones ya puede mandar el aviso (FLOW-F31), pero Reservas todavía no dice el día de la reserva en palabras, en el idioma del negocio (como ya lo dice Citas para F23): la automatización no se ofrece y el cliente no recibe el aviso
 Actor: responsable, cliente
 Pantalla: WhatsApp: chat del cliente
 Pasos:
@@ -719,16 +734,15 @@ Pasos:
 3. Como en F23: solo el número internacional exacto de una conversación de este negocio, y fuera de las 24
    horas, con una plantilla de Utilidad aprobada.
 Entra: la reserva confirmada (Reservas) y la conversación cuyo número es exactamente el de la reserva.
-Sale: hoy, nada. Cuando exista, un WhatsApp al cliente, que se ve en su conversación de la bandeja
-(`whatsapp_inbox.message.sent`).
+Sale: hoy, nada. Cuando Reservas diga el día en palabras, la automatización «Avisar por WhatsApp al cliente
+cuando se confirma su reserva» saldrá en **Viene con «Bandeja de WhatsApp»** y mandará un WhatsApp al cliente,
+que se ve en su conversación de la bandeja (`whatsapp_inbox.message.sent`), como en F23.
 Si falla: el motivo queda en el historial de la automatización; nada se ve en Reservas.
 Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
-Estado: parcial — la tabla enseña lo que el Hub sabe y cambia sola; la lista que llega de erplora.com no
-se ha visto todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el
-permiso del número, y el de su número de pruebas es inventado
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
@@ -743,9 +757,7 @@ Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F28 Traer las plantillas creadas en WhatsApp Manager
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f28 -->
-Estado: parcial — el Hub guarda lo que le llega; la lista que llega de erplora.com no se ha visto
-todavía de punta a punta: erplora.com solo tiene las plantillas que lee de Meta con el permiso del
-número, y el de su número de pruebas es inventado
+Estado: hecho
 Actor: sistema
 Pantalla: Ajustes
 Pasos:
@@ -753,8 +765,9 @@ Pasos:
 2. Aparece en **Ajustes → Plantillas de Meta** en cuanto erplora.com la manda, con su texto, sus
    variables, sus botones y su estado.
 3. Las que el Hub no sabe rellenar al enviar (cabecera con foto, vídeo, documento o una variable;
-   variables con nombre en vez de número; códigos de verificación) se ven, pero no se ofrecen para
-   enviar ni se editan aquí.
+   variables con nombre en vez de número; códigos de verificación) se ven con su estado y «No se puede
+   enviar ni editar aquí: se gestiona en WhatsApp Manager.», pero no se ofrecen para enviar ni se editan
+   aquí; sí se pueden borrar.
 Entra: la lista de plantillas que erplora.com trae de Meta.
 Sale: cada plantilla guardada como la tiene Meta.
 Si falla: nunca pisa una plantilla del Hub que todavía va hacia Meta ni trae de vuelta una borrada aquí.
@@ -867,7 +880,9 @@ Pasos:
 2. Elegir una y rellenar sus variables (`{{1}}`, `{{2}}`…); la vista previa enseña el texto final.
 3. Pulsar **Enviar**: el mensaje aparece en el hilo como en F32.
 También por el asistente o la API a un número que aún no ha escrito («envía la plantilla de
-recordatorio a este número»): se crea su conversación. Un número escrito a mano es del país del negocio
+recordatorio a este número»): se crea su conversación. Una automatización no usa este envío sino uno más
+estrecho, que nunca crea una conversación: solo escribe a la que ya existe con el número internacional exacto
+(FLOW-F31, F23). Un número escrito a mano es del país del negocio
 salvo que lleve su prefijo.
 Entra: la plantilla (nombre e idioma), sus variables, una clave del mensaje y la conversación o el
 número.
@@ -979,6 +994,7 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 |---|---|
 | `whatsapp_inbox.message.send` | Guarda y entrega un texto (dentro de 24 h) o una plantilla aprobada, a una conversación o a un número; pide una clave por mensaje |
 | `whatsapp_inbox.message.retry` | Vuelve a entregar un mensaje que no salió, con la misma clave |
+| `whatsapp_inbox.message.notify` | El envío que puede tener una automatización (FLOW-F31): solo a la conversación viva del número internacional exacto, nunca una nueva; texto dentro de 24 h y la plantilla aprobada fuera; mismo camino de salida que `message.send` |
 | `whatsapp_inbox.conversation.mark_read` | Deja **Sin leer** a cero |
 | `whatsapp_inbox.conversation.assign` | Asigna o desasigna; «Asignármela» no pisa a otro |
 | `whatsapp_inbox.conversation.set_status` | Abierta, pendiente o cerrada |
@@ -1024,9 +1040,10 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
 
 ### Quién la usa
 
-- **Citas** y **Reservas** (cuando avisen por WhatsApp): `conversation.by_phone` para encontrar la
-  conversación, `message.send` con una plantilla de Utilidad para el aviso o el recordatorio, y el aviso
-  `message.received` para saber qué contestó la clienta (F38).
+- **Automatizaciones**: la receta de esta app «Avisar por WhatsApp a la clienta cuando se confirma su cita»
+  (F23) lee la ficha, busca la conversación con `conversation.by_phone` y avisa con `message.notify`; las
+  automatizaciones del negocio usan el mismo `message.notify` (FLOW-F31). Para saber qué contestó la clienta,
+  el aviso `message.received` (F38).
 - El **asistente**: todas las operaciones, con referencias humanas («responde a Ana», «asigna la
   conversación de Ana a Luis», «envía la plantilla recordatorio al número que te dicto», «crea una
   plantilla de recordatorio»).
@@ -1036,7 +1053,7 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
 | Permiso | Propietario | Administrador | Responsable | Empleado |
 |---|---|---|---|---|
 | `whatsapp_inbox.view` (leer, marcar leída) | sí | sí | sí | sí |
-| `whatsapp_inbox.reply` (enviar, reintentar, notas, estado, ficha, asignarse una libre) | sí | sí | sí | sí |
+| `whatsapp_inbox.reply` (enviar, avisar a un número exacto, reintentar, notas, estado, ficha, asignarse una libre) | sí | sí | sí | sí |
 | `whatsapp_inbox.assign` (asignar a otro, quitársela a otro, borrar notas ajenas) | sí | sí | sí | no |
 | `whatsapp_inbox.configure` (Ajustes; conectar, volver a conectar y desconectar el número; crear, editar, reenviar y borrar plantillas) | sí | sí | no | no |
 | `whatsapp_inbox.erase` (borrar datos de un número) | sí | sí | no | no |
@@ -1048,7 +1065,9 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 ### Modelo
 
 - `Channel` (una fila por negocio): estado del número (`not_connected`, `connected`, `reconnect_needed`),
-  número y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`) y la
+  número y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`; 0 = el
+  plan no incluye ninguno, nunca sin límite, y antes de la primera foto, `synced_at` vacío, no se supone
+  tope: `Channel.cap_reached`) y la
   `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). **Fase 1
   sin tenencia:** las tablas son compartidas, así que la fila lleva el negocio en `host` (la primera etiqueta
   de su host, como `base.Membership`; única) y cada operación lee y escribe solo la del `Scope` de su
@@ -1336,9 +1355,11 @@ respuesta o un 200 que no es el de la puerta → 503 `whatsapp_inbox.connect_unk
     "1234567890", "config_id": "9876543210", "graph_version": "v25.0", "redirect_uri":
     "https://erplora.com/whatsapp/return"}` (solo identificadores públicos). `configured: false` → «WhatsApp
     todavía no está disponible en ERPlora.» y no se ofrece conectar. Ids que no son cifras o una versión que
-    no es `vNN.N` → 503 `whatsapp_inbox.saas_unreachable`. **`redirect_uri` es propuesta del Hub** (la puerta
-    de `main` no lo da todavía): la página de erplora.com a la que Meta devuelve el código; el Hub solo la
-    acepta https y del origen de `SAAS_URL`. Sin ella, o si las páginas del Hub cortan las ventanas que abren
+    no es `vNN.N` → 503 `whatsapp_inbox.saas_unreachable`. `redirect_uri` es la página de erplora.com a la que
+    Meta devuelve el código (`GET /whatsapp/return`, saas#71), y la misma con la que la puerta 11 lo canjea. El
+    Hub solo la acepta del origen exacto de `SAAS_URL` (esquema, host y puerto) y sin fragmento: https, y http
+    solo en desarrollo (`DEBUG`) con un `SAAS_URL` http, la misma regla que erplora.com
+    (`whatsapp.meta.redirect_uri`). Sin ella, o si las páginas del Hub cortan las ventanas que abren
     (`SECURE_CROSS_ORIGIN_OPENER_POLICY` que no es `same-origin-allow-popups` ni `unsafe-none`; `base` pone
     `same-origin-allow-popups` desde hub#154), `prepare` dice `available: false` con `window_unavailable` o
     `popups_blocked` y la pantalla, «Todavía no se puede conectar el número desde aquí.».
@@ -1400,22 +1421,23 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 F14–F26 son recetas de fábrica de esta app sobre el registro de Automatizaciones (`apps/flow/recipes.py`,
 FLOW-F33 a F36), y las tarjetas de **Ajustes → ¿Para qué lo usas?** las encienden, pausan y restauran por
 sus operaciones (`flow.recipe.list`, `flow.recipe.enable`, `flow.recipe.disable`, `flow.recipe.restore`):
-esta app no lleva recetas propias en su base de datos. Hoy no se puede declarar ninguna, por dos piezas
-que no están en `main` (2026-10-21; la tercera, la puerta de envío de erplora.com, existe desde saas#63):
+esta app no lleva recetas propias en su base de datos. `recipes.py` declara ya «Cita confirmada → WhatsApp»
+(F23, `appointment_confirmed`: lee la ficha, busca la conversación con `conversation.by_phone`, se para sin
+error si no hay teléfono o conversación, lee la cita y avisa con `message.notify`, el envío acotado de
+FLOW-F31, que una automatización sí puede tener). Las demás esperan a dos piezas que no están en `main`
+(2026-10-21):
 
 1. **El asistente en el Hub**: ni la app `assistant` ni un paso de Automatizaciones que lo ejecute con
    herramientas (las operaciones con `ai=`). Las automatizaciones solo tienen pasos `command`, `query`,
    `condition`, `delay`, `http` y `ask`. Sin él nadie lee el texto libre de la clienta (F14–F22, F24, F25):
    la receta vieja era un paso `ai` con `policy: auto`, el acuse fijo y la disculpa de F20.
-2. **«Enviar un mensaje» en Automatizaciones** (FLOW-F31): `whatsapp_inbox.message.send` es de riesgo
-   alto (`ai.risk = "high"`) y una automatización no lo puede usar. Lo piden los avisos de F23 y F26 y toda
-   respuesta de F21–F25; FLOW-F31 lo quiere con plantilla aprobada, que es lo que deja Meta fuera de las 24 h
-   (el aviso de texto libre del producto actual se perdía ahí).
+2. **El día de la reserva en palabras** (F26): `reservation.reservation.get` da la fecha (`2026-10-25`) y
+   no la dice en el idioma del negocio, como sí hace `appointment.appointment.get` (`start_date_label`). Con
+   ese dato, el acompañante de mesa es la misma receta sobre `reservation.reservation.status_changed` con el
+   estado confirmado.
 
-Cómo encaja cuando lleguen: `apps/whatsapp_inbox/recipes.py` declara «WhatsApp → cita reservada» y su
-acompañante «Cita confirmada → WhatsApp» (disparada por `appointment.appointment.confirmed`; la conversación,
-con `whatsapp_inbox.conversation.by_phone`, que solo acepta el número internacional exacto) y «WhatsApp → mesa
-reservada» (y, para F26, su acompañante sobre `reservation.reservation.status_changed` con el estado
+Cómo encaja cuando lleguen: `apps/whatsapp_inbox/recipes.py` añade «WhatsApp → cita reservada» junto a su
+acompañante «Cita confirmada → WhatsApp», que ya está, y «WhatsApp → mesa reservada» (y, para F26, su acompañante sobre `reservation.reservation.status_changed` con el estado
 confirmado); la exclusión entre tarjetas (una sola respuesta automática en el número) y el orden al apagar
 (acompañantes primero) son de la pantalla; el interruptor de F16 escribe `auto_confirm_online` con
 `appointment.settings.update` o `auto_confirm` con `reservation.settings.update`; F19 necesita guardar la

@@ -21,6 +21,22 @@ CI=1 pnpm e2e tests/e2e/sale-sales.spec.ts     # una spec: SIN `--` (con él, Pl
 Antes de la primera spec, `global-setup.ts` comprueba que la BD de la ejecución (`DB_NAME`) no tiene
 migraciones pendientes (`migrate --check`, `migrate_hubs --check`) y nunca migra nada.
 
+## El login
+
+`login()` de `helpers.ts` hace el login de verdad: el hub manda al SaaS, el SaaS pide la cuenta y el código que
+envía por correo (leído de `E2E_MAIL_DIR`) y devuelve al hub con su código de un solo uso. Cada cuenta inicia
+sesión en el SaaS **una vez por worker**: los logins siguientes, en contextos nuevos, empiezan con esa sesión del
+SaaS, como quien ya entró en erplora.com, y solo hacen la vuelta al hub. Antes cada login dejaba otra sesión
+abierta de la cuenta, y el SaaS las recorre todas en cada inicio de sesión (`allauth.usersessions`): con 1680 de
+`owner@example.com` en la BD `saas` compartida, el SaaS tardó 30 y 37 s en contestar el código con la máquina
+cargada (hub#107). Si una spec cierra la sesión del SaaS, el siguiente login vuelve a pedir la cuenta y guarda la
+sesión nueva (`helpers-login.spec.ts`).
+
+Cada paso espera una sexta parte del tiempo del test (30 s con los 180 s de `playwright.config.ts`; más con
+`test.slow()` o `test.setTimeout`) y, si no llega, falla diciendo cuál y cuánto esperó. «code rejected» solo
+sale cuando el SaaS dice que el código no vale; si aún no ha contestado, el error dice «the SaaS did not answer
+the code within … ms».
+
 ## La pila compartida
 
 Sin variables, el e2e va contra la pila compartida: Hub en `:8000` (Vite `:5173`), SaaS en `:8001` y la BD

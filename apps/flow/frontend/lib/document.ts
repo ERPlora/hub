@@ -90,6 +90,15 @@ export function addStep(doc: FlowDocument, kind: StepKind): FlowDocument {
   return { ...doc, steps: [...doc.steps, blankStep(newStepId(doc.steps), kind)] };
 }
 
+/** The WhatsApp inbox's narrow send (FLOW-F31): what «Send a message» runs, a «Do something» of its own form. */
+export const NOTIFY_OPERATION = 'whatsapp_inbox.message.notify';
+
+/** «Send a message»: a «Do something» step of the narrow send, to whom and what still to fill. */
+export function addMessageStep(doc: FlowDocument): FlowDocument {
+  const step: Step = { id: newStepId(doc.steps), kind: 'command', operation: NOTIFY_OPERATION, params: { phone: '', text: '' } };
+  return { ...doc, steps: [...doc.steps, step] };
+}
+
 export function removeStep(doc: FlowDocument, index: number): FlowDocument {
   return { ...doc, steps: doc.steps.filter((_, i) => i !== index) };
 }

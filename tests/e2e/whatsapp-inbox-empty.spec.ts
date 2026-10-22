@@ -8,7 +8,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
 import { noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, pushChannel, seedErplora } from './whatsapp-helpers';
+import { cleanUp, metaGraph, pushChannel, seedErplora } from './whatsapp-helpers';
 
 const SIZES = [
   { label: '375', width: 375, height: 667 },
@@ -17,9 +17,11 @@ const SIZES = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   // erplora.com's accounts (and `a` with this Hub's id), so the owner signs in on a fresh database too.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
   cleanUp();
 });
 

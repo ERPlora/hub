@@ -57,8 +57,9 @@ class Channel(UUIDModel):
     # The business's own number (E.164) and the name WhatsApp shows for it.
     phone_number = models.CharField(_("phone number"), max_length=16, blank=True)
     display_name = models.CharField(_("display name"), max_length=200, blank=True)
-    # The plan's monthly allowance of messages sent (0 = no cap) and what is spent, with the month
-    # (``YYYY-MM``) the figure counts: another month's figure counts as nothing spent.
+    # The plan's monthly allowance of messages sent (0 = the plan includes none, ADR-0474; there is no
+    # «unlimited») and what is spent, with the month (``YYYY-MM``) the figure counts: another month's figure
+    # counts as nothing spent.
     monthly_limit = models.PositiveIntegerField(_("monthly limit"), default=0)
     monthly_usage = models.PositiveIntegerField(_("used this month"), default=0)
     usage_month = models.CharField(_("month of the figure"), max_length=7, blank=True)
@@ -80,12 +81,12 @@ class Channel(UUIDModel):
         return self.phone_number or str(self.get_status_display())
 
     def cap_reached(self, month: str) -> bool:
-        """Whether the plan's messages of ``month`` (``YYYY-MM``) are spent; never without a cap."""
-        return (
-            self.monthly_limit > 0
-            and self.usage_month == month
-            and self.monthly_usage >= self.monthly_limit
-        )
+        """Whether the plan's messages of ``month`` (``YYYY-MM``) are spent: from the first one when the plan
+        includes none. Never before erplora.com spoke: until then the 0 is the row's default, not the plan's."""
+        if self.synced_at is None:
+            return False
+        spent = self.monthly_usage if self.usage_month == month else 0
+        return spent >= self.monthly_limit
 
 
 class Conversation(UUIDModel):

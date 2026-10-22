@@ -1,6 +1,6 @@
 // WhatsApp inbox → Settings («Ajustes del canal»; WHATSAPP_INBOX-F01, F02, F13, F27, F28), owner and admin
 // only: «Your number» (connected with the number and the name, not connected, or to reconnect), connected,
-// reconnected and disconnected here (components/NumberConnection.vue); «This month» (messages sent against the plan's, or no limit); «Meta templates»
+// reconnected and disconnected here (components/NumberConnection.vue); «This month» (messages sent against the plan's, or that the plan includes none, with «Upgrade plan»); «Meta templates»
 // — Name, Language, Category, Status in Meta and Text, «Search template…», Meta's reason on a rejected
 // one, «No templates.» with where they are made. Whoever may not configure reads «You do not have permission».
 import { DataTable, EmptyState, UsageMeter } from '@erplora/ui/components';
@@ -29,6 +29,7 @@ const CONNECTED: ChannelOut = {
   cap_reached: false,
   synced_at: '2026-10-15T09:00:00Z',
   manage_url: 'http://localhost:8001',
+  plans_url: 'http://localhost:8001/store/plans',
 };
 const template = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   id: 't1',
@@ -52,6 +53,7 @@ const template = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   submit_error: '',
   editable: true,
   sendable: true,
+  supported: true,
   deleting: false,
   ...over,
 });
@@ -90,16 +92,39 @@ describe('SettingsPage: the number and the month', () => {
     );
   });
 
-  it('the month: messages sent against the plan’s, the cap said when it is reached, or no limit', async () => {
+  it('the month: messages sent against the plan’s, and the cap said with «Upgrade plan» when it is reached', async () => {
     const s = await setup();
     // The block is titled «This month» once: the meter's own label says what it counts (hub#118 review).
     expect(s.wrapper.findComponent(UsageMeter).props()).toMatchObject({ value: 12, max: 150, label: 'Messages sent' });
     expect(s.find('whatsapp-inbox-settings-month').text()).toContain('12 of 150 messages sent');
+    expect(s.find('whatsapp-inbox-settings-upgrade').exists()).toBe(false);
     const spent = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
     expect(spent.find('whatsapp-inbox-settings-month').text()).toContain('You have used all the messages of your plan this month.');
-    const free = await setup({}, { ...CONNECTED, monthly_limit: 0, monthly_usage: 40 });
-    expect(free.wrapper.findComponent(UsageMeter).exists()).toBe(false);
-    expect(free.find('whatsapp-inbox-settings-month').text()).toContain('No limit: 40 messages sent');
+    expect(spent.find('whatsapp-inbox-settings-upgrade').attributes()).toMatchObject({
+      href: 'http://localhost:8001/store/plans',
+      target: '_blank',
+      rel: 'noopener',
+    });
+    expect(spent.find('whatsapp-inbox-settings-upgrade').text()).toBe('Upgrade plan');
+  });
+
+  it('a plan without WhatsApp messages says so, never «No limit» (WHATSAPP_INBOX-F13, ADR-0474: 0 = none)', async () => {
+    const none = await setup({}, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true });
+    expect(none.wrapper.findComponent(UsageMeter).exists()).toBe(false);
+    const month = none.find('whatsapp-inbox-settings-month');
+    expect(month.text()).toContain('Your plan does not include WhatsApp messages.');
+    expect(month.text()).not.toContain('No limit');
+    expect(none.find('whatsapp-inbox-settings-upgrade').attributes('href')).toBe('http://localhost:8001/store/plans');
+    // A server not linked to erplora.com has nowhere to send the owner.
+    const unlinked = await setup({}, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true, plans_url: '' });
+    expect(unlinked.find('whatsapp-inbox-settings-upgrade').exists()).toBe(false);
+  });
+
+  it('before erplora.com speaks, the month says it is not known yet (no figure, no cap)', async () => {
+    const unknown = await setup({}, { ...CONNECTED, status: 'not_connected', phone_number: '', monthly_limit: 0, monthly_usage: 0, synced_at: null });
+    expect(unknown.wrapper.findComponent(UsageMeter).exists()).toBe(false);
+    expect(unknown.find('whatsapp-inbox-settings-month').text()).toContain('erplora.com has not reported this month’s messages yet.');
+    expect(unknown.find('whatsapp-inbox-settings-upgrade').exists()).toBe(false);
   });
 });
 
@@ -117,6 +142,33 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
     const status = columns.find((c) => c.key === 'status')!;
     expect(status.format!('REJECTED', PAGE.rows[1])).toBe("Rejected · Meta's reason: INVALID_FORMAT");
     expect(status.format!('APPROVED', PAGE.rows[0])).toBe('Approved');
+  });
+
+  it('says of one made in WhatsApp Manager the Hub cannot fill that it is not sent nor edited here, whatever Meta says of it', async () => {
+    const manager = template({
+      id: 't3',
+      name: 'bienvenida_foto',
+      category: 'MARKETING',
+      header_format: 'IMAGE',
+      body: 'Hola {{nombre}}, te damos la bienvenida.',
+      variables: 0,
+      editable: false,
+      sendable: false,
+      supported: false,
+    });
+    const inReview = template({ id: 't4', status: 'PENDING', editable: false, sendable: false });
+    for (const [locale, approved, review, rejected] of [
+      ['en', "Approved · Can't be sent or edited here: it is managed in WhatsApp Manager.", 'In review', "Rejected · Meta's reason: INVALID_FORMAT · Can't be sent or edited here: it is managed in WhatsApp Manager."],
+      ['es', 'Aprobada · No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager.', 'En revisión', 'Rechazada · Motivo de Meta: INVALID_FORMAT · No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager.'],
+    ] as const) {
+      const s = await setup({ locale });
+      await s.result(TEMPLATES, { ...PAGE, rows: [manager, inReview], total: 2 });
+      const status = s.prop<{ key: string; format?: (v: unknown, r: TemplateOut) => string }[]>('columns').find((c) => c.key === 'status')!;
+      expect(status.format!('APPROVED', manager), locale).toBe(approved);
+      // In review the Hub cannot send nor change it either, yet it fills it: nothing said of WhatsApp Manager.
+      expect(status.format!('PENDING', inReview), locale).toBe(review);
+      expect(status.format!('REJECTED', { ...manager, status: 'REJECTED', rejected_reason: 'INVALID_FORMAT' }), locale).toBe(rejected);
+    }
   });
 
   it('a search goes to the server; empty says where templates are made', async () => {
@@ -226,5 +278,8 @@ describe('SettingsPage: who sees it', () => {
     const s = await setup({ locale: 'es' });
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Ajustes del canal');
     expect(s.find('whatsapp-inbox-settings-month').text()).toContain('12 de 150 mensajes enviados');
+    const none = await setup({ locale: 'es' }, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true });
+    expect(none.find('whatsapp-inbox-settings-month').text()).toContain('Tu plan no incluye mensajes de WhatsApp.');
+    expect(none.find('whatsapp-inbox-settings-upgrade').text()).toBe('Mejorar el plan');
   });
 });

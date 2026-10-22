@@ -454,6 +454,7 @@
   "whatsapp_inbox.message.list": { "method": "get", "path": "/api/whatsapp_inbox/messages" },
   "whatsapp_inbox.message.send": { "method": "post", "path": "/api/whatsapp_inbox/messages/send" },
   "whatsapp_inbox.message.retry": { "method": "post", "path": "/api/whatsapp_inbox/messages/retry" },
+  "whatsapp_inbox.message.notify": { "method": "post", "path": "/api/whatsapp_inbox/messages/notify" },
   "whatsapp_inbox.note.list": { "method": "get", "path": "/api/whatsapp_inbox/notes" },
   "whatsapp_inbox.note.add": { "method": "post", "path": "/api/whatsapp_inbox/notes" },
   "whatsapp_inbox.note.delete": { "method": "post", "path": "/api/whatsapp_inbox/notes/delete" },

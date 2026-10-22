@@ -358,6 +358,13 @@ def test_a_change_by_voice_names_the_reservation_by_its_guest_and_day(week):
 # ── Its states (F07, F09–F12) ────────────────────────────────────────────────────────────────────
 
 
+def test_the_confirmation_answers_with_its_day_and_hour_ready_to_read_in_the_callers_language(week):
+    """RESERVATION-F19: what confirms a table can say it back («jueves, 15 de octubre de 2026 a las 21:00»)."""
+    out = book()
+    confirmed = run("reservation.reservation.confirm", {"id": str(out.id)}, ctx_for(language="es"))
+    assert (confirmed.date_label, confirmed.time_label) == ("jueves, 15 de octubre de 2026", "21:00")
+
+
 def test_the_states_only_move_forward_and_stamp_their_time(week):
     out = book()
     confirmed = run("reservation.reservation.confirm", {"id": str(out.id)})

@@ -3,8 +3,10 @@
 // configures. The number lives in erplora.com (the WhatsApp Business account and Meta's permission): «Your
 // number» shows what it reports — connected with the number and the name, not connected or to reconnect — and
 // connects, reconnects or disconnects it through erplora.com (NumberConnection); «This month» — messages sent against the plan's,
-// the cap when reached, or no limit —; «Meta templates» — the live `whatsapp_inbox.template.list` with
-// Name, Language, Category, Status in Meta (Meta's reason, and where it is on its way to Meta) and Text;
+// the cap when reached, that the plan includes none (0, ADR-0474), or that erplora.com has not said it yet, and
+// «Upgrade plan» (erplora.com's plans) at the cap —; «Meta templates» — the live `whatsapp_inbox.template.list` with
+// Name, Language, Category, Status in Meta (Meta's reason, where it is on its way to Meta, and that one made in
+// WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;
 // «Add template» and a row open the form (F29, F30), Delete asks first (F31), «Send to Meta again» hands
 // over again what did not get there.
 import {
@@ -25,6 +27,7 @@ import TemplateFormModal from './TemplateFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
+import { noAllowance } from '../lib/plan';
 import type { TemplateListIn, TemplateOut } from '../operations';
 
 const t = useT();
@@ -59,6 +62,8 @@ function statusText(status: string, row: TemplateOut): string {
   else if (row.submit_state === 'sending' && row.submit_error)
     parts.push(row.status === 'DRAFT' ? row.submit_error : t('whatsapp_inbox.templates.state.notSent', { reason: row.submit_error }));
   else if (row.submit_state === 'queued' || row.submit_state === 'sending') parts.push(t('whatsapp_inbox.templates.state.sending'));
+  // One the Hub cannot fill (F28: a file header, named variables, a code…) is only seen here.
+  if (!row.supported) parts.push(t('whatsapp_inbox.templates.state.unfillable'));
   return parts.join(' · ');
 }
 
@@ -138,7 +143,19 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
       data-testid="whatsapp-inbox-settings-month"
     >
       <h2>{{ $t('whatsapp_inbox.settings.month') }}</h2>
-      <template v-if="channel.monthly_limit > 0">
+      <p
+        v-if="channel.synced_at === null"
+        class="wa-settings__hint"
+      >
+        {{ $t('whatsapp_inbox.settings.notReported') }}
+      </p>
+      <p
+        v-else-if="noAllowance(channel)"
+        class="wa-settings__warning"
+      >
+        {{ $t('whatsapp_inbox.settings.notIncluded') }}
+      </p>
+      <template v-else>
         <UsageMeter
           :label="t('whatsapp_inbox.settings.sent')"
           :value="channel.monthly_usage"
@@ -152,9 +169,14 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
           {{ $t('whatsapp_inbox.settings.capReached') }}
         </p>
       </template>
-      <p v-else>
-        {{ $t('whatsapp_inbox.settings.noLimit', { used: channel.monthly_usage }) }}
-      </p>
+      <a
+        v-if="channel.cap_reached && channel.plans_url"
+        class="wa-settings__upgrade"
+        data-testid="whatsapp-inbox-settings-upgrade"
+        :href="channel.plans_url"
+        target="_blank"
+        rel="noopener"
+      >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
     </section>
 
     <section class="wa-settings__block wa-settings__block--templates">
@@ -247,6 +269,12 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
 }
 .wa-settings__warning {
   color: var(--ion-color-warning-shade);
+  font-weight: 600;
+}
+.wa-settings__upgrade {
+  display: inline-block;
+  margin-top: 0.25rem;
+  color: var(--ion-color-primary);
   font-weight: 600;
 }
 </style>

@@ -26,6 +26,7 @@ describe('ChannelSettings', () => {
       cap_reached: false,
       synced_at: null,
       manage_url: 'http://localhost:8001',
+      plans_url: 'http://localhost:8001/store/plans',
     });
     expect(m.find('whatsapp-inbox-settings-number').text()).toContain('Not connected');
     expect(m.find('whatsapp-inbox-settings-month').exists()).toBe(true);

@@ -242,6 +242,8 @@ export interface TemplateOut {
   submit_error: string;
   editable: boolean;
   sendable: boolean;
+  /** Whether the Hub fills it when sending; else it is only sent and changed from WhatsApp Manager (F28). */
+  supported: boolean;
   deleting: boolean;
 }
 
@@ -280,6 +282,8 @@ export interface ChannelOut {
   cap_reached: boolean;
   synced_at: string | null;
   manage_url: string;
+  /** erplora.com's plans, where more WhatsApp messages come by upgrading; empty without erplora.com. */
+  plans_url: string;
 }
 
 export interface AgentListIn extends PageIn {

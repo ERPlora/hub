@@ -10,7 +10,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.schedule.models import ScheduleSettings
-from apps.schedule.queries import resolve_override, resolve_special_day
+from apps.schedule.queries import day_label, resolve_override, resolve_special_day
 from apps.schedule.schemas import (
     HoursRangeIn,
     IsOpenIn,
@@ -290,6 +290,18 @@ def test_a_temporary_change_is_found_by_id_reason_or_a_date_it_covers():
     assert resolve_override(None, "2026-08-15") == summer
     with pytest.raises(NotFound):
         resolve_override(None, "2026-09-01")
+
+
+# ── A day ready to say (Appointments' and Reservations' «…_date_label») ──────────────────────────
+
+
+def test_a_day_is_said_with_its_weekday_in_the_language_asked_whatever_the_thread_speaks():
+    tuesday = dt.date(2030, 3, 5)
+    with translation.override("en"):
+        assert day_label(tuesday, "es") == "martes, 5 de marzo de 2030"
+        assert translation.get_language() == "en"
+    with translation.override("es"):
+        assert day_label(tuesday, "en") == "Tuesday, March 5, 2030"
 
 
 # ── Settings (SCHEDULE-F08, F09) ───────────────────────────────────────────────────────────────

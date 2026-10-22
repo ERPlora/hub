@@ -9,25 +9,29 @@
 //   leaves), erplora.com cannot hand them over here (this run's `a.localhost` and erplora.com's `localhost` are two
 //   sites, so its session does not travel and it answers 401, which Chrome's ORB hides from an `<img>` or `<audio>`;
 //   on `a.erplora.com` and `erplora.com`, one site, it does), and each bubble says so and keeps «Open the attachment».
-// Each screen in three sizes (FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12-F06-*). What it creates is named `e2e.…` and
-// deleted after the file.
+// erplora.com hands each of Meta's messages to this Hub within its webhook's request: one this Hub refused fails at
+// once saying why (`metaHandsOver`), e.g. an attachment linked on another origin than SAAS_URL's.
+// Each screen in three sizes (FIX-HUB-WHATSAPP-INBOX-MEDIA-E2E-NEEDS-SAAS-MEDIA-URL-F06-*). What it creates is named
+// `e2e.…` and deleted after the file.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, e2ePhone, meta, metaNow, notice, PREFIX, receive, seedErplora } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, metaGraph, metaHandsOver, metaNow, notice, PREFIX, receive, seedErplora } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   // erplora.com's accounts and `a`'s number (a made-up Meta permission), and this Hub takes its photo.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
   cleanUp();
 });
 
 test.afterAll(() => cleanUp());
 
-const TASK = 'FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12';
+const TASK = 'FIX-HUB-WHATSAPP-INBOX-MEDIA-E2E-NEEDS-SAAS-MEDIA-URL';
 const panel = (page: Page) => shown(page).locator('[data-testid=whatsapp-inbox-detail]');
 const rowOf = (page: Page, phone: string) => shown(page).locator('[data-testid=whatsapp-inbox-row]', { hasText: phone.slice(3) });
 const bubbleWith = (page: Page, testid: string) =>
@@ -98,8 +102,9 @@ test('WHATSAPP_INBOX-F06: a customer’s photo and voice note come through erplo
       contacts: [{ profile: { name }, wa_id: phone.slice(1) }],
       messages: [{ from: phone.slice(1), id: `${PREFIX}wamid.${Date.now()}.${type}`, timestamp: metaNow(), type, [type]: content }],
     });
-  expect(await meta(page.request, sent('image', { id: `${PREFIX}media.photo`, mime_type: 'image/jpeg', sha256: 'e2e', caption: 'La foto del pelo' }))).toBe(200);
-  expect(await meta(page.request, sent('audio', { id: `${PREFIX}media.voice`, mime_type: 'audio/ogg; codecs=opus', sha256: 'e2e', voice: true }))).toBe(200);
+  // erplora.com takes each and hands it to this Hub at once; a refused one fails here saying why (whatsapp-pushes.ts).
+  await metaHandsOver(page.request, sent('image', { id: `${PREFIX}media.photo`, mime_type: 'image/jpeg', sha256: 'e2e', caption: 'La foto del pelo' }));
+  await metaHandsOver(page.request, sent('audio', { id: `${PREFIX}media.voice`, mime_type: 'audio/ogg; codecs=opus', sha256: 'e2e', voice: true }));
   await expect(rowOf(page, phone)).toBeVisible({ timeout: 30_000 });
   await openConversation(page, phone);
 

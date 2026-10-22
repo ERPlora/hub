@@ -18,6 +18,7 @@
     "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros.",
     "yesterday": "Ayer",
     "cancel": "Cancelar",
+    "upgradePlan": "Mejorar el plan",
     "status": {
       "open": "Abierta",
       "pending": "Pendiente",
@@ -50,6 +51,7 @@
       "reconnectNeeded": "WhatsApp pide volver a conectar el número en Ajustes: hasta entonces no se puede enviar nada.",
       "goToSettings": "Ir a Ajustes",
       "capReached": "Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.",
+      "notIncluded": "Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se puede enviar nada hasta que mejores el plan.",
       "erased": "Se han borrado los datos de este número."
     },
     "conversation": {
@@ -134,7 +136,8 @@
         "not_connected": "WhatsApp no está conectado: conecta el número en Ajustes para enviar.",
         "cap_reached": "Los mensajes de WhatsApp de tu plan de este mes están gastados: no se puede enviar nada hasta el mes que viene.",
         "unconfigured": "Este Hub no llega a erplora.com, así que desde él no se puede enviar nada."
-      }
+      },
+      "notIncluded": "Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada."
     },
     "templates": {
       "sendTitle": "Enviar una plantilla",
@@ -221,7 +224,8 @@
         "sending": "Enviándose a Meta…",
         "notAccepted": "No aceptada: {reason}",
         "notSent": "Cambios sin enviar: {reason}",
-        "deleting": "Borrándose en Meta"
+        "deleting": "Borrándose en Meta",
+        "unfillable": "No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager."
       }
     },
     "settings": {
@@ -234,7 +238,8 @@
       "month": "Este mes",
       "sent": "Mensajes enviados",
       "usage": "{used} de {limit} mensajes enviados",
-      "noLimit": "Sin límite: {used} mensajes enviados",
+      "notIncluded": "Tu plan no incluye mensajes de WhatsApp.",
+      "notReported": "erplora.com todavía no ha informado de los mensajes de este mes.",
       "capReached": "Has usado todos los mensajes de tu plan este mes.",
       "templatesTitle": "Plantillas de Meta",
       "loadError": "No se pudo cargar el canal.",

@@ -388,10 +388,10 @@ def card_for_phone(
 # ── Reservations ─────────────────────────────────────────────────────────────────────────────────
 
 
-def _loaded(reservation: Reservation) -> dict:
-    """The reservation's row, read again with its table and its waitlist entry."""
+def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
+    """The reservation's row, read again with its table and its waitlist entry, as ``ctx`` reads it."""
     return reservation_out(
-        Reservation.objects.select_related("table__zone").get(pk=reservation.pk)
+        ctx, Reservation.objects.select_related("table__zone").get(pk=reservation.pk)
     )
 
 
@@ -462,7 +462,7 @@ def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
     if confirmed:
         status_changed(ctx, reservation, None)
         sync_hold(ctx, reservation, S.CONFIRMED)
-    return _loaded(reservation)
+    return _loaded(ctx, reservation)
 
 
 def created_event(ctx: OperationContext, reservation: Reservation) -> None:
@@ -545,7 +545,7 @@ def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
         )
         judge(ctx, settings, request, new_table, exclude=(reservation.pk,))
     if not changes and not table_changed:
-        return _loaded(reservation)
+        return _loaded(ctx, reservation)
     _stamp(reservation, ctx)
     reservation.save()
     told = {
@@ -567,7 +567,7 @@ def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
             drop_hold(ctx, reservation)
         else:
             sync_hold(ctx, reservation, S.CONFIRMED)
-    return _loaded(reservation)
+    return _loaded(ctx, reservation)
 
 
 def step(ctx: OperationContext, reservation: Reservation, target: str) -> str:
@@ -653,7 +653,7 @@ def confirm_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     reservation.save()
     status_changed(ctx, reservation, previous)
     sync_hold(ctx, reservation, S.CONFIRMED)
-    return _loaded(reservation)
+    return _loaded(ctx, reservation)
 
 
 @operation(
@@ -678,7 +678,7 @@ def seat_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
         reservation.table_session_id = seat_at_table(ctx, reservation)
     reservation.save()
     status_changed(ctx, reservation, previous)
-    return _loaded(reservation)
+    return _loaded(ctx, reservation)
 
 
 def seat_at_table(ctx: OperationContext, reservation: Reservation):
@@ -740,7 +740,7 @@ def complete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     previous = step(ctx, reservation, S.COMPLETED)
     reservation.save()
     status_changed(ctx, reservation, previous)
-    return _loaded(reservation)
+    return _loaded(ctx, reservation)
 
 
 @operation(
@@ -763,7 +763,7 @@ def cancel_reservation(ctx: OperationContext, data: CancelIn) -> dict:
     reservation.save()
     status_changed(ctx, reservation, previous)
     sync_hold(ctx, reservation, S.CANCELLED)
-    return _loaded(reservation)
+    return _loaded(ctx, reservation)
 
 
 @operation(
@@ -785,7 +785,7 @@ def no_show_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     reservation.save()
     status_changed(ctx, reservation, previous)
     sync_hold(ctx, reservation, S.NO_SHOW)
-    return _loaded(reservation)
+    return _loaded(ctx, reservation)
 
 
 @operation(
@@ -1124,7 +1124,7 @@ def convert_entry(ctx: OperationContext, data: WaitlistConvertIn) -> dict:
         events.WAITLIST_CONVERTED,
         {"id": str(entry.pk), "reservation_id": str(reservation.pk)},
     )
-    return {"entry": entry_out(entry), "reservation": _loaded(reservation)}
+    return {"entry": entry_out(entry), "reservation": _loaded(ctx, reservation)}
 
 
 @operation(

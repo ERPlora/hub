@@ -403,6 +403,9 @@ msgstr "Este servidor no llega a erplora.com, así que desde él no se puede env
 msgid "You have used every WhatsApp message of your plan this month: nothing can be sent until next month or until you upgrade the plan."
 msgstr "Has usado todos los mensajes de WhatsApp de tu plan este mes: no se puede enviar nada hasta el mes que viene o hasta que mejores el plan."
 
+msgid "Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan."
+msgstr "Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada hasta que mejores el plan."
+
 msgid "erplora.com did not send the message."
 msgstr "erplora.com no ha enviado el mensaje."
 
@@ -465,6 +468,12 @@ msgstr "Esa nota ya no existe."
 
 msgid "You may only delete your own notes."
 msgstr "Solo puedes borrar tus propias notas."
+
+msgid "“%(phone)s” is not a number in international format (+34600111222): nothing was sent, so that it never reaches the wrong person."
+msgstr "«%(phone)s» no es un número en formato internacional (+34600111222): no se ha enviado nada, para que nunca le llegue a otra persona."
+
+msgid "There is no WhatsApp conversation with %(phone)s in this business: nothing was sent."
+msgstr "No hay ninguna conversación de WhatsApp con el %(phone)s en este negocio: no se ha enviado nada."
 
 # Templates made in the Hub (WHATSAPP_INBOX-F29…F31)
 
@@ -659,3 +668,27 @@ msgstr "WhatsApp todavía no está disponible en ERPlora."
 #, python-format
 msgid "erplora.com did not take the request (%(code)s). Try again later."
 msgstr "erplora.com no ha aceptado la petición (%(code)s). Inténtalo más tarde."
+
+msgid "Tell the customer by WhatsApp when their appointment is confirmed"
+msgstr "Avisar por WhatsApp a la clienta cuando se confirma su cita"
+
+msgid "When an appointment is confirmed, the customer gets a WhatsApp with its day, time, service and professional."
+msgstr "Cuando se confirma una cita, la clienta recibe un WhatsApp con el día, la hora, el servicio y el profesional."
+
+msgid "Only to a customer who already has a WhatsApp conversation with your business, and only to exactly the number on their card. Within 24 hours of their last message it goes as text; after them WhatsApp only lets an approved template through: create the Utility template «appointment_confirmed» in WhatsApp settings with four values (the day, the time, the service and the professional). Whenever it cannot go, the reason is in this automation's history."
+msgstr "Solo a una clienta que ya tiene conversación de WhatsApp con tu negocio, y solo al número exacto de su ficha. Dentro de las 24 horas desde su último mensaje sale como texto; después, WhatsApp solo deja pasar una plantilla aprobada: crea en los ajustes de WhatsApp la plantilla de Utilidad «appointment_confirmed» con cuatro datos (el día, la hora, el servicio y el profesional). Siempre que no pueda salir, el motivo queda en el historial de esta automatización."
+
+msgid "Confirmed! We are expecting you on {{steps.s5.start_date_label}} at {{steps.s5.start_time_label}} for your {{steps.s5.service_names}} with {{steps.s5.staff_name}}."
+msgstr "¡Confirmada! Te esperamos el {{steps.s5.start_date_label}} a las {{steps.s5.start_time_label}} para tu {{steps.s5.service_names}} con {{steps.s5.staff_name}}."
+
+msgid "Reads the customer's card, for the number to write to."
+msgstr "Lee la ficha de la clienta, para saber a qué número escribir."
+
+msgid "Checks that exactly that number has a WhatsApp conversation with your business."
+msgstr "Comprueba que justo ese número tiene conversación de WhatsApp con tu negocio."
+
+msgid "Reads the appointment, for its day, time, service and professional."
+msgstr "Lee la cita, para decir su día, su hora, el servicio y el profesional."
+
+msgid "Sends the customer the WhatsApp, only in their own conversation and within your plan's messages."
+msgstr "Manda el WhatsApp a la clienta, solo en su propia conversación y dentro de los mensajes de tu plan."
