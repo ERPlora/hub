@@ -106,7 +106,7 @@ def test_deleting_an_item_is_the_only_high_risk_command():
 
 def test_the_homes_hooks_are_the_example_every_app_copies():
     """PLAN-HUB round 2026-10-21: one step, one panel and one counter, each on a query of its own queries.py. The
-    demo is out of the store, so base shows them only where HOME_UNLISTED_HOOKS is on (development, tests, e2e)."""
+    demo is out of the store, so base shows them only where SHOW_UNLISTED_MODULES is on (development, tests, e2e)."""
     config = apps.get_app_config("demo")
     [step] = config.setup
     [panel] = config.widgets

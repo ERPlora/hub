@@ -8,7 +8,6 @@ from django.utils import translation
 from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
 from live.errors import NotFound
-from live.meta import module_configs
 from live.operations import operation
 
 from base import home
@@ -41,14 +40,16 @@ ADMINISTER_HUB = "base.administer_hub"
 def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     """The user, its permissions, and the menu and apps it may see on this scope, already translated.
 
-    Menu and apps list modules only (``module_configs``): a platform app such as ``base`` is always
-    on and never shows. ``demo`` says when the demo ends, on a demo's hub only. No permission: an
-    anonymous visitor gets ``user: None`` and nothing else, which tells the SPA to send it to the login.
+    Menu and apps list modules only (``home.shown_modules``: the reference app only in development, the tests
+    or a demo's hub): a platform app such as ``base`` is always on and never shows. ``demo`` says when the demo
+    ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing else, which
+    tells the SPA to send it to the login.
     """
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
+    demo = _demo_hub(ctx)
     with translation.override(ctx.language):
-        visible = [config for config in module_configs() if _can_see(ctx, config)]
+        visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
             "user": _user(ctx.actor),
             "scope": {"kind": ctx.scope.kind, "key": ctx.scope.key},
@@ -66,16 +67,16 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
             ],
             "apps": [{"label": config.label, "state": "on"} for config in visible],
             "language": ctx.language,
-            "demo": _demo(ctx),
+            "demo": None if demo is None else {"expires_at": demo.expires_at},
         }
 
 
-def _demo(ctx: OperationContext) -> dict[str, Any] | None:
-    """When the demo of this scope ends (plan 2026-10-17, §1.6), or ``None`` on a business's hub."""
+def _demo_hub(ctx: OperationContext) -> Hub | None:
+    """The demo's hub of this scope (its end, plan 2026-10-17, §1.6, and the reference app it shows), or ``None``
+    on a business's hub."""
     if ctx.scope.kind != "host":
         return None
-    hub = Hub.objects.filter(slug=ctx.scope.key, is_demo=True).first()
-    return None if hub is None else {"expires_at": hub.expires_at}
+    return Hub.objects.filter(slug=ctx.scope.key, is_demo=True).first()
 
 
 def _can_see(ctx: OperationContext, config: Any) -> bool:

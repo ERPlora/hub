@@ -69,7 +69,7 @@ def declare(monkeypatch):
 @pytest.fixture
 def modules(monkeypatch, settings):
     """The modules base sees (all of them on in every scope unless ``on`` says otherwise)."""
-    settings.HOME_UNLISTED_HOOKS = True
+    settings.SHOW_UNLISTED_MODULES = True
 
     def use(*configs, on=None):
         labels = {config.label for config in configs} if on is None else set(on)
@@ -352,7 +352,7 @@ def test_a_module_out_of_the_store_brings_no_step_to_a_customer(modules, declare
     modules(module("demo", setup=[step("first_item", "demo.item.stats")], listed=False))
     assert keys(setup_status(ctx())) == ["demo.first_item"]
 
-    settings.HOME_UNLISTED_HOOKS = False
+    settings.SHOW_UNLISTED_MODULES = False
     assert keys(setup_status(ctx())) == []
 
     # A demo's hub shows the reference's example: there it is what the visitor came to see.
@@ -383,7 +383,7 @@ def test_the_demos_example_step_for_real_with_the_setting_on(settings):
     """The real demo app (no stand-in): its step is pending until the hub has an item, then done."""
     from apps.demo.models import Item
 
-    settings.HOME_UNLISTED_HOOKS = True
+    settings.SHOW_UNLISTED_MODULES = True
     owner = ctx(ADMIN, "demo.view", "demo.manage")
     assert by_key(setup_status(owner))["demo.first_item"]["state"] == "pending"
 
@@ -391,7 +391,7 @@ def test_the_demos_example_step_for_real_with_the_setting_on(settings):
     item = by_key(setup_status(owner))["demo.first_item"]
     assert (item["state"], item["level"], item["route"]) == ("done", "recommended", "/demo/items/new")
 
-    settings.HOME_UNLISTED_HOOKS = False  # a customer's hub, in prod
+    settings.SHOW_UNLISTED_MODULES = False  # a customer's hub, in prod
     assert "demo.first_item" not in keys(setup_status(owner))
 
 
@@ -465,7 +465,7 @@ def test_panels_of_a_module_off_or_out_of_the_store(modules, settings):
     modules(module("stock", widgets=[panel]), module("demo", widgets=[panel], listed=False), on=["demo"])
     assert [w["key"] for w in widget_list(ctx())] == ["demo.w"]
 
-    settings.HOME_UNLISTED_HOOKS = False
+    settings.SHOW_UNLISTED_MODULES = False
     assert widget_list(ctx()) == []
 
     Hub.objects.filter(slug="a").update(is_demo=True)
@@ -524,7 +524,7 @@ def test_the_counters_of_a_module_out_of_the_store_only_where_the_setting_says(m
     modules(module("demo", bell=[counter("open", "demo.item.open_count")], listed=False))
     assert [c["key"] for c in bell(ctx())] == ["demo.open"]
 
-    settings.HOME_UNLISTED_HOOKS = False
+    settings.SHOW_UNLISTED_MODULES = False
     assert bell(ctx()) == []
 
     Hub.objects.filter(slug="a").update(is_demo=True)

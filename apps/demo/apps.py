@@ -37,7 +37,7 @@ class DemoConfig(LiveAppConfig):
     navigation = [Nav(id="demo", label=_("Demo"), icon="ion:flask-outline", path="/demo/items")]
     # The Home's hooks (PLAN-HUB round 2026-10-21), the example every module copies: a step of «Finish setting up
     # your business», a panel of the dashboard and a counter of the bell, each on a query of queries.py. Out of the
-    # store (listed = False), so base shows them only where HOME_UNLISTED_HOOKS is on or in a demo's hub: never to a
+    # store (listed = False), so base shows them only where SHOW_UNLISTED_MODULES is on or in a demo's hub: never to a
     # customer.
     setup = [
         SetupStep(

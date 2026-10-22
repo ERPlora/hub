@@ -75,6 +75,7 @@ class FakeApp:
     permissions: list[str]
     navigation: list[Nav] = field(default_factory=list)
     kind: str = "app"
+    listed: bool = True
 
 
 @pytest.fixture
@@ -147,6 +148,33 @@ def test_on_a_demo_it_says_when_the_demo_ends():
     ctx = OperationContext(scope=Scope("host", demo.slug), actor=None, permissions=frozenset(), language="en")
     me = get("base.session.me")(ctx, SessionMeIn())
     assert me.demo is not None and me.demo.expires_at == demo.expires_at
+
+
+def test_a_module_out_of_the_store_stays_out_of_a_customers_menu_and_apps(make_user, settings):
+    """The reference app (``demo``, ``listed = False``) is never offered to a customer: not in the menu, not in
+    «My apps», whatever the person may do (prod and pre run with ``SHOW_UNLISTED_MODULES`` off)."""
+    settings.SHOW_UNLISTED_MODULES = False
+    me = session_me(make_user(), {"demo.view", "demo.manage"})
+    assert "demo" not in [group["id"] for group in me["menu"]]
+    assert "demo" not in [app["label"] for app in me["apps"]]
+
+
+def test_a_module_out_of_the_store_shows_on_a_demos_hub_and_with_the_setting_on(make_user, settings):
+    """A demo's hub lists it whatever the setting says; development, the tests and the e2e list it everywhere."""
+    from django.utils import timezone
+
+    from base.models import Hub
+
+    settings.SHOW_UNLISTED_MODULES = False
+    demo = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="ready", expires_at=timezone.now())
+    on_demo = OperationContext(
+        scope=Scope("host", demo.slug), actor=make_user(), permissions=frozenset({"demo.view"}), language="en"
+    )
+    me = get("base.session.me")(on_demo, SessionMeIn()).model_dump(mode="json")
+    assert (me["menu"], me["apps"]) == ([DEMO_MENU], [{"label": "demo", "state": "on"}])
+
+    settings.SHOW_UNLISTED_MODULES = True
+    assert session_me(make_user("bea"), {"demo.view"})["menu"] == [DEMO_MENU]
 
 
 @pytest.mark.parametrize("slug", ["a", "acme"])

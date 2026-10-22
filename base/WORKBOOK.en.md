@@ -35,8 +35,8 @@ each person picks and orders of Lightspeed and Toast, and the bell with counters
 - What each person sees depends on their role in the business and on the apps the business has on.
 - The apps declare their steps, their panels and their counters; the Home only puts them together. While
   an app does not declare its own, nothing of it shows in the list or on the board.
-- The example app (Demo) shows an example step, panel and counter on the Home only in development, in
-  the tests and in a demo business: never in a customer's.
+- The example app (Demo) shows in the menu, in "My apps" and with an example step, panel and counter on
+  the Home only in development, in the tests and in a demo business: never in a customer's.
 
 ## Screens
 

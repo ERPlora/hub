@@ -6,7 +6,7 @@ panels of the dashboard (``widgets``) and its counters of the bell (``bell``), e
 ``base.widget.list``, ``base.bell.counters``) with the old hub's rules (``crates/runtime/src/setup_status.rs``):
 
 - only the modules on in the scope bring anything, and a module kept out of the store (``listed = False``, the
-  reference app ``demo``) only where ``HOME_UNLISTED_HOOKS`` is on (development, the tests and the e2e);
+  reference app ``demo``) only where it shows at all (:func:`shown_modules`);
 - a step reads the FIRST row of its query, run by name as the person of the request: done when every condition
   of ``configured_when`` passes on it, pending without a row; a step whose query fails is left out and logged
   (a false «you are missing X» sends the person to fix what may be fine);
@@ -46,18 +46,19 @@ DEFAULT_ORDER = 500
 DEFAULT_STEP_ICON = "ion:settings-outline"
 
 
-def home_modules(on: Iterable[str], *, demo_hub: bool = False) -> list[LiveAppConfig]:
-    """The modules whose steps, panels and counters reach the Home of a scope where the apps ``on`` are on.
+def shown_modules(*, demo_hub: bool = False) -> list[LiveAppConfig]:
+    """The modules a scope shows anywhere: its menu, «My apps» (``base.session.me``) and the Home's hooks.
 
-    A module out of the store (the reference app) only where ``HOME_UNLISTED_HOOKS`` says (development, the tests)
-    or on a demo's hub: never on a customer's.
+    Every module of the store; one kept out of it (the reference app) only where ``SHOW_UNLISTED_MODULES`` says
+    (development, the tests and the e2e) or on a demo's hub: never on a customer's.
     """
+    return [config for config in module_configs() if config.listed or settings.SHOW_UNLISTED_MODULES or demo_hub]
+
+
+def home_modules(on: Iterable[str], *, demo_hub: bool = False) -> list[LiveAppConfig]:
+    """The modules whose steps, panels and counters reach the Home of a scope where the apps ``on`` are on."""
     on = set(on)
-    return [
-        config
-        for config in module_configs()
-        if config.label in on and (config.listed or settings.HOME_UNLISTED_HOOKS or demo_hub)
-    ]
+    return [config for config in shown_modules(demo_hub=demo_hub) if config.label in on]
 
 
 def business_apps() -> list[str]:

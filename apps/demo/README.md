@@ -29,7 +29,8 @@ optimista e idempotente, permisos por papel) y es la que se copia para escribir 
 - **Ejemplo de los ganchos del Inicio** (BASE-F01, F06, F10; PLAN-HUB, ronda 2026-10-21): un paso de «Termina de
   configurar tu negocio» («Crea tu primer elemento»), un panel del tablero («Elementos abiertos») y un contador
   de la campana («Elementos de demo abiertos»), el modelo que copian los módulos. Como Demo no está en la tienda,
-  `base` solo los enseña con `HOME_UNLISTED_HOOKS` (desarrollo, tests y e2e) o en un hub de demo; nunca a un cliente.
+  `base` solo la enseña (menú, «Mis apps» y estos ejemplos) con `SHOW_UNLISTED_MODULES` (desarrollo, tests y e2e) o
+  en un hub de demo; nunca a un cliente.
 
 ## Ficha
 

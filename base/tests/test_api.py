@@ -55,7 +55,7 @@ def test_the_homes_routes_are_bound_to_its_queries(path, operation):
 
 
 def test_the_list_of_an_owner_over_http(client, make_user, settings):
-    settings.HOME_UNLISTED_HOOKS = False
+    settings.SHOW_UNLISTED_MODULES = False
     client.force_login(make_user("ana", host="a", role="hub_owner"))
 
     response = client.get("/api/home/setup", HTTP_HOST="a.localhost:8000")

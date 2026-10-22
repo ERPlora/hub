@@ -43,8 +43,8 @@ backoffice.
 - Lo que cada persona ve depende de su papel en el negocio y de las apps que el negocio tiene encendidas.
 - Las apps declaran sus pasos, sus paneles y sus contadores; el Inicio solo los junta. Mientras una app no
   declara los suyos, no aparece nada suyo en la lista ni en el tablero.
-- La app de ejemplo (Demo) enseña en el Inicio un paso, un panel y un contador de ejemplo solo en
-  desarrollo, en las pruebas y en un negocio de demostración: nunca en el de un cliente.
+- La app de ejemplo (Demo) sale en el menú, en «Mis apps» y con un paso, un panel y un contador de ejemplo
+  en el Inicio solo en desarrollo, en las pruebas y en un negocio de demostración: nunca en el de un cliente.
 
 ## Pantallas
 
@@ -335,8 +335,9 @@ Implicados: ninguno
   al A (test de dos hubs en `base/tests/test_queries_home.py`).
 - Un panel con `operation` viva (está en un `live.py`) se sigue con `useLive`; si no, se pide una vez
   (`live` en `WidgetOut`). Un panel con `component` monta `apps/<app>/frontend/components/<Nombre>.vue`.
-- El ejemplo de `demo` (módulo no listado) llega al Inicio con `HOME_UNLISTED_HOOKS` (por defecto,
-  `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
+- `demo` (módulo no listado) sale en el menú, en «Mis apps» y con su ejemplo en el Inicio solo con
+  `SHOW_UNLISTED_MODULES` (por defecto, `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
+  Una sola regla, `base.home.shown_modules`, para `base.session.me` y los ganchos del Inicio.
 - `base/spa.py` incrusta `hub-home` (`name` del registro y `plan_url` =
   `SAAS_URL/store/plans?business=<id del hub>`).
 - Navegador: el tablero se guarda en `localStorage["dashboard-hub"]` (la clave del viejo) y el uso de
