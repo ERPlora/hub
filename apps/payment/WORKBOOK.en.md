@@ -3,7 +3,7 @@
 ## What it is for and who it is for
 
 Payments records the **money that goes out** of the business: what is paid to a supplier, a transfer,
-a refund that is not a sale's. Each payment carries its own reference (`PAY-AAAAMMDD-NNNN`) and goes
+a refund that is not a sale's. Each payment carries its own reference (`PAY-YYYYMMDD-NNNN`) and goes
 up a ladder of statuses — **Draft**, **Approved**, **Sent**, **Completed** — or is **Cancelled** —,
 and keeps who recorded it, who approved it and when each step happened.
 
@@ -145,7 +145,7 @@ Steps:
 In: the form's data; the business's currency. Through the assistant or the API, the method is given by
 its id or by its name, the amount goes in cents and, if wanted, an attempt key: repeating the same call
 with the same key answers the payment already recorded instead of recording another.
-Out: a draft payment with reference `PAY-AAAAMMDD-NNNN` — the date is that of the business day on which
+Out: a draft payment with reference `PAY-YYYYMMDD-NNNN` — the date is that of the business day on which
 it is recorded, not the payment's; the number counts per day and never repeats — and the notice
 `payment.payment.created` (it carries the reference, the beneficiary, the amount and the currency).
 If it fails: nothing is saved and no number is spent. Inside the form, under its field: an empty, 0 or
