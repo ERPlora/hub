@@ -46,6 +46,16 @@ describe('HomeActivity', () => {
     ]);
   });
 
+  it('pages 15 sales at a time and offers that size among its choices, never a blank chooser', async () => {
+    const m = await mountBase(HomeActivity, { session: WITH_SALES });
+    const { pageSize, pageSizeOptions } = m.wrapper.findComponent(DataTable).props() as {
+      pageSize: number;
+      pageSizeOptions: number[];
+    };
+    expect(pageSize).toBe(15);
+    expect(pageSizeOptions).toContain(pageSize);
+  });
+
   it('paints date, sale, customer, method, amount in euros and the status in the history’s words', async () => {
     const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
     const call = await m.live();

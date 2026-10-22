@@ -14,6 +14,8 @@ import { formatValue, saleStatus } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 
 const LIMIT = 100;
+/** Rows per page: 15 first (the old hub's), and the chooser offers it, so it never shows blank. */
+const PAGE_SIZES = [15, 25, 50, 100];
 /** The statuses the filter offers: the sales history's own. */
 const SALE_STATUSES = ['completed', 'voided', 'refunded'] as const;
 
@@ -91,7 +93,8 @@ const columns = computed(() => [
       column-picker
       :search-keys="['number', 'customer_name', 'payment_method_name']"
       :search-placeholder="$t('base.activity.search')"
-      :page-size="15"
+      :page-size="PAGE_SIZES[0]"
+      :page-size-options="PAGE_SIZES"
       :views="['table', 'cards']"
       :rows="rows"
       :columns="columns"

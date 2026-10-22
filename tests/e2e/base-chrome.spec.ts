@@ -52,9 +52,14 @@ test('BASE-F11 — «Upgrade plan» lines up with the QR at the foot of the menu
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/`);
+    // The Home behind it painted (its capture is evidence too): its checklist read, then nothing left loading; then
+    // the drawer slid in whole.
+    await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
+    await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
     if (vp.width < PINNED_MIN) await shown(page).locator('ion-menu-button').click();
     await expect(link).toBeVisible();
     await expect(link).toContainText('Upgrade plan');
+    await expect.poll(async () => (await boxOf(foot)).left, { message: `the menu open whole at ${vp.label}` }).toBeGreaterThanOrEqual(-0.5);
     // The same inner edges as the QR above it (the drawer slides in: measured once it settled).
     await expect
       .poll(async () => {

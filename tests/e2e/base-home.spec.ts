@@ -35,12 +35,27 @@ function countMovingOverlays(): void {
   }
 }
 
+/**
+ * The capture of a flow, once the screen settled: no overlay sliding, no animation running in the page nor in a
+ * shadow root (the checklist's `ion-progress-bar` slides its bar there) — a shimmer that never ends aside — and
+ * nothing of the Home still loading (its skeletons, «Loading widgets…»).
+ */
 async function snap(page: Page, flow: string, width: number): Promise<void> {
-  await page.waitForFunction(
-    () =>
-      ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0 &&
-      document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity),
-  );
+  await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
+  await page.waitForFunction(() => {
+    if (((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) !== 0) return false;
+    const animations = [...document.getAnimations()];
+    const walk = (root: Document | ShadowRoot) => {
+      for (const el of root.querySelectorAll('*')) {
+        if (el.shadowRoot) {
+          animations.push(...el.shadowRoot.getAnimations());
+          walk(el.shadowRoot);
+        }
+      }
+    };
+    walk(document);
+    return animations.every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity);
+  });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APP-BASE-1-${flow}-${width}`) });
