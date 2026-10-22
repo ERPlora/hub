@@ -1,7 +1,7 @@
 # Workbook — Pagos (app)
 Prefijo: PAYMENT
 Alcance MVP: fuera del MVP (en la tienda; no viene en ninguna plantilla)
-Estado de la app: hecha (servidor y páginas); sus avisos arrancan las automatizaciones (PAYMENT-F07)
+Estado de la app: completa (2026-10-22); sus avisos arrancan las automatizaciones (PAYMENT-F07)
 
 > Manual de usuario y especificación de la app `payment`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -372,8 +372,9 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
 
 - Anatomía completa (copia de `apps/service`): `apps.py`, `models.py`, `migrations/`, `schemas.py`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/`
-  y un `tests/test_<fichero>.py` por fichero, más `test_integration_sale.py` (con Ventas real) y
-  `test_concurrency.py` (hilos).
+  y un `tests/test_<fichero>.py` por fichero, más `test_integration_sale.py` (con Ventas real),
+  `test_concurrency.py` (hilos) y `test_relay.py` (el aviso por el relay real del worker hasta una
+  automatización real de Automatizaciones, PAYMENT-F07).
 - Modelos: `PaymentMethod` (nombre único sin distinguir mayúsculas, tipo, cuenta, activo),
   `Payment` (referencia única, método, fecha del pago, importe en la unidad menor de su moneda > 0,
   moneda ISO 4217, beneficiario, IBAN, concepto, estado, factura del proveedor, motivo de cancelación,
@@ -415,6 +416,8 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
 ### Cómo son las páginas
 
 - `frontend/pages/PaymentsPage.vue` y `MethodsPage.vue`, con la barra de pestañas de `frontend/tabs.ts`.
+  La Fecha de Pagos filtra por rango (`daterange`: `payment_date_from` y `payment_date_to`, cada extremo
+  por su lado).
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
   con `MoneyInput` y `lib/money.ts`.
@@ -453,6 +456,7 @@ Tests:
 
 ## Lo que queda fuera
 
+Nada de sus flujos: los ocho están hechos (2026-10-22). Lo que no hace a propósito, abajo.
 
 ## Lo que NO hace, a propósito
 
@@ -465,6 +469,8 @@ Tests:
 
 ## Cambios frente al producto actual
 
+- **Repetir el alta no duplica el pago**: el mismo intento enviado otra vez (un reintento tras un corte,
+  un doble toque) responde el pago ya registrado; antes registraba otro, con su número (payments#8).
 - **Los rechazos ya no son mudos**: aprobar, enviar, completar o cancelar en el estado equivocado, o
   registrar con un método que no existe o desactivado, contesta con su motivo, no cambia nada, no
   gasta número y no avisa. Antes contestaba bien, gastaba número y emitía el aviso (incluido el de
