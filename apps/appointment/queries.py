@@ -19,7 +19,7 @@ from dataclasses import replace
 from uuid import UUID
 
 from django.db.models import Count, Exists, OuterRef, Q, QuerySet
-from django.utils import formats, timezone, translation
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
@@ -64,7 +64,7 @@ from apps.appointment.schemas import (
     VisitPage,
 )
 from apps.customer.queries import find_customer
-from apps.schedule.queries import hours_for_range
+from apps.schedule.queries import day_label, hours_for_range
 from apps.schedule.schemas import HoursRangeIn
 from apps.service.models import Assignment, Service
 from apps.service.queries import find_service
@@ -333,9 +333,7 @@ def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
     """``start``'s day and hour ready to say (a flow's template has no clock nor formatter, appointments#151):
     the weekday and the date in the caller's language, and the hour in 24 hours (the old product's messages)."""
     wall = start.astimezone(business_zone())
-    with translation.override(ctx.language):
-        day = f"{formats.date_format(wall, 'l')}, {formats.date_format(wall, 'DATE_FORMAT')}"
-    return {"start_date_label": day, "start_time_label": f"{wall:%H:%M}"}
+    return {"start_date_label": day_label(wall.date(), ctx.language), "start_time_label": f"{wall:%H:%M}"}
 
 
 def detail(ctx: OperationContext, appointment: Appointment) -> dict:

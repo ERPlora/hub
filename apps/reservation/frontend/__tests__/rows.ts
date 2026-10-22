@@ -11,6 +11,8 @@ export function reservationRow(overrides: Partial<ReservationOut> = {}): Reserva
     date: '2026-10-15',
     time: '21:00:00',
     end_time: '23:00:00',
+    date_label: 'Thursday, October 15, 2026',
+    time_label: '21:00',
     duration_minutes: 120,
     party_size: 4,
     table_id: 't5',

@@ -97,6 +97,10 @@ export interface ReservationOut {
   date: string;
   time: string;
   end_time: string;
+  /** Its day ready to say, in the caller's language («martes, 5 de marzo de 2030»). */
+  date_label: string;
+  /** Its hour ready to say, 24-hour on the business's clock («21:30»). */
+  time_label: string;
   duration_minutes: number;
   party_size: number;
   table_id: string | null;
