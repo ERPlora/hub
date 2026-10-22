@@ -12,6 +12,7 @@ import datetime as dt
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 
 import httpx
@@ -284,6 +285,145 @@ def test_the_model_without_an_answer_is_unreachable():
     respx.get(MODEL_URL).mock(side_effect=httpx.ConnectError("refused"))
     with pytest.raises(representation.SaasUnreachable):
         representation.model_pdf()
+
+
+# The model with the business in its blanks (FISCAL-F06 of the SaaS: ``ModelQueryIn``, its query signed by v2 only).
+
+BUSINESS = {
+    "taxpayer_tax_id": "B12345674",
+    "taxpayer_name": "Peluquería Ana & Hijos, S.L.",
+    "municipality": "Alcalá de Henares",
+    "street": "Calle Mayor 1",
+}
+
+
+def a_pdf() -> httpx.Response:
+    return httpx.Response(
+        200, content=b"%PDF-1.4 Anexo I", headers={"Content-Type": "application/pdf"}
+    )
+
+
+def as_the_saas_sees_it(request: httpx.Request) -> str:
+    """The path the SaaS signs v2 over: Django's ``get_full_path()`` of the request as it arrives
+    (``accounts.signing.verify_request``)."""
+    from django.test import RequestFactory
+
+    return RequestFactory().get(request.url.raw_path.decode("ascii")).get_full_path()
+
+
+@respx.mock
+def test_the_model_carries_the_business_in_its_query_signed_with_it():
+    route = respx.get(MODEL_URL).mock(return_value=a_pdf())
+    assert representation.model_pdf(BUSINESS) == b"%PDF-1.4 Anexo I"
+    request = route.calls.last.request
+    assert dict(request.url.params) == BUSINESS
+    # Encoded, never raw: a space, an accent or an «&» of the name would break the query.
+    query = request.url.raw_path.decode("ascii").partition("?")[2]
+    assert " " not in query and "í" not in query and "Ana+%26+Hijos" in query
+    timestamp = request.headers["X-Erplora-Timestamp"]
+    full_path = as_the_saas_sees_it(request)
+    assert full_path.startswith("/internal/representation/model?")
+    assert request.headers["X-Erplora-Signature-V2"] == v2(
+        "GET", full_path, timestamp, b""
+    )
+    assert request.headers["X-Erplora-Signature"] == v1(timestamp, b"")
+
+
+@respx.mock
+def test_a_blank_detail_of_the_business_is_not_sent():
+    route = respx.get(MODEL_URL).mock(return_value=a_pdf())
+    representation.model_pdf({**BUSINESS, "street": "   ", "number": ""})
+    sent = dict(route.calls.last.request.url.params)
+    assert sent == {key: BUSINESS[key] for key in BUSINESS if key != "street"}
+
+
+@respx.mock
+def test_without_any_detail_the_model_is_asked_for_blank():
+    route = respx.get(MODEL_URL).mock(return_value=a_pdf())
+    representation.model_pdf({"taxpayer_name": " ", "number": ""})
+    request = route.calls.last.request
+    assert request.url.raw_path == b"/internal/representation/model"
+    assert request.headers["X-Erplora-Signature-V2"] == v2(
+        "GET",
+        "/internal/representation/model",
+        request.headers["X-Erplora-Timestamp"],
+        b"",
+    )
+
+
+@respx.mock
+def test_a_detail_the_model_cannot_write_is_left_blank_and_the_rest_still_filled():
+    route = respx.get(MODEL_URL).mock(
+        side_effect=[
+            refusal(
+                422,
+                "invalid_payload",
+                "Invalid payload",
+                {"taxpayer_name": "Value error, The model cannot write some of these characters."},
+            ),
+            a_pdf(),
+        ]
+    )
+    assert representation.model_pdf(BUSINESS) == b"%PDF-1.4 Anexo I"
+    assert route.call_count == 2
+    again = route.calls.last.request
+    assert dict(again.url.params) == {
+        key: BUSINESS[key] for key in BUSINESS if key != "taxpayer_name"
+    }
+    assert again.headers["X-Erplora-Signature-V2"] == v2(
+        "GET", as_the_saas_sees_it(again), again.headers["X-Erplora-Timestamp"], b""
+    )
+
+
+@respx.mock
+def test_a_refusal_that_names_nothing_sent_downloads_the_blank_model():
+    route = respx.get(MODEL_URL).mock(
+        side_effect=[
+            refusal(422, "invalid_payload", "Invalid payload", {"__all__": "No."}),
+            a_pdf(),
+        ]
+    )
+    assert representation.model_pdf(BUSINESS) == b"%PDF-1.4 Anexo I"
+    assert route.calls.last.request.url.raw_path == b"/internal/representation/model"
+
+
+@respx.mock
+def test_the_refusal_is_logged_by_the_fields_names_and_never_their_values(caplog):
+    """The business's details are personal data: the warning names the fields the model could not write, not what
+    they held."""
+    route = respx.get(MODEL_URL).mock(
+        side_effect=[
+            refusal(422, "invalid_payload", "Invalid payload", {"taxpayer_name": "No.", "street": "No."}),
+            a_pdf(),
+        ]
+    )
+    with caplog.at_level(logging.WARNING, logger="apps.verifactu.representation"):
+        representation.model_pdf(BUSINESS)
+    assert route.call_count == 2
+    [message] = [
+        record.getMessage() for record in caplog.records if "model_field_unwritable" in record.getMessage()
+    ]
+    assert "fields=street,taxpayer_name" in message
+    for value in BUSINESS.values():
+        assert value not in message
+
+
+@pytest.mark.parametrize(
+    ("answer", "asked"),
+    [
+        # Asked again once at most, and only for a value the model cannot write.
+        (refusal(422, "invalid_payload", "Invalid payload", {"street": "No."}), 2),
+        (refusal(422, "fiscal.something_else", "No.", {"street": "No."}), 1),
+        (refusal(401, "signature_v2_required", "No."), 1),
+    ],
+)
+@respx.mock
+def test_a_model_still_refused_is_unreachable(answer, asked):
+    route = respx.get(MODEL_URL).mock(side_effect=[answer, answer])
+    with pytest.raises(representation.SaasUnreachable) as unreachable:
+        representation.model_pdf(BUSINESS)
+    assert unreachable.value.status == answer.status_code
+    assert route.call_count == asked
 
 
 # The rules the Hub checks before anything crosses the network (the old Hub's ``validate``, with the contract's 5 MB).

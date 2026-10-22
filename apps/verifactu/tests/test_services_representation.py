@@ -422,6 +422,73 @@ def test_the_model_is_the_saas_pdf(issuer):
     assert base64.b64decode(model.content_base64) == b"%PDF-1.4 Anexo I"
 
 
+def a_model() -> httpx.Response:
+    return httpx.Response(
+        200, content=b"%PDF-1.4 Anexo I", headers={"Content-Type": "application/pdf"}
+    )
+
+
+@respx.mock
+def test_the_model_comes_with_the_business_of_invoicing(issuer):
+    route = respx.get(MODEL_URL).mock(return_value=a_model())
+    run("verifactu.representation.model")
+    # The taxpayer of the upload (Invoicing's issuer), as the SaaS writes it in the model's blanks; the number goes
+    # within the street, as the issuer keeps its address. Never a signer: that one is written by hand (saas#1743).
+    assert dict(route.calls.last.request.url.params) == {
+        "taxpayer_tax_id": "B12345674",
+        "taxpayer_name": "Peluquería Ana SL",
+        "municipality": "Madrid",
+        "street": "Calle Mayor 1",
+    }
+
+
+@respx.mock
+def test_the_model_takes_the_issuer_as_it_is_now(issuer):
+    # hub#1306: the business's tax ID saved in Invoicing is the one the model carries, with no wait for the account.
+    route = respx.get(MODEL_URL).mock(return_value=a_model())
+    run(
+        "invoice.issuer.update",
+        {**ISSUER, "legal_name": "Ana Pérez", "tax_id": "12345678Z", "city": ""},
+    )
+    run("verifactu.representation.model")
+    assert dict(route.calls.last.request.url.params) == {
+        "taxpayer_tax_id": "12345678Z",
+        "taxpayer_name": "Ana Pérez",
+        "street": "Calle Mayor 1",
+    }
+
+
+@respx.mock
+def test_without_an_issuer_the_model_downloads_blank(db):
+    route = respx.get(MODEL_URL).mock(return_value=a_model())
+    model = run("verifactu.representation.model")
+    assert base64.b64decode(model.content_base64) == b"%PDF-1.4 Anexo I"
+    assert route.calls.last.request.url.raw_path == b"/internal/representation/model"
+
+
+@respx.mock
+def test_a_detail_the_model_cannot_write_downloads_blank_not_unavailable(issuer):
+    route = respx.get(MODEL_URL).mock(
+        side_effect=[
+            httpx.Response(
+                422,
+                json={
+                    "error": {
+                        "code": "invalid_payload",
+                        "message": "Invalid payload",
+                        "fields": {"street": "Value error, The model cannot write some of these characters."},
+                    }
+                },
+            ),
+            a_model(),
+        ]
+    )
+    model = run("verifactu.representation.model")
+    assert base64.b64decode(model.content_base64) == b"%PDF-1.4 Anexo I"
+    assert "street" not in dict(route.calls.last.request.url.params)
+    assert dict(route.calls.last.request.url.params)["taxpayer_tax_id"] == "B12345674"
+
+
 @respx.mock
 def test_without_the_saas_the_model_is_unavailable(issuer):
     respx.get(MODEL_URL).mock(side_effect=httpx.ConnectError("refused"))

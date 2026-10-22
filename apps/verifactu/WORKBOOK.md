@@ -328,8 +328,10 @@ Actor: administrador (permiso «configurar»)
 Pantalla: Configuración
 Pasos:
 1. En **VeriFactu → Configuración**, pestaña «Lo remite ERPlora», el estado dice «Sin firmar».
-2. «Descargar el modelo» baja el modelo oficial en blanco (Anexo I del Convenio 17, el del SaaS); se rellena y se
-   firma fuera de la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma.
+2. «Descargar el modelo» baja el modelo oficial (Anexo I del Convenio 17, el del SaaS) con los datos del negocio ya
+   puestos: la razón social, el NIF y la dirección del emisor de Facturación (el municipio y la vía pública, con el
+   número tal como figura en la dirección); sin emisor, baja en blanco. Se completa lo que falte y se firma fuera de
+   la pantalla: a mano (y se escanea a PDF, con el sello si es una sociedad) o con AutoFirma.
 3. Una sociedad escribe su representante legal (nombre y NIF/NIE); un autónomo firma él mismo.
 4. Se elige el documento de identidad (DNI o NIE) y se adjuntan los PDF: el modelo firmado, la copia del
    documento, con NIE una muestra de la firma y, con sociedad, el justificante de representación.
@@ -337,7 +339,8 @@ Pasos:
 6. Una persona de ERPlora lo revisa en el SaaS; la cuenta manda al Hub el estado nuevo: «Aprobado», «Devuelto»
    (con el motivo) o «Revocado».
 Entra: el emisor de Facturación (obligado tributario), el representante, el tipo de documento y los PDF en base64
-(`verifactu.representation.submit`); el modelo, de `verifactu.representation.model`.
+(`verifactu.representation.submit`); el modelo, de `verifactu.representation.model`, que le pasa al SaaS los datos
+del emisor.
 Sale: `POST /internal/hubs/{id}/representation` al SaaS; «En revisión» (uno aprobado sigue vigente y remitiendo
 hasta que se apruebe el nuevo), su huella en «Lo que has enviado» y en el registro de auditoría (número, fecha,
 tipo de documento y qué documentos; nunca su contenido) y el aviso `verifactu.config.changed`. El Hub no guarda
@@ -349,6 +352,8 @@ fichero puede ocupar 5 MB como máximo.»); el rechazo del SaaS, con su código 
 emisor, 409 `verifactu.issuer_missing`; sin la foto de la cuenta (el Hub aún no sabe su id en ERPlora) o un negocio
 que el SaaS no conoce, 409 `verifactu.hub_unregistered` («ERPlora todavía no ha vinculado este negocio.»); sin el
 SaaS, 503 `verifactu.saas_unreachable` («ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.»).
+Al descargar el modelo, un dato del emisor que el modelo no puede escribir (una letra fuera de las suyas o un texto
+demasiado largo) baja en blanco para escribirlo a mano, con el resto ya puesto: nunca deja sin modelo.
 Implicados: VERIFACTU-F08
 
 ### VERIFACTU-F06 Volver a enviar el otorgamiento

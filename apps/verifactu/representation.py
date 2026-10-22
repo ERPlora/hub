@@ -1,7 +1,7 @@
 """The client of the SaaS's review of the signed authorisation (Anexo I of Convenio 17; VERIFACTU-F05, F06).
 
 ERPlora files a business's records with the AEAT on its behalf only with its signed «otorgamiento de
-representación». The business downloads the blank model here, signs it away from the screen and uploads it with
+representación». The business downloads the model here, its details already in, signs it away from the screen and uploads it with
 the signer's identity document; a person at ERPlora reviews it in the SaaS (``fiscal/``), and its state comes back
 in the account's photo (``verifactu.config.sync``). The Hub keeps none of the documents: it checks them and hands
 them on byte for byte, as the old Hub did (``crates/server/src/representation_grant.rs``).
@@ -14,7 +14,11 @@ Two doors of the SaaS (plan 2026-10-15, «Contrato SaaS ↔ Hub», point 2), sig
   "signer_name", "signer_document_type", "documents": {"signed_model", "id_copy", "signature_sample",
   "representation_proof"}}`` (base64; the optional ones ``null``) → ``201 {"status": "submitted", "version",
   "submitted_at"}``;
-- ``GET /internal/representation/model`` → the blank model, ``application/pdf``.
+- ``GET /internal/representation/model?taxpayer_tax_id=…&taxpayer_name=…&municipality=…&street=…&number=…`` → the
+  model, ``application/pdf``, with the business written in its blanks (the SaaS's ``fiscal.schemas.ModelQueryIn``,
+  every field optional; a blank one stays dotted). Only v2 covers a query, so it signs the path with its query, as
+  the SaaS's ``get_full_path()`` reads it. A value the model cannot write (422 ``invalid_payload`` naming it) is
+  dropped and the model asked for once more, so it downloads with that blank for the business to fill in by hand.
 
 How a call ended: ``SubmitResult``; ``RepresentationRefused`` (400, 413 or 422 with the contract's envelope: the
 documents as they are will not do, its ``fiscal.*`` code and its ``fields`` kept to be shown); ``HubUnknown`` (404:
@@ -27,9 +31,10 @@ import base64
 import binascii
 import datetime as dt
 import json
+import logging
 import time
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+from urllib.parse import urlencode
 from uuid import UUID
 
 import httpx
@@ -38,8 +43,12 @@ from django.conf import settings
 from base.auth import SIGNATURE_HEADER, TIMESTAMP_HEADER, sign
 from base.internal import SIGNATURE_V2_HEADER, sign_v2
 
+logger = logging.getLogger(__name__)
+
 SUBMIT_PATH = "/internal/hubs/{hub_id}/representation"
 MODEL_PATH = "/internal/representation/model"
+#: The business's details the SaaS writes in the model's blanks (its ``ModelQueryIn``), in the query.
+MODEL_FIELDS = ("taxpayer_tax_id", "taxpayer_name", "municipality", "street", "number")
 TIMEOUT = httpx.Timeout(60.0, connect=5.0)
 #: The statuses whose contract error is about the documents, not about this server.
 REFUSALS = (400, 413, 422)
@@ -130,9 +139,9 @@ def _headers(method: str, url: str, body: bytes) -> dict[str, str]:
     return {
         TIMESTAMP_HEADER: timestamp,
         SIGNATURE_HEADER: sign(secret, timestamp, body),
-        # The path as the SaaS sees it, prefix included.
+        # The path as the SaaS sees it, prefix and query included: the request's target, byte for byte.
         SIGNATURE_V2_HEADER: sign_v2(
-            method, urlsplit(url).path, body, timestamp, secret
+            method, httpx.URL(url).raw_path.decode("ascii"), body, timestamp, secret
         ),
     }
 
@@ -216,11 +225,40 @@ def submit(hub_id: UUID, payload: dict, *, language: str = "en") -> SubmitResult
     )
 
 
-def model_pdf() -> bytes:
-    """The blank model the business signs (Anexo I of Convenio 17), as the SaaS keeps it."""
-    url = _url(MODEL_PATH)
+def _model(query: dict[str, str]) -> httpx.Response:
+    url = _url(f"{MODEL_PATH}?{urlencode(query)}" if query else MODEL_PATH)
     headers = {**_headers("GET", url, b""), "Accept": "application/pdf"}
-    response = _request("GET", url, b"", headers)
+    return _request("GET", url, b"", headers)
+
+
+def _unwritable(response: httpx.Response) -> set[str] | None:
+    """The fields a 422 ``invalid_payload`` names (the values the model cannot write), or ``None`` for any other
+    answer."""
+    error = _envelope(response)
+    if response.status_code != 422 or error is None or error["code"] != "invalid_payload":
+        return None
+    fields = error.get("fields")
+    return {str(name) for name in fields} if isinstance(fields, dict) else set()
+
+
+def model_pdf(taxpayer: dict[str, str] | None = None) -> bytes:
+    """The model the business signs (Anexo I of Convenio 17), as the SaaS fills it in: with ``taxpayer`` (the
+    ``MODEL_FIELDS`` it has) in the business's blanks, a blank value left dotted. One the model cannot write is
+    dropped and the model asked for once more (all of them when the refusal names none of what was sent)."""
+    query = {
+        name: value.strip()
+        for name, value in (taxpayer or {}).items()
+        if name in MODEL_FIELDS and value and value.strip()
+    }
+    response = _model(query)
+    unwritable = _unwritable(response) if query else None
+    if unwritable is not None:
+        logger.warning(
+            "verifactu.representation.model_field_unwritable fields=%s",
+            ",".join(sorted(unwritable & query.keys())) or "-",
+        )
+        kept = {name: value for name, value in query.items() if name not in unwritable}
+        response = _model(kept if len(kept) < len(query) else {})
     if response.status_code != 200 or not response.content.startswith(PDF_MAGIC):
         raise SaasUnreachable(
             f"ERPlora's account did not hand over the model (HTTP {response.status_code}).",

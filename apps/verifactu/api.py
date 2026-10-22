@@ -78,7 +78,7 @@ async def certificate_remove(request):
 
 
 # The signed authorisation (VERIFACTU-F05, F06): the documents in the body, four PDFs of up to 5 MB in base64, more
-# than Django's ceiling for any other view. The blank model is served as the PDF it is, or as the operation's JSON
+# than Django's ceiling for any other view. The model is served as the PDF it is, or as the operation's JSON
 # to a client that asks for JSON alone (the SPA's API client), which turns it into the file.
 
 
@@ -95,7 +95,7 @@ async def representation_submit(request, data: RepresentationSubmitIn):
     openapi_extra={
         "responses": {
             200: {
-                "description": "The blank official model: the PDF, or the operation's JSON when only JSON is accepted.",
+                "description": "The official model with the business written in: the PDF, or the operation's JSON when only JSON is accepted.",
                 "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
             }
         }

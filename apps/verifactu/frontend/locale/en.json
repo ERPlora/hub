@@ -363,7 +363,7 @@
       "issuerMissing": "Set up the issuer first in Invoicing → Issuer: it is who owes the tax.",
       "notLinked": "ERPlora has not linked this business yet: you can send it once your ERPlora account has sent its data.",
       "step1Title": "1 · Get the official form",
-      "step1Hint": "Its wording is set by the tax authority and cannot be changed: fill in the details of your business and of whoever signs.",
+      "step1Hint": "Its wording is set by the tax authority and cannot be changed. It already carries your business's details from Invoicing: fill in whatever is missing and the details of whoever signs.",
       "downloadModel": "Download the form",
       "downloading": "Downloading…",
       "downloaded": "Model downloaded. Sign it and upload it below.",
