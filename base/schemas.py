@@ -193,3 +193,79 @@ class DemoStatusOut(Schema):
     slug: str
     status: str
     expires_at: dt.datetime | None
+
+
+# --- The Home (PLAN-HUB round 2026-10-21): base.setup.status, base.widget.list, base.bell.counters ---------------
+
+
+class SetupStatusIn(Schema):
+    """No input: the list of this hub, as the person of the request may be told about it."""
+
+
+class SetupItemOut(Schema):
+    key: str = Field(description="«<app>.<step>»: «base.apps», «base.team» or a module's own step.")
+    app: str = Field(description="The app that declares the step («base» for the platform's).")
+    state: Literal["done", "pending", "unavailable"] = Field(
+        description="«unavailable»: ours, not the person's task (nothing could be turned on)."
+    )
+    level: Literal["legal", "functional", "recommended"] = Field(
+        description="«legal» (needed to invoice) is base's list; else the module's «required»."
+    )
+    required: bool
+    actionable: bool = Field(description="False: a pending ⛔ that the person cannot set up (an administrator must).")
+    title: str
+    description: str
+    icon: str
+    route: str = Field(description="The screen that completes it.")
+    order: int
+
+
+class SetupStatusOut(Schema):
+    total: int
+    pending: int
+    unavailable: int
+    blocking_pending: int = Field(description="Pending ⛔ steps: the invoice is refused until they are done.")
+    items: list[SetupItemOut]
+
+
+class WidgetListIn(Schema):
+    """No input: the panels this person may put on the dashboard of this hub."""
+
+
+class WidgetOut(Schema):
+    key: str = Field(description="«<app>.<panel>».")
+    app: str
+    title: str
+    icon: str
+    category: str = Field(description="The group of the picker: the panel's own, or its app's name.")
+    size: Literal["sm", "md", "lg"]
+    default: bool = Field(description="On by default, before the person chooses.")
+    kind: str | None = Field(description="How it renders without a component of its own (kpi, stat, sparkline…).")
+    operation: str | None = Field(description="The query that feeds it, followed live by the SPA.")
+    params: dict[str, Any]
+    map: dict[str, str] = Field(description="Prop of the panel → field of the operation's result.")
+    options: dict[str, Any] = Field(description="Literal props of the panel.")
+    component: str | None = Field(description="A Vue component of the app's frontend/components/, without «.vue».")
+    refresh_on: list[str]
+    live: bool = Field(description="Its operation is a live query: the SPA follows it, else it asks once.")
+
+
+class WidgetListOut(Schema):
+    widgets: list[WidgetOut]
+
+
+class BellCountersIn(Schema):
+    """No input: the counters above zero this person may see in this hub."""
+
+
+class BellCounterOut(Schema):
+    key: str = Field(description="«<app>.<counter>», or «base.failed_events».")
+    app: str
+    count: int
+    route: str
+    label: str
+    icon: str
+
+
+class BellCountersOut(Schema):
+    counters: list[BellCounterOut]

@@ -10,11 +10,13 @@ import {
   type SessionMe,
   type SessionStatus,
   type ShellSidebar,
+  type ShellUserMenu,
 } from '@erplora/ui/shell';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
-import { ref } from 'vue';
+import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
+import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 /**
@@ -36,6 +38,16 @@ export const SIDEBAR: ShellSidebar = {
       { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings' },
     ],
   ],
+};
+
+/**
+ * base's pieces of the chrome (APP-BASE-1, the old hub's): the bell at the end of the topbar, «Upgrade plan»
+ * in the menu's footer and the blocking strip over every screen. Loaded on demand: none is needed to paint.
+ */
+export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
+  topbar: defineAsyncComponent(() => import('../base/frontend/components/HubBell.vue')),
+  sidebarFooter: defineAsyncComponent(() => import('../base/frontend/components/UpgradePlanLink.vue')),
+  notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
 };
 
 /** An app's `frontend/routes.ts` default-exports its routes → pages, and nothing else. */
@@ -60,6 +72,23 @@ export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShe
     messages[language] = { ...messages[language], ...catalogue };
   }
   return messages;
+}
+
+/**
+ * The user menu (PLAN-SAAS §1.1): the person's account and «Report a problem» are erplora.com's pages, opened from
+ * the addresses `base/spa.py` embeds in `hub-home` (a new tab; the system browser in the installed app); then the
+ * Hub's sign out, a form POST to `/auth/logout` and the SaaS's logout page. Without them, only the sign out.
+ */
+export function userMenu(doc: Document): ShellUserMenu {
+  const home = readJsonBlock<HubHome>('hub-home', doc);
+  if (!home?.account_url || !home.report_url) return { logout };
+  return {
+    items: [
+      { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
+      { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
+    ],
+    logout,
+  };
 }
 
 /** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. */
@@ -97,13 +126,14 @@ export async function boot(
     messages: appMessages(catalogues),
     // The hub has no login of its own: the SaaS's, for this hub (Django fills it in spa-config).
     loginPath: config.loginUrl,
-    // The apps of the hub as a grid at `/` (where the login lands without `next`).
+    // «Home» first in the menu, and the shell's grid of apps as the fallback of `/` (where the login lands
+    // without `next`): base's Home (base/frontend/routes.ts) is registered before it and wins `/`.
     home: true,
     // The old hub's shell (PLAN-MIGRATIONS §16): its side menu, pinned from 992 px and a drawer below,
     // with the QR in its footer and the rail toggle and «My apps» in the topbar.
     sidebar: SIDEBAR,
-    // Sign out is the Hub's: a form POST to `/auth/logout`, then the SaaS's logout page.
-    userMenu: { logout },
+    userMenu: userMenu(doc),
+    chrome: CHROME,
   });
   provideLiveClient(client, app);
   try {
@@ -116,6 +146,9 @@ export async function boot(
 }
 
 void boot(
-  import.meta.glob<AppRoutes>('../apps/*/frontend/routes.ts', { eager: true }),
-  import.meta.glob<AppCatalogue>('../apps/*/frontend/locale/*.json', { eager: true, import: 'default' }),
+  import.meta.glob<AppRoutes>(['../base/frontend/routes.ts', '../apps/*/frontend/routes.ts'], { eager: true }),
+  import.meta.glob<AppCatalogue>(['../base/frontend/locale/*.json', '../apps/*/frontend/locale/*.json'], {
+    eager: true,
+    import: 'default',
+  }),
 );
