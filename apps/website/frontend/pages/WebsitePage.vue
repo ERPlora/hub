@@ -614,17 +614,13 @@ function setHoursShown(shown: boolean): void {
                         </ion-select-option>
                       </ion-select>
                     </ion-item>
-                    <ion-item
+                    <InlineFeedback
                       v-if="sourceOff"
-                      lines="none"
+                      tone="warning"
+                      data-testid="website-catalog-source-off"
                     >
-                      <ion-note
-                        color="warning"
-                        data-testid="website-catalog-source-off"
-                      >
-                        {{ sourceOff === 'inventory' ? t('website.fields.sourceOffInventory') : t('website.fields.sourceOffService') }}
-                      </ion-note>
-                    </ion-item>
+                      {{ sourceOff === 'inventory' ? t('website.fields.sourceOffInventory') : t('website.fields.sourceOffService') }}
+                    </InlineFeedback>
                     <ion-item
                       v-else-if="!sources.length"
                       lines="none"
