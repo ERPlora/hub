@@ -1,5 +1,6 @@
 // «Activity» on the Home (BASE-G129): the last 100 sales of Sales (`sale.sale.list`, live), only while Sales is
 // on in this hub, with the words of the sales history; a failed read says so with «Retry», never «no sales».
+import { DataTable } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -64,6 +65,33 @@ describe('HomeActivity', () => {
       ['Completada', 'success'],
       ['Anulada', 'danger'],
       ['Otro', 'neutral'],
+    ]);
+  });
+
+  it('filters by method and by status behind the funnel, with the methods of the sales on screen', async () => {
+    const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
+    const call = await m.live();
+    await m.result(call, 'sale.sale.list', {
+      rows: [sale('1'), sale('2', { payment_method_name: 'Tarjeta' }), sale('3')],
+      total: 3,
+      limit: 100,
+      offset: 0,
+    });
+    const table = m.wrapper.getComponent(DataTable);
+    expect(table.props('filterable')).toBe(true);
+    type Filter = { type: string; options?: { value: string; label: string }[] };
+    const columns = table.props('columns') as { key: string; filter?: Filter }[];
+    expect(columns.filter((c) => c.filter).map((c) => [c.key, c.filter?.type, c.filter?.options])).toEqual([
+      ['payment_method_name', 'select', [{ value: 'Efectivo', label: 'Efectivo' }, { value: 'Tarjeta', label: 'Tarjeta' }]],
+      [
+        'status',
+        'select',
+        [
+          { value: 'completed', label: 'Completada' },
+          { value: 'voided', label: 'Anulada' },
+          { value: 'refunded', label: 'Devuelta' },
+        ],
+      ],
     ]);
   });
 
