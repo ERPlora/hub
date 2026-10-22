@@ -1,5 +1,5 @@
 // base's `routes.ts`: the Home at `/` (APP-BASE-1) and nothing else; main.ts reads the default export.
-import type { RouteComponent, RouteRecordRaw } from 'vue-router';
+import type { RouteComponent } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
 import routes from './routes';
@@ -14,7 +14,7 @@ describe('base routes', () => {
   });
 
   it('loads the Home page on demand', async () => {
-    const loader = (routes[0] as RouteRecordRaw & { component: () => Promise<{ default: RouteComponent }> }).component;
+    const loader = routes[0].component as () => Promise<{ default: RouteComponent }>;
     expect(((await loader()).default as { name: string }).name).toBe('HomePage');
   });
 });

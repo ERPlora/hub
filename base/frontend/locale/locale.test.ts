@@ -60,7 +60,7 @@ describe('base catalogues (en source + es)', () => {
     }
   });
 
-  it('cover every key base's pages and components use', () => {
+  it("cover every key base's pages and components use", () => {
     const files = vueFiles(FRONTEND);
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {

@@ -25,7 +25,7 @@ const { t } = useBaseI18n();
 const router = useRouter();
 const phone = usePhone();
 const expanded = ref(false);
-const { data, status, error, refresh } = useLive('base.setup.status', {});
+const { data, status, refresh } = useLive('base.setup.status', {});
 
 const view = computed(() =>
   checklistView(data.value, {

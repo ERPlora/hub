@@ -63,7 +63,7 @@ export interface MountOptions {
   status?: SessionStatus;
   /** Paths the router knows (besides the 404 catch-all named `not-found`, as the shell's). */
   routes?: string[];
-  stubs?: Record<string, unknown>;
+  stubs?: Record<string, Component | boolean>;
   sidebar?: ShellSidebar;
   /** What the fake API answers, set before mounting (a component may ask on mount). */
   onApi?: ApiHandler;
