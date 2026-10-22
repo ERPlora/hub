@@ -13,12 +13,17 @@
 // 8, 9) reach Meta, which refuses that permission; and `meta` posts to erplora.com's webhook what Meta would, signed
 // with the run's Meta app secret, so that erplora.com hands it to this Hub through its doors 1 and 2. Only Meta is
 // played. It needs, beside this stack, erplora.com run from its checkout on `SAAS_URL` with
-// `HUB_INTERNAL_URL=http://127.0.0.1:<hub port>` and the e2e Meta app (`WHATSAPP_APP_ID=1234567890`,
-// `WHATSAPP_APP_SECRET=e2e-meta-app-secret`, `WHATSAPP_VERIFY_TOKEN=e2e-meta-verify-token`,
-// `WHATSAPP_CONFIG_ID=987654321`: `WHATSAPP_E2E` of its tests/e2e/panel/project.ts), on its own database created
-// fresh by its tests/e2e/database.ts (the seed refuses one whose `a` has another id). `E2E_SAAS_DIR` (that
-// checkout; by default `../saas` beside this one), `E2E_SAAS_DB` (by default `saas_e2e_<SAAS_URL's port>`) and
-// `E2E_WHATSAPP_APP_SECRET` say where it is.
+// `HUB_INTERNAL_URL=http://127.0.0.1:<hub port>`, `WHATSAPP_MEDIA_BASE_URL=<SAAS_URL>` (where it links a customer's
+// attachments, and its return page `WHATSAPP_REDIRECT_URI` with them: this Hub takes only its SAAS_URL's origin, and
+// unset it is `http://localhost:8001`; `metaHandsOver` says so when this Hub refuses an attachment) and the e2e Meta
+// app (`WHATSAPP_APP_ID=1234567890`, `WHATSAPP_APP_SECRET=e2e-meta-app-secret`,
+// `WHATSAPP_VERIFY_TOKEN=e2e-meta-verify-token`, `WHATSAPP_CONFIG_ID=987654321`: `WHATSAPP_E2E` of its
+// tests/e2e/panel/project.ts), on its own database created fresh by its tests/e2e/database.ts (the seed refuses one
+// whose `a` has another id). `E2E_SAAS_DIR` (that checkout; by default `../saas` beside this one), `E2E_SAAS_DB` (by
+// default `saas_e2e_<SAAS_URL's port>`) and `E2E_WHATSAPP_APP_SECRET` say where it is.
+// whatsapp-inbox-connect-return.spec.ts also needs erplora.com started with `HTTPS_PROXY` and `SSL_CERT_FILE` (its
+// header) toward a Graph that lives only while that spec runs: the specs whose doors reach Meta itself (a reply, a
+// template) get «Meta did not answer» from such an erplora.com, so they run against one started without them.
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -29,6 +34,7 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import { HUB_DIR, psql, REPO_DIR, SAAS, shot } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
+import { messageIds, type Push, pushProblem } from './whatsapp-pushes';
 
 /** Every WhatsApp id, template and card name of a run starts like this. */
 export const PREFIX = 'e2e.';
@@ -157,6 +163,30 @@ export async function meta(request: APIRequestContext, body: string): Promise<nu
     headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signature },
   });
   return answer.status();
+}
+
+/** What erplora.com's database recorded of its push of each of `ids` to this Hub (whatsapp-pushes.ts). */
+function pushesOf(ids: string[]): Push[] {
+  const list = ids.map((id) => `'${id.replace(/'/g, '')}'`).join(',');
+  const sql =
+    "select coalesce(json_agg(json_build_object('waMessageId', wa_message_id, 'attachment', media_id <> '', " +
+    "'delivered', delivered_at is not null, 'error', last_error)), '[]') " +
+    `from whatsapp_delivery where kind = 'message' and wa_message_id in (${list})`;
+  const out = execFileSync('docker', ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'hub', '-d', SAAS_DB, '-At', '-c', sql], {
+    cwd: REPO_DIR,
+    encoding: 'utf8',
+  });
+  return JSON.parse(out.trim()) as Push[];
+}
+
+/** Posts `body` to erplora.com's webhook as Meta does (`meta`) and fails saying why unless erplora.com took it and
+ *  handed this Hub every message it carries: an attachment refused for its origin names `WHATSAPP_MEDIA_BASE_URL`. */
+export async function metaHandsOver(request: APIRequestContext, body: string): Promise<void> {
+  const status = await meta(request, body);
+  if (status !== 200) throw new Error(`erplora.com's webhook answered ${status} to Meta's notice.`);
+  const ids = messageIds(body);
+  const problem = ids.length ? pushProblem(ids, pushesOf(ids), { saas: SAAS, database: SAAS_DB }) : '';
+  if (problem) throw new Error(problem);
 }
 
 /** Meta's time now, in seconds. */
