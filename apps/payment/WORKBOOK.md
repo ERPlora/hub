@@ -1,8 +1,7 @@
 # Workbook — Pagos (app)
 Prefijo: PAYMENT
 Alcance MVP: fuera del MVP (en la tienda; no viene en ninguna plantilla)
-Estado de la app: hecha (servidor y páginas); el aviso a Automatizaciones (PAYMENT-F07) sale al
-outbox, pero esa app todavía no existe en el Hub
+Estado de la app: hecha (servidor y páginas); sus avisos arrancan las automatizaciones (PAYMENT-F07)
 
 > Manual de usuario y especificación de la app `payment`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -120,7 +119,7 @@ Importes y fechas salen con el formato del idioma de quien mira; el importe, en 
 | PAYMENT-F04 | Marcar un pago como enviado y como completado | hecho |
 | PAYMENT-F05 | Cancelar un pago | hecho |
 | PAYMENT-F06 | Buscar y revisar los pagos | hecho |
-| PAYMENT-F07 | Avisar de un pago completado | hecho el aviso (outbox); Automatizaciones no existe aún en el Hub |
+| PAYMENT-F07 | Avisar de un pago completado | hecho |
 | PAYMENT-F08 | Editar, desactivar y reactivar un método de pago | hecho |
 
 ### PAYMENT-F01 Crear un método de pago
@@ -166,7 +165,7 @@ válido («Ese IBAN no es válido: revisa el país, los dígitos de control y la
 que no existe («Ese método de pago no existe en este negocio.») o desactivado («Ese método de pago
 está desactivado: elige uno activo.»). Por el asistente, un nombre de método que encaja con varios
 dice cuáles («“Caja” encaja con varios métodos de pago: …»).
-Implicados: FLOWS-F13
+Implicados: FLOW-F21
 
 ### PAYMENT-F03 Aprobar un pago
 Estado: hecho
@@ -181,7 +180,7 @@ Sale: el estado, quién lo aprobó y cuándo (la fila lo enseña: «Aprobado por
 Si falla: quien solo registra pagos (sin permiso de aprobar) no ve la acción y la app lo rechaza.
 Aprobar un pago que ya no está en borrador no cambia nada, no avisa a nadie y dice por qué («Solo se
 puede aprobar un pago en borrador; este está Aprobado.»), encima de la tabla.
-Implicados: FLOWS-F13
+Implicados: FLOW-F21
 
 ### PAYMENT-F04 Marcar un pago como enviado y como completado
 Estado: hecho
@@ -197,7 +196,7 @@ ni se habla con ningún banco.
 Si falla: cada paso exige el anterior; saltarse uno no cambia nada, no avisa y dice por qué («Solo se
 puede marcar como enviado un pago aprobado; este está Borrador.», «Solo se puede marcar como
 completado un pago enviado; …»). Un pago completado o cancelado no ofrece más acciones.
-Implicados: FLOWS-F13
+Implicados: FLOW-F21
 
 ### PAYMENT-F05 Cancelar un pago
 Estado: hecho
@@ -213,7 +212,7 @@ Sale: el estado cancelado y el motivo guardados en el pago (no se borra nada); e
 Si falla: sin motivo no se puede pulsar; un motivo de solo espacios se rechaza debajo del campo. Un
 pago completado o cancelado no se puede cancelar («El pago ya no admite cancelación.»): no cambia
 nada y no avisa. Una aprobación no se deshace: se cancela el pago y se registra otro.
-Implicados: FLOWS-F13
+Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
 Estado: hecho
@@ -231,18 +230,24 @@ Si falla: error de carga con «Reintentar».
 Implicados: ninguno
 
 ### PAYMENT-F07 Avisar de un pago completado
-Estado: hecho el aviso; Automatizaciones no existe aún en el Hub
+<!-- origen: fi:modules/payments#event-emitidos-payment-created-approved-sent-completed-cancelled old:payments/WORKFLOW.md#payments-f07 -->
+Estado: hecho
 Actor: sistema
-Pantalla: ninguna
+Pantalla: ninguna (la automatización se crea en **Automatizaciones**)
 Pasos:
-1. Un pago pasa a **Completado** (PAYMENT-F04).
-2. El aviso `payment.payment.completed` queda en el outbox para quien quiera reaccionar (una
-   automatización que arranque con «pago completado»).
+1. En **Automatizaciones**, crea una automatización que arranque con «se completa un pago» (por
+   ejemplo, para que te deje la tarea de archivar el justificante) y enciéndela.
+2. Marca un pago como **Completado** (PAYMENT-F04).
+3. En unos segundos la automatización corre, una sola vez, con los datos de ese pago.
 Entra: el pago completado.
-Sale: el aviso, con el id, la referencia, el importe y la moneda. Solo sale cuando el pago cambia de
-verdad: un «completar» rechazado no avisa.
-Si falla: sin nadie que escuche, no pasa nada. Esta app no escucha a ninguna otra.
-Implicados: FLOWS-F13
+Sale: el aviso `payment.payment.completed`, con el id, la referencia, el estado, el importe y la
+moneda. Cada automatización que lo espera corre una vez por pago, aunque el aviso le llegue dos veces.
+Los demás pasos de un pago (registrar, aprobar, enviar, cancelar) y los cambios de un método también
+se pueden elegir como disparador.
+Si falla: solo sale cuando el pago cambia de verdad: un «completar» rechazado no avisa y no arranca
+nada. Sin ninguna automatización que lo espere, no pasa nada. El aviso de un negocio nunca arranca
+nada en otro. Esta app no escucha a ninguna otra.
+Implicados: FLOW-F21
 
 ### PAYMENT-F08 Editar, desactivar y reactivar un método de pago
 Estado: hecho
@@ -292,7 +297,8 @@ que su cambio y solo si el cambio ocurrió.
 
 ### A qué reacciona y lo que necesita de otras apps
 
-A nada y de nadie: `requires = []`. Ninguna otra app lee Pagos.
+A nada y de nadie: `requires = []`. Ninguna otra app lee Pagos; **Automatizaciones** escucha todos
+sus avisos y los ofrece como disparadores (PAYMENT-F07).
 
 ### Quién puede qué
 
@@ -426,8 +432,6 @@ Tests:
 
 ## Lo que queda fuera
 
-- **Automatizaciones** (PAYMENT-F07): el aviso sale al outbox; la app que reacciona no existe aún en
-  el Hub, y la entrega de avisos entre apps llega con el relay del outbox (fase 2).
 - **Filtro de fecha por rango en la pantalla**: el `DataTable` de `@erplora/ui` filtra un día; la
   consulta ya acepta el rango (`UI-REQUESTS.md`).
 
