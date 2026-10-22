@@ -15,7 +15,7 @@ from django.utils.translation import gettext
 from live.context import OperationContext, Scope
 from live.errors import PermissionDenied
 
-from base.models import Hub
+from control.models import Hub
 from base.schemas import HubOut
 
 #: The scope of the registry's operations (``base.hub.*``): the platform's, never a hub's.
@@ -69,6 +69,8 @@ def is_preparing(hub: Hub) -> bool:
 HUB_GONE = "base.hub_gone"
 HUB_PREPARING = "base.hub_preparing"
 HUB_SUSPENDED = "base.hub_suspended"
+#: A hub whose database is not its own (``base.tenancy.identity``): nothing is served from it (phase 2, S1).
+HUB_UNAVAILABLE = "base.hub_unavailable"
 
 
 @dataclass(frozen=True)
@@ -96,6 +98,11 @@ def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
     if is_suspended(hub):
         return Refusal(402, HUB_SUSPENDED, gettext("This business is suspended until its unpaid invoice is paid."))
     return None
+
+
+def unavailable() -> Refusal:
+    """What a hub whose database is not its own answers (503): nothing of it is served; in the active language."""
+    return Refusal(503, HUB_UNAVAILABLE, gettext("This hub cannot be opened right now; try again later."))
 
 
 def internal_only(ctx: OperationContext) -> None:

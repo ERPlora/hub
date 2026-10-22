@@ -7,6 +7,10 @@ Phase 2 adds the templates (``hub_template_<vertical>``) and then every hub behi
 its direct ``hub_<hex>__ddl`` connection, expand/contract, with the schema lock per hub (PLAN-DB).
 ``pending_control`` is ``migrate_hubs --check``: what a run would apply, applying nothing.
 
+``migrate_apps`` (phase 2, S1) brings some apps of one hub's or template's database to the code's leaf, through that
+database's migrator alias (``<db_name>__ddl``): the tests' template is built with it, and S3's ``ensure_schema`` (the
+schema lock, ``schema_apps``) wraps it. The ``TenantRouter`` keeps control's models out of it.
+
 The only module of ``base/`` and ``apps/`` that names a connection by hand and takes a session
 advisory lock (``tests/test_guardrails.py``): the control database is reached directly, never
 through PgBouncer, so a session lock holds for as long as this function runs.
@@ -19,6 +23,8 @@ from django.core.management import call_command
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.recorder import MigrationRecorder
+
+from base.tenancy import names
 
 logger = logging.getLogger(__name__)
 
@@ -70,3 +76,24 @@ def migrate_control(*, stdout=None, verbosity: int = 1) -> int:
                 "migrate_hubs: the lock was no longer held by this connection when released."
             )
     return len(after - before)
+
+
+def migrate_apps(ddl_alias: str, app_labels) -> list[str]:
+    """Bring ``app_labels`` of the database behind ``ddl_alias`` to the code's leaf; return what it applied, in order.
+
+    Only a migrator's alias (``…__ddl``): every other alias is refused. Their dependencies come along (Django's own
+    and control's are recorded, their tables left to control's database by the ``TenantRouter``); with nothing to
+    apply it does not migrate at all, and it never steps back.
+    """
+    if not ddl_alias.endswith(names.DDL_SUFFIX):
+        raise ValueError(f"migrate_apps runs only on a migrator's alias (…{names.DDL_SUFFIX}), not on {ddl_alias!r}.")
+    executor = MigrationExecutor(connections[ddl_alias])
+    labels = set(app_labels)
+    targets = [node for node in executor.loader.graph.leaf_nodes() if node[0] in labels]
+    plan = executor.migration_plan(targets)
+    if any(backwards for _migration, backwards in plan):
+        raise ValueError(f"migrate_apps never steps back: {ddl_alias} is ahead of the code for {sorted(labels)}.")
+    if not plan:
+        return []
+    executor.migrate(targets, plan=plan)
+    return [f"{migration.app_label}.{migration.name}" for migration, _backwards in plan]

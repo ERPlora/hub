@@ -43,6 +43,15 @@ def test_creates_a_and_b_ready():
 
 
 @pytest.mark.usefixtures("fresh")
+def test_leaves_a_and_b_on_the_shared_database_of_phase_one():
+    """Phase 2, S1: a and b keep their data in control's database (``db_name=""``) until the cut of S5, so
+    ``a.localhost`` and ``b.localhost`` serve what they always did."""
+    seed()
+
+    assert sorted(Hub.objects.values_list("slug", "db_name")) == [("a", ""), ("b", "")]
+
+
+@pytest.mark.usefixtures("fresh")
 def test_is_idempotent():
     seed()
     ids = dict(Hub.objects.values_list("slug", "id"))

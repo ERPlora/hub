@@ -37,13 +37,31 @@ SPA are redirected: anything with a URL of its own in Django (``/api`` answers 4
 the shell, whose auth gate sends to ``/auth/login``, the same jump. On a demo's host the jump is the demo's, to the
 SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``, plan 2026-10-17 §1.6): there is no account to log in to.
 ``/`` of a hub with a published website is that website instead (``base.public_home``, round 2026-10-21).
+
+``HubDatabaseMiddleware`` (phase 2, S1; plan 2026-10-22): right after the host gate, the rest of the request runs in
+its database context: ``use_hub(request.hub)`` on a hub's host; on the platform host, the hub the admin chose
+(``/admin/hub/<slug>/``) or, with none, phase 1's shared database; nothing for ``/internal`` and the open paths,
+whose code opens its own. A hub's database that says it is another hub (``base.tenancy.identity``) answers 503
+(``base.hub_unavailable``), serves nothing and raises an alarm; one that cannot be reached now answers the same 503
+with ``Retry-After`` and a warning.
+
+``SessionHostMiddleware`` (phase 2, S1): a session is a session of the host it was opened on (the login notes it);
+on another hub's host, or on the platform host, it is anonymous (401).
 """
 
+import logging
+from contextlib import nullcontext
+
+from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_async
 from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.signals import user_logged_in
 from django.core.exceptions import PermissionDenied
+from django.db import DatabaseError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import get_script_prefix, reverse
+from django.dispatch import receiver
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
 from live.api_errors import DEFAULT_API_PREFIX
@@ -56,6 +74,11 @@ from base.models import Hub
 from base.operations import HostScopeResolver, is_platform_host
 from base.public_home import website_enabled
 from base.spa import spa
+from base.tenancy import connections as tenancy_connections
+from base.tenancy import context as tenancy_context
+from base.tenancy.identity import HubIdentityMismatch
+
+logger = logging.getLogger(__name__)
 
 #: The page of a hub that is gone (410) and of one being prepared (503); no request, no scripts (strict CSP).
 HUB_GONE_TEMPLATE = "base/hub_gone.html"
@@ -185,3 +208,144 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
         if hub is not None and hub.is_demo:
             return demo_login_redirect(slug, request.get_full_path())
         return login_redirect(slug, request.get_full_path())
+
+
+#: What the platform host runs in without a hub chosen for the admin (phase 1's one database, S1–S4).
+_SHARED = object()
+
+
+class HubDatabaseMiddleware:
+    """Placed right after ``HubHostRequiredMiddleware``: everything after it runs in the request's database context."""
+
+    sync_capable = True
+    async_capable = True
+
+    def __init__(self, get_response) -> None:
+        self.get_response = get_response
+        if iscoroutinefunction(get_response):
+            markcoroutinefunction(self)
+
+    def __call__(self, request: HttpRequest):
+        if iscoroutinefunction(self):
+            return self.__acall__(request)
+        try:
+            resolved = self._resolve(request)
+        except (HubIdentityMismatch, DatabaseError) as error:
+            return self._unavailable(request, error)
+        with self._entered(resolved):
+            return self.get_response(request)
+
+    async def __acall__(self, request: HttpRequest):
+        try:
+            if _reaches_the_database(request):
+                # Reading the session and checking a database's identity reach the database: not in the event loop.
+                resolved = await sync_to_async(self._resolve)(request)
+            else:
+                resolved = self._resolve(request)
+        except (HubIdentityMismatch, DatabaseError) as error:
+            return self._unavailable(request, error)
+        with self._entered(resolved):
+            return await self.get_response(request)
+
+    def _resolve(self, request: HttpRequest):
+        """The hub the request works on, ``_SHARED`` or ``None``; a hub's own database is registered and checked."""
+        hub = getattr(request, "hub", None)
+        if hub is None and getattr(request, "platform_host", False):
+            hub = _admin_hub(request)
+            if hub is None:
+                return _SHARED
+        if hub is not None and hub.db_name:
+            tenancy_connections.open_hub_alias(hub)
+        return hub
+
+    @staticmethod
+    def _entered(resolved):
+        if resolved is _SHARED:
+            return tenancy_context.use_shared_database()
+        if resolved is None:
+            return nullcontext()
+        return tenancy_context.use_hub(resolved)
+
+    @staticmethod
+    def _unavailable(request: HttpRequest, error: Exception) -> HttpResponse:
+        """503: a database that is not its hub's (an alarm), or one that cannot be reached now (it passes)."""
+        hub = getattr(request, "hub", None)
+        if isinstance(error, HubIdentityMismatch):
+            logger.critical("base.hub_unavailable hub=%s: its database is not its own; nothing is served (%s).", hub, error)
+        else:
+            logger.warning("base.hub_unreachable hub=%s: its database cannot be reached now (%s).", hub, error)
+        refusal = registry.unavailable()
+        response = _envelope(refusal.status, refusal.code, refusal.message)
+        response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
+        return response
+
+
+def _reaches_the_database(request: HttpRequest) -> bool:
+    """Whether resolving the request's context reads the database: the admin's session, a hub's own database."""
+    hub = getattr(request, "hub", None)
+    return getattr(request, "platform_host", False) or (hub is not None and bool(hub.db_name))
+
+
+def _admin_hub(request: HttpRequest):
+    """The hub the admin chose for this session (``base.admin.open_hub``), or ``None``."""
+    from base.admin import ADMIN_HUB_SESSION_KEY
+
+    session = getattr(request, "session", None)
+    slug = session.get(ADMIN_HUB_SESSION_KEY) if session is not None else None
+    return registry.hub_by_slug(slug) if slug else None
+
+
+# ── A session is its host's (phase 2, S1; PLAN-DB §14.2; plan 2026-10-22, §2.3) ──────────────────────────────────
+
+#: Where the login noted the host a session was opened on: a hub's slug, or :data:`PLATFORM_SESSION_HOST`.
+SESSION_HOST_KEY = "hub_host"
+#: The platform host's mark (no hub's slug can be it: ``live.slugs``).
+PLATFORM_SESSION_HOST = "@platform"
+
+
+def session_host(request: HttpRequest) -> str | None:
+    """The host a session of this request belongs to: the hub's slug, the platform host's mark, or ``None``."""
+    if getattr(request, "platform_host", False):
+        return PLATFORM_SESSION_HOST
+    hub = getattr(request, "hub", None)
+    return hub.slug if hub is not None else None
+
+
+def opened_elsewhere(request: HttpRequest) -> bool:
+    """Whether the request's session was opened on another host than the request's (a hub's or the platform's).
+
+    The one rule of every way in that reads a session: ``SessionHostMiddleware`` and the print socket
+    (``base.ws_print``). A session with no host noted (from before the rule) is not.
+    """
+    host = session_host(request)
+    if host is None:
+        return False
+    noted = request.session.get(SESSION_HOST_KEY)
+    return noted is not None and noted != host
+
+
+@receiver(user_logged_in)
+def note_the_sessions_host(sender, request, user, **kwargs) -> None:
+    """Every login notes its host in the new session (the SaaS's jump, a demo's, the admin's)."""
+    host = session_host(request) if request is not None else None
+    if host is not None and hasattr(request, "session"):
+        request.session[SESSION_HOST_KEY] = host
+
+
+class SessionHostMiddleware(MiddlewareMixin):
+    """Placed right after ``AuthenticationMiddleware``: a session opened on another host is no session here.
+
+    Sessions stay in control's database in this phase (plan, decision 3): a session of hub B would otherwise be
+    valid on A's host for a user who is a member of both. Here it is anonymous (401 on the API; on a page, the
+    SaaS's login, as without a session). A session from before this rule, with no host noted, stays valid until it
+    expires; ``/internal`` and the open paths, with no hub, are left alone.
+    """
+
+    def process_request(self, request: HttpRequest) -> None:
+        if opened_elsewhere(request):
+            request.user = AnonymousUser()
+
+            async def anonymous():
+                return request.user
+
+            request.auser = anonymous

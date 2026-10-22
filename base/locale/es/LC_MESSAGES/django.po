@@ -532,3 +532,14 @@ msgstr "Ningún hub responde en este host."
 #: throttle.py:27
 msgid "Too many requests. Try again in a moment."
 msgstr "Demasiadas peticiones. Inténtalo de nuevo en un momento."
+
+#: models.py
+msgid "hub identity"
+msgstr "identidad del hub"
+
+msgid "hub identities"
+msgstr "identidades del hub"
+
+#: registry.py
+msgid "This hub cannot be opened right now; try again later."
+msgstr "Este hub no se puede abrir ahora; inténtalo más tarde."

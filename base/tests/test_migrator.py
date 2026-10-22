@@ -153,3 +153,34 @@ def test_a_second_run_waits_until_the_first_one_ends(monkeypatch):
 
     assert order == ["first:start", "first:end", "second:start", "second:end"]
     assert lock_is_free()
+
+
+# ── Phase 2 (plan 2026-10-22, S1): a hub's database migrates only its own apps, through its __ddl alias ──────────
+
+
+def test_migrate_apps_refuses_an_alias_that_is_no_migrators():
+    with pytest.raises(ValueError, match="__ddl"):
+        migrator.migrate_apps("default", ["demo"])
+
+
+def test_the_template_has_the_hub_tables_of_its_apps_and_nothing_of_controls(hub_databases):
+    """PLAN-DB §14.1: a hub's database has exactly the tables of base and of its created apps."""
+    from base.tenancy.tests import hubs
+
+    assert hubs.table_names(hub_databases.template) == hubs.hub_tables(hub_databases.apps) | {"django_migrations"}
+    assert "base_hub" not in hubs.table_names(hub_databases.a)
+    assert "auth_user" not in hubs.table_names(hub_databases.a)
+
+
+def test_migrate_apps_with_nothing_pending_applies_nothing(hub_databases, django_db_blocker):
+    """A clone of the template is at the code's leaf: nothing to apply, and ``migrate`` is not even called."""
+    from django.db import connections as django_connections
+
+    from base.tenancy import connections
+
+    with django_db_blocker.unblock():
+        alias = connections.register_ddl_alias(hub_databases.a)
+        try:
+            assert migrator.migrate_apps(alias, hub_databases.apps) == []
+        finally:
+            django_connections[alias].close()

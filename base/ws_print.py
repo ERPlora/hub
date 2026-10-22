@@ -74,7 +74,9 @@ reconnect is taken from the device that held the job, whatever hand-out it was.
 **Tenancy** (phase 1, PLAN §16): the hub is the Host's first label, checked against the registry by the gate the
 HTTP doors pass (``base.middleware.HubHostRequiredMiddleware``), and every operation runs in its scope with the
 session's user. The gate is heard again before every frame and every wake (the context's refresh,
-``base.operations.HostClosed``): a hub that stops serving while the socket is open closes it with the same code; phase 2 swaps the context builder for ``use_hub`` and this module does not change. The ``Origin``
+``base.operations.HostClosed``): a hub that stops serving while the socket is open closes it with the same code. From
+phase 2's S1 every synchronous step after the handshake runs in the hub's database (``use_hub``, ``_sync``) and its
+wake in the live executor, which enters the hub itself (``base.operations.HubContextBuilder.enter``). The ``Origin``
 must be the hub's own (cross-site WebSocket hijacking): anything else is refused at the handshake (Daphne answers
 it 403).
 
@@ -96,6 +98,7 @@ import logging
 import re
 import uuid
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from importlib import import_module
 from typing import Any
@@ -105,6 +108,7 @@ import pydantic
 from asgiref.sync import ThreadSensitiveContext, sync_to_async
 from django.conf import settings
 from django.contrib import auth
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import NON_FIELD_ERRORS, SuspiciousOperation
 from django.core.handlers.asgi import ASGIRequest
 from django.db import close_old_connections
@@ -117,8 +121,9 @@ from live.errors import NotFound, OperationError
 from live.executor import BYE_FRAME, Stream, Subscription, executor
 from live.operations import UnknownOperation, get
 
-from base.middleware import HubHostRequiredMiddleware
+from base.middleware import HubHostRequiredMiddleware, opened_elsewhere
 from base.operations import HostClosed
+from base.tenancy.context import use_hub
 
 logger = logging.getLogger(__name__)
 
@@ -496,7 +501,8 @@ class PrintSocket:
         if not key:
             raise Refusal("unauthenticated", gettext("Sign in to this hub to print: this connection has no session."), status=401)
         self.request.session = import_module(settings.SESSION_ENGINE).SessionStore(key)
-        user = auth.get_user(self.request)
+        # A session opened on another host is no session here (phase 2, S1): the HTTP doors' rule.
+        user = AnonymousUser() if opened_elsewhere(self.request) else auth.get_user(self.request)
         held = self.device.ctx.actor if self.device is not None else None
         if not user.is_authenticated or (held is not None and user.pk != held.pk):
             raise Refusal(
@@ -586,11 +592,13 @@ class PrintSocket:
 
     async def _sync(self, fn: Callable, *args: Any) -> Any:
         """Run the synchronous ``fn`` in a thread of its own, as Django runs a request's sync code, in the
-        socket's language; the database connection it used is released after it (there is no request_finished)."""
+        socket's language and, once admitted, in its hub's database (``use_hub``; phase 2, S1); the database
+        connection it used is released after it (there is no request_finished)."""
+        hub = getattr(self.request, "hub", None)
 
         def call():
             try:
-                with translation.override(self.language):
+                with translation.override(self.language), (use_hub(hub) if hub is not None else nullcontext()):
                     return fn(*args)
             finally:
                 close_old_connections()

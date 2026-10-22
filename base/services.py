@@ -539,6 +539,8 @@ def _wake_open_apps(slug: str) -> None:
 
 
 def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
+    from base.tenancy.context import use_hub
+
     sync = get_operation("verifactu.config.sync")
     try:
         payload = sync.input.model_validate(
@@ -548,7 +550,9 @@ def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
         raise InvalidPayload(
             f"The verifactu block is out of contract: {invalid}", code="internal.payload_invalid"
         ) from None
-    sync(system_context(Scope("host", hub.slug)), payload)
+    # The hub's own operation, in its database: the same transaction while it shares control's (phase 1, S1–S4).
+    with use_hub(hub):
+        sync(system_context(Scope("host", hub.slug)), payload)
 
 
 #: The app whose number's state travels in the photo (``whatsapp``) and whose doors erplora.com calls.
@@ -558,6 +562,7 @@ WHATSAPP_APP = "whatsapp_inbox"
 def _sync_whatsapp(hub: Hub, data: HubStateIn) -> None:
     # base.relay imports this module: asked when the photo comes, not when this module loads.
     from base import relay
+    from base.tenancy.context import use_hub
 
     scope = Scope("host", hub.slug)
     if WHATSAPP_APP not in relay.active_apps(scope):
@@ -569,7 +574,8 @@ def _sync_whatsapp(hub: Hub, data: HubStateIn) -> None:
         raise InvalidPayload(
             f"The whatsapp block is out of contract: {invalid}", code="internal.payload_invalid"
         ) from None
-    sync(system_context(scope), payload)
+    with use_hub(hub):
+        sync(system_context(scope), payload)
 
 
 @operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut)

@@ -1,0 +1,197 @@
+"""The tests' hubs with a database of their own (PLAN-DB §4 «Tests»; plan 2026-10-22-fase-2-tenencia §4, step 7).
+
+Per test session (and xdist worker), next to its control database ``<control>``:
+
+- ``<control>_template_test``: built by the migrator (``base.tenancy.migrator.migrate_apps``) through its ``__ddl``
+  alias, with every hub app whose tables only reference the hub's own (:func:`portable_apps`);
+- ``<control>_<hex of HUB_A_ID>`` and ``<control>_<hex of HUB_B_ID>``: cloned from it with
+  ``CREATE DATABASE … TEMPLATE``, each with its identity row (``base_hub_identity``).
+
+The names are the production rule's (``base.tenancy.names``), so two sessions or two workers never share one. They are
+dropped when the session ends. The rows in control (``hub_a``, ``hub_b``) are the root ``conftest.py``'s fixtures.
+"""
+
+import uuid
+from contextlib import contextmanager
+from dataclasses import dataclass
+from types import SimpleNamespace
+
+import psycopg
+from django.apps import apps
+from django.db import connections
+from django.db.migrations.loader import MigrationLoader
+from psycopg import sql
+
+from base.tenancy import connections as tenancy_connections
+from base.tenancy import identity, inventory, migrator, names
+
+HUB_A_ID = uuid.UUID("01a16000-0000-7000-8000-00000000000a")
+HUB_B_ID = uuid.UUID("01a16000-0000-7000-8000-00000000000b")
+#: Their aliases (``base.tenancy.connections.hub_alias``), registered for the whole session once built, so a test can
+#: name them: ``pytest.mark.django_db(databases=HUB_DATABASES)`` wraps them in its transaction as it does ``default``.
+HUB_A_ALIAS = f"hub_{HUB_A_ID.hex}"
+HUB_B_ALIAS = f"hub_{HUB_B_ID.hex}"
+HUB_DATABASES = ("default", HUB_A_ALIAS, HUB_B_ALIAS)
+TEMPLATE_VERTICAL = "test"
+#: What the tests keep in a hub's database between tests: the rest is emptied after each one.
+KEPT_TABLES = frozenset({"django_migrations", "base_hub_identity"})
+
+
+@dataclass(frozen=True)
+class HubDatabases:
+    control: str
+    template: str
+    a: str
+    b: str
+    apps: tuple[str, ...]
+
+
+def _hub_classes(model) -> bool:
+    return inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
+
+
+def portable_apps() -> tuple[str, ...]:
+    """The hub apps whose tables reference only a hub's own, and whose migrations need no other app's.
+
+    Phase 1 links some modules to control's users (``settings.AUTH_USER_MODEL``: staff, attendance, task,
+    whatsapp_inbox and what depends on them): their tables cannot live in a hub's database until the hub's own
+    staff comes (PLAN-DB §2), so the tests' template leaves them out.
+    """
+    hub_apps = {
+        config.label
+        for config in apps.get_app_configs()
+        if config.name.startswith(inventory.HUB_MODULES_PACKAGE) or inventory.APP_CLASSES.get(config.label) == inventory.HUB
+    }
+    graph = MigrationLoader(None, ignore_no_migrations=True).graph
+    needs = {
+        label: {node[0] for leaf in graph.leaf_nodes() if leaf[0] == label for node in graph.forwards_plan(leaf)}
+        & hub_apps
+        for label in hub_apps
+    }
+    blocked = {
+        label
+        for label in hub_apps
+        for model in apps.get_app_config(label).get_models(include_auto_created=True)
+        if _hub_classes(model)
+        for field in model._meta.get_fields()
+        if field.is_relation and field.concrete and field.related_model is not None
+        and inventory.classify(field.related_model) == inventory.CONTROL
+    }
+    while grown := {label for label in hub_apps - blocked if needs[label] & blocked}:
+        blocked |= grown
+    return tuple(sorted(hub_apps - blocked))
+
+
+def hub_tables(app_labels) -> set[str]:
+    """The tables a hub's database has for ``app_labels``: their hub's and contextual models'."""
+    return {
+        model._meta.db_table
+        for label in app_labels
+        for model in apps.get_app_config(label).get_models(include_auto_created=True)
+        if _hub_classes(model)
+    }
+
+
+@contextmanager
+def _maintenance(dbname: str = "postgres"):
+    """A direct, autocommit connection with control's credentials (``CREATE``/``DROP DATABASE`` need one)."""
+    settings = connections.settings["default"]
+    with psycopg.connect(
+        dbname=dbname,
+        user=settings["USER"],
+        password=settings["PASSWORD"],
+        host=settings["HOST"],
+        port=settings["PORT"],
+        autocommit=True,
+    ) as conn:
+        yield conn
+
+
+def _drop(conn, name: str, control: str) -> None:
+    conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(names.identifier(name, control=control)))
+
+
+def forget_aliases(before: dict) -> None:
+    """Close and forget every alias registered since ``connections.settings`` was ``before``.
+
+    Django's test case wraps, when it starts, every alias it was not told about, and unwraps them when it ends: an
+    alias a test registered and left would break that unwrapping, so each test leaves the settings as it found them.
+    """
+    for alias in set(connections.settings) - set(before):
+        connections[alias].close()
+    connections.settings = before
+
+
+def build() -> HubDatabases:
+    """Make the template and both hubs' databases, then register both hubs' aliases for the rest of the session."""
+    before = connections.settings
+    try:
+        built = _build()
+    finally:
+        forget_aliases(before)
+    for hub_id, name in ((HUB_A_ID, built.a), (HUB_B_ID, built.b)):
+        tenancy_connections.register_hub_alias(SimpleNamespace(id=hub_id, db_name=name, cluster=None))
+    return built
+
+
+def _build() -> HubDatabases:
+    control = tenancy_connections.control_name()
+    hubs = HubDatabases(
+        control=control,
+        template=names.template_db_name(control, TEMPLATE_VERTICAL),
+        a=names.hub_db_name(control, HUB_A_ID),
+        b=names.hub_db_name(control, HUB_B_ID),
+        apps=portable_apps(),
+    )
+    with _maintenance() as conn:
+        for name in (hubs.a, hubs.b, hubs.template):
+            _drop(conn, name, control)
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(hubs.template, control=control)))
+    ddl = tenancy_connections.register_ddl_alias(hubs.template)
+    try:
+        migrator.migrate_apps(ddl, hubs.apps)
+    finally:
+        # Nobody may stay connected to a template: its clone would fail.
+        connections[ddl].close()
+    with _maintenance() as conn:
+        for name in (hubs.a, hubs.b):
+            conn.execute(
+                sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                    names.identifier(name, control=control), names.identifier(hubs.template, control=control)
+                )
+            )
+    for hub_id, name in ((HUB_A_ID, hubs.a), (HUB_B_ID, hubs.b)):
+        alias = tenancy_connections.register_ddl_alias(name)
+        try:
+            identity.write(alias, hub_id)
+        finally:
+            connections[alias].close()
+    return hubs
+
+
+def drop(hubs: HubDatabases) -> None:
+    for alias in (HUB_A_ALIAS, HUB_B_ALIAS):
+        connections[alias].close()
+    with _maintenance() as conn:
+        for name in (hubs.a, hubs.b, hubs.template):
+            _drop(conn, name, hubs.control)
+
+
+def empty(name: str) -> None:
+    """Delete every row a test left in the hub's database ``name``, its identity and migrations aside."""
+    with _maintenance(name) as conn:
+        tables = [
+            row[0]
+            for row in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'").fetchall()
+            if row[0] not in KEPT_TABLES
+        ]
+        if tables:
+            conn.execute(
+                sql.SQL("TRUNCATE {} CASCADE").format(sql.SQL(", ").join(sql.Identifier(table) for table in tables))
+            )
+
+
+def table_names(name: str) -> set[str]:
+    """The tables of the database ``name``'s ``public`` schema."""
+    with _maintenance(name) as conn:
+        return {row[0] for row in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")}

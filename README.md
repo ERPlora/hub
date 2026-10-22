@@ -22,7 +22,7 @@ del entorno, y `uv run pytest` sigue en el `5173` aunque la defina (`config/sett
 
 ## Registro de hubs y `/internal`
 
-El Hub sirve solo los hubs de su registro (`base.Hub`, plan `docs/plans/2026-10-17-demo-hubs-fase-1.md` de
+El Hub sirve solo los hubs de su registro (`control.Hub`, antes `base.Hub`; plan `docs/plans/2026-10-17-demo-hubs-fase-1.md` de
 erplora-next): `HubHostRequiredMiddleware` busca la fila del slug del `Host` y responde **404** si no hay fila,
 **410** si el hub terminó (cancelado, purgado o una demo pasada su `expires_at`; página con la vuelta a ERPlora) y
 **503** con `Retry-After` si aún se prepara. La API, y toda llamada que no pide una página, recibe el sobre
@@ -60,6 +60,40 @@ En las tres, en este orden: sin `hub`, 422 `internal.payload_invalid`; el negoci
 la app apagada en él, 404 `app_inactive` (erplora.com guarda el mensaje y reintenta); un cuerpo fuera de contrato, 422
 con `fields`; y el sobre de cualquier otra negativa de la operación, tal cual.
 
+## Tenencia: una BD por hub (fase 2, tajada S1)
+
+Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-DB y CLAUDE.md «Tenencia del Hub».
+
+- **Dos clases de BD.** La de control (`default`) guarda el registro (`control/`: `Hub`, `DemoCode`, `Cluster`,
+  `HubDue`; `Hub` y `DemoCode` conservan sus tablas `base_hub` y `base_democode`), Django (admin, auth, contenttypes,
+  sesiones) y, en esta fase, `base.Membership`. La de cada hub, todo lo demás (`base`, `live` y cada app de `apps/`).
+  La lista explícita está en `base/tenancy/inventory.py`; un modelo sin clase falla. El outbox (`live.OutboxEvent`
+  y sus entregas) sigue al contexto: las operaciones del registro (`base.hub.*`, `base.demo.*`) lo escriben en control.
+- **Modo compartido transitorio (S1–S4).** `Hub.db_name` vacío = el hub sigue con sus datos en la BD de control,
+  como en la fase 1: todos los hubs de prod, las demos y `a`/`b` (`seed_local_hubs`). Un hub con `db_name`
+  (`<control>_<hex>`, `demo_<hex>`; `base/tenancy/names.py`) trabaja en su BD. S5 hace el corte y retira el modo.
+- **Contexto** (`base/tenancy/context.py`): `use_hub(hub)`, `use_control()` y, transitorio, `use_shared_database()`
+  (la BD única de la fase 1 para lo que aún no tiene un hub: el relevo y las tareas del worker, el admin sin hub
+  elegido, `manage.py shell`, el hub de plataforma sin fila). Sin contexto, un modelo o una operación de hub lanza
+  `HubContextMissing`: nunca cae a `default`. Una operación de un hub dentro del contexto de otro,
+  `HubContextMismatch`.
+- **Enrutado** (`base/tenancy/router.py`, detrás de `SharedRouter`): control → `default`; hub → el alias del contexto.
+  El alias de un hub con BD propia es `hub_<hex>`, registrado en caliente copiando `hub_template` (PgBouncer en modo
+  transacción: sin pool, `CONN_MAX_AGE` 0, sin cursores de servidor ni sentencias preparadas) sin mutar
+  `connections.settings`; su `base_hub_identity` se comprueba una vez por proceso (otra identidad → 503
+  `base.hub_unavailable`, no se sirve nada). `migrate` solo acepta `default` (y `shared`); el esquema de un hub lo
+  cambia el migrador por su alias `<db_name>__ddl` (`migrate_apps`; `ensure_schema` llega en S3).
+- **Quién abre el contexto**: `HubDatabaseMiddleware` (cada petición: el hub del host; en `hubs.localhost`, el hub
+  elegido en el admin o la BD compartida), `HubContextBuilder.enter` (cada re-ejecución viva, en el hilo del ejecutor),
+  `/ws/print`, las puertas de `/internal`, el worker y los comandos. Una sesión vale solo en el host donde se abrió
+  (`SessionHostMiddleware`): la de B en el host de A es anónima (401).
+- **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
+  propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
+  La plantilla de test lleva las apps cuyas tablas solo apuntan a las del hub: las enlazadas al usuario de control
+  (`staff`, `attendance`, `task`, `whatsapp_inbox` y las que dependen de ellas) esperan al personal propio del hub.
+  Los tests escritos antes de la tenencia caen en la BD compartida (fixture de sesión `shared_database_fallback`); los
+  de la tenencia y los de cada puerta de entrada la apagan (`no_test_fallback`), como en producción.
+
 ## Demo
 
 Una demo es un hub **vacío** del propio Hub (`demo-<8 hex>`, fila `is_demo` de `base.Hub`) que pide el `/demo/` del
@@ -85,7 +119,7 @@ SaaS, que olvida la demo que su sesión aún daba por viva: una demo puede acaba
 worker la purga en ≤ 60 s (`reap_demos`, `base.demo.purge`: borra sus códigos, su `Membership` y el usuario
 `demo:<slug>`; `purge_demo_data` no borra nada en la fase 1 y en la fase 2 hará el `DROP DATABASE`) y la fila queda
 `purged` como lápida `DEMO_TOMBSTONE_DAYS` (7) días; después, 404. Para terminar una demo a mano: la acción «Expire
-now» del admin (`hubs.localhost:8000/admin/base/hub/`, solo superusuarios) o, en cualquier entorno:
+now» del admin (`hubs.localhost:8000/admin/control/hub/`, solo superusuarios) o, en cualquier entorno:
 
 ```bash
 uv run python manage.py demo_expire demo-1a2b3c4d   # base.demo.expire + una pasada del reaper → «demo-1a2b3c4d: purged»

@@ -52,6 +52,10 @@ SaaS», doors 1–3): ``POST …/inbound`` → ``whatsapp_inbox.message.receive`
 1), whose host gate answers first (404 ``not_found`` unknown, 410 gone, 503 being prepared, 402 suspended); then the
 app off in it is 404 ``app_inactive`` (erplora.com keeps the message and tries again), and the operation runs as the
 system on that business, whose refusals (422 out of contract…) are answered with their own envelope.
+
+Their databases (phase 2, S1; plan 2026-10-22): the registry's and the demos' operations run on control
+(``base.tenancy.context.operation_database``); the WhatsApp doors enter the business's hub (``use_hub``); ERPlora's
+invoices run on phase 1's shared database, where the platform hub keeps its data until S2.
 """
 
 import json
@@ -60,6 +64,7 @@ from functools import wraps
 from uuid import UUID
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
@@ -71,6 +76,8 @@ from pydantic import ValidationError
 
 from base import registry, relay
 from base.registry import REGISTRY_SCOPE
+from base.tenancy.context import use_hub, use_shared_database
+from base.tenancy.identity import HubIdentityMismatch
 from base.services import DEMO_FULL_RETRY_AFTER_SECONDS, WHATSAPP_APP
 
 # ``SIGNATURE_V2_HEADER`` and ``sign_v2`` stay importable from here for the apps that sign their own calls to the
@@ -255,13 +262,20 @@ def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:
             },
             status=422,
         )
-    closed = registry.refusal(registry.hub_by_slug(slug))
+    hub = registry.hub_by_slug(slug)
+    closed = registry.refusal(hub)
     if closed is not None:
         return refuse(closed.status, closed.code, closed.message)
     scope = Scope("host", slug)
     if WHATSAPP_APP not in relay.active_apps(scope):
         return refuse(404, "app_inactive", "WhatsApp is not on in this business.")
-    answer, refused = _operation_call(name, body, system_context(scope))
+    try:
+        with use_hub(hub):
+            answer, refused = _operation_call(name, body, system_context(scope))
+    except (HubIdentityMismatch, DatabaseError):
+        # Not its own, or unreachable now: erplora.com keeps the message and tries again.
+        unavailable = registry.unavailable()
+        return refuse(unavailable.status, unavailable.code, unavailable.message)
     return refused or JsonResponse(answer.model_dump(mode="json"))
 
 
@@ -310,8 +324,12 @@ def _issue_answer(answer) -> dict:
 
 
 def _platform_call(name: str, payload: dict):
-    """Runs ``name`` as the system on the platform hub: its output, or the response of its refusal."""
-    return _operation_call(name, payload, _platform_context())
+    """Runs ``name`` as the system on the platform hub: its output, or the response of its refusal.
+
+    Phase 1's platform hub has no registry row and keeps its data in the one database every hub shares: it runs
+    there (``use_shared_database``, S1–S4) until S2 provisions it as a hub with its own (``is_platform``)."""
+    with use_shared_database():
+        return _operation_call(name, payload, _platform_context())
 
 
 def _operation_call(name: str, payload: dict, ctx: OperationContext):
