@@ -155,6 +155,10 @@ msgstr "factura del proveedor"
 msgid "cancellation reason"
 msgstr "motivo de cancelación"
 
+msgctxt "payment"
+msgid "attempt key"
+msgstr "clave del intento"
+
 msgid "payment"
 msgstr "pago"
 
@@ -231,6 +235,13 @@ msgstr ""
 
 msgid "This payment can no longer be cancelled."
 msgstr "El pago ya no admite cancelación."
+
+msgid ""
+"That attempt key already recorded another payment. Make a new key for each "
+"payment."
+msgstr ""
+"Esa clave de intento ya registró otro pago. Crea una clave nueva para cada "
+"pago."
 
 msgctxt "payment"
 msgid "approved by"

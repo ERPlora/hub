@@ -7,11 +7,13 @@ wins a step; the other one waits for it and is refused with the real reason.
 """
 
 import threading
+import uuid
 
 import pytest
 from django.db import connection
 from django.utils import timezone
 from live.errors import OperationError
+from live.models import OutboxEvent
 from live.operations import get
 
 from apps.payment.models import Payment, PaymentCounter, PaymentMethod
@@ -111,6 +113,33 @@ def test_completing_and_cancelling_at_once_never_leave_both():
     else:
         assert final.status == "cancelled"
         assert codes(results) == ["ok", "payment.invalid_transition"]
+
+
+def test_the_same_attempt_twice_at_once_records_one_payment():
+    # A double tap or a retry racing the first send (payments#8): neither sees the other's payment yet,
+    # the second one waits for the first and then answers that one, without a second number or notice.
+    method = make_method("BBVA account")
+    PaymentCounter.objects.create(day=timezone.localdate())
+    key = str(uuid.uuid4())
+
+    def send():
+        return run(
+            "payment.payment.create",
+            {
+                "method_id": str(method.id),
+                "payment_date": "2026-10-10",
+                "amount": 100,
+                "beneficiary_name": "Proveedor",
+                "idempotency_key": key,
+            },
+        )
+
+    results = at_once(send, send)
+    assert codes(results) == ["ok", "ok"]
+    assert results[0].id == results[1].id
+    assert Payment.objects.count() == 1
+    assert PaymentCounter.objects.get(day=timezone.localdate()).last == 1
+    assert OutboxEvent.objects.filter(name="payment.payment.created").count() == 1
 
 
 def test_two_methods_with_one_name_at_once():

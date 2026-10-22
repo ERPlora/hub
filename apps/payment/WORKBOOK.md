@@ -141,6 +141,7 @@ tipo fuera de la lista. Lo tecleado se conserva. Sin ningún método activo, «N
 Implicados: ninguno
 
 ### PAYMENT-F02 Registrar un pago
+<!-- origen: fi:modules/payments#command-wasm-payments-payments-create-create_payment old:payments/WORKFLOW.md#payments-f02 -->
 Estado: hecho
 Actor: responsable, administrador, propietario, asistente
 Pantalla: Pagos
@@ -152,8 +153,11 @@ Pasos:
 3. Pulsa **Registrar pago**.
 4. El formulario se cierra y el pago sale en la lista como **Borrador**, con su referencia. La lista
    va por la fecha del pago: uno con una fecha antigua no sale arriba.
+5. Si se corta la conexión y vuelves a pulsar **Registrar pago** en el mismo formulario, el pago se
+   registra una sola vez.
 Entra: los datos del formulario; la moneda del negocio. Por el asistente o la API, el método se dice
-por su id o por su nombre, y el importe va en céntimos.
+por su id o por su nombre, el importe va en céntimos y, si se quiere, una clave del intento: repetir
+la misma llamada con la misma clave responde el pago ya registrado en vez de registrar otro.
 Sale: un pago en borrador con referencia `PAY-AAAAMMDD-NNNN` — la fecha es la del día del negocio en
 que se registra, no la del pago; el número cuenta por día y nunca se repite — y el aviso
 `payment.payment.created` (lleva la referencia, el beneficiario, el importe y la moneda).
@@ -164,7 +168,9 @@ puede ser 1.250 € o 1,25 €: hay que escribir los decimales); un beneficiario
 válido («Ese IBAN no es válido: revisa el país, los dígitos de control y la longitud.»); un método
 que no existe («Ese método de pago no existe en este negocio.») o desactivado («Ese método de pago
 está desactivado: elige uno activo.»). Por el asistente, un nombre de método que encaja con varios
-dice cuáles («“Caja” encaja con varios métodos de pago: …»).
+dice cuáles («“Caja” encaja con varios métodos de pago: …»). Una clave de intento que ya registró
+otro pago se rechaza («Esa clave de intento ya registró otro pago. Crea una clave nueva para cada
+pago.») y no se guarda nada.
 Implicados: FLOW-F21
 
 ### PAYMENT-F03 Aprobar un pago
@@ -371,6 +377,12 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   registrarlo; el contador sube con `UPDATE … RETURNING` en la transacción del alta (nunca una
   secuencia), así que dos altas a la vez no repiten número y un alta rechazada no gasta ninguno. Por
   encima de 9999 al día, el número sale entero (`PAY-20261014-10000`).
+- **Un intento, un pago**: `payment.payment.create` acepta `idempotency_key` (UUID, opcional; columna
+  única). El mismo intento otra vez responde el pago que registró, tal como está, sin gastar número ni
+  avisar; dos a la vez: el segundo espera al primero (el bloqueo del método) y su alta choca con la
+  columna única dentro de un savepoint, que devuelve el número, y responde el del primero. Con otros
+  datos, 409 `payment.idempotency_key_reused`. «Nuevo pago» crea una clave al abrirse y la manda en cada
+  envío (la idea de `sale.sale.complete`; payments#8).
 - **Transiciones**: cada una bloquea la fila del pago (`select_for_update`) y comprueba el estado de
   origen; si no casa, 409 `payment.invalid_transition` (cancelar: `payment.not_cancellable`), sin
   cambio y sin aviso.
