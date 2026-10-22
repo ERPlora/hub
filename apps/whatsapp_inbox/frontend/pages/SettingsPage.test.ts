@@ -53,6 +53,7 @@ const template = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   submit_error: '',
   editable: true,
   sendable: true,
+  supported: true,
   deleting: false,
   ...over,
 });
@@ -141,6 +142,33 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
     const status = columns.find((c) => c.key === 'status')!;
     expect(status.format!('REJECTED', PAGE.rows[1])).toBe("Rejected · Meta's reason: INVALID_FORMAT");
     expect(status.format!('APPROVED', PAGE.rows[0])).toBe('Approved');
+  });
+
+  it('says of one made in WhatsApp Manager the Hub cannot fill that it is not sent nor edited here, whatever Meta says of it', async () => {
+    const manager = template({
+      id: 't3',
+      name: 'bienvenida_foto',
+      category: 'MARKETING',
+      header_format: 'IMAGE',
+      body: 'Hola {{nombre}}, te damos la bienvenida.',
+      variables: 0,
+      editable: false,
+      sendable: false,
+      supported: false,
+    });
+    const inReview = template({ id: 't4', status: 'PENDING', editable: false, sendable: false });
+    for (const [locale, approved, review, rejected] of [
+      ['en', "Approved · Can't be sent or edited here: it is managed in WhatsApp Manager.", 'In review', "Rejected · Meta's reason: INVALID_FORMAT · Can't be sent or edited here: it is managed in WhatsApp Manager."],
+      ['es', 'Aprobada · No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager.', 'En revisión', 'Rechazada · Motivo de Meta: INVALID_FORMAT · No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager.'],
+    ] as const) {
+      const s = await setup({ locale });
+      await s.result(TEMPLATES, { ...PAGE, rows: [manager, inReview], total: 2 });
+      const status = s.prop<{ key: string; format?: (v: unknown, r: TemplateOut) => string }[]>('columns').find((c) => c.key === 'status')!;
+      expect(status.format!('APPROVED', manager), locale).toBe(approved);
+      // In review the Hub cannot send nor change it either, yet it fills it: nothing said of WhatsApp Manager.
+      expect(status.format!('PENDING', inReview), locale).toBe(review);
+      expect(status.format!('REJECTED', { ...manager, status: 'REJECTED', rejected_reason: 'INVALID_FORMAT' }), locale).toBe(rejected);
+    }
   });
 
   it('a search goes to the server; empty says where templates are made', async () => {

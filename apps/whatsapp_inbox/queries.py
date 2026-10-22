@@ -553,6 +553,7 @@ def template_out(row: Template) -> dict:
         "submit_error": row.submit_error,
         "editable": template_editable(row),
         "sendable": template_sendable(row),
+        "supported": row.supported,
         "deleting": row.delete_state == Template.DeleteState.PENDING,
     }
 
