@@ -7,7 +7,7 @@
 // as before, and the new one is kept; `fresh: true` asks for the jump on purpose.
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, B, EMPLOYEE, listReady, login, type Credentials, OWNER, shot } from './helpers';
+import { A, api, B, type Credentials, EMPLOYEE, listReady, login, OWNER, shot, untilStill } from './helpers';
 
 /** One more than the SaaS lets an account jump in 5 minutes (`HUB_LOGIN_RATELIMIT`, 20/5m by default). */
 const ENTRIES = 21;
@@ -71,6 +71,7 @@ test(`${ENTRIES} entries in a row of one account, each in a fresh context: one j
         for (const { label, width, height } of VIEWPORTS) {
           await page.setViewportSize({ width, height });
           await listReady(page);
+          await untilStill(page);
           await page.screenshot({ path: shot(`FIX-HUB-E2E-HUB-LOGIN-RATELIMIT-429-${label}`) });
         }
       }
