@@ -22,6 +22,7 @@ from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.http import Http404, HttpRequest
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope
@@ -139,7 +140,8 @@ class HubContextBuilder:
         if hub.db_name:
             try:
                 tenancy_connections.open_hub_alias(hub)
-            except HubIdentityMismatch:
+            except (HubIdentityMismatch, DatabaseError):
+                # Not its own (an alarm on the request's side) or unreachable now: the stream ends and reconnects.
                 refusal = registry.unavailable()
                 raise HostClosed(refusal.message, code=refusal.code, status=refusal.status) from None
         return use_hub(hub)

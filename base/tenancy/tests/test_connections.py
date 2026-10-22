@@ -18,12 +18,17 @@ from base.tenancy import connections, names
 
 
 def pgbouncer_safe(settings: dict) -> bool:
-    """What PgBouncer in transaction mode needs of an alias (``tests/test_guardrails.py``, ``database_problems``)."""
+    """What PgBouncer in transaction mode needs of an alias (``tests/test_guardrails.py``, ``database_problems``).
+
+    ``prepare_threshold`` must be there and ``None``: Django does not set it and psycopg 3 prepares a statement on
+    its fifth run, which PgBouncer with ``max_prepared_statements=0`` (docker/pgbouncer-entrypoint.sh) then loses
+    («prepared statement _pg3_N does not exist»)."""
     return (
         settings["CONN_MAX_AGE"] == 0
         and "pool" not in settings["OPTIONS"]
         and settings["DISABLE_SERVER_SIDE_CURSORS"] is True
-        and settings["OPTIONS"].get("prepare_threshold") is None
+        and "prepare_threshold" in settings["OPTIONS"]
+        and settings["OPTIONS"]["prepare_threshold"] is None
         and not settings.get("ATOMIC_REQUESTS")
     )
 
@@ -47,7 +52,8 @@ def test_the_template_alias_goes_through_pgbouncer_safely():
     assert template["CONN_MAX_AGE"] == 0
     assert "pool" not in template["OPTIONS"]
     assert template["DISABLE_SERVER_SIDE_CURSORS"] is True
-    assert template["OPTIONS"].get("prepare_threshold") is None
+    assert "prepare_threshold" in template["OPTIONS"] and template["OPTIONS"]["prepare_threshold"] is None
+    assert pgbouncer_safe(template)
     # Named after the control database of the settings (hub_template, pre_hub_template); config/tests checks it.
     assert template["NAME"].endswith("_template")
 
@@ -164,7 +170,8 @@ def test_the_migrators_alias_is_the_same_database_reached_directly_without_a_poo
     assert (registered["HOST"], registered["PORT"]) == (control["HOST"], control["PORT"])
     assert registered["CONN_MAX_AGE"] == 0
     assert "pool" not in registered["OPTIONS"]
-    assert pgbouncer_safe(registered)
+    # Direct to the writer, no PgBouncer: it may prepare statements (guardrails exempt __ddl aliases).
+    assert registered["DISABLE_SERVER_SIDE_CURSORS"] is True
 
 
 def test_the_template_is_never_connected_to_by_registering():

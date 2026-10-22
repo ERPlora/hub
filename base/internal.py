@@ -64,6 +64,7 @@ from functools import wraps
 from uuid import UUID
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
@@ -271,7 +272,8 @@ def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:
     try:
         with use_hub(hub):
             answer, refused = _operation_call(name, body, system_context(scope))
-    except HubIdentityMismatch:
+    except (HubIdentityMismatch, DatabaseError):
+        # Not its own, or unreachable now: erplora.com keeps the message and tries again.
         unavailable = registry.unavailable()
         return refuse(unavailable.status, unavailable.code, unavailable.message)
     return refused or JsonResponse(answer.model_dump(mode="json"))

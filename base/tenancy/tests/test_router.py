@@ -150,3 +150,19 @@ def test_an_object_related_to_a_loaded_one_lives_in_its_database(hub_alias):
     assert router.db_for_write(Item, instance=loaded) == alias
     with context.use_control():
         assert router.db_for_write(Hub, instance=loaded) == "default"
+
+
+def test_a_control_objects_hint_never_sends_a_hubs_model_to_default(hub_alias):
+    """A reverse relation from a control object (``user.<hub model>_set`` through the AUTH_USER_MODEL links of staff,
+    attendance, task, whatsapp_inbox) hints ``default``: the hub's model still goes to the hub of the context."""
+    from django.contrib.auth import get_user_model
+
+    alias, hub = hub_alias
+    user = get_user_model()()
+    user._state.db = "default"
+
+    with in_hub(alias, hub):
+        assert router.db_for_read(Item, instance=user) == alias
+        assert router.db_for_write(Item, instance=user) == alias
+    with pytest.raises(HubContextMissing):
+        router.db_for_read(Item, instance=user)

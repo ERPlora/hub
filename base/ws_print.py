@@ -108,6 +108,7 @@ import pydantic
 from asgiref.sync import ThreadSensitiveContext, sync_to_async
 from django.conf import settings
 from django.contrib import auth
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import NON_FIELD_ERRORS, SuspiciousOperation
 from django.core.handlers.asgi import ASGIRequest
 from django.db import close_old_connections
@@ -120,7 +121,7 @@ from live.errors import NotFound, OperationError
 from live.executor import BYE_FRAME, Stream, Subscription, executor
 from live.operations import UnknownOperation, get
 
-from base.middleware import HubHostRequiredMiddleware
+from base.middleware import HubHostRequiredMiddleware, opened_elsewhere
 from base.operations import HostClosed
 from base.tenancy.context import use_hub
 
@@ -500,7 +501,8 @@ class PrintSocket:
         if not key:
             raise Refusal("unauthenticated", gettext("Sign in to this hub to print: this connection has no session."), status=401)
         self.request.session = import_module(settings.SESSION_ENGINE).SessionStore(key)
-        user = auth.get_user(self.request)
+        # A session opened on another host is no session here (phase 2, S1): the HTTP doors' rule.
+        user = AnonymousUser() if opened_elsewhere(self.request) else auth.get_user(self.request)
         held = self.device.ctx.actor if self.device is not None else None
         if not user.is_authenticated or (held is not None and user.pk != held.pk):
             raise Refusal(

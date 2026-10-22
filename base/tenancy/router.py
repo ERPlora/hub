@@ -8,7 +8,9 @@ database class of each model from ``base.tenancy.inventory`` and the active cont
   in control's, ``HubContextMissing``: never a guess;
 - ``contextual`` (the outbox) → the alias of the active context, control's included.
 
-A hub's object related to one already loaded (``instance`` hint) goes where that one is, as Django's own default does.
+A hub's object related to another hub object already loaded (``instance`` hint) goes where that one is, as Django's
+own default does; a control object's hint (a reverse relation from a user) never decides a hub's model: the context
+does.
 
 ``allow_relation`` compares databases, not aliases (``hub_x`` and ``hub_x__ddl`` are one database). ``allow_migrate``:
 control's models only on ``default``; a hub's only on a migrator's ``…__ddl`` alias and, while phase 1's hubs keep
@@ -31,9 +33,10 @@ def _route(model, hints: dict) -> str | None:
     if database_class == inventory.SHARED:
         return None
     related = hints.get("instance")
-    if related is not None and related._state.db is not None:
-        # An object related to one already loaded lives in that one's database (a migration's RunPython on a
-        # hub's __ddl alias, an object of the hub being served): Django's own rule.
+    if related is not None and related._state.db is not None and inventory.classify(related) != inventory.CONTROL:
+        # A hub's object related to another hub's object lives in that one's database (a migration's RunPython on a
+        # hub's __ddl alias): Django's own rule. A control object's hint (``user.<hub model>_set``) says ``default``,
+        # which is never a hub's: the context decides.
         return related._state.db
     active = context.current()
     if database_class == inventory.HUB and active.kind == context.CONTROL:

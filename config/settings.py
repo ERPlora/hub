@@ -249,8 +249,10 @@ if SHARED_DB_USER:
 # it, NAME aside, for each hub with a database of its own, and nobody ever connects to the template itself (its clone
 # would fail). The hubs' databases go through the PgBouncer sidecar of the task in transaction mode
 # (PGBOUNCER_HOST/PORT, aws stacks/prod/apps.tf; locally the Postgres of compose.yaml, directly): no pool,
-# CONN_MAX_AGE 0, no server-side cursors and no prepared statements (Django's default prepare_threshold=None). The
-# sidecar listens on the task's own loopback, so TLS goes from PgBouncer to Aurora, not to it.
+# CONN_MAX_AGE 0, no server-side cursors and no prepared statements: prepare_threshold=None explicitly (Django leaves
+# it unset and psycopg 3 prepares on a statement's fifth run, which PgBouncer with max_prepared_statements=0 loses:
+# «prepared statement _pg3_N does not exist»). The sidecar listens on the task's own loopback, so TLS goes from
+# PgBouncer to Aurora, not to it.
 PGBOUNCER_HOST = config("PGBOUNCER_HOST", default="")
 DATABASES["hub_template"] = {
     "ENGINE": "django.db.backends.postgresql",
@@ -262,9 +264,12 @@ DATABASES["hub_template"] = {
     "CONN_MAX_AGE": 0,
     "DISABLE_SERVER_SIDE_CURSORS": True,
     "OPTIONS": {
-        option: value
-        for option, value in DATABASES["default"]["OPTIONS"].items()
-        if option != "pool" and not (PGBOUNCER_HOST and option in ("sslmode", "sslrootcert"))
+        **{
+            option: value
+            for option, value in DATABASES["default"]["OPTIONS"].items()
+            if option != "pool" and not (PGBOUNCER_HOST and option in ("sslmode", "sslrootcert"))
+        },
+        "prepare_threshold": None,
     },
     "TEST": {"NAME": f"{TEST_DB_NAME}_template"},
 }

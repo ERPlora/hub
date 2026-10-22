@@ -2,15 +2,16 @@
 
 Every hub's database holds one row in ``base_hub_identity`` (``base.models.HubIdentity``): its hub's id, written
 when the database is made (:func:`write`). ``use_hub`` checks it the first time a process uses an alias
-(:func:`verify`): a database that says it is another hub, or says nothing, is refused (``HubIdentityMismatch``) and
-nothing is served from it; one that is its hub is not read again in this process. Outside any operation, on purpose:
-it runs before anything of the hub does.
+(:func:`verify`): a database that says it is another hub, or has no identity table, is refused
+(``HubIdentityMismatch``) and nothing is served from it; one that is its hub is not read again in this process. A
+database that cannot be reached now raises its own ``DatabaseError``: passing, never taken for a mismatch. Outside any
+operation, on purpose: it runs before anything of the hub does.
 """
 
 import threading
 import uuid
 
-from django.db import DatabaseError, connections
+from django.db import ProgrammingError, connections
 
 IDENTITY_TABLE = "base_hub_identity"
 
@@ -31,8 +32,11 @@ def verify(alias: str, hub_id: uuid.UUID) -> None:
         with connections[alias].cursor() as cursor:
             cursor.execute(f"SELECT hub_id FROM {IDENTITY_TABLE}")
             found = [row[0] for row in cursor.fetchall()]
-    except DatabaseError as error:
-        raise HubIdentityMismatch(f"The database of {alias} has no readable identity ({error}): refused.") from error
+    except ProgrammingError as error:
+        # No identity table: the database is no hub's (a template, a database that was never provisioned).
+        raise HubIdentityMismatch(f"The database of {alias} has no identity ({error}): refused.") from error
+    # Any other DatabaseError (unreachable, a failover) goes up as it came: a passing failure, not a mismatch, and
+    # the alias is read again next time.
     if found != [hub_id]:
         raise HubIdentityMismatch(
             f"The database of {alias} says it is {[str(value) for value in found]}, not the hub {hub_id}: refused."

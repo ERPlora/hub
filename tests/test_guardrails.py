@@ -21,7 +21,8 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     formatting (``base.tenancy.names``: ``sql.Identifier``); ``connections.settings`` never changed in place (a copy is
     swapped in); ``apps/`` never imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside
     ``live.broker``; phase 1's shared database (``use_shared_database``) only where the list says, until S5; the
-    tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones.
+    tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
+    ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``) but the 8 S2 moves first.
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -328,8 +329,12 @@ def database_problems(databases: dict) -> list[str]:
                 problems.append(f"{alias}: CONN_MAX_AGE={max_age}")
             if not db.get("DISABLE_SERVER_SIDE_CURSORS"):
                 problems.append(f"{alias}: server-side cursors on")
-            if options.get("prepare_threshold") is not None:
-                problems.append(f"{alias}: prepare_threshold={options['prepare_threshold']}")
+            # Django leaves it unset and psycopg 3 then prepares on the fifth run, which PgBouncer in transaction mode
+            # (max_prepared_statements=0) loses: it must be there, None. A __ddl alias is direct, to the writer.
+            if not alias.endswith(DDL_ALIAS_SUFFIX) and (
+                "prepare_threshold" not in options or options["prepare_threshold"] is not None
+            ):
+                problems.append(f"{alias}: prepare_threshold={options.get('prepare_threshold', 'unset (psycopg: 5)')}")
         if db.get("ATOMIC_REQUESTS"):
             problems.append(f"{alias}: ATOMIC_REQUESTS")
     return problems
@@ -353,6 +358,14 @@ SHARED_DATABASE_USERS: dict[str, str] = {
     "base/management/commands/create_platform_hub.py": "the platform hub has no registry row before S2.",
     "base/management/commands/shell.py": "manage.py shell (the e2e's relay helpers) on phase 1's database.",
 }
+#: ``transaction.on_commit`` in the modules, pending S2, by file and count: with the hub's own database the operation's
+#: transaction is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a
+#: rollback). The first step of S2 moves them to ``live.operations.on_commit`` and empties this list.
+PENDING_S2_ON_COMMIT: dict[str, int] = {
+    "apps/flow/services.py": 2,
+    "apps/website/services.py": 4,
+    "apps/whatsapp_inbox/services.py": 2,
+}
 #: Hub models that still have a ``hub_id`` column, each with its reason (PLAN-DB §11: the border is the database).
 HUB_ID_COLUMNS: dict[str, str] = {
     "base.hubidentity": "the identity of the hub's database itself (PLAN-DB §3).",
@@ -360,6 +373,26 @@ HUB_ID_COLUMNS: dict[str, str] = {
     "website.image": "phase 1's scaffold, with the site's: it goes in S5 (plan, decision 2).",
     "verifactu.config": "not tenancy: the business's id in the SaaS; it becomes business_id (plan, decision 2).",
 }
+
+
+def bare_on_commit_touches(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every ``transaction.on_commit(`` and every import of Django's ``on_commit``."""
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(source)):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "on_commit"
+            and _receiver_name(node.func.value) == "transaction"
+        ):
+            found.add((node.lineno, "transaction.on_commit("))
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.module == "django.db.transaction"
+            and any(alias.name == "on_commit" for alias in node.names)
+        ):
+            found.add((node.lineno, "from django.db.transaction import on_commit"))
+    return sorted(found)
 
 
 def database_ddl_touches(source: str) -> list[tuple[int, str]]:
@@ -637,6 +670,12 @@ def test_database_check_sees_pools_persistent_connections_and_server_cursors_on_
             "NAME": "hub_template",
             "CONN_MAX_AGE": 0,
             "DISABLE_SERVER_SIDE_CURSORS": True,
+            "OPTIONS": {"prepare_threshold": None},
+        },
+        "hub_template_restaurant": {
+            "NAME": "hub_template_restaurant",
+            "CONN_MAX_AGE": 0,
+            "DISABLE_SERVER_SIDE_CURSORS": True,
         },
         "demo_0190a1b2c3d4": {
             "NAME": "demo_0190a1b2c3d4",
@@ -652,7 +691,9 @@ def test_database_check_sees_pools_persistent_connections_and_server_cursors_on_
         "hub_0190a1b2c3d4: OPTIONS['pool']",
         "hub_0190a1b2c3d4: CONN_MAX_AGE=60",
         "hub_0190a1b2c3d4: server-side cursors on",
+        "hub_0190a1b2c3d4: prepare_threshold=unset (psycopg: 5)",
         "hub_0190a1b2c3d4__ddl: CONN_MAX_AGE=None",
+        "hub_template_restaurant: prepare_threshold=unset (psycopg: 5)",
         "demo_0190a1b2c3d4: prepare_threshold=5",
         "pre_hub_0190a1b2c3d4__ddl: server-side cursors on",
         "other: ATOMIC_REQUESTS",
@@ -739,6 +780,8 @@ del connections.settings[alias]
 cursor.execute("LISTEN hub_x")
 context._test_fallback = SHARED
 setattr(context, "_test_fallback", SHARED)
+transaction.on_commit(partial(notify, scope), robust=True)
+from django.db.transaction import on_commit
 """
 TENANCY_LOOKALIKES = """\
 \"\"\"LISTEN on control, never CREATE DATABASE by hand.\"\"\"
@@ -746,6 +789,8 @@ query = sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name))
 connections.settings = {**connections.settings, alias: cfg}
 settings = dict(connections.settings)
 fallback = context._test_fallback
+operations.on_commit(partial(notify, scope))
+transaction.atomic(using=alias)
 """
 
 
@@ -768,6 +813,10 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
     assert listen_touches(TENANCY_OFFENDER) == [(11, "LISTEN")]
     assert shared_database_touches(TENANCY_OFFENDER) == [(4, "use_shared_database")]
     assert fallback_touches(TENANCY_OFFENDER) == [(12, "_test_fallback"), (13, "_test_fallback")]
+    assert bare_on_commit_touches(TENANCY_OFFENDER) == [
+        (14, "transaction.on_commit("),
+        (15, "from django.db.transaction import on_commit"),
+    ]
     for check in (
         database_ddl_touches,
         settings_mutation_touches,
@@ -775,6 +824,7 @@ def test_the_tenancy_scanners_see_what_they_must_and_nothing_else():
         listen_touches,
         shared_database_touches,
         fallback_touches,
+        bare_on_commit_touches,
     ):
         assert check(TENANCY_LOOKALIKES) == [], check.__name__
 
@@ -850,4 +900,40 @@ def test_no_hub_model_carries_its_hub_but_the_listed_ones():
     assert found == sorted(HUB_ID_COLUMNS), (
         "The border between hubs is the database, not a column (PLAN-DB §11): drop hub_id, or add a reasoned entry "
         f"to HUB_ID_COLUMNS (and remove those that no longer have one): {found}"
+    )
+
+
+def _on_commit_counts(files) -> dict[str, int]:
+    counts = {str(path): len(bare_on_commit_touches((HUB_DIR / path).read_text())) for path in files}
+    return {path: count for path, count in counts.items() if count}
+
+
+def on_commit_problems(counts: dict[str, int]) -> dict[str, tuple[int, int]]:
+    """``{file: (found, listed)}`` wherever the bare calls differ from ``PENDING_S2_ON_COMMIT``."""
+    return {
+        path: (counts.get(path, 0), PENDING_S2_ON_COMMIT.get(path, 0))
+        for path in set(counts) | set(PENDING_S2_ON_COMMIT)
+        if counts.get(path, 0) != PENDING_S2_ON_COMMIT.get(path, 0)
+    }
+
+
+def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
+    listed = dict(PENDING_S2_ON_COMMIT)
+
+    assert on_commit_problems(listed) == {}
+    assert on_commit_problems({**listed, "apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
+    assert on_commit_problems({**listed, "apps/flow/services.py": 3}) == {"apps/flow/services.py": (3, 2)}
+    # One moved to live.operations.on_commit: its entry shrinks, so the list never hides a new one.
+    assert on_commit_problems({**listed, "apps/website/services.py": 3}) == {"apps/website/services.py": (3, 4)}
+
+
+def test_the_modules_run_after_the_commit_only_through_live():
+    files = [path for path in source_files(HUB_DIR) if path.parts[0] == "apps"]
+
+    problems = on_commit_problems(_on_commit_counts(files))
+
+    assert problems == {}, (
+        "A module runs after the COMMIT with live.operations.on_commit, on its operation's alias; a bare "
+        "transaction.on_commit registers on default, outside the hub's transaction. PENDING_S2_ON_COMMIT lists the "
+        f"8 calls S2 moves first (shrink an entry once moved, never add one): {{file: (found, listed)}} {problems}"
     )

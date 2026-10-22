@@ -9,6 +9,7 @@ records its event in B's database and notifies B's channel, never A's; and B's s
 import asyncio
 import json
 from contextlib import contextmanager
+from unittest import mock
 
 import pytest
 from django.contrib.auth import get_user_model, login
@@ -36,8 +37,11 @@ def every_hub_known(settings):
 
 
 @contextmanager
-def watched(monkeypatch):
-    """Every statement any thread sends, by alias: a wrapper at the cursor, under every connection of every thread."""
+def watched():
+    """Every statement any thread sends, by alias: a wrapper at the cursor, under every connection of every thread.
+
+    Scoped to the block (``mock.patch.object``): ``monkeypatch.undo()`` would also undo the test's other patches, the
+    ``no_test_fallback`` one included."""
     sent: dict[str, list[str]] = {}
     real = CursorWrapper._execute
 
@@ -45,9 +49,8 @@ def watched(monkeypatch):
         sent.setdefault(self.db.alias, []).append(sql)
         return real(self, sql, params, *ignored)
 
-    monkeypatch.setattr(CursorWrapper, "_execute", execute)
-    yield sent
-    monkeypatch.undo()
+    with mock.patch.object(CursorWrapper, "_execute", execute):
+        yield sent
 
 
 def as_hub(hub) -> OperationContext:
@@ -71,13 +74,15 @@ def touches(sent: dict[str, list[str]], alias: str, table: str = "demo_item") ->
 
 
 @HUB_DB
-def test_an_operation_as_a_reaches_a_and_never_b(hub_a, hub_b, monkeypatch):
+def test_an_operation_as_a_reaches_a_and_never_b(hub_a, hub_b):
     create(hub_a, "Of A")
     create(hub_b, "Of B")
 
-    with watched(monkeypatch) as sent:
+    with watched() as sent:
         names = listed(hub_a)
 
+    # The watch is scoped: the rest of the test still runs as production (no fallback).
+    assert context._test_fallback is None
     assert names == ["Of A"]
     assert touches(sent, hubs.HUB_A_ALIAS)
     assert hubs.HUB_B_ALIAS not in sent
@@ -85,14 +90,14 @@ def test_an_operation_as_a_reaches_a_and_never_b(hub_a, hub_b, monkeypatch):
 
 
 @HUB_DB
-def test_a_request_as_a_reaches_a_and_never_b(client, hub_a, hub_b, monkeypatch):
+def test_a_request_as_a_reaches_a_and_never_b(client, hub_a, hub_b):
     create(hub_a, "Of A")
     create(hub_b, "Of B")
     user = get_user_model().objects.create_user(username="ana", password="pw")
     Membership.objects.create(user=user, host=hub_a.slug, role=Membership.Role.ADMIN)
     client.force_login(user)
 
-    with watched(monkeypatch) as sent:
+    with watched() as sent:
         response = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost")
 
     assert [row["name"] for row in response.json()["rows"]] == ["Of A"]
@@ -101,7 +106,7 @@ def test_a_request_as_a_reaches_a_and_never_b(client, hub_a, hub_b, monkeypatch)
 
 
 @HUB_DB_COMMITTED
-def test_a_live_rerun_as_a_reaches_a_and_never_b_in_the_executors_thread(hub_a, hub_b, monkeypatch):
+def test_a_live_rerun_as_a_reaches_a_and_never_b_in_the_executors_thread(hub_a, hub_b):
     create(hub_a, "Of A")
     create(hub_b, "Of B")
     user = get_user_model().objects.create_user(username="ana", password="pw")
@@ -118,7 +123,7 @@ def test_a_live_rerun_as_a_reaches_a_and_never_b_in_the_executors_thread(hub_a, 
             executor.reset()
             executor.shutdown()
 
-    with watched(monkeypatch) as sent:
+    with watched() as sent:
         asyncio.run(run_once())
 
     frame = stream.queue.get_nowait().decode()

@@ -890,7 +890,7 @@ def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_
     assert template["NAME"] == "pre_hub_template"
     assert (template["HOST"], template["PORT"]) == (databases["default"]["HOST"], databases["default"]["PORT"])
     assert (template["CONN_MAX_AGE"], template["DISABLE_SERVER_SIDE_CURSORS"]) == (0, True)
-    assert template["OPTIONS"] == {"connect_timeout": 5}
+    assert template["OPTIONS"] == {"connect_timeout": 5, "prepare_threshold": None}
     assert template["TEST"]["NAME"] == "test_hub_sup_template"
 
 
@@ -909,7 +909,7 @@ def test_in_aws_the_hubs_go_through_the_pgbouncer_sidecar_without_tls_to_it(load
     template = loaded["DATABASES"]["hub_template"]
 
     assert (template["HOST"], template["PORT"]) == ("127.0.0.1", 6432)
-    assert template["OPTIONS"] == {"connect_timeout": 5, "application_name": "hub"}
+    assert template["OPTIONS"] == {"connect_timeout": 5, "application_name": "hub", "prepare_threshold": None}
     assert loaded["DATABASE_ROUTERS"] == ["base.routers.SharedRouter", "base.tenancy.router.TenantRouter"]
 
 

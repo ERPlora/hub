@@ -76,13 +76,14 @@ def test_a_request_on_a_hub_with_its_database_writes_there_and_nowhere_else(clie
 
 
 @HUB_DB
-def test_a_hub_whose_database_is_not_its_own_serves_nothing(client, hub_a, monkeypatch):
+def test_a_hub_whose_database_is_not_its_own_serves_nothing(client, hub_a, monkeypatch, caplog):
     """The identity check refuses the database (``test_identity.py``): the request answers 503 and runs nothing."""
     monkeypatch.setattr(identity, "_verified", set())
 
     def refuse(alias, hub_id):
         raise identity.HubIdentityMismatch(f"{alias} is another hub's")
 
+    real_verify = identity.verify
     monkeypatch.setattr(identity, "verify", refuse)
     client.force_login(member(hub_a.slug))
 
@@ -90,8 +91,31 @@ def test_a_hub_whose_database_is_not_its_own_serves_nothing(client, hub_a, monke
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "base.hub_unavailable"
-    monkeypatch.undo()
+    assert [record for record in caplog.records if record.levelname == "CRITICAL"]
+    monkeypatch.setattr(identity, "verify", real_verify)
     assert items_in(hub_a) == []
+
+
+@HUB_DB
+def test_a_hub_whose_database_cannot_be_reached_now_is_503_without_the_mismatch_alarm(client, hub_a, monkeypatch, caplog):
+    """A passing failure (PgBouncer restarting, a failover) is no «database not its own»: 503, a warning, no critical."""
+    from django.db import OperationalError
+
+    monkeypatch.setattr(identity, "_verified", set())
+
+    def unreachable(alias, hub_id):
+        raise OperationalError("connection refused")
+
+    monkeypatch.setattr(identity, "verify", unreachable)
+    client.force_login(member(hub_a.slug))
+
+    response = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost")
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "base.hub_unavailable"
+    assert "Retry-After" in response
+    assert not [record for record in caplog.records if record.levelname == "CRITICAL"]
+    assert [record for record in caplog.records if record.levelname == "WARNING" and "base.hub_unreachable" in record.getMessage()]
 
 
 @pytest.mark.django_db

@@ -20,6 +20,7 @@ from collections.abc import Callable
 import pytest
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.contrib.auth import login
 from django.contrib.sessions.backends.db import SessionStore
 from django.db import close_old_connections
 from django.test import Client, RequestFactory
@@ -388,6 +389,31 @@ async def test_hello_without_a_session_is_refused_and_the_socket_closed(sockets)
     assert invalid["code"] == "unauthenticated"
     assert invalid["message"] != refused["message"], "«you sent none» and «yours is not valid» are different facts"
     assert await bogus.closed() == 4401
+
+
+async def test_a_session_opened_on_another_hub_is_no_session_here_even_for_a_member_of_both(sockets, django_user_model):
+    """Phase 2, S1: the session notes the host it was opened on (``base.middleware.SessionHostMiddleware``); the print
+    socket reads the session itself, so it applies the same rule: B's session on A's socket is 4401."""
+
+    def opened_on_b() -> str:
+        user = django_user_model.objects.create_user(username="bea", password="pw")
+        for host in ("a", "b"):
+            Membership.objects.create(user=user, host=host, role=Membership.Role.OWNER)
+        request = RequestFactory().get("/auth/callback")
+        request.session, request.hub = SessionStore(), Hub.objects.get(slug="b")
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        request.session.save()
+        return request.session.session_key
+
+    cookie = await db(opened_on_b)
+    till = await db(printer)
+    socket = sockets(cookie=cookie)
+    await socket.connect()
+
+    frame = await socket.hello("till-1", [till])
+
+    assert frame["type"] == "error" and frame["code"] == "unauthenticated"
+    assert await socket.closed() == 4401
 
 
 async def test_a_session_of_another_hub_drains_nothing_here(sockets, session):

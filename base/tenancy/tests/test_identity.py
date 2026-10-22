@@ -81,3 +81,47 @@ def test_a_refusal_is_not_remembered_the_database_is_read_again(hub_databases, d
         identity.verify(alias, hubs.HUB_B_ID)
 
     assert alias in identity._verified
+
+
+class _Unreachable:
+    """A database that cannot be reached right now (PgBouncer restarting, a failover): every cursor fails."""
+
+    def __getitem__(self, alias):
+        return self
+
+    def cursor(self):
+        from django.db import OperationalError
+
+        raise OperationalError("connection to server at 127.0.0.1, port 6432 failed: Connection refused")
+
+
+def test_an_unreachable_database_is_no_mismatch_and_is_read_again(monkeypatch):
+    """A transient failure is re-raised as it came (503 upstream, no «not its own» alarm), and not remembered."""
+    from django.db import OperationalError
+
+    monkeypatch.setattr(identity, "connections", _Unreachable())
+
+    with pytest.raises(OperationalError):
+        identity.verify("hub_0190a1b2c3d47e5f8a9b0c1d2e3f4a5b", hubs.HUB_A_ID)
+    assert identity._verified == set()
+
+
+def test_a_database_without_the_identity_table_is_a_mismatch(hub_databases, django_db_blocker):
+    """``base_hub_identity`` missing (``ProgrammingError``): that database is no hub's, not a passing failure."""
+    from django.db import connections as django_connections
+    from psycopg import sql
+
+    from base.tenancy import names
+
+    empty = stranger(names.hub_db_name(hub_databases.control, uuid.uuid7()))
+    with hubs._maintenance() as conn:
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(empty.db_name)))
+    try:
+        with django_db_blocker.unblock():
+            alias = connections.register_hub_alias(empty)
+            with pytest.raises(identity.HubIdentityMismatch):
+                identity.verify(alias, empty.id)
+            django_connections[alias].close()
+    finally:
+        with hubs._maintenance() as conn:
+            conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(empty.db_name)))
