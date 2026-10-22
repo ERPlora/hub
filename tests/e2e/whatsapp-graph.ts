@@ -154,6 +154,10 @@ export function configProblem(answer: DoorAnswer, run: ErploraRun): string {
   return '';
 }
 
+/** The messages erplora.com asked Meta to send from `a`'s number (`POST /<NUMBER_ID>/messages`) among `calls`. */
+export const messageSends = (calls: GraphCall[]): GraphCall[] =>
+  calls.filter((call) => call.method === 'POST' && call.path === `/${NUMBER_ID}/messages`);
+
 /** Why door 11 with `PROBE_CODE` shows the run's erplora.com does not reach Meta only through this run's Graph — it
  *  went to the real graph.facebook.com (or to no Meta at all), came through the proxy without trusting the Graph, or
  *  exchanged the code with another app secret — naming what to start it with; `''` when this Graph got the code. */
