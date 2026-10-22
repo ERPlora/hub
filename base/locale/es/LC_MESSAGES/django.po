@@ -559,3 +559,11 @@ msgid_plural "Try again in %(minutes)s minutes."
 msgstr[0] "Vuelve a intentarlo en %(minutes)s minuto."
 msgstr[1] "Vuelve a intentarlo en %(minutes)s minutos."
 msgstr[2] "Vuelve a intentarlo en %(minutes)s minutos."
+
+#: ws_print.py
+#, python-format
+msgid "Too many failed sign-ins from this connection. Try again in %(minutes)s minute."
+msgid_plural "Too many failed sign-ins from this connection. Try again in %(minutes)s minutes."
+msgstr[0] "Demasiados intentos fallidos de entrar desde esta conexión. Vuelve a intentarlo en %(minutes)s minuto."
+msgstr[1] "Demasiados intentos fallidos de entrar desde esta conexión. Vuelve a intentarlo en %(minutes)s minutos."
+msgstr[2] "Demasiados intentos fallidos de entrar desde esta conexión. Vuelve a intentarlo en %(minutes)s minutos."
