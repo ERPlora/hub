@@ -9,8 +9,9 @@
   429 ``base.rate_limited``). The catalog is read live and kept a minute per hub, version and language; the reviews
   are those kept (``apps.website.reviews``: a read never asks Google).
 - **The catalog** (``read_catalog``): Inventory's products on sale or Services' offered services, read by their
-  operations' names with a context that may read them (as ``apps.flow`` does), only when that app is installed; an
-  app that is not there leaves the catalog empty, never an error.
+  operations' names with a context that may read them (as ``apps.flow`` does), only while that app is on in the hub
+  (``base.relay.active_apps``, the website's own guard); an app that is off or not there leaves the catalog empty,
+  never an error.
 - ``published_page`` and ``live_version`` are what ``public_home`` reads; ``page_cache_key`` and
   ``catalog_cache_key`` name what is cached, and ``forget_cached`` drops a version's entries.
 
@@ -23,7 +24,6 @@ from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
 
-from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Q, QuerySet
@@ -73,10 +73,10 @@ PAGE_TTL = 3600
 MAX_ITEMS = 200
 #: The page size of the other apps' lists.
 PAGE = 100
-#: Each source: its app, what the delegated context may read, and how it is read.
+#: Each source (its app's label) and what the delegated context may read of it.
 SOURCES = {
-    "service": ("apps.service", frozenset({"service.view_service", "service.view_category"})),
-    "inventory": ("apps.inventory", frozenset({"inventory.view_product", "inventory.view_category"})),
+    "service": frozenset({"service.view_service", "service.view_category"}),
+    "inventory": frozenset({"inventory.view_product", "inventory.view_category"}),
 }
 #: A site visitors see: published at least once and online.
 LIVE = Q(is_live=True, published_version__gt=0)
@@ -224,10 +224,9 @@ def get_qr(ctx: OperationContext, data: QrIn) -> dict:
     ai={"description": "The categories of Inventory's products or Services' services the website's catalog can show."},
 )
 def list_categories(ctx: OperationContext, data: CategoriesIn) -> dict:
-    app, permissions = SOURCES[data.source]
-    if not apps.is_installed(app):
+    if not _source_on(ctx.scope, data.source):
         return {"categories": []}
-    reader = replace(ctx, permissions=ctx.permissions | permissions)
+    reader = replace(ctx, permissions=ctx.permissions | SOURCES[data.source])
     rows = _service_categories(reader) if data.source == "service" else _product_categories(reader)
     return {"categories": [{"id": row.id, "name": row.name} for row in rows]}
 
@@ -389,15 +388,12 @@ def read_catalog(ctx: OperationContext, section: CatalogSection) -> dict[str, An
     """The snapshot of ``section``'s source: ``{source, show_prices, groups: [{name, items}]}``.
 
     Read by the source's operations with ``ctx`` allowed to read it (and nothing else); empty when the section has
-    no source or the source's app is not installed.
+    no source or the source's app is not on in the hub.
     """
     snapshot: dict[str, Any] = {"source": section.source, "show_prices": section.show_prices, "groups": []}
-    if section.source is None:
+    if section.source is None or not _source_on(ctx.scope, section.source):
         return snapshot
-    app, permissions = SOURCES[section.source]
-    if not apps.is_installed(app):
-        return snapshot
-    reader = replace(ctx, permissions=ctx.permissions | permissions)
+    reader = replace(ctx, permissions=ctx.permissions | SOURCES[section.source])
     wanted = {str(category_id) for category_id in section.category_ids}
     groups = _service_groups(reader) if section.source == "service" else _product_groups(reader)
     snapshot["groups"] = [
@@ -406,6 +402,11 @@ def read_catalog(ctx: OperationContext, section: CatalogSection) -> dict[str, An
         if items and (not wanted or category_id in wanted)
     ]
     return snapshot
+
+
+def _source_on(scope: Scope, source: str) -> bool:
+    """Whether the catalog's ``source`` (an app's label) is on in ``scope``'s hub, as the website's own guard asks."""
+    return source in relay.active_apps(scope)
 
 
 def _rows(ctx: OperationContext, name: str, limit: int = MAX_ITEMS, **params: Any) -> Iterator[Any]:

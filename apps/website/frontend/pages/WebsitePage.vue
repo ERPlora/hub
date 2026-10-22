@@ -99,6 +99,12 @@ const sources = computed(() => {
   const on = new Set((session.me.value?.apps ?? []).filter((app) => app.state === 'on').map((app) => app.label));
   return SOURCES.filter((source) => on.has(source));
 });
+/** The draft's catalog source when its app is off in this business: the page shows no catalog from it (the server
+ *  reads nothing of an app that is off), so it is listed, unpickable, and said. */
+const sourceOff = computed(() => {
+  const source = draft.value?.content.catalog.source ?? null;
+  return source && !sources.value.includes(source) ? source : null;
+});
 
 watch(
   site,
@@ -599,17 +605,35 @@ function setHoursShown(shown: boolean): void {
                         >
                           {{ source === 'inventory' ? t('website.fields.sourceInventory') : t('website.fields.sourceService') }}
                         </ion-select-option>
+                        <ion-select-option
+                          v-if="sourceOff"
+                          :value="sourceOff"
+                          disabled
+                        >
+                          {{ sourceOff === 'inventory' ? t('website.fields.sourceInventory') : t('website.fields.sourceService') }}
+                        </ion-select-option>
                       </ion-select>
                     </ion-item>
                     <ion-item
-                      v-if="!sources.length"
+                      v-if="sourceOff"
+                      lines="none"
+                    >
+                      <ion-note
+                        color="warning"
+                        data-testid="website-catalog-source-off"
+                      >
+                        {{ sourceOff === 'inventory' ? t('website.fields.sourceOffInventory') : t('website.fields.sourceOffService') }}
+                      </ion-note>
+                    </ion-item>
+                    <ion-item
+                      v-else-if="!sources.length"
                       lines="none"
                     >
                       <ion-note data-testid="website-catalog-no-source">
                         {{ t('website.fields.noSource') }}
                       </ion-note>
                     </ion-item>
-                    <template v-if="draft.content.catalog.source">
+                    <template v-if="draft.content.catalog.source && !sourceOff">
                       <ion-item>
                         <CategoryPicker
                           v-model="draft.content.catalog.category_ids"

@@ -289,6 +289,20 @@ describe('WebsitePage', () => {
     expect(options.map((option) => (option.element as Control).value)).toEqual(['', 'service']);
   });
 
+  // flow: WEBSITE-F05 — a catalog saved from an app that is now off says so, and asks that app nothing.
+  it('a catalog saved from an app that is off says the page shows no catalog, and asks it for no categories', async () => {
+    const s = await setup();
+    await s.show({ ...SITE, content: { ...SITE.content, catalog: { ...SITE.content.catalog, source: 'inventory' } } });
+    const options = s.wrapper.findAll('[data-testid="website-catalog-source"] ion-select-option');
+    expect(options.map((option) => (option.element as Control).value)).toEqual(['', 'service', 'inventory']);
+    expect((options.at(-1)!.element as Control & { disabled?: boolean }).disabled).toBe(true);
+    expect(s.testid('website-catalog-source-off').text()).toBe(
+      'Inventory is not on in this business: your page shows no catalog until you turn it on or choose another source.',
+    );
+    expect(s.wrapper.findComponent({ name: 'CategoryPicker' }).exists()).toBe(false);
+    expect(s.net.api.some((api) => api.url.startsWith('/api/website/catalog/categories'))).toBe(false);
+  });
+
   it('turning the opening hours on starts from a usual week', async () => {
     const s = await setup();
     await s.show();
