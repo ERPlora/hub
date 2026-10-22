@@ -1,6 +1,8 @@
 // «Activity» on the Home (BASE-F09) against the real Sales: a sale charged through its API shows up live in
 // the table at `/#actividad` with its number, amount in euros and status, and its date and time are read whole
-// in the three viewports (hub#2637: at about 820 px the old hub's «Date» column cut the time off).
+// in the three viewports (hub#2637: at about 820 px the old hub's «Date» column cut the time off). Whole for the
+// widest date the format can print, not only for this sale's: «Oct 22, 2026, 10:09 PM» was cut at 834 while
+// «9:30 PM» fit, so a check of the clock's own time passed or failed by the hour it ran (2026-10-22).
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
@@ -48,6 +50,39 @@ function cuts(el: Locator): Promise<string[]> {
       if (at === cell) break;
     }
     return found;
+  });
+}
+
+/**
+ * The widest text `formatDateTime` (@erplora/ui: medium date + short time, «Oct 22, 2026, 10:09 PM») can print, in
+ * the hub's two languages and `cell`'s own font, against the room inside `cell`. Dates and times are measured apart
+ * (every day of a leap year at one time, every minute at one date) and the widest of each, then put together.
+ */
+function widestDate(cell: Locator): Promise<{ text: string; width: number; room: number }> {
+  return cell.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.cssText = 'position: absolute; visibility: hidden; white-space: nowrap; left: 0; top: 0;';
+    node.appendChild(probe);
+    const width = (text: string) => {
+      probe.textContent = text;
+      return probe.getBoundingClientRect().width;
+    };
+    const widestOf = (format: Intl.DateTimeFormat, instants: Date[]) =>
+      instants.reduce((best, at) => (width(format.format(at)) > width(format.format(best)) ? at : best));
+    let found = { text: '', width: 0 };
+    for (const locale of ['en', 'es']) {
+      const format = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
+      const days = Array.from({ length: 366 }, (_, day) => new Date(Date.UTC(2028, 0, 1 + day, 12, 0)));
+      const minutes = Array.from({ length: 24 * 60 }, (_, minute) => new Date(Date.UTC(2028, 0, 1, 0, minute)));
+      const day = widestOf(format, days);
+      const time = widestOf(format, minutes);
+      const text = format.format(new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), time.getUTCHours(), time.getUTCMinutes())));
+      if (width(text) > found.width) found = { text, width: width(text) };
+    }
+    probe.remove();
+    const style = getComputedStyle(node);
+    const room = node.getBoundingClientRect().width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return { ...found, room };
   });
 }
 
@@ -114,10 +149,20 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/#actividad`);
     const seen = await rowOf(page, sale.id);
-    const date = seen.locator('.data-table__cell, .data-table__field-value').first();
-    // The date carries its time («22/10/2026, 9:30»), and nothing clips it.
+    const cells = seen.locator('.data-table__cell, .data-table__field-value');
+    const date = cells.first();
+    // The date carries its time («22/10/2026, 9:30»), and nothing clips it, nor any other value of the row.
     await expect(date).toHaveText(/\d{1,2}:\d{2}/);
     await expect.poll(() => cuts(date), `date at ${vp.label}`).toEqual([]);
+    for (const cell of await cells.all()) {
+      expect(await cuts(cell), `«${await cell.innerText()}» at ${vp.label}`).toEqual([]);
+    }
+    // Nor would the widest date the format prints, whatever the hour of this run: a table cell keeps its value on one
+    // line and ends it in «…»; a card's value wraps between words, so it never needs the widest on one line.
+    if (await date.evaluate((node) => node.matches('.data-table__cell'))) {
+      const widest = await widestDate(date);
+      expect(widest.width, `«${widest.text}» in ${widest.room.toFixed(1)} px at ${vp.label}`).toBeLessThanOrEqual(widest.room + 0.5);
+    }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `no sideways scroll at ${vp.label}`).toBeLessThanOrEqual(0);
     // The list/cards switch slides its indicator when the width changes the view: capture it settled.

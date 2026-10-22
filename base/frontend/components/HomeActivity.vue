@@ -49,7 +49,8 @@ const columns = computed(() => [
     key: 'created_at',
     label: t('base.activity.columns.date'),
     format: (value: unknown) => formatDateTime(value as string, locale.value),
-    width: 'minmax(9.5rem, 1fr)',
+    // The widest date and time the format prints («May 30, 2028, 10:44 AM», 158 px) whole, with room to spare.
+    width: 'minmax(10.5rem, 1fr)',
   },
   { key: 'number', label: t('base.activity.columns.sale') },
   { key: 'customer_name', label: t('base.activity.columns.customer') },
