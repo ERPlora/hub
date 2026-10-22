@@ -111,3 +111,13 @@ def test_the_shell_paints_every_palette_of_the_ui_and_the_default_for_any_other(
     client.cookies["ep_palette"] = cookie
     response = client.get("/demo/items", HTTP_HOST="a.localhost:8000")
     assert f'data-ep-palette="{painted}"' in response.content.decode()
+
+
+@pytest.mark.parametrize("slug", ["a", "b"])
+def test_the_shell_embeds_where_this_hub_s_plan_is_changed_on_the_saas(client, settings, slug):
+    # BASE-G169: «Upgrade plan» at the foot of the menu opens this hub's plan page on erplora.com.
+    from base.models import Hub
+
+    hub = Hub.objects.get(slug=slug)
+    _, plan = json_block(client.get("/demo/items", HTTP_HOST=f"{slug}.localhost:8000"), "hub-plan")
+    assert plan == {"url": f"{settings.SAAS_URL.rstrip('/')}/store/plans?business={hub.id}"}
