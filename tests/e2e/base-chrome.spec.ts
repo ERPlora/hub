@@ -1,13 +1,15 @@
 // The Hub's pieces of the shell's chrome (ERPlora/ui#19), as a person sees them at 390, 834 and 1440:
 // - «Upgrade plan» at the foot of the side menu (BASE-F11): lined up with the QR above it and inside the menu, and on
 //   the rail (≥992 px, the menu folded to its icons) only its icon, still named, inside the 68 px;
-// - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height.
+// - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height;
+// - the user menu's «My account» and «Report a problem» (PLAN-SAAS §1.1): erplora.com's pages, in a new tab.
 // No module of main declares a ⛔ step yet (Invoicing's comes with its own task), so the strip's test serves the page
 // a `base.setup.status` with one pending: the live stream is answered by the test, every other query stays loading.
 // flow: BASE-F01 BASE-F11
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 
-import { A, decodeSubs, login, shot, shown } from './helpers';
+import { A, decodeSubs, login, shot, shown, untilStill } from './helpers';
+import { STACK } from './stack';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -162,5 +164,50 @@ test('BASE-F01 — the blocking strip sits between the bar and the content, at i
     await expect(screen.locator('.data-table__empty')).toBeVisible();
     await page.screenshot({ path: shot(`APP-BASE-1-BASE-F01-strip-${vp.label}`) });
     await page.unroute(/\/api\/live\?/);
+  }
+});
+
+test('the user menu opens «My account» and «Report a problem» on erplora.com, in a new tab', async ({ page }) => {
+  await login(page, A, '/');
+  const trigger = page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name');
+  const entries = [
+    { id: 'account', label: 'My account', address: `${STACK.saas}/account` },
+    { id: 'report', label: 'Report a problem', address: `${STACK.saas}/report-a-problem` },
+  ];
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/`);
+    await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
+    await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
+    if (vp.width < PINNED_MIN) {
+      const opened = page.evaluate(() => new Promise<void>((resolve) => document.addEventListener('ionDidOpen', () => resolve(), { once: true })));
+      await shown(page).locator('ion-menu-button').click();
+      await opened;
+    }
+    const presented = page.evaluate(
+      () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
+    );
+    await trigger.click();
+    await presented;
+    for (const entry of entries) {
+      const row = page.locator(`ion-popover [data-testid="user-menu-${entry.id}"]`);
+      await expect(row, `${entry.id} at ${vp.label}`).toContainText(entry.label);
+      // ion-item paints its own link from them: the address on erplora.com, in a new tab.
+      const link = row.locator('a.item-native');
+      await expect(link).toHaveAttribute('href', entry.address);
+      await expect(link).toHaveAttribute('target', '_blank');
+      await expect(link).toHaveAttribute('rel', 'noopener');
+    }
+    await untilStill(page);
+    await page.screenshot({ path: shot(`APP-BASE-1-user-menu-${vp.label}`) });
+    if (vp.width === 1440) {
+      // Tapped, the page opens in a tab of its own and the hub stays where it was.
+      const [tab] = await Promise.all([page.waitForEvent('popup'), page.locator('ion-popover [data-testid="user-menu-report"]').click()]);
+      await tab.waitForURL(`${STACK.saas}/report-a-problem`);
+      await tab.close();
+      await expect(page).toHaveURL(`${A}/`);
+    } else {
+      await page.keyboard.press('Escape');
+    }
   }
 });

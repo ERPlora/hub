@@ -40,6 +40,10 @@ export function readJsonBlock<T>(id: string, doc: Document = document): T | unde
 export interface HubHome {
   name: string;
   plan_url: string;
+  /** The person's account on erplora.com (the user menu's «My account»). */
+  account_url: string;
+  /** erplora.com's form to report a problem to support (the user menu's «Report a problem», PLAN-SAAS §1.1). */
+  report_url: string;
 }
 
 // ── «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164) ────────────────────────────────────

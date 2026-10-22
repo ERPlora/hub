@@ -98,6 +98,10 @@
     },
     "plan": {
       "upgrade": "Upgrade plan"
+    },
+    "userMenu": {
+      "account": "My account",
+      "reportProblem": "Report a problem"
     }
   }
 }

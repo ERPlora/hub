@@ -4,8 +4,8 @@ Next to ``spa-config`` it embeds the result of ``base.session.me`` (``session-me
 paints the menu and decides on the login without a first round trip. ``spa-config`` carries
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
 jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
-Home, BASE-G127) and where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
-plan», BASE-G169).
+Home, BASE-G127), where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
+plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1).
 
 ``spa`` is the view ``base.middleware`` knows by identity; it dispatches. A visitor without a session who loads
 ``/`` of a hub with a published website gets that website (``base.public_home``), which never passes through
@@ -38,7 +38,12 @@ def _shell(request: HttpRequest) -> HttpResponse:
     extra_json = {SESSION_ME_ID: me.model_dump(mode="json")}
     hub = getattr(request, "hub", None)
     if hub is not None:
-        extra_json[HUB_HOME_ID] = {"name": hub.name, "plan_url": saas_url(f"/store/plans?business={hub.id}")}
+        extra_json[HUB_HOME_ID] = {
+            "name": hub.name,
+            "plan_url": saas_url(f"/store/plans?business={hub.id}"),
+            "account_url": saas_url("/account"),
+            "report_url": saas_url("/report-a-problem"),
+        }
     return render_spa(
         request,
         extra_json=extra_json,

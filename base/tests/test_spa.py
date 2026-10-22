@@ -116,12 +116,16 @@ def test_the_shell_paints_every_palette_of_the_ui_and_the_default_for_any_other(
 @pytest.mark.parametrize("slug", ["a", "b"])
 def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_saas(client, settings, slug):
     # BASE-G127: the Home is headed by the business's name; BASE-G169: «Upgrade plan» opens its plan on erplora.com.
+    # APP-BASE-1 (PLAN-SAAS §1.1): the user menu's «My account» and «Report a problem» open the SaaS's own pages.
     from base.models import Hub
 
     Hub.objects.filter(slug=slug).update(name=f"Bar {slug.upper()}")
     hub = Hub.objects.get(slug=slug)
+    saas = settings.SAAS_URL.rstrip("/")
     _, home = json_block(client.get("/demo/items", HTTP_HOST=f"{slug}.localhost:8000"), "hub-home")
     assert home == {
         "name": f"Bar {slug.upper()}",
-        "plan_url": f"{settings.SAAS_URL.rstrip('/')}/store/plans?business={hub.id}",
+        "plan_url": f"{saas}/store/plans?business={hub.id}",
+        "account_url": f"{saas}/account",
+        "report_url": f"{saas}/report-a-problem",
     }

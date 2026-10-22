@@ -186,10 +186,31 @@ describe('main.ts', () => {
     expect(shellOptions()).not.toHaveProperty('nav');
   });
 
-  it("gives the user menu the Hub's sign out (a form POST to /auth/logout), and nothing else", async () => {
+  it("without this hub's addresses on erplora.com (no hub-home), the user menu has only the Hub's sign out", async () => {
     fakeShell();
     await main.boot({});
     expect(shellOptions().userMenu).toEqual({ logout });
+  });
+
+  // PLAN-SAAS §1.1: «Report a problem» is the SaaS's form (saas `/report-a-problem`), and the account lives there
+  // too: the Hub links both, in a new tab, from the addresses base/spa.py embeds (never written here).
+  it("gives the user menu «My account» and «Report a problem» on erplora.com, then the Hub's sign out", async () => {
+    const home = {
+      name: 'Bar A',
+      plan_url: 'https://erplora.com/store/plans?business=h1',
+      account_url: 'https://erplora.com/account',
+      report_url: 'https://erplora.com/report-a-problem',
+    };
+    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
+    fakeShell();
+    await main.boot({});
+    expect(shellOptions().userMenu).toEqual({
+      items: [
+        { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
+        { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
+      ],
+      logout,
+    });
   });
 
   it('without an embedded session, asks GET /api/me (base.session.me) and goes live with its answer', async () => {

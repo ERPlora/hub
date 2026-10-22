@@ -73,6 +73,12 @@ por aviso («Eventos caídos (2)») que lleva a su pantalla. Sin nada: «Todo al
 Al pie del menú lateral, entre el código QR y la marca. Abre la página del plan de este negocio en
 erplora.com, en una pestaña nueva. Solo en el navegador: en la app instalada no está.
 
+### El menú de usuario
+Se abre tocando a la persona, arriba del menú lateral. Primero «Mi cuenta» y «Reportar un problema», que
+abren esas páginas en erplora.com (en una pestaña nueva; en la app instalada, en el navegador del
+dispositivo); después «Tema» (claro, oscuro o el del sistema) y «Cerrar sesión». Las dos primeras salen
+también en la app instalada: ninguna vende nada.
+
 ### La franja «Todavía no puedes facturar»
 Encima de cualquier pantalla mientras falta un paso que impide facturar: «No se podrá emitir ningún
 ticket ni factura hasta que configures esto:» y cada paso con «Configurar». En el «Resumen» del Inicio no
@@ -354,3 +360,5 @@ Implicados: ninguno
 - No inventa cifras: un panel o un paso que no se puede comprobar no sale o dice «No disponible».
 - No guarda el tablero en el servidor: es de cada dispositivo, como en el hub viejo.
 - No enseña nunca a un cliente los ejemplos de la app Demo.
+- No tiene formulario de soporte propio: «Reportar un problema» abre el de erplora.com, que manda el aviso
+  con la cuenta y el negocio; el hub no guarda nada.

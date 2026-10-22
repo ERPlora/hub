@@ -65,6 +65,12 @@ At the top right, after "My apps". Its number adds up the pending notices; tappe
 At the foot of the side menu, between the QR code and the brand. It opens this business's plan page on
 erplora.com, in a new tab. Only in the browser: the installed app does not have it.
 
+### The user menu
+It opens by tapping the person, at the top of the side menu. First "My account" and "Report a problem",
+which open those pages on erplora.com (in a new tab; in the installed app, in the device's browser); then
+"Theme" (light, dark or the system's) and "Sign out". The first two also show in the installed app:
+neither sells anything.
+
 ### The "You cannot issue invoices yet" strip
 Over any screen while a step that stops invoicing is missing: "No ticket or invoice can be issued until
 this is set up:" and each step with "Set up". It does not show on the Home's "Summary" (the list says the

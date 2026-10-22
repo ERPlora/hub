@@ -10,11 +10,13 @@ import {
   type SessionMe,
   type SessionStatus,
   type ShellSidebar,
+  type ShellUserMenu,
 } from '@erplora/ui/shell';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
 import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
+import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 /**
@@ -72,6 +74,23 @@ export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShe
   return messages;
 }
 
+/**
+ * The user menu (PLAN-SAAS §1.1): the person's account and «Report a problem» are erplora.com's pages, opened from
+ * the addresses `base/spa.py` embeds in `hub-home` (a new tab; the system browser in the installed app); then the
+ * Hub's sign out, a form POST to `/auth/logout` and the SaaS's logout page. Without them, only the sign out.
+ */
+export function userMenu(doc: Document): ShellUserMenu {
+  const home = readJsonBlock<HubHome>('hub-home', doc);
+  if (!home?.account_url || !home.report_url) return { logout };
+  return {
+    items: [
+      { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
+      { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
+    ],
+    logout,
+  };
+}
+
 /** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. */
 function loadSession(client: LiveClient, doc: Document) {
   const text = doc.getElementById('session-me')?.textContent;
@@ -113,8 +132,7 @@ export async function boot(
     // The old hub's shell (PLAN-MIGRATIONS §16): its side menu, pinned from 992 px and a drawer below,
     // with the QR in its footer and the rail toggle and «My apps» in the topbar.
     sidebar: SIDEBAR,
-    // Sign out is the Hub's: a form POST to `/auth/logout`, then the SaaS's logout page.
-    userMenu: { logout },
+    userMenu: userMenu(doc),
     chrome: CHROME,
   });
   provideLiveClient(client, app);
