@@ -447,20 +447,3 @@ visitors' three public reads (`website.public.*`).
 |---|---|---|---|---|---|
 | See the status, share the address and the QR | yes | yes | yes | no | `website.view` |
 | Change, upload images, preview, publish and take offline | yes | yes | no | no | `website.manage` |
-
-## What it does NOT do, on purpose
-
-- A single page per business: no additional pages nor `/p/<page>`.
-- No custom domain per business (ADR-0502), no HTML, CSS or JS of the user's and no more templates than the four.
-- The opening hours are not imported from Schedules; there is no booking link until Online booking's page exists in
-  `/p/…`.
-- Images are kept as they are (no size variants nor cropping, and their EXIF metadata is not removed); the ones that
-  are no longer used and the old versions are not deleted.
-- No sitemap nor robots beyond the preview's `noindex` tag.
-- The gallery has no caption per photo nor a full-screen viewer: each photo opens whole in another tab.
-- The Google reviews are the ones Google gives (five at most, the most relevant): not all the reviews, no replying to
-  them from ERPlora, no reviews of its own and no author's photo (the page loads no outside images: their initial
-  goes instead). Without Google's key on the server nothing is asked.
-- The footer's credit «© <year> ERPlora» cannot be removed or changed: the business's name and legal details go in
-  the footer's line.
-- The real activation of the module per business (`AppActivation`) comes in phase 2.
