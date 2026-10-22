@@ -269,7 +269,7 @@ describe('MembersPage: who may do what', () => {
       ['deactivate', 'ban-outline'],
       ['terminate', 'person-remove-outline'],
     ]);
-    expect((s.wrapper.findComponent(AppPage).props('tabs') ?? []).map((t: { id: string }) => t.id)).toEqual(['staff', 'roles', 'time_off', 'schedules', 'settings']);
+    expect((s.wrapper.findComponent(AppPage).props('tabs') ?? []).map((t: { id: string }) => t.id)).toEqual(['staff', 'roles', 'time_off', 'schedules', 'commissions', 'settings']);
   });
 
   it('a manager adds and edits, but neither deactivates nor terminates', async () => {
@@ -278,7 +278,7 @@ describe('MembersPage: who may do what', () => {
     expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['edit']);
   });
 
-  it('an employee only reads: no «+», no row to open, no action, no Settings tab', async () => {
+  it('an employee only reads: no «+», no row to open, no action, no Commissions or Settings tab', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(page(ROWS));
     expect([s.prop('addable'), s.prop('rowClickable'), s.prop('actions')]).toEqual([false, false, []]);

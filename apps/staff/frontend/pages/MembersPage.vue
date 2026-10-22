@@ -197,7 +197,7 @@ async function deactivate(): Promise<void> {
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings })"
+    :tabs="staffTabs($t, { settings: canSettings, commissions: canPay })"
     :tabs-label="$t('staff.tabs.label')"
   >
     <PageNotices

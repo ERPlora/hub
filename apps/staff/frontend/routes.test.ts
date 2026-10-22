@@ -17,6 +17,7 @@ vi.mock('./pages/MembersPage.vue', () => ({ default: { name: 'MembersPage' } }))
 vi.mock('./pages/RolesPage.vue', () => ({ default: { name: 'RolesPage' } }));
 vi.mock('./pages/TimeOffPage.vue', () => ({ default: { name: 'TimeOffPage' } }));
 vi.mock('./pages/SchedulesPage.vue', () => ({ default: { name: 'SchedulesPage' } }));
+vi.mock('./pages/CommissionsPage.vue', () => ({ default: { name: 'CommissionsPage' } }));
 vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -27,12 +28,13 @@ async function load(r: RouteRecordRaw): Promise<RouteComponent> {
 }
 
 describe('staff routes.ts', () => {
-  it('maps Staff, Roles, Time Off, Schedules and Settings, all behind a session', () => {
+  it('maps Staff, Roles, Time Off, Schedules, Commissions and Settings, all behind a session', () => {
     expect(routes.map((r) => [r.path, r.meta?.auth])).toEqual([
       ['/staff/members', true],
       ['/staff/roles', true],
       ['/staff/time-off', true],
       ['/staff/schedules', true],
+      ['/staff/commissions', true],
       ['/staff/settings', true],
     ]);
   });
@@ -45,6 +47,7 @@ describe('staff routes.ts', () => {
       { name: 'RolesPage' },
       { name: 'TimeOffPage' },
       { name: 'SchedulesPage' },
+      { name: 'CommissionsPage' },
       { name: 'SettingsPage' },
     ]);
   });

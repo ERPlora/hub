@@ -13,6 +13,7 @@ from apps.staff.schemas import (
     AvailabilityIn,
     BulkCreateIn,
     ByIdIn,
+    CommissionReportIn,
     CommissionSummaryIn,
     CompensationListIn,
     MemberIn,
@@ -94,6 +95,11 @@ async def member_terminate(request, data: TerminateIn):
 @bind(router, "staff.commission.summary", "/staff/commissions")
 async def commission_summary(request, params: Query[CommissionSummaryIn]):
     return await run_operation(request, queries.commission_summary, params)
+
+
+@bind(router, "staff.commission.report", "/staff/commissions/report")
+async def commission_report(request, params: Query[CommissionReportIn]):
+    return await run_operation(request, queries.commission_report, params)
 
 
 # Accounts (the «Hub user» selector)

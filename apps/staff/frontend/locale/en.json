@@ -7,6 +7,7 @@
       "roles": "Roles",
       "time_off": "Time Off",
       "schedules": "Schedules",
+      "commissions": "Commissions",
       "settings": "Settings"
     },
     "live": {
@@ -267,6 +268,44 @@
         "sepBreak": "break",
         "notWorking": "Off",
         "create": "Create schedule"
+      }
+    },
+    "commissions": {
+      "period": {
+        "label": "Period",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "this_week": "This week",
+        "this_month": "This month",
+        "custom": "Custom"
+      },
+      "from": "From",
+      "to": "To",
+      "totals": {
+        "label": "Totals of the period",
+        "sold": "Sold",
+        "commission": "Commissions"
+      },
+      "columns": {
+        "name": "Name",
+        "role": "Role",
+        "sold": "Sold",
+        "rate": "Commission %",
+        "commission": "Commission"
+      },
+      "inactive": "Inactive",
+      "left": "No longer works here",
+      "search": "Search professional…",
+      "entity": {
+        "one": "professional",
+        "many": "professionals"
+      },
+      "empty": "No one on the team can earn a commission yet.",
+      "emptyMessage": "Add your professionals in Staff and give each one their commission.",
+      "loadError": "Could not load the commissions",
+      "noSales": {
+        "heading": "Commissions come from the sales",
+        "message": "Turn on Sales to see what each professional earned."
       }
     },
     "settings": {

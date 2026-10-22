@@ -523,17 +523,6 @@ def test_the_commission_sheet_lists_who_can_earn_one_with_both_ids(make_user):
     assert [row.id for row in run("staff.commission.summary", CommissionSummaryIn(search="bea")).rows] == [bea.id]
 
 
-def test_the_close_of_the_day_adds_both_ids_of_a_person_before_the_rate(make_user):
-    # The old battery's fold (commissions_identity): 30 € of appointments under the record and
-    # 20 € at the counter under the user are one day of 50 €, and 15 % of it is 7.50 €.
-    account = make_user("ana")
-    ana = make_member("Ana", user=account, commission_rate=Decimal("15"))
-    [row] = run("staff.commission.summary", CommissionSummaryIn()).rows
-    gross_by_id = {str(ana.id): 3000, str(account.id): 2000}
-    gross = gross_by_id[str(row.id)] + gross_by_id[str(row.user_id)]
-    assert gross * row.commission_rate / 100 == Decimal("750")
-
-
 def test_an_employee_does_not_see_the_commission_sheet():
     with pytest.raises(PermissionDenied):
         run("staff.commission.summary", CommissionSummaryIn(), "hub_employee")

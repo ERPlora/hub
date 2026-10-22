@@ -8,6 +8,7 @@ import json
 import uuid
 
 import pytest
+from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.staff.api import router
@@ -28,6 +29,7 @@ ROUTES = {
     ("POST", "/staff/members/deactivate", "staff.member.deactivate"),
     ("POST", "/staff/members/terminate", "staff.member.terminate"),
     ("GET", "/staff/commissions", "staff.commission.summary"),
+    ("GET", "/staff/commissions/report", "staff.commission.report"),
     ("GET", "/staff/roles", "staff.role.list"),
     ("POST", "/staff/roles", "staff.role.create"),
     ("POST", "/staff/roles/update", "staff.role.update"),
@@ -110,6 +112,16 @@ def test_openapi_publishes_the_operations_with_their_ids(client):
     assert served == ROUTES
 
 
+def test_the_spas_route_map_names_every_staff_route():
+    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+    mine = {
+        (route["method"].upper(), route["path"].removeprefix("/api"), op)
+        for op, route in spa.items()
+        if op.startswith("staff.")
+    }
+    assert mine == ROUTES
+
+
 # Authentication and permissions
 
 
@@ -130,11 +142,27 @@ def test_an_employee_reads_the_team_but_neither_writes_nor_sees_pay(employee, cl
     for response in (
         get(client, "/staff/members/compensation"),
         get(client, "/staff/commissions"),
+        get(client, "/staff/commissions/report"),
         post(client, "/staff/members", {"first_name": "A", "last_name": "B"}),
         post(client, "/staff/roles", {"name": "Stylist"}),
     ):
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "permission_denied"
+
+
+@pytest.mark.django_db
+def test_the_commission_report_over_http_today_by_default_and_a_bad_period_is_422(boss, client):
+    # flow: STAFF-F21 (paso 3: la comisión del día)
+    make_member("Ana", commission_rate="15")
+    body = get(client, "/staff/commissions/report").json()
+    assert (body["sales_available"], body["total_sold"], body["total_commission"]) == (True, 0, 0)
+    assert body["date_from"] == body["date_to"]
+    assert [(row["full_name"], row["commission_rate"], row["sold"], row["commission"]) for row in body["rows"]] == [
+        ("Ana López", "15.00", 0, 0)
+    ]
+    response = get(client, "/staff/commissions/report", date_from="2026-08-19", date_to="2026-08-18")
+    assert response.status_code == 422
+    assert list(response.json()["error"]["fields"]) == ["date_to"]
 
 
 @pytest.mark.django_db

@@ -46,6 +46,7 @@ const client = useLiveClient();
 const canManage = computed(() => session.can('staff.manage_time_off'));
 const canRequest = computed(() => session.can('staff.request_time_off'));
 const canSettings = computed(() => session.can('staff.manage_settings'));
+const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 // ── The lists ──────────────────────────────────────────────────────────────────────────────────
 const view = ref<View>('all');
@@ -245,7 +246,7 @@ function add(): void {
   <AppPage
     :title="$t('staff.title')"
     content-layout="fill"
-    :tabs="staffTabs($t, { settings: canSettings })"
+    :tabs="staffTabs($t, { settings: canSettings, commissions: canSeePay })"
     :tabs-label="$t('staff.tabs.label')"
   >
     <PageNotices
