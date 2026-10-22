@@ -1,5 +1,16 @@
 # Peticiones de `apps/staff` a `@erplora/ui`
 
+**Estado al cerrar la app (CLOSE-STAFF, 2026-10-22):** contra `ERPlora/ui` `origin/main` de635ff (el puntero
+del Hub está en 07b4392):
+
+- **`SearchSelect`** ha llegado como `Combo` (ya está en 07b4392, el puntero del Hub): busca en el servidor con
+  `search(query)`, descarta la respuesta vieja y se vacía con su botón (en lugar de la opción «Sin rol» /
+  «Sin acceso al Hub»). Personal sigue con su copia, que funciona: pasar sus selectores a `Combo` cambia lo
+  que se ve y queda como línea `FIX:` del informe de CLOSE-STAFF, no como petición abierta.
+- **Fecha y hora** y la **tarjeta de cifra** siguen abiertas: ninguna ha llegado a `ui`. Sus sustitutos
+  funcionan y ningún flujo está roto; van propuestas para `## 6` de `MIGRATION.md` como
+  `staff:ui-time-date-fields` (la misma petición que `schedule:ui-time-date-fields`) y `staff:ui-kpi-card`.
+
 ## Iconos
 
 Ninguna pendiente: `ion:shield-outline` (pestaña «Roles», el icono del módulo viejo) ya está registrado
@@ -8,7 +19,7 @@ en `packages/ui` (8c30c2a) y lo usan el menú (`apps/staff/apps.py`) y la barra 
 
 ## Componentes
 
-### `SearchSelect` — selector con búsqueda en el servidor
+### `SearchSelect` — selector con búsqueda en el servidor (llegó como `Combo`)
 
 - **Para qué:** elegir en una lista que puede pasar de las 100 filas que da el servidor de una vez
   (miembros del equipo, roles, cuentas del negocio). Un `ion-select` con `limit: 100` se queda corto.
