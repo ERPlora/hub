@@ -26,6 +26,7 @@ from typing import Any
 from django.conf import settings
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
+from live.live_registry import live_registry
 from live.meta import LiveAppConfig, SetupCheck, module_configs
 from live.operations import get
 
@@ -229,6 +230,7 @@ def widgets(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_vertica
                     "options": dict(widget.options),
                     "component": widget.component,
                     "refresh_on": list(widget.refresh_on),
+                    "live": widget.operation is not None and live_registry.is_subscribable(widget.operation),
                 }
             )
     return panels

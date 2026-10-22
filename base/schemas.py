@@ -247,6 +247,7 @@ class WidgetOut(Schema):
     options: dict[str, Any] = Field(description="Literal props of the panel.")
     component: str | None = Field(description="A Vue component of the app's frontend/components/, without «.vue».")
     refresh_on: list[str]
+    live: bool = Field(description="Its operation is a live query: the SPA follows it, else it asks once.")
 
 
 class WidgetListOut(Schema):

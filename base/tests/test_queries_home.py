@@ -428,9 +428,20 @@ def test_the_panels_the_person_may_see(modules):
         "options": {"format": "number"},
         "component": None,
         "refresh_on": ["stock.item.created"],
+        "live": False,  # stock.item.count is no live query: the Home asks for it once
     }
     assert widgets[1]["category"] == "Charts"
     assert [w["key"] for w in widget_list(ctx("stock.view"))] == ["stock.today", "stock.private", "stock.chart"]
+
+
+def test_a_panel_says_whether_its_operation_is_a_live_query(modules, monkeypatch):
+    # BASE-G168: the Home follows a live query and asks once for one that is not.
+    from live.live_registry import live_registry
+
+    modules(module("stock", widgets=[Widget(key="today", title="Today", kind="kpi", operation="stock.item.count"),
+                                     Widget(key="chart", title="Chart", component="StockChart")]))
+    monkeypatch.setitem(live_registry.subscribable, "stock.item.count", ["stock.item.created"])
+    assert [(w["key"], w["live"]) for w in widget_list(ctx())] == [("stock.today", True), ("stock.chart", False)]
 
 
 def test_a_panel_of_some_verticals_shows_only_in_a_hub_of_one_of_them(modules):
