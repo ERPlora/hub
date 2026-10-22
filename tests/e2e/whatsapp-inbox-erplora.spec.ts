@@ -18,13 +18,15 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp as cleanUpCards, inputOf } from './customer-helpers';
 import { A, HUB_DIR, login, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { BUSINESS_PHONE, cleanUp, e2ePhone, meta, metaNow, notice, PREFIX, seedErplora } from './whatsapp-helpers';
+import { BUSINESS_PHONE, cleanUp, e2ePhone, meta, metaGraph, metaNow, notice, PREFIX, seedErplora } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   // erplora.com takes `a`'s number (again, connected) and this Hub takes its photo.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
 });
 
 test.afterAll(() => {

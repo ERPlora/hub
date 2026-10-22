@@ -9,149 +9,28 @@
 // - its dialog (`https://www.facebook.com/<version>/dialog/oauth`), served by the browser's route: as Meta's window
 //   does, it posts the account and the number chosen (`WA_EMBEDDED_SIGNUP`, from facebook.com's origin) to the Hub's
 //   page and sends the window to the dialog's `redirect_uri` with a code and the Hub's `state` (or Meta's refusal);
-// - its Graph API, which erplora.com calls in door 11 to exchange the code: a TLS endpoint of this spec for
-//   `graph.facebook.com` only, reached by erplora.com through `HTTPS_PROXY=http://127.0.0.1:<hub port + 9>` and
-//   trusted with `SSL_CERT_FILE=<this checkout>/tests/e2e/.artifacts/meta-graph-<hub port>/ca.pem` (environment
-//   only, set when erplora.com starts: its code is not touched; the certificate is made by this spec, before the
-//   first call). It answers as Meta does in erplora.com's own whatsapp/tests/test_internal_connect.py.
-// Besides those two, erplora.com runs as whatsapp-helpers.ts says (the e2e Meta app, `HUB_INTERNAL_URL` to this Hub,
-// its own database) with `WHATSAPP_REDIRECT_URI=<SAAS_URL>/whatsapp/return`.
+// - its Graph API, which erplora.com calls in door 11 to exchange the code: the run's Graph (whatsapp-graph.ts, alive for
+//   the whole run and awaited with `metaGraph()`), which answers as Meta does in erplora.com's own
+//   whatsapp/tests/test_internal_connect.py and keeps every call erplora.com made.
+// Besides those two, erplora.com runs as whatsapp-helpers.ts's header says, the same for every WhatsApp spec.
 //
 // F01: not connected, Settings offers «Connect WhatsApp»; the window brings the code back and the number is connected,
 // without reloading; Meta's cancelled window and an expired code connect nothing and say why. F02: with «Needs
 // reconnecting», the inbox's notice leads to Settings, «Reconnect» opens the same window and connects the number
 // again, and the inbox's notice goes by itself (disconnecting: whatsapp-inbox-connect.spec.ts).
 // Captures, three sizes: FIX-HUB-WHATSAPP-INBOX-LOCAL-HTTP-RETURN-PAGE-REFUSED[-F01|-F02]-390|834|1440.
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { createServer as createHttpsServer } from 'node:https';
-import type { Socket } from 'node:net';
-import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, ARTIFACTS, HUB_DIR, login, SAAS, shot, shown } from './helpers';
+import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { STACK } from './stack';
-import { cleanUp, NUMBER_ID, pushChannel, seedErplora, WABA_ID } from './whatsapp-helpers';
+import { BUSINESS_ID, CODE, EXPIRED_CODE, type GraphCall, NUMBER_ID, SHOWN_NAME, WABA_ID } from './whatsapp-graph';
+import { cleanUp, metaGraph, pushChannel, seedErplora } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-LOCAL-HTTP-RETURN-PAGE-REFUSED';
 const RETURN_PAGE = `${SAAS}/whatsapp/return`;
-const GRAPH_HOST = 'graph.facebook.com';
-const GRAPH_PORT = STACK.hubPort + 9;
-const CERTS = join(ARTIFACTS, `meta-graph-${STACK.hubPort}`);
-
-/** The codes Meta's window gives in this spec, and what Meta answers when erplora.com exchanges each one. */
-const CODE = 'AQBe2e-one-time-code_ok';
-const EXPIRED_CODE = 'AQBe2e-one-time-code_expired';
-const TOKEN = 'EAAGe2e-business-token';
-const BUSINESS_ID = '880000000000102';
 const SHOWN_NUMBER = '+34910000101';
-const SHOWN_NAME = 'E2E Peluquería';
-/** Meta's refusal of an expired code (erplora.com's tests: `OAUTH_ERROR`). */
-const OAUTH_ERROR = {
-  error: { message: 'This authorization code has expired.', type: 'OAuthException', code: 100, error_subcode: 36007, fbtrace_id: 'A1' },
-};
-
-/** What erplora.com asked Meta's Graph: the method, the path without its version and the query. */
-interface GraphCall {
-  method: string;
-  path: string;
-  query: Record<string, string>;
-}
-
-/** Meta's Graph as erplora.com's door 11 meets it: the code exchanged, the token's expiry, the account's numbers,
- *  the app subscribed and the number registered. */
-function graphAnswer(call: GraphCall): [number, unknown] {
-  const route = `${call.method} ${call.path}`;
-  if (route === 'GET /oauth/access_token') {
-    return call.query.code === CODE ? [200, { access_token: TOKEN, token_type: 'bearer' }] : [400, OAUTH_ERROR];
-  }
-  if (route === 'GET /debug_token') return [200, { data: { is_valid: true, expires_at: 0 } }];
-  if (route === `GET /${WABA_ID}/phone_numbers`) {
-    return [200, { data: [{ id: NUMBER_ID, display_phone_number: '+34 910 00 01 01', verified_name: SHOWN_NAME }] }];
-  }
-  if (route === `POST /${WABA_ID}/subscribed_apps` || route === `POST /${NUMBER_ID}/register`) return [200, { success: true }];
-  return [400, { error: { message: `Unsupported request: ${route}.`, type: 'GraphMethodException', code: 100 } }];
-}
-
-/** A certificate authority of this run and `graph.facebook.com`'s certificate signed by it (what erplora.com's
- *  `SSL_CERT_FILE` trusts), made with the Hub's `cryptography`. */
-const MAKE_CERTS = `
-import datetime, pathlib, sys
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-
-out = pathlib.Path(sys.argv[1])
-out.mkdir(parents=True, exist_ok=True)
-now = datetime.datetime.now(datetime.UTC)
-usage = dict(content_commitment=False, key_encipherment=False, data_encipherment=False, key_agreement=False,
-             encipher_only=False, decipher_only=False)
-ca_key, key = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
-ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "e2e Meta Graph CA")])
-def base(subject, public):
-    return (x509.CertificateBuilder().subject_name(subject).issuer_name(ca_name).public_key(public)
-            .serial_number(x509.random_serial_number()).not_valid_before(now - datetime.timedelta(hours=1))
-            .not_valid_after(now + datetime.timedelta(days=2))
-            .add_extension(x509.SubjectKeyIdentifier.from_public_key(public), critical=False))
-ca = (base(ca_name, ca_key.public_key())
-      .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
-      .add_extension(x509.KeyUsage(digital_signature=False, key_cert_sign=True, crl_sign=True, **usage), critical=True)
-      .sign(ca_key, hashes.SHA256()))
-leaf = (base(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "${GRAPH_HOST}")]), key.public_key())
-        .add_extension(x509.SubjectAlternativeName([x509.DNSName("${GRAPH_HOST}")]), critical=False)
-        .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
-        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-        .add_extension(x509.KeyUsage(digital_signature=True, key_cert_sign=False, crl_sign=False, **usage), critical=True)
-        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
-        .sign(ca_key, hashes.SHA256()))
-(out / "ca.pem").write_bytes(ca.public_bytes(serialization.Encoding.PEM))
-(out / "cert.pem").write_bytes(leaf.public_bytes(serialization.Encoding.PEM))
-(out / "key.pem").write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                                serialization.NoEncryption()))
-`;
-
-/** Meta's Graph, for erplora.com only: an HTTP proxy on `GRAPH_PORT` that tunnels `graph.facebook.com:443` (and
- *  nothing else) to a TLS server answering `graphAnswer`; every call is kept in `calls`. */
-async function startGraph(calls: GraphCall[]): Promise<Server> {
-  execFileSync('uv', ['run', 'python', '-c', MAKE_CERTS, CERTS], { cwd: HUB_DIR, encoding: 'utf8' });
-  const graph = createHttpsServer(
-    { cert: readFileSync(join(CERTS, 'cert.pem')), key: readFileSync(join(CERTS, 'key.pem')) },
-    (request: IncomingMessage, response: ServerResponse) => {
-      request.resume();
-      request.on('end', () => {
-        const url = new URL(request.url ?? '/', `https://${GRAPH_HOST}`);
-        const call = {
-          method: request.method ?? 'GET',
-          path: url.pathname.replace(/^\/v\d+\.\d+/, ''),
-          query: Object.fromEntries(url.searchParams),
-        };
-        calls.push(call);
-        const [status, body] = graphAnswer(call);
-        response.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
-      });
-    },
-  );
-  const proxy = createHttpServer((_request, response) => response.writeHead(403).end());
-  proxy.on('connect', (request: IncomingMessage, socket: Socket, head: Buffer) => {
-    if (request.url !== `${GRAPH_HOST}:443`) {
-      socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
-      return;
-    }
-    socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-    if (head.length) socket.unshift(head);
-    graph.emit('connection', socket);
-  });
-  proxy.on('close', () => graph.close());
-  await new Promise<void>((resolve, reject) => {
-    proxy.once('error', reject);
-    proxy.listen(GRAPH_PORT, '127.0.0.1', () => resolve());
-  });
-  return proxy;
-}
 
 /** How Meta's window ends: what it posts from facebook.com meanwhile (`session`, its `event` and `data`) and what it
  *  sends back to the return page besides the Hub's state (`back`: a code, or Meta's refusal). */
@@ -263,18 +142,17 @@ async function shots(page: Page, name: string, ready: (page: Page) => Promise<vo
 
 test.describe.configure({ mode: 'serial' });
 
-const graphCalls: GraphCall[] = [];
-let graph: Server | undefined;
+/** What erplora.com asked the run's Graph during the test running. */
+let graphCalls: GraphCall[] = [];
 
 test.beforeAll(async () => {
-  graph = await startGraph(graphCalls);
-  // erplora.com knows `a` (its test seed, with `a`'s number) and this Hub takes its photo.
+  // erplora.com knows `a` (its test seed, with `a`'s number) and this Hub takes its photo; it reaches only the run's Graph.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  graphCalls = (await metaGraph()).calls;
 });
 
-test.afterAll(async () => {
+test.afterAll(() => {
   cleanUp();
-  if (graph) await new Promise((resolve) => graph?.close(resolve));
 });
 
 test.beforeEach(() => {

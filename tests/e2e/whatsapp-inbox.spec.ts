@@ -18,11 +18,13 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { cleanUp as cleanUpCards } from './customer-helpers';
 import { A, EMPLOYEE, hostPage, login, SAAS, shot, shown } from './helpers';
 import { filterBy } from './service-helpers';
-import { cleanUp, e2ePhone, flowShots, PREFIX, pushChannel, receive, seedErplora, template, waId } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, flowShots, metaGraph, PREFIX, pushChannel, receive, seedErplora, template, waId } from './whatsapp-helpers';
 
-test.beforeAll(() => {
+test.beforeAll(async () => {
   // erplora.com takes `a`'s number (its test seed): what the Hub hands it reaches Meta.
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+  // erplora.com reaches Meta only through the run's Graph, or the run stops here (whatsapp-helpers.ts).
+  await metaGraph();
 });
 
 test.afterAll(() => {
