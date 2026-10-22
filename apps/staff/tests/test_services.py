@@ -1231,6 +1231,18 @@ def test_a_start_after_the_saved_end_is_refused_under_the_start():
     assert outbox() == []
 
 
+def test_a_night_shift_saved_before_the_rule_is_refused_under_the_start_whatever_is_changed():
+    # A working day saved when a night shift was still admitted cannot propose a schedule's day:
+    # changing only the break says so under the start (nothing of the day was sent), and saves nothing.
+    fields = refused_settings(
+        SettingsIn(default_break_duration=30),
+        saved={"default_work_start": dt.time(22), "default_work_end": dt.time(6)},
+    )
+    assert fields == {"default_work_start": "The start time must be before the end time."}
+    assert StaffSettings.objects.get().default_break_duration == 60
+    assert outbox() == []
+
+
 def test_the_break_must_be_shorter_than_the_working_day():
     message = {"default_break_duration": "The break must fall inside the working hours."}
     assert refused_settings(SettingsIn(default_work_start="09:00", default_work_end="10:00", default_break_duration=60)) == message
