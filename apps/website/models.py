@@ -37,7 +37,7 @@ class Site(UUIDModel):
     is_live = models.BooleanField(_("live"), default=False)
     #: Google's last good answer for the reviews section's place (``apps.website.reviews``): it stands in for the
     #: cache when it was flushed or Google fails, for 30 days at most.
-    reviews_snapshot = models.JSONField(_("Google reviews"), default=dict, blank=True)
+    reviews_snapshot = models.JSONField(_("Google reviews"), default=dict, blank=True, db_default={})
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
     updated_by = models.CharField(_("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
 

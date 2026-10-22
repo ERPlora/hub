@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='site',
             name='reviews_snapshot',
-            field=models.JSONField(blank=True, default=dict, verbose_name='Google reviews'),
+            field=models.JSONField(blank=True, db_default={}, default=dict, verbose_name='Google reviews'),
         ),
     ]
