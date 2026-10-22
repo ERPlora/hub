@@ -292,6 +292,7 @@ def test_the_editor_sees_whether_googles_reviews_are_there(settings, no_google):
     assert status.fetched_at.isoformat() == payload["fetched_at"]
 
 
+@pytest.mark.usefixtures("website_manifest")
 def test_the_preview_paints_the_reviews_kept_or_says_where_they_will_be(settings, no_google):
     settings.GOOGLE_PLACES_API_KEY = "test-key"
     save(full_content(reviews={"place_ref": PLACE_ID}))
@@ -301,6 +302,7 @@ def test_the_preview_paints_the_reviews_kept_or_says_where_they_will_be(settings
     assert "128 reviews on Google" in html and "data-ep-reviews-hint" not in html
 
 
+@pytest.mark.usefixtures("website_manifest")
 def test_the_sites_last_good_reviews_stand_in_when_nothing_is_kept(settings, no_google):
     from apps.website.models import Site
 

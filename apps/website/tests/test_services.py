@@ -241,6 +241,7 @@ def test_each_hub_saves_and_publishes_its_own_site():
     assert (hub_site("a").is_live, hub_site("b").is_live) == (True, False)
 
 
+@pytest.mark.usefixtures("website_manifest")
 def test_the_team_of_another_hub_never_reads_nor_changes_this_hubs_site():
     save(template="modern", ctx=ctx_for(scope=A))
     run("website.site.publish", ctx=ctx_for(scope=A))
