@@ -7,10 +7,11 @@ wins a step; the other one waits for it and is refused with the real reason.
 """
 
 import threading
+import time
 import uuid
 
 import pytest
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 from live.errors import OperationError
 from live.models import OutboxEvent
@@ -51,6 +52,42 @@ def at_once(*calls):
         thread.start()
     for thread in threads:
         thread.join(30)
+    return results
+
+
+def at_once_behind(hold, *calls):
+    """``at_once``, with every call started while a session of its own holds what ``hold`` takes (a
+    row lock, a table lock): all of them read what they read before any of them can write, which a
+    barrier alone does not promise (the first call can finish before the second one starts). The
+    session lets go once every call is waiting on it."""
+    held = threading.Event()
+
+    def holder():
+        try:
+            with transaction.atomic():
+                hold()
+                held.set()
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline and waiting() < len(calls):
+                    time.sleep(0.02)
+        finally:
+            connection.close()
+
+    def waiting() -> int:
+        with connection.cursor() as cursor:
+            # Inside a transaction Postgres keeps the first snapshot of the activity view: clear it.
+            cursor.execute("SELECT pg_stat_clear_snapshot()")
+            cursor.execute(
+                "SELECT count(*) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+            )
+            return cursor.fetchone()[0]
+
+    keeper = threading.Thread(target=holder)
+    keeper.start()
+    assert held.wait(5), "the holding session never took its lock"
+    results = at_once(*calls)
+    keeper.join(30)
     return results
 
 
@@ -118,6 +155,8 @@ def test_completing_and_cancelling_at_once_never_leave_both():
 def test_the_same_attempt_twice_at_once_records_one_payment():
     # A double tap or a retry racing the first send (payments#8): neither sees the other's payment yet,
     # the second one waits for the first and then answers that one, without a second number or notice.
+    # Both look for the key before either can take the method's lock (a session holds it until both
+    # wait): the second one's attempt must collide with the first's row and give its number back.
     method = make_method("BBVA account")
     PaymentCounter.objects.create(day=timezone.localdate())
     key = str(uuid.uuid4())
@@ -134,7 +173,10 @@ def test_the_same_attempt_twice_at_once_records_one_payment():
             },
         )
 
-    results = at_once(send, send)
+    def lock_the_method():
+        PaymentMethod.objects.select_for_update().get(pk=method.pk)
+
+    results = at_once_behind(lock_the_method, send, send)
     assert codes(results) == ["ok", "ok"]
     assert results[0].id == results[1].id
     assert Payment.objects.count() == 1
@@ -143,6 +185,14 @@ def test_the_same_attempt_twice_at_once_records_one_payment():
 
 
 def test_two_methods_with_one_name_at_once():
+    # Both check the name before either can write (a session keeps the table from writes, not from
+    # reads, until both wait): the second one's save must end in the unique constraint, the same 409.
     create = lambda: run("payment.method.create", {"name": "Cash drawer"})  # noqa: E731
-    assert codes(at_once(create, create)) == ["ok", "payment.method_exists"]
+
+    def keep_from_writes():
+        table = connection.ops.quote_name(PaymentMethod._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(f"LOCK TABLE {table} IN SHARE ROW EXCLUSIVE MODE")
+
+    assert codes(at_once_behind(keep_from_writes, create, create)) == ["ok", "payment.method_exists"]
     assert PaymentMethod.objects.count() == 1
