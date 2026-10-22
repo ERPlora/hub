@@ -70,3 +70,17 @@ def test_an_anonymous_visitor_gets_no_home(client):
     for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell"):
         response = client.get(path, HTTP_HOST="a.localhost:8000")
         assert response.status_code in (401, 403), path
+
+
+def test_the_spas_route_map_names_every_base_route(settings):
+    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
+    import json
+
+    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+    mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("base.")}
+    assert mine == {
+        ("GET", "/api/me", "base.session.me"),
+        ("GET", "/api/home/setup", "base.setup.status"),
+        ("GET", "/api/home/widgets", "base.widget.list"),
+        ("GET", "/api/home/bell", "base.bell.counters"),
+    }
