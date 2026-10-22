@@ -34,6 +34,7 @@ const template = (n: number): TemplateOut => ({
   submit_error: '',
   editable: true,
   sendable: true,
+  supported: true,
   deleting: false,
 });
 const rows = (from: number, count: number) => Array.from({ length: count }, (_, i) => template(from + i));

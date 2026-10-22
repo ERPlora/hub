@@ -5,7 +5,8 @@
 // connects, reconnects or disconnects it through erplora.com (NumberConnection); «This month» — messages sent against the plan's,
 // the cap when reached, that the plan includes none (0, ADR-0474), or that erplora.com has not said it yet, and
 // «Upgrade plan» (erplora.com's plans) at the cap —; «Meta templates» — the live `whatsapp_inbox.template.list` with
-// Name, Language, Category, Status in Meta (Meta's reason, and where it is on its way to Meta) and Text;
+// Name, Language, Category, Status in Meta (Meta's reason, where it is on its way to Meta, and that one made in
+// WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;
 // «Add template» and a row open the form (F29, F30), Delete asks first (F31), «Send to Meta again» hands
 // over again what did not get there.
 import {
@@ -61,6 +62,8 @@ function statusText(status: string, row: TemplateOut): string {
   else if (row.submit_state === 'sending' && row.submit_error)
     parts.push(row.status === 'DRAFT' ? row.submit_error : t('whatsapp_inbox.templates.state.notSent', { reason: row.submit_error }));
   else if (row.submit_state === 'queued' || row.submit_state === 'sending') parts.push(t('whatsapp_inbox.templates.state.sending'));
+  // One the Hub cannot fill (F28: a file header, named variables, a code…) is only seen here.
+  if (!row.supported) parts.push(t('whatsapp_inbox.templates.state.unfillable'));
   return parts.join(' · ');
 }
 
