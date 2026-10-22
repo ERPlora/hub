@@ -101,9 +101,6 @@ describe('schedule catalogues (en source + es)', () => {
     expect(ES.get('schedule.tabs.settings')).toBe('Ajustes');
     expect(ES.get('schedule.notSet')).toBe('Sin definir');
     expect(ES.get('schedule.open24h')).toBe('Abierto 24 horas');
-    expect(ES.get('schedule.hours.defaultWeek.message')).toBe(
-      'Este es un horario por defecto que hemos puesto por ti. Comprueba que coincide con el de tu negocio: las reservas fuera de él se rechazan.',
-    );
     expect(ES.get('schedule.hours.defaultWeek.confirm')).toBe('Sí, este es mi horario');
     expect(ES.get('schedule.hours.form.title')).toBe('Editar horario — {day}');
     expect(ES.get('schedule.hours.form.submit')).toBe('Guardar día');
@@ -116,7 +113,7 @@ describe('schedule catalogues (en source + es)', () => {
     expect(ES.get('schedule.overrides.empty')).toBe('Sin cambios temporales.');
     expect(ES.get('schedule.specialDays.search')).toBe('Buscar día especial…');
     expect(ES.get('schedule.overrides.search')).toBe('Buscar cambio temporal…');
-    expect(ES.get('schedule.specialDays.form.namePlaceholder')).toBe('Nombre (p.ej. Navidad)');
+    expect(ES.get('schedule.specialDays.form.namePlaceholder')).toBe('Nombre (p. ej. Navidad)');
     expect(ES.get('schedule.specialDays.form.openWithHours')).toBe('Abierto (con horario)');
     expect(ES.get('schedule.specialDays.form.recurring')).toBe('Se repite cada año');
     expect(ES.get('schedule.specialDays.form.submit')).toBe('Añadir día');
@@ -124,5 +121,16 @@ describe('schedule catalogues (en source + es)', () => {
     expect(ES.get('schedule.delete.message')).toBe('Se eliminará «{name}». No se puede deshacer.');
     expect(ES.get('schedule.settings.timezone')).toBe('Zona horaria del negocio');
     expect(ES.get('schedule.settings.weekStarts')).toBe('Semana empieza');
+  });
+
+  it('promise of the default week only what holds while it is unconfirmed: appointments are refused outside it', () => {
+    // The old words said «las reservas fuera de él se rechazan», but Reservations does not apply the week until it
+    // is saved or confirmed; Appointments (and Online booking through it) does (CLOSE-SCHEDULE, hub#172).
+    expect(ES.get('schedule.hours.defaultWeek.message')).toBe(
+      'Este es un horario por defecto que hemos puesto por ti. Comprueba que coincide con el de tu negocio: las citas fuera de él se rechazan.',
+    );
+    expect(EN.get('schedule.hours.defaultWeek.message')).toBe(
+      'These are default opening hours we set up for you. Check they match your business — appointments outside them are refused.',
+    );
   });
 });

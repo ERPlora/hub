@@ -705,3 +705,17 @@ def test_a_day_of_the_bulk_taken_at_the_same_time_is_skipped_not_the_whole_list(
     assert "result" in outcome, outcome
     assert [(s.index, s.code) for s in outcome["result"].skipped] == [(0, "already_exists")]
     assert sorted(SpecialDay.objects.values_list("name", flat=True)) == ["Boxing day", "First"]
+
+
+def test_correcting_a_special_day_with_a_split_shift_keeps_every_interval_sent():
+    # SCHEDULE-F13: the intervals sent replace them all, every one of them, sorted.
+    eve = make_special_day("2026-12-24", "Christmas Eve", ("10:00", "13:00"))
+    fixed = run(
+        "schedule.special_day.update",
+        SpecialDayPatchIn(id=eve.id, intervals=hours(("17:00", "20:00"), ("09:00", "14:00"))),
+    )
+    assert [(i.open_time, i.close_time) for i in fixed.intervals] == [
+        (t("09:00"), t("14:00")),
+        (t("17:00"), t("20:00")),
+    ]
+    assert SpecialDay.objects.get(pk=eve.id).intervals.count() == 2
