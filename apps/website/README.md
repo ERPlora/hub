@@ -28,8 +28,9 @@ producto actual no tenía página por negocio.
   dirección al acceso del equipo sin perder nada.
 - **Compartir** (F09): la dirección, **Copiar enlace** y el QR en PNG y SVG.
 - **La página pública** (F10): plantilla de Django con Bootstrap 5.3, en el idioma del navegador, sin cookies, con su
-  propia CSP sin nonce, caché de una hora en el servidor por versión, idioma y día, un minuto en el navegador y 60
-  lecturas por minuto y dirección; las reseñas de Google las pide el servidor (Places API (New)), nunca el navegador.
+  propia CSP sin nonce, caché de una hora en el servidor por versión, idioma y día y un minuto en el navegador; sus tres
+  lecturas públicas (`website.public.*`) admiten 60 por minuto por hub y visitante; las reseñas de Google las pide el
+  servidor (Places API (New)), nunca el navegador.
 
 ## Ficha
 
@@ -39,7 +40,7 @@ producto actual no tenía página por negocio.
 | Verticales | `hair_salon` y `restaurant` (entra en sus plantillas) |
 | `requires` | `[]` |
 | Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.relay.active_apps`). De la plataforma: `base.operations.hub_id`, `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
-| La usa | `base.public_home`: la entrada `/` del host del hub carga `apps/website/public_home.py` (`is_published`, `respond`) por `import_string`; ninguna app de negocio la lee |
+| La usa | `base.public_home`: la entrada `/` del host del hub carga `apps/website/public_home.py` (`is_published`, `respond`) por `import_module`; ninguna app de negocio la lee |
 | Pantallas | `/website` (editor, vista previa y «Compartir y QR») y la página pública en `/` |
 | Operaciones | 7 consultas (`queries.py`) y 4 acciones (`services.py`), todas con su ruta en `/api/website/…` (11; las 3 `website.public.*` sin sesión) y `expose_api`; 5 con `ai=` (las que usa el asistente) |
 | Eventos | 4, `website.<entidad>.<hecho>` (`events.py`); no reacciona a ninguno |
