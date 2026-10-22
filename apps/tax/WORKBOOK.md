@@ -480,7 +480,7 @@ Pasos:
 2. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+** (TAX-F04). En
    Reglas el aviso no lleva botón.
 3. En cuanto una regla raíz activa está vigente hoy, el aviso desaparece solo.
-Entra: las reglas y el país del negocio.
+Entra: las reglas de cualquier país (el aviso todavía no mira el del negocio).
 Sale: cuántas reglas aplican hoy y si los impuestos están configurados. No bloquea vender por sí mismo.
 Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Hoy cuenta las reglas de
 cualquier país y de cualquier territorio: un negocio de Canarias sin ninguna regla de IGIC no ve el aviso,
@@ -687,7 +687,7 @@ cajero del producto actual es un empleado.
   para el staff de la plataforma. Lo que guarda de categorías, reglas y alias no pasa por las operaciones:
   no deja aviso ni comprueba el solape ni la coherencia de un componente; la base de datos sigue rechazando
   el % fuera de 0–100, el % en una clase sin impuesto, el rango al revés y la raíz gemela. Los ajustes del
-  negocio sí (hub#42): el territorio es un desplegable con los del país del negocio más «Whole country», se
+  negocio sí (hub#42): el territorio es un desplegable con los del país del negocio más «Todo el país», se
   guarda por `tax.settings.update` (su actor y su evento en el outbox) y no se añade una segunda fila ni se
   borra la que hay (borrarla movería el negocio a todo el país en silencio).
 - **Paridad con el producto actual**: las listas aceptan los mismos filtros, búsqueda y orden

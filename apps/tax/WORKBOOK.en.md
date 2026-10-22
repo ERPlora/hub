@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b2e177addc9725323299b59734977bb75168ebb1f28d444465b4ca1f32e9dacd -->
+<!-- generated from WORKBOOK.md sha256:a9dc2fa6b47bc1bc08f0a7583bb4a544057568324c2a44557920192e88938452 -->
 
 ## What it is for and who it is for
 
@@ -448,7 +448,7 @@ Steps:
 2. Tap "Set up": it takes you to the Rules tab, where the missing one is created with **+** (TAX-F04). In
    Rules the notice carries no button.
 3. As soon as an active root rule is in force today, the notice disappears by itself.
-In: the rules and the business's country.
+In: the rules of any country (the notice does not look at the business's yet).
 Out: how many rules apply today and whether taxes are set up. It does not block selling by itself.
 If it fails: a single rule of any category is enough to consider it done. Today it counts the rules of any
 country and of any region: a Canary Islands business without any IGIC rule does not see the notice,

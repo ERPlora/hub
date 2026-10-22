@@ -40,6 +40,13 @@ describe('TaxCategorySelect', () => {
     ]);
   });
 
+  it("offers a factory category by the name Taxes translates for the reader, never the stored one (taxes#38)", async () => {
+    const s = await setup();
+    const [generic] = TAX_CATEGORIES.rows;
+    await s.show(page([{ ...generic, display_name: 'Producto — general' }]));
+    expect(s.options()).toEqual([['product.generic', 'Producto — general · 21%']]);
+  });
+
   it('is an outlined md select with its label and placeholder, nothing chosen in advance', async () => {
     const s = await setup();
     await s.show(TAX_CATEGORIES);
