@@ -138,3 +138,11 @@ def test_api_live_without_a_session_is_401_envelope(client):
     response = client.get("/api/live", HTTP_HOST=HOST)
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_the_hub_file_store_is_served_at_p_media_never_by_the_shell():
+    from base.media import media
+
+    match = resolve("/p/media/0199c4b00000700080000000000abcd1/website/img/3f2a.png")
+    assert (match.func, match.url_name) == (media, "media")
+    assert match.kwargs == {"hub": "0199c4b00000700080000000000abcd1", "name": "website/img/3f2a.png"}

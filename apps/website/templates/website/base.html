@@ -1,0 +1,14 @@
+{% load i18n hub_assets %}<!doctype html>
+<html lang="{{ lang }}" data-bs-theme="{{ theme.first_paint }}" data-ep-mode="{{ theme.mode }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="{{ theme.color_scheme }}">
+<title>{{ site_name }}{% if content.hero.tagline %} · {{ content.hero.tagline }}{% endif %}</title>
+{% if content.hero.tagline %}<meta name="description" content="{{ content.hero.tagline }}">
+{% endif %}{% if preview %}<meta name="robots" content="noindex">
+{% endif %}{% hub_assets "frontend/website.ts" %}
+<style>{{ theme.css }}</style>
+</head>
+{% block body %}{% endblock %}
+</html>

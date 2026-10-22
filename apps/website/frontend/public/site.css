@@ -1,0 +1,466 @@
+/* The public website's one stylesheet of our own (apps/website, rounds 2026-10-22). The pages are Bootstrap 5.3: its
+ * grid, navbar, cards, list groups, badges, pills and utilities do the layout (frontend/public/classes.test.ts checks
+ * every class). This file only
+ *   1. maps the palette onto Bootstrap's variables where Bootstrap writes a fixed colour instead of a variable (the
+ *      primary buttons, the text on `text-bg-*`, the navbar's links): the colours themselves are the `--bs-*` and
+ *      `--ws-*` variables of the page's one <style> (templates/website/base.html, from apps/website/palettes.py),
+ *      one set for `data-bs-theme="light"` and one for "dark";
+ *   2. draws what Bootstrap has no utility for, through `ws-*` hooks: the see-through top bar, the header's cover veil
+ *      and its palette gradient, the eyebrows, the contact's chips and their icons, the catalog's placeholders, the
+ *      map panel, the photo frame, the gallery's zoom, and each template's type and spacing;
+ *   3. the icons: Ionicons (`ion:`, MIT) as @erplora/ui ships them, as CSS masks (icons.test.ts checks each one), and
+ *      the half star of the Google reviews.
+ * Fonts are system stacks (CSP: nothing from a CDN), chosen to look right on macOS, iOS, Windows and Android. Motion is
+ * only a hover's transition, and none for who asks the system for less. */
+
+/* 1. The palette on Bootstrap's components */
+
+.btn-primary {
+  --bs-btn-color: var(--ws-on-primary);
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-color: var(--ws-on-primary);
+  --bs-btn-hover-bg: var(--ws-primary-hover);
+  --bs-btn-hover-border-color: var(--ws-primary-hover);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+  --bs-btn-active-color: var(--ws-on-primary);
+  --bs-btn-active-bg: var(--ws-primary-active);
+  --bs-btn-active-border-color: var(--ws-primary-active);
+  --bs-btn-disabled-color: var(--ws-on-primary);
+  --bs-btn-disabled-bg: var(--bs-primary);
+  --bs-btn-disabled-border-color: var(--bs-primary);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--bs-link-color);
+  --bs-btn-border-color: var(--bs-link-color);
+  --bs-btn-hover-color: var(--ws-on-primary);
+  --bs-btn-hover-bg: var(--bs-primary);
+  --bs-btn-hover-border-color: var(--bs-primary);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+  --bs-btn-active-color: var(--ws-on-primary);
+  --bs-btn-active-bg: var(--ws-primary-active);
+  --bs-btn-active-border-color: var(--ws-primary-active);
+  --bs-btn-disabled-color: var(--bs-link-color);
+  --bs-btn-disabled-border-color: var(--bs-link-color);
+}
+
+/* A button on a band of the main colour (bold's header): the main colour's text colour as the fill. */
+.ws-btn-contrast {
+  --bs-btn-color: var(--bs-primary);
+  --bs-btn-bg: var(--ws-on-primary);
+  --bs-btn-border-color: var(--ws-on-primary);
+  --bs-btn-hover-color: var(--bs-primary);
+  --bs-btn-hover-bg: var(--ws-on-primary);
+  --bs-btn-hover-border-color: var(--ws-on-primary);
+  --bs-btn-active-color: var(--bs-primary);
+  --bs-btn-active-bg: var(--ws-on-primary);
+  --bs-btn-active-border-color: var(--ws-on-primary);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}
+
+/* Bootstrap writes white on `text-bg-*`: the palette says black or white, whichever reads (AA). */
+.text-bg-primary {
+  color: var(--ws-on-primary) !important;
+}
+
+.text-bg-secondary {
+  color: var(--ws-on-accent) !important;
+}
+
+/* The navbar's links at the palette's muted text (AA on the page and on the bands), in either mode. */
+.navbar,
+.navbar[data-bs-theme] {
+  --bs-navbar-color: var(--bs-secondary-color);
+  --bs-navbar-hover-color: var(--bs-emphasis-color);
+  --bs-navbar-active-color: var(--bs-emphasis-color);
+  --bs-navbar-brand-color: var(--bs-emphasis-color);
+  --bs-navbar-brand-hover-color: var(--bs-emphasis-color);
+}
+
+/* The editor's preview: what a link does is shown, not followed. */
+body[data-ep-preview] a {
+  pointer-events: none;
+}
+
+/* 2. The shared pieces */
+
+.ws-classic,
+.ws-modern,
+.ws-minimal,
+.ws-bold {
+  --ws-serif-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', 'URW Palladio L', 'Noto Serif',
+    Georgia, serif;
+  --ws-serif-text: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, 'Noto Serif', Georgia, serif;
+  --ws-sans: 'Avenir Next', Avenir, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, system-ui,
+    sans-serif;
+  --ws-condensed: 'Avenir Next Condensed', 'Bahnschrift SemiCondensed', 'Roboto Condensed', sans-serif-condensed,
+    'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --bs-body-font-family: var(--ws-sans);
+  --bs-body-line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A link to a section lands below the sticky top bar. */
+.ws-classic section[id],
+.ws-modern section[id],
+.ws-minimal section[id],
+.ws-bold section[id],
+[data-ep-block] [id] {
+  scroll-margin-top: 5.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:has(> .ws-classic, > .ws-modern, > .ws-minimal, > .ws-bold) {
+    scroll-behavior: smooth;
+  }
+}
+
+.ws-display {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* The top bar: sticky (Bootstrap's sticky-top), see-through over what scrolls under it, blurred. */
+.ws-glass {
+  background-color: rgba(var(--bs-body-bg-rgb), 0.78);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid rgba(var(--bs-body-color-rgb), 0.08);
+}
+
+.ws-logo {
+  width: auto;
+  max-height: 2.5rem;
+}
+
+.ws-tracking {
+  letter-spacing: 0.14em;
+}
+
+/* The header. */
+.ws-hero {
+  padding-block: clamp(4rem, 10vw, 8rem);
+}
+
+/* With a cover: the photo fills the header (Bootstrap's object-fit-cover) under a veil, and the text is white. */
+.ws-hero-cover {
+  display: flex;
+  align-items: center;
+  min-height: min(82vh, 46rem);
+  color: #fff;
+}
+
+/* Bootstrap's lead is light (300): too thin in these stacks; the tagline reads at the regular weight. */
+.ws-hero .lead {
+  font-weight: 400;
+}
+
+.ws-hero-cover .lead {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* The veil: dark enough for white text on any photo, tinted with the palette. */
+.ws-hero-overlay {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.62) 100%),
+    linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.55) 0%, rgba(var(--bs-secondary-rgb), 0.22) 100%);
+}
+
+/* Without a cover: the palette's own light, so the header never looks empty. */
+.ws-hero-glow {
+  background:
+    radial-gradient(60% 70% at 12% 12%, rgba(var(--bs-primary-rgb), 0.16), transparent 70%),
+    radial-gradient(55% 65% at 90% 20%, rgba(var(--bs-secondary-rgb), 0.24), transparent 70%),
+    radial-gradient(70% 60% at 50% 115%, rgba(var(--bs-primary-rgb), 0.12), transparent 70%),
+    var(--bs-body-bg);
+}
+
+/* The business's initial on the header's gradient panel (modern, without a cover). */
+.ws-monogram {
+  font-size: clamp(5rem, 16vw, 11rem);
+  line-height: 1;
+}
+
+/* A pill in the colour of the text around it: white on a photo, the main colour's text on the bold header. */
+.ws-btn-ghost {
+  --bs-btn-color: currentColor;
+  --bs-btn-border-color: currentColor;
+  --bs-btn-hover-color: currentColor;
+  --bs-btn-hover-bg: color-mix(in srgb, currentColor 14%, transparent);
+  --bs-btn-hover-border-color: currentColor;
+  --bs-btn-active-color: currentColor;
+  --bs-btn-active-bg: color-mix(in srgb, currentColor 22%, transparent);
+  --bs-btn-active-border-color: currentColor;
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}
+
+/* The small line over a heading. */
+.ws-eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bs-link-color);
+}
+
+.ws-section {
+  padding-block: clamp(4rem, 9vw, 7rem);
+}
+
+/* A short rule in the second colour under a heading (Bootstrap's hr, border-secondary). */
+.ws-rule {
+  width: 3.5rem;
+}
+
+/* The owner's Markdown: no gap under its last paragraph or list. */
+.ws-prose > :last-child {
+  margin-bottom: 0;
+}
+
+/* A photo in a frame, with a soft palette block behind it, inside its own box (nothing spills sideways). */
+.ws-frame {
+  position: relative;
+  isolation: isolate;
+  padding: 0 1rem 1rem 0;
+}
+
+.ws-frame::before {
+  content: '';
+  position: absolute;
+  inset: 1rem 0 0 1rem;
+  z-index: -1;
+  border-radius: var(--bs-border-radius-xl);
+  background: linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.2), rgba(var(--bs-secondary-rgb), 0.3));
+}
+
+/* A card or a chip that rises a little under the pointer. */
+.ws-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.ws-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--bs-box-shadow) !important;
+}
+
+/* A contact's chip: a long address wraps inside it. */
+.ws-chip {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A round badge of the main colour with an icon in it. */
+.ws-glyph {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.5em;
+  block-size: 2.5em;
+  background-color: var(--bs-primary);
+  color: var(--ws-on-primary);
+}
+
+/* A catalog item without a photo: a gradient of the palette with its initial. */
+.ws-thumb {
+  background: linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.95), rgba(var(--bs-secondary-rgb), 0.85));
+  color: var(--ws-on-primary);
+}
+
+.col:nth-child(3n + 2) > .card > .ws-thumb {
+  background: linear-gradient(135deg, rgba(var(--bs-secondary-rgb), 0.9), rgba(var(--bs-primary-rgb), 0.95));
+}
+
+.col:nth-child(3n) > .card > .ws-thumb {
+  background: linear-gradient(200deg, rgba(var(--bs-primary-rgb), 0.75), var(--bs-primary));
+}
+
+/* The address's panel: a soft map-like grid in the palette, with a pin. */
+.ws-map {
+  min-height: 12rem;
+  background:
+    repeating-linear-gradient(0deg, rgba(var(--bs-primary-rgb), 0.08) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, rgba(var(--bs-primary-rgb), 0.08) 0 1px, transparent 1px 28px),
+    linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.16), rgba(var(--bs-secondary-rgb), 0.24));
+}
+
+/* A gallery photo: it grows a little inside its rounded square under the pointer or the keyboard's focus. */
+.ws-zoom img {
+  transition: transform 0.4s ease;
+}
+
+.ws-zoom:hover img,
+a:focus-visible > .ws-zoom img {
+  transform: scale(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-lift,
+  .ws-lift:hover,
+  .ws-zoom img,
+  .ws-zoom:hover img,
+  a:focus-visible > .ws-zoom img {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* 3. The templates' character */
+
+/* Classic: centred and warm, serif display over a sans text, the cover across the whole header. */
+.ws-classic .ws-display {
+  font-family: var(--ws-serif-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ws-classic .ws-hero-glow {
+  background:
+    radial-gradient(55% 70% at 50% 0%, rgba(var(--bs-secondary-rgb), 0.26), transparent 70%),
+    radial-gradient(60% 70% at 10% 100%, rgba(var(--bs-primary-rgb), 0.14), transparent 70%),
+    var(--bs-tertiary-bg);
+}
+
+/* Modern: one sans, heavy and tight; the cover beside the title in a frame with a light tint. */
+.ws-modern .ws-display {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.ws-modern .ws-hero-overlay {
+  background: linear-gradient(200deg, transparent 45%, rgba(var(--bs-primary-rgb), 0.38) 100%);
+}
+
+.ws-modern .ws-hero-glow {
+  background:
+    radial-gradient(60% 60% at 80% 15%, rgba(var(--bs-secondary-rgb), 0.55), transparent 70%),
+    linear-gradient(135deg, var(--bs-primary) 0%, rgba(var(--bs-primary-rgb), 0.82) 100%);
+  color: var(--ws-on-primary);
+}
+
+/* Minimal: a reading serif, light headings, a lot of air and thin rules. */
+.ws-minimal {
+  --bs-body-font-family: var(--ws-serif-text);
+  --bs-body-font-size: 1.0625rem;
+  --bs-body-line-height: 1.75;
+}
+
+.ws-minimal .ws-display {
+  font-family: var(--ws-sans);
+  letter-spacing: -0.025em;
+}
+
+.ws-minimal .ws-hero {
+  padding-block: clamp(4rem, 10vw, 7.5rem) clamp(3rem, 7vw, 5rem);
+}
+
+.ws-minimal .ws-hero-glow {
+  background:
+    radial-gradient(45% 80% at 0% 0%, rgba(var(--bs-primary-rgb), 0.09), transparent 70%),
+    var(--bs-body-bg);
+}
+
+.ws-minimal .ws-hero-overlay {
+  background: linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, 0.18) 100%);
+}
+
+/* Bold: a header of colour across the whole width, oversized condensed capitals. */
+.ws-bold .ws-display {
+  font-family: var(--ws-condensed);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+}
+
+.ws-mega {
+  font-size: clamp(3rem, 11vw, 8rem);
+  line-height: 0.92;
+}
+
+.ws-bold .ws-hero .lead {
+  color: inherit;
+  font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+  opacity: 0.92;
+}
+
+.ws-bold .ws-hero-overlay {
+  background: linear-gradient(
+    135deg,
+    rgba(var(--bs-primary-rgb), 0.93) 0%,
+    rgba(var(--bs-primary-rgb), 0.8) 65%,
+    rgba(var(--bs-primary-rgb), 0.62) 100%
+  );
+}
+
+.ws-bold .ws-hero-glow {
+  background:
+    radial-gradient(55% 75% at 92% 8%, rgba(var(--bs-secondary-rgb), 0.38), transparent 70%),
+    radial-gradient(60% 70% at 0% 100%, rgba(0, 0, 0, 0.18), transparent 70%),
+    var(--bs-primary);
+}
+
+/* 4. The icons: Ionicons (MIT), as `ionicons/icons` writes them, painted in the text's colour. */
+
+.ws-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  inline-size: 1.15em;
+  block-size: 1.15em;
+  vertical-align: -0.15em;
+  background-color: currentColor;
+  -webkit-mask: var(--ws-icon) center / contain no-repeat;
+  mask: var(--ws-icon) center / contain no-repeat;
+}
+
+.ws-icon-call {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M391 480c-19.52 0-46.94-7.06-88-30-49.93-28-88.55-53.85-138.21-103.38C116.91 298.77 93.61 267.79 61 208.45c-36.84-67-30.56-102.12-23.54-117.13C45.82 73.38 58.16 62.65 74.11 52a176.3 176.3 0 0 1 28.64-15.2c1-.43 1.93-.84 2.76-1.21 4.95-2.23 12.45-5.6 21.95-2 6.34 2.38 12 7.25 20.86 16 18.17 17.92 43 57.83 52.16 77.43 6.15 13.21 10.22 21.93 10.23 31.71 0 11.45-5.76 20.28-12.75 29.81-1.31 1.79-2.61 3.5-3.87 5.16-7.61 10-9.28 12.89-8.18 18.05 2.23 10.37 18.86 41.24 46.19 68.51s57.31 42.85 67.72 45.07c5.38 1.15 8.33-.59 18.65-8.47 1.48-1.13 3-2.3 4.59-3.47 10.66-7.93 19.08-13.54 30.26-13.54h.06c9.73 0 18.06 4.22 31.86 11.18 18 9.08 59.11 33.59 77.14 51.78 8.77 8.84 13.66 14.48 16.05 20.81 3.6 9.53.21 17-2 22-.37.83-.78 1.74-1.21 2.75a176.5 176.5 0 0 1-15.29 28.58c-10.63 15.9-21.4 28.21-39.38 36.58A67.4 67.4 0 0 1 391 480'/></svg>");
+}
+
+.ws-icon-mail {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M424 80H88a56.06 56.06 0 0 0-56 56v240a56.06 56.06 0 0 0 56 56h336a56.06 56.06 0 0 0 56-56V136a56.06 56.06 0 0 0-56-56m-14.18 92.63-144 112a16 16 0 0 1-19.64 0l-144-112a16 16 0 1 1 19.64-25.26L256 251.73l134.18-104.36a16 16 0 0 1 19.64 25.26'/></svg>");
+}
+
+.ws-icon-time {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48m96 240h-96a16 16 0 0 1-16-16V128a16 16 0 0 1 32 0v128h80a16 16 0 0 1 0 32'/></svg>");
+}
+
+.ws-icon-location {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><circle cx='256' cy='192' r='32'/><path d='M256 32c-88.22 0-160 68.65-160 153 0 40.17 18.31 93.59 54.42 158.78 29 52.34 62.55 99.67 80 123.22a31.75 31.75 0 0 0 51.22 0c17.42-23.55 51-70.88 80-123.22C397.69 278.61 416 225.19 416 185c0-84.35-71.78-153-160-153m0 224a64 64 0 1 1 64-64 64.07 64.07 0 0 1-64 64'/></svg>");
+}
+
+.ws-icon-navigate {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M272 464a16 16 0 0 1-16-16.42V264.13a8 8 0 0 0-8-8H64.41a16.31 16.31 0 0 1-15.49-10.65 16 16 0 0 1 8.41-19.87l384-176.15a16 16 0 0 1 21.22 21.19l-176 384A16 16 0 0 1 272 464'/></svg>");
+}
+
+.ws-icon-whatsapp {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M414.73 97.1A222.14 222.14 0 0 0 256.94 32C134 32 33.92 131.58 33.87 254a220.6 220.6 0 0 0 29.78 111L32 480l118.25-30.87a223.6 223.6 0 0 0 106.6 27h.09c122.93 0 223-99.59 223.06-222A220.18 220.18 0 0 0 414.73 97.1M256.94 438.66h-.08a185.75 185.75 0 0 1-94.36-25.72l-6.77-4-70.17 18.32 18.73-68.09-4.41-7A183.46 183.46 0 0 1 71.53 254c0-101.73 83.21-184.5 185.48-184.5a185 185 0 0 1 185.33 184.64c-.04 101.74-83.21 184.52-185.4 184.52m101.69-138.19c-5.57-2.78-33-16.2-38.08-18.05s-8.83-2.78-12.54 2.78-14.4 18-17.65 21.75-6.5 4.16-12.07 1.38-23.54-8.63-44.83-27.53c-16.57-14.71-27.75-32.87-31-38.42s-.35-8.56 2.44-11.32c2.51-2.49 5.57-6.48 8.36-9.72s3.72-5.56 5.57-9.26.93-6.94-.46-9.71-12.54-30.08-17.18-41.19c-4.53-10.82-9.12-9.35-12.54-9.52-3.25-.16-7-.2-10.69-.2a20.53 20.53 0 0 0-14.86 6.94c-5.11 5.56-19.51 19-19.51 46.28s20 53.68 22.76 57.38 39.3 59.73 95.21 83.76a323 323 0 0 0 31.78 11.68c13.35 4.22 25.5 3.63 35.1 2.2 10.71-1.59 33-13.42 37.63-26.38s4.64-24.06 3.25-26.37-5.11-3.71-10.69-6.48' fill-rule='evenodd'/></svg>");
+}
+
+.ws-icon-instagram {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M349.33 69.33a93.62 93.62 0 0 1 93.34 93.34v186.66a93.62 93.62 0 0 1-93.34 93.34H162.67a93.62 93.62 0 0 1-93.34-93.34V162.67a93.62 93.62 0 0 1 93.34-93.34zm0-37.33H162.67C90.8 32 32 90.8 32 162.67v186.66C32 421.2 90.8 480 162.67 480h186.66C421.2 480 480 421.2 480 349.33V162.67C480 90.8 421.2 32 349.33 32'/><path d='M377.33 162.67a28 28 0 1 1 28-28 27.94 27.94 0 0 1-28 28M256 181.33A74.67 74.67 0 1 1 181.33 256 74.75 74.75 0 0 1 256 181.33m0-37.33a112 112 0 1 0 112 112 112 112 0 0 0-112-112'/></svg>");
+}
+
+.ws-icon-facebook {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' data-name='Layer 1' viewBox='0 0 512 512' class='ionicon'><path fill-rule='evenodd' d='M480 257.35c0-123.7-100.3-224-224-224s-224 100.3-224 224c0 111.8 81.9 204.47 189 221.29V322.12h-56.89v-64.77H221V208c0-56.13 33.45-87.16 84.61-87.16 24.51 0 50.15 4.38 50.15 4.38v55.13H327.5c-27.81 0-36.51 17.26-36.51 35v42h62.12l-9.92 64.77H291v156.54c107.1-16.81 189-109.48 189-221.31'/></svg>");
+}
+
+.ws-icon-tiktok {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M412.19 118.66a109 109 0 0 1-9.45-5.5 133 133 0 0 1-24.27-20.62c-18.1-20.71-24.86-41.72-27.35-56.43h.1C349.14 23.9 350 16 350.13 16h-82.44v318.78c0 4.28 0 8.51-.18 12.69 0 .52-.05 1-.08 1.56 0 .23 0 .47-.05.71v.18a70 70 0 0 1-35.22 55.56 68.8 68.8 0 0 1-34.11 9c-38.41 0-69.54-31.32-69.54-70s31.13-70 69.54-70a68.9 68.9 0 0 1 21.41 3.39l.1-83.94a153.14 153.14 0 0 0-118 34.52 161.8 161.8 0 0 0-35.3 43.53c-3.48 6-16.61 30.11-18.2 69.24-1 22.21 5.67 45.22 8.85 54.73v.2c2 5.6 9.75 24.71 22.38 40.82A167.5 167.5 0 0 0 115 470.66v-.2l.2.2c39.91 27.12 84.16 25.34 84.16 25.34 7.66-.31 33.32 0 62.46-13.81 32.32-15.31 50.72-38.12 50.72-38.12a158.5 158.5 0 0 0 27.64-45.93c7.46-19.61 9.95-43.13 9.95-52.53V176.49c1 .6 14.32 9.41 14.32 9.41s19.19 12.3 49.13 20.31c21.48 5.7 50.42 6.9 50.42 6.9v-81.84c-10.14 1.1-30.73-2.1-51.81-12.61'/></svg>");
+}
+
+.ws-icon-x {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' class='ionicon ionicon-fill-none'><path d='M9.333 6.929 14.546 1H13.31L8.783 6.147 5.169 1H1l5.466 7.783L1 15h1.235l4.779-5.436L10.83 15H15zM7.641 8.852l-.554-.776L2.68 1.911h1.898l3.557 4.977.552.776 4.623 6.47h-1.897z'/></svg>");
+}
+
+.ws-icon-star {
+  --ws-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' class='ionicon'><path d='M394 480a16 16 0 0 1-9.39-3L256 383.76 127.39 477a16 16 0 0 1-24.55-18.08L153 310.35 23 221.2a16 16 0 0 1 9-29.2h160.38l48.4-148.95a16 16 0 0 1 30.44 0l48.4 149H480a16 16 0 0 1 9.05 29.2L359 310.35l50.13 148.53A16 16 0 0 1 394 480'/></svg>");
+}
+
+/* Half a star (a rating such as 4.5): the left half in the warning colour of the full stars, the right half muted. */
+.ws-icon.ws-star-half {
+  background: linear-gradient(90deg, var(--bs-warning) 50%, var(--bs-tertiary-color) 50%);
+}
+

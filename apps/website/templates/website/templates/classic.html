@@ -1,0 +1,81 @@
+{% extends "website/base.html" %}{% load i18n %}
+{% comment %}Classic: centred, warm and timeless, after Start Bootstrap's «Business Casual» and «Landing Page» (MIT). A
+see-through sticky bar, the cover across the whole header under a warm veil (or the palette's soft light without one), a
+serif display title over a rule in the second colour, two pills, and each section centred on its eyebrow and heading,
+its content in rounded cards on bands that alternate. Bootstrap's own classes only; the ws-* hooks are in
+apps/website/frontend/public/site.css.{% endcomment %}
+{% block body %}
+<body class="ws-classic text-break" data-ep-template="classic"{% if preview %} data-ep-preview{% endif %}>
+<header data-ep-section="topbar" class="sticky-top ws-glass">
+  <nav class="navbar navbar-expand-md py-3">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2 fs-4 text-wrap ws-display" href="/">
+        {% if content.topbar.logo %}<img class="ws-logo rounded" src="{{ content.topbar.logo.url }}" alt="{{ site_name }}">{% endif %}
+        <span>{{ site_name }}</span>
+      </a>
+      <div class="d-flex align-items-center gap-2 order-md-last">
+        <a class="btn btn-outline-primary rounded-pill px-3" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+        {% if body %}<button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#ws-nav" aria-controls="ws-nav" aria-expanded="false" aria-label="{% translate "Menu" context "website" %}"><span class="navbar-toggler-icon"></span></button>{% endif %}
+      </div>
+      {% if body %}<div class="collapse navbar-collapse justify-content-md-center" id="ws-nav">
+        <ul class="navbar-nav gap-md-1">
+          {% for section in body %}<li class="nav-item"><a class="nav-link" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>{% endif %}
+    </div>
+  </nav>
+</header>
+<main>
+  <section data-ep-section="hero" data-ep-hero="center" class="ws-hero position-relative overflow-hidden text-center {% if content.hero.cover %}ws-hero-cover{% else %}ws-hero-glow{% endif %}">
+    {% if content.hero.cover %}<img class="position-absolute top-0 start-0 w-100 h-100 object-fit-cover" src="{{ content.hero.cover.url }}" alt="" fetchpriority="high">
+    <div class="ws-hero-overlay position-absolute top-0 start-0 w-100 h-100" aria-hidden="true"></div>{% endif %}
+    <div class="container position-relative">
+      <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-8">
+          <h1 class="display-3 mb-0 ws-display">{{ content.hero.title|default:site_name }}</h1>
+          <hr class="border-secondary border-2 opacity-100 mx-auto my-4 ws-rule">
+          {% if content.hero.tagline %}<p class="{% if content.hero.cover %}lead{% else %}lead text-body-secondary{% endif %} mb-0">{{ content.hero.tagline }}</p>{% endif %}
+          {% if ctas %}<div class="d-flex flex-wrap justify-content-center gap-3 mt-5">
+            {% for cta in ctas %}<a class="btn btn-lg rounded-pill px-4 d-inline-flex align-items-center gap-2 {% if forloop.first %}btn-primary{% else %}ws-btn-ghost{% endif %}" href="{{ cta.href }}"{% if cta.whatsapp %} target="_blank" rel="noopener noreferrer"{% endif %}>{% if cta.whatsapp %}<span class="ws-icon ws-icon-whatsapp" aria-hidden="true"></span>{% endif %}{{ cta.label }}</a>
+            {% endfor %}
+          </div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% for section in body %}
+  <section id="{{ section.name }}" data-ep-section="{{ section.name }}" class="ws-section{% if forloop.counter|divisibleby:2 %} bg-body-tertiary{% endif %}">
+    <div class="container">
+      <div class="text-center mb-5">
+        <p class="ws-eyebrow mb-2">{{ section.data.eyebrow }}</p>
+        <h2 class="display-6 mb-0 ws-display">{{ section.data.title }}</h2>
+        <hr class="border-secondary border-2 opacity-100 mx-auto mt-4 mb-0 ws-rule">
+      </div>
+      {% include section.partial with data=section.data %}
+    </div>
+  </section>
+  {% endfor %}
+</main>
+<footer data-ep-section="footer" class="bg-body-tertiary border-top pt-5 pb-4">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-6 col-lg-5">
+        <a class="d-inline-block fs-4 text-reset text-decoration-none ws-display" href="/">{{ site_name }}</a>
+        {% if content.footer.text %}<p class="small text-body-secondary mt-2 mb-0" data-ep-footer-text>{{ content.footer.text }}</p>{% endif %}
+      </div>
+      {% if body %}<div class="col-6 col-md-3 col-lg-4">
+        <ul class="list-unstyled small d-grid gap-2 mb-0">
+          {% for section in body %}<li><a class="text-body-secondary text-decoration-none" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>{% endif %}
+      <div class="col-6 col-md-3 text-md-end">
+        <a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
+      </div>
+    </div>
+    <p class="small text-body-secondary border-top mt-4 pt-3 mb-0" data-ep-credit>© {% now "Y" %} <a class="text-reset" href="https://erplora.com" target="_blank" rel="noopener">ERPlora</a></p>
+  </div>
+</footer>
+</body>
+{% endblock %}

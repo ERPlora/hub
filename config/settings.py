@@ -15,6 +15,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 from live.csp import base_policy, debug_policy
 
+from base.storage import hub_files_storage
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Off by default: a missing variable must never run production with DEBUG.
@@ -42,6 +44,12 @@ ALLOWED_HOSTS = config(
 # --proxy-headers reads it as well). Django does not redirect: the SaaS calls /internal over plain
 # HTTP on the private name (saas → hub.erplora.internal), never through the ALB.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# How many proxies stand in front of the Hub, each appending the address that connected to it to
+# X-Forwarded-For: the ALB in AWS (1), nothing in local development (0). base.throttle.client_address
+# counts a public caller by that entry from the end, never by one the client wrote.
+TRUSTED_PROXY_HOPS = config("TRUSTED_PROXY_HOPS", default=0 if DEBUG else 1, cast=int)
+if TRUSTED_PROXY_HOPS < 0:
+    raise ImproperlyConfigured(f"TRUSTED_PROXY_HOPS must be 0 or more (got {TRUSTED_PROXY_HOPS}).")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 # HSTS on the hub's own hosts (<slug>.erplora.com, hubs.erplora.com). Subdomains and the preload list
@@ -113,6 +121,7 @@ INSTALLED_APPS = [
     "apps.printing",
     "apps.cart_checkout",
     "apps.modifier",
+    "apps.website",
 ]
 
 MIDDLEWARE = [
@@ -291,6 +300,10 @@ FISCAL_CERTIFICATE_KEY = config("FISCAL_CERTIFICATE_KEY", default="")
 # use to call other systems (apps/flow/vault.py, FLOW-F26). Empty: the Hub starts, and saving or using a secret
 # is refused visibly (flow.secrets_key_missing).
 FLOW_SECRETS_KEY = config("FLOW_SECRETS_KEY", default="")
+# The platform's key of Google's Places API (New), with which the Hub reads the rating and reviews of a business's
+# place for its website (apps/website/reviews.py; Place Details and Text Search, from the server only). Secrets Manager
+# and the task definition in AWS. Empty: the reviews section asks nothing and shows only what was read before.
+GOOGLE_PLACES_API_KEY = config("GOOGLE_PLACES_API_KEY", default="")
 # Whether a business may go live with VeriFactu on this server (VERIFACTU-F08): ERPlora opens it under Ioan's
 # supervision, and only the prod deployment honours it (apps.verifactu.queries.production_open; pre files in testing).
 VERIFACTU_PRODUCTION_ENABLED = config("VERIFACTU_PRODUCTION_ENABLED", default=False, cast=bool)
@@ -376,6 +389,18 @@ STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
     "base.catalog.AppImagesFinder",
 ]
+
+# The hub's file store (PLAN-HUB block 7; base.storage): the S3 bucket Terraform names, with the task role's
+# credentials, or MEDIA_ROOT on disk without one. Every module reaches it as storages["hub_files"].
+
+MEDIA_ROOT = config("MEDIA_ROOT", default=BASE_DIR / "media", cast=Path)
+STORAGES["hub_files"] = hub_files_storage(
+    {
+        "AWS_STORAGE_BUCKET_NAME": config("AWS_STORAGE_BUCKET_NAME", default=""),
+        "AWS_REGION": config("AWS_REGION", default=""),
+    },
+    MEDIA_ROOT,
+)
 
 # The apps' registry in the SaaS (round 16, PLAN §21; spec §4). The image's build fixes the release:
 # APP_VERSION (the commit's sha) and APP_RELEASED_AT (its time, ISO 8601), which register_apps

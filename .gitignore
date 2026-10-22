@@ -19,3 +19,6 @@ tests/e2e/.artifacts/
 
 # OS
 .DS_Store
+
+# Local files of the hub file store (base.storage; S3 in AWS)
+media/

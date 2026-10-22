@@ -1,0 +1,26 @@
+{% load i18n %}<div class="row g-4">
+  <div class="{% if data.hours %}col-lg-7{% else %}col-12{% endif %}">
+    {% if data.phone or data.email %}<div class="row row-cols-1 row-cols-sm-2 g-3">
+      {% if data.phone %}<div class="col"><a class="ws-chip ws-lift d-flex align-items-center gap-3 h-100 p-3 rounded-4 bg-body shadow-sm text-reset text-decoration-none" href="{{ data.phone_href }}"><span class="ws-glyph rounded-circle fs-5" aria-hidden="true"><span class="ws-icon ws-icon-call"></span></span><span class="d-flex flex-column"><span class="small text-body-secondary">{% translate "Phone" context "website" %}</span><span class="fw-semibold">{{ data.phone }}</span></span></a></div>{% endif %}
+      {% if data.email %}<div class="col"><a class="ws-chip ws-lift d-flex align-items-center gap-3 h-100 p-3 rounded-4 bg-body shadow-sm text-reset text-decoration-none" href="mailto:{{ data.email }}"><span class="ws-glyph rounded-circle fs-5" aria-hidden="true"><span class="ws-icon ws-icon-mail"></span></span><span class="d-flex flex-column"><span class="small text-body-secondary">{% translate "Email" context "website" %}</span><span class="fw-semibold">{{ data.email }}</span></span></a></div>{% endif %}
+    </div>{% endif %}
+    {% if data.whatsapp or data.socials %}<div class="d-flex flex-wrap align-items-center gap-2 mt-4">
+      {% if data.whatsapp %}<a class="btn btn-primary rounded-pill px-4 d-inline-flex align-items-center gap-2" href="{{ data.whatsapp_href }}" target="_blank" rel="noopener noreferrer"><span class="ws-icon ws-icon-whatsapp" aria-hidden="true"></span>{% translate "Chat on WhatsApp" context "website" %}</a>{% endif %}
+      {% if data.socials.instagram %}<a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ data.socials.instagram }}" target="_blank" rel="noopener noreferrer"><span class="ws-icon ws-icon-instagram" aria-hidden="true"></span>Instagram</a>{% endif %}
+      {% if data.socials.facebook %}<a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ data.socials.facebook }}" target="_blank" rel="noopener noreferrer"><span class="ws-icon ws-icon-facebook" aria-hidden="true"></span>Facebook</a>{% endif %}
+      {% if data.socials.tiktok %}<a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ data.socials.tiktok }}" target="_blank" rel="noopener noreferrer"><span class="ws-icon ws-icon-tiktok" aria-hidden="true"></span>TikTok</a>{% endif %}
+      {% if data.socials.x %}<a class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2" href="{{ data.socials.x }}" target="_blank" rel="noopener noreferrer"><span class="ws-icon ws-icon-x" aria-hidden="true"></span>X</a>{% endif %}
+    </div>{% endif %}
+  </div>
+  {% if data.hours %}<div class="col-lg-5">
+    <div class="card border-0 rounded-4 shadow-sm h-100">
+      <div class="card-body p-4">
+        <h3 class="h6 d-flex align-items-center gap-2 mb-3"><span class="ws-glyph rounded-circle" aria-hidden="true"><span class="ws-icon ws-icon-time"></span></span>{% translate "Opening hours" context "website" %}</h3>
+        <ul class="list-group list-group-flush">
+          {% for row in data.hours %}<li class="list-group-item d-flex flex-wrap align-items-center column-gap-3 row-gap-1 px-3 {% if row.today %}bg-primary-subtle border-0 rounded-3 fw-semibold{% else %}bg-transparent{% endif %}"{% if row.today %} aria-current="date"{% endif %}><span class="text-nowrap">{{ row.day }}{% if row.today %} <span class="badge rounded-pill text-bg-primary ms-1">{% translate "Today" context "website" %}</span>{% endif %}</span><span class="{% if row.today %}text-body{% else %}text-body-secondary{% endif %} ms-auto text-end">{{ row.times }}</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>{% endif %}
+</div>

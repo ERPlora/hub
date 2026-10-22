@@ -524,3 +524,11 @@ msgstr "Mensaje no válido."
 #, python-format
 msgid "%(field)s is text."
 msgstr "%(field)s es un texto."
+
+#: operations.py:62
+msgid "No hub answers on this host."
+msgstr "Ningún hub responde en este host."
+
+#: throttle.py:27
+msgid "Too many requests. Try again in a moment."
+msgstr "Demasiadas peticiones. Inténtalo de nuevo en un momento."

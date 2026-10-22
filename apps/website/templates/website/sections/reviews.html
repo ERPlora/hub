@@ -1,0 +1,39 @@
+{% load i18n %}{% comment %}Google's rating and reviews of the business's place (apps/website/reviews.py, read by the Hub). The summary and
+the cards are rebuilt by frontend/public/reviews.ts from the public API: frontend/public/reviews.fixture.json holds
+their markup for both sides' tests. Change the three together.{% endcomment %}{% if data.hint %}<div class="card border-0 rounded-4 shadow-sm">
+  <div class="card-body p-4 text-body-secondary" data-ep-reviews-hint>{% translate "Your Google rating and reviews will show here once Google answers for this place." context "website" %}</div>
+</div>{% else %}<div data-ep-block="reviews">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3" data-ep-reviews-summary>{% if data.rating_label %}
+      <span class="display-5 fw-bold lh-1">{{ data.rating_label }}</span>{% endif %}
+      <div class="d-flex flex-column gap-1">
+        {% if data.stars %}<div class="d-flex gap-1 fs-5" role="img" aria-label="{{ data.stars_label }}">{% for star in data.stars %}<span class="ws-icon ws-icon-star {% if star == 'on' %}text-warning{% elif star == 'half' %}ws-star-half{% else %}text-body-tertiary{% endif %}" aria-hidden="true"></span>{% endfor %}</div>{% endif %}
+        <span class="small text-body-secondary">{{ data.count_label }}</span>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% if data.maps_uri %}<a class="btn btn-outline-primary rounded-pill px-4" href="{{ data.maps_uri }}" target="_blank" rel="noopener noreferrer">{% translate "See on Google" context "website" %}</a>{% endif %}
+      <a class="btn btn-primary rounded-pill px-4" href="{{ data.write_uri }}" target="_blank" rel="noopener noreferrer">{% translate "Write a review" context "website" %}</a>
+    </div>
+  </div>
+  <div data-ep-reviews-list>{% if data.reviews %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+      {% for review in data.reviews %}<div class="col">
+        <figure class="card h-100 border-0 rounded-4 shadow-sm mb-0">
+          <div class="card-body p-4 d-flex flex-column gap-3">
+            <figcaption class="d-flex align-items-center gap-3">
+              <span class="ws-glyph rounded-circle fw-semibold" aria-hidden="true">{{ review.initial }}</span>
+              <span class="d-flex flex-column">
+                {% if review.author_uri %}<a class="fw-semibold text-reset text-decoration-none" href="{{ review.author_uri }}" target="_blank" rel="noopener noreferrer">{{ review.author }}</a>{% else %}<span class="fw-semibold">{{ review.author }}</span>{% endif %}
+                {% if review.when %}{% if review.uri %}<a class="small text-body-secondary" href="{{ review.uri }}" target="_blank" rel="noopener noreferrer">{{ review.when }}</a>{% else %}<span class="small text-body-secondary">{{ review.when }}</span>{% endif %}{% endif %}
+              </span>
+            </figcaption>
+            <div class="d-flex gap-1" role="img" aria-label="{{ review.stars_label }}">{% for star in review.stars %}<span class="ws-icon ws-icon-star {% if star == 'on' %}text-warning{% elif star == 'half' %}ws-star-half{% else %}text-body-tertiary{% endif %}" aria-hidden="true"></span>{% endfor %}</div>
+            {% if review.text %}<blockquote class="mb-0"><p class="mb-0"{% if review.full_text %} title="{{ review.full_text }}"{% endif %}>{{ review.text }}</p></blockquote>{% endif %}
+          </div>
+        </figure>
+      </div>{% endfor %}
+    </div>{% endif %}
+  </div>
+  <p class="small text-body-secondary mt-4 mb-0">{% translate "Rating and reviews from" context "website" %} <span translate="no">Google Maps</span>. {% translate "The most relevant first, as Google orders them." context "website" %}</p>
+</div>{% endif %}
