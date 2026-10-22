@@ -7,6 +7,7 @@
       "roles": "Roles",
       "time_off": "Ausencias",
       "schedules": "Horarios",
+      "commissions": "Comisiones",
       "settings": "Ajustes"
     },
     "live": {
@@ -267,6 +268,44 @@
         "sepBreak": "descanso",
         "notWorking": "No trabaja",
         "create": "Crear horario"
+      }
+    },
+    "commissions": {
+      "period": {
+        "label": "Periodo",
+        "today": "Hoy",
+        "yesterday": "Ayer",
+        "this_week": "Esta semana",
+        "this_month": "Este mes",
+        "custom": "Personalizado"
+      },
+      "from": "Desde",
+      "to": "Hasta",
+      "totals": {
+        "label": "Totales del periodo",
+        "sold": "Vendido",
+        "commission": "Comisiones"
+      },
+      "columns": {
+        "name": "Nombre",
+        "role": "Rol",
+        "sold": "Vendido",
+        "rate": "Comisión %",
+        "commission": "Comisión"
+      },
+      "inactive": "Inactivo",
+      "left": "Ya no trabaja aquí",
+      "search": "Buscar profesional…",
+      "entity": {
+        "one": "profesional",
+        "many": "profesionales"
+      },
+      "empty": "Nadie del equipo puede cobrar comisión todavía.",
+      "emptyMessage": "Da de alta a tus profesionales en Personal y pon la comisión de cada uno.",
+      "loadError": "No se pudieron cargar las comisiones",
+      "noSales": {
+        "heading": "Las comisiones salen de las ventas",
+        "message": "Activa Ventas para ver lo que ha ganado cada profesional."
       }
     },
     "settings": {

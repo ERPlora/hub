@@ -4,6 +4,7 @@ from pathlib import Path
 
 from live.live_registry import live_registry
 
+from apps.sale import events as sale_events
 from apps.staff import events, services
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
@@ -22,6 +23,8 @@ TIME_OFF = [
     events.TIME_OFF_CANCELLED,
 ]
 SCHEDULE = [events.SCHEDULE_CREATED, events.SCHEDULE_UPDATED, events.SCHEDULE_DELETED]
+# Sales' events, cited by name in live.py: Sales is no requirement of Staff.
+SALE_FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"]
 
 
 def staff_queries():
@@ -45,6 +48,7 @@ def test_every_query_of_the_app_but_the_accounts_can_be_followed_live():
         "staff.member.compensation",
         "staff.member.stats",
         "staff.commission.summary",
+        "staff.commission.report",
         "staff.role.list",
         "staff.schedule.list",
         "staff.schedule.detail",
@@ -74,6 +78,8 @@ def test_each_query_and_its_events():
         events.ROLE_UPDATED,
     ]
     assert queries["staff.member.stats"] == [*MEMBER, *TIME_OFF]
+    # The report names and rates people (a renamed role too) and reads what Sales sold.
+    assert queries["staff.commission.report"] == [*MEMBER, events.ROLE_UPDATED, *SALE_FIGURES]
     # «Members» of a role counts the active people.
     assert queries["staff.role.list"] == [
         events.ROLE_CREATED,
@@ -118,10 +124,17 @@ def test_each_query_and_its_events():
 def test_every_event_is_a_literal_of_events_py_recorded_by_a_service():
     for on in staff_queries().values():
         for event in on:
+            if event in SALE_FIGURES:
+                continue
             assert f'"{event}"' in EVENTS_SOURCE, event
     for name, value in vars(events).items():
         if name.isupper() and isinstance(value, str):
             assert f"events.{name}" in SERVICES_SOURCE, name
+
+
+def test_the_sales_events_the_report_follows_are_the_ones_sales_records():
+    recorded = {value for value in vars(sale_events).values() if isinstance(value, str)}
+    assert set(SALE_FIGURES) <= recorded
 
 
 def test_a_pending_request_does_not_re_run_who_is_away_or_the_availability():
