@@ -2,7 +2,7 @@
 // Payments → Payments (WORKBOOK «Pantallas · Pagos»; PAYMENT-F02 to F06): «Outgoing payments», the live
 // `payment.payment.list` in a server-side DataTable with the old table's Reference, Date, Beneficiary,
 // Amount and Status (Method in the column chooser), «Search reference or beneficiary…», filters per
-// column, newest payment date first, 50 a page, list or cards. Each row offers the step it can take
+// column (the date from / to), newest payment date first, 50 a page, list or cards. Each row offers the step it can take
 // (Approve, Mark as sent, Mark as completed) and «Cancel payment» while it is not finished, only to
 // whoever may; a refusal shows above the table. «New payment» opens the form; changes come back
 // through the stream.
@@ -56,12 +56,13 @@ function cents(text: string | undefined): number | undefined {
   return read.ok && read.cents !== null ? read.cents : undefined;
 }
 
-/** The table's filters as the query takes them: one day as both ends, amounts in cents. */
+/** The table's filters as the query takes them: each end of the dates as sent, amounts in cents. */
 const query = computed<Partial<PaymentListIn>>(() => {
   const f = filters.value;
   const out: Partial<PaymentListIn> = {
     ...(f.reference ? { reference: f.reference } : {}),
-    ...(f.payment_date ? { payment_date_from: f.payment_date, payment_date_to: f.payment_date } : {}),
+    ...(f.payment_date_from ? { payment_date_from: f.payment_date_from } : {}),
+    ...(f.payment_date_to ? { payment_date_to: f.payment_date_to } : {}),
     ...(f.beneficiary_name ? { beneficiary_name: f.beneficiary_name } : {}),
   };
   const min = cents(f.amount_from);
@@ -92,7 +93,7 @@ const columns = computed<DataTableColumn<PaymentOut>[]>(() => [
     label: t('payment.payments.columns.date'),
     sortable: true,
     format: (_, row) => formatDay(row.payment_date, locale.value),
-    filter: { type: 'date' },
+    filter: { type: 'daterange' },
   },
   { key: 'beneficiary_name', label: t('payment.payments.columns.beneficiary'), sortable: true, filter: { type: 'text' } },
   {

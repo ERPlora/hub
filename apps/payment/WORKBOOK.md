@@ -71,7 +71,7 @@ asistente.
 Título «Pagos salientes». Una tabla con las columnas **Referencia**, **Fecha**, **Beneficiario**,
 **Importe** y **Estado** (y **Método**, que se puede mostrar con el selector de columnas). Buscador
 «Buscar referencia o beneficiario…» (busca también en la referencia de la factura del proveedor),
-filtros por columna — referencia y beneficiario por un trozo del texto, la fecha por día, el importe
+filtros por columna — referencia y beneficiario por un trozo del texto, la fecha «desde / hasta», el importe
 «desde / hasta» en euros, el estado por lista —, orden por columna, vista de lista o de tarjetas y 50
 filas por página. Va ordenada por la **fecha del pago**, la más reciente arriba (no por la de alta).
 
@@ -215,18 +215,21 @@ nada y no avisa. Una aprobación no se deshace: se cancela el pago y se registra
 Implicados: FLOW-F21
 
 ### PAYMENT-F06 Buscar y revisar los pagos
+<!-- origen: fi:modules/payments#navigation-list-erp-payments-list fi:modules/payments#query-payments-payments-get fi:modules/payments#query-payments-payments-list old:payments/WORKFLOW.md#payments-f06 -->
 Estado: hecho
 Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Pagos
 Pasos:
 1. Abre **Pagos**.
 2. Escribe en el buscador un trozo de la referencia (los últimos dígitos, la fecha), del beneficiario
-   o de la factura del proveedor, o usa los filtros de columna.
+   o de la factura del proveedor, o usa los filtros de columna: la **Fecha** desde un día, hasta otro o
+   entre los dos; el **Importe** desde / hasta en euros; el **Estado** de la lista.
 3. Ordena por la columna que necesite.
 Entra: lo que teclea la persona.
 Sale: nada; solo lectura. La lista se pone al día sola cuando otra persona registra o cambia un pago.
 Por el asistente, «el pago PAY-20261014-0003» se lee entero, con su método, concepto, IBAN y factura.
-Si falla: error de carga con «Reintentar».
+Si falla: si la lista no carga, la tabla lo dice («No se han podido cargar los pagos.») con
+«Reintentar», nunca «Sin pagos.». Un importe del filtro que no es una cifra no filtra (nunca «desde 0»).
 Implicados: ninguno
 
 ### PAYMENT-F07 Avisar de un pago completado
@@ -397,7 +400,7 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   Listas con `DataTable` de servidor (`useServerTable` + `useLiveList`, copias de las de `service`),
   formularios en `FormModal` (`PaymentFormModal`, `MethodFormModal`, `CancelPaymentModal`), importes
   con `MoneyInput` y `lib/money.ts`.
-- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (filtro de rango de fechas, iconos).
+- Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (iconos).
 
 ### Tablas de paridad con el producto actual
 
@@ -432,8 +435,6 @@ Tests:
 
 ## Lo que queda fuera
 
-- **Filtro de fecha por rango en la pantalla**: el `DataTable` de `@erplora/ui` filtra un día; la
-  consulta ya acepta el rango (`UI-REQUESTS.md`).
 
 ## Lo que NO hace, a propósito
 
@@ -463,4 +464,3 @@ Tests:
 - **Fuera de las plantillas** (decisión del 2026-10-14): el catálogo actual la tenía retirada del MVP
   (saas#1542), así que ni la peluquería ni el restaurante la traen al darse de alta (`verticals = []`);
   sigue en la tienda (`listed`), desde donde la enciende quien la quiera.
-- El filtro de fecha de la pantalla es de un día (la consulta acepta el rango).
