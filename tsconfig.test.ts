@@ -104,7 +104,7 @@ it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA
   const single = ts.parseJsonConfigFileContent(
     {
       compilerOptions: { allowJs: true, resolveJsonModule: true },
-      include: ['frontend/**/*', 'apps/*/frontend/**/*', '*.ts', '*.js'],
+      include: ['frontend/**/*', 'base/frontend/**/*', 'apps/*/frontend/**/*', '*.ts', '*.js'],
       exclude: ['node_modules', 'frontend/dist'],
     },
     ts.sys,

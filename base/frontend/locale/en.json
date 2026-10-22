@@ -1,0 +1,107 @@
+{
+  "base": {
+    "home": {
+      "title": "Home",
+      "greeting": {
+        "morning": "Good morning",
+        "afternoon": "Good afternoon",
+        "evening": "Good evening"
+      },
+      "today": "Today, {date}",
+      "tabs": {
+        "label": "Home sections",
+        "summary": "Summary",
+        "activity": "Activity"
+      }
+    },
+    "apps": {
+      "title": "My apps",
+      "add": "Add apps",
+      "viewAll": "View all apps",
+      "empty": "Your apps will show up here. Add the ones your business needs.",
+      "loadError": "Could not load your apps. Reload the page; if it keeps failing, sign in again.",
+      "loading": "Loading your apps…",
+      "state": {
+        "activating": "Activating…",
+        "off": "Off"
+      }
+    },
+    "setup": {
+      "title": "Finish setting up your business",
+      "progress": "{done} of {total} done",
+      "viewAll": "View all",
+      "viewLess": "Show less",
+      "configure": "Set up",
+      "done": "Done",
+      "level": {
+        "legal": "Needed to invoice",
+        "functional": "Important",
+        "recommended": "Recommended"
+      },
+      "unavailable": "Not available yet",
+      "unavailableHint": "This one is on us: there is nothing on your side to do yet. We are on it.",
+      "delegatedHint": "An administrator has to set this up.",
+      "completeTitle": "Your business is ready",
+      "completeBody": "Everything on the checklist is done.",
+      "loadError": "Could not load what is left to set up",
+      "loadErrorBody": "Check the connection and try again.",
+      "retry": "Retry"
+    },
+    "widgets": {
+      "loading": "Loading widgets…",
+      "customize": "Customize panel",
+      "close": "Close",
+      "presets": "Start from a preset",
+      "recommended": "Recommended",
+      "active": "Active · drag to reorder",
+      "available": "Available",
+      "add": "Add {widget}",
+      "remove": "Remove {widget}",
+      "empty": "Empty panel. Tap ⋮ to add widgets.",
+      "none": "No installed app offers widgets yet.",
+      "noData": "No data",
+      "error": "Unavailable",
+      "loadError": "Could not load the panels",
+      "loadErrorBody": "Check the connection and try again.",
+      "retry": "Retry"
+    },
+    "activity": {
+      "loading": "Loading…",
+      "search": "Search activity…",
+      "columns": {
+        "date": "Date",
+        "sale": "Sale",
+        "customer": "Customer",
+        "method": "Method",
+        "amount": "Amount",
+        "status": "Status"
+      },
+      "status": {
+        "completed": "Completed",
+        "voided": "Voided",
+        "refunded": "Refunded",
+        "other": "Other"
+      },
+      "loadError": "Could not load the latest sales",
+      "loadErrorBody": "Check the connection and try again.",
+      "retry": "Retry"
+    },
+    "bell": {
+      "title": "Notifications",
+      "empty": "All caught up. No notifications.",
+      "loadError": "Could not check the notifications. They will show up when the connection is back."
+    },
+    "blocking": {
+      "title": "You cannot issue invoices yet",
+      "body": "No ticket or invoice can be issued until this is set up:",
+      "configure": "Set up"
+    },
+    "plan": {
+      "upgrade": "Upgrade plan"
+    },
+    "userMenu": {
+      "account": "My account",
+      "reportProblem": "Report a problem"
+    }
+  }
+}

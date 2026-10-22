@@ -1,0 +1,107 @@
+{
+  "base": {
+    "home": {
+      "title": "Inicio",
+      "greeting": {
+        "morning": "Buenos días",
+        "afternoon": "Buenas tardes",
+        "evening": "Buenas noches"
+      },
+      "today": "Hoy, {date}",
+      "tabs": {
+        "label": "Secciones del Inicio",
+        "summary": "Resumen",
+        "activity": "Actividad"
+      }
+    },
+    "apps": {
+      "title": "Mis apps",
+      "add": "Añadir apps",
+      "viewAll": "Ver todas las apps",
+      "empty": "Aquí aparecerán tus apps. Añade las que necesite tu negocio.",
+      "loadError": "No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.",
+      "loading": "Cargando tus apps…",
+      "state": {
+        "activating": "Activando…",
+        "off": "Desactivada"
+      }
+    },
+    "setup": {
+      "title": "Termina de configurar tu negocio",
+      "progress": "{done} de {total} hechos",
+      "viewAll": "Ver todo",
+      "viewLess": "Ver menos",
+      "configure": "Configurar",
+      "done": "Hecho",
+      "level": {
+        "legal": "Necesario para facturar",
+        "functional": "Importante",
+        "recommended": "Recomendado"
+      },
+      "unavailable": "Todavía no disponible",
+      "unavailableHint": "Esto es cosa nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.",
+      "delegatedHint": "Esto lo tiene que configurar un administrador.",
+      "completeTitle": "Tu negocio está listo",
+      "completeBody": "No queda nada pendiente en la checklist.",
+      "loadError": "No se ha podido cargar lo que te falta por configurar",
+      "loadErrorBody": "Comprueba la conexión y vuelve a intentarlo.",
+      "retry": "Reintentar"
+    },
+    "widgets": {
+      "loading": "Cargando widgets…",
+      "customize": "Personalizar panel",
+      "close": "Cerrar",
+      "presets": "Empezar desde un preset",
+      "recommended": "Recomendado",
+      "active": "Activos · arrastra para reordenar",
+      "available": "Disponibles",
+      "add": "Añadir {widget}",
+      "remove": "Quitar {widget}",
+      "empty": "Panel vacío. Pulsa ⋮ para añadir widgets.",
+      "none": "Ninguna app instalada ofrece widgets todavía.",
+      "noData": "Sin datos",
+      "error": "No disponible",
+      "loadError": "No se han podido cargar los paneles",
+      "loadErrorBody": "Comprueba la conexión y vuelve a intentarlo.",
+      "retry": "Reintentar"
+    },
+    "activity": {
+      "loading": "Cargando…",
+      "search": "Buscar actividad…",
+      "columns": {
+        "date": "Fecha",
+        "sale": "Venta",
+        "customer": "Cliente",
+        "method": "Método",
+        "amount": "Importe",
+        "status": "Estado"
+      },
+      "status": {
+        "completed": "Completada",
+        "voided": "Anulada",
+        "refunded": "Devuelta",
+        "other": "Otro"
+      },
+      "loadError": "No se han podido cargar las últimas ventas",
+      "loadErrorBody": "Comprueba la conexión y vuelve a intentarlo.",
+      "retry": "Reintentar"
+    },
+    "bell": {
+      "title": "Notificaciones",
+      "empty": "Todo al día. Sin notificaciones.",
+      "loadError": "No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión."
+    },
+    "blocking": {
+      "title": "Todavía no puedes facturar",
+      "body": "No se podrá emitir ningún ticket ni factura hasta que configures esto:",
+      "configure": "Configurar"
+    },
+    "plan": {
+      "upgrade": "Actualizar plan"
+    },
+    "userMenu": {
+      "account": "Mi cuenta",
+      "reportProblem": "Reportar un problema"
+    }
+  }
+}

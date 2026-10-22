@@ -1,4 +1,5 @@
-"""Read operations of the demo app (``READ ONLY``); the three of them can be followed live (live.py)."""
+"""Read operations of the demo app (``READ ONLY``): the list, the detail and the stats, which can be followed live
+(live.py), and the open items that the bell's example counter reads (``DemoConfig.bell``)."""
 
 from uuid import UUID
 
@@ -9,7 +10,7 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.demo.models import Item, ItemLine
-from apps.demo.schemas import ByIdIn, ItemDetailOut, ItemListIn, ItemPage, ItemStatsIn, ItemStatsOut
+from apps.demo.schemas import ByIdIn, ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemStatsIn, ItemStatsOut
 
 ITEM_NOT_FOUND = _("This item no longer exists.")
 
@@ -75,6 +76,18 @@ def item_stats(ctx: OperationContext, data: ItemStatsIn) -> dict:
         done=Count("id", filter=Q(status=Item.Status.DONE)),
     )
     return {**counts, "lines": ItemLine.objects.count()}
+
+
+@operation(
+    "demo.item.open_count",
+    kind="query",
+    permission="demo.view",
+    input=ItemStatsIn,
+    output=ItemCountOut,
+    ai={"description": "Counts the demo items still open."},
+)
+def open_count(ctx: OperationContext, data: ItemStatsIn) -> dict:
+    return {"count": Item.objects.filter(status=Item.Status.OPEN).count()}
 
 
 def load_detail(item_id: UUID) -> Item | None:

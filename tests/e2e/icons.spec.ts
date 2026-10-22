@@ -18,8 +18,22 @@ test.afterAll(() => {
   if (ids) psql(`delete from demo_itemline where item_id in (${ids}); delete from demo_item where id in (${ids})`);
 });
 
-/** Every visible `ion-icon` (light DOM and shadow roots) and whether it painted a sized `<svg>`. */
+/**
+ * Every visible `ion-icon` once they all painted, or as they are after 5 s: an icon mounted with its screen
+ * (the side menu's foot after a full load) paints its `<svg>` a few frames later. One that never paints
+ * still comes back unpainted.
+ */
 async function icons(page: Page, where: string): Promise<IconState[]> {
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const found = await iconsNow(page, where);
+    if (found.every((icon) => icon.painted) || Date.now() > deadline) return found;
+    await page.waitForTimeout(100);
+  }
+}
+
+/** Every visible `ion-icon` (light DOM and shadow roots) and whether it painted a sized `<svg>`. */
+async function iconsNow(page: Page, where: string): Promise<IconState[]> {
   const found = await page.evaluate(() => {
     const out: { name: string; host: string; painted: boolean; width: number; height: number }[] = [];
     const walk = (root: Document | ShadowRoot) => {

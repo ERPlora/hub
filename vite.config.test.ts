@@ -79,7 +79,7 @@ describe('vite.config', () => {
   it('tests the shell entry and every app frontend in happy-dom', () => {
     expect(config.test?.environment).toBe('happy-dom');
     expect(config.test?.include).toEqual(
-      expect.arrayContaining(['frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts']),
+      expect.arrayContaining(['frontend/**/*.test.ts', 'base/frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts']),
     );
     // Vitest's default `exclude` drops every `vite.config.*`, this test included.
     expect(config.test?.exclude).toEqual(['**/node_modules/**', '**/dist/**']);

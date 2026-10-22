@@ -14,6 +14,15 @@ class BaseConfig(LiveAppConfig):
     kind = "platform"
     verbose_name = _("Base")
     default_auto_field = "django.db.models.BigAutoField"
+    # The Home (PLAN-HUB round 2026-10-21): everyone of the hub sees it; whoever runs the hub (the old hub's
+    # ``hub.administer``) is told its platform steps and the failed events.
+    permissions = ["base.view_home", "base.administer_hub"]
+    role_permissions = {
+        "hub_owner": ["base.*"],
+        "hub_admin": ["base.*"],
+        "hub_manager": ["base.view_home"],
+        "hub_employee": ["base.view_home"],
+    }
 
     def ready(self) -> None:
         # Importing the scheduler registers the check of the apps' scheduled tasks (tag "base").

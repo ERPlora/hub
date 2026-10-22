@@ -1,5 +1,8 @@
 {
   "base.session.me": { "method": "get", "path": "/api/me" },
+  "base.setup.status": { "method": "get", "path": "/api/home/setup" },
+  "base.widget.list": { "method": "get", "path": "/api/home/widgets" },
+  "base.bell.counters": { "method": "get", "path": "/api/home/bell" },
   "demo.item.list": { "method": "get", "path": "/api/demo/items" },
   "demo.item.detail": { "method": "get", "path": "/api/demo/items/detail" },
   "demo.item.stats": { "method": "get", "path": "/api/demo/items/stats" },

@@ -109,7 +109,7 @@ test('1440: the menu pinned next to the content, the person on top and the QR be
   // Home, from the menu.
   await menu(page).locator('[data-testid=nav-home]').click();
   await expect(page).toHaveURL(`${A}/`);
-  await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
+  await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
   await expect(menu(page).locator('[data-testid=nav-home]')).toHaveAttribute('aria-current', 'page');
   await page.waitForTimeout(400);
   await page.screenshot({ path: shot('FIX-SHELL-SPLIT-PANE-1440') });
@@ -145,7 +145,7 @@ for (const vp of [VIEWPORTS.tablet, VIEWPORTS.phone]) {
     await menu(page).locator('[data-testid=nav-home]').click();
     await expect(page).toHaveURL(`${A}/`);
     await expect(menu(page)).toBeHidden();
-    await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
+    await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
     await page.waitForTimeout(400);
     await page.screenshot({ path: shot(`FIX-SHELL-SPLIT-PANE-${vp.label}`) });
     record(`FIX-SHELL-SPLIT-PANE-${vp.label}`, centred);
@@ -166,7 +166,7 @@ test('no Back on the screens of a module nor on Home, only on a detail; the ⠿ 
     await expect(topbar(page).back, `${vp.label}: the root of a business app`).toHaveCount(0);
 
     await page.goto('/');
-    await expect(shown(page).locator('[data-testid=home-app]').first()).toBeVisible();
+    await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
     await expect(topbar(page).back, `${vp.label}: Home`).toHaveCount(0);
 
     // A detail keeps its contextual Back (the old hub's `back-href`), and it returns to its list.
