@@ -26,14 +26,16 @@ y qué comisión lleva. Responde a «**quién trabaja y atiende**», no a «qui�
 Quién la usa:
 
 - El **propietario** y el **administrador** lo hacen todo, también desactivar y dar de baja.
-- El **responsable** da de alta y edita fichas, roles, horarios y ajustes, ve la tarifa, la comisión
-  y las notas de RRHH, registra ausencias y las aprueba, rechaza o cancela.
+- El **responsable** da de alta y edita fichas, roles, horarios y ajustes, ve la tarifa, la comisión,
+  las notas de RRHH y lo que ha ganado cada profesional en **Comisiones**, registra ausencias y las
+  aprueba, rechaza o cancela.
 - El **empleado** ve el directorio, los horarios y quién falta (nunca la tarifa ni el motivo de una
   ausencia ajena), ve su propia ficha y sus ausencias, **pide sus ausencias** y retira las que aún
   están pendientes.
 
 Citas (cuando llegue) lee de aquí quién es reservable, su horario y sus ausencias aprobadas; el TPV
-y la cocina leen el directorio para nombrar a quien atiende; el cierre del día lee la comisión.
+y la cocina leen el directorio para nombrar a quien atiende. Al cerrar el día, **Comisiones** da lo que
+ha vendido y ganado cada profesional.
 
 ## Referencia adoptada
 
@@ -70,8 +72,9 @@ y la cocina leen el directorio para nombrar a quien atiende; el cierre del día 
 ## Pantallas
 
 Personal se abre desde el menú **Personal** y tiene cuatro pestañas: **Personal**, **Roles**,
-**Ausencias** y **Horarios**, más **Ajustes**. Lo que una persona no puede hacer no aparece, y la
-app lo rechaza aunque lo intente por la API o por el asistente.
+**Ausencias** y **Horarios**, más **Comisiones** (para quien ve la compensación) y **Ajustes** (para
+quien puede guardarlos). Lo que una persona no puede hacer no aparece, y la app lo rechaza aunque lo
+intente por la API o por el asistente.
 
 ### Personal
 Encima de la tabla, tres cifras: **Plantilla activa**, **Ausentes hoy** y **Ausencias pendientes**
@@ -109,6 +112,16 @@ Horas** (la semana resumida). Acciones de fila: **Editar**, **Activar / desactiv
 desde, Vigente hasta, Por defecto** y una fila por día de la semana con **Inicio, Fin, Inicio
 descanso, Fin descanso** (o «No trabaja»).
 
+### Comisiones
+Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
+día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
+días que cuenta. Debajo, dos cifras: **Vendido** y **Comisiones** del periodo. Después, la lista con
+buscador «Buscar profesional…» y columnas **Nombre, Rol, Vendido, Comisión %** y **Comisión**: cada
+persona que puede cobrar comisión (Activa o De baja), también sin ventas y con comisión 0, y quien vendió
+en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto al nombre). Se ordena por
+nombre, rol, vendido o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
+o devolver una venta y al cambiar una ficha.
+
 ### Ajustes de Personal
 «Inicio de jornada (HH:MM)», «Fin de jornada (HH:MM)», «Duración del descanso (minutos)»,
 «Antelación mínima de reserva (horas)», «Horas máximas por día», «Umbral de horas extra
@@ -127,7 +140,7 @@ columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
 | Estado | Qué ve la persona |
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado; cada cifra enseña «…». |
-| Vacío | «Sin miembros del staff.», «Sin roles definidos.», «Sin solicitudes de ausencia.» o «Este miembro aún no tiene horarios.»; con búsqueda o filtro, «Sin resultados». «Ausencias de hoy» sin nadie: «Nadie falta hoy.». |
+| Vacío | «Sin miembros del staff.», «Sin roles definidos.», «Sin solicitudes de ausencia.» o «Este miembro aún no tiene horarios.»; con búsqueda o filtro, «Sin resultados». «Ausencias de hoy» sin nadie: «Nadie falta hoy.». Comisiones sin nadie que pueda cobrarla: «Nadie del equipo puede cobrar comisión todavía.»; sin Ventas en el negocio, «Las comisiones salen de las ventas» y «Activa Ventas para ver lo que ha ganado cada profesional.», sin lista. |
 | Error | El aviso de la tabla con «Reintentar»; en Ajustes, «No se pudieron cargar los ajustes» con «Reintentar» y sin formulario. Las cifras dicen «No se pudieron cargar las cifras» y «Ausencias de hoy», «No se pudo cargar quién falta hoy», y la tabla sigue funcionando. Un rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila, encima de la tabla. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
@@ -217,9 +230,9 @@ Pasos:
 2. Elige la cuenta de esa persona, o «Sin acceso al Hub» para desvincular, y guarda.
 Entra: las cuentas activas con acceso a este negocio, solo su identificador y su nombre
 (`staff.account.list`; las lee quien puede dar de alta o editar fichas).
-Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08), pide sus ausencias (STAFF-F24)
-y sus ventas de mostrador cuentan para su comisión (STAFF-F21). No cambia ningún permiso. Dar de
-baja la ficha libera la cuenta.
+Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08) y pide sus ausencias (STAFF-F24).
+No cambia ningún permiso ni la comisión: una venta cuenta para quien se eligió al cobrarla (STAFF-F21).
+Dar de baja la ficha libera la cuenta.
 Si falla: «Ese usuario del Hub ya está vinculado a {nombre}. Un usuario del Hub solo puede
 pertenecer a un miembro del equipo: desvincúlalo allí primero o elige otro usuario.»
 (`staff.user_already_linked`), también si dos personas lo vinculan a la vez; «Ese usuario del Hub no
@@ -474,20 +487,30 @@ Implicados: ninguno
 ### STAFF-F21 Dar la tarifa y la comisión de cada profesional
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/staff#query-staff-commissions-summary old:staff/workflow/pago-y-ajustes.md#staff-f21 qa:modules/staff/commission-per-professional qa:verticals/beauty/07-closing-per-professional -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable; sistema (el cierre del día)
-Pantalla: Personal (columna Tarifa/h y formulario)
+Actor: propietario, administrador, responsable
+Pantalla: Personal (columna Tarifa/h y formulario) y Comisiones
 Pasos:
 1. Quien puede ver la compensación ve la tarifa, la comisión y las notas de RRHH de cada ficha.
 2. La **hoja de comisiones** da, por cada persona que puede cobrar comisión (Activa o De baja; no las
    Inactivas ni las dadas de baja), su ficha, su cuenta (vacía si no tiene), nombre, rol y comisión,
    también las de comisión 0.
-3. El importe de un día (vendido × comisión ÷ 100) lo compone quien cierra el día con las ventas por
-   profesional: una persona puede salir en las ventas bajo su ficha (venta de una cita) o bajo su
-   cuenta (venta de mostrador), y las dos se suman antes de aplicar la comisión.
-Entra: la tarifa y la comisión de cada ficha; no lee ventas.
+3. Para saber lo que ha ganado cada profesional, abre **Personal → Comisiones**. Sale «Hoy»: lo que ha
+   vendido cada persona en el día del negocio, con lo devuelto ya restado, su comisión y lo que le
+   corresponde (vendido × comisión ÷ 100, redondeado al céntimo una sola vez por persona; medio céntimo
+   sube). Arriba, el total vendido y el total de comisiones.
+4. Para otro periodo, elige «Ayer», «Esta semana», «Este mes» o «Personalizado» y pon «Desde» y
+   «Hasta».
+5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella o, si la línea no dice
+   quién, la cuenta que atendió (en una venta de una cita, la profesional de la cita). Lo que se cobra
+   sin elegir a nadie del equipo no cuenta para nadie.
+Entra: la tarifa y la comisión de cada ficha y, de Ventas, lo vendido por cada profesional en el periodo
+(ya resta lo devuelto: lo que vuelve, a quien lo vendió). Ventas es opcional.
 Sale: solo lectura.
-Si falla: sin permiso de compensación, «Se necesita el permiso…».
-Implicados: ninguno
+Si falla: sin permiso de compensación, «No tienes permiso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
+«La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
+personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
+una vez.».
+Implicados: SALE-F16, SALE-F28
 
 ### STAFF-F22 Cambiar los ajustes de Personal
 <!-- origen: old-hub:HUB_SHELL-F43 old-hub:HUB_SHELL-F44 fi:modules/staff#command-staff-settings-update fi:modules/staff#query-staff-settings-get fi:modules/staff#settings-bloque old:staff/workflow/pago-y-ajustes.md#staff-f22 -->
@@ -562,7 +585,8 @@ su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
 | La ficha de una persona (sin compensación) | ver | F02 | `staff.member.detail` |
 | Mi ficha, con mi tarifa y mi comisión | ver | F08 | `staff.member.mine` |
 | Tarifa, comisión y notas de RRHH, con los filtros, el orden y las páginas del directorio (la columna Tarifa/h lee las mismas filas) | ver la compensación | F21 | `staff.member.compensation` |
-| La hoja de comisiones, con las dos identidades de cada persona | ver la compensación | F21 | `staff.commission.summary` |
+| La hoja de comisiones: quien puede cobrar comisión, con su ficha, su cuenta y su comisión | ver la compensación | F21 | `staff.commission.summary` |
+| Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las cifras de Ventas) | F21 | `staff.commission.report` |
 | Las cifras: fichas, activos, de baja, inactivos, ausentes hoy y solicitudes pendientes | ver | F23 | `staff.member.stats` |
 | Los roles con sus miembros activos, con filtros y orden | ver | F04, F23 | `staff.role.list` |
 | Los horarios de una persona con su semana | ver | F13–F15 | `staff.schedule.list` |
@@ -617,7 +641,11 @@ su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
 | Ajustes cambiados | Guardar con algún cambio (o el primer guardado) | Nada | `staff.settings.updated` |
 
 ### A qué reacciona y lo que necesita de otras apps
-Nada: Personal no depende de ninguna app. De la plataforma usa las cuentas del negocio (para
+No reacciona a ningún aviso y no requiere ninguna app. Para **Comisiones** pide a **Ventas**, si el
+negocio la tiene, lo vendido por cada profesional en el periodo, con lo devuelto ya restado
+(`sale.sale.by_staff`, con el permiso de cifras de Ventas de quien mira), y se pone al día con sus avisos
+de venta cobrada, anulada o devuelta (`sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded`).
+Sin Ventas, Comisiones lo dice y no lista a nadie. De la plataforma usa las cuentas del negocio (para
 vincular una ficha) y la zona horaria del negocio (para el «hoy»).
 
 ### Quién puede qué
@@ -663,7 +691,12 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
 - El «hoy» es `timezone.localdate()` (zona del negocio; en la fase 1, `TIME_ZONE`).
-- Dinero en céntimos enteros (`hourly_rate`); la comisión es `Decimal(5, 2)` de 0 a 100.
+- Dinero en céntimos enteros (`hourly_rate`); la comisión es `Decimal(5, 2)` de 0 a 100. El importe
+  de la comisión (`staff.commission.report`) es `vendido × comisión ÷ 100` en `Decimal`, redondeado a
+  céntimos enteros con `ROUND_HALF_UP` una sola vez por persona, sobre lo que Ventas le atribuye
+  (`total_revenue`, que ya resta lo devuelto). Una venta nombra a su profesional por el id de su ficha
+  (UUID); la cuenta (`user_id`, un entero) nunca llega a una venta, así que no hay dos identidades que
+  sumar.
 - Los avisos solo llevan identificadores: nunca el motivo de una baja ni de una ausencia (datos
   personales, y la baja por enfermedad es un dato de salud).
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
@@ -689,9 +722,15 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 
 ## Cómo son las páginas (para quien lo mantiene)
 
-- `frontend/routes.ts`: `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules` y
-  `/staff/settings`; la barra de pestañas (`frontend/tabs.ts`) añade «Ajustes» solo a quien puede
-  guardarlos (`staff.manage_settings`), como la pestaña que generaba la shell vieja.
+- `frontend/routes.ts`: `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`,
+  `/staff/commissions` y `/staff/settings`; la barra de pestañas (`frontend/tabs.ts`) añade «Comisiones»
+  solo a quien ve la compensación (`staff.view_compensation`) y «Ajustes» solo a quien puede guardarlos
+  (`staff.manage_settings`), como la pestaña que generaba la shell vieja. El menú de `apps.py` no las
+  lleva: una entrada de menú no puede depender de un permiso (`live.meta.Nav`).
+- Comisiones (`frontend/pages/CommissionsPage.vue`) sigue `staff.commission.report`: el periodo lo
+  resuelve el servidor en días del negocio, y «Personalizado» envía `date_from` y `date_to`. Su 422 sale
+  bajo «Hasta». Solo se suscribe quien ve la compensación. La consulta pide `sale.sale.by_staff` por su
+  nombre (`live.operations.get`): Ventas ausente o apagada da `sales_available: false`.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas como suscripciones aparte: el servidor no da
   más de 100) y `useServerTable` (orden `columna`/`-columna`); escrituras con `useCommand`.
 - Un horario nuevo solo nace «Por defecto» si la persona no tiene ya uno: un segundo (el de verano)
@@ -712,8 +751,8 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 ## Lo que NO hace, a propósito
 
 - **No es el acceso**: no crea cuentas, no da permisos, no guarda PIN.
-- **No ficha** (entradas, salidas, horas trabajadas, horas extra) ni calcula nóminas ni el importe de
-  la comisión.
+- **No ficha** (entradas, salidas, horas trabajadas, horas extra) ni calcula nóminas: Comisiones da lo
+  ganado en un periodo, pero ni lo paga ni lo guarda.
 - **No reserva** ni mira las citas: al desactivar, dar de baja o aprobar una ausencia, las citas ya
   reservadas siguen en la agenda (la agenda es de Citas).
 - **No guarda el horario del negocio** (abrir, cerrar, festivos: es de Horarios).
@@ -753,4 +792,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - Las cifras ya no cuentan las ausencias pendientes de una ficha dada de baja.
 - **Los paneles del Inicio** (Plantilla activa, Ausentes hoy, Ausencias pendientes, Ausencias de hoy y
   Empleados por rol) salen dentro de Personal mientras el Hub no tenga un Inicio con paneles.
+- **Comisiones** (nuevo): el producto actual no tenía pantalla que cruzara lo vendido con la comisión
+  (STAFF-F21 «parcial»); el cierre por profesional lo componía cada uno. Ahora Personal da lo ganado por
+  cada profesional en un periodo, con lo devuelto restado a quien lo vendió, como el informe de comisiones
+  de Fresha, Phorest o Zenoti; no va en el cierre de caja (ningún TPV del mercado la pone en el informe Z).
+  Ya no hay dos identidades de una persona que sumar: una venta siempre nombra la ficha.
 - Las listas paginan con hasta 100 por página.

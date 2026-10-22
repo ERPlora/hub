@@ -129,7 +129,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 33 staff operations to apps/staff/api.py: queries by GET, commands by POST', () => {
+  it('binds the 34 staff operations to apps/staff/api.py: queries by GET, commands by POST', () => {
     const staff = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('staff.')));
     expect(staff).toEqual({
       'staff.member.list': { method: 'get', path: '/api/staff/members' },
@@ -143,6 +143,7 @@ describe('OPERATION_ROUTES', () => {
       'staff.member.deactivate': { method: 'post', path: '/api/staff/members/deactivate' },
       'staff.member.terminate': { method: 'post', path: '/api/staff/members/terminate' },
       'staff.commission.summary': { method: 'get', path: '/api/staff/commissions' },
+      'staff.commission.report': { method: 'get', path: '/api/staff/commissions/report' },
       'staff.account.list': { method: 'get', path: '/api/staff/accounts' },
       'staff.role.list': { method: 'get', path: '/api/staff/roles' },
       'staff.role.create': { method: 'post', path: '/api/staff/roles' },
