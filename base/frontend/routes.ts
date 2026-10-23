@@ -18,6 +18,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/AppsPage.vue'),
     meta: { auth: true },
   },
+  // System (BASE-G81 brings its «Plan and limits»; its other sections come with the part of System).
+  {
+    path: '/system',
+    name: 'base-system',
+    component: () => import('./pages/SystemPage.vue'),
+    meta: { auth: true },
+  },
 ];
 
 export default routes;

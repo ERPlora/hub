@@ -175,6 +175,38 @@
         "body": "Check the connection and try again."
       },
       "toApps": "Go to Apps"
+    },
+    "systemPlan": {
+      "title": "System",
+      "tabs": {
+        "label": "System sections",
+        "plan": "Plan and limits"
+      },
+      "heading": "Your plan's limits",
+      "status": {
+        "within": "Within the limit",
+        "close": "Close to the limit"
+      },
+      "people": "People",
+      "devices": "Devices",
+      "limitHint": "Plan limit",
+      "noLimit": "No limit",
+      "upTo": "Up to {n}",
+      "notCounted": "n/a",
+      "devicesNotCounted": "The hub does not count its devices yet.",
+      "full": {
+        "heading": "You are running out of room in your plan",
+        "body": "Your plan has every place taken, so you cannot add anyone else."
+      },
+      "unknown": "We do not know this business's plan yet: it shows up as soon as erplora.com sends it.",
+      "managed": "Plans are managed from your ERPlora account, on erplora.com.",
+      "loading": "Loading your plan…",
+      "denied": "Only who runs the business sees the plan and its limits.",
+      "error": {
+        "heading": "We could not read your plan",
+        "body": "Check the connection and try again."
+      },
+      "retry": "Retry"
     }
   }
 }

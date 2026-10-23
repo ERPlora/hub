@@ -348,3 +348,23 @@ class AppListOut(Schema):
     apps: list[AppOut]
     #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
     store_url: str
+
+
+class PlanUsageIn(Schema):
+    """No input: the plan of the business of the request."""
+
+
+class LimitOut(Schema):
+    #: How much is in use; ``None`` when the Hub does not count it (never a made-up figure).
+    used: int | None
+    #: The plan's limit; ``None`` when it has none (0 in the SaaS's plan) or the plan is not known.
+    limit: int | None
+
+
+class PlanUsageOut(Schema):
+    """``base.plan.usage``: the plan's limits (the SaaS's photo, ``plan``) against what the business uses."""
+
+    #: Whether the Hub has the business's plan from erplora.com (a demo, or a business without a photo yet, has not).
+    known: bool
+    people: LimitOut
+    devices: LimitOut

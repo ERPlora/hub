@@ -175,6 +175,38 @@
         "body": "Comprueba la conexión y vuelve a intentarlo."
       },
       "toApps": "Ir a Apps"
+    },
+    "systemPlan": {
+      "title": "Sistema",
+      "tabs": {
+        "label": "Secciones de Sistema",
+        "plan": "Plan y límites"
+      },
+      "heading": "Los límites de tu plan",
+      "status": {
+        "within": "Dentro del límite",
+        "close": "Cerca del límite"
+      },
+      "people": "Personas",
+      "devices": "Dispositivos",
+      "limitHint": "Límite del plan",
+      "noLimit": "Sin límite",
+      "upTo": "Hasta {n}",
+      "notCounted": "n/d",
+      "devicesNotCounted": "El hub aún no lleva la cuenta de sus dispositivos.",
+      "full": {
+        "heading": "Te estás quedando sin margen en tu plan",
+        "body": "Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más."
+      },
+      "unknown": "Todavía no conocemos el plan de este negocio: aparecerá en cuanto erplora.com lo envíe.",
+      "managed": "Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.",
+      "loading": "Cargando tu plan…",
+      "denied": "Solo quien administra el negocio ve el plan y sus límites.",
+      "error": {
+        "heading": "No hemos podido leer tu plan",
+        "body": "Comprueba la conexión y vuelve a intentarlo."
+      },
+      "retry": "Reintentar"
     }
   }
 }

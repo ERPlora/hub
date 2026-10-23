@@ -151,3 +151,71 @@ def test_over_http(client, make_user):
     response = client.get("/api/apps", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT_LANGUAGE="es")
     assert response.status_code == 200
     assert by_id(response.json())["tax"]["name"] == "Impuestos"
+
+
+# ── base.plan.usage: how much of the plan's limits the business uses (BASE-G81) ──────────────────────────────
+
+
+def plan_usage(*permissions, scope=A):
+    from base.schemas import PlanUsageIn
+
+    ctx = OperationContext(scope=scope, actor="ana", permissions=frozenset(permissions), language="en")
+    return get("base.plan.usage")(ctx, PlanUsageIn()).model_dump(mode="json")
+
+
+def test_plan_usage_is_for_who_runs_the_business():
+    from base.schemas import PlanUsageIn, PlanUsageOut
+
+    op = get("base.plan.usage")
+    assert (op.kind, op.permission, op.input, op.output) == ("query", "base.administer_hub", PlanUsageIn, PlanUsageOut)
+    assert "base.plan.usage" in live_registry.affected([HUB_STATE_APPLIED])
+
+
+def test_the_people_against_the_plans_limit_and_the_devices_limit(make_user):
+    keep("a", {"plan": {"slug": "starter", "max_users": 3, "max_devices": 2}})
+    make_user("ana", host="a", role="hub_owner")
+    make_user("leo", host="a", role="hub_employee")
+    make_user("old", host="a", role="hub_employee", is_active=False)
+    make_user("bea", host="b", role="hub_owner")
+
+    assert plan_usage("base.administer_hub") == {
+        "known": True,
+        "people": {"used": 2, "limit": 3},
+        # The Hub keeps no count of its devices yet (trusted devices come later): the limit, never a made-up use.
+        "devices": {"used": None, "limit": 2},
+    }
+
+
+def test_zero_in_the_plan_is_no_limit():
+    keep("a", {"plan": {"slug": "standard", "max_users": 0, "max_devices": 0}})
+    usage = plan_usage("base.administer_hub")
+    assert (usage["people"]["limit"], usage["devices"]["limit"]) == (None, None)
+
+
+@pytest.mark.parametrize("state", [{}, {"plan": None}, {"plan": "free"}, {"plan": {"slug": "x", "max_users": "3"}}])
+def test_without_a_readable_plan_it_says_it_does_not_know_it(state):
+    keep("a", state)
+    usage = plan_usage("base.administer_hub")
+    assert usage["known"] is False
+    assert (usage["people"]["limit"], usage["devices"]["limit"]) == (None, None)
+
+
+def test_each_business_its_own_plan(make_user):
+    keep("a", {"plan": {"max_users": 3, "max_devices": 1}})
+    keep("b", {"plan": {"max_users": 10, "max_devices": 5}})
+    assert plan_usage("base.administer_hub", scope=B)["people"]["limit"] == 10
+
+
+def test_plan_usage_over_http(client, make_user):
+    from django.urls import resolve
+
+    from base.api import router
+
+    [route] = router.path_operations["/system/plan"].operations
+    assert (route.methods, route.operation_id) == (["GET"], "base.plan.usage")
+    assert resolve("/api/system/plan").url_name
+    keep("a", {"plan": {"max_users": 3, "max_devices": 2}})
+    client.force_login(make_user("leo", host="a", role="hub_employee"))
+    assert client.get("/api/system/plan", HTTP_HOST="a.localhost:8000").status_code == 403
+    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    assert client.get("/api/system/plan", HTTP_HOST="a.localhost:8000").json()["people"] == {"used": 2, "limit": 3}

@@ -25,3 +25,5 @@ live("base.notice.list", on=events_of("notices"))
 # ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
 # The SaaS's photo gives or takes the right to a paid module (base.entitlement): the Apps screen follows it.
 live("base.app.list", on=[HUB_STATE_APPLIED])
+# The plan and the members come in the photo too: «Plan and limits» follows it.
+live("base.plan.usage", on=[HUB_STATE_APPLIED])

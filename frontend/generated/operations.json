@@ -5,6 +5,7 @@
   "base.bell.counters": { "method": "get", "path": "/api/home/bell" },
   "base.notice.list": { "method": "get", "path": "/api/home/notices" },
   "base.app.list": { "method": "get", "path": "/api/apps" },
+  "base.plan.usage": { "method": "get", "path": "/api/system/plan" },
   "demo.item.list": { "method": "get", "path": "/api/demo/items" },
   "demo.item.detail": { "method": "get", "path": "/api/demo/items/detail" },
   "demo.item.stats": { "method": "get", "path": "/api/demo/items/stats" },

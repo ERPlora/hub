@@ -119,6 +119,20 @@ export interface AppList {
   store_url: string;
 }
 
+/** `base.LimitOut`: what is in use (null: the Hub does not count it) against the plan's limit (null: none). */
+export interface PlanLimit {
+  used: number | null;
+  limit: number | null;
+}
+
+/** `base.PlanUsageOut`: «Plan and limits» of System. */
+export interface PlanUsage {
+  /** Whether the Hub has the business's plan from erplora.com yet. */
+  known: boolean;
+  people: PlanLimit;
+  devices: PlanLimit;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
@@ -127,5 +141,6 @@ declare module '@erplora/ui/sdk' {
     'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
     // Apps (APP-BASE-4)
     'base.app.list': { input: NoInput; output: AppList };
+    'base.plan.usage': { input: NoInput; output: PlanUsage };
   }
 }

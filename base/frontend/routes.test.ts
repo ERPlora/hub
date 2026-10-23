@@ -1,4 +1,5 @@
-// base's `routes.ts`: the Home at `/` (APP-BASE-1) and Apps at `/apps` (APP-BASE-4); main.ts reads the default export.
+// base's `routes.ts`: the Home at `/` (APP-BASE-1), Apps at `/apps` and System at `/system` (APP-BASE-4); main.ts reads
+// the default export.
 import type { RouteComponent } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -8,12 +9,14 @@ import routes from './routes';
 // test mounts it).
 vi.mock('./pages/HomePage.vue', () => ({ default: { name: 'HomePage' } }));
 vi.mock('./pages/AppsPage.vue', () => ({ default: { name: 'AppsPage' } }));
+vi.mock('./pages/SystemPage.vue', () => ({ default: { name: 'SystemPage' } }));
 
 describe('base routes', () => {
   it("puts the Home at `/`, under a name of its own: the shell's grid keeps `home`", () => {
     expect(routes.map((r) => [r.path, r.name, r.meta?.auth])).toEqual([
       ['/', 'base-home', true],
       ['/apps', 'base-apps', true],
+      ['/system', 'base-system', true],
     ]);
   });
 
@@ -25,5 +28,10 @@ describe('base routes', () => {
   it('loads the Home page on demand', async () => {
     const loader = routes[0].component as () => Promise<{ default: RouteComponent }>;
     expect(((await loader()).default as { name: string }).name).toBe('HomePage');
+  });
+
+  it('loads System on demand', async () => {
+    const loader = routes[2].component as () => Promise<{ default: RouteComponent }>;
+    expect(((await loader()).default as { name: string }).name).toBe('SystemPage');
   });
 });
