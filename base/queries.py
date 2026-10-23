@@ -10,8 +10,8 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from base import home
-from base.models import EventDelivery, Hub, Membership
+from base import access, home
+from base.models import AccessSettings, EventDelivery, Hub, Membership, Profile
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
 from base.schemas import (
@@ -233,3 +233,24 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         return {"notices": home.device_notices(ctx, modules), "sources": home.notice_sources(ctx, modules)}
+
+
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
+
+
+def access_settings() -> AccessSettings:
+    """How the business asks who is at the till: its row, or the factory values (an unsaved row) without one. A
+    stored value this build does not understand reads as the factory one, never as «not asking» (``base.access``)."""
+    row = AccessSettings.objects.first() or AccessSettings()
+    row.pin_policy = access.policy_or_default(row.pin_policy)
+    row.pin_inactivity_minutes = access.inactivity_or_default(row.pin_inactivity_minutes)
+    row.pin_length = access.pin_length_or_default(row.pin_length)
+    return row
+
+
+def person_label(user) -> str:
+    """How ``user`` is named in this hub: its «My profile» name, else its erplora.com account's, else its username."""
+    profile = Profile.objects.filter(username=user.get_username()).only("first_name", "last_name").first()
+    if profile is not None and (name := f"{profile.first_name} {profile.last_name}".strip()):
+        return name
+    return user.get_full_name() or user.get_username()

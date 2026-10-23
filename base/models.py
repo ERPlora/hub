@@ -66,21 +66,185 @@ class SessionOwner(UUIDModel):
     with its session (``CASCADE``): a logout or ``clearsessions`` takes it too. Control's, like the sessions.
     """
 
+    class Credential(models.TextChoices):
+        ACCOUNT = "account", pgettext_lazy("way in", "Account")
+        PIN = "pin", pgettext_lazy("way in", "PIN")
+        BADGE = "badge", pgettext_lazy("way in", "Badge")
+
     session = models.OneToOneField(
         "sessions.Session", on_delete=models.CASCADE, related_name="owner", verbose_name=_("session")
     )
     saas_user_id = models.CharField(_("SaaS account"), max_length=64)
     host = models.CharField(_("host"), max_length=63, help_text=_("The hub's slug, or the platform host's mark."))
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    # APP-BASE-3: the hub's device the session was opened on (a ``TrustedDevice``'s id: a hub's row, so no foreign key
+    # from control) and how its person proved who they are. A session with no device (the admin's, a demo's) has none.
+    device_id = models.UUIDField(_("device"), null=True, blank=True)
+    credential = models.CharField(
+        _("way in"),
+        max_length=8,
+        choices=Credential.choices,
+        default=Credential.ACCOUNT,
+        db_default=Credential.ACCOUNT,
+    )
 
     class Meta:
         verbose_name = _("session owner")
         verbose_name_plural = _("session owners")
         ordering = ["saas_user_id", "host"]
-        indexes = [models.Index(fields=["saas_user_id", "host"], name="base_sessionowner_user_host")]
+        indexes = [
+            models.Index(fields=["saas_user_id", "host"], name="base_sessionowner_user_host"),
+            models.Index(fields=["host", "device_id"], name="base_sessionowner_host_device"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.saas_user_id} @ {self.host}"
+
+
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
+# Hub models (``base.tenancy.inventory``: base's), like any module's: phase 1 keeps them in the shared tables of every
+# scope, phase 2 in each hub's database. A person is named by the ``username`` of its local copy (``saas:<id>``,
+# ``base.services.username_for``), never by a foreign key: the users are control's and a hub's database has none.
+
+#: The longest «who did it» kept beside a row (``str(actor)``), as the apps keep it.
+ACTOR_MAX_LENGTH = 150
+
+
+class TrustedDevice(UUIDModel):
+    """A browser or an installed app in which someone entered this hub with their erplora.com account.
+
+    Known by the token of its cookie ``hub_device`` (``base.access``), of which only the digest is kept. From that
+    first entry on, the PIN and the badge work on it (when it is ``shared`` and the business asks). Removing it ends
+    its sessions and takes the PIN away from it until someone enters with an account again.
+    """
+
+    class Mode(models.TextChoices):
+        SHARED = "shared", pgettext_lazy("device mode", "Shared")
+        PERSONAL = "personal", pgettext_lazy("device mode", "Personal")
+
+    class EndedReason(models.TextChoices):
+        DEVICE_LIMIT = "device_limit", _("Opened on another device")
+
+    token_digest = models.CharField(_("token digest"), max_length=64, unique=True)
+    mode = models.CharField(_("mode"), max_length=16, choices=Mode.choices, default=Mode.SHARED)
+    mode_set_by = models.CharField(_("mode set by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    mode_set_at = models.DateTimeField(_("mode set at"), null=True, blank=True)
+    name = models.CharField(_("name"), max_length=60, blank=True)
+    agent = models.CharField(_("browser"), max_length=80, blank=True)
+    last_username = models.CharField(_("last person in"), max_length=150, blank=True)
+    last_user_label = models.CharField(_("last person in (name)"), max_length=150, blank=True)
+    last_entry_at = models.DateTimeField(_("last entry"))
+    created_at = models.DateTimeField(_("added at"), auto_now_add=True)
+    # Why another device's entry ended its sessions (the plan covers fewer devices): its next way in says so.
+    ended_reason = models.CharField(_("sessions ended because"), max_length=16, choices=EndedReason.choices, blank=True)
+    ended_at = models.DateTimeField(_("sessions ended at"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("device")
+        verbose_name_plural = _("devices")
+        ordering = ["-last_entry_at"]
+
+    def __str__(self) -> str:
+        return self.name or self.agent or str(self.pk)
+
+
+class Credential(UUIDModel):
+    """The PIN and the badge with which a person enters this hub on its shared devices.
+
+    The PIN is kept as an argon2id hash and the badge as a keyed digest (``base.access.badge_digest``), never in
+    clear. A badge opens one person's door only (unique among those that have one).
+    """
+
+    username = models.CharField(_("person"), max_length=150, unique=True)
+    pin_hash = models.CharField(_("PIN"), max_length=128, blank=True)
+    pin_set_at = models.DateTimeField(_("PIN set at"), null=True, blank=True)
+    badge_digest = models.CharField(_("badge"), max_length=64, blank=True)
+    badge_set_at = models.DateTimeField(_("badge set at"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("way in")
+        verbose_name_plural = _("ways in")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["badge_digest"], condition=~Q(badge_digest=""), name="base_credential_badge_unique"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.username
+
+
+class AccessSettings(UUIDModel):
+    """How the business asks who is at the till: one row at most; without it, the factory values (``base.access``).
+
+    ``badge_key`` is the key of the badges' digests, made once and kept: a key that changed would orphan every badge.
+    """
+
+    class PinPolicy(models.TextChoices):
+        ALWAYS = "always", _("Always, and again after a while without use")
+        PER_SHIFT = "per_shift", _("Once per shift")
+        NEVER = "never", _("Never")
+
+    singleton = models.BooleanField(_("single row"), default=True, editable=False)
+    pin_policy = models.CharField(_("ask for the PIN"), max_length=16, choices=PinPolicy.choices, default="per_shift")
+    pin_inactivity_minutes = models.PositiveSmallIntegerField(_("ask again after (minutes)"), default=5)
+    pin_length = models.PositiveSmallIntegerField(_("PIN digits"), default=4)
+    badge_key = models.CharField(_("badge key"), max_length=64, blank=True, editable=False)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    updated_by = models.CharField(_("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+
+    class Meta:
+        verbose_name = _("way in settings")
+        verbose_name_plural = _("way in settings")
+        constraints = [
+            models.UniqueConstraint(fields=["singleton"], name="base_accesssettings_single_row"),
+            models.CheckConstraint(condition=Q(singleton=True), name="base_accesssettings_singleton"),
+            models.CheckConstraint(condition=Q(pin_policy__in=["always", "per_shift", "never"]), name="base_accesssettings_policy"),
+            models.CheckConstraint(
+                condition=Q(pin_inactivity_minutes__in=[1, 5, 10, 15, 30]), name="base_accesssettings_inactivity"
+            ),
+            models.CheckConstraint(condition=Q(pin_length__in=[4, 6]), name="base_accesssettings_pin_length"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.pin_policy}, {self.pin_length} digits"
+
+
+class Profile(UUIDModel):
+    """How a person appears in this hub and what they prefer: «My profile».
+
+    The name and the contact email are this business's (receipts, Personal), not the erplora.com account's, which
+    the SaaS keeps; the contact email never gives nor takes any access. ``language``, ``theme_mode`` and ``palette``
+    empty = the business's.
+    """
+
+    class Language(models.TextChoices):
+        BUSINESS = "", _("The business's language")
+        SPANISH = "es", "Español"
+        ENGLISH = "en", "English"
+
+    class ThemeMode(models.TextChoices):
+        BUSINESS = "", _("The business's appearance")
+        SYSTEM = "system", _("System")
+        LIGHT = "light", _("Light")
+        DARK = "dark", _("Dark")
+
+    username = models.CharField(_("person"), max_length=150, unique=True)
+    first_name = models.CharField(_("first name"), max_length=150, blank=True)
+    last_name = models.CharField(_("last name"), max_length=150, blank=True)
+    contact_email = models.EmailField(_("contact email"), blank=True)
+    avatar = models.CharField(_("photo"), max_length=255, blank=True)
+    language = models.CharField(_("language"), max_length=8, choices=Language.choices, blank=True)
+    theme_mode = models.CharField(_("appearance"), max_length=8, choices=ThemeMode.choices, blank=True)
+    palette = models.CharField(_("palette"), max_length=16, blank=True)
+    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("profile")
+        verbose_name_plural = _("profiles")
+
+    def __str__(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip() or self.username
 
 
 class TaskSchedule(UUIDModel):

@@ -49,7 +49,7 @@ from django.views.decorators.http import require_POST, require_safe
 from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
-from base import auth, services
+from base import access, auth, services
 from base.operations import HostScopeResolver
 from base.throttle import AttemptLimit, client_key
 
@@ -121,7 +121,7 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
     except services.InactiveUser:
         logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
         return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
-    return auth.forget_state(_with_language(HttpResponseRedirect(next_path), result.user.locale))
+    return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(next_path), result.user.locale)))
 
 
 def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRedirect:
@@ -224,6 +224,14 @@ def auth_logout(request: HttpRequest) -> HttpResponseRedirect:
     demo = _is_demo(request)
     logout(request)
     return HttpResponseRedirect(auth.saas_url(auth.DEMO_DOOR_PATH if demo else SAAS_LOGOUT_PATH))
+
+
+def with_device(request: HttpRequest, response: HttpResponse) -> HttpResponse:
+    """``response`` with the cookie of this browser's device when the entry left its token (``base.services``)."""
+    token = getattr(request, services.DEVICE_TOKEN_ATTR, None)
+    if token:
+        access.set_device_cookie(response, token, secure=settings.SESSION_COOKIE_SECURE)
+    return response
 
 
 def safe_next(value: str | None) -> str:

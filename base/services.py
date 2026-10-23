@@ -42,7 +42,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.sessions.models import Session
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import HttpRequest
@@ -57,11 +57,11 @@ from live.operations import operation
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 
-from base import auth, events, registry, signing
+from base import access, auth, events, queries, registry, signing
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST, session_host
-from base.models import DemoCode, EventDelivery, Hub, Membership, SessionOwner, TaskSchedule
+from base.models import DemoCode, EventDelivery, Hub, Membership, SessionOwner, TaskSchedule, TrustedDevice
 from base.schemas import (
     DemoCodeIn,
     DemoCodeOut,
@@ -130,14 +130,33 @@ def _local_copy(redeemed: RedeemedUser, *, username: str, is_staff: bool, is_sup
     return user
 
 
-def _log_in(request: HttpRequest, user, redeemed: RedeemedUser) -> None:
+def _log_in(
+    request: HttpRequest,
+    user,
+    saas_user_id: str,
+    *,
+    device: TrustedDevice | None = None,
+    credential: str = SessionOwner.Credential.ACCOUNT,
+) -> None:
+    """Log ``user`` in (a new session key) as the SaaS account ``saas_user_id``; on a hub's ``device``, for as long
+    as that device and the business allow (``base.access.session_lifetime``), fixed now."""
     login(request, user, backend=MODEL_BACKEND)
-    request.session[SAAS_USER_ID_SESSION_KEY] = redeemed.user_id
-    _note_the_owner(request, redeemed.user_id)
+    request.session[SAAS_USER_ID_SESSION_KEY] = saas_user_id
+    if device is not None:
+        policy = queries.access_settings().pin_policy
+        request.session.set_expiry(timezone.now() + access.session_lifetime(device.mode, policy))
+    _note_the_owner(request, saas_user_id, device=device, credential=credential)
 
 
-def _note_the_owner(request: HttpRequest, saas_user_id: str) -> None:
-    """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index.
+def _note_the_owner(
+    request: HttpRequest,
+    saas_user_id: str,
+    *,
+    device: TrustedDevice | None = None,
+    credential: str = SessionOwner.Credential.ACCOUNT,
+) -> None:
+    """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index, and
+    on which device and with which credential it was opened.
 
     ``login`` gives the session a new key and saves it, unless it flushed another user's session first: then it has
     no key until it is saved, which happens here, in the login's transaction.
@@ -146,7 +165,12 @@ def _note_the_owner(request: HttpRequest, saas_user_id: str) -> None:
         request.session.save()
     SessionOwner.objects.update_or_create(
         session_id=request.session.session_key,
-        defaults={"saas_user_id": saas_user_id, "host": session_host(request) or ""},
+        defaults={
+            "saas_user_id": saas_user_id,
+            "host": session_host(request) or "",
+            "device_id": None if device is None else device.pk,
+            "credential": credential,
+        },
     )
 
 
@@ -160,7 +184,9 @@ def open_session_from_saas(request: HttpRequest, redeemed: RedeemedUser, slug: s
     """
     user = _local_copy(redeemed, username=username_for(redeemed.user_id), is_staff=False, is_superuser=False)
     Membership.objects.update_or_create(user=user, host=slug, defaults={"role": redeemed.role})
-    _log_in(request, user, redeemed)
+    device = trust_device(request, user)
+    _log_in(request, user, redeemed.user_id, device=device)
+    _end_other_devices(slug, device)
     return user
 
 
@@ -183,7 +209,7 @@ def open_admin_session_from_saas(request: HttpRequest, redeemed: RedeemedUser):
         user.groups.remove(support)
     else:
         user.groups.add(support)
-    _log_in(request, user, redeemed)
+    _log_in(request, user, redeemed.user_id)
     return user
 
 
@@ -998,3 +1024,78 @@ def reap_demo_tombstones(now: dt.datetime | None = None) -> int:
     cutoff = now - dt.timedelta(days=settings.DEMO_TOMBSTONE_DAYS)
     _, deleted = Hub.objects.filter(is_demo=True, status=Hub.Status.PURGED, purged_at__lt=cutoff).delete()
     return deleted.get(Hub._meta.label, 0)
+
+
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
+
+#: Where an entry leaves the token of this browser's device for its response (``base.auth_views`` sets the cookie):
+#: renewed at every entry with the account, a new one when the browser had none or its device was removed.
+DEVICE_TOKEN_ATTR = "hub_device_token"
+
+
+def trust_device(request: HttpRequest, user) -> TrustedDevice:
+    """This browser's device of the hub, made a trusted one by an entry with the account (BASE-G52, G53).
+
+    The device of the cookie ``hub_device`` if the hub knows it (its mode and name are kept), else a new one with a
+    new token. Its last person in and entry are now's, and a notice of sessions it lost (``ended_reason``) is read.
+    """
+    now = timezone.now()
+    device = device_of(request, for_update=True)
+    if device is None:
+        token = access.new_device_token()
+        device = TrustedDevice.objects.create(
+            token_digest=access.token_digest(token),
+            agent=access.device_agent(request.META.get("HTTP_USER_AGENT", ""))[:80],
+            last_username=user.get_username(),
+            last_user_label=_label_of(user),
+            last_entry_at=now,
+        )
+    else:
+        token = request.COOKIES[access.DEVICE_COOKIE]
+        _entered(device, user, now)
+    setattr(request, DEVICE_TOKEN_ATTR, token)
+    return device
+
+
+def device_of(request: HttpRequest, *, for_update: bool = False) -> TrustedDevice | None:
+    """The hub's device this browser's cookie names, or ``None`` (no cookie, or a device the hub does not know)."""
+    token = request.COOKIES.get(access.DEVICE_COOKIE, "")
+    if not token:
+        return None
+    devices = TrustedDevice.objects.select_for_update() if for_update else TrustedDevice.objects
+    return devices.filter(token_digest=access.token_digest(token)).first()
+
+
+def _entered(device: TrustedDevice, user, now: dt.datetime) -> None:
+    device.last_username, device.last_user_label, device.last_entry_at = user.get_username(), _label_of(user), now
+    device.ended_reason, device.ended_at = "", None
+    device.save(update_fields=["last_username", "last_user_label", "last_entry_at", "ended_reason", "ended_at"])
+
+
+def _label_of(user) -> str:
+    """How a person is named in this hub: its profile's name, else its account's (``base.queries.person_label``)."""
+    return queries.person_label(user)[:150]
+
+
+def _end_other_devices(slug: str, device: TrustedDevice) -> None:
+    """Keep within the devices the business's plan covers (``plan.max_devices`` of the SaaS's photo; 0 or none, no
+    cap; BASE-G57): an entry on ``device`` ends the live sessions on this host of every other device past the
+    ``max_devices - 1`` most recently entered, and marks those devices so their next way in says why. A session with
+    no device (from before the rule) never counts as a kept one. Their tabs wake after the COMMIT and leave."""
+    hub = Hub.objects.filter(slug=slug).first()
+    plan = (hub.state or {}).get("plan") if hub is not None and isinstance(hub.state, dict) else None
+    cap = plan.get("max_devices") if isinstance(plan, dict) else None
+    if not isinstance(cap, int) or cap < 1:
+        return
+    now = timezone.now()
+    others = SessionOwner.objects.filter(host=slug, session__expire_date__gt=now).exclude(device_id=device.pk)
+    latest = (
+        others.exclude(device_id=None).values("device_id").annotate(opened=Max("created_at")).order_by("-opened")
+    )
+    kept = [row["device_id"] for row in latest[: cap - 1]]
+    ending = others.exclude(device_id__in=kept) if kept else others
+    devices = {pk for pk in ending.values_list("device_id", flat=True) if pk is not None}
+    _end_sessions(ending)
+    TrustedDevice.objects.filter(pk__in=devices).update(
+        ended_reason=TrustedDevice.EndedReason.DEVICE_LIMIT, ended_at=now
+    )
