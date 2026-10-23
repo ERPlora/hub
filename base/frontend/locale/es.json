@@ -154,6 +154,27 @@
         "paid": "Ninguna app se vende aparte: todas vienen con tu plan."
       },
       "noResults": "No hay apps que coincidan con tu búsqueda."
+    },
+    "appBlocked": {
+      "checking": "Comprobando por qué no se abre esta app…",
+      "subscription": {
+        "heading": "Suscripción necesaria",
+        "body": "{app} está deshabilitada porque este negocio no tiene su suscripción. Tus datos están a salvo y vuelven en cuanto se contrate."
+      },
+      "ready": {
+        "heading": "{app} ya está lista",
+        "body": "Ya se puede usar.",
+        "open": "Abrir {app}"
+      },
+      "missing": {
+        "heading": "Esta app no está disponible en este negocio",
+        "body": "Búscala en Apps, o abre otra desde el menú."
+      },
+      "error": {
+        "heading": "No se ha podido comprobar por qué no se abre esta app",
+        "body": "Comprueba la conexión y vuelve a intentarlo."
+      },
+      "toApps": "Ir a Apps"
     }
   }
 }

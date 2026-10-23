@@ -154,6 +154,27 @@
         "paid": "No app is sold separately: every app comes with your plan."
       },
       "noResults": "No apps match your search."
+    },
+    "appBlocked": {
+      "checking": "Checking why this app does not open…",
+      "subscription": {
+        "heading": "Subscription needed",
+        "body": "{app} is disabled because this business does not have its subscription. Your data is safe and comes back as soon as it is subscribed to."
+      },
+      "ready": {
+        "heading": "{app} is ready",
+        "body": "It can be used now.",
+        "open": "Open {app}"
+      },
+      "missing": {
+        "heading": "This app is not available in this business",
+        "body": "Look for it in Apps, or open another one from the menu."
+      },
+      "error": {
+        "heading": "We could not check why this app does not open",
+        "body": "Check the connection and try again."
+      },
+      "toApps": "Go to Apps"
     }
   }
 }
