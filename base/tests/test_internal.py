@@ -120,7 +120,7 @@ def test_another_secret_is_401(client, db):
 
 def test_the_previous_secret_still_signs(client, db, settings):
     settings.INTERNAL_SHARED_SECRET_PREVIOUS = "old"
-    body = {"slug": "a", "version": 1, "verifactu": {"live_paid": True}}
+    body = {"slug": "a", "version": 1, "verifactu": {"representation": APPROVED}}
     assert signed(client, "put", PATH, body, secret="old").status_code == 200
 
 
@@ -131,7 +131,7 @@ def test_without_a_rotation_the_old_secret_opens_nothing(client, db, settings):
 
 
 def test_a_v2_signature_alone_decides(client, db):
-    body = {"slug": "a", "version": 1, "verifactu": {"live_paid": True}}
+    body = {"slug": "a", "version": 1, "verifactu": {"representation": APPROVED}}
     alone = signed(client, "put", PATH, body, with_v1=False, with_v2=True)
     assert alone.status_code == 200
     # Naming v2 and failing it is refused even with a good v1: no downgrade.
@@ -244,8 +244,6 @@ def test_the_state_is_only_put(client, db):
 
 
 def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
-    # The SaaS still sends ``live_paid`` until VeriFactu's retirement of it is out (PLAN §30, expand/contract): the
-    # photo is applied as ever and the retired field is written nowhere.
     answer = signed(
         client,
         "put",
@@ -255,7 +253,7 @@ def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
             "slug": "a",
             "version": 3,
             "status": "active",
-            "verifactu": {"live_paid": True, "representation": APPROVED},
+            "verifactu": {"representation": APPROVED},
         },
     )
     assert answer.status_code == 200 and answer.json() == {
@@ -264,11 +262,32 @@ def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
     }
     config = Config.objects.get()
     assert (
-        config.live_paid,
         config.hub_status,
         config.representation_status,
         config.synced_version,
-    ) == (False, "active", "approved", 3)
+    ) == ("active", "approved", 3)
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"live_paid": "yes", "representation": APPROVED},
+        {"live_paid": 1, "representation": APPROVED},
+        {"live_paid": None, "representation": APPROVED},
+        {"live_paid": True, "representation": APPROVED},
+        {"a_key_the_hub_does_not_know": [1], "representation": APPROVED},
+    ],
+)
+def test_a_key_of_the_verifactu_block_the_hub_does_not_read_never_refuses_the_photo(client, db, block, registered):
+    # PLAN §30 (round 2026-10-22b): the Hub reads ``live_paid`` no more (hub#205) and the SaaS stopped sending it
+    # (saas#108). A photo from a SaaS before that, or one carrying a key added later, applies whole: the door only
+    # checks that the block is an object, and ``verifactu.config.sync`` ignores what it does not know.
+    answer = signed(client, "put", PATH, {"hub_id": HUB_ID, "slug": "acme", "version": 2, "verifactu": block})
+    assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 2}
+    registered.refresh_from_db()
+    assert registered.state_version == 2
+    config = Config.objects.get()
+    assert (config.representation_status, config.synced_version) == ("approved", 2)
 
 
 def test_the_business_status_travels_on_its_own(client, db):
@@ -343,8 +362,6 @@ def test_the_photo_is_kept_on_the_registry_as_it_came(client, db, registered):
         {"slug": "a", "version": "7"},
         {"slug": "a", "version": True},
         {"slug": "a", "version": 1, "status": "gone"},
-        {"slug": "a", "version": 1, "verifactu": {"live_paid": "yes"}},
-        {"slug": "a", "version": 1, "verifactu": {"live_paid": 1}},
         {
             "slug": "a",
             "version": 1,
