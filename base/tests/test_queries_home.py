@@ -738,6 +738,68 @@ def test_a_row_without_a_title_filled_in_is_not_told(modules, declare, caplog):
     assert "stock.added" in caplog.text
 
 
+BOOKING = {
+    "id": 9,
+    "at": "2026-10-23T08:00:00Z",
+    "offset": "2026-10-23T09:44:00+02:00",
+    "wall": "2026-10-23T10:15:00",
+    "day": "2026-10-23",
+    "opens": "09:30:00",
+    "code": "2026",
+}
+
+
+def test_a_template_formats_the_rows_dates_and_hours_on_the_businesss_clock(modules, declare):
+    """The rows reach base as JSON, so a date is text: ``{at:%H:%M}`` reads it as the date, hour or instant it says,
+    an instant on the business's clock (Django's zone) and one without an offset as it says; ``{at:.10}`` still
+    slices the text, also beside a date format on the same field."""
+    declare("stock.item.changes", {"rows": [BOOKING]})
+    modules(
+        module(
+            "stock",
+            notices=[
+                notice(
+                    title=["Appointment at {at:%H:%M}"],
+                    body=["{offset:%H:%M}", "{wall:%H:%M}", "{day:%d/%m/%Y}", "opens {opens:%H:%M}"],
+                    route="/agenda?date={at:.10}&hour={at:%H}",
+                )
+            ],
+        )
+    )
+
+    with timezone.override("Europe/Madrid"):
+        [told] = notice_list(ctx())
+    assert (told["title"], told["body"], told["route"]) == (
+        "Appointment at 10:00",
+        "09:44 · 10:15 · 23/10/2026 · opens 09:30",
+        "/agenda?date=2026-10-23&hour=10",
+    )
+    assert told["at"] == "2026-10-23T08:00:00Z"
+    with timezone.override("Atlantic/Canary"):
+        [told] = notice_list(ctx())
+    assert (told["title"], told["body"]) == ("Appointment at 09:00", "08:44 · 10:15 · 23/10/2026 · opens 09:30")
+
+
+def test_a_date_format_on_a_field_that_is_no_iso_date_is_logged_and_that_text_left_out(modules, declare, caplog):
+    """``{code:%Y}`` on ``"2026"`` (a year as text, not an ISO date) is a module's mistake: never read as some hour."""
+    declare("stock.item.changes", {"rows": [BOOKING]})
+    modules(module("stock", notices=[notice(title=["Year {code:%Y}", "New item"], body=["{code:%H}", "{day:%d/%m}"])]))
+
+    with caplog.at_level(logging.WARNING, logger="base.home"), timezone.override("Europe/Madrid"):
+        [told] = notice_list(ctx())
+    assert (told["title"], told["body"]) == ("New item", "23/10")
+    assert "Year {code:%Y}" in caplog.text
+
+
+def test_a_percent_format_on_a_number_of_the_row_formats_as_before(modules, declare):
+    """``%`` is also a number's percent (``{share:.0%}``): only a text is read as a date, a number formats as it did."""
+    declare("stock.item.changes", {"rows": [{**BOOKING, "share": 0.5}]})
+    modules(module("stock", notices=[notice(title=["{share:.0%} booked"])]))
+
+    [told] = notice_list(ctx())
+    assert told["title"] == "50% booked"
+
+
 def test_the_notices_of_a_module_off_or_out_of_the_store(modules, declare, settings):
     declare("stock.item.changes", CHANGES)
     modules(module("stock", notices=[notice()]), on=[])
