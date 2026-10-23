@@ -147,10 +147,14 @@ def test_the_accounts_photo():
     )
     assert data.version == 7
     assert data.representation.status == "approved"
-    assert "live_paid" in refused(
-        schemas.ConfigSyncIn, {"version": 1, "live_paid": "maybe"}
-    )
     assert "version" in refused(schemas.ConfigSyncIn, {})
+
+
+def test_the_photo_s_retired_live_option_is_neither_read_nor_refused():
+    # PLAN §30 (round 2026-10-22b): ``live_paid`` is no condition any more. The SaaS sends it until the Hub's
+    # retirement is out (expand/contract): refusing it would stop every photo; reading it, keep a plan gate.
+    data = schemas.ConfigSyncIn.model_validate({"version": 1, "live_paid": "maybe"})
+    assert "live_paid" not in data.model_dump()
 
 
 def test_an_aeat_query_month_is_one_to_twelve():

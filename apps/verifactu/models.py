@@ -1,8 +1,7 @@
 """Models of the verifactu app (WORKBOOK «Para quien lo mantiene»).
 
 - ``Config``: one row; the environment (testing or production), the route (ERPlora files, or the business's own
-  certificate) and what the ERPlora account sends (the authorisation's state, the live option, the business's
-  status).
+  certificate) and what the ERPlora account sends (the authorisation's state, the business's status).
 - ``OwnCertificate``: one row at most; the business's own certificate, uploaded here (VERIFACTU-F02): its holder,
   kind and expiry, and the .p12 with its password sealed together (``certificates.seal``). The sealed blob is
   never shown: not in ``str``, the admin, the API nor the photo.
@@ -96,9 +95,12 @@ class Config(UUIDModel):
     representation_reason = models.CharField(
         _("representation note"), max_length=500, blank=True
     )
-    # From the ERPlora account's photo: whether its plan includes filing in production (VERIFACTU-F08) and the
-    # business's commercial status; going live needs both (``queries.live_problems``).
+    # Retired (PLAN §30, round 2026-10-22b: VeriFactu on Free): no plan gates production any more, so nothing reads
+    # nor writes it. The column stays until a later contract step drops it: the tasks of the previous deployment
+    # still read it while the new one rolls out.
     live_paid = models.BooleanField(_("live option in the plan"), default=False)
+    # From the ERPlora account's photo: the business's commercial status; going live needs it active
+    # (``queries.live_problems``).
     hub_status = models.CharField(
         _("business status"),
         max_length=10,
@@ -475,9 +477,6 @@ WAIT_REASONS = {
     ),
     "representation_not_approved": _(
         "ERPlora still has to approve your signed authorisation to file in production"
-    ),
-    "live_option_unpaid": _(
-        "the live option of VeriFactu is not in your plan: add it in your ERPlora account"
     ),
     "go_live_forbidden": _(
         "this is a demo business: it always files in the AEAT's test environment"

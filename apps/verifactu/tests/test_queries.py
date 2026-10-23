@@ -457,28 +457,25 @@ def test_production_opens_only_in_prod_with_the_flag(settings, env, flag, open_)
     assert queries.production_open() is open_
 
 
-def test_erplora_route_in_production_needs_approval_and_the_paid_option(server_ready):
+def test_erplora_route_in_production_needs_only_the_approved_authorisation(server_ready):
+    # PLAN §30 (round 2026-10-22b, VeriFactu on Free): no plan gates production any more; ERPlora's route files
+    # with the approved authorisation alone, whatever the retired ``live_paid`` column still holds.
     config = Config(route="erplora", representation_status="approved", live_paid=False)
-    assert queries.route_problem(config, "production", A) == "live_option_unpaid"
-    config.live_paid = True
     assert queries.route_problem(config, "production", A) == ""
     config.representation_status = "submitted"
     assert queries.route_problem(config, "production", A) == "representation_not_approved"
     assert queries.route_problem(config, "testing", A) == ""
 
 
-def test_what_was_sealed_leaves_without_the_live_option_but_never_without_a_way(
-    server_ready,
-):
-    # The live option keeps new sales from being sealed (route_problem); what was sealed goes to the AEAT while
-    # the route can carry it (every ticket with a QR reaches the AEAT).
-    config = Config(route="erplora", representation_status="approved", live_paid=False)
-    assert queries.sending_problem(config, "production", A) == ""
+def test_what_was_sealed_leaves_while_the_route_can_carry_it(server_ready):
+    # What was sealed goes to the AEAT while the route can carry it (every ticket with a QR reaches the AEAT).
+    config = Config(route="erplora", representation_status="approved")
+    assert queries.route_problem(config, "production", A) == ""
     config.representation_status = "revoked"
-    assert queries.sending_problem(config, "production", A) == "representation_not_approved"
-    assert queries.sending_problem(config, "testing", A) == ""
+    assert queries.route_problem(config, "production", A) == "representation_not_approved"
+    assert queries.route_problem(config, "testing", A) == ""
     config.route = "own"
-    assert queries.sending_problem(config, "testing", A) == "own_certificate_missing"
+    assert queries.route_problem(config, "testing", A) == "own_certificate_missing"
 
 
 def test_the_configuration_says_why_new_sales_are_refused_only_in_production(
@@ -486,11 +483,12 @@ def test_the_configuration_says_why_new_sales_are_refused_only_in_production(
 ):
     assert run("verifactu.config.get").issue_blocker is None
     Config.objects.create(environment="production", representation_status="approved")
-    blocker = run("verifactu.config.get").issue_blocker
-    assert blocker.code == "live_option_unpaid"
-    assert blocker.message.startswith("the live option of VeriFactu is not in your plan")
-    Config.objects.update(live_paid=True)
+    # On any plan (PLAN §30): the approved authorisation is ERPlora's whole way to the AEAT.
     assert run("verifactu.config.get").issue_blocker is None
+    Config.objects.update(representation_status="revoked")
+    blocker = run("verifactu.config.get").issue_blocker
+    assert blocker.code == "representation_not_approved"
+    assert blocker.message.startswith("ERPlora still has to approve your signed authorisation")
 
 
 def own_certificate(days=30):
@@ -506,9 +504,9 @@ def own_certificate(days=30):
 
 def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
     # As in the old Hub (an_own_certificate_needs_no_grant_to_go_live): the business files with its own
-    # certificate, so neither ERPlora's approval nor the live option of the plan applies (Ioan's model,
-    # 2026-10-15: «con certificado propio, como en el Hub antiguo»).
-    config = Config(route="own", live_paid=False)
+    # certificate, so ERPlora's approval does not apply (Ioan's model, 2026-10-15: «con certificado propio, como
+    # en el Hub antiguo»).
+    config = Config(route="own")
     assert queries.route_problem(config, "production", A) == "own_certificate_missing"
     own_certificate(days=-1)
     assert queries.route_problem(config, "production", A) == "own_certificate_missing"
@@ -521,15 +519,14 @@ def test_own_route_in_production_needs_only_its_valid_certificate(server_ready):
 def test_the_configuration_lists_everything_that_keeps_it_from_going_live(
     issuer, server_ready
 ):
+    # No plan option among them (PLAN §30, round 2026-10-22b: VeriFactu on Free).
     assert [reason.code for reason in run("verifactu.config.get").live_blockers] == [
         "representation_not_approved",
-        "live_option_unpaid",
     ]
     run(
         "verifactu.config.sync",
         {
             "version": 1,
-            "live_paid": True,
             "hub_status": "past_due",
             "representation": {"status": "approved"},
         },
@@ -542,7 +539,7 @@ def test_the_configuration_lists_everything_that_keeps_it_from_going_live(
     assert run("verifactu.config.get").live_blockers == []
 
 
-def test_with_the_own_certificate_the_live_option_is_not_asked(issuer, server_ready):
+def test_with_the_own_certificate_no_authorisation_is_asked(issuer, server_ready):
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
     assert run("verifactu.config.get").live_blockers == []

@@ -130,23 +130,23 @@ def test_in_production_without_a_way_to_the_aeat_nothing_is_issued(issuer, setti
     system = system_context(A)
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system,
     )
     run("verifactu.config.go_live")
-    run("verifactu.config.sync", {"version": 2, "live_paid": False}, system)
+    run("verifactu.config.sync", {"version": 2, "representation": {"status": "revoked"}}, system)
     with pytest.raises(Conflict) as refused:
         manual()
-    assert refused.value.code == "verifactu.live_option_unpaid"
+    assert refused.value.code == "verifactu.representation_not_approved"
     assert str(refused.value).startswith("Nothing was issued")
-    assert "the live option of VeriFactu is not in your plan" in str(refused.value)
+    assert "ERPlora still has to approve your signed authorisation" in str(refused.value)
     assert not Invoice.objects.exists()
     assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()
     assert not Record.objects.exists()
     with translation.override("es"), pytest.raises(Conflict) as en_espanol:
         manual(ctx_for(language="es"))
     assert str(en_espanol.value).startswith("No se ha emitido nada")
-    assert "la opción en vivo de VeriFactu no está en tu plan" in str(en_espanol.value)
+    assert "falta que ERPlora apruebe tu autorización firmada" in str(en_espanol.value)
 
 
 def test_a_transient_database_error_leaves_it_pending_for_its_reaction(

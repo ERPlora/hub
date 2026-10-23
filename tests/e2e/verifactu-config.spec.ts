@@ -11,8 +11,9 @@
 //     sending does to the one in review;
 //   - VERIFACTU-F04: «Usar mi propio certificado» in Settings chooses who files: the own certificate once it is
 //     loaded, ERPlora's seal again when switched off;
-//   - VERIFACTU-F08: Settings lists what keeps the business from going live, the missing paid option among it, from
-//     the SaaS's photo (`PUT /internal/hubs/{id}/state`, signed as the SaaS signs it), and drops it once paid.
+//   - VERIFACTU-F08: Settings lists what keeps the business from going live, the authorisation in review among it,
+//     from the SaaS's photo (`PUT /internal/hubs/{id}/state`, signed as the SaaS signs it), and drops it once approved;
+//     no plan option is ever among them (PLAN §30, round 2026-10-22b: VeriFactu on Free).
 // Each flow leaves its evidence in the three sizes of the migration (`APP-VERIFACTU-<flow>-390|834|1440`).
 // The photo is the SaaS's, sent here the way the SaaS sends it, to `a`'s row of the registry (`base_hub`). What the
 // run changes in VeriFactu's configuration, the own certificate and that row's photo is put back after it (or
@@ -61,7 +62,6 @@ const CONFIG_COLUMNS = [
   'synced_version',
   'synced_at',
   'hub_status',
-  'live_paid',
   'hub_id',
 ];
 
@@ -78,8 +78,8 @@ async function flowShots(page: Page, flow: string, ready: (page: Page) => Promis
   await page.setViewportSize(restore);
 }
 
-/** The SaaS's photo of hub `a`: the representation's state, the live option and the account's status. */
-async function pushPhoto(representation: Representation, livePaid: boolean): Promise<void> {
+/** The SaaS's photo of hub `a`: the representation's state and the account's status. */
+async function pushPhoto(representation: Representation): Promise<void> {
   version += 1;
   const body = JSON.stringify({
     hub_id: hubId,
@@ -92,7 +92,6 @@ async function pushPhoto(representation: Representation, livePaid: boolean): Pro
         updated_at: representation === 'none' ? null : new Date().toISOString(),
         reason: '',
       },
-      live_paid: livePaid,
     },
   });
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -294,7 +293,7 @@ test('Mi certificado: upload a .p12, see its holder and expiry, remove it', asyn
 });
 
 test('Lo remite ERPlora: a signed model that is no PDF is refused in Spanish; four PDFs go on to the SaaS', async ({ browser }) => {
-  await pushPhoto('none', false);
+  await pushPhoto('none');
   const { context, page } = await spanishPage(browser, '/verifactu/config');
   const grant = shown(page).locator('[data-testid=verifactu-config-erplora]');
   await expect(grant.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
@@ -341,7 +340,7 @@ test('Lo remite ERPlora: a signed model that is no PDF is refused in Spanish; fo
 });
 
 test('VERIFACTU-F05: «Descargar el modelo» downloads the model with the business of Invoicing already written in', async ({ browser }) => {
-  await pushPhoto('none', false);
+  await pushPhoto('none');
   const { context, page } = await spanishPage(browser, '/verifactu/config');
   const grant = shown(page).locator('[data-testid=verifactu-config-erplora]');
   await expect(grant.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
@@ -363,22 +362,21 @@ test('VERIFACTU-F05: «Descargar el modelo» downloads the model with the busine
   await context.close();
 });
 
-test('Ajustes: the missing paid option keeps the business from going live until the photo says it is paid; the closed server still does', async ({ browser }) => {
-  await pushPhoto('approved', false);
+test('Ajustes: the authorisation in review keeps the business from going live until the photo says it is approved; the closed server still does', async ({ browser }) => {
+  await pushPhoto('submitted');
   const { context, page } = await spanishPage(browser, '/verifactu/settings');
   const view = shown(page);
   const blockers = view.locator('[data-testid=verifactu-settings-live-blockers]');
   await expect(blockers).toContainText('Todavía no puede pasar a producción:');
-  await expect(blockers).toContainText('la opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora');
-  await expect(blockers).not.toContainText('falta que ERPlora apruebe tu autorización firmada');
+  await expect(blockers).toContainText('falta que ERPlora apruebe tu autorización firmada para remitir en producción');
   await expect(view.locator('[data-testid=verifactu-settings-go-live]')).toHaveAttribute('aria-disabled', 'true');
   await flowShots(page, 'F08', async (p) => {
     await expect(shown(p).locator('[data-testid=verifactu-settings-live-blockers]')).toBeVisible();
   });
 
-  // The live result follows the next photo, without reloading: the plan no longer blocks it.
-  await pushPhoto('approved', true);
-  await expect(blockers).not.toContainText('la opción en vivo de VeriFactu no está en tu plan');
+  // The live result follows the next photo, without reloading: the approval is all ERPlora's route needs.
+  await pushPhoto('approved');
+  await expect(blockers).not.toContainText('falta que ERPlora apruebe tu autorización firmada');
   // Still closed: this server has not opened production (VERIFACTU_PRODUCTION_ENABLED, prod only), and that is one
   // more of the reasons listed, not a notice of its own.
   await expect(blockers).toContainText('ERPlora todavía no ha abierto la presentación real a la AEAT en este servidor');
@@ -387,7 +385,7 @@ test('Ajustes: the missing paid option keeps the business from going live until 
 });
 
 test('VERIFACTU-F06: an authorisation in review offers «Volver a enviar», which says what the new sending does', async ({ browser }) => {
-  await pushPhoto('submitted', false);
+  await pushPhoto('submitted');
   const { context, page } = await spanishPage(browser, '/verifactu/config');
   const grant = shown(page).locator('[data-testid=verifactu-config-erplora]');
   // In review, the form is closed: «Volver a enviar» opens it, with its notice and «Cancelar».
@@ -406,7 +404,7 @@ test('VERIFACTU-F06: an authorisation in review offers «Volver a enviar», whic
 });
 
 test('VERIFACTU-F04: «Usar mi propio certificado» chooses who files, the own certificate once loaded', async ({ browser }) => {
-  await pushPhoto('none', false);
+  await pushPhoto('none');
   const p12 = join(DIR, 'negocio-f04.p12');
   makeP12(p12);
   const { context, page } = await spanishPage(browser, '/verifactu/config');
