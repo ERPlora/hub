@@ -235,6 +235,9 @@ describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
     const fortnight = ['2026-10-10', '2026-10-17', '2026-10-23'];
     expect(barsOf(days(fortnight), 'es').map((bar) => bar.label)).toEqual(['10 oct', '17 oct', '23 oct']);
     expect(barsOf(days(fortnight), 'en').map((bar) => bar.label)).toEqual(['Oct 10', 'Oct 17', 'Oct 23']);
+    // Eight days already repeat a weekday (Friday the 16th and the 23rd): one day past a week is by its date.
+    const eight = ['2026-10-16', ...WEEK];
+    expect(barsOf(days(eight), 'es').map((bar) => bar.label)).toEqual(['16 oct', '17 oct', '18 oct', '19 oct', '20 oct', '21 oct', '22 oct', '23 oct']);
   });
 
   it('a business day is the same day in every time zone: a civil day, never an instant', async () => {

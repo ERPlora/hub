@@ -211,8 +211,10 @@ Pasos:
   1. Bajo la lista está el tablero («Cargando widgets…» mientras llega).
   2. Cada panel es una tarjeta con su título e icono: una cifra, una lista con barras, una cronología, un
      gráfico o un trozo de la pantalla de su app.
-  3. De entrada salen los que cada app marca como recomendados para el sector del negocio.
-  4. Solo salen los paneles de las apps encendidas que esta persona puede ver.
+  3. En un gráfico de días, cada barra lleva debajo su día de la semana (o su fecha, si abarca más de una
+     semana) y encima salen el día y su importe: los de la última barra hasta que tocas otra.
+  4. De entrada salen los que cada app marca como recomendados para el sector del negocio.
+  5. Solo salen los paneles de las apps encendidas que esta persona puede ver.
 Entra: los paneles que declara cada app encendida; los datos de cada uno, pedidos con los permisos de
 quien mira.
 Sale: nada guardado en el hub.

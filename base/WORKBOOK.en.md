@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:63647ccb05db29753b0936c9b69b650368d190769ccb7d39941638c21dfa6853 -->
+<!-- generated from WORKBOOK.md sha256:4b064c8e41c1552c7df183506810e1afc00f87d3fbab8aa684234d6651e21f81 -->
 
 ## What it is for and who it is for
 
@@ -198,8 +198,10 @@ Steps:
   1. Under the list is the board ("Loading widgets…" while it comes).
   2. Each panel is a card with its title and icon: a figure, a list with bars, a timeline, a chart or a
      piece of its app's screen.
-  3. At first, the ones each app marks as recommended for the business's sector show.
-  4. Only the panels of the apps that are on and that this person may see show.
+  3. In a chart of days, each bar has its weekday under it (or its date, if it spans more than a week) and
+     above them show the day and its amount: the last bar's until you tap another.
+  4. At first, the ones each app marks as recommended for the business's sector show.
+  5. Only the panels of the apps that are on and that this person may see show.
 In: the panels each app that is on declares; each one's data, asked for with the permissions of whoever
 is looking.
 Out: nothing saved in the hub.
