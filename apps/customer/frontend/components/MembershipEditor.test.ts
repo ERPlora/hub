@@ -98,7 +98,7 @@ describe('MembershipEditor', () => {
     expect(sent(s.net.api[0])).toMatchObject({ path: '/api/customer/customers/set_groups', body: { id: 'c1', group_ids: ['g1', 'g3', 'g2'] } });
   });
 
-  it('someone else\'s change to the card does not undo an unsaved untick either', async () => {
+  it('someone else\'s change to the card does not undo an unsaved untick, and what they added shows and is kept', async () => {
     const s = await setup();
     await s.result(s.call, 'customer.group.list', GROUPS);
     s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: false } });
@@ -106,9 +106,13 @@ describe('MembershipEditor', () => {
     await s.wrapper.setProps({ selected: ['g1', 'g2', 'g3'] });
     expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
       ['VIP', false],
-      ['Staff', false],
+      ['Staff', true],
       ['Old (not active)', true],
     ]);
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    await flush();
+    expect((sent(s.net.api[0]).body as { group_ids: string[] }).group_ids).toEqual(['g2', 'g3']);
   });
 
   it('once saved it follows the card again', async () => {
@@ -162,6 +166,93 @@ describe('MembershipEditor', () => {
     ]);
   });
 
+  // What is saved is what is seen: a live result of the card only keeps what the user ticked or
+  // unticked; what someone else deleted or took off (and the user did not touch) leaves the selection.
+  it('a saved group someone else deletes while a tick is unsaved leaves the selection: saving sends what is seen', async () => {
+    const s = await setup({ selected: ['g1'] });
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    await s.result(s.call, 'customer.group.list', pageOf([group('g2', 'Staff'), group('g3', 'Old', false), group('g4', 'Retired', false)]));
+    await s.wrapper.setProps({ selected: [] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([['Staff', true]]);
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    await flush();
+    expect((sent(s.net.api[0]).body as { group_ids: string[] }).group_ids).toEqual(['g2']);
+  });
+
+  it('a ticked group someone else deletes is not sent: saving works, and again after it', async () => {
+    const s = await setup({ selected: [] });
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    await s.result(s.call, 'customer.group.list', pageOf([group('g2', 'Staff'), group('g3', 'Old', false)]));
+    await s.wrapper.setProps({ selected: [] });
+    s.net.onApi((r) =>
+      (sent(r).body as { group_ids: string[] }).group_ids.includes('g1')
+        ? refusal(422, 'customer.group_unavailable', 'That group no longer exists.', { group_ids: 'That group no longer exists.' })
+        : json({ id: 'c1' }),
+    );
+    await s.save().trigger('click');
+    await flush();
+    await s.save().trigger('click');
+    await flush();
+    expect(s.net.api.map((r) => (sent(r).body as { group_ids: string[] }).group_ids)).toEqual([[], []]);
+    expect(s.wrapper.find('[data-testid="customer-groups-error"]').exists()).toBe(false);
+  });
+
+  it('with a long list, after «That group no longer exists.» the next save leaves the deleted group out', async () => {
+    const s = await setup({ selected: [] });
+    await s.result(s.call, 'customer.group.list', { ...GROUPS, total: 140 });
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    // Someone deletes VIP: in a list that does not hold every group, only the server can tell.
+    await s.result(s.call, 'customer.group.list', pageOf([group('g2', 'Staff'), group('g3', 'Old', false)], 139));
+    s.net.onApi((r) =>
+      (sent(r).body as { group_ids: string[] }).group_ids.includes('g1')
+        ? refusal(422, 'customer.group_unavailable', 'That group no longer exists.', { group_ids: 'That group no longer exists.' })
+        : json({ id: 'c1' }),
+    );
+    await s.save().trigger('click');
+    await flush();
+    expect(s.wrapper.get('[data-testid="customer-groups-error"]').text()).toContain('That group no longer exists.');
+    await s.save().trigger('click');
+    await flush();
+    expect(s.net.api.map((r) => (sent(r).body as { group_ids: string[] }).group_ids)).toEqual([['g1', 'g2'], ['g2']]);
+    expect(toastSuccess).toHaveBeenCalledWith('Groups assigned');
+  });
+
+  it('a ticked group someone else deactivates is no longer seen, and not sent', async () => {
+    const s = await setup({ selected: [] });
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    await s.result(s.call, 'customer.group.list', pageOf([group('g1', 'VIP'), group('g2', 'Staff', false), group('g3', 'Old', false)]));
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([['VIP', false]]);
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    await flush();
+    expect((sent(s.net.api[0]).body as { group_ids: string[] }).group_ids).toEqual([]);
+  });
+
+  it('an inactive group someone else takes off the card is not put back by saving an untick', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: false } });
+    await flush();
+    await s.wrapper.setProps({ selected: ['g1'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', false],
+      ['Staff', false],
+    ]);
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    await flush();
+    expect((sent(s.net.api[0]).body as { group_ids: string[] }).group_ids).toEqual([]);
+  });
+
   it('a tick taken back leaves nothing unsaved: it follows the card again', async () => {
     const s = await setup();
     await s.result(s.call, 'customer.group.list', GROUPS);
@@ -169,6 +260,11 @@ describe('MembershipEditor', () => {
     staff().vm.$emit('ionChange', { detail: { checked: true } });
     staff().vm.$emit('ionChange', { detail: { checked: false } });
     await flush();
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', true],
+      ['Staff', false],
+      ['Old (not active)', true],
+    ]);
     await s.wrapper.setProps({ selected: ['g2'] });
     expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
       ['VIP', false],
@@ -242,6 +338,28 @@ describe('MembershipEditor', () => {
     await s.wrapper.get('[data-testid="customer-tags-save"]').trigger('click');
     await flush();
     expect(sent(s.net.api[0])).toMatchObject({ path: '/api/customer/customers/set_tags', body: { id: 'c1', tag_ids: ['t1'] } });
+    expect(toastSuccess).toHaveBeenCalledWith('Tags assigned');
+  });
+
+  it('the tags: after «That tag no longer exists.» the next save leaves the deleted tag out', async () => {
+    const tag = (id: string, name: string) => ({ id, name, color: 'primary', is_active: true, customer_count: 0 });
+    const s = await setup({ kind: 'tags', selected: [] });
+    await s.result(s.call, 'customer.tag.list', pageOf([tag('t1', 'Loyal'), tag('t2', 'New')], 140));
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    await s.result(s.call, 'customer.tag.list', pageOf([tag('t2', 'New')], 139));
+    s.net.onApi((r) =>
+      (sent(r).body as { tag_ids: string[] }).tag_ids.includes('t1')
+        ? refusal(422, 'customer.tag_unavailable', 'That tag no longer exists.', { tag_ids: 'That tag no longer exists.' })
+        : json({ id: 'c1' }),
+    );
+    const save = () => s.wrapper.get('[data-testid="customer-tags-save"]');
+    await save().trigger('click');
+    await flush();
+    await save().trigger('click');
+    await flush();
+    expect(s.net.api.map((r) => (sent(r).body as { tag_ids: string[] }).tag_ids)).toEqual([['t1', 't2'], ['t2']]);
     expect(toastSuccess).toHaveBeenCalledWith('Tags assigned');
   });
 
