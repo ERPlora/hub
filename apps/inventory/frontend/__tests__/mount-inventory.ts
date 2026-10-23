@@ -142,17 +142,17 @@ export const TAX_CATEGORIES = page([
   },
 ]);
 
-/** The eight units (`inventory.unit.list`). */
+/** The eight units (`inventory.unit.list`), named as the API names them: with their code. */
 export const UNITS = page(
   [
-    ['ud', 'Unit', 'count', '1'],
-    ['kg', 'Kilogram', 'mass', '0.001'],
-    ['g', 'Gram', 'mass', '1'],
-    ['t', 'Tonne', 'mass', '0.001'],
-    ['l', 'Litre', 'volume', '0.001'],
-    ['ml', 'Millilitre', 'volume', '1'],
-    ['min', 'Minute', 'time', '1'],
-    ['h', 'Hour', 'time', '0.25'],
+    ['ud', 'Unit (ud)', 'count', '1'],
+    ['kg', 'Kilogram (kg)', 'mass', '0.001'],
+    ['g', 'Gram (g)', 'mass', '1'],
+    ['t', 'Tonne (t)', 'mass', '0.001'],
+    ['l', 'Litre (l)', 'volume', '0.001'],
+    ['ml', 'Millilitre (ml)', 'volume', '1'],
+    ['min', 'Minute (min)', 'time', '1'],
+    ['h', 'Hour (h)', 'time', '0.25'],
   ].map(([code, name, category, increment]) => ({
     code,
     name,

@@ -52,6 +52,14 @@ def visible_texts() -> set[str]:
         # The Home's step of «Finish setting up your business» and its panels (FIX-VERIFACTU-SETUP-HOOKS).
         *(text for step in config.setup for text in (step.title, step.description)),
         *(panel.title for panel in config.widgets),
+        # The texts among a panel's literal props, as the one under the queue's figure
+        # (FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT).
+        *(
+            value
+            for panel in config.widgets
+            for value in panel.options.values()
+            if type(value).__name__ == "__proxy__"
+        ),
         *messages_of(queries),
         *messages_of(schemas),
         *messages_of(services),

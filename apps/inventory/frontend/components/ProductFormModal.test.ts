@@ -4,10 +4,12 @@
 // item» with its note, «Unit of measure», «Tax category» (required, none chosen in advance) and
 // «Categories» (when there are any). «Save» / «Save changes» is off while Name, SKU or the tax
 // category are missing; amounts and quantities are read as typed; an edit sends only what changed;
-// a refusal stays in the dialog under its field.
+// a refusal stays in the dialog under its field. «Tax category» and «Categories» are `Combo` fields of
+// @erplora/ui that search the server (TaxCategorySelect, ProductCategoriesField).
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { category, flush, mountInventory, ok, page, product, refusal, TAX_CATEGORIES, UNITS } from '../__tests__/mount-inventory';
+import { type ApiCall, category, flush, mountInventory, ok, page, product, refusal, TAX_CATEGORIES, UNITS } from '../__tests__/mount-inventory';
 import ProductFormModal from './ProductFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -23,14 +25,22 @@ type Control = HTMLElement & { value?: unknown; errorText?: string; disabled?: b
 
 const CATEGORIES = page([category(), category({ id: 'c2', name: 'Food', slug: 'food' })], 2, 100);
 
-async function setup(props: Record<string, unknown> = {}, options: { locale?: 'en' | 'es'; categories?: unknown } = {}) {
+/** What the server answers the Combo searches: the tax categories and the product categories. */
+const searches = (categories: unknown) => (call: ApiCall) =>
+  ok(call.url.startsWith('/api/tax/categories') ? TAX_CATEGORIES : categories);
+
+async function setup(
+  props: Record<string, unknown> = {},
+  options: { locale?: 'en' | 'es'; categories?: unknown; taxes?: unknown; api?: (call: ApiCall) => Response } = {},
+) {
   const m = await mountInventory(ProductFormModal, {
     props: { open: true, product: null, units: UNITS.rows, ...props },
     locale: options.locale,
     attach: true,
+    api: options.api ?? searches(options.categories ?? CATEGORIES),
   });
   const call = await m.live();
-  await m.result(call, 'tax.category.list', TAX_CATEGORIES);
+  await m.result(call, 'tax.category.list', options.taxes ?? TAX_CATEGORIES);
   await m.result(call, 'inventory.category.list', options.categories ?? CATEGORIES);
   const el = (id: string) => document.querySelector<Control>(`[data-testid="${id}"]`);
   async function type(id: string, value: string) {
@@ -43,6 +53,15 @@ async function setup(props: Record<string, unknown> = {}, options: { locale?: 'e
     const field = el(id)!;
     field.value = value;
     field.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
+    await flush();
+  }
+  /** Picks, in the Combo `id`, the option of `key` it offers on opening. */
+  async function choose(id: string, key: string) {
+    const combo = m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === id);
+    if (!combo) throw new Error(`${id} is not a Combo`);
+    const option = (await (combo.props('search') as (q: string) => Promise<ComboOption[]>)('')).find((o) => o.id === key);
+    if (!option) throw new Error(`${id} offers no ${key}`);
+    combo.vm.$emit('update:modelValue', option);
     await flush();
   }
   async function check(id: string, checked: boolean) {
@@ -59,10 +78,11 @@ async function setup(props: Record<string, unknown> = {}, options: { locale?: 'e
     await type('inventory-product-name', 'Coffee');
     await type('inventory-product-sku', 'CAF-1');
     await type('inventory-product-price', '2,20');
-    await pick('inventory-product-tax', 'product.generic');
+    await choose('inventory-product-tax', 'product.generic');
   }
   const sent = (path: string) => m.body(m.calls(path).at(-1)!) as Record<string, unknown>;
-  return { ...m, el, type, pick, check, submit, fillRequired, sent };
+  const chips = () => [...document.querySelectorAll('[data-testid^="inventory-product-categories-chip-"]')].map((c) => c.textContent?.trim());
+  return { ...m, el, type, pick, choose, check, submit, fillRequired, sent, chips };
 }
 
 describe('ProductFormModal: new product', () => {
@@ -99,7 +119,10 @@ describe('ProductFormModal: new product', () => {
     ]);
     expect(s.el('inventory-product-tax')?.value).toBe('');
     expect(s.el('inventory-product-unit')?.value).toBe('ud');
-    expect([...s.el('inventory-product-unit')!.querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim())).toContain('Kilogram (kg)');
+    // Each unit by the name the API gives it, which already carries its code («Unit (ud)», once).
+    expect([...s.el('inventory-product-unit')!.querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim())).toEqual(
+      UNITS.rows.map((unit) => unit.name),
+    );
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
   });
 
@@ -123,7 +146,8 @@ describe('ProductFormModal: new product', () => {
     await s.type('inventory-product-cost', '0,80');
     await s.type('inventory-product-initial-stock', '2,5');
     await s.pick('inventory-product-unit', 'kg');
-    await s.pick('inventory-product-categories', ['c2']);
+    await s.choose('inventory-product-categories', 'c2');
+    expect(s.chips()).toEqual(['Food']);
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
     s.net.onApi(() => ok(product(), 201));
     await s.submit();
@@ -164,15 +188,18 @@ describe('ProductFormModal: new product', () => {
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 
-  it('Enter on a long «Categories» field opens its picker and does not save the product', async () => {
+  it('Enter on the open «Categories» list adds the category and does not save the product', async () => {
     const s = await setup({}, { categories: page([category()], 140, 100) });
     await s.fillRequired();
-    // Enter on the field's own input: what FormModal reads as «submit» when it reaches the form.
-    const field = s.el('inventory-product-categories')!.querySelector('input')!;
+    // Enter on the field while its list is open: what FormModal reads as «submit» if it reaches the form.
+    const field = s.el('inventory-product-categories')!;
+    field.dispatchEvent(new CustomEvent('ionInput', { detail: { value: 'Dri' } }));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await flush();
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     await flush();
     expect(s.calls('/api/inventory/products')).toHaveLength(0);
-    expect(s.el('inventory-product-categories-search')).not.toBeNull();
+    expect(s.chips()).toEqual(['Drinks']);
   });
 
   it('without categories the «Categories» field is not there', async () => {
@@ -196,7 +223,7 @@ describe('ProductFormModal: editing', () => {
     expect(s.el('inventory-product-sku')?.helperText).toBe("The SKU is the product's identity: it is not edited");
     expect(s.el('inventory-product-threshold')?.value).toBe('10');
     expect([s.el('inventory-product-initial-stock'), s.el('inventory-product-type')]).toEqual([null, null]);
-    expect(s.el('inventory-product-categories')?.value).toEqual(['c1']);
+    expect(s.chips()).toEqual(['Drinks']);
     expect(s.el('inventory-product-form-submit')?.textContent?.trim()).toBe('Save changes');
     expect(s.el('inventory-product-form-cancel')?.textContent?.trim()).toBe('Cancel editing');
   });
@@ -205,7 +232,7 @@ describe('ProductFormModal: editing', () => {
     const s = await setup({ product: COFFEE });
     await s.type('inventory-product-price', '2,50');
     await s.type('inventory-product-ean13', '');
-    await s.pick('inventory-product-categories', ['c1', 'c2']);
+    await s.choose('inventory-product-categories', 'c2');
     s.net.onApi(() => ok(COFFEE));
     await s.submit();
     expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', price: 250, ean13: '', category_ids: ['c1', 'c2'] });
@@ -215,7 +242,7 @@ describe('ProductFormModal: editing', () => {
     const s = await setup({ product: product({ tax_category_key: null, needs_tax_setup: true }) });
     expect(s.el('inventory-product-tax-unconfigured')).not.toBeNull();
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
-    await s.pick('inventory-product-tax', 'service.health');
+    await s.choose('inventory-product-tax', 'service.health');
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
     s.net.onApi(() => ok(product()));
     await s.submit();
@@ -226,8 +253,25 @@ describe('ProductFormModal: editing', () => {
     const s = await setup({ product: product({ tax_category_key: 'old.deactivated', needs_tax_setup: true }) });
     expect(s.el('inventory-product-tax-unconfigured')).not.toBeNull();
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
-    await s.pick('inventory-product-tax', 'product.generic');
+    await s.choose('inventory-product-tax', 'product.generic');
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
+  });
+
+  it('a product whose category and tax category lie beyond the first page opens with their names, never an id or a key', async () => {
+    // More than one query holds (100) of each: the first pages do not name them, so the form asks for them.
+    const wine = { ...TAX_CATEGORIES.rows[0], id: 't9', key: 'drink.wine', name: 'Wine', display_name: 'Wine', rate_pct: '10.00' };
+    const wines = category({ id: 'c9', name: 'Wines', slug: 'wines' });
+    const s = await setup(
+      { product: product({ tax_category_key: 'drink.wine', category_ids: ['c9'] }) },
+      {
+        taxes: { ...TAX_CATEGORIES, total: 140 },
+        categories: page([category()], 140, 100),
+        api: (call) => ok(call.url.startsWith('/api/tax/categories') ? page([wine]) : page([wines])),
+      },
+    );
+    expect(s.el('inventory-product-tax')?.value).toBe('Wine · 10%');
+    expect(s.chips()).toEqual(['Wines']);
+    expect(s.el('inventory-product-tax-unconfigured')).toBeNull();
   });
 
   it('a unit that cannot change with stock says so under the unit', async () => {

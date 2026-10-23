@@ -1136,6 +1136,10 @@ msgid "Contingency queue"
 msgstr "Cola de contingencia"
 
 #: apps/verifactu/apps.py
+msgid "In contingency queue"
+msgstr "En cola de contingencia"
+
+#: apps/verifactu/apps.py
 msgid "Records by status"
 msgstr "Registros por estado"
 

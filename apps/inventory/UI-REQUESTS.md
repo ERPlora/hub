@@ -23,12 +23,12 @@ Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`
 - **`KpiCard`** (el `ok-kpi`): etiqueta en versalitas con icono, valor grande, nota o tendencia y, con
   `to`, toda la tarjeta enlaza. API: `label`, `value`, `icon`, `note?`, `tone?: 'neutral' | 'warning' | 'danger'`,
   `to?`, `testid?`. Uso: las cinco cifras del Panel. Hoy `components/KpiTile.vue`.
-- **`SearchSelect`**: selector sobre una lista paginada en el servidor (≤ 100 filas por consulta). Con la
-  lista entera, un `ion-select` normal; con más, campo de solo lectura que abre `ion-modal` + `ion-searchbar`
-  (búsqueda en servidor) + lista; simple o múltiple, recuerda la etiqueta de lo elegido. API: `modelValue`,
-  `options`, `complete`, `fixedOptions?`, `multiple?`, `label`, `placeholder?`, `testid`, `errorText?`;
-  emite `update:modelValue` y `update:search`. Uso: categoría fiscal (producto y categoría), categorías del
-  producto. Hoy `components/SearchSelect.vue`.
+- **`Combo` múltiple** (la petición `SearchSelect` llegó como `Combo`, de selección simple, y la categoría
+  fiscal del producto, de la categoría y del import ya lo usan: `components/TaxCategorySelect.vue`): un
+  `multiple` en `Combo` con `modelValue: ComboOption[]`, las elegidas como chips con su botón «Quitar» y sin
+  ofrecer de nuevo las ya elegidas. Uso: «Categorías» del producto. Hoy `components/ProductCategoriesField.vue`
+  compone un `Combo` simple (con `v-model` que se vacía tras cada elección) y los chips a mano, como
+  `apps/appointment/frontend/components/ServicesField.vue`.
 - **`DataTable`**, lo que el `ok-data-table` viejo tenía y el puerto aún no:
   - **importar / exportar CSV** (`importable`, `exportable`; el import entrega el texto ya decodificado: UTF-8
     con o sin BOM o Windows-1252 de Excel); hoy `components/CsvButtons.vue` en el hueco `toolbar`;

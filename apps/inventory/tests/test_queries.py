@@ -1004,6 +1004,27 @@ def test_category_list_filters_and_orders():
     assert listed(sort="-name") == ["Food", "Drinks"]
 
 
+def test_category_list_names_the_categories_asked_by_id():
+    # The product form names the categories of a product beyond the first page (FIX-INVENTORY-SEARCHSELECT-TO-COMBO).
+    drinks = Category.objects.create(name="Drinks", slug="drinks")
+    food = Category.objects.create(name="Food", slug="food")
+    Category.objects.create(name="Wines", slug="wines")
+    gone = Category.objects.create(name="Old", slug="old", is_deleted=True)
+
+    def listed(**params):
+        return [row.name for row in run("inventory.category.list", CategoryListIn(**params)).rows]
+
+    assert listed(ids=[food.id, drinks.id]) == ["Drinks", "Food"]
+    assert listed(ids=[gone.id]) == []
+    assert listed(ids=[uuid.uuid7()]) == []
+    assert listed() == ["Drinks", "Food", "Wines"]
+
+
+def test_category_list_asks_at_most_a_page_of_ids():
+    with pytest.raises(ValueError):
+        CategoryListIn(ids=[uuid.uuid7() for _ in range(101)])
+
+
 def test_movements_by_dates_and_ordered_by_type():
     coffee = product("Coffee")
     early = movement(coffee, "reception", 5, 5)

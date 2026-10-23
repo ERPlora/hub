@@ -26,6 +26,7 @@ export interface Product {
   needs_tax_setup: boolean;
   is_active: boolean;
   is_sold_out: boolean;
+  category_ids: string[];
 }
 
 /** Deletes every `E2E` product, movement, category, link and learned text and `e2e.inv_*` tax category. */
@@ -68,6 +69,18 @@ export async function pick(page: Page, select: Locator, text: string | RegExp): 
     await overlay.locator('ion-radio, ion-item, ion-checkbox').filter({ hasText: text }).first().click();
   }
   await expect(overlay).toBeHidden();
+}
+
+/** Picks, in a `Combo` (a field that searches the server: the tax category, the product's categories),
+ *  the option whose text matches, after typing `query`; choosing closes its list. */
+export async function pickCombo(page: Page, field: Locator, query: string, text: string | RegExp): Promise<void> {
+  const testid = await field.getAttribute('data-testid');
+  const input = field.locator('input');
+  await input.click();
+  await input.fill(query);
+  const options = page.locator(`[data-testid^="${testid}-option-"]`);
+  await options.filter({ hasText: text }).first().click();
+  await expect(options).toHaveCount(0);
 }
 
 /** The dialog of a FormModal (Ionic moves it to ion-app). */
