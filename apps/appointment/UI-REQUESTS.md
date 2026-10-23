@@ -59,5 +59,7 @@ Al registrarlos, cambiar `frontend/components/AppointmentList.vue` (`ICONS`) y
   Android pide antes el permiso con su frase. El navegador no avisa (decisión de mercado). e2e:
   `tests/e2e/fix-ui-shell-appointment-notices.spec.ts`.
 - **Hecho — la campana** (BASE-G137, hub#168): existe y cuenta los `bell` de los módulos.
-- **Pendiente — el contador «por confirmar» de Citas en la campana** (`LiveAppConfig.bell` con
-  `appointment.appointment.count_to_confirm`): otra tarea de la cola (FIX-APPOINTMENT-SETUP-HOOKS).
+- **Hecho — el contador «Citas por confirmar» de Citas en la campana** (FIX-APPOINTMENT-SETUP-HOOKS):
+  `LiveAppConfig.bell` con `appointment.appointment.count_to_confirm`, que lleva a `/appointment/agenda` y se
+  refresca con `TO_CONFIRM_EVENTS`. e2e: `tests/e2e/fix-appointment-setup-hooks.spec.ts`. No queda nada pendiente
+  de este punto.

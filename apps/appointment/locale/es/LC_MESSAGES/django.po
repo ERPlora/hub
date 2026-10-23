@@ -36,6 +36,9 @@ msgstr "Cita cancelada · {customer_name}"
 msgid "Appointment cancelled"
 msgstr "Cita cancelada"
 
+msgid "Appointments to confirm"
+msgstr "Citas por confirmar"
+
 msgid ""
 "Your diary: appointments by professional, free times, repeating bookings and "
 "charging them at the till."
