@@ -96,9 +96,13 @@ class InactiveUser(Exception):
     """The Hub's copy of the user was deactivated (in the admin): no session, whatever the SaaS says."""
 
 
+#: The username prefix of the customer copies of SaaS accounts (:func:`username_for`).
+SAAS_USERNAME_PREFIX = "saas:"
+
+
 def username_for(saas_user_id: str) -> str:
     """The customer copy of a SaaS account (hub door)."""
-    return f"saas:{saas_user_id}"
+    return f"{SAAS_USERNAME_PREFIX}{saas_user_id}"
 
 
 def staff_username_for(saas_user_id: str) -> str:
@@ -529,8 +533,9 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     ``verifactu.config.sync`` on the hub's slug, and the number's state of WhatsApp (``whatsapp``), through
     ``whatsapp_inbox.channel.sync`` with the photo's version when the app is on in that business (off, the photo
     applies and the block waits for the next one); both in this same transaction, so their notices go out after its
-    COMMIT (a block out of contract keeps nothing). The rights it carries (plan, modules, members) are only kept
-    until phase 2 applies them.
+    COMMIT (a block out of contract keeps nothing). Its ``members`` apply on the business's memberships
+    (:func:`_apply_members`), in this transaction too. The rest of the rights it carries (plan, modules) are only
+    kept until phase 2 applies them.
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
@@ -543,6 +548,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
         _sync_verifactu(hub, data)
     if data.whatsapp is not None:
         _sync_whatsapp(hub, data)
+    if data.members is not None:
+        _apply_members(hub, data.members)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
     if was_open and registry.is_suspended(hub):
         transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
@@ -590,6 +597,37 @@ def _end_sessions(owners) -> int:
     for host in sorted(hosts - {PLATFORM_SESSION_HOST, ""}):
         transaction.on_commit(partial(_wake_open_apps, host), robust=True)
     return deleted.get(Session._meta.label, 0)
+
+
+def _apply_members(hub: Hub, members: list) -> None:
+    """Make the memberships of ``hub`` say what the photo's ``members`` say (HUBS-F26, F27 and F28 of the SaaS).
+
+    A person whose role changed has it now and a person no longer listed loses their membership; either way their
+    sessions on this business end (:func:`_end_sessions`), so the next thing they do runs with the permissions of
+    the photo, not of their login. Nobody is created: a person the Hub has not seen yet takes their role when they
+    first enter (:func:`open_session_from_saas`). Only the copies of SaaS accounts are the photo's (``saas:<id>``):
+    a demo's owner is not.
+    """
+    wanted = {str(member.user_id): member.role for member in members}
+    changed = []
+    memberships = (
+        Membership.objects.select_for_update(of=("self",))
+        .select_related("user")
+        .filter(host=hub.slug, user__username__startswith=SAAS_USERNAME_PREFIX)
+    )
+    for membership in memberships:
+        saas_user_id = membership.user.username.removeprefix(SAAS_USERNAME_PREFIX)
+        role = wanted.get(saas_user_id)
+        if role is None:
+            membership.delete()
+        elif role != membership.role:
+            membership.role = role
+            membership.save(update_fields=["role"])
+        else:
+            continue
+        changed.append(saas_user_id)
+    if changed:
+        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host=hub.slug))
 
 
 def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
