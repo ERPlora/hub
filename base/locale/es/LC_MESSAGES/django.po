@@ -587,3 +587,81 @@ msgstr "dueños de las sesiones"
 #: operations.py:169
 msgid "Your session ended: sign in again."
 msgstr "Tu sesión ha terminado: vuelve a entrar."
+
+# Django 6.1.2 ships these with an empty Spanish translation, so the admin of hubs.erplora.com showed them in English
+# (APP-ACCOUNTS-6). They are Django's messages, not base's: a makemessages of base marks them obsolete, keep them.
+# base/tests/test_admin_django_catalog.py asks for every hole of Django's Spanish catalogues behind the admin.
+
+#: django/contrib/admin/sites.py
+#, python-format
+msgid "The app \"%s\" could not be found."
+msgstr "No se ha encontrado la aplicación \"%s\"."
+
+#: django/contrib/admin/templatetags/admin_list.py
+#, python-format
+msgid "…and %(count)d more object."
+msgid_plural "…and %(count)d more objects."
+msgstr[0] "…y %(count)d objeto más."
+msgstr[1] "…y %(count)d objetos más."
+msgstr[2] "…y %(count)d objetos más."
+
+#: django/contrib/admin/templates/admin/actions.html
+msgid "Run"
+msgstr "Ejecutar"
+
+#: django/contrib/admin/templates/admin/filter.html
+#, python-format
+msgid "Filter by %(field_name)s"
+msgstr "Filtrar por %(field_name)s"
+
+#: django/contrib/admin/templates/admin/delete_confirmation.html
+#, python-format
+msgid ""
+"Deleting the %(object_name)s “%(escaped_object)s” would require deleting the "
+"following protected related objects:"
+msgstr ""
+"Eliminar el objeto %(object_name)s “%(escaped_object)s” requeriría eliminar "
+"los siguientes objetos relacionados protegidos:"
+
+#: django/contrib/admin/templates/admin/delete_confirmation.html
+#, python-format
+msgid ""
+"Are you sure you want to delete the %(object_name)s “%(escaped_object)s”? "
+"All of the following related items will be deleted:"
+msgstr ""
+"¿Está seguro de que quiere eliminar el objeto %(object_name)s "
+"“%(escaped_object)s”? Se eliminarán todos los siguientes elementos "
+"relacionados:"
+
+#: django/contrib/admin/templates/admin/pagination.html
+#, python-format
+msgid "Pagination %(name)s entries"
+msgstr "Paginación de las entradas de %(name)s"
+
+#: django/contrib/admin/templates/admin/pagination.html
+#, python-format
+msgid "Pagination %(name)s"
+msgstr "Paginación de %(name)s"
+
+#: django/contrib/admin/templates/admin/search_form.html
+#, python-format
+msgid "Search %(name)s"
+msgstr "Buscar %(name)s"
+
+#: django/contrib/admin/templates/admin/base.html
+msgid "Logout"
+msgstr "Cerrar sesión"
+
+#: django/db/models/fields/__init__.py
+msgid "- Select an option -"
+msgstr "- Seleccione una opción -"
+
+#: django/db/models/fields/__init__.py
+#, python-format
+msgid "“%(value)s” is not a valid binary value."
+msgstr "“%(value)s” no es un valor binario válido."
+
+#: django/shortcuts.py
+#, python-format
+msgid "No %s matches the given query."
+msgstr "Ningún %s coincide con la consulta."
