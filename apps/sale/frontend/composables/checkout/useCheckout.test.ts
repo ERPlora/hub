@@ -104,10 +104,10 @@ describe('useCheckout', () => {
     const s = await setup();
     const message =
       'No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros: ' +
-      'la opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora. Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo.';
-    s.replies({ [COMPLETE]: [refusal(409, 'verifactu.live_option_unpaid', message)] });
+      'falta que ERPlora apruebe tu autorización firmada para remitir en producción. Resuélvelo en VeriFactu → Ajustes y vuelve a intentarlo.';
+    s.replies({ [COMPLETE]: [refusal(409, 'verifactu.representation_not_approved', message)] });
     await s.checkout.charge(INPUT);
-    expect(s.checkout.failure.value).toEqual({ kind: 'refused', code: 'verifactu.live_option_unpaid', message });
+    expect(s.checkout.failure.value).toEqual({ kind: 'refused', code: 'verifactu.representation_not_approved', message });
     expect(s.charged()).toEqual([]);
     expect(s.sent().map((c) => c.path)).toEqual([COMPLETE]);
   });

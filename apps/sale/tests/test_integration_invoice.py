@@ -344,47 +344,25 @@ def test_a_refusal_of_invoicing_never_stops_the_charge_and_the_document_waits(ba
     assert system_context(A).actor  # the reaction ran as the platform
 
 
-def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(issuer, bar, settings):
-    # Working-rules §15 (the old Hub's enforce_fiscal_road, HUB-1935): a business that files for real never
-    # charges a sale whose ticket could never reach the AEAT. VeriFactu's refusal is not a document that
-    # waits: it reaches the cashier as it is and nothing is charged, numbered or sealed.
+def _live_through_erplora(settings):
+    """ERPlora files for the business: its signed authorisation is approved and the business goes live."""
     from live.context import system_context
 
     from apps.sale.tests.conftest import A
 
-    settings.ERPLORA_ENVIRONMENT = "prod"
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
-    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
-    system = system_context(A)
     run(
         "verifactu.config.sync",
         {"version": 1, "representation": {"status": "approved"}},
-        system,
+        system_context(A),
     )
     run("verifactu.config.go_live")
-    run("verifactu.config.sync", {"version": 2, "representation": {"status": "revoked"}}, system)
-    with pytest.raises(Conflict) as refused:
-        charge("chain-0099", {"product": "TAP"})
-    assert refused.value.code == "verifactu.representation_not_approved"
-    assert not Sale.objects.exists()
-    assert not Invoice.objects.exists()
-    assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()
 
 
-@pytest.mark.parametrize(
-    "lost", ["own_certificate_unreadable", "gateway_unavailable", "production_closed"]
-)
-def test_in_production_a_server_that_cannot_reach_the_aeat_refuses_the_charge(
-    issuer, bar, settings, lost
-):
-    # The same rule when what is missing is the server's: the key that opens the own certificate (missing or
-    # rotated), ERPlora's gateway or the opening of real filing. The charge never stays «pending».
+def _live_with_its_own_certificate(settings):
+    """The business files with its own certificate, uploaded by the owner, and goes live."""
     from apps.verifactu import certificates
     from apps.verifactu.tests.conftest import b64, make_p12
 
-    settings.ERPLORA_ENVIRONMENT = "prod"
-    settings.VERIFACTU_PRODUCTION_ENABLED = True
-    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
     settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
     run(
         "verifactu.certificate.upload",
@@ -392,20 +370,117 @@ def test_in_production_a_server_that_cannot_reach_the_aeat_refuses_the_charge(
     )
     run("verifactu.config.update", {"route": "own"})
     run("verifactu.config.go_live")
-    if lost == "own_certificate_unreadable":
-        settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
-    elif lost == "gateway_unavailable":
-        settings.VERIFACTU_GATEWAY_URL = ""
-    else:
-        settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+
+def _authorisation_revoked(settings):
+    from live.context import system_context
+
+    from apps.sale.tests.conftest import A
+
+    run(
+        "verifactu.config.sync",
+        {"version": 2, "representation": {"status": "revoked"}},
+        system_context(A),
+    )
+
+
+def _certificate_removed(settings):
+    run("verifactu.certificate.remove")
+
+
+def _certificate_key_rotated(settings):
+    from apps.verifactu import certificates
+
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+
+
+def _gateway_gone(settings):
+    settings.VERIFACTU_GATEWAY_URL = ""
+
+
+def _real_filing_closed(settings):
+    settings.VERIFACTU_PRODUCTION_ENABLED = False
+
+
+#: Every way a business that went live loses its way to the AEAT, by the refusal VeriFactu raises for it
+#: (``route_problem`` in production): how it went live, and what the platform, the owner or the server took away.
+WAYS_LOST = {
+    "representation_not_approved": (_live_through_erplora, _authorisation_revoked),
+    "own_certificate_missing": (_live_with_its_own_certificate, _certificate_removed),
+    "own_certificate_unreadable": (_live_with_its_own_certificate, _certificate_key_rotated),
+    "gateway_unavailable": (_live_with_its_own_certificate, _gateway_gone),
+    "production_closed": (_live_with_its_own_certificate, _real_filing_closed),
+}
+
+
+@pytest.mark.parametrize("lost", sorted(WAYS_LOST))
+def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(
+    issuer, bar, settings, lost
+):
+    # Working-rules §15 (the old Hub's enforce_fiscal_road, HUB-1935): a business that files for real never
+    # charges a sale whose ticket could never reach the AEAT, whether the route lost it (the authorisation, the
+    # own certificate) or the server (the key that opens the certificate, ERPlora's gateway, real filing). The
+    # refusal is not a document that waits: it reaches the cashier as it is and nothing is charged, numbered or
+    # sealed. The charge never stays «pending».
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    go_live, take_away = WAYS_LOST[lost]
+    go_live(settings)
+    take_away(settings)
 
     with pytest.raises(Conflict) as refused:
-        charge("chain-0098", {"product": "TAP"})
+        charge("chain-0099", {"product": "TAP"})
 
     assert refused.value.code == f"verifactu.{lost}"
     assert not Sale.objects.exists()
     assert not Invoice.objects.exists()
     assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()
+
+
+def test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today():
+    # A code VeriFactu no longer raises (the paid live option's, retired with it: PLAN §30, round 2026-10-22b)
+    # is dead code in Sales: each one Sales treats as «no way to the AEAT» is one the test above makes VeriFactu
+    # raise for real, and each way lost it walks is one Sales refuses.
+    from apps.sale.services import NO_WAY_TO_THE_AEAT
+
+    assert NO_WAY_TO_THE_AEAT == {f"verifactu.{lost}" for lost in WAYS_LOST}
+
+
+def test_sales_refuses_every_problem_verifactu_can_find_on_the_route():
+    # Bound to VeriFactu's source, not to this file's table (the test above): a wait code ``route_problem`` (or
+    # what it calls in ``apps.verifactu.queries``) returns tomorrow that Sales does not refuse would be a sale
+    # charged whose ticket never reaches the AEAT. It shows up here first; then ``WAYS_LOST`` asks for the real way
+    # to lose it. The same for a code VeriFactu retires: dead in Sales. Testing's refusals are no exception, as
+    # there is none (``_refuse_without_a_way`` only refuses in production).
+    import ast
+    import inspect
+
+    from apps.sale.services import NO_WAY_TO_THE_AEAT
+    from apps.verifactu import queries
+
+    functions = {
+        node.name: node
+        for node in ast.parse(inspect.getsource(queries)).body
+        if isinstance(node, ast.FunctionDef)
+    }
+    problems, seen, pending = set(), set(), ["route_problem"]
+    while pending:
+        name = pending.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        for node in ast.walk(functions[name]):
+            if not isinstance(node, ast.Return) or node.value is None:
+                continue
+            for leaf in ast.walk(node.value):
+                if isinstance(leaf, ast.Constant) and isinstance(leaf.value, str) and leaf.value:
+                    problems.add(leaf.value)
+                elif isinstance(leaf, ast.Call) and isinstance(leaf.func, ast.Name):
+                    if leaf.func.id in functions:
+                        pending.append(leaf.func.id)
+    assert problems  # the walk reached VeriFactu's codes, not an empty module
+    assert NO_WAY_TO_THE_AEAT == {f"verifactu.{problem}" for problem in problems}
 
 
 def test_the_seller_without_the_right_to_invoice_still_charges(issuer, bar):
