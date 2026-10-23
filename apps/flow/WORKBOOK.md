@@ -187,7 +187,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F23 | Cuando acaba una espera, la automatización sigue | hecho |
 | FLOW-F24 | Reanudar una ejecución desde el paso que falló | hecho |
 | FLOW-F25 | «Solo si…» y «Si falla, sigue» en cada paso | hecho |
-| FLOW-F26 | Guardar secretos que no se pueden volver a leer | parcial |
+| FLOW-F26 | Guardar secretos que no se pueden volver a leer | hecho |
 | FLOW-F27 | Llamar a otro sistema | hecho |
 | FLOW-F28 | Preguntar antes a alguien | hecho |
 | FLOW-F29 | Contestar lo que pregunta una automatización | hecho |
@@ -718,7 +718,7 @@ Implicados: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F26 Guardar secretos que no se pueden volver a leer
 <!-- origen: old-hub:HUB-F99 -->
-Estado: parcial — en este servidor todavía no se pueden guardar secretos; llegará cuando se active su clave
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
@@ -1201,7 +1201,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   empezó) y deja en el log `resumed` con quién. Dos a la vez: la segunda espera el bloqueo y ve que ya no
   está `failed`.
 - **Secretos** (`vault.py`, FLOW-F26): Fernet de `cryptography` con la clave `FLOW_SECRETS_KEY` del
-  entorno (Secrets Manager en AWS; nunca en el código); sin ella, `flow.secret.list` dice `available: false`
+  entorno (nunca en el código): en AWS la genera Terraform (`ERPlora/aws`) en `erplora/prod/flow/secrets-key`
+  y, en pre, en `erplora/pre/flow`, y solo la reciben `hub` y `worker`; no se rota, porque con otra clave todo
+  secreto guardado queda ilegible (`flow.secret_unreadable`). Sin ella, `flow.secret.list` dice `available: false`
   y guardar da `flow.secrets_key_missing`. El valor entra como `SecretStr` (un 422 nunca lo repite), solo se
   abre al hacer la llamada y se tapa (`vault.mask`) en todo lo que se guarda o se enseña de ella: log,
   errores, lo que respondió y **Probar**. Ni la API, ni `live.py`, ni el admin (solo ver el nombre y borrar)
@@ -1390,9 +1392,6 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Qué queda fuera
 
-- **Guardar secretos en los servidores de ERPlora** (FLOW-F26, parcial): la caja, el sellado y su uso en
-  una llamada están hechos y probados, pero producción y pre todavía no tienen su clave de cifrado; hasta
-  que se active, la caja lo dice al abrirse y las llamadas sin secretos funcionan igual.
 - **Mandar un correo a un cliente desde una automatización** (FLOW-F31 lo manda por WhatsApp): el Hub todavía
   no manda correos a clientes. Y la cabecera con foto, vídeo o PDF de un WhatsApp (FLOW-F32, parcial): falta un
   sitio donde guardar los archivos.
