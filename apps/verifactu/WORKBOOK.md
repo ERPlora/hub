@@ -70,6 +70,11 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   firmada, el Anexo I, aprobada por ERPlora), o remites tú con tu propio certificado. La autorización (el
   otorgamiento de representación) se firma y se sube aquí, en «Lo remite ERPlora», y la revisa ERPlora; el
   certificado se sube aquí, en «Mi certificado». Aquí se elige cuál usar.
+- **En el Inicio**, mientras la vía elegida no pueda llevar tus registros a la AEAT de producción (ERPlora sin la
+  autorización aprobada, o tu certificado sin subir o caducado), «Termina de configurar tu negocio» lo recuerda con
+  «Configura VeriFactu» y la pastilla «Importante» (no frena la venta: en pruebas se vende igual); su «Configurar»
+  lleva a VeriFactu → Configuración, y el paso queda «Hecho» en cuanto ERPlora aprueba la autorización o subes y
+  eliges tu certificado. Solo lo ve quien configura VeriFactu.
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
   responsable), también «Da servicio a varios obligados», siempre «S» (contradicción 7, cerrada).
 
@@ -236,7 +241,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F28 | Recuperar la cadena desde la AEAT tras restaurar una copia | hecho — por la pasarela del SaaS (`/internal/verifactu/query`) |
 | VERIFACTU-F29 | Continuar la cadena de otra aplicación (migración) | hecho |
 | VERIFACTU-F30 | Anular un registro enviado por error | hecho |
-| VERIFACTU-F31 | Vigilar los envíos desde las pantallas | hecho; el panel de Inicio con tarjetas es de la plataforma (aún no existe) |
+| VERIFACTU-F31 | Vigilar los envíos desde las pantallas | hecho — también desde los cuatro paneles del Inicio |
 | VERIFACTU-F32 | Impedir apagar la app con registros sin enviar | parcial — apagar una app es de la plataforma y aún no existe; VeriFactu ya cuenta lo que no está en la AEAT |
 | VERIFACTU-F33 | Cesar la actividad | descartado — la baja censal es del negocio, fuera de ERPlora; un negocio dado de baja no abre (410) |
 | VERIFACTU-F34 | Renovar el certificado propio | hecho — en el Hub (subir el renovado sustituye al anterior) |
@@ -830,13 +835,18 @@ Implicados: INVOICE-F07
 
 ### VERIFACTU-F31 Vigilar los envíos desde las pantallas
 <!-- origen: fi:modules/verifactu#query-verifactu-events-list fi:modules/verifactu#query-verifactu-stats-contingency_summary fi:modules/verifactu#query-verifactu-stats-events_recent fi:modules/verifactu#query-verifactu-stats-records_by_status fi:modules/verifactu#widget-verifactu-pending-kpi-verifactu-contingency-stat-verifactu-by_status-bar-list-verifactu-events-timeline old:verifactu/workflow/control.md#verifactu-f31 -->
-Estado: hecho; el panel de Inicio con tarjetas es de la plataforma (aún no existe)
+Estado: hecho — también desde los cuatro paneles del Inicio
 Actor: empleado, responsable, administrador
-Pantalla: Registros, Contingencia, Eventos
+Pantalla: Registros, Contingencia, Eventos, Inicio
 Pasos:
 1. **Registros** y **Contingencia** dicen qué falta por llegar; **Eventos**, qué pasó. Las tres se ponen al día
    solas.
-2. Los resúmenes (pendientes, por estado, cola y últimos eventos) se pueden pedir al asistente o por la API.
+2. En el **Inicio**, el panel «Pendientes VeriFactu» (encendido de serie) cuenta lo que aún no está en la AEAT
+   (pendiente, enviado sin respuesta o rechazado); desde «Personalizar panel» se añaden «Cola de contingencia» (lo
+   que espera en la cola, en naranja si espera y en rojo si ya ha fallado algún intento), «Registros por estado» y
+   «Eventos AEAT recientes» (los ocho últimos, con su hora, su tipo y su frase). Todos se ponen al día solos y los ve
+   quien puede consultar los registros.
+3. Los resúmenes (pendientes, por estado, cola y últimos eventos) se pueden pedir al asistente o por la API.
 Entra: los registros y los eventos.
 Sale: nada; es consulta.
 Si falla: el mensaje con «Reintentar».
@@ -1035,6 +1045,23 @@ que manda la cuenta (`verifactu.sync_config`) no es de ningún papel: solo del s
 por fichero, más `test_xsd.py` contra los esquemas reales, `test_integration_invoice.py` (Facturación real,
 sin dobles), `test_concurrency.py` (sesiones reales en hilos; también una emisión cuyo cerrojo de cadena no
 llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el hub B no avisa al A).
+
+### El Inicio (los «hooks» de `LiveAppConfig`, ronda PLAN-HUB 2026-10-21)
+
+Los del `module.json` viejo (`setup` y `widgets`; no tenía `bell`), en `apps.py`. **Paso** `verifactu.sending_route`
+(«Set up VeriFactu» / «Configura VeriFactu», `required=True` → «Importante», nunca el nivel legal de `base`:
+gh:hub#1726), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
+production, scope)`: vía propia con certificado vigente que este servidor abre, o vía ERPlora con el otorgamiento
+aprobado; la exención del hub de ERPlora incluida; lo que le falte al servidor no cuenta, no es tarea del negocio),
+permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`. **Paneles** (permiso
+`verifactu.view_record`, `refresh_on` = lo que `live.py` re-ejecuta): `pending` (kpi de
+`verifactu.stats.compliance_summary.pending_count`, de serie), `contingency` (stat de `contingency_summary`,
+`queued_count` y `severity`), `by_status` (bar-list de `records_by_status`) y `events` (componente
+`RecentEventsPanel.vue`, que sigue `verifactu.stats.events_recent` con `limit` 8 y nombra el tipo con el catálogo de la
+app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`, iconos, eventos),
+`test_integration_home.py` (por `base.setup.status` y `base.widget.list` reales, con dos hubs),
+`test_queries.py` (`route_ready_for_production`), `RecentEventsPanel.test.ts` y la e2e
+`tests/e2e/fix-verifactu-setup-hooks.spec.ts`.
 
 ### La cadena, la huella y el QR
 
@@ -1441,7 +1468,8 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
 | Recuperación (`erp-verifactu-recovery`) | `RecoveryPage.vue` | El ancla manual exige número y fecha (son parte del encadenado) |
 | Configuración (`erp-verifactu-config`, `erp-verifactu-grant`) | `ConfigPage.vue` (+ `RepresentationGrant.vue`) | La subida del `.p12` sigue aquí («Mi certificado»: elegir el fichero, contraseña, «Subir el certificado», «Quitar») y el Anexo I también («Lo remite ERPlora»: modelo, firmante y PDF, «Enviar a revisión»); un botón y el nombre del fichero en vez de la zona de arrastre (falta el componente en `@erplora/ui`); la «Conexión segura» desaparece (F07) |
 | Ajustes (`erp-verifactu-settings`) | `SettingsPage.vue` | Sin «Activar VeriFactu» (duda 7) ni «Tipo de prueba» (la prueba ya no presenta ninguna muestra) |
-| Tarjetas del panel de Inicio (`erp-verifactu-events-widget` y tres más) | — | El panel de Inicio con tarjetas es de la plataforma y aún no existe; los datos están en `verifactu.stats.*` |
+| Tarjetas del panel de Inicio (`verifactu.pending`, `verifactu.contingency`, `verifactu.by_status` y `erp-verifactu-events-widget`) | `widgets` de `apps.py` (tres declarativos) + `frontend/components/RecentEventsPanel.vue` | Agrupados bajo «VeriFactu» en «Personalizar panel» (el viejo, «Cumplimiento»); sin el rótulo bajo la cifra de la cola («En cola de contingencia»): un panel declarativo de `base` aún no lleva texto traducido en `options.label` (FIX en el informe); iconos registrados (`stats-chart-outline` espera en `UI-REQUESTS.md`) |
+| Paso «Configura VeriFactu» del Inicio (`module.json#setup`) | `setup` de `apps.py` sobre `verifactu.config.get` | Hecho con la vía lista para producción (`route_ready_for_production`), no con «activar VeriFactu» y el certificado: ya no hay interruptor y la vía de ERPlora no pide certificado (PLAN §30) |
 
 ### Qué queda fuera
 

@@ -40,6 +40,7 @@ const CONFIG: ConfigOut = {
   representation: { status: 'none', updated_at: null, reason: '', linked: true, company: true, submission: null, history: [] },
   synced_at: null,
   route_ready: true,
+  route_ready_for_production: false,
   reasons: [],
   issue_blocker: null,
   live_blockers: [],

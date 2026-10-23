@@ -67,7 +67,8 @@ def test_the_list_of_an_owner_over_http(client, make_user, settings):
 
     assert response.status_code == 200
     body = response.json()
-    assert [item["key"] for item in body["items"]] == ["base.apps", "base.team"]
+    # Base's own steps; the modules of the store bring theirs too (VeriFactu's, FIX-VERIFACTU-SETUP-HOOKS).
+    assert [item["key"] for item in body["items"] if item["app"] == "base"] == ["base.apps", "base.team"]
     assert body["blocking_pending"] == 0
 
 

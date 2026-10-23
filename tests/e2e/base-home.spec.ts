@@ -70,10 +70,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await snap(page, 'BASE-F02', width);
     await snap(page, 'BASE-F05', width);
 
-    // BASE-F01 — the list from base.setup.status: the demo's example step, pending with no items.
+    // BASE-F01 — the list from base.setup.status: the demo's example step, pending with no items. Recommended, it
+    // folds behind «View all» while an important step of another app is pending (VeriFactu's, until its way to the
+    // AEAT is ready): the whole list, always offered here («Your apps» is done), shows it.
     const card = testid(page, 'setup-card');
     await expect(card).toHaveAttribute('aria-busy', 'false');
-    await expect(card.locator('[data-testid="setup-row"][data-key="demo.first_item"]')).toBeVisible();
+    await card.locator('[data-testid="setup-toggle"]').click();
+    const demoStep = card.locator('[data-testid="setup-row"][data-key="demo.first_item"]');
+    await expect(demoStep.locator('[data-testid="setup-pill"]')).toHaveText('Recommended');
     await card.scrollIntoViewIfNeeded();
     await snap(page, 'BASE-F01', width);
 
@@ -84,7 +88,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await api(context, A, 'POST', '/demo/items', { name: uniqueName('Home') });
     await expect(value).toHaveText('1');
     // The step «Create your first item» is done now: the list re-ran on the server too.
-    await expect(card.locator('[data-testid="setup-row"][data-key="demo.first_item"]')).toHaveCount(0);
+    await expect(demoStep.locator('[data-testid="setup-pill"]')).toHaveText('Done');
     await panel.scrollIntoViewIfNeeded();
     await snap(page, 'BASE-F06', width);
     await snap(page, 'BASE-F08', width);

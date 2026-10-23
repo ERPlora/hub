@@ -49,6 +49,9 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        # The Home's step of «Finish setting up your business» and its panels (FIX-VERIFACTU-SETUP-HOOKS).
+        *(text for step in config.setup for text in (step.title, step.description)),
+        *(panel.title for panel in config.widgets),
         *messages_of(queries),
         *messages_of(schemas),
         *messages_of(services),

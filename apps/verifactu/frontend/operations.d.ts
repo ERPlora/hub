@@ -288,6 +288,8 @@ export interface ConfigOut {
   representation: RepresentationOut;
   synced_at: string | null;
   route_ready: boolean;
+  /** The route could carry the records to the AEAT of production (the Home's «Set up VeriFactu»). */
+  route_ready_for_production: boolean;
   reasons: WaitOut[];
   /** Why new sales and invoices are refused now (production without a way to the AEAT); null when they are not. */
   issue_blocker: WaitOut | null;

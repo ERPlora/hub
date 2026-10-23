@@ -25,6 +25,7 @@ from apps.verifactu.models import (
 from apps.verifactu.tests.conftest import (
     A,
     RECIPIENT,
+    b64,
     ctx_for,
     make_p12,
     manual,
@@ -545,6 +546,66 @@ def test_with_the_own_certificate_no_authorisation_is_asked(issuer, server_ready
     assert run("verifactu.config.get").live_blockers == []
     run("verifactu.config.sync", {"version": 1, "hub_status": "suspended"}, system_context(A))
     assert [r.code for r in run("verifactu.config.get").live_blockers] == ["hub_not_active"]
+
+
+# The way to production, what «Finish setting up your business» asks (FIX-VERIFACTU-SETUP-HOOKS)
+
+
+def approve(version: int, status: str = "approved") -> None:
+    run(
+        "verifactu.config.sync",
+        {"version": version, "representation": {"status": status}},
+        system_context(A),
+    )
+
+
+def test_erploras_route_is_ready_for_production_with_the_authorisation_approved(issuer):
+    # Testing lets ERPlora file without it (``route_ready``); production asks for the signed authorisation, and that
+    # is the business's to do, whatever this server lacks (closed and without a gateway here).
+    config = run("verifactu.config.get")
+    assert (config.route, config.route_ready, config.route_ready_for_production) == (
+        "erplora",
+        True,
+        False,
+    )
+    for version, status in enumerate(("submitted", "returned"), start=1):
+        approve(version, status)
+        assert run("verifactu.config.get").route_ready_for_production is False, status
+    approve(3)
+    assert run("verifactu.config.get").route_ready_for_production is True
+    approve(4, "revoked")
+    assert run("verifactu.config.get").route_ready_for_production is False
+
+
+def upload_own_certificate() -> None:
+    run(
+        "verifactu.certificate.upload",
+        {"p12_base64": b64(make_p12()), "password": "secret"},
+    )
+
+
+def test_the_own_route_is_ready_for_production_with_a_valid_certificate_this_server_opens(
+    issuer, settings
+):
+    upload_own_certificate()
+    run("verifactu.config.update", {"route": "own"})
+    assert run("verifactu.config.get").route_ready_for_production is True
+    # No authorisation is asked of the own route (VERIFACTU-F08).
+    assert Config.objects.get().representation_status == "none"
+    # A certificate this server's key cannot open is no way to production.
+    settings.FISCAL_CERTIFICATE_KEY = certificates.generate_key()
+    assert run("verifactu.config.get").route_ready_for_production is False
+
+
+def test_the_own_route_is_not_ready_once_its_certificate_expires_or_is_removed(issuer):
+    upload_own_certificate()
+    run("verifactu.config.update", {"route": "own"})
+    OwnCertificate.objects.update(expires_at=timezone.now() - dt.timedelta(minutes=1))
+    assert run("verifactu.config.get").route_ready_for_production is False
+    OwnCertificate.objects.update(expires_at=timezone.now() + dt.timedelta(days=30))
+    assert run("verifactu.config.get").route_ready_for_production is True
+    run("verifactu.certificate.remove")
+    assert run("verifactu.config.get").route_ready_for_production is False
 
 
 def test_the_certificate_says_whose_it_is_and_when_it_expires(issuer):

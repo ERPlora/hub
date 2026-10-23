@@ -1114,3 +1114,31 @@ msgid ""
 msgstr ""
 "La pasarela de envío de ERPlora no está configurada en este servidor: nada "
 "podría llegar a la AEAT."
+
+#: apps/verifactu/apps.py
+msgid "Set up VeriFactu"
+msgstr "Configura VeriFactu"
+
+#: apps/verifactu/apps.py
+msgid ""
+"Sign the authorisation for ERPlora to send your invoices to the AEAT, or "
+"upload your business certificate."
+msgstr ""
+"Firma la autorización para que ERPlora envíe tus facturas a la AEAT, o sube "
+"el certificado del negocio."
+
+#: apps/verifactu/apps.py
+msgid "VeriFactu pending"
+msgstr "Pendientes VeriFactu"
+
+#: apps/verifactu/apps.py
+msgid "Contingency queue"
+msgstr "Cola de contingencia"
+
+#: apps/verifactu/apps.py
+msgid "Records by status"
+msgstr "Registros por estado"
+
+#: apps/verifactu/apps.py
+msgid "Recent AEAT events"
+msgstr "Eventos AEAT recientes"

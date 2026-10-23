@@ -190,6 +190,7 @@
       "empty": "Sin eventos.",
       "loading": "Cargando…",
       "loadError": "No se han podido cargar los eventos",
+      "panelError": "No se han podido cargar los últimos eventos de la AEAT.",
       "entity": {
         "one": "evento",
         "many": "eventos"
