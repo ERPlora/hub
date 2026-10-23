@@ -206,6 +206,18 @@ describe('WidgetPanel', () => {
       expect(times(m.wrapper).map(([text]) => text)).toEqual(['Ayer 23:00']);
     });
 
+    it('keeps its minute clock only while it is mounted', async () => {
+      const m = await panel(timeline, 'es');
+      expect(vi.getTimerCount()).toBe(1);
+      m.wrapper.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('a panel that is no timeline keeps no clock', async () => {
+      await panel({}, 'es');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
     it('a time that is no date is painted as it came, outside a <time>', async () => {
       const m = await panel(timeline, 'es');
       const call = await m.live();

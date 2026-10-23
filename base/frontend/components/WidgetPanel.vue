@@ -5,7 +5,7 @@
 // asked once when it is not. A failed read says «Unavailable», never the figure it had. A panel with its own
 // `component` mounts that component of its app (`apps/<app>/frontend/components/<component>.vue`). A timeline says
 // when each entry happened in the device's time (the Hub has no business zone in the browser): «4:23», «Ayer 18:10»,
-// «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F09).
+// «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06).
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
