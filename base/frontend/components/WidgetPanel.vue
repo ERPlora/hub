@@ -271,10 +271,10 @@ const chosenBar = computed(() => {
           @click="chosen = bar.key"
           @focus="chosen = bar.key"
         >
-          <span
+          <span class="widget-chart-track"><span
             class="widget-chart-bar"
             :style="{ height: percent(bar.share) }"
-          />
+          /></span>
           <span class="widget-chart-label">{{ bar.label }}</span>
         </button>
       </div>
@@ -422,7 +422,6 @@ const chosenBar = computed(() => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  justify-content: flex-end;
   align-items: center;
   gap: 4px;
   height: 100%;
@@ -439,6 +438,15 @@ const chosenBar = computed(() => {
 .widget-chart-col:focus-visible {
   outline: 2px solid var(--ion-color-primary);
   outline-offset: 2px;
+}
+
+/* The bar's height is its share of the track, above the day: the day is never squeezed by a tall bar. */
+.widget-chart-track {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  width: 100%;
+  min-height: 0;
 }
 
 .widget-chart-bar {
@@ -459,6 +467,7 @@ const chosenBar = computed(() => {
 }
 
 .widget-chart-label {
+  flex-shrink: 0;
   max-width: 100%;
   overflow: hidden;
   font-size: 0.75rem;

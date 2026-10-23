@@ -70,9 +70,6 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
   return { context, page };
 }
 
-/** Text that closes an attribute, matched literally. */
-const endsWith = (text: string): RegExp => new RegExp(`${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-
 const panel = (page: Page, key: string): Locator => shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
 
 async function today(context: BrowserContext): Promise<Today> {
@@ -126,7 +123,7 @@ test('paneles de Ventas en el Inicio (hooks de LiveAppConfig): today\'s figures 
     const chart = panel(page, 'sale.last_7_days');
     await expect(chart.locator('[data-testid="widget-title"]')).toHaveText('Ventas últimos 7 días');
     await expect(chart.locator('.widget-chart-col')).toHaveCount(7);
-    await expect(chart.locator('.widget-chart[role="img"]')).toHaveAttribute('aria-label', endsWith(money.format((before.total + PRICE) / 100)));
+    await expect(chart.locator('[data-testid="widget-chart-amount"]')).toHaveText(money.format((before.total + PRICE) / 100));
     // «Actividad reciente»: the last sales, newest first.
     const activity = panel(page, 'sale.recent_activity');
     await expect(activity.locator('[data-testid="widget-title"]')).toHaveText('Actividad reciente');
