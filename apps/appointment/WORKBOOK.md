@@ -248,10 +248,11 @@ Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
-1. Entra desde el aviso **N por confirmar** (lo pulsas y la lista filtra las pendientes) o busca la cita
-   **Pendiente**.
+1. Entra desde el aviso **N por confirmar** (lo pulsas y la lista filtra las pendientes), desde la campana
+   de la barra de arriba (su fila «Citas por confirmar» abre la Agenda) o busca la cita **Pendiente**.
 2. Pulsa **Confirmar** en su fila.
-3. La cita pasa a **Confirmada**, el historial dice «Confirmada» y el aviso **N por confirmar** baja.
+3. La cita pasa a **Confirmada**, el historial dice «Confirmada» y el aviso **N por confirmar** baja; la
+   campana también, al momento, y deja de contarla.
 Entra: una cita pendiente (la que reservó la clienta con la confirmación automática apagada).
 Sale: la cita confirmada, su línea de historial y el aviso `appointment.appointment.confirmed`.
 Si falla: «Esta cita ya no se puede confirmar: ya no está pendiente.»; no se escribe nada.
@@ -531,7 +532,8 @@ Pasos:
 1. La automatización ofrece las horas libres (APPOINTMENT-F02) y reserva con origen «WhatsApp» u
    «Online».
 2. Con **Confirmar automáticamente las citas que reserva la clienta** encendido (de fábrica), nace
-   **Confirmada**; apagado, nace **Pendiente** y suma en **N por confirmar**. Si un servicio de la cita
+   **Confirmada**; apagado, nace **Pendiente** y suma en **N por confirmar** y en la campana de la barra de
+   arriba («Citas por confirmar»), en todos los dispositivos de quien ve esa agenda. Si un servicio de la cita
    tiene **Requiere confirmación** (Servicios), nace **Pendiente** aunque esté encendido.
 3. Siempre con la antelación mínima, nunca en el pasado ni encima de otra cita del profesional.
 4. La cita da su día y su hora listos para decírselos a la clienta («miércoles, 2 de diciembre de
@@ -863,6 +865,12 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
   los rellena en `base.notice.list` en el idioma de quien mira y la shell de `@erplora/ui` los da una vez
   por dispositivo con `erplora_notify` de la app instalada. El toque lleva a `/appointment/agenda?date=…`,
   que la Agenda lee al abrir y al cambiar.
+- **Campana del Inicio** (ronda PLAN-HUB 2026-10-21): `apps.py` declara `bell` (un `BellCounter`,
+  `appointment.to_confirm`, sobre `appointment.appointment.count_to_confirm`, con el permiso de esa consulta,
+  `view_own_appointment`, y la ruta `/appointment/agenda`: no hay vista filtrada a la que llevar). Lo
+  refrescan `TO_CONFIRM_EVENTS` de `events.py`, los que cambian ese número (el no-show solo llega pasada la
+  hora, cuando ya no cuenta); `tests/test_integration_home.py` lo prueba evento a evento. Sin `setup` ni
+  `widgets`: el `module.json` viejo no los tenía y `setup_status.rs` solo listaba los pasos del núcleo.
 - Las reacciones (`events.py`) las reparte el relay del outbox del worker (`base/relay.py`, ya en la fase
   1, hub#105): `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y los avisos
   reales de Venta, Clientes y Personal; `test_integration_*.py`, cada reacción con su app.
@@ -879,9 +887,6 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 
 ## Lo que queda fuera
 
-- **El contador «por confirmar» en la campana** de la barra de arriba: la campana existe y cuenta lo que
-  declaran las apps; el contador de Citas llega con sus pasos del Inicio. El aviso del dispositivo de una
-  cita que la clienta reserva o cancela ya está (APPOINTMENT-F28).
 - **Volver a activar los avisos negados** desde Sistema (la fila «Los avisos están desactivados» del
   producto actual): hoy, negados en Android, se activan en los ajustes del sistema.
 - **Recordatorios** («Enviar recordatorios»): el producto actual guardaba el ajuste sin enviar nada; aquí
@@ -918,6 +923,10 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
   dispositivo (al reconectar no se repite) y solo a quien ve esa agenda; tocarlo abre la Agenda en el día de
   la cita (antes, Citas sin más). El navegador no avisa: el mercado avisa al equipo en su aplicación, no en
   el navegador (Fresha, Booksy, Treatwell, Mindbody, Toast, Lightspeed).
+- **La campana cuenta «Citas por confirmar»** de la agenda de quien mira: el empleado, las suyas; el
+  responsable, las de todos (antes, todas para cualquiera que viera citas). Lleva a la Agenda y cambia al
+  momento, sin recargar. Como antes, Citas no pone pasos en «Termina de configurar tu negocio» ni paneles en
+  el Inicio.
 - **Baja de un profesional**: sus citas futuras pasan a «Sin asignar» y sus series se pausan (antes, Citas
   no escuchaba a Personal). Archivar un servicio no cambia ninguna cita (decisión de mercado).
 - **Un bloqueo de día entero** se juzga igual en la reserva y en las horas libres.

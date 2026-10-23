@@ -1,7 +1,9 @@
 """The appointment app: the salon's diary — who comes, for what, with whom and when."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, DeviceNotice, LiveAppConfig, Nav, SetupCheck
+from live.meta import BellCounter, Category, DeviceNotice, LiveAppConfig, Nav, SetupCheck
+
+from apps.appointment.events import TO_CONFIRM_EVENTS
 
 #: What may add a notice: a booking, and a cancellation (the query keeps the customer's own).
 NOTICE_EVENTS = ["appointment.appointment.created", "appointment.appointment.cancelled"]
@@ -79,6 +81,21 @@ class AppointmentConfig(LiveAppConfig):
             "ion:calendar-outline",
             "/appointment/agenda",
         ),
+    ]
+    # The Home's hooks (PLAN-HUB round 2026-10-21): the old module's counter of the bell, the customers' own bookings
+    # waiting for confirmation, on the query the agenda's «N to confirm» reads (whoever sees an agenda counts her
+    # own, or everybody's when she sees them all). No steps of «Finish setting up your business» nor panels of the
+    # dashboard: the old module had none.
+    bell = [
+        BellCounter(
+            key="to_confirm",
+            operation="appointment.appointment.count_to_confirm",
+            route="/appointment/agenda",
+            label=_("Appointments to confirm"),
+            icon="ion:calendar-outline",
+            permission="appointment.view_own_appointment",
+            refresh_on=TO_CONFIRM_EVENTS,
+        )
     ]
     # APPOINTMENT-F28 (old-hub:HUB_SHELL-F66): the device is told what the customer booked or cancelled herself, of
     # the agenda the person sees (the query's rules: never the front desk's, an employee only hears her own).

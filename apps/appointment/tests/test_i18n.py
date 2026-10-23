@@ -87,6 +87,8 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        *(counter.label for counter in config.bell),
+        *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
         *module_texts(queries),
         *module_texts(services),
         *module_texts(schemas),

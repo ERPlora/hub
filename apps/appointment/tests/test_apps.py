@@ -1,7 +1,12 @@
 """The appointment app declares its module metadata, its menu, its permissions and what each role gets."""
 
+from pathlib import Path
+
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.conf import settings
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import BellCounter, Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 
 PERMISSIONS = [
     "appointment.view_appointment",
@@ -146,6 +151,65 @@ def test_it_tells_the_device_of_the_customers_own_bookings_and_cancellations():
         assert list(notice.refresh_on) == ["appointment.appointment.created", "appointment.appointment.cancelled"]
 
 
-def test_it_declares_no_bell_counter_here():
-    """The «to confirm» counter of the bell is FIX-APPOINTMENT-SETUP-HOOKS's, not the device's notices'."""
-    assert appointment().bell == []
+# ── The Home's hooks (PLAN-HUB round 2026-10-21) ────────────────────────────────────────────────────
+
+#: What changes how many upcoming bookings wait for confirmation in the agenda the person sees: one is booked
+#: pending; it is confirmed, started, completed (charged at the till), cancelled or deleted; it moves (to the past
+#: or to another professional) or its professional leaves. Never a no-show (only once its start is past, when it
+#: no longer counts), an edit of its notes or phone, a charge that leaves it as it was, nor a card merged into
+#: another (same professional, time and state).
+TO_CONFIRM = [
+    "appointment.appointment.created",
+    "appointment.appointment.confirmed",
+    "appointment.appointment.started",
+    "appointment.appointment.completed",
+    "appointment.appointment.cancelled",
+    "appointment.appointment.rescheduled",
+    "appointment.appointment.unassigned",
+    "appointment.appointment.deleted",
+]
+
+
+def test_the_bell_counts_the_appointments_to_confirm():
+    """The old module's counter of the bell (its module.json ``bell``, appointments#169, hub#1678): «Appointments to
+    confirm», on the query the agenda's «N to confirm» reads, leading to the agenda. Whoever sees an agenda sees it
+    (its query counts the person's own, or everybody's for whoever sees them all)."""
+    [counter] = appointment().bell
+    assert isinstance(counter, BellCounter)
+    assert (
+        counter.key,
+        counter.operation,
+        dict(counter.params),
+        counter.route,
+        str(counter.label),
+        counter.icon,
+        counter.permission,
+    ) == (
+        "to_confirm",
+        "appointment.appointment.count_to_confirm",
+        {},
+        "/appointment/agenda",
+        "Appointments to confirm",
+        "ion:calendar-outline",
+        "appointment.view_own_appointment",
+    )
+    assert list(counter.refresh_on) == TO_CONFIRM
+
+
+def test_the_counter_says_the_old_words_in_spanish():
+    with translation.override("es"):
+        assert str(appointment().bell[0].label) == "Citas por confirmar"
+
+
+def test_the_counters_events_re_run_its_query_and_its_icon_is_registered():
+    counter = appointment().bell[0]
+    assert live_registry.is_subscribable(counter.operation)
+    assert set(counter.refresh_on) <= set(live_registry.subscribable[counter.operation])
+    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    assert f"'{counter.icon.removeprefix('ion:')}'" in icons
+
+
+def test_citas_has_no_setup_steps_nor_panels():
+    # The old module declared neither (its module.json has no `setup` nor `widgets`), and the old hub's
+    # setup_status.rs only listed the core's own steps (apps, business details, printer, team).
+    assert (appointment().setup, appointment().widgets) == ([], [])

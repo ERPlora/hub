@@ -62,6 +62,21 @@ APPOINTMENT_EVENTS = [
     APPOINTMENT_UNASSIGNED,
     APPOINTMENT_REASSIGNED,
 ]
+#: What changes how many upcoming bookings wait for confirmation in the agenda a person sees (the bell's «to
+#: confirm»): one is booked pending; it is confirmed, started, completed (a charge at the till completes it),
+#: cancelled or deleted; it moves (to a past hour or to another professional), or its professional leaves. Never a
+#: no-show (only once its start has passed, when it no longer counts), an edit of its notes or contact, a charge
+#: that leaves its state, an open or closed check, nor a card merged into another (same time, professional, state).
+TO_CONFIRM_EVENTS = [
+    APPOINTMENT_CREATED,
+    APPOINTMENT_CONFIRMED,
+    APPOINTMENT_STARTED,
+    APPOINTMENT_COMPLETED,
+    APPOINTMENT_CANCELLED,
+    APPOINTMENT_RESCHEDULED,
+    APPOINTMENT_UNASSIGNED,
+    APPOINTMENT_DELETED,
+]
 BLOCKED_TIME_EVENTS = [BLOCKED_TIME_CREATED, BLOCKED_TIME_DELETED]
 RECURRING_EVENTS = [RECURRING_CREATED, RECURRING_UPDATED, RECURRING_DELETED]
 ALL = [*APPOINTMENT_EVENTS, *BLOCKED_TIME_EVENTS, *RECURRING_EVENTS, SETTINGS_UPDATED]
