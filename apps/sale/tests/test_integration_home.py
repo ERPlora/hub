@@ -9,6 +9,7 @@ import json
 
 import psycopg
 import pytest
+from live.errors import PermissionDenied
 from live.live_registry import live_registry
 from live.operations import get
 from live.outbox import channel_for
@@ -63,6 +64,18 @@ def test_an_employee_without_the_reports_permission_only_gets_the_recent_activit
     employee = ctx_for("hub_employee")
     assert employee.has("sale.view_sale") and not employee.has("sale.view_reports")
     assert list(sale_panels(employee)) == ["sale.recent_activity"]
+
+
+@pytest.mark.django_db
+def test_an_employee_who_subscribes_to_the_figures_by_hand_is_refused_them():
+    """Hiding a panel is not the gate: the live stream runs the panel's own query as the person, so the figures'
+    queries refuse the employee themselves, and only the recent activity answers."""
+    employee = ctx_for("hub_employee")
+    panels = sale_panels(ctx_for("hub_manager"))
+    for key in ("sale.today", "sale.tickets_today", "sale.last_7_days"):
+        with pytest.raises(PermissionDenied):
+            answer(panels[key], employee)
+    assert answer(panels["sale.recent_activity"], employee)["rows"] == []
 
 
 @pytest.mark.django_db
