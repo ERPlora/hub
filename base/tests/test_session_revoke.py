@@ -159,14 +159,15 @@ class TestTheDoor:
 
         assert (first.status_code, first.json(), second.status_code, second.json()) == (200, {"ended": 1}, 200, {"ended": 0})
 
-    def test_an_unknown_business_answers_like_a_known_one_without_sessions(self, client, acme):
-        on_acme = login(ANA, acme)
+    def test_an_unknown_business_answers_like_a_known_one_without_sessions(self, client, acme, beta):
+        on_acme, hostless = login(ANA, acme), login(ANA, beta)
+        SessionOwner.objects.filter(session_id=hostless).update(host="")
 
         unknown = signed(client, "post", REVOKE, {"user_id": ANA, "hub_id": UNKNOWN_ID})
         known_but_empty = signed(client, "post", REVOKE, {"user_id": OLGA, "hub_id": ACME_ID})
 
         assert (unknown.status_code, unknown.json()) == (known_but_empty.status_code, known_but_empty.json()) == (200, {"ended": 0})
-        assert alive(on_acme)
+        assert alive(on_acme) and alive(hostless)
 
     def test_it_never_decodes_the_sessions_of_the_table(self, client, acme, monkeypatch):
         on_acme = login(ANA, acme)
