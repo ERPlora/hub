@@ -76,6 +76,7 @@ test('selectores de Inventario (Combo compartido): the product form searches its
 }) => {
   // flow: selectores de Inventario (Combo compartido) — INVENTORY-F01, INVENTORY-F08
   await login(page, A, '/inventory/products');
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   const category = async (name: string) => {
     const res = await api<{ id: string; name: string }>(context, A, 'POST', '/inventory/categories', { name });
     expect(res.status).toBe(201);
