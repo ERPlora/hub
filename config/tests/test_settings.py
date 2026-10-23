@@ -911,7 +911,8 @@ def names_the_suite_derives(databases: dict) -> list[str]:
 
 @pytest.mark.parametrize(
     "requested",
-    ["test_hub_next", "test_hub_sup", "t" * 24, "t" * 25, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 40, "t" * 100],
+    # "ñ" * 13: 13 characters but 26 bytes, past the 24 that fit (PostgreSQL's limit counts bytes).
+    ["test_hub_next", "test_hub_sup", "t" * 24, "t" * 25, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 13, "ñ" * 40, "t" * 100],
 )
 def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres(load_settings, requested):
     """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (TODO.md, hub#188, hub#204)."""
