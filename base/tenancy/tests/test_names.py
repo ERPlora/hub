@@ -90,6 +90,13 @@ def test_a_name_past_postgres_63_characters_is_refused_instead_of_truncated():
         names.template_db_name("hub", "v" * 60)
 
 
+def test_max_control_is_the_longest_control_database_its_hubs_names_fit_after():
+    # A hub's ``_<hex>`` is the longest a name adds to control's (config/settings.py fits the tests' to it).
+    assert names.hub_db_name("c" * names.MAX_CONTROL, HUB_ID)
+    with pytest.raises(names.InvalidDatabaseName, match="63"):
+        names.hub_db_name("c" * (names.MAX_CONTROL + 1), HUB_ID)
+
+
 def test_an_invalid_vertical_never_makes_a_template_name():
     with pytest.raises(names.InvalidDatabaseName):
         names.template_db_name("hub", "Hair Salon")
