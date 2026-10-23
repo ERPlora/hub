@@ -97,8 +97,8 @@ REPORT_HIDDEN = _(
 #: The words of the X and Z reports (their own context: «Cash in» is a total on the paper, «Entradas»).
 CLOSED_BY_ITSELF = pgettext_lazy("cash report", "Closed by itself")
 COUNTED = pgettext_lazy("cash report", "Counted")
-#: The paper's own «Difference» line is the device's (closing − opening): the drawer's difference is its
-#: over/short, as Toast prints it.
+#: The drawer's difference is its over/short, as Toast prints it; the device's paper prints no other
+#: difference of its own.
 OVER_SHORT = pgettext_lazy("cash report", "Over/short")
 #: The lines of the X and Z reports, as the detail shows them: (figure, label, sign on the paper).
 REPORT_LINES = (
