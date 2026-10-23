@@ -6,14 +6,17 @@ the Claude API from its user part (``base.catalog.user_part``) and versioned nex
 «Para quien lo mantiene» never asks for a new translation, and an unchanged hash costs no call.
 
 Run by hand by whoever edits a WORKBOOK, never in CI nor in the build: the ``anthropic`` client is a
-development dependency, its key ``ANTHROPIC_API_KEY`` lives in the local ``.env`` and the model is
-``settings.WORKBOOK_TRANSLATION_MODEL``. ``--check`` never reaches the network: it fails listing the
-modules whose ``WORKBOOK.en.md`` exists and is out of date (a missing one is no error).
+development dependency, its key ``ANTHROPIC_API_KEY`` lives in the local ``.env`` (or the
+environment) and the model is ``settings.WORKBOOK_TRANSLATION_MODEL``. Without the key, a module to
+translate stops the command before any call, naming the key; an up-to-date one needs none.
+``--check`` never reaches the network nor needs the key: it fails listing the modules whose
+``WORKBOOK.en.md`` exists and is out of date (a missing one is no error).
 """
 
 import re
 from pathlib import Path
 
+import decouple
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
@@ -38,6 +41,8 @@ punctuation removed and spaces as hyphens (`## How to use it` is `#how-to-use-it
 """
 #: Long WORKBOOKs come back whole: streamed, so the request never times out.
 MAX_TOKENS = 64000
+#: The Claude API key: without it no call is made.
+API_KEY = "ANTHROPIC_API_KEY"
 _IMAGE_PATH_RE = re.compile(r"docs/img/[^\s)\"'>]+")
 
 
@@ -49,8 +54,16 @@ def translate(source: str) -> str:
         raise CommandError(
             "translate_workbooks needs the anthropic client, a development dependency: run `uv sync`."
         ) from error
+    # Read as every setting (environment, then this checkout's .env) and handed to the client, which
+    # only looks at the environment: python-decouple exports nothing.
+    api_key = decouple.config(API_KEY, default="")
+    if not api_key:
+        raise CommandError(
+            f"translate_workbooks needs {API_KEY} to call the Claude API: set it in this checkout's .env "
+            "(or the environment) and run it again. translate_workbooks --check needs no key."
+        )
     try:
-        with anthropic.Anthropic().messages.stream(
+        with anthropic.Anthropic(api_key=api_key).messages.stream(
             model=settings.WORKBOOK_TRANSLATION_MODEL,
             max_tokens=MAX_TOKENS,
             system=INSTRUCTIONS,
