@@ -8,7 +8,7 @@ import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/she
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
 import { mount, type VueWrapper } from '@vue/test-utils';
-import { afterEach, beforeAll, beforeEach, expect, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect } from 'vitest';
 import { type Component, createApp, ref, render } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
@@ -184,17 +184,33 @@ export function mountComposable(use: () => void, options: Omit<MountOptions, 'pr
  * a timer still armed then fires into a missing window — an «Unhandled error» and exit 1 with every test
  * green. Called at the top of a test file, each test's end leaves the page as a person does (unmounts what
  * `mountSale` mounted: AppPage clears its tabbar's 450 ms scroll hint then, which emptying the document
- * alone does not), empties the document, lets what that sets off run and counts the timers still armed.
- * Fake timeouts that follow the real clock (the harness's flush() still runs) let it count them.
+ * alone does not), empties the document, lets what that sets off run and counts the real timeouts the test
+ * armed that are still pending. It watches the real `setTimeout`/`clearTimeout`, not Vitest's fake clock,
+ * so it lives with a file's own fake timers (a frozen `Date`); a timeout a test puts on a fake clock dies
+ * with that clock: it cannot outlive the page.
  */
 export function noTimerOutlivesATest(): void {
+  const { setTimeout: realSetTimeout, clearTimeout: realClearTimeout } = globalThis;
+  /** The real timeouts the running test armed that have neither run nor been cleared. */
+  const armed = new Set<ReturnType<typeof setTimeout>>();
   beforeAll(() => {
-    // Vue arms a one-off 3 s timer (its devtools hook) the first time it renders: armed here, on the real
-    // clock, it is not a test's.
+    // Vue arms a one-off 3 s timer (its devtools hook) the first time it renders: armed here, before any
+    // test watches, it is not a test's.
     render(null, document.createElement('div'));
   });
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true, advanceTimeDelta: 1 });
+    globalThis.setTimeout = ((handler: (...args: unknown[]) => void, timeout?: number, ...args: unknown[]) => {
+      const id = realSetTimeout(() => {
+        armed.delete(id);
+        handler(...args);
+      }, timeout);
+      armed.add(id);
+      return id;
+    }) as typeof setTimeout;
+    globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
+      if (id !== undefined) armed.delete(id);
+      realClearTimeout(id);
+    }) as typeof clearTimeout;
   });
   afterEach(async () => {
     try {
@@ -203,9 +219,13 @@ export function noTimerOutlivesATest(): void {
       document.body.innerHTML = '';
       // What clearing the page sets off arms its timers in the next ticks: let them run before counting.
       await flush();
-      expect(vi.getTimerCount(), 'timers still armed when the test ends').toBe(0);
+      expect(armed.size, 'timers still armed when the test ends').toBe(0);
     } finally {
-      vi.useRealTimers();
+      globalThis.setTimeout = realSetTimeout;
+      globalThis.clearTimeout = realClearTimeout;
+      // A failed test's leftovers must not fire into the next one.
+      for (const id of armed) realClearTimeout(id);
+      armed.clear();
     }
   });
 }
