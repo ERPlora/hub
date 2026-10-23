@@ -13,6 +13,9 @@
 // own padding, all a clipped or touching date leaves; a whole date keeps 8px or more (box 112px: 3, cut; 117px: 3,
 // touching; 122px: 8 — measured on this field). In the row each end also gets the width a free date field of its
 // font asks for (116px at 13px), what the browser gives a date field by default.
+// Since FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL Payments keeps its column filters behind the funnel, as the old
+// list did: at 1440 and 834 the same ends are measured in its panel (no hub list paints a date range in the open row
+// any more; the row's 8.75rem stays guarded by ui's DataTable.visual.test.ts).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, record, shot, shown, untilStill } from './helpers';
@@ -36,9 +39,10 @@ interface Case {
   where: 'row' | 'panel';
 }
 const CASES: Case[] = [
-  { label: '1440', width: 1440, height: 900, where: 'row' },
-  { label: '834', width: 834, height: 1112, where: 'row' },
-  // The cards fold the filters behind the funnel (ui#28): at 1440 its panel is 360px beside the cards.
+  // The list is `filterable`: its filters live behind the funnel in every view and size.
+  { label: '1440', width: 1440, height: 900, where: 'panel' },
+  { label: '834', width: 834, height: 1112, where: 'panel' },
+  // The cards fold the filters behind the funnel too (ui#28): at 1440 its panel is 360px beside the cards.
   { label: '1440-cards', width: 1440, height: 900, view: 'cards', where: 'panel' },
   // A phone paints cards: the panel is the sheet over the content area.
   { label: '390', width: 390, height: 844, where: 'panel' },

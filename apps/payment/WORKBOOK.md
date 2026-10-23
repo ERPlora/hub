@@ -71,9 +71,9 @@ asistente.
 Título «Pagos salientes». Una tabla con las columnas **Referencia**, **Fecha**, **Beneficiario**,
 **Importe** y **Estado** (y **Método**, que se puede mostrar con el selector de columnas). Buscador
 «Buscar referencia o beneficiario…» (busca también en la referencia de la factura del proveedor),
-filtros por columna — referencia y beneficiario por un trozo del texto, la fecha «desde / hasta», el importe
-«desde / hasta» en euros, el estado por lista —, orden por columna, vista de lista o de tarjetas y 50
-filas por página. Va ordenada por la **fecha del pago**, la más reciente arriba (no por la de alta).
+filtros por columna tras el embudo de la barra — referencia y beneficiario por un trozo del texto, la fecha
+«desde / hasta», el importe «desde / hasta» en euros, el estado por lista; se aplican con «Aplicar» y el
+embudo cuenta los que están en uso —, orden por columna, vista de lista o de tarjetas y 50 filas por página. Va ordenada por la **fecha del pago**, la más reciente arriba (no por la de alta).
 
 Cada fila ofrece la acción que le toca, con el nombre de lo que hace: **Aprobar** (Borrador),
 **Marcar como enviado** (Aprobado) o **Marcar como completado** (Enviado), y **Cancelar pago**
@@ -233,8 +233,9 @@ Pantalla: Pagos
 Pasos:
 1. Abre **Pagos**.
 2. Escribe en el buscador un trozo de la referencia (los últimos dígitos, la fecha), del beneficiario
-   o de la factura del proveedor, o usa los filtros de columna: la **Fecha** desde un día, hasta otro o
-   entre los dos; el **Importe** desde / hasta en euros; el **Estado** de la lista.
+   o de la factura del proveedor, o abre los filtros con el embudo de la barra: la **Fecha** desde un día,
+   hasta otro o entre los dos; el **Importe** desde / hasta en euros; el **Estado** de la lista; y pulsa
+   «Aplicar».
 3. Ordena por la columna que necesite.
 Entra: lo que teclea la persona.
 Sale: nada; solo lectura. La lista se pone al día sola cuando otra persona registra o cambia un pago.

@@ -117,9 +117,16 @@ def test_a_signed_in_person_gets_the_shell_even_with_a_published_site(client, we
     assert website.served == []
 
 
-@pytest.mark.parametrize("path", ["/demo/items", "/website", "/index.html"])
+@pytest.mark.parametrize("path", ["/demo/items", "/website"])
 def test_other_paths_still_jump_to_the_login(client, website, path):
     assert jumps_to(browse(client, path), "/hub-login/")
+    assert website.served == []
+
+
+def test_a_path_that_names_a_file_is_not_the_website_either(client, website):
+    # /index.html names a file, no route of the SPA (base.spa.NOT_A_FILE): a plain 404 with no cookie, not the site.
+    response = browse(client, "/index.html")
+    assert (response.status_code, dict(response.cookies)) == (404, {})
     assert website.served == []
 
 

@@ -157,6 +157,31 @@ describe('PaymentsPage', () => {
     expect(s.list()).toEqual([{ payment_date_to: '2026-08-31', sort: '-payment_date', limit: 50, offset: 0 }]);
   });
 
+  // flow: PAYMENT-F06 (lista de Pagos: filtros tras el embudo) — FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL
+  it('keeps the column filters behind the funnel, as the old list: no open filter row; «Apply» sends them as before (PAYMENT-F06)', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    const testid = (id: string) => s.wrapper.find(`[data-testid="${id}"]`);
+    expect(s.prop('filterable')).toBe(true);
+    expect(testid('payment-payments-filters-toggle').exists(), 'the funnel is in the toolbar').toBe(true);
+    expect(testid('payment-payments-filters').exists(), 'no filter row open on arrival').toBe(false);
+    await testid('payment-payments-filters-toggle').trigger('click');
+    await flush();
+    const panel = testid('payment-payments-filters-panel');
+    expect(panel.exists()).toBe(true);
+    const set = (name: string, event: string, value: string) =>
+      panel.get(`[data-testid="payment-payments-filter-${name}"]`).element.dispatchEvent(new CustomEvent(event, { detail: { value } }));
+    set('status', 'ionChange', 'approved');
+    set('payment_date_from', 'ionChange', '2026-08-01');
+    set('amount_from', 'ionInput', '12,5');
+    await flush();
+    expect(s.list(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: '-payment_date', limit: 50, offset: 0 }]);
+    await panel.get('[data-testid="payment-payments-filters-apply"]').trigger('click');
+    await flush();
+    expect(s.list()).toEqual([{ payment_date_from: '2026-08-01', amount_min: 1250, status: 'approved', sort: '-payment_date', limit: 50, offset: 0 }]);
+    expect(testid('payment-payments-filters-count').text()).toBe('3');
+  });
+
   it('a list that cannot load says so in the table and offers «Retry», never «No payments.» (pm#533)', async () => {
     const s = await setup();
     s.net.lastStream().push(errorFrame(s.subId(OP), 'internal_error'));

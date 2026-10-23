@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Payments → Payments (WORKBOOK «Pantallas · Pagos»; PAYMENT-F02 to F06): «Outgoing payments», the live
 // `payment.payment.list` in a server-side DataTable with the old table's Reference, Date, Beneficiary,
-// Amount and Status (Method in the column chooser), «Search reference or beneficiary…», filters per
-// column (the date from / to), newest payment date first, 50 a page, list or cards. Each row offers the step it can take
+// Amount and Status (Method in the column chooser), «Search reference or beneficiary…», the column
+// filters behind the toolbar's funnel as in the old list (the date from / to), newest payment date
+// first, 50 a page, list or cards. Each row offers the step it can take
 // (Approve, Mark as sent, Mark as completed) and «Cancel payment» while it is not finished, only to
 // whoever may; a refusal shows above the table. «New payment» opens the form; changes come back
 // through the stream.
@@ -204,6 +205,7 @@ function onCreated(): void {
       fill
       server-side
       searchable
+      filterable
       :filters="filters"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
