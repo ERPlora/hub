@@ -299,8 +299,10 @@ def stale_translations(configs: Iterable | None = None) -> list[str]:
                 if workbook_translation(config).state == "stale":
                     stale.append(config.label)
             except WorkbookError:
-                # Not a translation problem: build_registry reports the WORKBOOK itself.
-                continue
+                # A module's: build_registry reports the WORKBOOK itself. A platform app's (base) no
+                # registry reads, so it counts here and ``translate_workbooks --app`` names the error.
+                if config.kind != "app":
+                    stale.append(config.label)
     return stale
 
 

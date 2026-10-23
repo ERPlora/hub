@@ -221,10 +221,23 @@ def test_a_platform_app_without_workbook_is_no_app_to_translate_and_base_stays_o
     things, base, control = installed(module(tmp_path, "things"), platform(tmp_path), platform(tmp_path, "control", workbook=None))
     translator(allowed=False)
 
-    with pytest.raises(CommandError, match="control"):
+    with pytest.raises(CommandError, match=r"No app 'control' with a WORKBOOK to translate; the apps are: base, things\."):
         call_command("translate_workbooks", "--app", "control")
 
     assert catalog.catalog_modules() == [things]
+
+
+def test_check_fails_on_a_platform_workbook_it_cannot_read(tmp_path, installed, translator):
+    """No registry reads base's WORKBOOK (it is no module): a broken user part must not pass the check in silence."""
+    broken = WORKBOOK.replace("Ver [cómo se usa](#cómo-se-usa).", "Ver [cómo se usa](#no-existe).")
+    assert broken != WORKBOOK
+    installed(platform(tmp_path, workbook=broken, en=translated(USER_PART, ENGLISH)))
+    translator(allowed=False)
+
+    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\. Run translate_workbooks --app base\."):
+        call_command("translate_workbooks", "--check")
+    with pytest.raises(CommandError, match="base: WORKBOOK.md: .*#no-existe"):
+        call_command("translate_workbooks", "--app", "base")
 
 
 # ── the key: ANTHROPIC_API_KEY, from the environment or the checkout's .env ────────────────────
