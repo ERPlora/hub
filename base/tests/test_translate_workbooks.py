@@ -1,4 +1,4 @@
-"""translate_workbooks: each module's WORKBOOK.en.md, generated from its Spanish user part (spec §4.5).
+"""translate_workbooks: each app's WORKBOOK.en.md (the modules' and base's), generated from its Spanish user part (spec §4.5).
 
 The hash is the user part's, not the file's: touching «Para quien lo mantiene» costs nothing. With
 the hash in the header unchanged, no call; otherwise one call and the header with the new hash.
@@ -15,6 +15,7 @@ import anthropic
 import decouple
 import pytest
 from decouple import Config, RepositoryEmpty, RepositoryEnv
+from django.apps import apps as django_apps
 from django.core.management import CommandError, call_command
 
 from base import catalog
@@ -40,10 +41,11 @@ class FakeTranslator:
 
 @pytest.fixture
 def installed(monkeypatch):
-    """Make ``configs`` the installed modules."""
+    """Make ``configs`` our installed apps: the modules (``kind == "app"``) and the platform's."""
 
     def install(*configs):
-        monkeypatch.setattr(catalog, "module_configs", lambda: list(configs))
+        monkeypatch.setattr(catalog, "module_configs", lambda: [config for config in configs if config.kind == "app"])
+        monkeypatch.setattr(catalog, "all_live_app_configs", lambda: list(configs))
         return configs
 
     return install
@@ -165,6 +167,77 @@ def test_check_passes_when_every_translation_is_current_or_missing(tmp_path, ins
 def test_the_real_modules_are_up_to_date(translator):
     translator(allowed=False)
     call_command("translate_workbooks", "--check")
+
+
+# ── base: the platform's WORKBOOK is translated too, though it is no module of the store ─────────
+
+
+def platform(root: Path, label: str = "base", **kwargs) -> SimpleNamespace:
+    """A platform app of ours on disk (``base``): no module, never in the store's catalogue."""
+    return module(root, label, kind="platform", **kwargs)
+
+
+def test_check_covers_the_platforms_workbook_though_it_is_no_module(tmp_path, installed, translator):
+    installed(
+        module(tmp_path, "things", en=translated(USER_PART, ENGLISH)),
+        platform(tmp_path, en=translated("una versión anterior\n", ENGLISH)),
+    )
+    translator(allowed=False)
+
+    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\.") as raised:
+        call_command("translate_workbooks", "--check")
+
+    assert "things" not in str(raised.value)
+
+
+def test_a_changed_user_part_of_the_real_base_workbook_fails_the_check(tmp_path, installed, translator):
+    """The positive the CI has to catch: base's own WORKBOOK with its user part edited and no new translation."""
+    real = Path(django_apps.get_app_config("base").path)
+    spanish = (real / "WORKBOOK.md").read_text(encoding="utf-8")
+    [base] = installed(platform(tmp_path, workbook=spanish, en=(real / "WORKBOOK.en.md").read_text(encoding="utf-8")))
+    translator(allowed=False)
+    call_command("translate_workbooks", "--check")  # as committed: up to date
+
+    edited = spanish.replace("\n## Flujos\n", "\n## Flujos\n\nUna frase nueva para quien usa el Hub.\n", 1)
+    assert edited != spanish
+    (Path(base.path) / "WORKBOOK.md").write_text(edited, encoding="utf-8")
+
+    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\. Run translate_workbooks --app base\."):
+        call_command("translate_workbooks", "--check")
+
+
+def test_the_platforms_workbook_is_translated_when_asked_for(tmp_path, installed, translator):
+    things, base = installed(module(tmp_path, "things"), platform(tmp_path))
+    fake = translator()
+
+    call_command("translate_workbooks", "--app", "base")
+
+    assert fake.sources == [USER_PART]
+    assert en_file(base).read_text().startswith(en_header(source_hash(USER_PART)))
+    assert not en_file(things).exists()
+
+
+def test_a_platform_app_without_workbook_is_no_app_to_translate_and_base_stays_out_of_the_store(tmp_path, installed, translator):
+    things, base, control = installed(module(tmp_path, "things"), platform(tmp_path), platform(tmp_path, "control", workbook=None))
+    translator(allowed=False)
+
+    with pytest.raises(CommandError, match=r"No app 'control' with a WORKBOOK to translate; the apps are: base, things\."):
+        call_command("translate_workbooks", "--app", "control")
+
+    assert catalog.catalog_modules() == [things]
+
+
+def test_check_fails_on_a_platform_workbook_it_cannot_read(tmp_path, installed, translator):
+    """No registry reads base's WORKBOOK (it is no module): a broken user part must not pass the check in silence."""
+    broken = WORKBOOK.replace("Ver [cómo se usa](#cómo-se-usa).", "Ver [cómo se usa](#no-existe).")
+    assert broken != WORKBOOK
+    installed(platform(tmp_path, workbook=broken, en=translated(USER_PART, ENGLISH)))
+    translator(allowed=False)
+
+    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\. Run translate_workbooks --app base\."):
+        call_command("translate_workbooks", "--check")
+    with pytest.raises(CommandError, match="base: WORKBOOK.md: .*#no-existe"):
+        call_command("translate_workbooks", "--app", "base")
 
 
 # ── the key: ANTHROPIC_API_KEY, from the environment or the checkout's .env ────────────────────

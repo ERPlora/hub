@@ -40,7 +40,7 @@ from django.db import DatabaseError, connections, transaction
 from django.db.models import Max
 from django.utils import timezone, translation
 from live.markdown import IMAGE_EXTENSIONS, render_markdown
-from live.meta import module_configs
+from live.meta import all_live_app_configs, module_configs
 from live.shared_catalog import DOC_LANGUAGES
 
 from base.routers import SHARED_ALIAS
@@ -280,17 +280,29 @@ def workbook_translation(config) -> Translation:
     return Translation(config.label, source, en_path, "current", en_text[match.end() :])
 
 
+def workbook_configs(configs: Iterable | None = None) -> list:
+    """The apps whose ``WORKBOOK.en.md`` is generated: every module, and every platform app with a WORKBOOK
+    (``base``, which documents the Hub without being a module of the store: never in ``catalog_modules``)."""
+    return [
+        config
+        for config in (all_live_app_configs() if configs is None else configs)
+        if config.kind == "app" or (Path(config.path) / WORKBOOK).is_file()
+    ]
+
+
 def stale_translations(configs: Iterable | None = None) -> list[str]:
-    """Labels of the modules whose ``WORKBOOK.en.md`` exists and no longer matches their WORKBOOK."""
+    """Labels of the apps (``workbook_configs``) whose ``WORKBOOK.en.md`` exists and no longer matches their WORKBOOK."""
     stale = []
-    for config in catalog_modules(configs):
+    for config in workbook_configs(configs):
         if (Path(config.path) / WORKBOOK).is_file():
             try:
                 if workbook_translation(config).state == "stale":
                     stale.append(config.label)
             except WorkbookError:
-                # Not a translation problem: build_registry reports the WORKBOOK itself.
-                continue
+                # A module's: build_registry reports the WORKBOOK itself. A platform app's (base) no
+                # registry reads, so it counts here and ``translate_workbooks --app`` names the error.
+                if config.kind != "app":
+                    stale.append(config.label)
     return stale
 
 
