@@ -291,3 +291,21 @@ class BellCounterOut(Schema):
 
 class BellCountersOut(Schema):
     counters: list[BellCounterOut]
+
+
+class NoticeListIn(Schema):
+    """No input: what the modules on tell this person's device, of the rows their queries give them."""
+
+
+class DeviceNoticeOut(Schema):
+    key: str = Field(description="«<app>.<notice>».")
+    app: str
+    id: str = Field(description="The id of what happened, as the module's row says it.")
+    at: str = Field(description="The instant it happened, as the module's row says it: with key and id, told once.")
+    title: str
+    body: str = Field(description="Empty when none of its parts is filled in.")
+    route: str = Field(description="The screen a tap opens; empty when a field of it is empty.")
+
+
+class NoticeListOut(Schema):
+    notices: list[DeviceNoticeOut] = Field(description="The newest first.")

@@ -23,6 +23,8 @@ from base.schemas import (
     HubOut,
     HubsBySlugIn,
     HubsBySlugOut,
+    NoticeListIn,
+    NoticeListOut,
     SessionMeIn,
     SessionMeOut,
     SetupStatusIn,
@@ -222,3 +224,12 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
                     },
                 )
         return {"counters": counters}
+
+
+@operation("base.notice.list", kind="query", permission=VIEW_HOME, input=NoticeListIn, output=NoticeListOut)
+def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
+    """The device's notices (PLAN-HUB round 2026-10-23): the rows the modules on tell, with their texts filled in."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
+        return {"notices": home.device_notices(ctx, modules)}

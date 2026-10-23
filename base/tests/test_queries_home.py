@@ -1,4 +1,5 @@
-"""The Home's three live queries: ``base.setup.status``, ``base.widget.list`` and ``base.bell.counters``.
+"""The Home's three live queries: ``base.setup.status``, ``base.widget.list`` and ``base.bell.counters``; and the
+device's notices, ``base.notice.list`` (PLAN-HUB round 2026-10-23).
 
 PLAN-HUB round 2026-10-21. Each module declares its steps, panels and counters in its ``LiveAppConfig`` and base runs
 their queries by name, as the person of the request, with the old hub's rules (``setup_status.rs``): only modules on
@@ -17,7 +18,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import NotFound
-from live.meta import BellCounter, SetupCheck, SetupStep, Widget
+from live.meta import BellCounter, DeviceNotice, SetupCheck, SetupStep, Widget
 from live.operations import Operation, get, registry
 from live.outbox import channel_for
 from live.models import OutboxEvent
@@ -25,7 +26,16 @@ from psycopg.conninfo import make_conninfo
 from pydantic import BaseModel, ConfigDict
 
 from base.models import EventDelivery, Hub, Membership
-from base.schemas import BellCountersIn, BellCountersOut, SetupStatusIn, SetupStatusOut, WidgetListIn, WidgetListOut
+from base.schemas import (
+    BellCountersIn,
+    BellCountersOut,
+    NoticeListIn,
+    NoticeListOut,
+    SetupStatusIn,
+    SetupStatusOut,
+    WidgetListIn,
+    WidgetListOut,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -80,7 +90,7 @@ def modules(monkeypatch, settings):
     return use
 
 
-def module(label, *, setup=(), widgets=(), bell=(), listed=True, permissions=(), name=None):
+def module(label, *, setup=(), widgets=(), bell=(), notices=(), listed=True, permissions=(), name=None):
     return SimpleNamespace(
         label=label,
         verbose_name=name or label.capitalize(),
@@ -88,6 +98,7 @@ def module(label, *, setup=(), widgets=(), bell=(), listed=True, permissions=(),
         setup=list(setup),
         widgets=list(widgets),
         bell=list(bell),
+        notices=list(notices),
         permissions=list(permissions),
     )
 
@@ -121,6 +132,7 @@ def step(key="catalog", operation="stock.catalog.status", **fields):
         ("base.setup.status", SetupStatusIn, SetupStatusOut),
         ("base.widget.list", WidgetListIn, WidgetListOut),
         ("base.bell.counters", BellCountersIn, BellCountersOut),
+        ("base.notice.list", NoticeListIn, NoticeListOut),
     ],
 )
 def test_declarations(name, input, output):
@@ -595,3 +607,142 @@ def test_a_demo_item_written_in_b_notifies_b_only_and_re_runs_the_home_there(lis
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["demo.item.created"]})]
     assert received(on_a, timeout=0.3) == []
     assert {"base.setup.status", "base.bell.counters"} <= live_registry.affected(["demo.item.created"])
+
+
+# --- base.notice.list (PLAN-HUB round 2026-10-23, APPOINTMENT-F28) ----------------------------------------------
+
+
+def notice_list(context):
+    return get("base.notice.list")(context, NoticeListIn()).model_dump(mode="json")["notices"]
+
+
+def notice(key="added", operation="stock.item.changes", **fields):
+    return DeviceNotice(
+        key=key,
+        operation=operation,
+        title=fields.pop("title", (gettext_lazy("New item · {name}"), gettext_lazy("New item"))),
+        route=fields.pop("route", "/stock?day={at:.10}"),
+        **fields,
+    )
+
+
+CHANGES = {
+    "rows": [
+        {"id": 7, "at": "2026-10-23T09:45:00Z", "kind": "removed", "name": "Pen", "sku": "P-1", "shelf": ""},
+        {"id": 3, "at": "2026-10-23T09:40:00Z", "kind": "added", "name": "", "sku": "B-2", "shelf": "A"},
+        {"id": 5, "at": "2026-10-23T09:44:00+02:00", "kind": "added", "name": "Ink", "sku": "I-9", "shelf": "C"},
+    ]
+}
+
+
+def test_the_rows_each_notice_tells_with_its_texts_the_newest_first(modules, declare):
+    """Each declaration takes the rows that pass its ``when``; the title is the first template filled in, the body
+    joins the parts filled in, and the route is filled in too. One query for the notices that share it."""
+    calls = []
+    declare("stock.item.changes", lambda c, data: calls.append(data) or CHANGES)
+    modules(
+        module(
+            "stock",
+            notices=[
+                notice(when=[SetupCheck(field="kind", equals="added")], body=["{sku}", gettext_lazy("shelf {shelf}")]),
+                notice("removed", when=[SetupCheck(field="kind", equals="removed")], title=["Item removed · {name}"]),
+            ],
+        )
+    )
+
+    assert notice_list(ctx()) == [
+        {
+            "key": "stock.removed",
+            "app": "stock",
+            "id": "7",
+            "at": "2026-10-23T09:45:00Z",
+            "title": "Item removed · Pen",
+            "body": "",
+            "route": "/stock?day=2026-10-23",
+        },
+        {
+            "key": "stock.added",
+            "app": "stock",
+            "id": "3",
+            "at": "2026-10-23T09:40:00Z",
+            "title": "New item",
+            "body": "B-2 · shelf A",
+            "route": "/stock?day=2026-10-23",
+        },
+        {
+            "key": "stock.added",
+            "app": "stock",
+            "id": "5",
+            "at": "2026-10-23T09:44:00+02:00",
+            "title": "New item · Ink",
+            "body": "I-9 · shelf C",
+            "route": "/stock?day=2026-10-23",
+        },
+    ]
+    assert len(calls) == 1
+
+
+def test_the_texts_are_in_the_persons_language(modules, declare):
+    declare("stock.item.changes", CHANGES)
+    modules(module("stock", notices=[notice(when=[SetupCheck(field="id", equals=5)], title=[gettext_lazy("Failed events")])]))
+
+    assert [n["title"] for n in notice_list(ctx(language="es"))] == ["Eventos caídos"]
+
+
+def test_the_query_runs_as_the_person_with_the_notices_params(modules, declare):
+    seen = []
+    declare("stock.item.changes", lambda c, data: seen.append((c.actor, data.model_dump())) or {"rows": []})
+    modules(module("stock", notices=[notice(params={"limit": 5})]))
+
+    assert notice_list(ctx(actor="bea")) == []
+    assert seen == [("bea", {"limit": 5})]
+
+
+def test_a_notice_the_person_may_not_see_or_whose_query_fails_is_left_out(modules, declare, caplog):
+    def broken(c, data):
+        raise RuntimeError("boom")
+
+    declare("stock.item.changes", CHANGES)
+    declare("stock.broken.changes", broken)
+    modules(
+        module(
+            "stock",
+            permissions=["stock.view"],
+            notices=[notice(permission="stock.view"), notice("broken", "stock.broken.changes")],
+        )
+    )
+
+    with caplog.at_level(logging.WARNING, logger="base.home"):
+        assert notice_list(ctx()) == []
+    assert "stock.broken" in caplog.text
+    assert len(notice_list(ctx("stock.view"))) == 3
+
+
+def test_a_template_its_translation_breaks_falls_to_the_next_and_is_logged(modules, declare, caplog):
+    """A translator's typo in a field (``{nombre}``) must not lose the notice: the next title, and a line in the log."""
+    declare("stock.item.changes", {"rows": [CHANGES["rows"][2]]})
+    modules(module("stock", notices=[notice(title=["{nombre}", "New item"], body=["{sku:%Y}", "{shelf}"])]))
+
+    with caplog.at_level(logging.WARNING, logger="base.home"):
+        [told] = notice_list(ctx())
+    assert (told["title"], told["body"]) == ("New item", "C")
+    assert "stock.added" in caplog.text
+
+
+def test_a_row_without_a_title_filled_in_is_not_told(modules, declare, caplog):
+    declare("stock.item.changes", {"rows": [CHANGES["rows"][1]]})
+    modules(module("stock", notices=[notice(title=["New item · {name}"])]))
+
+    with caplog.at_level(logging.WARNING, logger="base.home"):
+        assert notice_list(ctx()) == []
+    assert "stock.added" in caplog.text
+
+
+def test_the_notices_of_a_module_off_or_out_of_the_store(modules, declare, settings):
+    declare("stock.item.changes", CHANGES)
+    modules(module("stock", notices=[notice()]), on=[])
+    assert notice_list(ctx()) == []
+
+    modules(module("stock", notices=[notice()], listed=False))
+    settings.SHOW_UNLISTED_MODULES = False
+    assert notice_list(ctx()) == []
