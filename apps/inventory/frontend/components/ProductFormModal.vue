@@ -3,12 +3,12 @@
 // panel as a dialog (FormModal; UI-REQUESTS.md asks for DataTable's side panel). New: Name, SKU,
 // Price, «Cost (EUR)», «Initial stock», «Low stock threshold» (empty = 10), EAN-13, Description, «Type»,
 // «Track stock for this item» (physical only; follows the hub until touched), «Unit of measure»,
-// «Tax category» (required, none chosen in advance) and «Categories» (when there are any), saved in one
-// go. Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
+// «Tax category» (required, none chosen in advance) and «Categories» (when there are any; both search
+// the server, TaxCategorySelect and ProductCategoriesField), saved in one go. Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
 // (the stock is never edited here: it is received or counted). Amounts and quantities are read as
 // the person typed them; a refusal stays in the dialog, each message under its field.
 import { FormModal } from '@erplora/ui/components';
-import { type InputOf, type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
+import { type InputOf, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
@@ -18,8 +18,8 @@ import { errorFields } from '../lib/errors';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { readQuantity } from '../lib/quantity';
 import MoneyInput from './MoneyInput.vue';
+import ProductCategoriesField from './ProductCategoriesField.vue';
 import QuantityInput from './QuantityInput.vue';
-import SearchSelect from './SearchSelect.vue';
 import TaxCategorySelect from './TaxCategorySelect.vue';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
@@ -59,20 +59,6 @@ const open = defineModel<boolean>('open', { default: false });
 const { t, locale } = useT();
 const create = useCommand('inventory.product.create');
 const update = useCommand('inventory.product.update');
-// The business's categories, for «Categories»: one query of at most 100 (the API's cap); a longer
-// list is searched on the server (SearchSelect).
-const categorySearch = ref('');
-const { data: categoryPage } = useLive('inventory.category.list', () => ({
-  limit: 100,
-  sort: 'name' as const,
-  ...(categorySearch.value ? { search: categorySearch.value } : {}),
-}));
-const categoryOptions = computed(() => (categoryPage.value?.rows ?? []).map((row) => ({ value: row.id, label: row.name })));
-/** Decided without a search and kept while searching: whether there are any, and more than one query holds. */
-const categoryList = ref({ any: false, long: false });
-watch(categoryPage, (now) => {
-  if (now && !categorySearch.value) categoryList.value = { any: now.total > 0, long: now.total > now.rows.length };
-});
 
 const editing = computed(() => props.product !== null);
 
@@ -128,8 +114,9 @@ const taxMissing = computed(() => !form.value.tax || (!!props.product?.needs_tax
 const complete = computed(() => !!form.value.name.trim() && !!form.value.sku.trim() && !taxMissing.value);
 const tracksNow = computed(() => form.value.track ?? (props.product ? props.product.tracks_stock : props.hubTracksStock));
 const step = computed(() => props.units.find((unit) => unit.code === form.value.unit)?.increment);
+/** Each unit by the name the API gives it, which already carries its code («Unit (ud)»). */
 const unitOptions = computed(() =>
-  props.units.length ? props.units.map((unit) => ({ code: unit.code, label: t('inventory.form.unitOption', { name: unit.name, code: unit.code }) })) : [{ code: form.value.unit, label: form.value.unit }],
+  props.units.length ? props.units.map((unit) => ({ code: unit.code, label: unit.name })) : [{ code: form.value.unit, label: form.value.unit }],
 );
 
 function set<K extends keyof Fields>(key: K, value: Fields[K]): void {
@@ -358,17 +345,11 @@ async function save(): Promise<void> {
         :error-text="fields.tax_category_key"
         @update:model-value="set('tax', $event)"
       />
-      <SearchSelect
-        v-if="categoryList.any"
+      <ProductCategoriesField
         testid="inventory-product-categories"
-        multiple
         :model-value="form.categories"
-        :options="categoryOptions"
-        :complete="!categoryList.long"
-        :label="$t('inventory.form.categories')"
         :error-text="fields.category_ids"
-        @update:model-value="set('categories', Array.isArray($event) ? $event : [])"
-        @update:search="categorySearch = $event"
+        @update:model-value="set('categories', $event)"
       />
     </div>
   </FormModal>

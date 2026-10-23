@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
-import { cleanInventory, createProduct, dialog, fill, pick, productBySku, productsReady, shootFlow, stamp } from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, pickCombo, productBySku, productsReady, shootFlow, stamp } from './inventory-helpers';
 
 test.afterAll(() => {
   cleanInventory();
@@ -59,7 +59,7 @@ test('INVENTORY-F09: a CSV is checked first, its unknown tax text is asked for, 
   const taxes = dialog(page, 'inventory-import-tax');
   await expect(taxes).toBeVisible();
   await expect(taxes.locator('[data-testid=inventory-import-tax-text]')).toHaveText([`«${text}»`]);
-  await pick(page, taxes.locator('[data-testid=inventory-import-tax-category-0]'), /(Product — generic|Producto — general)/);
+  await pickCombo(page, taxes.locator('[data-testid=inventory-import-tax-category-0]'), 'generic', /(Product — generic|Producto — general)/);
   await page.screenshot({ path: shot('inventory-import-tax-1280') });
   await taxes.locator('[data-testid=inventory-import-tax-submit]').click();
 
@@ -87,7 +87,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   await shown(page).locator('[data-testid=inventory-categories-add]').click();
   const form = dialog(page, 'inventory-category-form');
   await fill(form, 'inventory-category-name', name);
-  await pick(page, form.locator('[data-testid=inventory-category-tax]'), /(Restaurant — drink|Restauración — bebida|Restaurante — bebida).*10/);
+  await pickCombo(page, form.locator('[data-testid=inventory-category-tax]'), 'drink', /(Restaurant — drink|Restauración — bebida|Restaurante — bebida).*10/);
   await page.screenshot({ path: shot('inventory-category-new-1280') });
   await shootFlow(page, 'INVENTORY-F06');
   await form.locator('[data-testid=inventory-category-form-submit]').click();

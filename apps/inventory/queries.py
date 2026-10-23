@@ -445,7 +445,10 @@ def list_product_categories(
     },
 )
 def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
-    return _page(_filter_categories(_categories(), params), params, _category_row)
+    categories = _categories()
+    if params.ids is not None:
+        categories = categories.filter(id__in=params.ids)
+    return _page(_filter_categories(categories, params), params, _category_row)
 
 
 def _filter_categories(categories, params: CategoryFiltersIn):

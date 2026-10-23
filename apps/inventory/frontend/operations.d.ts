@@ -75,7 +75,10 @@ export interface CategoryFiltersIn {
   sort?: Sorted<'name' | 'slug' | 'icon' | 'color' | 'product_count'>;
 }
 
-export interface CategoryListIn extends PageIn, CategoryFiltersIn {}
+export interface CategoryListIn extends PageIn, CategoryFiltersIn {
+  /** Only these categories, by id (to name the categories of a product); at most 100. */
+  ids?: string[];
+}
 
 export interface MovementListIn extends PageIn {
   search?: string;
