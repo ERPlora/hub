@@ -8,9 +8,12 @@
 // Since FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL (CART_CHECKOUT-F12) Carts is `filterable` as the old list
 // (cart_checkout-carts-{834,1440}.png): the wide list (1440) has no row either, its panel filters and switching to
 // the cards and back keeps the filter in use; at 834, whatever paints by default, the filters wait behind the funnel.
+// The rule for a list that keeps its filter row (not `filterable`) is measured since then on Modifiers › Groups (its
+// Name filter is a text box, as Carts' Session was): at 1440 the list opens the row, the cards fold it behind the
+// funnel with the filter in use (count 1) and back in the list the row shows it; at 834 each view follows the rule.
 import { type Page, expect, test } from '@playwright/test';
 
-import { record, shot, shown, untilStill } from './helpers';
+import { psql, record, shot, shown, untilStill } from './helpers';
 import { type Cart, cleanUp, code, listShown, post, rowOf, signedIn, VIEWPORTS } from './cart-checkout-helpers';
 
 const TABLE = 'cart-checkout-carts';
@@ -149,6 +152,93 @@ test('UI DataTable filtros en tarjetas at 834: whatever paints by default, the f
     await expect(hook(page, 'filters'), `no filter row (${cards ? 'cards' : 'list'})`).toHaveCount(0);
     await expect(hook(page, 'filters-toggle')).toBeVisible();
     await page.screenshot({ path: shot('FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390-834') });
+  } finally {
+    await context.close();
+  }
+});
+
+// ── A list that keeps its filter row: Modifiers › Groups ─────────────────────────────────────────────────────
+const ROW_TABLE = 'modifier-groups';
+/** Every group these cases create starts like this (and only those are deleted). */
+const GROUPS = 'E2E Fold';
+const rowHook = (page: Page, suffix: string) => shown(page).locator(`[data-testid=${ROW_TABLE}-${suffix}]`);
+
+function cleanGroups(): void {
+  psql(`delete from modifier_modifiergroup where name like '${GROUPS} %'`);
+}
+test.beforeEach(cleanGroups);
+test.afterAll(cleanGroups);
+
+interface Group {
+  id: string;
+  name: string;
+}
+
+/** Two groups of this run, through the API (the assistant's path): the Name filter has something to tell apart. */
+async function seedGroups(context: Parameters<typeof post>[0], width: number): Promise<{ one: Group; two: Group }> {
+  const stamp = Date.now().toString(36);
+  const one = await post<Group>(context, '/modifier/groups', { name: `${GROUPS} one ${width} ${stamp}` }, 201);
+  const two = await post<Group>(context, '/modifier/groups', { name: `${GROUPS} two ${width} ${stamp}` }, 201);
+  return { one, two };
+}
+
+test('UI DataTable filtros en tarjetas at 1440: a list with its filter row keeps it open; the cards fold it and keep the filter in use', async ({ browser }) => {
+  const { context, page } = await signedIn(browser, '/modifier/groups', VIEWPORTS.desktop);
+  try {
+    const { one, two } = await seedGroups(context, 1440);
+    await page.goto('/modifier/groups');
+    await expect(rowOf(page, ROW_TABLE, one.id)).toBeVisible();
+    await expect(cardsPainted(page), 'a wide screen paints the list').toHaveCount(0);
+
+    const row = rowHook(page, 'filters');
+    await expect(row, 'the list keeps its filter row open').toBeVisible();
+    await expect(rowHook(page, 'filters-toggle')).toHaveCount(0);
+    await page.screenshot({ path: shot('FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390-1440-row') });
+
+    await row.locator(`[data-testid=${ROW_TABLE}-filter-name] input`).fill(one.name);
+    await expect(rowOf(page, ROW_TABLE, two.id)).toHaveCount(0);
+    await expect(rowOf(page, ROW_TABLE, one.id)).toBeVisible();
+
+    await rowHook(page, 'view-cards').click();
+    await expect(cardsPainted(page).first()).toBeVisible();
+    await expect(row, 'the cards fold the row').toHaveCount(0);
+    await expect(rowHook(page, 'filters-toggle'), 'behind the funnel').toBeVisible();
+    await expect(rowHook(page, 'filters-count'), 'the filter in use is kept').toHaveText('1');
+    await expect(rowOf(page, ROW_TABLE, one.id)).toBeVisible();
+    await expect(rowOf(page, ROW_TABLE, two.id)).toHaveCount(0);
+
+    await rowHook(page, 'view-table').click();
+    await expect(cardsPainted(page)).toHaveCount(0);
+    await expect(row, 'back in the list the row opens again').toBeVisible();
+    await expect(row.locator(`[data-testid=${ROW_TABLE}-filter-name] input`)).toHaveValue(one.name);
+    await expect(rowOf(page, ROW_TABLE, two.id)).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
+test('UI DataTable filtros en tarjetas at 834: on a list with its filter row each view follows the rule (the cards fold it, the list opens it)', async ({ browser }) => {
+  const { context, page } = await signedIn(browser, '/modifier/groups', VIEWPORTS.tablet);
+  try {
+    const { one } = await seedGroups(context, 834);
+    await page.goto('/modifier/groups');
+    await expect(rowOf(page, ROW_TABLE, one.id)).toBeVisible();
+    const first = (await cardsPainted(page).count()) > 0 ? 'cards' : 'table';
+    record('FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390-834-row', { first, ...(await toolbar(page)) });
+    await page.screenshot({ path: shot('FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390-834-row') });
+    // What paints by default, then the other view: both follow the rule.
+    for (const view of [first, first === 'cards' ? 'table' : 'cards']) {
+      if (view !== first) await rowHook(page, `view-${view}`).click();
+      if (view === 'cards') {
+        await expect(cardsPainted(page).first()).toBeVisible();
+        await expect(rowHook(page, 'filters'), 'the cards fold the row').toHaveCount(0);
+        await expect(rowHook(page, 'filters-toggle')).toBeVisible();
+      } else {
+        await expect(cardsPainted(page)).toHaveCount(0);
+        await expect(rowHook(page, 'filters'), 'the list opens the row').toBeVisible();
+        await expect(rowHook(page, 'filters-toggle')).toHaveCount(0);
+      }
+    }
   } finally {
     await context.close();
   }
