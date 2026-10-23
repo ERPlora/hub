@@ -120,6 +120,24 @@ def test_each_professional_earns_their_rate_on_what_they_sold_refunds_taken_off(
     assert page.total_sold == run("sale.sale.stats", {}).total_revenue
 
 
+def test_a_sale_left_on_me_counts_in_the_commission_of_whoever_charged_it(catalog, make_user):
+    # flow: SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»); STAFF-F21 (paso 3)
+    account = make_user("ana", role="hub_employee")
+    ana = make_member("Ana", user=account, commission_rate=Decimal("15"))
+    make_member("Luis", commission_rate=Decimal("10"))
+    # The till charges with the chip on «Me»: it sends nobody, and Sales asks Staff whose record it is.
+    run(
+        "sale.sale.complete",
+        {"idempotency_key": "commission-me-01", "lines": [{"product": "CUT"}], "payments": CARD},
+        "hub_employee",
+        actor=account,
+    )
+    assert figures(report()) == [
+        ("Ana López", 1800, Decimal("15.00"), 270),
+        ("Luis López", 0, Decimal("10.00"), 0),
+    ]
+
+
 def test_the_commission_is_rounded_half_up_once_on_what_the_person_sold(catalog):
     bea = make_member("Bea", commission_rate=Decimal("12.5"))
     # Two fringes of 5.06: each would earn 0.6325 → 0.63 (1.26 in all), but she sold 10.12 → 1.265 → 1.27.
