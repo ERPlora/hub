@@ -1392,6 +1392,9 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
 8. La subsanación lleva el `RechazoPrevio` de la Descripción del servicio web v1.0.3 (`X` / `S` / `N`; antes,
    siempre `S`), el desglose no se recorta nunca (antes, a 12 líneas en silencio), la consulta a la AEAT sigue
    todas sus páginas (antes, solo la primera) y una pasada sin conexión no se cuenta como enviada.
+9. Los importes agrupan los millares desde cuatro cifras (hub#1090): «1.234,56 €» en español en la lista y la
+   ficha de un registro y en la lista del admin (antes «1234,56 €»). El XML y la huella de la AEAT no cambian:
+   llevan el importe sin millares, como pide su esquema.
 
 ### Paridad con el módulo actual
 

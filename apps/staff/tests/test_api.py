@@ -21,6 +21,7 @@ ROUTES = {
     ("GET", "/staff/members", "staff.member.list"),
     ("GET", "/staff/members/detail", "staff.member.detail"),
     ("GET", "/staff/members/mine", "staff.member.mine"),
+    ("GET", "/staff/members/current", "staff.member.current"),
     ("GET", "/staff/members/compensation", "staff.member.compensation"),
     ("GET", "/staff/members/stats", "staff.member.stats"),
     ("POST", "/staff/members", "staff.member.create"),
@@ -457,6 +458,18 @@ def test_my_record_over_http(employee, client):
     assert get(client, "/staff/members/mine").json()["member"]["hourly_rate"] == 1200
     make_time_off(member, "2026-10-12")
     assert get(client, "/staff/time_off/mine").json()["total"] == 1
+
+
+@pytest.mark.django_db
+def test_the_current_record_over_http_says_only_who_and_never_the_pay(employee, client):
+    # flow: SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»)
+    assert get(client, "/staff/members/current").json() == {"member": None}
+    member = make_member("Ana", user=employee, hourly_rate=1200)
+    assert get(client, "/staff/members/current").json() == {
+        "member": {"id": str(member.id), "full_name": "Ana López"}
+    }
+    client.logout()
+    assert get(client, "/staff/members/current").status_code == 401
 
 
 @pytest.mark.django_db

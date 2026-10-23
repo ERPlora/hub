@@ -17,6 +17,7 @@ from operator import attrgetter
 from uuid import UUID
 
 import pydantic
+from babel.numbers import format_currency
 from django.conf import settings as django_settings
 from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, QuerySet, Sum
 from django.db.models.fields.json import KeyTextTransform
@@ -659,8 +660,13 @@ def call_services(ctx: OperationContext, name: str, data: dict):
     return call_app(ctx, name, data, "sale.services_unavailable")
 
 
-def _euros(cents: int | None) -> str:
-    return "—" if cents is None else f"{Decimal(cents) / 100:.2f} €"
+def money_text(cents: int | None) -> str:
+    """``cents`` of euro as the reader writes money in a sentence, thousands always grouped as every screen
+    paints them («1.234,56 €», «€1,234.56»; hub#1090); nothing is «—»."""
+    if cents is None:
+        return "—"
+    locale = translation.to_locale(translation.get_language() or "en")
+    return format_currency(Decimal(cents) / 100, CURRENCY, locale=locale)
 
 
 def _line_price(
@@ -686,7 +692,7 @@ def _service_price(service, unit_price: int | None) -> int:
         raise Conflict(message, code="sale.service_price_required", fields={"unit_price": message})
     low, high = service.min_price, service.max_price
     if (low is not None and unit_price < low) or (high is not None and unit_price > high):
-        message = str(SERVICE_PRICE_OUT_OF_RANGE) % {"min": _euros(low), "max": _euros(high)}
+        message = str(SERVICE_PRICE_OUT_OF_RANGE) % {"min": money_text(low), "max": money_text(high)}
         raise Conflict(
             message, code="sale.service_price_out_of_range", fields={"unit_price": message}
         )

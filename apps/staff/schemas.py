@@ -205,6 +205,10 @@ class MineIn(Schema):
     pass
 
 
+class CurrentMemberIn(Schema):
+    pass
+
+
 class SettingsGetIn(Schema):
     pass
 
@@ -462,6 +466,17 @@ class MemberMineOut(MemberDetailOut):
 class MineOut(Schema):
     member: MemberMineOut | None = Field(
         description="The caller's own record; null without one."
+    )
+
+
+class CurrentMemberRecordOut(Schema):
+    id: UUID
+    full_name: str
+
+
+class CurrentMemberOut(Schema):
+    member: CurrentMemberRecordOut | None = Field(
+        description="The caller's own record, its id and name only; null without one."
     )
 
 

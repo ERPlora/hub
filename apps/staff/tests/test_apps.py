@@ -24,6 +24,7 @@ QUERIES = {
     "staff.member.list",
     "staff.member.detail",
     "staff.member.mine",
+    "staff.member.current",
     "staff.member.compensation",
     "staff.member.stats",
     "staff.commission.summary",

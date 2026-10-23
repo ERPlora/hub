@@ -20,6 +20,8 @@ from apps.staff.schemas import (
     CommissionSummaryIn,
     CompensationListIn,
     CompensationPage,
+    CurrentMemberIn,
+    CurrentMemberOut,
     MemberDetailOut,
     MemberListIn,
     MemberPage,
@@ -83,6 +85,8 @@ def today():
         ("staff.member.list", "staff.view", MemberListIn, MemberPage, True),
         ("staff.member.detail", "staff.view", MemberRefIn, MemberDetailOut, True),
         ("staff.member.mine", "staff.view", MineIn, MineOut, True),
+        # Whoever holds the session, with no Staff permission: Sales attributes «Me» with it (SALE-F16).
+        ("staff.member.current", None, CurrentMemberIn, CurrentMemberOut, False),
         ("staff.member.compensation", "staff.view_compensation", CompensationListIn, CompensationPage, False),
         ("staff.member.stats", "staff.view", MemberStatsIn, MemberStatsOut, False),
         ("staff.commission.summary", "staff.view_compensation", CommissionSummaryIn, CommissionPage, True),
@@ -344,6 +348,36 @@ def test_mine_is_empty_without_a_live_linked_record(make_user):
             run("staff.member.mine", MineIn(), "hub_employee", actor=actor).member
             is None
         )
+
+
+# staff.member.current (SALE-F16: who «Me» is at the till)
+
+
+def test_current_is_the_id_and_name_of_the_callers_own_record_without_any_staff_permission(make_user):
+    ana_user, bea_user = make_user("ana"), make_user("bea")
+    ana = make_member("Ana", user=ana_user, hourly_rate=1500, commission_rate=Decimal("12.5"))
+    make_member("Bea", user=bea_user)
+    make_member("Carla")
+
+    # A cashier may sell without seeing the team: her own record is no secret to her.
+    current = run("staff.member.current", CurrentMemberIn(), actor=ana_user, permissions={"sale.take_payment"})
+
+    assert current.model_dump() == {"member": {"id": ana.id, "full_name": "Ana López"}}
+
+
+def test_current_is_empty_without_a_live_linked_record_or_a_user_behind_the_session(make_user):
+    linked, unlinked = make_user("ana"), make_user("bea")
+    make_member("Ana", user=linked, status=TERMINATED)
+    for actor in (linked, unlinked, "system", "tester"):
+        assert run("staff.member.current", CurrentMemberIn(), actor=actor, permissions=set()).member is None
+
+
+def test_current_names_a_record_that_is_inactive_or_on_leave_and_still_sells(make_user):
+    away, idle = make_user("ana"), make_user("bea")
+    ana = make_member("Ana", user=away, status=Member.Status.ON_LEAVE)
+    bea = make_member("Bea", user=idle, status=Member.Status.INACTIVE)
+    assert run("staff.member.current", CurrentMemberIn(), actor=away).member.id == ana.id
+    assert run("staff.member.current", CurrentMemberIn(), actor=idle).member.id == bea.id
 
 
 # staff.member.compensation (STAFF-F21)

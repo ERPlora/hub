@@ -109,6 +109,7 @@ sale (la lista dice lo mismo un poco más abajo); en «Actividad», sí.
 | BASE-F10 | Ver en la campana los avisos entre apps que no se entregaron | parcial |
 | BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | parcial |
 | BASE-F12 | Pedirle al asistente que repase la configuración | parcial |
+| BASE-F13 | Perder el acceso al cambiar de rol o al salir del negocio | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -322,6 +323,28 @@ Sale: nada guardado.
 Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
 Implicados: ninguno
 
+### BASE-F13 Perder el acceso al cambiar de rol o al salir del negocio
+<!-- origen: old-saas:SAAS_AUTH-F22 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: cualquier pantalla del hub
+Pasos:
+  1. En erplora.com, quien gestiona el negocio le cambia el rol a una persona, la quita del negocio o le
+     traspasa la propiedad.
+  2. En ese momento se cierra la sesión de esa persona en este negocio, en todos sus dispositivos: lo que
+     tiene abierto deja de ponerse al día y lo siguiente que haga le pide volver a entrar. Sus sesiones en
+     otros negocios siguen abiertas.
+  3. Si sigue en el negocio, vuelve a entrar desde erplora.com y trabaja ya con su rol nuevo: aparece lo
+     que el rol nuevo permite y desaparece lo que no.
+  4. Si la han quitado, al volver erplora.com le dice «No tienes acceso a este hub» y no entra.
+  5. Si cambia su contraseña, cierra la sesión en todas partes o borra su cuenta en erplora.com, se cierran
+     todas sus sesiones del hub, en todos sus negocios.
+Entra: el cambio que hizo erplora.com (quién, en qué negocio y con qué rol, o que ya no está).
+Sale: las sesiones de esa persona cerradas; su rol en el negocio, al día.
+Si falla: si el hub no responde en ese momento, erplora.com lo vuelve a intentar al poco; mientras, la
+siguiente vez que erplora.com le pase al hub el estado del negocio también se cierran esas sesiones.
+Implicados: HUBS-F26, HUBS-F27, HUBS-F28
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -354,6 +377,17 @@ Implicados: ninguno
   `createShell`. La ruta `/` de base (`base-home`) gana a la rejilla del shell (`home`).
 - Tests: `base/tests/test_home.py`, `test_queries_home.py`, `test_live.py`, `test_api.py`, `test_spa.py`;
   Vitest en `base/frontend/**`; e2e `tests/e2e/base-home.spec.ts` y `base-home-activity.spec.ts`.
+- BASE-F13: cada login anota de quién y dónde es su sesión (`base.SessionOwner`, en control junto a las
+  sesiones de Django; `CASCADE` con la sesión). `POST /internal/sessions/revoke {user_id, hub_id?}`
+  (`base.internal.sessions_revoke` → `base.session.revoke`, firmada como todo `/internal`) borra por ese
+  índice, sin descodificar ninguna sesión: las del negocio y las que no anotaron host (de antes de la regla),
+  o sin `hub_id` todas, las del admin incluidas; idempotente, un negocio desconocido responde `{ended: 0}` y
+  un cuerpo fuera de contrato, 422 `internal.payload_invalid`. La foto (`base.hub.state_apply`) aplica
+  `members` en su transacción: rol nuevo o baja → `Membership` al día y sesiones de ese negocio cerradas; no
+  crea copias locales. Tras el COMMIT se despierta el host (`_wake_open_apps`): el stream vivo re-ejecuta,
+  `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
+  relee la sesión en cada mensaje. Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
+  `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
 
 ## Lo que NO hace, a propósito
 

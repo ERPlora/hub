@@ -119,3 +119,33 @@ def test_cancelling_marking_a_no_show_charging_and_deleting_are_high_risk():
         "appointment.blocked_time.delete",
     ):
         assert get(name).ai["risk"] == "high", name
+
+
+def test_it_tells_the_device_of_the_customers_own_bookings_and_cancellations():
+    """APPOINTMENT-F28 (old-hub:HUB_SHELL-F66): «New appointment · {customer}» or «Appointment cancelled · {customer}»,
+    with the services, «{day} at {hour}» and the professional; a tap opens the agenda on that day. Of the agenda the
+    person sees (its query's own rule), refreshed by a booking and a cancellation."""
+    from live.meta import DeviceNotice, SetupCheck
+
+    booked, cancelled = appointment().notices
+    assert all(isinstance(notice, DeviceNotice) for notice in (booked, cancelled))
+    assert [(n.key, n.operation, list(n.when)) for n in (booked, cancelled)] == [
+        ("booked", "appointment.appointment.notices", [SetupCheck(field="kind", equals="booked")]),
+        ("cancelled", "appointment.appointment.notices", [SetupCheck(field="kind", equals="cancelled")]),
+    ]
+    assert [str(text) for text in booked.title] == ["New appointment · {customer_name}", "New appointment"]
+    assert [str(text) for text in cancelled.title] == ["Appointment cancelled · {customer_name}", "Appointment cancelled"]
+    for notice in (booked, cancelled):
+        assert [str(text) for text in notice.body] == [
+            "{service_names}",
+            "{start_date_label} at {start_time_label}",
+            "{staff_name}",
+        ]
+        assert notice.route == "/appointment/agenda?date={start:.10}"
+        assert notice.permission == "appointment.view_own_appointment"
+        assert list(notice.refresh_on) == ["appointment.appointment.created", "appointment.appointment.cancelled"]
+
+
+def test_it_declares_no_bell_counter_here():
+    """The «to confirm» counter of the bell is FIX-APPOINTMENT-SETUP-HOOKS's, not the device's notices'."""
+    assert appointment().bell == []

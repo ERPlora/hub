@@ -133,6 +133,34 @@ function loginStepTimeout(): number {
  */
 const saasSessions = new Map<string, Cookie[]>();
 
+/** Django's session cookie, the Hub's and the SaaS's (`SESSION_COOKIE_NAME`, left at its default by both). */
+const SESSION_COOKIE = 'sessionid';
+/**
+ * A hub's cookies that a browser coming back to it still has: its session and the language the jump set
+ * (`LANGUAGE_COOKIE_NAME`, the Hub's default). Not its `csrftoken`, which the SPA's page sets in every context.
+ */
+const HUB_SESSION_COOKIES = new Set([SESSION_COOKIE, 'django_language']);
+
+/**
+ * The hub's session of each account this worker signed in, by account and hub (`hubSessionKey`). Every jump to a
+ * hub is one more for the SaaS's brake (`HUB_LOGIN_RATELIMIT`, 20 per account every 5 minutes, ACCOUNTS-F28): a
+ * spec of more than 20 logins, each in a fresh context, fell at the 21st with «429 · Too many attempts»
+ * (staff-flows.spec.ts). A later login in a fresh context starts with it and lands on `next` with no jump, as a
+ * person who comes back to their business.
+ */
+const hubSessions = new Map<string, Cookie[]>();
+
+const hubSessionKey = (account: string, origin: string): string => `${account} ${origin}`;
+
+/**
+ * The hub's session cookies of `origin` in `context`: only its host's own. The SaaS's (host `localhost`) come
+ * along in `context.cookies(origin)` too, and are never a hub's.
+ */
+async function hubSessionOf(context: BrowserContext, origin: string): Promise<Cookie[]> {
+  const host = new URL(origin).hostname;
+  return (await context.cookies(origin)).filter((c) => c.domain === host && HUB_SESSION_COOKIES.has(c.name));
+}
+
 /**
  * The real login of a hub: `origin + next` → the SPA's gate sends to the SaaS (`/hub-login/?hub=…`)
  * → the SaaS asks for the account at `/launch` (or, signed in there already, skips it) → every
@@ -146,6 +174,14 @@ const saasSessions = new Map<string, Cookie[]>();
  * it has there. When that session has ended (a spec signed out at the SaaS), the SaaS asks for the account
  * again and the new session is the one kept.
  *
+ * The same with the hub: the session a jump opened for the account is kept for that hub (`hubSessions`), and a
+ * fresh context starts with it and lands on `next` without going through the SaaS, so a spec jumps once per
+ * account and hub while that session lives. When it has ended (a spec signed out of the hub), the hub sends to
+ * the SaaS as always and the new session is the one kept. A context that already has a session of the hub keeps
+ * it. Only a session the SaaS opened for `credentials` is kept: one signed in with the form, or with the account's
+ * own SaaS session in a context that had none. `fresh: true` jumps through the SaaS even with a kept session (a
+ * spec about the jump itself), and keeps the session it opens.
+ *
  * Each step waits `loginStepTimeout()` and a step that does not come fails at once, saying which and how long
  * it waited. runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
  * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
@@ -158,13 +194,22 @@ export async function login(
   origin: string,
   next = '/demo/items',
   credentials: Credentials = OWNER,
+  options: { fresh?: boolean } = {},
 ): Promise<void> {
   const target = `${origin}${next}`;
   const wait = loginStepTimeout();
   const context = page.context();
   const account = credentials.email.toLowerCase();
   const kept = saasSessions.get(account);
-  if (kept && (await context.cookies(SAAS)).length === 0) await context.addCookies(kept);
+  // A context with no SaaS cookies goes to the SaaS as this account, never as another one.
+  const ownSaas = (await context.cookies(SAAS)).length === 0;
+  if (kept && ownSaas) await context.addCookies(kept);
+  const hubSession = async () => (await hubSessionOf(context, origin)).find((c) => c.name === SESSION_COOKIE)?.value;
+  const keptHub = options.fresh ? undefined : hubSessions.get(hubSessionKey(account, origin));
+  if (keptHub && (await hubSession()) === undefined) await context.addCookies(keptHub);
+  // What the hub had before the trip: a jump replaces it. `where` cannot tell, the whole jump may happen
+  // within `page.goto` (the gate sends to the SaaS before the page's load).
+  const before = await hubSession();
   let signedIn = false;
   const inHub = () => topbarApps(page).waitFor({ state: 'attached', timeout: wait });
   await withRetry(
@@ -198,6 +243,10 @@ export async function login(
   );
   await inHub();
   if (signedIn) saasSessions.set(account, await context.cookies(SAAS));
+  const opened = await hubSession();
+  if (opened !== undefined && opened !== before && (signedIn || ownSaas)) {
+    hubSessions.set(hubSessionKey(account, origin), await hubSessionOf(context, origin));
+  }
 }
 
 /**
@@ -272,15 +321,18 @@ async function saidBy(page: Page): Promise<string> {
   return text ? `: «${text}»` : '';
 }
 
-/** A new browser context logged in on `origin` (as the owner unless `credentials`), first page on `next`. */
+/**
+ * A new browser context logged in on `origin` (as the owner unless `credentials`), first page on `next`; with
+ * `fresh`, through the SaaS even when `login` keeps a session of the hub.
+ */
 export async function hostPage(
   browser: Browser,
   origin: string,
-  options: { next?: string; viewport?: { width: number; height: number }; credentials?: Credentials } = {},
+  options: { next?: string; viewport?: { width: number; height: number }; credentials?: Credentials; fresh?: boolean } = {},
 ): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: origin, viewport: options.viewport });
   const page = await context.newPage();
-  await login(page, origin, options.next, options.credentials);
+  await login(page, origin, options.next, options.credentials, { fresh: options.fresh });
   return { context, page };
 }
 

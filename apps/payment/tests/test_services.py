@@ -240,6 +240,66 @@ def test_past_9999_the_number_is_written_whole(bank):
     assert record(bank).reference == "PAY-20261014-10000"
 
 
+# The same attempt sent again (payments#8: a retry used to record a second payment)
+
+
+def test_the_same_attempt_sent_again_answers_the_payment_it_recorded(bank):
+    key = str(uuid.uuid4())
+    first = record(bank, idempotency_key=key, concept="Tintes")
+    again = record(bank, idempotency_key=key, concept="Tintes")
+
+    assert (again.id, again.reference, again.status) == (first.id, "PAY-20261014-0001", "draft")
+    assert Payment.objects.count() == 1
+    # No second number spent and no second notice.
+    assert PaymentCounter.objects.get(day=TODAY).last == 1
+    assert events() == ["payment.payment.created"]
+    assert record(bank).reference == "PAY-20261014-0002"
+
+
+def test_the_same_attempt_answers_the_payment_as_it_is_now(bank):
+    key = str(uuid.uuid4())
+    first = record(bank, idempotency_key=key)
+    run("payment.payment.approve", {"id": str(first.id)})
+    assert record(bank, idempotency_key=key).status == "approved"
+    assert Payment.objects.count() == 1
+
+
+def test_the_same_attempt_after_its_method_was_deactivated_still_answers_its_payment(bank):
+    key = str(uuid.uuid4())
+    first = record(bank, idempotency_key=key)
+    run("payment.method.deactivate", {"id": str(bank.id)})
+    assert record(bank, idempotency_key=key).id == first.id
+
+
+def test_the_same_attempt_naming_its_method_answers_its_payment(bank):
+    key = str(uuid.uuid4())
+    data = {"method": "bbva", "payment_date": "2026-10-10", "amount": 12_50, "beneficiary_name": "Luz SA"}
+    first = run("payment.payment.create", data | {"idempotency_key": key})
+    assert run("payment.payment.create", data | {"idempotency_key": key}).id == first.id
+    make_method("Caja")
+    with pytest.raises(Conflict) as caught:
+        run("payment.payment.create", data | {"method": "Caja", "idempotency_key": key})
+    assert caught.value.code == "payment.idempotency_key_reused"
+
+
+def test_a_key_already_used_for_another_payment_is_refused(bank):
+    key = str(uuid.uuid4())
+    record(bank, idempotency_key=key)
+
+    with pytest.raises(Conflict) as caught:
+        record(bank, idempotency_key=key, amount=99_00)
+
+    assert caught.value.code == "payment.idempotency_key_reused"
+    assert Payment.objects.count() == 1
+    assert PaymentCounter.objects.get(day=TODAY).last == 1
+    assert events() == ["payment.payment.created"]
+
+
+def test_without_a_key_every_call_is_a_new_payment(bank):
+    assert record(bank).id != record(bank).id
+    assert Payment.objects.count() == 2
+
+
 def test_the_method_can_be_said_by_its_name(bank):
     payment = run(
         "payment.payment.create",

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // «Groups» or «Tags» of a card (CUSTOMER-F06): a checkbox per group (tag) of the business, followed
 // live; the card's own come ticked. «Save groups» sends the whole selection, which REPLACES the
-// previous one; the card's live result then ticks what the server kept. A group no longer active
-// is still shown on the cards that have it, marked so. Who cannot manage cards only sees.
+// previous one; the card's live result then ticks what the server kept. What the user ticked or
+// unticked and has not saved stays so through a live result of the card (its other list saved, someone
+// else's change); the rest follows the card, and what is no longer seen is not sent. A group no
+// longer active is still shown on the cards that have it, marked so. Who cannot manage cards only sees.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -36,19 +38,55 @@ const setGroups = useCommand('customer.customer.set_groups');
 const setTags = useCommand('customer.customer.set_tags');
 const command = computed(() => (isGroups.value ? setGroups : setTags));
 
-const picked = ref<string[]>([...props.selected]);
+// What the user touched and has not saved yet, over what the server is known to hold (the card's
+// last result, or what was just saved). A live result of the card moves only the rest: what someone
+// else added, deleted or took off and the user did not touch follows the card.
+const saved = ref<string[]>([...props.selected]);
+const ticked = ref<string[]>([]);
+const unticked = ref<string[]>([]);
+
 watch(
   () => props.selected,
   (now) => {
-    picked.value = [...now];
+    saved.value = [...now];
+    ticked.value = ticked.value.filter((id) => !now.includes(id));
+    unticked.value = unticked.value.filter((id) => now.includes(id));
   },
+);
+watch(
+  () => props.customerId,
+  () => {
+    saved.value = [...props.selected];
+    ticked.value = [];
+    unticked.value = [];
+  },
+);
+
+/** The whole list is here (no search, nothing past the 100 a query takes): a group not in it is gone. */
+const wholeList = computed(() => source.status.value === 'live' && !search.value.trim() && (source.data.value?.total ?? 0) <= rows.value.length);
+/** A group (tag) that is no longer seen: not on the card, and deleted, or no longer active. */
+function unseen(id: string): boolean {
+  if (saved.value.includes(id) || props.selected.includes(id)) return false;
+  const row = rows.value.find((r) => r.id === id);
+  return row ? !row.is_active : wholeList.value;
+}
+
+/** The selection as seen: what is saved, with the user's ticks and unticks. */
+const picked = computed(() =>
+  [...saved.value.filter((id) => !unticked.value.includes(id)), ...ticked.value.filter((id) => !saved.value.includes(id))].filter(
+    (id) => !unseen(id),
+  ),
 );
 
 /** The active ones, and the inactive ones the card has. */
 const shown = computed(() => rows.value.filter((row) => row.is_active || props.selected.includes(row.id)));
 
 function toggle(id: string, checked: boolean): void {
-  picked.value = checked ? [...picked.value.filter((p) => p !== id), id] : picked.value.filter((p) => p !== id);
+  const onCard = saved.value.includes(id);
+  ticked.value = ticked.value.filter((p) => p !== id);
+  unticked.value = unticked.value.filter((p) => p !== id);
+  if (checked && !onCard) ticked.value.push(id);
+  if (!checked && onCard) unticked.value.push(id);
 }
 
 const label = (row: { name: string; is_active: boolean }): string =>
@@ -60,12 +98,28 @@ const failure = computed(() => {
 });
 
 async function save(): Promise<void> {
+  const sending = [...picked.value];
   try {
-    if (isGroups.value) await setGroups.run({ id: props.customerId, group_ids: picked.value });
-    else await setTags.run({ id: props.customerId, tag_ids: picked.value });
+    if (isGroups.value) await setGroups.run({ id: props.customerId, group_ids: sending });
+    else await setTags.run({ id: props.customerId, tag_ids: sending });
   } catch {
+    // Some were deleted meanwhile and the refusal names them (`unavailable_ids`): exactly those leave the
+    // selection, so the next save works; every ticked one that still exists stays, seen or hidden by a
+    // search. A refusal that names none takes nothing off.
+    const error = command.value.error.value;
+    if (error?.code === (isGroups.value ? 'customer.group_unavailable' : 'customer.tag_unavailable')) {
+      const named = error.details.unavailable_ids;
+      const gone = Array.isArray(named) ? named.filter((id): id is string => typeof id === 'string') : [];
+      ticked.value = ticked.value.filter((id) => !gone.includes(id));
+      saved.value = saved.value.filter((id) => !gone.includes(id));
+    }
     return; // `error` holds it: the block shows it.
   }
+  // Saved: the card's live results lead again; what was touched while it was on its way stays touched.
+  const now = picked.value;
+  saved.value = sending;
+  ticked.value = now.filter((id) => !sending.includes(id));
+  unticked.value = sending.filter((id) => !now.includes(id));
   void toastSuccess(t(isGroups.value ? 'customer.membership.groupsSaved' : 'customer.membership.tagsSaved'));
 }
 </script>

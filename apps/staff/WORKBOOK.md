@@ -509,9 +509,9 @@ Pasos:
    sube). Arriba, el total vendido y el total de comisiones.
 4. Para otro periodo, elige «Ayer», «Esta semana», «Este mes» o «Personalizado» y pon «Desde» y
    «Hasta».
-5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella o, si la línea no dice
-   quién, la cuenta que atendió (en una venta de una cita, la profesional de la cita). Lo que se cobra
-   sin elegir a nadie del equipo no cuenta para nadie.
+5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella (la de una cita, a la
+   profesional de la cita) o, si la línea no dice quién, quien atendió la cuenta. Con «Yo» en el TPV, es
+   quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie.
 Entra: la tarifa y la comisión de cada ficha y, de Ventas, lo vendido por cada profesional en el periodo
 (ya resta lo devuelto: lo que vuelve, a quien lo vendió). Ventas es opcional.
 Sale: solo lectura.
@@ -588,13 +588,14 @@ habla) y la API, con las mismas reglas y los mismos permisos. Una persona se nom
 su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
 (`staff.ambiguous_member`).
 
-### Lo que ofrece: consultas (leen, no cambian nada; todas menos las cuentas se pueden seguir en vivo)
+### Lo que ofrece: consultas (leen, no cambian nada; todas menos las cuentas y la ficha de la sesión se pueden seguir en vivo)
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | El directorio, con búsqueda, filtros y orden por cualquier columna, en páginas (hasta 100) | ver | F09 | `staff.member.list` |
 | La ficha de una persona (sin compensación) | ver | F02 | `staff.member.detail` |
 | Mi ficha, con mi tarifa y mi comisión | ver | F08 | `staff.member.mine` |
+| La ficha de quien tiene la sesión, solo su id y su nombre: a ella atribuye Ventas «Yo» | cualquiera con sesión | SALE-F16 | `staff.member.current` |
 | Tarifa, comisión y notas de RRHH, con los filtros, el orden y las páginas del directorio (la columna Tarifa/h lee las mismas filas) | ver la compensación | F21 | `staff.member.compensation` |
 | La hoja de comisiones: quien puede cobrar comisión, con su ficha, su cuenta y su comisión | ver la compensación | F21 | `staff.commission.summary` |
 | Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las cifras de Ventas) | F21 | `staff.commission.report` |

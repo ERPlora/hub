@@ -62,3 +62,12 @@ def test_the_events_are_grouped_by_entity():
 
 def test_it_listens_to_nobody():
     assert not hasattr(events, "react")
+
+
+def test_automations_offer_every_event_as_a_trigger():
+    """What the app declares is what an automation can start with (PAYMENT-F07; the old module declared
+    nothing, so its events never reached the catalogue: payments#16)."""
+    from apps.flow.queries import catalog_events
+
+    offered = {name for name, config in catalog_events().items() if config.label == "payment"}
+    assert offered == set(declared().values())

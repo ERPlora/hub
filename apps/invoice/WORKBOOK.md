@@ -1069,6 +1069,9 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 7. Los nombres de las series que se crean solas y la línea de la rectificativa por diferencias ya no
    salen en inglés en un papel en español: las series de fábrica llevan su nombre traducido y la línea
    dice lo que volvió.
+8. Los importes y precios unitarios agrupan los millares desde cuatro cifras (hub#1090): «1.234,56 €» en
+   español en la lista, la ficha y el aviso del tope del tique (antes «1234,56 €» y «3000.00 €»), como ya hacía
+   el documento A4.
 
 ### Lo que NO hace, a propósito
 

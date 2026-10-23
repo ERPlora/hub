@@ -200,3 +200,27 @@ def test_without_appointments_in_the_business_a_booked_price_is_an_open_price(sa
         open_check(appointment, haircut, ctx_for(EMPLOYEE), booked_price=9000)
     order = open_check(appointment, haircut, ctx_for("hub_manager"), booked_price=9000)
     assert order.lines[0].unit_price == 9000
+
+
+# ── «Me» charging an appointment (SALE-F16): its services stay with its professional ─────────────
+
+
+def test_charging_an_appointment_on_me_leaves_its_services_with_its_professional(salon, make_user):
+    # flow: SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»)
+    haircut, ana, _lucia = salon
+    appointment = book(salon)
+    opened = run("appointment.appointment.charge", {"id": str(appointment.id)})
+    # The receptionist charges it with the chip on «Me»; a comb sold at the till goes with the check.
+    user = make_user("bea", role="hub_manager")
+    bea = as_platform("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz", "user_id": user.pk})
+    as_platform("inventory.product.create", {"name": "Comb", "sku": "CMB", "price": 605, "tax_category_key": "product.generic"})
+    receptionist = ctx_for("hub_manager", actor=user)
+    run("sale.order.add_line", {"order_id": str(opened.order_id), "product": "CMB"}, receptionist)
+    sale = run(
+        "sale.sale.complete",
+        {"idempotency_key": "apt-me-0001", "order_id": str(opened.order_id), "payments": [{"method": "card"}]},
+        receptionist,
+    )
+    assert [(line.service_id, line.staff_id) for line in sale.lines] == [(haircut.id, ana.id), (None, None)]
+    assert sale.staff_id == bea.id
+    assert {row.staff_id: row.total_revenue for row in run("sale.sale.by_staff", {}).rows} == {ana.id: 9000, bea.id: 605}

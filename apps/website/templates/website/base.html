@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="{{ theme.color_scheme }}">
 <title>{{ site_name }}{% if content.hero.tagline %} · {{ content.hero.tagline }}{% endif %}</title>
+<link rel="icon" href="{{ icon }}">
 {% if content.hero.tagline %}<meta name="description" content="{{ content.hero.tagline }}">
 {% endif %}{% if preview %}<meta name="robots" content="noindex">
 {% endif %}{% hub_assets "frontend/website.ts" %}

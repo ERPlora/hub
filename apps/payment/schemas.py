@@ -329,6 +329,12 @@ class PaymentIn(In):
         max_length=8,
         description="ISO 4217 code (e.g. EUR); without it, the business's currency.",
     )
+    idempotency_key: UUID | None = Field(
+        None,
+        description="A key the caller makes once per payment it means to record. Sent again with the same "
+        "payment (a retry, a double tap), it answers the payment already recorded instead of recording "
+        "another one; with another payment, it is refused.",
+    )
 
     @field_validator("amount")
     @classmethod

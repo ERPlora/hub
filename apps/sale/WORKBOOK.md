@@ -330,7 +330,7 @@ Sale: una venta con una fila por medio; el cambio sale siempre del efectivo y nu
 Si falla: mientras falte dinero, el botón dice «Faltan <importe>»; si los cobros no suman el total al
 céntimo, el servidor lo rechaza: «Los cobros no suman el total de la venta.». En un negocio de España,
 una venta de 1.000 € o más no admite **ningún** cobro en efectivo, tampoco repartido: el botón de
-efectivo sale desactivado con su motivo y el servidor rechaza «Por ley, una venta de 1.000 € o más no
+efectivo sale desactivado con su motivo y el servidor rechaza «Por ley, una venta de 1.000,00 € o más no
 se puede cobrar en efectivo, ni en parte. Cóbrala con tarjeta, Bizum o transferencia.». Partir la
 cuenta en varios cobros (SALE-F22) no lo salta: cuenta la cuenta entera (lo ya cobrado de ella y todo lo
 que le queda), porque la ley suma los pagos en que se fracciona una operación (Ley 7/2012, art. 7.Uno.1,
@@ -365,7 +365,7 @@ cliente. Rellénalos o cóbrala como tique.». El NIF se lee como lo lee Cliente
 español que no cuadra sale bajo su casilla («Ese NIF no es válido.») y el botón dice «Revisa el NIF»;
 fuera de España, sin tipo de documento, «Indica qué tipo de documento es un NIF extranjero…» (el
 servidor lo rechaza igual, 422 en su campo; un NIF-IVA europeo lo comprueba el servidor). Un tique por
-encima del límite también lo rechaza el servidor por cualquier vía: «Por encima de 3.000 € esta venta
+encima del límite también lo rechaza el servidor por cualquier vía: «Por encima de 3.000,00 € esta venta
 no puede ser un tique: cóbrala como factura con los datos del cliente.». El país es un código ISO 3166-1
 (la misma lista que Facturación: «UK» o «EL» no valen, «GB» sí): otro se rechaza con «Escribe el código
 ISO del país, p. ej. ES, FR o GB.» (422 en `customer_country`), también el que traiga una ficha vieja.
@@ -646,14 +646,17 @@ Pantalla: Vender
 Pasos:
 1. En la cabecera de la cuenta, el chip «Atiende yo» dice a quién se atribuye. Tócalo.
 2. En «Quién atiende esta cuenta», elige a la persona del equipo de Personal o «Yo (quien tenga la
-   sesión)».
+   sesión)». Si tu cuenta no tiene ficha en Personal, la hoja lo avisa: «Tu cuenta no tiene ficha en
+   Personal: si lo dejas en «Yo», esta venta no contará para nadie.»
 3. Las líneas que se añadan a partir de ahí quedan selladas con esa persona. Para corregir una línea
    ya puesta, toca el nombre que sale debajo de ella («De quién es esta línea») y elige otra persona o
    «El profesional de la cuenta».
-4. Al cobrar, el chip vuelve a «yo».
-Entra: el equipo de Personal (fichas activas).
-Sale: la venta y cada línea atribuidas a esa persona (para el cierre por profesional), y la comanda de
-cocina que se envíe con su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
+4. Cobra. Con el chip en «Yo», la venta se atribuye a tu ficha de Personal; una línea con su propio
+   profesional (la de una cita, la que moviste) se queda con él. Después, el chip vuelve a «yo».
+Entra: el equipo de Personal (fichas activas) y la ficha de quien tiene la sesión.
+Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
+Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía.
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido mover la línea a otro profesional. Se queda con el que tenía.». Una línea enviada a
 cocina no se reasigna.
@@ -934,13 +937,16 @@ Pasos:
    territorio a mitad, por ejemplo), se llama «Impuestos». Sin ventas en el periodo, lleva el impuesto del
    territorio de **Impuestos → Ajustes**, y cambia al momento si se cambia el territorio. Con «7 días»,
    debajo de las cifras, lo vendido cada uno de esos días, de más antiguo a hoy («mié 14 · 120,50 €»).
-   Lo que el Inicio del producto actual enseñaba en paneles está aquí: lo de hoy y sus tickets son las
-   cifras de «Hoy», la actividad reciente es la tabla, y los últimos 7 días, esa fila.
 3. La tabla: Fecha, Número, Cliente, Pago, Estado (Completada, Anulada, Devuelta; con «Por devolver
    <importe>» si se devolvió una parte) y Total. Busca con «Buscar número o cliente…», filtra por
    estado, pago, fecha o total, u ordena.
 4. Toca una fila para ver su documento (SALE-F29). La tabla se recarga sola cuando se cobra, anula o
    devuelve una venta.
+5. Las cifras de hoy también están en el **Inicio**, en el tablero, como en el producto actual: «Ventas
+   hoy» y «Tickets hoy» salen de entrada; «Ventas últimos 7 días» (una barra por día, de más antiguo a
+   hoy) y «Actividad reciente» (las ocho últimas ventas, la más nueva arriba, con su número y su
+   cliente) se añaden con ⋮ («Personalizar panel»). Se ponen al día solos al cobrar, anular o devolver
+   una venta, sin recargar. Quien no tiene permiso de informes solo puede poner «Actividad reciente».
 Entra: nada de otras apps.
 Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
 la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
@@ -952,8 +958,9 @@ Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se
 «No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
-puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo.
-Implicados: STAFF-F21
+puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
+de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
+Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 <!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
@@ -1325,7 +1332,8 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
   enlace de la cuenta con su cliente lo guarda Clientes (`customer.order.link`).
 - **Inventario** (opcional): el catálogo de venta, el precio, la unidad y la categoría fiscal de cada
   artículo, leídos con sus propias consultas al añadir la línea.
-- **Personal** (opcional): el equipo para el chip «Atiende».
+- **Personal** (opcional): el equipo para el chip «Atiende» y la ficha de quien tiene la sesión
+  (`staff.member.current`, sin permiso de Personal), a la que el cobro atribuye «Yo».
 - **Servicios** (opcional): sus servicios en oferta (`service.service.list_for_sale`, y
   `service.service.get` al añadir la línea), los bonos de la clienta para un servicio
   (`service.grant.tender_options`) y las sesiones de bono: las reserva, las suelta, las gasta y las
@@ -1605,9 +1613,15 @@ administrador y responsable, los mismos que anulan y devuelven).
     medio de pago por nombre o tipo, sección y nota por nombre (409 `*_ambiguous` si casan
     varios).
 12. **El cajero** es un empleado: monta la cuenta y cobra.
-13. **Las cifras del panel de inicio** (los widgets «Ventas hoy», «Tickets hoy», «Ventas últimos 7
-    días», «Actividad reciente») no tienen dónde pintarse: el inicio del Hub es la rejilla de apps. Sus
-    consultas existen (`sale.sale.today`, `sale.sale.last_7_days`, `sale.sale.list`).
+13. **Las cifras del panel de inicio** («Ventas hoy», «Tickets hoy», «Ventas últimos 7 días»,
+    «Actividad reciente») vuelven al tablero del Inicio, como en el producto actual (ronda PLAN-HUB
+    2026-10-21, que deroga el «no tienen dónde pintarse» anterior): son los `widgets` del
+    `LiveAppConfig` sobre `sale.sale.today`, `sale.sale.last_7_days` y `sale.sale.list` (ocho, la más
+    reciente primero), con el `refresh_on` de los eventos con que `live.py` re-ejecuta cada consulta. Las
+    dos de hoy salen de entrada. Lo que cambia: el gráfico es de barras simples, sin las opciones del
+    viejo que el tablero de `base` aún no tiene (`chartType`, `seriesName`, `gridlines`, `height`), y dos
+    iconos esperan en `UI-REQUESTS.md`. Ni pasos de «Termina de configurar tu negocio» ni contadores de la
+    campana: el módulo viejo no los tenía.
 14. **«Descuentos» de la venta cuenta todos los descuentos**, también los de línea (antes solo el de la
     cuenta); las invitaciones van aparte, a coste.
 15. **El IVA se cierra una vez por clave fiscal** con el cálculo de Impuestos (antes, por perfil de
@@ -1659,6 +1673,10 @@ administrador y responsable, los mismos que anulan y devuelven).
 36. **Lo vendido por cada profesional resta lo devuelto** (ver 5), a quien vendió lo que vuelve (antes
     una devolución parcial no restaba y la total borraba la venta, así que la suma de las profesionales
     no cuadraba con los «Ingresos» del día).
+37. **Los importes agrupan los millares desde cuatro cifras** (hub#1090): «1.234,56 €» en español, también
+    en los avisos del servidor (el tope del efectivo y del tique, el margen de precio de un servicio, lo que
+    queda por devolver con un medio), que antes decían «1000.00 €». Lo que se teclea (cobro, cantidades,
+    devolución) nunca se agrupa.
 
 ### Lo que NO hace, a propósito
 

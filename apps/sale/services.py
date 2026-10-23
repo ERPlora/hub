@@ -97,6 +97,7 @@ from apps.sale.queries import (
     lines_to_charge,
     loose_lines,
     method_display_name,
+    money_text,
     operation_total,
     order_detail,
     payment_method_row,
@@ -255,10 +256,6 @@ CASH_REGISTER_CLOSED = _(
     "The cash register is closed: open a cash session to charge in cash."
 )
 KEY_REUSED = _("That attempt key was already used for another charge. Open it again to charge this one.")
-
-
-def _money(cents: int) -> str:
-    return f"{Decimal(cents) / 100:.2f} €"
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────────
@@ -1595,7 +1592,7 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
         and any(leg["method"].type == PaymentMethod.Type.CASH for leg in legs)
     ):
         raise Conflict(
-            str(CASH_LIMIT_EXCEEDED) % {"limit": _money(limit)},
+            str(CASH_LIMIT_EXCEEDED) % {"limit": money_text(limit)},
             code="sale.cash_limit_exceeded",
         )
     return legs
@@ -1740,6 +1737,27 @@ def _check_drawer(ctx: OperationContext, legs: list[dict]) -> None:
         raise Conflict(str(CASH_REGISTER_CLOSED), code="sale.cash_register_closed")
 
 
+#: Staff's answer to «whose record is the session's?» (SALE-F16): who «Me» is at the till.
+CURRENT_MEMBER = "staff.member.current"
+
+
+def _served_by(ctx: OperationContext, named: UUID | None) -> UUID | None:
+    """Who the sale is attributed to (SALE-F16): whoever the charge names (the person chosen on the chip, or
+    an integration's) or, left on «Me», the Staff record of whoever holds the session, asked by name (Staff is
+    no requirement of Sales; its operation needs no Staff permission, so a cashier who does not see the team
+    still sells as herself). Nobody without a record, without a user behind the session (the platform, an API
+    key) or without Staff (absent or off): the sale counts for nobody, as the till warns. It is the sale's
+    professional, for the lines of the check: a line with its own (an appointment's service) keeps it."""
+    if named is not None:
+        return named
+    try:
+        op = get(CURRENT_MEMBER)
+        current = op(ctx, op.input.model_validate({}))
+    except (UnknownOperation, AppInactive):
+        return None
+    return current.member.id if current.member else None
+
+
 def _number(day: dt.date) -> int:
     """The next number of ``day``: the counter's row raised with ``UPDATE … RETURNING`` (never a sequence)."""
     SaleCounter.objects.bulk_create([SaleCounter(day=day)], ignore_conflicts=True)
@@ -1876,7 +1894,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         and valuation.total > ticket_limit
     ):
         raise Conflict(
-            str(TICKET_OVER_LIMIT) % {"limit": _money(ticket_limit)},
+            str(TICKET_OVER_LIMIT) % {"limit": money_text(ticket_limit)},
             code="sale.ticket_over_limit",
         )
     counter_sale = order.source == Order.Source.COUNTER and not order.lines.exists()
@@ -1892,6 +1910,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
             {"order_id": str(order.id), "lines_count": len(lines)},
         )
 
+    served_by = _served_by(ctx, data.staff_id)
     sequence = _number(day)
     principal = max(legs, key=lambda leg: leg["amount"]) if legs else None
     try:
@@ -1914,7 +1933,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                     if invoice
                     else {}
                 ),
-                staff_id=data.staff_id,
+                staff_id=served_by,
                 appointment_id=appointment_id,
                 tax_included=settings.default_tax_included,
                 currency=CURRENCY,
@@ -2374,8 +2393,8 @@ def _refund_legs(sale: Sale, data: RefundIn) -> list[dict]:
         if allocation.amount > option["remaining"]:
             message = str(REFUND_EXCEEDS_TENDER) % {
                 "method": name,
-                "amount": _money(allocation.amount),
-                "remaining": _money(option["remaining"]),
+                "amount": money_text(allocation.amount),
+                "remaining": money_text(option["remaining"]),
             }
             raise Conflict(message, code="sale.refund_exceeds_tender")
         if allocation.to_method_id is None:

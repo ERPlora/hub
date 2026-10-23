@@ -3,15 +3,9 @@
 Lo que las páginas de Pagos necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-## Filtro de rango de fechas en `DataTable`
-
-- **Qué:** el `ok-data-table` viejo filtraba la columna Fecha de Pagos por rango (`daterange`). El
-  `DataTable` filtra un día (`date`) o un rango de números (`range`). Es la misma petición que
-  `apps/schedule/UI-REQUESTS.md` («Filtro de rango de fechas en `DataTable`»): `filter: { type:
-  'daterange' }` con `<key>_from` y `<key>_to`.
-- **Hoy:** la columna Fecha filtra un día y la página manda ese día como los dos extremos
-  (`payment_date_from` = `payment_date_to`). La consulta `payment.payment.list` ya acepta el rango: al
-  llegar el filtro, solo cambia `frontend/pages/PaymentsPage.vue` (y su test).
+**Al cerrar la app** (CLOSE-PAYMENT, 2026-10-23): nada de esto ha llegado a `ERPlora/ui` (`origin/main`
+53db78c); todo tiene sustituto en uso y ningún flujo está roto. Queda propuesto para `## 6` de
+`MIGRATION.md` como `payment:ui-icons`, `payment:ui-live-server-table` y `payment:ui-money-reader`.
 
 ## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
 
@@ -26,8 +20,13 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/t
 
 ## Piezas compartidas que viven copiadas en la app
 
-`frontend/composables/useServerTable.ts`, `useLiveList.ts`, `useT.ts`, `frontend/lib/money.ts`,
-`frontend/components/MoneyInput.vue` y `PageNotices.vue` son copias de las de `apps/service` (como las
-de `inventory`, `customer`, `sale`, `invoice`). Ya están pedidas en `apps/sale/UI-REQUESTS.md` e
-`apps/invoice/UI-REQUESTS.md` («Tabla de servidor viva»); cuando lleguen a `@erplora/ui/components`, se
-borran de aquí con sus tests.
+- **Tabla de servidor viva**: `frontend/composables/useServerTable.ts`, `useLiveList.ts`, `useT.ts` y
+  `frontend/components/PageNotices.vue`, copias de las de `apps/service` (como las de `inventory`,
+  `customer`, `sale`, `invoice`). Ya están pedidas en `apps/sale/UI-REQUESTS.md` e
+  `apps/invoice/UI-REQUESTS.md` («Tabla de servidor viva»; en el registro, `cart_checkout:`, `combo:`,
+  `tax:` y `kitchen:ui-live-server-table`).
+- **Dinero**: `frontend/lib/money.ts` (leer lo que se teclea, sin adivinar un «1.250») y
+  `frontend/components/MoneyInput.vue`. Es la misma pieza que piden `cash_register:ui-money-format`,
+  `cart_checkout:ui-money-reader` y `combo:ui-money-reader`.
+
+Cuando lleguen a `@erplora/ui`, se borran de aquí con sus tests.

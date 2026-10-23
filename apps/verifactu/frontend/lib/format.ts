@@ -31,17 +31,26 @@ function numberFormat(locale: string, key: string, options: Intl.NumberFormatOpt
 
 const missing = (value: unknown) => value === null || value === undefined || value === '' || Number.isNaN(Number(value));
 
-/** `cents` as euros in `locale` («€1,234.56», «-12,10 €»); nothing to show is «—». */
+// Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
+// here beside «1.234,56 €» in the other screens (hub#1090).
+/** `cents` as euros in `locale` («€1,234.56», «1.234,56 €», «-12,10 €»); nothing to show is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string): string {
   if (missing(cents)) return '—';
-  return numberFormat(locale, 'money', { style: 'currency', currency: CURRENCY }).format((cents as number) / 100);
+  return numberFormat(locale, 'money', { style: 'currency', currency: CURRENCY, useGrouping: 'always' }).format((cents as number) / 100);
 }
 
 /** A unit price in cents with two decimals («82.64» → «€0.8264»): two decimals of euro, up to four when
- *  the price without VAT has them (RD 1619/2012 art. 6.1.f); nothing to show is «—». */
+ *  the price without VAT has them (RD 1619/2012 art. 6.1.f), thousands grouped as `formatMoney`'s; nothing to
+ *  show is «—». */
 export function formatUnitPrice(cents: string | number | null | undefined, locale: string): string {
   if (missing(cents)) return '—';
-  return numberFormat(locale, 'unit-price', { style: 'currency', currency: CURRENCY, minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(
+  return numberFormat(locale, 'unit-price', {
+    style: 'currency',
+    currency: CURRENCY,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+    useGrouping: 'always',
+  }).format(
     Number(cents) / 100,
   );
 }

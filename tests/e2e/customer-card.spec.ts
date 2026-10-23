@@ -5,7 +5,7 @@
 // and deletes (F07).
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { cardOf, cleanUp, createCard, customersReady, e2eName, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
+import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
 import { A, api, login, shot, shown } from './helpers';
 
 test.afterAll(() => cleanUp());
@@ -33,6 +33,8 @@ test('a note added in one tab shows live in the other tab\'s activity', async ({
   await other.close();
 });
 
+// flow: CUSTOMER-F06 — saving the groups refreshes the card live; that refresh must not untick the tag
+// ticked right after and not saved yet (hub#114: «Save tags» sent none and the card lost it).
 test('a group and a tag made in their lists are assigned on the card; their counts follow', async ({ page, context }) => {
   await login(page, A, '/customer/groups');
   const card = await createCard(context, { name: e2eName('Member') });
@@ -75,6 +77,51 @@ test('a group and a tag made in their lists are assigned on the card; their coun
   await page.goto('/customer/groups');
   await searchList(page, 'customer-groups', groupName);
   await expect(rowNamed(page, 'customer-groups', groupName)).toContainText('1');
+});
+
+// flow: CUSTOMER-F06 — the other way round: a tag saved first, then a group ticked; the card changes
+// meanwhile (someone renames it) and its live result arrives before «Save groups»: the tick stays, the
+// card keeps both, and both stay ticked at every size.
+test('a tag saved first, a group ticked while the card changes, then saved: the card keeps both', async ({ page, context }) => {
+  await login(page, A, '/customer/customers');
+  const card = await createCard(context, { name: e2eName('Both') });
+  const tag = await api<{ id: string }>(context, A, 'POST', '/customer/tags', { name: e2eName('Regular') });
+  const group = await api<{ id: string }>(context, A, 'POST', '/customer/groups', { name: e2eName('Gold') });
+  expect([tag.status, group.status]).toEqual([201, 201]);
+
+  await page.goto(`/customer/customers/${card.id}`);
+  const tags = shown(page).locator('[data-testid=customer-tags]');
+  const groups = shown(page).locator('[data-testid=customer-groups]');
+  await tags.locator(`[data-testid=customer-tags-item-${tag.data.id}]`).click();
+  await tags.locator('[data-testid=customer-tags-save]').click();
+  await expect(page.locator('ion-toast').last()).toContainText(/Tags assigned|Etiquetas asignadas/);
+  const groupBox = groups.locator(`[data-testid=customer-groups-item-${group.data.id}]`);
+  await groupBox.click();
+  await expect(groupBox).toHaveJSProperty('checked', true);
+  const renamed = e2eName('Both renamed');
+  expect((await api(context, A, 'POST', '/customer/customers/update', { id: card.id, name: renamed })).status).toBe(200);
+  await expect(shown(page).locator('ion-title')).toContainText(renamed);
+  await expect(groupBox).toHaveJSProperty('checked', true);
+  await groups.locator('[data-testid=customer-groups-save]').click();
+  await expect(page.locator('ion-toast').last()).toContainText(/Groups assigned|Grupos asignados/);
+  await expect
+    .poll(async () => {
+      const { data } = await cardOf(context, card.id);
+      return [data.group_ids, data.tag_ids];
+    })
+    .toEqual([[group.data.id], [tag.data.id]]);
+
+  for (const vp of FLOW_VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`/customer/customers/${card.id}`);
+    const box = (kind: 'groups' | 'tags', id: string) => shown(page).locator(`[data-testid=customer-${kind}-item-${id}]`);
+    await expect(box('groups', group.data.id)).toHaveJSProperty('checked', true);
+    await expect(box('tags', tag.data.id)).toHaveJSProperty('checked', true);
+    await box('tags', tag.data.id).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: shot(`FIX-CUSTOMER-CARD-GROUP-LOST-AFTER-TAG-${vp.label}`) });
+  }
+  // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
 
 /** The id of an `e2e.` group or tag by its name (setup evidence, through the API). */

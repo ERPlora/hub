@@ -1,3 +1,4 @@
+// flow: WEBSITE-F02, WEBSITE-F10 — the four designs, light and dark, at three widths (one test per flow: website-flows.spec.ts)
 // The website module end to end (apps/website, rounds 2026-10-21 and 2026-10-22, PLAN §29): the owner fills the
 // editor at /website (hero with a cover photo, contact, «About us» typed key by key and then hidden, the footer's
 // line, the «Forest» palette, «Auto» and the «Modern» design) and publishes; a visitor without a session opens `/`
