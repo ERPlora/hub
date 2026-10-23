@@ -71,8 +71,9 @@ class VerifactuConfig(LiveAppConfig):
     ]
     # The Home's hooks (PLAN-HUB round 2026-10-21), the old module's module.json `setup` and `widgets` (it had no
     # `bell`). The step is done once the chosen way could carry the records to the AEAT of production (VERIFACTU-F08,
-    # no plan gating it: PLAN §30), which is what the business has to do; it is functional, never base's legal level:
-    # testing files without it and the till sells (gh:hub#1726). The panels read the queries of the old ones, each
+    # no plan gating it: PLAN §30), which is what the business has to do. Its level is base's: functional in testing,
+    # which files without it while the till sells (gh:hub#1726); ⛔ legal where the hub files in production, which
+    # refuses every sale without it (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). The panels read the queries of the old ones, each
     # refreshed by the events live.py re-runs it on; the latest events are a component of the app, which names each
     # event's type in the reader's language (gh:verifactu#139). Registered icons only: the old
     # `shield-checkmark-outline` and `stats-chart-outline` wait in UI-REQUESTS.md.

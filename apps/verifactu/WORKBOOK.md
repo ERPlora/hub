@@ -72,9 +72,12 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   certificado se sube aquí, en «Mi certificado». Aquí se elige cuál usar.
 - **En el Inicio**, mientras la vía elegida no pueda llevar tus registros a la AEAT de producción (ERPlora sin la
   autorización aprobada, o tu certificado sin subir o caducado), «Termina de configurar tu negocio» lo recuerda con
-  «Configura VeriFactu» y la pastilla «Importante» (no frena la venta: en pruebas se vende igual); su «Configurar»
-  lleva a VeriFactu → Configuración, y el paso queda «Hecho» en cuanto ERPlora aprueba la autorización o subes y
-  eliges tu certificado. Solo lo ve quien configura VeriFactu.
+  «Configura VeriFactu»; su «Configurar» lleva a VeriFactu → Configuración, y el paso queda «Hecho» en cuanto ERPlora
+  aprueba la autorización o subes y eliges tu certificado. En pruebas lleva la pastilla «Importante» (no frena la
+  venta: en pruebas se vende igual) y solo lo ve quien configura VeriFactu. En producción (VERIFACTU-F08), si la vía
+  se pierde (se revoca la autorización, o el certificado caduca o se quita), lleva «Necesario para facturar» y sale
+  la franja «Todavía no puedes facturar» encima de las demás pantallas, porque cada venta nueva se rechaza; lo ve
+  todo el equipo, y a quien no configura VeriFactu le dice «Esto lo tiene que configurar un administrador.».
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
   responsable), también «Da servicio a varios obligados», siempre «S» (contradicción 7, cerrada).
 
@@ -1049,8 +1052,9 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 ### El Inicio (los «hooks» de `LiveAppConfig`, ronda PLAN-HUB 2026-10-21)
 
 Los del `module.json` viejo (`setup` y `widgets`; no tenía `bell`), en `apps.py`. **Paso** `verifactu.sending_route`
-(«Set up VeriFactu» / «Configura VeriFactu», `required=True` → «Importante», nunca el nivel legal de `base`:
-gh:hub#1726), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
+(«Set up VeriFactu» / «Configura VeriFactu», `required=True` → «Importante» en pruebas, gh:hub#1726; ⛔ «Necesario
+para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home.py`: el nivel
+es de `base`), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
 production, scope)`: vía propia con certificado vigente que este servidor abre, o vía ERPlora con el otorgamiento
 aprobado; la exención del hub de ERPlora incluida; lo que le falte al servidor no cuenta, no es tarea del negocio),
 permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`. **Paneles** (permiso

@@ -62,6 +62,13 @@ describe('BlockingStrip', () => {
     expect(activity.strip().exists()).toBe(true);
   });
 
+  it('on the very screen that sets the step up, names it with no «Set up» to that same screen', async () => {
+    const s = await setup('/invoice/settings', status([legal()]));
+    expect(s.strip().get('[data-testid="blocking-item"]').text()).toContain('Los datos de tu negocio');
+    expect(s.strip().find('[data-testid="blocking-configure-invoice.business_identity"]').exists()).toBe(false);
+    expect(s.strip().text()).not.toContain('Esto lo tiene que configurar un administrador.');
+  });
+
   it('a step only an administrator can do says so, with no button', async () => {
     const s = await setup('/demo/items', status([legal({ actionable: false })]));
     expect(s.strip().find('[data-testid="blocking-configure-invoice.business_identity"]').exists()).toBe(false);

@@ -81,8 +81,9 @@ también en la app instalada: ninguna vende nada.
 
 ### La franja «Todavía no puedes facturar»
 Encima de cualquier pantalla mientras falta un paso que impide facturar: «No se podrá emitir ningún
-ticket ni factura hasta que configures esto:» y cada paso con «Configurar». En el «Resumen» del Inicio no
-sale (la lista dice lo mismo un poco más abajo); en «Actividad», sí.
+ticket ni factura hasta que configures esto:» y cada paso con «Configurar» (en la pantalla que lo configura,
+solo su nombre). En el «Resumen» del Inicio no sale (la lista dice lo mismo un poco más abajo); en
+«Actividad», sí.
 
 ## Estados de cada pantalla
 
@@ -361,9 +362,13 @@ Implicados: HUBS-F26, HUBS-F27, HUBS-F28
   (`Widget`) y `bell` (`BellCounter`), dataclasses de `live.meta` comprobadas por `live.checks`
   (E009–E016). Cada consulta que nombran es un `kind="query"` de la propia app; base la ejecuta como la
   persona (`run_hook`).
-- Nivel: ⛔ `legal` solo para `LEGAL_STEPS` (`invoice.business_identity`); si no, `required` →
-  `functional` y si no `recommended`. Un ⛔ cuya consulta la persona no puede leer se evalúa como sistema
-  (`system_context`) y sale `actionable: false`; un paso cuya consulta falla se omite y se anota en el log.
+- Nivel: ⛔ `legal` para `LEGAL_STEPS` (`invoice.business_identity`) y, donde la primera fila de su propia
+  consulta dice que el hub presenta en producción, para `LEGAL_IN_PRODUCTION` (`verifactu.sending_route`, con
+  `environment` de `verifactu.config.get`: sin vía lista en producción se rechaza toda venta; en pruebas se vende
+  sin ella y sigue `functional`, gh:hub#1726); si no, `required` → `functional` y si no `recommended`. Un ⛔ (o un
+  paso de `LEGAL_IN_PRODUCTION`) cuya consulta la persona no puede leer se evalúa como sistema (`system_context`) y,
+  si sale ⛔ pendiente, `actionable: false`; si no es ⛔, se omite como cualquier otro paso. Un paso cuya consulta
+  falla se omite y se anota en el log.
 - Pasos de plataforma (solo con `base.administer_hub`): `base.apps` (orden 10; `unavailable` si no hay
   ninguna app de negocio en el catálogo) y `base.team` (orden 80; hecho con dos personas activas).
 - `base/live.py`: cada consulta se re-ejecuta tras los eventos de `refresh_on` de su gancho más
