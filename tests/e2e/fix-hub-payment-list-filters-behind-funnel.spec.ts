@@ -114,6 +114,7 @@ for (const size of SIZES) {
       await view.locator(`[data-testid=${TABLE}-empty], [data-testid=${TABLE}-row]`).first().waitFor({ state: 'visible' });
       await view.locator(`[data-testid=${TABLE}-search] input`).fill(stamp);
       await listed(page, [august, september], []);
+      await expect(view.locator(`[data-testid=${TABLE}-row]`), 'the search keeps this run’s two payments only').toHaveCount(2);
 
       // On arrival, as the old list: the funnel in the toolbar, no row of filters, no panel.
       const funnel = view.locator(`[data-testid=${TABLE}-filters-toggle]`);
