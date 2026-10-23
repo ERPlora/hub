@@ -266,6 +266,81 @@ describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
   });
 });
 
+// BASE-F06, BASE-F09 — a timeline's moments (Sales' «Recent activity»): the panel painted the instant as the server
+// sent it, `2026-10-23T02:23:55.572622Z`. As Square, Shopify or a phone's call log: the local time alone if it was
+// today, «yesterday» and the time, else the short date and the time (its year only when it is another).
+describe('when a timeline entry happened (BASE-F06, BASE-F09)', () => {
+  const MADRID = 'Europe/Madrid';
+  /** Friday 23 Oct 2026, 12:00 in Madrid. */
+  const NOW = new Date('2026-10-23T10:00:00Z');
+  const recent = widget('sale.recent_activity', {
+    kind: 'timeline',
+    map: { title: 'number', description: 'customer_name', time: 'created_at' },
+  });
+  const moments = (times: unknown[], locale: string, timeZone = MADRID) => {
+    const rows = times.map((created_at, index) => ({ number: `S-${index}`, customer_name: '', created_at }));
+    const view = widgetView(recent, { rows }, locale, { now: NOW, timeZone });
+    if (view.kind !== 'timeline') throw new Error(`expected a timeline, got ${view.kind}`);
+    return view.entries.map((entry) => [entry.time, entry.datetime]);
+  };
+
+  it("says today's by its local time alone in the person's language, the instant whole as its datetime", () => {
+    const at = '2026-10-23T02:23:55.572622Z';
+    expect(moments([at], 'es')).toEqual([['4:23', at]]);
+    expect(moments([at], 'en')).toEqual([['4:23 AM', at]]);
+  });
+
+  it("says yesterday's with the word for yesterday and its time", () => {
+    expect(moments(['2026-10-22T16:10:00Z'], 'es')).toEqual([['Ayer 18:10', '2026-10-22T16:10:00Z']]);
+    expect(moments(['2026-10-22T16:10:00Z'], 'en')).toEqual([['Yesterday 6:10 PM', '2026-10-22T16:10:00Z']]);
+  });
+
+  it('says an older one by its short date and its time, and its year only when it is another', () => {
+    expect(moments(['2026-10-20T16:10:00Z'], 'es')).toEqual([['20 oct, 18:10', '2026-10-20T16:10:00Z']]);
+    expect(moments(['2026-10-20T16:10:00Z'], 'en')).toEqual([['Oct 20, 6:10 PM', '2026-10-20T16:10:00Z']]);
+    expect(moments(['2025-12-31T22:30:00Z'], 'es')).toEqual([['31 dic 2025, 23:30', '2025-12-31T22:30:00Z']]);
+    expect(moments(['2025-12-31T22:30:00Z'], 'en')).toEqual([['Dec 31, 2025, 11:30 PM', '2025-12-31T22:30:00Z']]);
+  });
+
+  it("today and yesterday are the zone's days, not UTC's", () => {
+    // 22:30Z on the 22nd is already the 23rd in Madrid, and still the 22nd in Los Angeles (03:00 there now).
+    expect(moments(['2026-10-22T22:30:00Z'], 'es')).toEqual([['0:30', '2026-10-22T22:30:00Z']]);
+    expect(moments(['2026-10-22T22:30:00Z'], 'es', 'America/Los_Angeles')).toEqual([['Ayer 15:30', '2026-10-22T22:30:00Z']]);
+  });
+
+  it('a civil day says «today», «yesterday» or its date, without a time', () => {
+    expect(moments(['2026-10-23', '2026-10-22', '2026-10-17'], 'es')).toEqual([
+      ['Hoy', '2026-10-23'],
+      ['Ayer', '2026-10-22'],
+      ['17 oct', '2026-10-17'],
+    ]);
+    expect(moments(['2025-10-23'], 'en')).toEqual([['Oct 23, 2025', '2025-10-23']]);
+  });
+
+  it('says each one whole as its detail: the date and time in the zone, a civil day without a time nor a zone', () => {
+    const view = widgetView(
+      recent,
+      { rows: ['2026-10-22T22:30:00Z', '2026-10-22', '10:00'].map((created_at) => ({ number: 'S', created_at })) },
+      'es',
+      { now: NOW, timeZone: 'America/Los_Angeles' },
+    );
+    if (view.kind !== 'timeline') throw new Error(`expected a timeline, got ${view.kind}`);
+    expect(view.entries.map((entry) => entry.detail)).toEqual(['22 oct 2026, 15:30', '22 oct 2026', undefined]);
+  });
+
+  it('a time that is no date stays as it is, and has no datetime', () => {
+    const times = ['10:00', 'Mañana', '2026-02-30', '2026-10-23T25:00:00Z', 1729677835, null];
+    expect(moments(times, 'es')).toEqual([
+      ['10:00', undefined],
+      ['Mañana', undefined],
+      ['2026-02-30', undefined],
+      ['2026-10-23T25:00:00Z', undefined],
+      ['1729677835', undefined],
+      ['', undefined],
+    ]);
+  });
+});
+
 describe('activeWidgetKeys (BASE-G167)', () => {
   const catalogue = [widget('a.one', { default: true }), widget('a.two'), widget('b.three', { default: true })];
 
