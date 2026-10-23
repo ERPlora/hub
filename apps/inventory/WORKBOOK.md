@@ -1013,15 +1013,15 @@ datos de quien lo provocó.
 
 | De | Para qué | Flujos | Servicio |
 |---|---|---|---|
-| Impuestos | Las categorías fiscales con su tipo, para el selector y para importar | F01, F02, F06, F09, F10 | `tax.category.list` |
-| Impuestos | Comprobar que una categoría fiscal existe antes de guardar un producto | F01, F02, F05 | `tax.category.get` |
-| Impuestos | Los textos fiscales aprendidos, para reconocer la columna fiscal de un CSV | F09, F10 | `tax.alias.list` |
+| Impuestos | Las categorías fiscales con su tipo, para el selector (también para nombrar la elegida cuando no está entre las primeras) y para importar productos | F01, F02, F06, F09 | `tax.category.list` |
+| Impuestos | Comprobar al guardar o importar que la categoría fiscal elegida existe y sigue activa, y saber qué productos no la tienen (lectura directa: es una app requerida) | F01, F02, F05, F06, F09, F10 | modelo `tax.TaxCategory` |
+| Impuestos | Reconocer el texto de la columna fiscal de un CSV: la clave, el nombre en cualquier idioma o un texto aprendido | F09, F10 | `tax.alias.resolve` |
 | Impuestos | Crear una categoría fiscal o aprender un texto desde la importación | F09 | `tax.category.create`, `tax.alias.create` |
-| Ventas | El número de la venta, para la Referencia de un movimiento | F16 | `sale.sale.get` |
-| Facturación | El número del tique o la factura de una venta, para la Referencia | F16 | `invoice.invoice.get_for_sale` |
+| Ventas | El número del tique o la factura de una venta, para la Referencia de un movimiento | F16 | `sale.sale.get` |
 | Impresión | Mandar la etiqueta a la impresora con la función «Etiqueta» | F25 | `printing.job.create` |
 
-Los nombres de los servicios de otras apps son una propuesta: los fija el WORKBOOK de cada una.
+Inventario no usa nada más de otras apps: el número de una venta le llega en su aviso, y el de su tique o
+factura se lo da Ventas, no Facturación.
 
 ### Quién puede qué
 
