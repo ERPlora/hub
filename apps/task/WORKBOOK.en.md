@@ -164,7 +164,7 @@ Steps:
    active team member), Project (the selector offers the active ones) and Tags (up to 20, of
    up to 50 characters, separated by commas).
 3. Tap **Create task**: the task shows in the list as **To Do**, without a completion date and with its number
-   `TSK-AAAAMMDD-NNNN` (the business's day and a counter of the day that leaves no gaps).
+   `TSK-YYYYMMDD-NNNN` (the business's day and a counter of the day that leaves no gaps).
 In: the form. The assistant names the project by its code or its name, the parent task by its
 number or its title and the assignee by their name. A date with a time is taken as its day in the business's
 time zone. Creator: whoever creates it, always from the session.
