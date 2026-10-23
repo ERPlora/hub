@@ -73,10 +73,24 @@ export interface BellCounter {
   icon: string;
 }
 
+/** `base.DeviceNoticeOut`: a row the device is told once (APPOINTMENT-F28). */
+export interface DeviceNoticeRow {
+  /** «<app>.<notice>». */
+  key: string;
+  app: string;
+  id: string;
+  at: string;
+  title: string;
+  body: string;
+  /** The screen a tap opens; empty when it names none. */
+  route: string;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
     'base.widget.list': { input: NoInput; output: { widgets: WidgetDef[] } };
     'base.bell.counters': { input: NoInput; output: { counters: BellCounter[] } };
+    'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[] } };
   }
 }

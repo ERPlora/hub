@@ -81,9 +81,9 @@ describe('main.ts', () => {
     expect(importBoot.home).toBe(true);
   });
 
-  it("plugs base's pieces into the chrome: the bell in the topbar, «Upgrade plan» in the menu, the blocking strip", () => {
+  it("plugs base's pieces into the chrome: the bell in the topbar, «Upgrade plan» in the menu, the blocking strip and the device's notices", () => {
     const chrome = importBoot.chrome as Record<string, unknown>;
-    expect(Object.keys(chrome).sort()).toEqual(['notice', 'sidebarFooter', 'topbar']);
+    expect(Object.keys(chrome).sort()).toEqual(['background', 'notice', 'sidebarFooter', 'topbar']);
     for (const piece of Object.values(chrome)) expect(piece).toBeTruthy();
   });
 

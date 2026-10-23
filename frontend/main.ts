@@ -42,12 +42,14 @@ export const SIDEBAR: ShellSidebar = {
 
 /**
  * base's pieces of the chrome (APP-BASE-1, the old hub's): the bell at the end of the topbar, «Upgrade plan»
- * in the menu's footer and the blocking strip over every screen. Loaded on demand: none is needed to paint.
+ * in the menu's footer, the blocking strip over every screen and, beside the pane, the device's notices
+ * (APPOINTMENT-F28). Loaded on demand: none is needed to paint.
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   topbar: defineAsyncComponent(() => import('../base/frontend/components/HubBell.vue')),
   sidebarFooter: defineAsyncComponent(() => import('../base/frontend/components/UpgradePlanLink.vue')),
   notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
+  background: defineAsyncComponent(() => import('../base/frontend/components/DeviceNotices.vue')),
 };
 
 /** An app's `frontend/routes.ts` default-exports its routes → pages, and nothing else. */
