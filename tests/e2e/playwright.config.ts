@@ -3,7 +3,8 @@
 // It drives the dev stack that `manage.py runserver` serves (Django on :8000 + Vite on :5173):
 // start it first. A branch beside another session's stack runs its own on other ports and its own e2e
 // database (`E2E_HUB_PORT`, `VITE_DEV_PORT`, `SAAS_URL`, `DB_NAME`: `stack.ts`; created by `database.ts`;
-// recipe in README.md). One worker: the specs share that server and some of them restart it.
+// recipe in README.md). One worker: the specs share that server and some of them restart it; `globalSetup`
+// refuses `--workers=N` above 1, which would override it.
 //
 // `globalSetup` (`global-setup.ts`) first stops the run if the local databases of that `DB_NAME` have
 // unapplied migrations: it runs `manage.py migrate --check --plan` (control) and `manage.py migrate_hubs

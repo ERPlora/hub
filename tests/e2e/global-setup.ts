@@ -6,9 +6,13 @@
 // A stack's own e2e database that does not exist yet is said as such, with `database.ts`, which creates
 // it (runserver cannot start without it, so the e2e cannot create it here). Then it checks that the local
 // hubs `a` and `b` are ready in the registry (`seed_local_hubs --check`; without them every host is a 404).
+// Before all that it refuses more than one worker: `--workers=N` overrides `workers: 1` of playwright.config.ts, and
+// specs running at once on the one stack delete each other's data (2026-10-23: the agenda spec timed out).
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import type { FullConfig } from '@playwright/test';
 
 import { isE2eDatabase, STACK } from './stack.ts';
 
@@ -100,8 +104,24 @@ export function managePy(database: string, spawn: Spawn = spawnSync, env: NodeJS
   };
 }
 
-export default function globalSetup(): void {
-  const manage = managePy(STACK.database);
+/** Throws unless the run has one worker: the specs share one server and one database, and one spec's cleanup deletes
+ * the rows another is using (`appointment-employee.spec.ts` deletes `E2E Apt%`, `appointment-agenda.spec.ts`'s too). */
+function assertSingleWorker(workers: number): void {
+  if (workers <= 1) return;
+  throw new Error(
+    `This e2e runs ${workers} workers on one shared stack (one Hub server, one SaaS and one database): specs running ` +
+      "at once delete each other's data. Run it with `--workers=1` or without `--workers` (playwright.config.ts sets " +
+      'workers: 1). To run specs in parallel, start another stack with its own ports and database ' +
+      '(tests/e2e/README.md, «Varias ejecuciones a la vez»).',
+  );
+}
+
+/** Playwright calls it with the resolved config (`--workers=N` already applied); `manage` is for the tests. */
+export default function globalSetup(
+  config: Pick<FullConfig, 'workers'>,
+  manage: ManagePy = managePy(STACK.database),
+): void {
+  assertSingleWorker(config.workers);
   assertMigrationsApplied(manage, STACK.database);
   assertLocalHubsRegistered(manage, STACK.database);
 }

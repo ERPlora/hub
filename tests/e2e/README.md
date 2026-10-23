@@ -19,7 +19,9 @@ CI=1 pnpm e2e tests/e2e/sale-sales.spec.ts     # una spec: SIN `--` (con él, Pl
 ```
 
 Antes de la primera spec, `global-setup.ts` comprueba que la BD de la ejecución (`DB_NAME`) no tiene
-migraciones pendientes (`migrate --check`, `migrate_hubs --check`) y nunca migra nada.
+migraciones pendientes (`migrate --check`, `migrate_hubs --check`) y nunca migra nada. Antes aún, rechaza más de un
+worker: `--workers=N` pisa el `workers: 1` de `playwright.config.ts`, y dos specs a la vez sobre la misma pila se
+borran los datos. Para correr en paralelo, otra pila (abajo, «Varias ejecuciones a la vez»).
 
 ## El login
 
