@@ -85,6 +85,31 @@ class TestTheIndex:
             (staff, ANA, PLATFORM_SESSION_HOST),
         }
 
+    def test_a_login_over_another_person_s_session_notes_the_new_one(self, acme):
+        """``login`` flushes a session of another user and leaves it without a key: the note saves it first."""
+        request = RequestFactory().post("/auth/callback", HTTP_HOST="acme.localhost:8000")
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.user, request.hub = AnonymousUser(), acme
+        for saas_id in (ANA, OLGA):
+            redeemed = RedeemedUser(user_id=saas_id, email="x@example.com", name="X", locale="es", role="hub_employee")
+            open_session_from_saas(request, redeemed, acme.slug)
+
+        assert list(SessionOwner.objects.values_list("session_id", "saas_user_id")) == [
+            (request.session.session_key, OLGA)
+        ]
+
+    def test_the_same_person_entering_again_keeps_one_note(self, acme):
+        request = RequestFactory().post("/auth/callback", HTTP_HOST="acme.localhost:8000")
+        SessionMiddleware(lambda r: None).process_request(request)
+        request.user, request.hub = AnonymousUser(), acme
+        redeemed = RedeemedUser(user_id=ANA, email="x@example.com", name="X", locale="es", role="hub_employee")
+        open_session_from_saas(request, redeemed, acme.slug)
+        open_session_from_saas(request, redeemed, acme.slug)
+
+        assert list(SessionOwner.objects.values_list("session_id", "saas_user_id")) == [
+            (request.session.session_key, ANA)
+        ]
+
     def test_a_session_that_ends_takes_its_note_with_it(self, acme):
         key = login(ANA, acme)
 
@@ -115,6 +140,16 @@ class TestTheDoor:
         assert not any(alive(key) for key in keys)
         assert alive(olga)
         assert set(SessionOwner.objects.values_list("saas_user_id", flat=True)) == {OLGA}
+
+    def test_with_a_business_it_ends_too_a_session_of_that_account_that_noted_no_host(self, client, acme, beta):
+        """A session from before the sessions noted their host is valid on every host (``base.middleware``)."""
+        hostless, olga_hostless = login(ANA, beta), login(OLGA, beta)
+        SessionOwner.objects.filter(session_id__in=[hostless, olga_hostless]).update(host="")
+
+        answer = signed(client, "post", REVOKE, {"user_id": ANA, "hub_id": ACME_ID})
+
+        assert (answer.status_code, answer.json()) == (200, {"ended": 1})
+        assert not alive(hostless) and alive(olga_hostless)
 
     def test_twice_is_the_same_answer_with_nothing_left_to_end(self, client, acme):
         login(ANA, acme)

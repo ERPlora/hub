@@ -116,13 +116,15 @@ class TestTheMembersOfThePhoto:
         assert answer.json() == {"applied": False, "version": 2}
         assert role_of(ANA) == "hub_employee" and alive(ana_here)
 
-    def test_the_demo_s_owner_is_not_one_of_the_saas_s_members(self, client, acme):
+    def test_a_photo_with_nobody_removes_the_saas_s_members_but_not_the_demo_s_owner(self, client, acme):
         demo = get_user_model().objects.create(username="demo:acme")
         Membership.objects.create(user=demo, host="acme", role="hub_owner")
+        ana_here = login(ANA, acme, "hub_employee")
 
         signed(client, "put", PATH, photo(1))
 
         assert Membership.objects.filter(user=demo, host="acme").exists()
+        assert role_of(ANA) is None and not alive(ana_here)
 
     @pytest.mark.parametrize(
         "members",

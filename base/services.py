@@ -585,7 +585,8 @@ def session_revoke(ctx: OperationContext, data: SessionRevokeIn) -> dict:
         slug = Hub.objects.filter(pk=data.hub_id).values_list("slug", flat=True).first()
         if slug is None:
             return {"ended": 0}
-        owners = owners.filter(host=slug)
+        # A session that noted no host (from before the rule) is valid on every host, this one's too.
+        owners = owners.filter(host__in=[slug, ""])
     return {"ended": _end_sessions(owners)}
 
 
