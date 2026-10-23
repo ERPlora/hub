@@ -100,6 +100,7 @@ describe('ListDetailPage', () => {
     await s.result(LIST, VIP);
     await s.result(ITEMS, page([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('This price list has no prices yet.');
+    expect(s.wrapper.findComponent(EmptyState).props('icon')).toBe('pricetag');
   });
 
   it('«+» adds a price, Edit changes one and Remove asks first', async () => {

@@ -80,7 +80,7 @@ const columns = computed<DataTableColumn<ProjectOut>[]>(() => [
 ]);
 
 const actions = computed<DataTableAction<ProjectOut>[]>(() => [
-  { id: 'open', label: t('task.actions.open'), icon: 'chevron-forward-outline', color: 'primary', showLabel: true, pinned: true },
+  { id: 'open', label: t('task.actions.open'), icon: 'open-outline', color: 'primary', showLabel: true, pinned: true },
 ]);
 
 const sheetProjectId = ref<string | null>(null);
@@ -124,7 +124,7 @@ const swatch = (row: unknown) => (row as ProjectOut).color;
       :sort-dir="table.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: ProjectOut) => row.name"
-      :card-icon="() => 'file-tray-outline'"
+      :card-icon="() => 'folder-outline'"
       :entity-label="{ one: $t('task.projects.entity.one'), many: $t('task.projects.entity.many') }"
       :loading="status === 'loading'"
       :error="status === 'error' && !blocked ? $t('task.projects.loadError') : undefined"
@@ -157,7 +157,7 @@ const swatch = (row: unknown) => (row as ProjectOut).color;
       <template #empty>
         <EmptyState
           data-testid="task-projects-empty"
-          icon="file-tray-outline"
+          icon="folder-outline"
           :heading="table.filtered.value ? $t('task.noResults') : $t('task.projects.empty')"
           :message="table.filtered.value ? $t('task.noResultsMessage') : undefined"
         />

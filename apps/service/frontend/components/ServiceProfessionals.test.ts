@@ -1,10 +1,12 @@
 // SERVICE-F31, F32 «Profesionales que lo hacen», inside «Editing service»: the live list of who performs
 // the service (`service.assignment.list`), each with what it lasts and costs with them, their main
-// service marked; whoever may edit services assigns someone of Staff (searched), with their own minutes
-// and price, changes those, marks the main service, switches one off or removes it. Nobody assigned
+// service marked with a filled star, as the old Staff record; whoever may edit services assigns someone of
+// Staff (searched), with their own minutes and price, changes those, marks the main service (the empty
+// star of a row), switches one off or removes it. Nobody assigned
 // says the whole bookable team may do it. Refusals are said above the list; while the list has not
 // arrived it says it is loading, and a list that cannot be read says so with «Retry».
 import { Combo, InlineFeedback } from '@erplora/ui/components';
+import { HubIcon } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
 import type { AssignmentOut } from '../operations';
@@ -38,7 +40,12 @@ async function setup(options: { canChange?: boolean; locale?: 'en' | 'es' } = {}
   await m.live();
   const el = (testid: string) => m.inDoc(testid) as Control;
   const member = () => m.wrapper.findComponent(Combo);
-  return { ...m, el, member, show: (data: unknown) => m.result(OP, data) };
+  /** The star of a row: its icon, and what it says to a screen reader (`null` = decorative). */
+  const star = (id: string) => {
+    const icon = m.find(`service-professionals-row-${id}`).findComponent(HubIcon);
+    return [icon.props('name'), icon.props('label') ?? null];
+  };
+  return { ...m, el, member, star, show: (data: unknown) => m.result(OP, data) };
 }
 
 describe('ServiceProfessionals', () => {
@@ -48,7 +55,7 @@ describe('ServiceProfessionals', () => {
     await s.show(page(ROWS));
     expect(s.el('service-professionals-row-a1')?.textContent).toContain('Ana López');
     expect(s.el('service-professionals-row-a1')?.textContent).toContain('30 min · €20.00');
-    expect(s.el('service-professionals-primary-a1')?.textContent).toContain('Main service');
+    expect(s.el('service-professionals-primary-a1')).not.toBeNull();
     expect(s.el('service-professionals-row-a2')?.textContent).toContain('40 min · €25.00');
     expect([s.el('service-professionals-minutes-a2').value, s.el('service-professionals-price-a2').value]).toEqual(['40', '25.00']);
   });
@@ -121,6 +128,27 @@ describe('ServiceProfessionals', () => {
     expect(options).toEqual([{ id: 'm9', label: 'Cris Gil', hint: 'Stylist' }]);
   });
 
+  it('stars the main service and offers the empty star of the others, as the old Staff record', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    // The main one: a filled star that says what it is, and nothing to press (it already is).
+    expect(s.star('a1')).toEqual(['ion:star', 'Main service']);
+    expect(s.el('service-professionals-primary-a1')?.getAttribute('aria-label')).toBe('Main service');
+    expect(s.el('service-professionals-make-primary-a1')).toBeNull();
+    // Another one: an empty star, the button that makes it theirs, named on the button.
+    expect(s.star('a2')).toEqual(['ion:star-outline', null]);
+    expect(s.el('service-professionals-primary-a2')).toBeNull();
+    const make = s.el('service-professionals-make-primary-a2');
+    expect([make?.tagName, make?.getAttribute('aria-label'), make?.getAttribute('title')]).toEqual([
+      'ION-BUTTON',
+      'Make it their main service',
+      'Make it their main service',
+    ]);
+    // No label or text button any more: the star says it.
+    expect(s.el('service-professionals-row-a1')?.textContent).not.toContain('Main service');
+    expect(s.el('service-professionals-row-a2')?.textContent).not.toContain('Make it their main service');
+  });
+
   it('marks the main service, switches one off and removes one', async () => {
     const s = await setup();
     await s.show(page(ROWS));
@@ -166,13 +194,18 @@ describe('ServiceProfessionals', () => {
     expect(s.el('service-professionals-row-a1')?.textContent).toContain('Ana López');
     expect(s.el('service-professionals-assign')).toBeNull();
     expect(s.el('service-professionals-remove-a1')).toBeNull();
+    // The star still says which one is the main service, but nobody can move it from here.
+    expect(s.star('a1')).toEqual(['ion:star', 'Main service']);
+    expect(s.star('a2')).toEqual(['ion:star-outline', null]);
+    expect(s.el('service-professionals-make-primary-a2')).toBeNull();
   });
 
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
     expect(s.el('service-professionals')?.textContent).toContain('Profesionales que lo hacen');
-    expect(s.el('service-professionals-primary-a1')?.textContent).toContain('Servicio principal');
+    expect(s.el('service-professionals-primary-a1')?.getAttribute('aria-label')).toBe('Servicio principal');
+    expect(s.el('service-professionals-make-primary-a2')?.getAttribute('aria-label')).toBe('Hacerlo su servicio principal');
     expect(s.member().props('label')).toBe('Añadir profesional…');
   });
 

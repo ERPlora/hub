@@ -36,6 +36,14 @@ async function setup(options: MountOptions = {}) {
 }
 
 describe('PriceListsTable', () => {
+  it("wears the old module's pricetag on its cards and its empty list, as its tab", async () => {
+    const s = await setup();
+    await s.show(page([GENERAL, VIP]));
+    expect(s.prop<() => string>('cardIcon')()).toBe('pricetag');
+    await s.show(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('icon')).toBe('pricetag');
+  });
+
   it('follows the price lists by name, 50 from the first', async () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ status: 'active', sort: 'name', dir: 'asc', limit: 50, offset: 0 }]);

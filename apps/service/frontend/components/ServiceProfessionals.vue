@@ -1,13 +1,15 @@
 <script setup lang="ts">
 // SERVICE-F31, F32 «Profesionales que lo hacen» (the old Staff record's «Servicios que realiza», now on
 // the service, as Fresha, Square or Vagaro): the live `service.assignment.list` of the service, each
-// with what it lasts and costs with that person and their main service marked. Whoever may edit
-// services assigns someone of Staff (searched on the server) with their own minutes and price, changes
-// those (empty = the service's), marks the main service, switches one off or removes it. Changes come
+// with what it lasts and costs with that person and their main service marked with a filled star (the
+// old Staff record's). Whoever may edit services assigns someone of Staff (searched on the server) with
+// their own minutes and price, changes those (empty = the service's), marks the main service with the
+// empty star of a row, switches one off or removes it. Changes come
 // back through the stream; a refusal is said above the list. Until the list arrives it says it is
 // loading; a list that cannot be read says so, with the reason and «Retry».
-import { Combo, type ComboOption, InlineFeedback, StatusPill } from '@erplora/ui/components';
+import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
+import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
@@ -184,17 +186,39 @@ const setDraft = (id: string, part: Partial<Draft>) => {
         :data-testid="`service-professionals-row-${row.id}`"
       >
         <div class="service-professionals__who">
+          <!-- The empty star makes it their main service (one per person: the previous one is no longer). -->
+          <ion-button
+            v-if="canChange && !row.is_primary"
+            class="service-professionals__star"
+            :data-testid="`service-professionals-make-primary-${row.id}`"
+            size="small"
+            fill="clear"
+            :aria-label="t('service.professionals.makePrimary')"
+            :title="t('service.professionals.makePrimary')"
+            @click="act(() => update.run({ id: row.id, is_primary: true }), () => update.error.value)"
+          >
+            <HubIcon
+              slot="icon-only"
+              name="ion:star-outline"
+            />
+          </ion-button>
+          <HubIcon
+            v-else-if="row.is_primary"
+            class="service-professionals__star-icon service-professionals__star-icon--on"
+            :data-testid="`service-professionals-primary-${row.id}`"
+            name="ion:star"
+            :label="t('service.professionals.primary')"
+            :title="t('service.professionals.primary')"
+          />
+          <HubIcon
+            v-else
+            class="service-professionals__star-icon"
+            name="ion:star-outline"
+          />
           <strong>{{ row.member_name }}</strong>
           <span class="service-professionals__own">
             {{ t('service.professionals.own', { duration: row.duration, price: formatMoney(row.price, locale) }) }}
           </span>
-          <StatusPill
-            v-if="row.is_primary"
-            size="sm"
-            tone="info"
-            :data-testid="`service-professionals-primary-${row.id}`"
-            :label="t('service.professionals.primary')"
-          />
         </div>
         <div
           v-if="canChange"
@@ -236,15 +260,6 @@ const setDraft = (id: string, part: Partial<Draft>) => {
           >
             {{ $t('service.professionals.active') }}
           </ion-toggle>
-          <ion-button
-            v-if="!row.is_primary"
-            :data-testid="`service-professionals-make-primary-${row.id}`"
-            size="small"
-            fill="clear"
-            @click="act(() => update.run({ id: row.id, is_primary: true }), () => update.error.value)"
-          >
-            {{ $t('service.professionals.makePrimary') }}
-          </ion-button>
           <ion-button
             :data-testid="`service-professionals-remove-${row.id}`"
             size="small"
@@ -330,6 +345,21 @@ const setDraft = (id: string, part: Partial<Draft>) => {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+.service-professionals__star {
+  margin: 0;
+  --padding-start: 4px;
+  --padding-end: 4px;
+}
+/* The same box as the star of the button, so the names line up whichever one a row has. */
+.service-professionals__star-icon {
+  box-sizing: content-box;
+  padding: 0 4px;
+  font-size: 1.25rem;
+  color: var(--ion-color-medium, #636469);
+}
+.service-professionals__star-icon--on {
+  color: var(--ion-color-primary, #3880ff);
 }
 .service-professionals__own {
   color: var(--ion-color-medium-shade, #5f5f5f);

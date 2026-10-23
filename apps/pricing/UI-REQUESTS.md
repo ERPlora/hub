@@ -3,19 +3,10 @@
 Lo que las páginas de Tarifas necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
 parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-**Estado al cerrar la app (2026-10-21, CLOSE-PRICING)**: no ha llegado nada a `ui` (`origin/main` 9962696; el
-puntero del Hub, f62af6b): los dos puntos siguen abiertos, los dos con sustituto y sin ningún flujo roto, y
-propuestos para «Fuera por ahora» del registro (`MIGRATION.md` §6) como `pricing:ui-icons` y
-`pricing:ui-datatable-side-panel`. El icono puede ir con los de Servicios y Tareas en
-`FIX-UI-SHELL-ICONS-SERVICE-TASK` (`TODO.md`), que hoy no lo nombra.
-
-## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
-
-- `ion:pricetag` — icono del módulo y de la entrada de menú **Tarifas** (`apps.py` `icon` y
-  `navigation`). Es el del producto actual. Hoy: `ion:pricetags-outline`.
-
-Al registrarlo, cambiar a la vez `apps.py` (`icon` y `navigation`) y sus tests (`tests/test_apps.py`,
-`frontend/routes.test.ts`) y correr `pnpm gen:app-icons`.
+**Estado (2026-10-23, FIX-UI-SHELL-ICONS-SERVICE-TASK)**: el icono del producto actual, `ion:pricetag`, ya llegó
+a `ui` y salió de aquí (módulo y entrada de menú **Tarifas**, y, como en Servicios y Tareas, las tarjetas y las listas
+vacías de Tarifas). Sigue abierto el panel lateral, con sustituto y
+sin ningún flujo roto, en «Fuera por ahora» (`MIGRATION.md` §6) como `pricing:ui-datatable-side-panel`.
 
 ## Panel lateral de `DataTable`
 

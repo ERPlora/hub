@@ -196,7 +196,7 @@ function onRowClick(row: PackageOut): void {
       :sort-dir="table.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: PackageOut) => row.name"
-      :card-icon="() => 'ticket-outline'"
+      :card-icon="() => 'gift-outline'"
       :entity-label="{ one: $t('service.packages.entity.one'), many: $t('service.packages.entity.many') }"
       :loading="status === 'loading'"
       :error="status === 'error' && !blocked ? $t('service.packages.loadError') : undefined"
@@ -226,7 +226,7 @@ function onRowClick(row: PackageOut): void {
       <template #empty>
         <EmptyState
           data-testid="service-packages-empty"
-          icon="ticket-outline"
+          icon="gift-outline"
           :heading="table.filtered.value ? $t('service.noResults') : $t('service.packages.empty')"
           :message="table.filtered.value ? $t('service.noResultsMessage') : undefined"
         />

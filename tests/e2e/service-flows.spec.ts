@@ -118,7 +118,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await page.locator(`[data-testid=service-professionals-save-${assignmentId}]`).click();
       await expect(assignment).toContainText('45 min · €25.00');
       await page.locator(`[data-testid=service-professionals-make-primary-${assignmentId}]`).click();
-      await expect(page.locator(`[data-testid=service-professionals-primary-${assignmentId}]`)).toHaveText('Main service');
+      // The empty star filled: their main service, said to a screen reader (HUB_SHELL icons).
+      await expect(page.locator(`[data-testid=service-professionals-primary-${assignmentId}]`)).toHaveAttribute('aria-label', 'Main service');
       await capture('SERVICE-F32');
       await page.locator(`[data-testid=service-professionals-remove-${assignmentId}]`).click();
       await expect(page.locator('[data-testid=service-professionals-empty]')).toBeVisible();

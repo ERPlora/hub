@@ -61,8 +61,8 @@ def test_service_is_a_free_module_of_the_catalog_group_with_a_registered_icon():
     assert config in module_configs()
     assert config.category is Category.CATALOG
     assert config.premium is False
-    # Registered in the shell (ION_ICONS); the old `briefcase` waits in UI-REQUESTS.md.
-    assert config.icon == "ion:pricetag-outline"
+    # The old module's `briefcase`, registered in the shell (ION_ICONS).
+    assert config.icon == "ion:briefcase-outline"
     assert str(config.verbose_name) == "Services"
 
 
@@ -108,9 +108,9 @@ def test_navigation_is_the_three_tabs_of_the_old_module_with_registered_icons():
     assert [
         (entry.id, str(entry.label), entry.icon, entry.path) for entry in entries
     ] == [
-        ("services", "Services", "ion:pricetag-outline", "/service/services"),
+        ("services", "Services", "ion:briefcase-outline", "/service/services"),
         ("categories", "Categories", "ion:pricetags-outline", "/service/categories"),
-        ("packages", "Packages", "ion:ticket-outline", "/service/packages"),
+        ("packages", "Packages", "ion:gift-outline", "/service/packages"),
     ]
 
 

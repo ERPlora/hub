@@ -119,6 +119,18 @@ describe('ServicesPage', () => {
     expect(s.prop('rowClickable')).toBe(false);
   });
 
+  it("wears the old module's icons: the briefcase on its cards and its empty list, «Archive» its archive box", async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop<Array<{ id: string; icon?: string }>>('actions').map((a) => [a.id, a.icon])).toEqual([
+      ['edit', 'create-outline'],
+      ['archive', 'archive-outline'],
+    ]);
+    expect(s.prop<() => string>('cardIcon')()).toBe('briefcase-outline');
+    await s.show(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('icon')).toBe('briefcase-outline');
+  });
+
   it('sorts and searches on the server; no service at all says «No services.»', async () => {
     const s = await setup();
     await s.show(page([]));

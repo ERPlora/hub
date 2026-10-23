@@ -9,8 +9,8 @@ class TaskConfig(LiveAppConfig):
     label = "task"
     kind = "app"
     verbose_name = _("Tasks")
-    # Registered in the shell (ION_ICONS); the old module's `checkbox-outline` waits in UI-REQUESTS.md.
-    icon = "ion:checkmark-circle-outline"
+    # The old module's `checkbox-outline`, registered in the shell (ION_ICONS).
+    icon = "ion:checkbox-outline"
     category = Category.ORGANIZATION
     premium = False
     # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
@@ -46,9 +46,8 @@ class TaskConfig(LiveAppConfig):
         "hub_employee": ["task.view", "task.add", "task.change"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
-    # `icon =` as the module's own icon. The same icons as the tabbar (frontend/tabs.ts); the old
-    # `checkbox-outline` of Tasks waits in UI-REQUESTS.md.
+    # `icon =` as the module's own icon. The same icons as the tabbar (frontend/tabs.ts).
     navigation = [
-        Nav("tasks", _("Tasks"), "ion:checkmark-circle-outline", "/task/tasks"),
+        Nav("tasks", _("Tasks"), "ion:checkbox-outline", "/task/tasks"),
         Nav("projects", _("Projects"), "ion:folder-outline", "/task/projects"),
     ]

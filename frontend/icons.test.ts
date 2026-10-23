@@ -3,7 +3,7 @@
 // one must fail a test, not a till. `scanIcons` is the reader @erplora/ui runs on itself; here it
 // reads the hub's own sources. It resolves icons through the baked `~icons/*` modules, so it needs
 // the `erploraVite()` plugins of vite.config.ts.
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,5 +43,24 @@ describe('guardrail: every icon the hub names is registered', () => {
       .flatMap((file) => [...readFileSync(join(base, file), 'utf8').matchAll(ICON_LITERAL)].map((m) => m[1]));
     expect(names.length).toBeGreaterThanOrEqual(4);
     expect(names.filter((name) => !isRegisteredIcon({ kind: 'icon', name }))).toEqual([]);
+  });
+
+  // An app's apps.py names the icons of its menu (the positional `Nav("id", _("Label"), "ion:…", "/path")`) and of
+  // its Home hooks (`"icon": "ion:…"` of a setup step, a widget, a bell counter) as plain strings, which
+  // `scanIcons` does not read either; the menu, the apps tiles and the Home paint them with HubIcon, so an
+  // unregistered one leaves the entry without its icon (old hub#160). The module's own `icon = "…"` is not one:
+  // only the store shows it, from the SVG `pnpm gen:app-icons` bakes (base/catalog.py).
+  it('every icon an app names in its apps.py, but its store icon, is registered', () => {
+    const apps = join(HUB_DIR, 'apps');
+    const named = readdirSync(apps)
+      .filter((app) => existsSync(join(apps, app, 'apps.py')))
+      .flatMap((app) =>
+        readFileSync(join(apps, app, 'apps.py'), 'utf8')
+          .split('\n')
+          .filter((line) => !/^\s*icon\s*=/.test(line))
+          .flatMap((line) => [...line.matchAll(ICON_LITERAL)].map((m) => [app, m[1]])),
+      );
+    expect(named.length).toBeGreaterThanOrEqual(20);
+    expect(named.filter(([, name]) => !isRegisteredIcon({ kind: 'icon', name }))).toEqual([]);
   });
 });
