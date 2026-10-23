@@ -3,7 +3,9 @@ refunds, the payment methods, the departments of the open price, the quick notes
 (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, LiveAppConfig, Nav, Widget
+
+from apps.sale.events import FIGURE_EVENTS, SALE_EVENTS
 
 
 class SaleConfig(LiveAppConfig):
@@ -72,4 +74,61 @@ class SaleConfig(LiveAppConfig):
         ),
         Nav("departments", _("Sections"), "ion:grid-outline", "/sale/departments"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/sale/settings"),
+    ]
+    # The Home's hooks (PLAN-HUB round 2026-10-21): the old module's four panels of the dashboard, on the
+    # queries Sales' own screen reads, each refreshed by the events live.py re-runs its query on. Registered
+    # icons only: the old `trending-up-outline` and `bar-chart-outline` wait in UI-REQUESTS.md. No steps of
+    # «Finish setting up your business» nor counters of the bell: the old module had none.
+    widgets = [
+        Widget(
+            key="today",
+            title=_("Today's sales"),
+            icon="ion:cash-outline",
+            size="sm",
+            permission="sale.view_reports",
+            default=True,
+            refresh_on=FIGURE_EVENTS,
+            kind="kpi",
+            operation="sale.sale.today",
+            map={"value": "total"},
+            options={"format": "currency"},
+        ),
+        Widget(
+            key="tickets_today",
+            title=_("Today's tickets"),
+            icon="ion:receipt-outline",
+            size="sm",
+            permission="sale.view_reports",
+            default=True,
+            refresh_on=FIGURE_EVENTS,
+            kind="kpi",
+            operation="sale.sale.today",
+            map={"value": "tickets"},
+            options={"format": "number"},
+        ),
+        Widget(
+            key="last_7_days",
+            title=_("Sales, last 7 days"),
+            icon="ion:calendar-outline",
+            size="lg",
+            permission="sale.view_reports",
+            refresh_on=FIGURE_EVENTS,
+            kind="chart",
+            operation="sale.sale.last_7_days",
+            map={"label": "day", "value": "total"},
+            options={"format": "currency"},
+        ),
+        # The sales list's own permission: whoever reads the sales sees the last ones charged.
+        Widget(
+            key="recent_activity",
+            title=_("Recent activity"),
+            icon="ion:time-outline",
+            size="md",
+            permission="sale.view_sale",
+            refresh_on=SALE_EVENTS,
+            kind="timeline",
+            operation="sale.sale.list",
+            params={"limit": 8, "sort": "created_at", "dir": "desc"},
+            map={"title": "number", "description": "customer_name", "time": "created_at"},
+        ),
     ]

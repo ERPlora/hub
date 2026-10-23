@@ -1,8 +1,20 @@
-"""The sale app declares its module metadata, its menu entries, its permissions and what each role gets."""
+"""The sale app declares its module metadata, its menu entries, its permissions, what each role gets and its panels
+of the Home."""
+
+from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import (
+    Category,
+    LiveAppConfig,
+    Nav,
+    Widget,
+    module_configs,
+    permissions_for_role,
+)
 
 PERMISSIONS = [
     "sale.view_sale",
@@ -137,3 +149,133 @@ def test_the_money_and_fiscal_writes_are_high_risk():
         "sale.order.set_line_discount",
         "sale.order.set_line_discount_over_limit",
     } <= high
+
+
+# ── The Home's hooks (PLAN-HUB round 2026-10-21) ────────────────────────────────────────────────────
+
+FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"]
+SALES = [*FIGURES, "sale.sale.reassigned", "sale.sale.invoiced"]
+
+
+def test_the_homes_panels_are_the_old_sales_dashboards_four():
+    """The old module's four panels of the dashboard (its module.json ``widgets``): today's sales and tickets on
+    by default, the last seven days and the recent activity to turn on, each on a query of queries.py."""
+    panels = sale().widgets
+    assert all(isinstance(panel, Widget) for panel in panels)
+    assert [
+        (
+            panel.key,
+            panel.kind,
+            panel.operation,
+            panel.size,
+            panel.default,
+            panel.permission,
+            dict(panel.params),
+            dict(panel.map),
+            dict(panel.options),
+        )
+        for panel in panels
+    ] == [
+        (
+            "today",
+            "kpi",
+            "sale.sale.today",
+            "sm",
+            True,
+            "sale.view_reports",
+            {},
+            {"value": "total"},
+            {"format": "currency"},
+        ),
+        (
+            "tickets_today",
+            "kpi",
+            "sale.sale.today",
+            "sm",
+            True,
+            "sale.view_reports",
+            {},
+            {"value": "tickets"},
+            {"format": "number"},
+        ),
+        (
+            "last_7_days",
+            "chart",
+            "sale.sale.last_7_days",
+            "lg",
+            False,
+            "sale.view_reports",
+            {},
+            {"label": "day", "value": "total"},
+            {"format": "currency"},
+        ),
+        (
+            "recent_activity",
+            "timeline",
+            "sale.sale.list",
+            "md",
+            False,
+            "sale.view_sale",
+            {"limit": 8, "sort": "created_at", "dir": "desc"},
+            {"title": "number", "description": "customer_name", "time": "created_at"},
+            {},
+        ),
+    ]
+    # Every business that sells: the old panels named the three sectors Sales sold in, which were all of them.
+    assert all(not panel.verticals and panel.component is None for panel in panels)
+
+
+def test_the_panels_are_titled_in_english_and_in_spanish_as_the_old_ones():
+    with translation.override("en"):
+        english = [str(panel.title) for panel in sale().widgets]
+    with translation.override("es"):
+        spanish = [str(panel.title) for panel in sale().widgets]
+    assert english == [
+        "Today's sales",
+        "Today's tickets",
+        "Sales, last 7 days",
+        "Recent activity",
+    ]
+    assert spanish == [
+        "Ventas hoy",
+        "Tickets hoy",
+        "Ventas últimos 7 días",
+        "Actividad reciente",
+    ]
+
+
+def test_each_panel_is_refreshed_by_the_events_that_re_run_its_query():
+    """The figures move with a charge, a void or a refund; the activity also with what changes a sale's row (its
+    customer's card merged into another, the invoice that gives it its number): what live.py re-runs each on."""
+    panels = {panel.key: panel for panel in sale().widgets}
+    assert {key: list(panel.refresh_on) for key, panel in panels.items()} == {
+        "today": FIGURES,
+        "tickets_today": FIGURES,
+        "last_7_days": FIGURES,
+        "recent_activity": SALES,
+    }
+    for panel in panels.values():
+        assert live_registry.is_subscribable(panel.operation), panel.key
+        assert set(panel.refresh_on) == set(
+            live_registry.subscribable[panel.operation]
+        ), panel.key
+
+
+def test_the_panels_icons_are_registered_in_the_shell():
+    # Registered icons only (an unregistered one paints nothing): the old `trending-up-outline` and
+    # `bar-chart-outline` wait in UI-REQUESTS.md.
+    assert [panel.icon for panel in sale().widgets] == [
+        "ion:cash-outline",
+        "ion:receipt-outline",
+        "ion:calendar-outline",
+        "ion:time-outline",
+    ]
+    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    for panel in sale().widgets:
+        assert f"'{panel.icon.removeprefix('ion:')}'" in icons, panel.icon
+
+
+def test_sales_has_no_setup_steps_nor_bell_counters():
+    # The old module declared neither: its module.json has no `setup`, and the old hub's setup_status.rs only
+    # listed the core's own steps (apps, business details, printer, team).
+    assert (sale().setup, sale().bell) == ([], [])

@@ -10,7 +10,7 @@ from apps.tax.events import RULE_EVENTS
 from apps.tax.events import SETTINGS_UPDATED as TAX_SETTINGS_UPDATED
 
 SALES = E.SALE_EVENTS
-FIGURES = [E.SALE_COMPLETED, E.SALE_VOIDED, E.SALE_REFUNDED]
+FIGURES = E.FIGURE_EVENTS
 
 live("sale.sale.list", on=SALES)
 live("sale.sale.get", on=SALES)
