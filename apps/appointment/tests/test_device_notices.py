@@ -100,3 +100,9 @@ def test_an_appointment_without_a_professional_is_told_without_one(salon):
 
     assert told["body"].split(" · ")[0] == salon.cut.name
     assert len(told["body"].split(" · ")) == 2
+
+
+def test_whoever_sees_an_agenda_hears_citas_and_nobody_else(salon):
+    op = get("base.notice.list")
+    assert op(ctx_for("hub_employee"), NoticeListIn()).sources == ["appointment.booked", "appointment.cancelled"]
+    assert op(ctx_for("hub_employee", permissions={"base.view_home"}), NoticeListIn()).sources == []

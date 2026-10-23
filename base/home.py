@@ -335,6 +335,13 @@ def instant(notice: Mapping[str, Any]) -> dt.datetime:
     return moment if moment.tzinfo else moment.replace(tzinfo=dt.UTC)
 
 
+def notice_sources(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> list[str]:
+    """``<app>.<notice>`` of every notice the person of ``ctx`` hears, whether it has rows or not."""
+    return [
+        f"{config.label}.{notice.key}" for config in configs for notice in config.notices if ctx.has(notice.permission)
+    ]
+
+
 def device_notices(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> list[dict]:
     """The rows the modules' notices tell that the person of ``ctx`` may see, the newest first.
 

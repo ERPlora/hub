@@ -746,3 +746,21 @@ def test_the_notices_of_a_module_off_or_out_of_the_store(modules, declare, setti
     modules(module("stock", notices=[notice()], listed=False))
     settings.SHOW_UNLISTED_MODULES = False
     assert notice_list(ctx()) == []
+
+
+def test_it_says_which_notices_the_person_hears_even_with_nothing_to_tell(modules, declare):
+    """So the shell asks the device's permission only where there is something to be told (hub#2046, HUB_APP-F07)."""
+    declare("stock.item.changes", {"rows": []})
+    modules(
+        module("stock", permissions=["stock.view"], notices=[notice(), notice("secret", permission="stock.view")]),
+        module("sale", notices=[notice(operation="stock.item.changes")]),
+        on=["stock"],
+    )
+
+    answer = get("base.notice.list")(ctx(), NoticeListIn()).model_dump(mode="json")
+
+    assert answer == {"notices": [], "sources": ["stock.added"]}
+    assert get("base.notice.list")(ctx("stock.view"), NoticeListIn()).model_dump(mode="json")["sources"] == [
+        "stock.added",
+        "stock.secret",
+    ]

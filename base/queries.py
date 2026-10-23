@@ -232,4 +232,4 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
-        return {"notices": home.device_notices(ctx, modules)}
+        return {"notices": home.device_notices(ctx, modules), "sources": home.notice_sources(ctx, modules)}

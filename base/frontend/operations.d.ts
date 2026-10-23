@@ -91,6 +91,6 @@ declare module '@erplora/ui/sdk' {
     'base.setup.status': { input: NoInput; output: SetupStatus };
     'base.widget.list': { input: NoInput; output: { widgets: WidgetDef[] } };
     'base.bell.counters': { input: NoInput; output: { counters: BellCounter[] } };
-    'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[] } };
+    'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
   }
 }

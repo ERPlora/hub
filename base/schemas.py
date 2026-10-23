@@ -309,3 +309,6 @@ class DeviceNoticeOut(Schema):
 
 class NoticeListOut(Schema):
     notices: list[DeviceNoticeOut] = Field(description="The newest first.")
+    sources: list[str] = Field(
+        description="«<app>.<notice>» of every notice this person hears, told or not: with none, nothing to ask for."
+    )
