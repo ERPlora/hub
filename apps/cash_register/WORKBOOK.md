@@ -499,7 +499,7 @@ Pasos:
    esa impresora lo saca en papel. Con la sesión abierta es el «Informe parcial (X)»; cerrada, el «Cierre de
    caja (Z)».
 3. El papel lleva el número de sesión con su X o su Z, quién la abrió (X) o la cerró (Z; «Cerrada sola» si
-   se cerró sola), el fondo y, línea a línea, las ventas por forma de pago, devoluciones,
+   se cerró sola), el fondo, el esperado y, línea a línea, las ventas por forma de pago, devoluciones,
    entradas, salidas, invitaciones, el esperado y, en el Z, el contado y el descuadre.
 4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
    navegador con el mismo informe (en la cola esperaría para siempre).
