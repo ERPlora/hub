@@ -7,6 +7,7 @@ off unless set: local development opts in with ``DEBUG=True`` in ``.env`` and th
 (``aws-next/README.md``, «Contrato app ↔ infra»).
 """
 
+import hashlib
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -16,6 +17,7 @@ from django.utils.csp import CSP
 from live.csp import base_policy, debug_policy
 
 from base.storage import hub_files_storage
+from base.tenancy.names import MAX_CONTROL
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -193,7 +195,16 @@ db_optional_options = {
 db_connect_timeout = config("DB_CONNECT_TIMEOUT", default=5, cast=int)
 # Not test_hub: that one belongs to the packages/live suite, which may run at the same time. Two runs
 # of this suite at once (two sessions, two checkouts) each set their own TEST_DB_NAME, as saas-next.
+# Every database the suite makes derives from it: pytest-xdist appends `_gwN` and the tenancy a hub's
+# `_<hex>` (base.tenancy.names, which refuses a name past PostgreSQL's 63 characters). A name with no
+# room for both (`_gw999`: up to 1000 workers) keeps its first characters and the first 8 of its
+# SHA-256: the same database every run (--reuse-db, the fleet's sweep) and another for another name.
 TEST_DB_NAME = config("TEST_DB_NAME", default="test_hub_next")
+if len(TEST_DB_NAME.encode()) > (fitting := MAX_CONTROL - len("_gw999")):
+    TEST_DB_NAME = (
+        TEST_DB_NAME.encode()[: fitting - len("_12345678")].decode(errors="ignore")
+        + f"_{hashlib.sha256(TEST_DB_NAME.encode()).hexdigest()[:8]}"
+    )
 
 DATABASES = {
     "default": {

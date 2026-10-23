@@ -1,5 +1,6 @@
 """hub-next settings: env through decouple, Postgres with a pool, CSP per DEBUG, WhiteNoise, LIVE."""
 
+import hashlib
 import os
 import re
 import runpy
@@ -880,6 +881,72 @@ def test_the_test_databases_are_named_by_the_environment(load_settings):
     ]
     assert databases["default"]["TEST"]["NAME"] == "test_hub_sup"
     assert databases["shared"]["TEST"]["NAME"] == "test_hub_sup_shared"
+
+
+#: The fleet's recipe: ``test_hub_next_`` and up to 35 characters of its task's key, 49 in all.
+LONG_TEST_DB_NAME = "test_hub_next_fix_hub_test_migrator_long_test_db_"
+#: The same but for its last character: another session at the same time.
+OTHER_LONG_TEST_DB_NAME = "test_hub_next_fix_hub_test_migrator_long_test_db2"
+#: What pytest-django appends to every test database under pytest-xdist (``-n``): ``_gw<worker>``.
+XDIST_SUFFIXES = ("", "_gw0", "_gw9", "_gw10", "_gw999")
+
+
+def names_the_suite_derives(databases: dict) -> list[str]:
+    """Every database the suite may create from these settings, with and without xdist's suffix: the test databases
+    and, from control's, both test hubs' and every template's (``base.tenancy.names``, which refuses a name past
+    PostgreSQL's 63 characters instead of truncating it)."""
+    from base import catalog
+    from base.tenancy import names
+    from base.tenancy.tests import hubs
+
+    verticals = (None, hubs.TEMPLATE_VERTICAL, *catalog.known_verticals())
+    derived = []
+    for suffix in XDIST_SUFFIXES:
+        control = databases["default"]["TEST"]["NAME"] + suffix
+        derived += [control, *(databases[alias]["TEST"]["NAME"] + suffix for alias in ("shared", "hub_template"))]
+        derived += [names.hub_db_name(control, hub_id) for hub_id in (hubs.HUB_A_ID, hubs.HUB_B_ID)]
+        derived += [names.template_db_name(control, vertical) for vertical in verticals]
+    return derived
+
+
+@pytest.mark.parametrize(
+    "requested",
+    # "ñ" * 13: 13 characters but 26 bytes, past the 24 that fit (PostgreSQL's limit counts bytes).
+    ["test_hub_next", "test_hub_sup", "t" * 24, "t" * 25, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 13, "ñ" * 40, "t" * 100],
+)
+def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres(load_settings, requested):
+    """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (TODO.md, hub#188, hub#204)."""
+    from base.tenancy import names
+
+    databases = load_settings(**DEVELOPMENT_ENV, TEST_DB_NAME=requested)["DATABASES"]
+
+    too_long = [name for name in names_the_suite_derives(databases) if len(name.encode()) > names.MAX_IDENTIFIER]
+    assert too_long == []
+
+
+def test_a_test_db_name_that_fits_is_kept_as_it_is(load_settings):
+    # --reuse-db and the fleet's sweep.sh find a short name's databases by that name.
+    for requested in ("test_hub_next", "t" * 24):
+        databases = load_settings(**DEVELOPMENT_ENV, TEST_DB_NAME=requested)["DATABASES"]
+        assert databases["default"]["TEST"]["NAME"] == requested
+
+
+def test_a_long_test_db_name_is_shortened_the_same_every_run_and_apart_from_another(load_settings):
+    """Its first characters and the first 8 of its SHA-256 (the sweep recomputes it the same way in a shell): the same
+    database every run (--reuse-db, the sweep) and another one for another name (two sessions at once)."""
+
+    def test_names(requested: str) -> dict:
+        databases = load_settings(**DEVELOPMENT_ENV, DB_NAME="pre_hub", TEST_DB_NAME=requested)["DATABASES"]
+        assert (databases["default"]["NAME"], databases["hub_template"]["NAME"]) == ("pre_hub", "pre_hub_template")
+        return {alias: databases[alias]["TEST"]["NAME"] for alias in ("default", "shared", "hub_template")}
+
+    shortened = f"test_hub_next_f_{hashlib.sha256(LONG_TEST_DB_NAME.encode()).hexdigest()[:8]}"
+    assert test_names(LONG_TEST_DB_NAME) == {
+        "default": shortened,
+        "shared": f"{shortened}_shared",
+        "hub_template": f"{shortened}_template",
+    }
+    assert test_names(OTHER_LONG_TEST_DB_NAME)["default"] not in (shortened, OTHER_LONG_TEST_DB_NAME)
 
 
 def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_in_development(load_settings):

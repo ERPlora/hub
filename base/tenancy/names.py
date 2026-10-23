@@ -19,6 +19,8 @@ from psycopg import sql
 
 #: Longest identifier PostgreSQL keeps (``NAMEDATALEN - 1``).
 MAX_IDENTIFIER = 63
+#: Longest control database name its hubs' fit after: a hub's ``_<hex>`` is the most a name adds to control's.
+MAX_CONTROL = MAX_IDENTIFIER - len("_") - 32
 DEMO_PREFIX = "demo"
 TEMPLATE_SUFFIX = "template"
 #: The suffix of a hub's migrator alias (``<alias>__ddl``, PLAN-DB §4): the same database, reached directly.
