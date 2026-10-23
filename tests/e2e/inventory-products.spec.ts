@@ -329,7 +329,7 @@ test('selectores de Inventario (Combo compartido): a product whose category and 
   await expect(form.locator('[data-testid^="inventory-product-categories-chip-"]')).toHaveText([`E2E Zz far ${tag}`]);
   await expect(form.locator('[data-testid=inventory-product-tax-unconfigured]')).toHaveCount(0);
   await form.locator('[data-testid^="inventory-product-categories-chip-"]').last().scrollIntoViewIfNeeded();
-  await page.screenshot({ path: shot('FIX-INVENTORY-SEARCHSELECT-TO-COMBO-far-1440') });
+  await page.screenshot({ path: shot('FIX-INVENTORY-SEARCHSELECT-TO-COMBO-far-1280') });
   await form.locator('[data-testid=inventory-product-form-cancel]').click();
   await expect(form).toBeHidden();
 });
