@@ -50,13 +50,15 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows: menu, store, admin, choices and messages."""
+    """The English source of every lazy text the app shows: menu, store, the Home's panels, admin, choices and
+    messages."""
     config = apps.get_app_config("sale")
     lazies = [
         config.verbose_name,
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        *(widget.title for widget in config.widgets),
     ]
     for module in (queries, services, pricing, schemas, models):
         lazies += [

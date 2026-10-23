@@ -98,12 +98,18 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(page).toHaveURL(`${A}/demo/items/new`);
     await page.goto(`${A}/`);
 
-    // BASE-F07 — «Customize panel»: the demo's panel among the active ones; removing it empties the board.
+    // BASE-F07 — «Customize panel»: the demo's panel among the active ones; removing them all (Sales' two of today
+    // are on by default too) empties the board.
     await testid(page, 'widgets-customize').click();
     const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
     await expect(picker.locator('[data-testid="widgets-active-item"][data-key="demo.open_items"]')).toBeVisible();
     await snap(page, 'BASE-F07', width);
-    await picker.locator('[data-testid="widgets-remove-demo.open_items"]').click();
+    const active = picker.locator('[data-testid="widgets-active-item"]');
+    const keys = await active.evaluateAll((items) => items.map((item) => item.getAttribute('data-key') ?? ''));
+    for (const [index, key] of keys.entries()) {
+      await picker.locator(`[data-testid="widgets-remove-${key}"]`).click();
+      await expect(active).toHaveCount(keys.length - index - 1);
+    }
     await picker.locator('[data-testid="widgets-close"]').click();
     await expect(picker).toBeHidden();
     await expect(testid(page, 'widgets-empty')).toBeVisible();

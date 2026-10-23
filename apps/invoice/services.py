@@ -78,7 +78,7 @@ from apps.invoice.schemas import (
 )
 from apps.sale import pricing
 from apps.sale.models import OrderLine, Refund, Sale, Settings
-from apps.sale.queries import TICKET_LIMIT, business_country, find_sale
+from apps.sale.queries import TICKET_LIMIT, business_country, find_sale, money_text
 from apps.tax.models import TaxRule
 from apps.tax.queries import (
     business_tax_kind,
@@ -767,7 +767,7 @@ def _within_ticket_limit(series: InvoiceSeries, total: int) -> None:
     limit = TICKET_LIMIT.get(business_country())
     if series.invoice_type == "F2" and limit is not None and total > limit:
         raise Conflict(
-            str(TICKET_OVER_LIMIT) % {"limit": f"{limit / 100:.2f} €"},
+            str(TICKET_OVER_LIMIT) % {"limit": money_text(limit)},
             code="invoice.ticket_over_limit",
         )
 
