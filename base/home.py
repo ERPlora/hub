@@ -25,11 +25,13 @@ No ORM here: ``queries.py`` reads what the platform's own steps and counters nee
 import datetime as dt
 import json
 import logging
+import re
 import string
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from django.conf import settings
+from django.utils import timezone
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
@@ -298,15 +300,51 @@ def filled(value: Any) -> bool:
     return value is not None and (not isinstance(value, str) or bool(value.strip()))
 
 
+#: The ISO forms JSON gives a day, an hour and an instant (``2026-10-23``, ``09:30:00``, ``2026-10-23T08:00:00Z``):
+#: only these are read as dates; any other text a template formats as one (``"2026"``) stays the module's mistake.
+ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+ISO_HOUR = re.compile(r"\d{2}:\d{2}(:\d{2}(\.\d+)?)?")
+ISO_INSTANT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?")
+
+
+def moment(text: str) -> dt.date | dt.time | dt.datetime:
+    """``text``, an ISO day, hour or instant, as Python's: an instant with an offset on the business's clock (Django's
+    current zone: ``TIME_ZONE`` in phase 1, the apps' ``business_zone``), one without as it says. Raises
+    ``ValueError`` for any other text."""
+    if ISO_DAY.fullmatch(text):
+        return dt.date.fromisoformat(text)
+    if ISO_HOUR.fullmatch(text):
+        return dt.time.fromisoformat(text)
+    if ISO_INSTANT.fullmatch(text):
+        value = dt.datetime.fromisoformat(text)
+        return timezone.localtime(value) if timezone.is_aware(value) else value
+    raise ValueError(f"{text!r} is not an ISO day, hour or instant")
+
+
+class RowFormatter(string.Formatter):
+    """``str.format`` on a row as JSON gives it (:func:`rows_of`), where a date is text: a field formatted as a date
+    (a ``%`` in its spec, ``{at:%H:%M}``) is read as the :func:`moment` it says, each time it is formatted, so
+    ``{at:.10}`` beside it still slices the text."""
+
+    def format_field(self, value: Any, format_spec: str) -> str:
+        if isinstance(value, str) and "%" in format_spec:
+            value = moment(value)
+        return super().format_field(value, format_spec)
+
+
+ROW_FORMATTER = RowFormatter()
+
+
 def fill(template: Any, row: Mapping[str, Any], key: str) -> str | None:
-    """``template`` with the row's fields, or ``None`` when a field it names is empty; one that does not fit the
-    row (a translation that misnames a field) is logged and is ``None`` too."""
+    """``template`` with the row's fields (its dates formatted by :class:`RowFormatter`), or ``None`` when a field it
+    names is empty; one that does not fit the row (a translation that misnames a field, a date format on a text that
+    is no ISO date) is logged and is ``None`` too."""
     text = str(template)
     try:
         names = [name for _literal, name, _spec, _conversion in string.Formatter().parse(text) if name is not None]
         if not all(filled(row.get(name)) for name in names):
             return None
-        return text.format_map(row)
+        return ROW_FORMATTER.vformat(text, (), row)
     except (KeyError, IndexError, ValueError, TypeError, AttributeError):
         logger.warning("Device notice %s: its text %r does not fit its rows.", key, text, exc_info=True)
         return None
