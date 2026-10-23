@@ -235,7 +235,7 @@ Steps:
 1. Ask the assistant to start the order of a cart and, if you want, the customer's email, the
    shipping and billing addresses, the shipping method, the payment method and some notes.
 2. Confirm the card.
-3. An **Initiated** order shows in **Orders** with the number `OS-AAAAMMDD-NNNN` (consecutive per day
+3. An **Initiated** order shows in **Orders** with the number `OS-YYYYMMDD-NNNN` (consecutive per day
    of the business, with no gaps) and the cart's total copied at that moment, in its currency.
 In: the cart; the customer's email (without it, the cart's); addresses (if the billing one is missing the
 shipping one is copied); shipping and payment methods (text) and notes.
