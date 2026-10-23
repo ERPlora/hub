@@ -3,6 +3,7 @@
 // «Save changes» is off without a name; an edit sends only what changed (what the screen does not
 // show — description, icon, colour, order — is left as it is); a refusal stays in the dialog with each
 // message under its field; «Cancel editing» leaves the category as it was.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { category, flush, mountInventory, ok, refusal, TAX_CATEGORIES } from '../__tests__/mount-inventory';
@@ -20,7 +21,12 @@ afterEach(() => {
 type Control = HTMLElement & { value?: unknown; errorText?: string; disabled?: boolean; label?: string };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountInventory(CategoryFormModal, { props: { open: true, category: null, ...props }, locale, attach: true });
+  const m = await mountInventory(CategoryFormModal, {
+    props: { open: true, category: null, ...props },
+    locale,
+    attach: true,
+    api: () => ok(TAX_CATEGORIES),
+  });
   const call = await m.live();
   await m.result(call, 'tax.category.list', TAX_CATEGORIES);
   const el = <T extends HTMLElement = Control>(id: string) => document.querySelector<T>(`[data-testid="${id}"]`);
@@ -31,17 +37,20 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     field.dispatchEvent(new CustomEvent('ionInput', { detail: { value } }));
     await flush();
   }
-  async function pickTax(value: string) {
-    const select = el('inventory-category-tax')!;
-    (select as Control).value = value;
-    select.dispatchEvent(new CustomEvent('ionChange', { detail: { value } }));
+  /** «Tax rate» is a Combo of @erplora/ui: what it offers on opening, as [key, label]. */
+  const combo = () => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === 'inventory-category-tax')!;
+  const offers = async () => (await (combo().props('search') as (q: string) => Promise<ComboOption[]>)('')).map((o) => [o.id, o.label]);
+  async function pickTax(key: string) {
+    const option = (await (combo().props('search') as (q: string) => Promise<ComboOption[]>)('')).find((o) => o.id === key);
+    if (!option) throw new Error(`«Tax rate» offers no ${key}`);
+    combo().vm.$emit('update:modelValue', option);
     await flush();
   }
   async function submit() {
     el('inventory-category-form-submit')!.click();
     await flush();
   }
-  return { ...m, el, type, pickTax, submit };
+  return { ...m, el, type, combo, offers, pickTax, submit };
 }
 
 describe('CategoryFormModal', () => {
@@ -52,16 +61,17 @@ describe('CategoryFormModal', () => {
       'Name',
       'Slug (optional)',
     ]);
-    expect(s.el('inventory-category-tax')?.querySelector('ion-select-option')?.textContent?.trim()).toBe('— (default)');
+    expect((await s.offers())[0]).toEqual(['', '— (default)']);
+    expect(s.combo().props('modelValue')).toEqual({ id: '', label: '— (default)' });
     expect(s.el('inventory-category-form-submit')?.textContent?.trim()).toBe('Save');
     expect((s.el('inventory-category-form-submit') as Control).disabled).toBe(true);
   });
 
   it('creates it with what was typed, an empty tax as none, and closes', async () => {
     const s = await setup();
-    s.net.onApi(() => ok(category({ id: 'c9', name: 'Wines' }), 201));
     await s.type('inventory-category-name', ' Wines ');
     await s.pickTax('product.generic');
+    s.net.onApi(() => ok(category({ id: 'c9', name: 'Wines' }), 201));
     await s.submit();
     const [call] = s.calls('/api/inventory/categories');
     expect(call.init.method).toBe('POST');
@@ -85,9 +95,9 @@ describe('CategoryFormModal', () => {
     expect([(s.el('inventory-category-name') as Control).value, (s.el('inventory-category-slug') as Control).value]).toEqual(['Drinks', 'drinks']);
     expect(s.el('inventory-category-form-submit')?.textContent?.trim()).toBe('Save changes');
     expect(s.el('inventory-category-form-cancel')?.textContent?.trim()).toBe('Cancel editing');
-    s.net.onApi(() => ok(category({ name: 'Bar' })));
     await s.type('inventory-category-name', 'Bar');
     await s.pickTax('');
+    s.net.onApi(() => ok(category({ name: 'Bar' })));
     await s.submit();
     const [call] = s.calls('/api/inventory/categories/update');
     expect(s.body(call)).toEqual({ id: 'c1', name: 'Bar', tax_category_key: '' });

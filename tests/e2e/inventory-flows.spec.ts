@@ -24,6 +24,7 @@ import {
   dialog,
   fill,
   pick,
+  pickCombo,
   productBySku,
   productRow,
   productsReady,
@@ -152,7 +153,8 @@ test('INVENTORY-F08: a category picked in the form groups the product, and the c
 
   await rowAction(page, mint.id, 'edit');
   const form = dialog(page, 'inventory-product-form');
-  await pick(page, form.locator('[data-testid=inventory-product-categories]'), category);
+  await pickCombo(page, form.locator('[data-testid=inventory-product-categories]'), category, category);
+  await expect(form.locator('[data-testid^=inventory-product-categories-chip-]')).toHaveText([category]);
   await shootFlow(page, 'INVENTORY-F08');
   await form.locator('[data-testid=inventory-product-form-submit]').click();
   await expect(form).toBeHidden();
@@ -301,7 +303,7 @@ test('INVENTORY-F26: a quantity off its unit\'s step is refused under its field;
   await fill(form, 'inventory-product-name', 'E2E Flour by weight');
   await fill(form, 'inventory-product-sku', sku);
   await fill(form, 'inventory-product-price', '1,20');
-  await pick(page, form.locator('[data-testid=inventory-product-tax]'), /(Product — generic|Producto — general).*21/);
+  await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general).*21/);
   await fill(form, 'inventory-product-initial-stock', '1,5');
   await form.locator('[data-testid=inventory-product-form-submit]').click();
   await expect(form.locator('[data-testid=inventory-product-initial-stock]')).toContainText(/(step allowed for this unit|incremento permitido)/);
@@ -327,7 +329,7 @@ test('on a phone a refused save is said where it can be read, and «Save» is ne
   await fill(form, 'inventory-product-name', 'E2E Another');
   await fill(form, 'inventory-product-sku', sku);
   await fill(form, 'inventory-product-price', '1');
-  await pick(page, form.locator('[data-testid=inventory-product-tax]'), /(Product — generic|Producto — general).*21/);
+  await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general).*21/);
   const save = form.locator('[data-testid=inventory-product-form-submit]');
   await save.scrollIntoViewIfNeeded();
   await expect(save).toBeInViewport();

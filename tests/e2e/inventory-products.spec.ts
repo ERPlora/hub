@@ -19,7 +19,7 @@ import {
   dialog,
   fill,
   GENERIC,
-  pick,
+  pickCombo,
   productBySku,
   productRow,
   productsReady,
@@ -55,7 +55,7 @@ test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, ac
   await fill(form, 'inventory-product-price', '2,20');
   await fill(form, 'inventory-product-initial-stock', '5');
   // The picker offers what Taxes seeds, by name and rate («Product — generic · 21%»).
-  await pick(page, form.locator('[data-testid=inventory-product-tax]'), /(Product — generic|Producto — general).*21/);
+  await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general).*21/);
   await page.screenshot({ path: shot('inventory-product-new-1280') });
   await shootFlow(page, 'INVENTORY-F01');
   await form.locator('[data-testid=inventory-product-form-submit]').click();
@@ -70,6 +70,59 @@ test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, ac
   expect([saved.tax_category_key, saved.needs_tax_setup, saved.is_active, saved.stock]).toEqual([GENERIC, false, true, '5.000']);
 });
 
+test('selectores de Inventario (Combo compartido): the product form searches its tax category and its categories on the server, at every width', async ({
+  page,
+  context,
+}) => {
+  // flow: selectores de Inventario (Combo compartido) — INVENTORY-F01, INVENTORY-F08
+  await login(page, A, '/inventory/products');
+  const category = async (name: string) => {
+    const res = await api<{ id: string; name: string }>(context, A, 'POST', '/inventory/categories', { name });
+    expect(res.status).toBe(201);
+    return res.data;
+  };
+  const drinks = await category(`E2E Combo drinks ${stamp()}`);
+  const food = await category(`E2E Combo food ${stamp()}`);
+  for (const { label, width, height } of FILTER_VIEWPORTS) {
+    await page.setViewportSize({ width, height });
+    const sku = `E2E-COMBO-${label}-${stamp()}`;
+    await page.goto(`${A}/inventory/products`);
+    await productsReady(page);
+    await shown(page).locator('[data-testid=inventory-products-add]').click();
+    const form = dialog(page, 'inventory-product-form');
+    await fill(form, 'inventory-product-name', `E2E Combo ${label}`);
+    await fill(form, 'inventory-product-sku', sku);
+    await fill(form, 'inventory-product-price', '1');
+    await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general).*21/);
+    await expect(form.locator('[data-testid=inventory-product-tax] input')).toHaveValue(/(Product — generic|Producto — general).*21/);
+
+    // «Categories»: each one found by typing and added under the field as a chip.
+    const categories = form.locator('[data-testid=inventory-product-categories]');
+    await pickCombo(page, categories, drinks.name, drinks.name);
+    await categories.locator('input').fill(food.name);
+    const offered = page.locator('[data-testid^="inventory-product-categories-option-"]');
+    await expect(offered).toHaveText([food.name]);
+    await page.screenshot({ path: shot(`FIX-INVENTORY-SEARCHSELECT-TO-COMBO-${label}`) });
+    await offered.first().click();
+    const chips = form.locator('[data-testid^="inventory-product-categories-chip-"]');
+    await expect(chips).toHaveText([drinks.name, food.name]);
+
+    // A chosen category is not offered again; the button of its chip takes it away.
+    await categories.locator('input').fill(drinks.name);
+    await expect(page.locator('[data-testid=inventory-product-categories-empty]')).toBeVisible();
+    await expect(offered).toHaveCount(0);
+    await categories.locator('input').press('Escape');
+    await expect(form).toBeVisible();
+    await form.locator(`[data-testid=inventory-product-categories-remove-${drinks.id}]`).click();
+    await expect(chips).toHaveText([food.name]);
+
+    await form.locator('[data-testid=inventory-product-form-submit]').click();
+    await expect(form).toBeHidden();
+    const saved = await productBySku(context, sku);
+    expect([saved.tax_category_key, saved.category_ids]).toEqual([GENERIC, [food.id]]);
+  }
+});
+
 test('the form keeps a refusal under its field: 422 for a price over the limit, 409 for a SKU taken', async ({ page, context }) => {
   await login(page, A, '/inventory/products');
   await productsReady(page);
@@ -80,7 +133,7 @@ test('the form keeps a refusal under its field: 422 for a price over the limit, 
   await fill(form, 'inventory-product-name', 'E2E Too dear');
   await fill(form, 'inventory-product-sku', `E2E-DEAR-${stamp()}`);
   await fill(form, 'inventory-product-price', '99999999999999');
-  await pick(page, form.locator('[data-testid=inventory-product-tax]'), /(Product — generic|Producto — general)/);
+  await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general)/);
   await form.locator('[data-testid=inventory-product-form-submit]').click();
   const price = form.locator('[data-testid=inventory-product-price]');
   await expect(price).toHaveClass(/ion-invalid/);
@@ -129,7 +182,7 @@ test('INVENTORY-F05: a product whose tax category Taxes deactivated is «Not con
     const form = dialog(page, 'inventory-product-form');
     await expect(form.locator('[data-testid=inventory-product-tax-unconfigured]')).toBeVisible();
     await expect(form.locator('[data-testid=inventory-product-form-submit]')).toHaveJSProperty('disabled', true);
-    await pick(page, form.locator('[data-testid=inventory-product-tax]'), /(Product — generic|Producto — general)/);
+    await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general)/);
     await form.locator('[data-testid=inventory-product-form-submit]').click();
     await expect(form).toBeHidden();
     await expect(marker).toHaveCount(0);

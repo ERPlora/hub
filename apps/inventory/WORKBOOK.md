@@ -266,7 +266,8 @@ Pasos:
 4. En un producto físico, la casilla «Controlar stock de este artículo» sale marcada o no según el
    ajuste del negocio, con la nota «Sigue el ajuste del hub». Tocarla fija la decisión para este
    artículo (INVENTORY-F20).
-5. Si hay categorías, marca en «Categorías» las que agrupan el producto en el TPV.
+5. Si hay categorías, busca en «Categorías» las que agrupan el producto en el TPV y elígelas una a
+   una: cada una sale debajo del campo, con su botón para quitarla.
 6. Pulsa «Guardar» («Guardando…»). El panel se cierra y el producto sale en la tabla con Estado
    «Sí».
 Entra: las categorías fiscales y su tipo, de Impuestos; las unidades de medida y las categorías de
@@ -407,8 +408,9 @@ Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
 1. Crea antes la categoría (INVENTORY-F06).
-2. En el formulario del producto (alta o edición), marca una o varias en «Categorías». El campo
-   solo sale si hay alguna categoría.
+2. En el formulario del producto (alta o edición), busca en «Categorías» y elige una o varias: cada
+   una sale debajo del campo, con su botón para quitarla, y ya no se ofrece de nuevo. El campo solo
+   sale si hay alguna categoría.
 3. Guarda. En **Categorías**, la columna Productos sube; en el TPV, el artículo sale bajo esa
    categoría.
 Entra: las categorías del negocio.

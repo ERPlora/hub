@@ -120,6 +120,9 @@
       "unit": "Unit of measure",
       "unitOption": "{name} ({code})",
       "categories": "Categories",
+      "categoriesSearch": "Search a category to add",
+      "removeCategory": "Remove {name}",
+      "categoriesLoadError": "The categories could not be loaded",
       "cancelEdit": "Cancel editing"
     },
     "stock": {

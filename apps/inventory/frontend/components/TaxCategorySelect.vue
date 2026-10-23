@@ -1,31 +1,32 @@
 <script setup lang="ts">
 // The tax category picker of a product and of a category (WORKBOOK «La categoría fiscal se elige
-// por su tipo», as Square, Lightspeed, Odoo and Holded do): it follows Taxes' `tax.category.list`
-// live (the active categories, each with its rate in force today) and offers each one by the name
-// the reader reads and its rate («Product — generic · 21 %», «… · exempt»), never its technical key
-// and never one chosen in advance. Hands back the category's key.
-//   - product (default): no empty option; `markMissing` marks «Not configured · Missing tax category»
-//     while the value is empty or no longer an active category; no categories at all says where to
-//     make them;
+// por su tipo», as Square, Lightspeed, Odoo and Holded do): a `Combo` of @erplora/ui that searches
+// Taxes' `tax.category.list` on the server (the active categories, each with its rate in force today,
+// at most 100 per query) and offers each one by the name the reader reads and its rate («Product —
+// generic · 21 %», «… · exempt»), never its technical key and never one chosen in advance. Hands back
+// the category's key.
+//   - product (default): no empty option, nothing to clear; `markMissing` marks «Not configured ·
+//     Missing tax category» while the value is empty or no longer an active category; no categories
+//     at all says where to make them;
 //   - category (`allowDefault`): «— (default)» first, an empty key.
-// More categories than one query serves (100) turn the select into a search on the server
-// (SearchSelect); the «Not configured» mark then only knows an empty value.
-import { InlineFeedback } from '@erplora/ui/components';
-import { type OutputOf, useLive } from '@erplora/ui/sdk';
+// The first page is followed live: it names the chosen category and tells «Not configured», «none» and
+// a loading error. With more categories than one query serves, a category is named once a search has
+// offered it, and the «Not configured» mark only knows an empty value.
+import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
+import { type OutputOf, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonChip, IonLabel } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useT } from '../composables/useT';
 import { formatPercent } from '../lib/format';
-import SearchSelect from './SearchSelect.vue';
 
 type TaxRow = OutputOf<'tax.category.list'>['rows'][number];
 
 const props = withDefaults(
   defineProps<{
     modelValue: string;
-    /** Label of the select; «Tax category» by default. */
+    /** Label of the field; «Tax category» by default. */
     label?: string;
     /** A category's picker: «— (default)» first (an empty key). */
     allowDefault?: boolean;
@@ -34,7 +35,7 @@ const props = withDefaults(
     /** The server's message for this field. */
     errorText?: string;
     disabled?: boolean;
-    /** `data-testid` of the select; its notes take it as prefix. */
+    /** `data-testid` of the field; its notes take it as prefix. */
     testid?: string;
   }>(),
   { label: undefined, allowDefault: false, markMissing: false, errorText: undefined, disabled: false, testid: 'inventory-tax-category' },
@@ -43,25 +44,16 @@ const props = withDefaults(
 const emit = defineEmits<{ 'update:modelValue': [key: string] }>();
 
 const { t, locale } = useT();
-/** What the person searches when the list is too long for one query. */
-const search = ref('');
+const client = useLiveClient();
 // At most 100 per query (the API's cap); a business usually has a dozen.
-const { data, status, error } = useLive('tax.category.list', () => ({
-  limit: 100,
-  sort: 'display_name' as const,
-  ...(search.value ? { search: search.value } : {}),
-}));
+const PAGE = { limit: 100, sort: 'display_name' } as const;
+const { data, status, error } = useLive('tax.category.list', () => PAGE);
 
 const rows = computed<TaxRow[]>(() => data.value?.rows ?? []);
 const loaded = computed(() => data.value !== undefined);
-/** The whole list came in one query (decided without a search, and kept while searching). */
-const long = ref(false);
-watch(data, (now) => {
-  if (now && !search.value) long.value = now.total > now.rows.length;
-});
-const complete = computed(() => !long.value);
-const options = computed(() => rows.value.map((row) => ({ value: row.key, label: optionLabel(row) })));
-const fixed = computed(() => (props.allowDefault ? [{ value: '', label: t('inventory.tax.defaultOption') }] : []));
+/** The first page holds every active category. */
+const complete = computed(() => !!data.value && data.value.total <= data.value.rows.length);
+const defaultOption = computed<ComboOption>(() => ({ id: '', label: t('inventory.tax.defaultOption') }));
 
 /** «Name · 21 %», «Name · exempt», or the bare name when the category has no rule yet. */
 function optionLabel(row: TaxRow): string {
@@ -71,34 +63,61 @@ function optionLabel(row: TaxRow): string {
   return `${name} · ${formatPercent(row.rate_pct, locale.value)}`;
 }
 
+const asOption = (row: TaxRow): ComboOption => ({ id: row.key, label: optionLabel(row) });
+
+/** The names of the categories a search offered (beyond the first page), by key. */
+const found = ref(new Map<string, string>());
+function remember(options: readonly ComboOption[]): void {
+  const next = new Map(found.value);
+  for (const option of options) next.set(option.id, option.label);
+  found.value = next;
+}
+
+/** What the field shows: the chosen category, «— (default)», or nothing. */
+const choice = computed<ComboOption | null>(() => {
+  const key = props.modelValue;
+  if (key === '') return props.allowDefault ? defaultOption.value : null;
+  const row = rows.value.find((r) => r.key === key);
+  if (row) return asOption(row);
+  const label = found.value.get(key);
+  return label === undefined ? null : { id: key, label };
+});
+
+async function search(query: string): Promise<ComboOption[]> {
+  const text = query.trim();
+  const answer = await client.api.call('tax.category.list', { ...PAGE, ...(text ? { search: text } : {}) });
+  const options = answer.rows.map(asOption);
+  remember(options);
+  return props.allowDefault && !text ? [defaultOption.value, ...options] : options;
+}
+
 const missing = computed(
   () =>
     props.markMissing &&
     loaded.value &&
     (props.modelValue === '' || (complete.value && !rows.value.some((row) => row.key === props.modelValue))),
 );
-const none = computed(() => !props.allowDefault && loaded.value && !search.value && rows.value.length === 0);
+const none = computed(() => !props.allowDefault && loaded.value && rows.value.length === 0);
 
-function pick(value: string | string[]): void {
-  const key = typeof value === 'string' ? value : '';
+function pick(option: ComboOption | null): void {
+  const key = option?.id ?? '';
+  if (option) remember([option]);
   if (key !== props.modelValue) emit('update:modelValue', key);
 }
 </script>
 
 <template>
   <div class="tax-category-select">
-    <SearchSelect
+    <Combo
       :testid="testid"
-      :model-value="modelValue"
-      :options="options"
-      :fixed-options="fixed"
-      :complete="complete"
+      :model-value="choice"
+      :search="search"
       :label="label ?? t('inventory.tax.label')"
       :placeholder="t('inventory.tax.placeholder')"
+      :clearable="false"
       :disabled="disabled"
       :error-text="errorText"
       @update:model-value="pick"
-      @update:search="search = $event"
     />
     <ion-chip
       v-if="missing"
