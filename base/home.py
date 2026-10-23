@@ -10,8 +10,9 @@ panels of the dashboard (``widgets``) and its counters of the bell (``bell``), e
 - a step reads the FIRST row of its query, run by name as the person of the request: done when every condition
   of ``configured_when`` passes on it, pending without a row; a step whose query fails is left out and logged
   (a false «you are missing X» sends the person to fix what may be fine);
-- the level is base's, never the module's: ⛔ legal for the list base fixes (``LEGAL_STEPS``), else ``required``
-  gives functional and its absence recommended;
+- the level is base's, never the module's: ⛔ legal for the list base fixes (``LEGAL_STEPS``) and, where the step's
+  row says the hub files in production, for the ones of ``LEGAL_IN_PRODUCTION``; else ``required`` gives functional
+  and its absence recommended;
 - whoever lacks a step's permission is not told about it, except a pending ⛔ (``actionable: false``): it is what
   will stop their invoice, whoever clears it (hub#435).
 
@@ -49,6 +50,12 @@ LEVEL_FUNCTIONAL = "functional"
 LEVEL_RECOMMENDED = "recommended"
 #: The ⛔ list base fixes: the steps whose absence stops the invoice (the old hub's ``BLOCKING_KEYS``).
 LEGAL_STEPS = frozenset({"invoice.business_identity"})
+#: The ⛔ steps only where the hub files in production, each with what the first row of its own query says there
+#: (PLAN-HUB round 2026-10-21): VeriFactu's way to the AEAT, without which every sale in production is refused; in
+#: testing the till sells without it (gh:hub#1726), so there it keeps the level its ``required`` gives.
+LEGAL_IN_PRODUCTION = {
+    "verifactu.sending_route": (SetupCheck(field="environment", equals="production"),),
+}
 #: Where a step without ``order`` goes: after every step placed (the old hub's ``DEFAULT_ORDER``).
 DEFAULT_ORDER = 500
 DEFAULT_STEP_ICON = "ion:settings-outline"
@@ -126,8 +133,13 @@ def applies_to_country(countries: Sequence[str], hub_country: str) -> bool:
     return bool(hub_country) and any(country.strip().upper() == hub_country.upper() for country in countries)
 
 
-def level_of(key: str, required: bool) -> str:
-    if key in LEGAL_STEPS:
+def may_be_legal(key: str) -> bool:
+    return key in LEGAL_STEPS or key in LEGAL_IN_PRODUCTION
+
+
+def level_of(key: str, required: bool, row: Mapping[str, Any] | None = None) -> str:
+    """The step's level, on the first row of its query (``row``) for the walls of production."""
+    if key in LEGAL_STEPS or (key in LEGAL_IN_PRODUCTION and is_configured(row, LEGAL_IN_PRODUCTION[key])):
         return LEVEL_LEGAL
     return LEVEL_FUNCTIONAL if required else LEVEL_RECOMMENDED
 
@@ -155,8 +167,9 @@ def run_hook(ctx: OperationContext, operation: str, params: Mapping[str, Any]) -
     return first_row(op(ctx, op.input.model_validate(dict(params))).model_dump(mode="json"))
 
 
-def hook_failed(key: str, operation: str) -> None:
-    logger.warning("Home: %s left out, its query %s failed.", key, operation, exc_info=True)
+def hook_failed(key: str, operation: str, error: BaseException | None = None) -> None:
+    """Logs the hook left out with the traceback of ``error`` (outside its ``except``), else of the one handled now."""
+    logger.warning("Home: %s left out, its query %s failed.", key, operation, exc_info=error or True)
 
 
 def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:
@@ -167,17 +180,19 @@ def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_co
             if not applies_to_country(step.countries, hub_country):
                 continue
             key = f"{config.label}.{step.key}"
-            level = level_of(key, step.required)
+            wall = may_be_legal(key)
             actionable = ctx.has(step.permission)
-            if not actionable and level != LEVEL_LEGAL:
+            if not actionable and not wall:
                 continue
+            denied: PermissionDenied | None = None
             try:
                 row = run_hook(ctx, step.operation, step.params)
-            except PermissionDenied:
-                if level != LEVEL_LEGAL:
+            except PermissionDenied as error:
+                if not wall:
                     hook_failed(key, step.operation)
                     continue
                 # A wall is a fact about the hub: whoever may not read it still has it in front of the invoice.
+                denied = error
                 try:
                     row = run_hook(system_context(ctx.scope), step.operation, step.params)
                 except Exception:
@@ -186,8 +201,15 @@ def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_co
             except Exception:
                 hook_failed(key, step.operation)
                 continue
+            level = level_of(key, step.required, row)
+            if denied is not None and level != LEVEL_LEGAL:
+                # No wall here after all (a hub in testing): left out, as any step the person may not read; logged
+                # only for whoever may do it (as before), never for whoever is not told about it at all.
+                if actionable:
+                    hook_failed(key, step.operation, denied)
+                continue
             state = STATE_DONE if is_configured(row, step.configured_when) else STATE_PENDING
-            if not actionable and state != STATE_PENDING:
+            if not actionable and (level != LEVEL_LEGAL or state != STATE_PENDING):
                 continue
             items.append(
                 item(

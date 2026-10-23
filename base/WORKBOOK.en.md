@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9cc4db81671a3b25196bbf5791c6cfba73a9e2a8390a35ef5e00f223a5481b78 -->
+<!-- generated from WORKBOOK.md sha256:45027ada7b323af07961882d38821d26065006ce86c2dbe90b1501ac5c559063 -->
 
 ## What it is for and who it is for
 
@@ -73,8 +73,8 @@ neither sells anything.
 
 ### The "You cannot issue invoices yet" strip
 Over any screen while a step that stops invoicing is missing: "No ticket or invoice can be issued until
-this is set up:" and each step with "Set up". It does not show on the Home's "Summary" (the list says the
-same a little further down); on "Activity", it does.
+this is set up:" and each step with "Set up" (on the screen that sets it up, only its name). It does not
+show on the Home's "Summary" (the list says the same a little further down); on "Activity", it does.
 
 ## States of each screen
 

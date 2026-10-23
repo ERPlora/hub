@@ -137,6 +137,36 @@ test('a context signed in at the SaaS as another account: the session its jump o
   expect(owner.user, 'the owner enters hub b as the owner').not.toBe(employee.user);
 });
 
+// FIX-HUB-E2E-INVENTORY-TABS-WALK-TIMEOUT-AFTER-OTHERS: `/inventory` is no page, the SPA's router sends it to
+// `/inventory/dashboard` (apps/inventory/frontend/routes.ts). On the jump, `login` saw `next` as the document arrived,
+// before that redirect, and passed; with a kept session it only looked once the shell was up, and waited for an address
+// that never comes until the step's time ran out. So a spec signing in at `/inventory` passed alone and fell after
+// the others (inventory-products.spec.ts). Both ways now look once the shell is up, and say where it landed at once.
+test('a `next` the SPA redirects is refused alike on the jump and with a kept session: it says where it landed, at once', async ({
+  browser,
+}) => {
+  const step = test.info().timeout / 6;
+  for (const fresh of [true, false]) {
+    const how = fresh ? 'on the jump' : 'with the kept session';
+    const context = await browser.newContext({ baseURL: A });
+    const jumps = jumpsOf(context);
+    try {
+      const page = await context.newPage();
+      const started = Date.now();
+      const failed = await login(page, A, '/inventory', OWNER, { fresh }).then(
+        () => null,
+        (error: unknown) => String(error).split('\n')[0],
+      );
+      const took = Date.now() - started;
+      expect(failed, how).toContain(`landed on ${A}/inventory/dashboard, not on ${A}/inventory`);
+      expect(took, `${how}: said before a step's wait (${step} ms) ran out`).toBeLessThan(step);
+      expect(jumps, how).toEqual(fresh ? [A] : []);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test('`fresh: true` jumps through the SaaS even with a kept session, and keeps the new one', async ({ browser }) => {
   const kept = await entry(browser, A);
   await kept.context.close();
