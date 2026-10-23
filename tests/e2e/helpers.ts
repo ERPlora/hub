@@ -182,6 +182,10 @@ async function hubSessionOf(context: BrowserContext, origin: string): Promise<Co
  * own SaaS session in a context that had none. `fresh: true` jumps through the SaaS even with a kept session (a
  * spec about the jump itself), and keeps the session it opens.
  *
+ * It ends on `next` itself, once the hub's shell is up, the same on the jump as with a kept session: `next` is a
+ * page, never a route the SPA's router redirects (`/inventory` → `/inventory/dashboard`), which fails at once
+ * saying where it landed. Looking earlier on the jump let such a `next` pass alone and time out after other specs.
+ *
  * Each step waits `loginStepTimeout()` and a step that does not come fails at once, saying which and how long
  * it waited. runserver or the SaaS restarting (another session saved a `.py` file) refuses the connection for
  * a moment: the trip through the SaaS then starts again once, a second later (`withRetry`). From
@@ -233,8 +237,10 @@ export async function login(
           await signInWithCode(page, origin, target, credentials, wait);
           signedIn = true;
         }
+        // Back from the SaaS: the hub's callback sends to `next`. In the hub already, the shell is up and the
+        // address final (checked below): waiting for `next` there waited for an address that might never come.
+        await page.waitForURL(target, { timeout: wait });
       }
-      await page.waitForURL(target, { timeout: wait });
     },
     {
       onRetry: (error) =>
@@ -246,6 +252,12 @@ export async function login(
   const opened = await hubSession();
   if (opened !== undefined && opened !== before && (signedIn || ownSaas)) {
     hubSessions.set(hubSessionKey(account, origin), await hubSessionOf(context, origin));
+  }
+  // Only now is the address final: the SPA mounts its shell once its router has settled, redirects included
+  // (`router.isReady()`, frontend/main.ts). Back from the SaaS, the wait above saw `next` as its document arrived.
+  const landed = page.url();
+  if (new URL(landed).href !== new URL(target).href) {
+    throw new Error(`login on ${origin}: landed on ${landed}, not on ${target}: the SPA's router took \`next\` elsewhere`);
   }
 }
 
