@@ -2,35 +2,14 @@
 // issue a document of the sale in its own write (no issuer yet, no permission…). The notice says so and,
 // to whoever may charge, offers «Issue now» (`sale.sale.issue_documents`); a refusal says why, worded by
 // the server, and the notice stays. Once issued, the live sale drops the notice by itself.
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render } from 'vue';
+import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, flush, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, EMPLOYEE, mountSale, noTimerOutlivesATest, settle } from '../../__tests__/mount-sale';
 import { refused } from '../pos/__tests__/fixtures';
 import { saleOut } from './__tests__/fixtures';
 import PendingDocuments from './PendingDocuments.vue';
 
-// No timer may outlive a test: Vitest tears the page's window down at the end of the file, and a timer
-// still armed then fires into a missing window: an «Unhandled error» and exit 1 with every test green.
-// Fake timeouts that follow the real clock (the harness's flush() still runs) let each test's end count them.
-beforeAll(() => {
-  // Vue arms a one-off 3 s timer (its devtools hook) the first time it renders: armed here, on the real
-  // clock, it is not a test's.
-  render(null, document.createElement('div'));
-});
-beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true, advanceTimeDelta: 1 });
-});
-afterEach(async () => {
-  try {
-    document.body.innerHTML = '';
-    // What clearing the page sets off arms its timers in the next ticks: let them run before counting.
-    await flush();
-    expect(vi.getTimerCount(), 'timers still armed when the test ends').toBe(0);
-  } finally {
-    vi.useRealTimers();
-  }
-});
+noTimerOutlivesATest();
 
 async function setup(options: { locale?: 'en' | 'es'; session?: typeof EMPLOYEE } = {}) {
   // A command, nothing live: no stream to open.

@@ -8,7 +8,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale } from '../__tests__/mount-sale';
+import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale, noTimerOutlivesATest } from '../__tests__/mount-sale';
 import QuickNoteFormModal from '../components/backoffice/QuickNoteFormModal.vue';
 import type { QuickNoteOut } from '../operations';
 import QuickNotesPage from './QuickNotesPage.vue';
@@ -23,6 +23,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
+noTimerOutlivesATest();
 beforeEach(() => mocks.confirm.mockReset());
 
 const OP = 'sale.quick_note.list';

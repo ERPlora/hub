@@ -7,8 +7,9 @@
 import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
-import { mount } from '@vue/test-utils';
-import { type Component, createApp, ref } from 'vue';
+import { mount, type VueWrapper } from '@vue/test-utils';
+import { afterEach, beforeAll, beforeEach, expect, vi } from 'vitest';
+import { type Component, createApp, ref, render } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
 import {
@@ -73,6 +74,9 @@ export interface MountOptions {
 
 type Params = Record<string, unknown>;
 
+/** What `mountSale` mounted and no test's end has unmounted yet (see {@link noTimerOutlivesATest}). */
+const mounted = new Set<VueWrapper>();
+
 /** One API call the page made: method, path, query and JSON body. */
 export interface SentCall {
   method: string;
@@ -105,6 +109,7 @@ export async function mountSale(component: Component, options: MountOptions = {}
       stubs: options.stubs,
     },
   });
+  mounted.add(wrapper);
 
   /** Opens the stream; returns the call to push frames into. */
   const live = (): Promise<StreamCall> => harness.goLive();
@@ -172,6 +177,37 @@ export function taxSettings(tax_kind: TerritoryTaxKind): TaxSettingsOut {
 /** Mounts `use` (a composable call) inside a component of the sale app's harness. */
 export function mountComposable(use: () => void, options: Omit<MountOptions, 'props'> = {}) {
   return mountSale(ComposableHost, { ...options, props: { use } });
+}
+
+/**
+ * No timer may outlive a test (hub#197): Vitest tears the page's window down at the end of the file, and
+ * a timer still armed then fires into a missing window — an «Unhandled error» and exit 1 with every test
+ * green. Called at the top of a test file, each test's end leaves the page as a person does (unmounts what
+ * `mountSale` mounted: AppPage clears its tabbar's 450 ms scroll hint then, which emptying the document
+ * alone does not), empties the document, lets what that sets off run and counts the timers still armed.
+ * Fake timeouts that follow the real clock (the harness's flush() still runs) let it count them.
+ */
+export function noTimerOutlivesATest(): void {
+  beforeAll(() => {
+    // Vue arms a one-off 3 s timer (its devtools hook) the first time it renders: armed here, on the real
+    // clock, it is not a test's.
+    render(null, document.createElement('div'));
+  });
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true, advanceTimeDelta: 1 });
+  });
+  afterEach(async () => {
+    try {
+      for (const wrapper of mounted) wrapper.unmount();
+      mounted.clear();
+      document.body.innerHTML = '';
+      // What clearing the page sets off arms its timers in the next ticks: let them run before counting.
+      await flush();
+      expect(vi.getTimerCount(), 'timers still armed when the test ends').toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 }
 
 /** Lets Vue render and a dialog's `didPresent` (next tick) land. */
