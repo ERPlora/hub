@@ -3,11 +3,13 @@
 // panel paints its operation's result by `kind` (lib/home.ts `widgetView`): followed live when the operation
 // is a live query — a write anywhere in the business re-runs it on the server and the new result arrives —,
 // asked once when it is not. A failed read says «Unavailable», never the figure it had. A panel with its own
-// `component` mounts that component of its app (`apps/<app>/frontend/components/<component>.vue`).
+// `component` mounts that component of its app (`apps/<app>/frontend/components/<component>.vue`). A timeline says
+// when each entry happened in the device's time (the Hub has no business zone in the browser): «4:23», «Ayer 18:10»,
+// «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06).
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
-import { type Component, computed, defineAsyncComponent, onMounted, ref, type Ref, shallowRef } from 'vue';
+import { type Component, computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Ref, shallowRef } from 'vue';
 
 import type { WidgetDef } from '../operations';
 import { widgetView } from '../lib/home';
@@ -75,7 +77,18 @@ const unavailable = computed(
   () => (props.widget.component ? !custom || componentFailed.value : !source || source.failed.value),
 );
 const loading = computed(() => !unavailable.value && (source?.loading.value ?? false));
-const view = computed(() => (source ? widgetView(props.widget, source.data.value, locale.value) : { kind: 'empty' as const }));
+/** «Now» for a timeline's moments: a minute's precision is all «today» and «yesterday» need. */
+const now = ref(new Date());
+let clock: ReturnType<typeof setInterval> | undefined;
+if (props.widget.kind === 'timeline') {
+  onMounted(() => {
+    clock = setInterval(() => (now.value = new Date()), 60_000);
+  });
+  onUnmounted(() => clearInterval(clock));
+}
+const view = computed(() =>
+  source ? widgetView(props.widget, source.data.value, locale.value, { now: now.value }) : { kind: 'empty' as const },
+);
 
 /** The sparkline's points in a 100×40 box, lowest value at the bottom. */
 const points = computed(() => {
@@ -227,9 +240,17 @@ const chosenBar = computed(() => {
         :key="index"
         data-testid="widget-entry"
       >
-        <span
-          v-if="entry.time"
+        <time
+          v-if="entry.datetime"
           class="widget-muted"
+          :datetime="entry.datetime"
+          :title="entry.detail"
+          data-testid="widget-entry-time"
+        >{{ entry.time }}</time>
+        <span
+          v-else-if="entry.time"
+          class="widget-muted"
+          data-testid="widget-entry-time"
         >{{ entry.time }}</span>
         <strong>{{ entry.title }}</strong>
         <span

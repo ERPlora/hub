@@ -213,8 +213,12 @@ Pasos:
      gráfico o un trozo de la pantalla de su app.
   3. En un gráfico de días, cada barra lleva debajo su día de la semana (o su fecha, si abarca más de una
      semana) y encima salen el día y su importe: los de la última barra hasta que tocas otra.
-  4. De entrada salen los que cada app marca como recomendados para el sector del negocio.
-  5. Solo salen los paneles de las apps encendidas que esta persona puede ver.
+  4. En una cronología, cada entrada dice cuándo pasó, en la hora del dispositivo: solo la hora si fue hoy
+     (9:15); si fue ayer, Ayer delante (Ayer 18:10); si no, la fecha corta con la hora (20 oct, 18:10), con
+     el año si es de otro. Al dejar el puntero encima sale la fecha entera. Con el Inicio abierto, lo de hoy
+     pasa a ayer al cambiar el día.
+  5. De entrada salen los que cada app marca como recomendados para el sector del negocio.
+  6. Solo salen los paneles de las apps encendidas que esta persona puede ver.
 Entra: los paneles que declara cada app encendida; los datos de cada uno, pedidos con los permisos de
 quien mira.
 Sale: nada guardado en el hub.
@@ -373,6 +377,14 @@ Implicados: HUBS-F26, HUBS-F27, HUBS-F28
   fecha (`17 oct`); una etiqueta que no es un día se queda tal cual. Encima de las barras salen el día entero y el
   importe (`options.format`) de la barra elegida: la última hasta que se toca o enfoca otra (gh:hub#2392 del hub
   viejo; `tests/e2e/fix-hub-home-chart-iso-day-labels.spec.ts`).
+- Un panel `timeline` dice cuándo pasó cada entrada con `formatMoment` de `base/frontend/lib/home.ts` (`Intl`, en
+  la zona del dispositivo: el Hub aún no tiene la del negocio en el navegador, gh:hub#1212): de hoy, la hora sola;
+  de ayer, la palabra de `Intl.RelativeTimeFormat` y la hora; antes, la fecha corta y la hora (con el año si es de
+  otro). Un día civil `YYYY-MM-DD` dice hoy, ayer o su fecha, en UTC y sin hora; lo que no es un ISO se pinta tal
+  cual y fuera de `<time>`. Cada entrada va en un `<time>` con el ISO del servidor en `datetime` y la fecha entera
+  (`formatDateTime` de `@erplora/ui`) en `title`; el panel relee la hora cada minuto (solo un `timeline`, y lo
+  para al desmontarse) para pasar lo de hoy a ayer a medianoche
+  (`tests/e2e/fix-hub-home-timeline-raw-utc-time.spec.ts`).
 - `demo` (módulo no listado) sale en el menú, en «Mis apps» y con su ejemplo en el Inicio solo con
   `SHOW_UNLISTED_MODULES` (por defecto, `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
   Una sola regla, `base.home.shown_modules`, para `base.session.me` y los ganchos del Inicio.

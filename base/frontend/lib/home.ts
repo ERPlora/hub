@@ -2,6 +2,8 @@
 // the fold of «Finish setting up your business», the blocking strip's steps, a panel's data → what it paints,
 // the panels this browser keeps on, and «My apps» in the order this browser opens them. Ported from the old
 // hub's `dashboard-heading.ts`, `setup-status.ts` and `dashboard-widgets.ts`.
+import { formatDateTime } from '@erplora/ui/components';
+
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
 
 // ── Heading (BASE-G127) ─────────────────────────────────────────────────────────────────────────────────────
@@ -146,8 +148,18 @@ export type WidgetView =
   | { kind: 'stat'; value: string; label: string | undefined; severity: string }
   | { kind: 'sparkline'; series: number[]; value: string | undefined }
   | { kind: 'bar-list'; bars: { label: string; value: number; text: string; share: number }[] }
-  | { kind: 'timeline'; entries: { title: string; time: string; description: string }[] }
+  | { kind: 'timeline'; entries: TimelineEntry[] }
   | { kind: 'chart'; bars: ChartBar[] };
+
+/** An entry of a timeline: `time` as the person reads it and, when it is a date, `datetime` = the instant (or day) as
+ *  the server sent it and `detail` = it whole in the person's language («23 oct 2026, 4:23», «22 oct 2026»). */
+export interface TimelineEntry {
+  title: string;
+  time: string;
+  datetime: string | undefined;
+  detail: string | undefined;
+  description: string;
+}
 
 /** A bar of a chart: `key` is its row's label as the server sent it; `label` goes under the bar and `detail` says
  *  it whole (a day: «vie» and «vie, 23 oct»). */
@@ -206,6 +218,79 @@ export function formatDay(day: Date, style: DayStyle, locale: string): string {
   return found.format(day);
 }
 
+/** When a moment is read: «now» and the IANA time zone (the device's when omitted; tests pin both). */
+export interface MomentOptions {
+  now?: Date;
+  timeZone?: string;
+}
+
+/** An instant as ISO 8601 sends it: a day, `T`, hours and minutes, optional seconds and fraction, optional offset. */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/;
+
+type MomentStyle = 'time' | 'date-time' | 'year-date-time' | 'date' | 'year-date' | 'whole-date' | 'day-key';
+
+const MOMENT_STYLES: Record<MomentStyle, Intl.DateTimeFormatOptions> = {
+  time: { timeStyle: 'short' },
+  'date-time': { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' },
+  'year-date-time': { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' },
+  date: { day: 'numeric', month: 'short' },
+  'year-date': { day: 'numeric', month: 'short', year: 'numeric' },
+  'whole-date': { dateStyle: 'medium' },
+  'day-key': { year: 'numeric', month: 'numeric', day: 'numeric' },
+};
+
+const momentFormats = new Map<string, Intl.DateTimeFormat>();
+
+function momentFormat(locale: string, style: MomentStyle, timeZone: string): Intl.DateTimeFormat {
+  const id = `${locale}|${style}|${timeZone}`;
+  let found = momentFormats.get(id);
+  if (!found) {
+    found = new Intl.DateTimeFormat(locale, { ...MOMENT_STYLES[style], timeZone });
+    momentFormats.set(id, found);
+  }
+  return found;
+}
+
+/** The civil day an instant falls on in `timeZone`, as that day's UTC midnight (what `isoDay` gives). */
+function dayIn(instant: Date, timeZone: string): Date {
+  const parts = momentFormat('en', 'day-key', timeZone).formatToParts(instant);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((found) => found.type === type)?.value);
+  return new Date(Date.UTC(part('year'), part('month') - 1, part('day')));
+}
+
+/** «Today» / «hoy», «Yesterday» / «ayer»: the language's own word, capitalised to open the line. */
+function relativeDay(offset: 0 | -1, locale: string): string {
+  const word = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(offset, 'day');
+  return word.charAt(0).toLocaleUpperCase(locale) + word.slice(1);
+}
+
+/** When something happened, as a day's list says it (Square, Shopify, a phone's call log): the local time alone if it
+ *  was today («4:23»), «Ayer 18:10» if yesterday, else the short date and the time («20 oct, 18:10»; the year only
+ *  when it is another); `detail` says it whole («23 oct 2026, 4:23»). A civil day `YYYY-MM-DD` says «Hoy», «Ayer» or
+ *  its date, in no zone. Not a date: `undefined`. */
+export function formatMoment(value: string, locale: string, options: MomentOptions = {}): { text: string; detail: string } | undefined {
+  const timeZone = options.timeZone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const now = options.now ?? new Date();
+  const civil = isoDay(value);
+  const instant = civil || !ISO_INSTANT.test(value) ? undefined : new Date(value);
+  if (instant && Number.isNaN(instant.getTime())) return undefined;
+  const day = civil ?? (instant ? dayIn(instant, timeZone) : undefined);
+  if (!day) return undefined;
+  const today = dayIn(now, timeZone);
+  const back = Math.round((today.getTime() - day.getTime()) / DAY_MS);
+  const sameYear = day.getUTCFullYear() === today.getUTCFullYear();
+  if (!instant) {
+    const detail = momentFormat(locale, 'whole-date', 'UTC').format(day);
+    if (back === 0 || back === 1) return { text: relativeDay(back === 0 ? 0 : -1, locale), detail };
+    return { text: momentFormat(locale, sameYear ? 'date' : 'year-date', 'UTC').format(day), detail };
+  }
+  const detail = formatDateTime(instant, locale, { timeZone });
+  const time = () => momentFormat(locale, 'time', timeZone).format(instant);
+  if (back === 0) return { text: time(), detail };
+  if (back === 1) return { text: `${relativeDay(-1, locale)} ${time()}`, detail };
+  return { text: momentFormat(locale, sameYear ? 'date-time' : 'year-date-time', timeZone).format(instant), detail };
+}
+
 /** A chart's bars, its days named in the person's language (the old hub's gh:hub#2392): a week by its weekdays, a
  *  longer series by its dates (its weekdays would repeat); a label that is no day stays as it is. */
 function chartBars(widget: WidgetDef, rows: Row[], locale: string, format: unknown): ChartBar[] {
@@ -224,8 +309,9 @@ function chartBars(widget: WidgetDef, rows: Row[], locale: string, format: unkno
   });
 }
 
-/** What a declarative panel paints from its operation's result; `empty` = «No data», never a made-up 0. */
-export function widgetView(widget: WidgetDef, result: unknown, locale: string): WidgetView {
+/** What a declarative panel paints from its operation's result; `empty` = «No data», never a made-up 0. A timeline's
+ *  moments are read at `moment.now` in `moment.timeZone`. */
+export function widgetView(widget: WidgetDef, result: unknown, locale: string, moment: MomentOptions = {}): WidgetView {
   const rows = rowsOf(result);
   const first = rows[0];
   const format = widget.options.format;
@@ -256,11 +342,17 @@ export function widgetView(widget: WidgetDef, result: unknown, locale: string): 
     }
     case 'timeline': {
       const entries = rows
-        .map((row) => ({
-          title: text(row[widget.map.title]),
-          time: text(row[widget.map.time ?? '']),
-          description: text(row[widget.map.description ?? '']),
-        }))
+        .map((row): TimelineEntry => {
+          const time = row[widget.map.time ?? ''];
+          const said = typeof time === 'string' ? formatMoment(time, locale, moment) : undefined;
+          return {
+            title: text(row[widget.map.title]),
+            time: said?.text ?? text(time),
+            datetime: said && (time as string),
+            detail: said?.detail,
+            description: text(row[widget.map.description ?? '']),
+          };
+        })
         .filter((entry) => entry.title !== '');
       return entries.length ? { kind: 'timeline', entries } : { kind: 'empty' };
     }
