@@ -1199,7 +1199,7 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 - **Producción**: además de lo de VERIFACTU-F08, el despliegue tiene que ser `prod` (`ERPLORA_ENVIRONMENT`; en
   `pre` nunca) y el servidor tener `VERIFACTU_PRODUCTION_ENABLED` a verdadero. Cerrado de nuevo, ningún registro de
   producción sale (esperan con `production_closed`, sin llamar a la pasarela) y no se emite nada nuevo en producción
-  (`queries.sending_problem`: primero lo que le falta a la vía, después lo del servidor, pasarela y apertura). Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
+  (`queries.route_problem`: primero lo que le falta a la vía, después lo del servidor, pasarela y apertura). Los workers solo trabajan contra la AEAT de pruebas; abrir la remisión real y los certificados
   queda bajo la supervisión de Ioan (working-rules §15).
 - **Hub de plataforma de ERPlora** (PLAN-SAAS §4; Facturación, INVOICE-F23): el hub `PLATFORM_HUB_SLUG` emite las
   facturas de ERPlora a sus clientes. Sus registros van al entorno de la AEAT del despliegue, diga lo que diga su
@@ -1208,7 +1208,7 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
   no pasen nunca a la cadena de pruebas; lo usan `record.create` y la factura de prueba); su interruptor está fijo (`go_live` y `back_to_testing` → 409 `verifactu.platform_fixed`) y
   `manage.py create_platform_hub` alinea su configuración con `verifactu.config.follow_deployment` (409
   `verifactu.platform_only` en cualquier otro negocio). El sello de ERPlora presenta sus propios registros sin
-  otorgamiento (`sending_problem`: el hub de plataforma **y** el emisor de Facturación `PLATFORM_ISSUER_TAX_ID`):
+  otorgamiento (`queries.route_problem`: el hub de plataforma **y** el emisor de Facturación `PLATFORM_ISSUER_TAX_ID`):
   ERPlora no se representa a sí misma. Un negocio cualquiera que teclee ese NIF como emisor sigue necesitando su
   otorgamiento aprobado (saas#2524): sin él, en producción no se emite nada nuevo; la pasarela del SaaS lo rechaza
   igual (`fiscal_gateway`, 409).
