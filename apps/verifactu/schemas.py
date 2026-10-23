@@ -480,6 +480,11 @@ class ConfigOut(Schema):
         description="When the account last sent its data."
     )
     route_ready: bool = Field(description="The route can file in this environment.")
+    route_ready_for_production: bool = Field(
+        description="The route could carry the records to the AEAT of production: ERPlora's with the signed "
+        "authorisation approved, or the business's own valid certificate (what the business has to do, whatever "
+        "this server lacks)."
+    )
     reasons: list[WaitOut] = Field(description="What keeps records from leaving now.")
     issue_blocker: WaitOut | None = Field(
         description="Why new sales and invoices are refused now (production without a way to the AEAT); "

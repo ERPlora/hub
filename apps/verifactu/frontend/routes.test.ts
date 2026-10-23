@@ -53,9 +53,9 @@ describe('verifactu routes.ts', () => {
     expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
   });
 
-  it('has a page for every entry of the navigation of apps.py', () => {
+  it('has a page for every path of apps.py: its navigation and the Home\'s step (Configuration)', () => {
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/verifactu\/[a-z]+)"/g)].map((m) => m[1]);
+    const paths = [...new Set([...appsPy.matchAll(/"(\/verifactu\/[a-z]+)"/g)].map((m) => m[1]))];
     expect(paths).toEqual(['/verifactu/records', '/verifactu/contingency', '/verifactu/events', '/verifactu/recovery', '/verifactu/config', '/verifactu/settings']);
     for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });
