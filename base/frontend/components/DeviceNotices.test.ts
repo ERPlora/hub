@@ -1,7 +1,7 @@
 // The device's notices (APPOINTMENT-F28, the old hub's HUB_SHELL-F66): base follows `base.notice.list` live — the rows
 // the modules on tell, with their texts filled in — and the shell tells each new one once with the installed app's
 // system notice (`erplora_notify`); a browser has the bell. It paints nothing.
-import { ANDROID_NOTIFICATIONS, PRIMER_ANSWERED_KEY, TOLD_KEY } from '@erplora/ui/shell';
+import { ANDROID_NOTIFICATIONS, applySurface, PRIMER_ANSWERED_KEY, TOLD_KEY } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const alerts = vi.hoisted(() => ({ created: [] as Array<{ header?: string }> }));
@@ -31,15 +31,26 @@ const BOOKED: DeviceNoticeRow = {
 
 const win = window as unknown as { __TAURI__?: unknown };
 let invoke: ReturnType<typeof vi.fn>;
+/** Every mount of a test, unmounted after it: a piece left mounted would wake up with the next test's app. */
+const mounted: Array<{ unmount: () => void }> = [];
+
+async function mountNotices() {
+  const m = await mountBase(DeviceNotices, { routes: ['/appointment/agenda'] });
+  mounted.push(m.wrapper);
+  return m;
+}
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', memoryStorage());
   localStorage.setItem(TOLD_KEY, '[]');
   invoke = vi.fn(async () => null);
   win.__TAURI__ = { core: { invoke } };
+  applySurface('desktop');
 });
 
 afterEach(() => {
+  mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+  applySurface('web');
   vi.unstubAllGlobals();
   delete win.__TAURI__;
   document.body.innerHTML = '';
@@ -48,7 +59,7 @@ afterEach(() => {
 const notified = () => invoke.mock.calls.filter(([command]) => command === 'erplora_notify').map(([, args]) => args);
 
 async function setup() {
-  const m = await mountBase(DeviceNotices, { routes: ['/appointment/agenda'] });
+  const m = await mountNotices();
   const call = await m.live();
   const show = (notices: DeviceNoticeRow[], rev?: number, sources = ['appointment.booked']) =>
     m.result(call, 'base.notice.list', { notices, sources }, rev);
@@ -100,12 +111,14 @@ describe('DeviceNotices', () => {
     expect(localStorage.getItem(PRIMER_ANSWERED_KEY)).toBe('1');
   });
 
-  it('in a browser (no installed app) it tells nothing and breaks nothing', async () => {
+  it('in a browser (no installed app) it does not even follow the notices: the bell is the browser\'s', async () => {
     delete win.__TAURI__;
-    const s = await setup();
+    applySurface('web');
+    const m = await mountNotices();
+    await m.live().catch(() => undefined);
+    await flush();
 
-    await s.show([BOOKED]);
-
+    expect(m.client.stream.subscriptions('base.notice.list')).toEqual([]);
     expect(invoke).not.toHaveBeenCalled();
     expect(localStorage.getItem(TOLD_KEY)).toBe('[]');
   });
