@@ -92,6 +92,15 @@ class HubRegisterOut(HubOut):
     created: bool
 
 
+class MemberIn(Schema):
+    """One person of the business as the photo lists them (``hubs.queries`` of the SaaS: its accepted members)."""
+
+    user_id: UUID
+    role: Literal["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+    email: str | None = None
+    name: str | None = None
+
+
 class HubStateIn(Schema):
     """``PUT /internal/hubs/{id}/state``: the SaaS's photo (``photo``, as it came) and the parts the Hub applies."""
 
@@ -100,12 +109,25 @@ class HubStateIn(Schema):
     status: Literal["active", "past_due", "suspended"] | None = None
     verifactu: dict[str, Any] | None = None
     whatsapp: dict[str, Any] | None = None
+    members: list[MemberIn] | None = None
     photo: dict[str, Any]
 
 
 class HubStateOut(Schema):
     applied: bool
     version: int
+
+
+class SessionRevokeIn(Schema):
+    """``POST /internal/sessions/revoke``: the SaaS account whose sessions end, on one business (``hub_id``) or on
+    every host, the Hub admin's included (without it)."""
+
+    user_id: UUID
+    hub_id: UUID | None = None
+
+
+class SessionRevokeOut(Schema):
+    ended: int
 
 
 class HubGetIn(Schema):

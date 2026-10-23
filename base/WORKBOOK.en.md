@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:02d6342a767b7b882c0f2474afcfdb26280f654ab34ac51b7ecb56c5f17cc968 -->
+<!-- generated from WORKBOOK.md sha256:63647ccb05db29753b0936c9b69b650368d190769ccb7d39941638c21dfa6853 -->
 
 ## What it is for and who it is for
 
@@ -101,6 +101,7 @@ same a little further down); on "Activity", it does.
 | BASE-F10 | See in the bell the notices between apps that were not delivered | partial |
 | BASE-F11 | Go to erplora.com to manage or upgrade the plan | partial |
 | BASE-F12 | Ask the assistant to go over the setup | partial |
+| BASE-F13 | Lose access on a role change or on leaving the business | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -302,3 +303,26 @@ In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
 Involved: none
+
+### BASE-F13 Lose access on a role change or on leaving the business
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: any screen of the hub
+Steps:
+  1. At erplora.com, whoever manages the business changes a person's role, removes them from the business
+     or hands the ownership over to them.
+  2. At that moment that person's session in this business ends, on all their devices: what they have open
+     stops updating and the next thing they do asks them to sign in again. Their sessions in other
+     businesses stay open.
+  3. If they are still in the business, they come back in from erplora.com and already work with their new
+     role: what the new role allows appears and what it does not, disappears.
+  4. If they were removed, on coming back erplora.com tells them "You don't have access to this hub" and
+     they do not get in.
+  5. If they change their password, sign out everywhere or delete their account at erplora.com, all their
+     sessions of the hub end, in all their businesses.
+In: the change erplora.com made (who, in which business and with which role, or that they are no longer
+there).
+Out: that person's sessions ended; their role in the business, up to date.
+If it fails: if the hub does not answer at that moment, erplora.com tries again shortly; meanwhile, the
+next time erplora.com passes the business's state to the hub those sessions end too.
+Involved: HUBS-F26, HUBS-F27, HUBS-F28

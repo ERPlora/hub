@@ -40,6 +40,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, Permission
+from django.contrib.sessions.models import Session
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.db.models.signals import post_save
@@ -59,7 +60,8 @@ from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from base import auth, events, registry, signing
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
-from base.models import DemoCode, EventDelivery, Hub, Membership, TaskSchedule
+from base.middleware import PLATFORM_SESSION_HOST, session_host
+from base.models import DemoCode, EventDelivery, Hub, Membership, SessionOwner, TaskSchedule
 from base.schemas import (
     DemoCodeIn,
     DemoCodeOut,
@@ -76,12 +78,14 @@ from base.schemas import (
     HubSeedLocalOut,
     HubStateIn,
     HubStateOut,
+    SessionRevokeIn,
+    SessionRevokeOut,
 )
 
 logger = logging.getLogger(__name__)
 
 MODEL_BACKEND = "django.contrib.auth.backends.ModelBackend"
-#: The SaaS account the session belongs to, for /internal/sessions/revoke (phase 2).
+#: The SaaS account the session belongs to (``SessionOwner`` is the index /internal/sessions/revoke reads).
 SAAS_USER_ID_SESSION_KEY = "saas_user_id"
 #: Read-only group of ``platform_support`` in the Hub admin (the SaaS's ``support``). Phase 2
 #: replaces it with the ``StaffUser`` mark (PLAN §17).
@@ -92,9 +96,13 @@ class InactiveUser(Exception):
     """The Hub's copy of the user was deactivated (in the admin): no session, whatever the SaaS says."""
 
 
+#: The username prefix of the customer copies of SaaS accounts (:func:`username_for`).
+SAAS_USERNAME_PREFIX = "saas:"
+
+
 def username_for(saas_user_id: str) -> str:
     """The customer copy of a SaaS account (hub door)."""
-    return f"saas:{saas_user_id}"
+    return f"{SAAS_USERNAME_PREFIX}{saas_user_id}"
 
 
 def staff_username_for(saas_user_id: str) -> str:
@@ -125,6 +133,21 @@ def _local_copy(redeemed: RedeemedUser, *, username: str, is_staff: bool, is_sup
 def _log_in(request: HttpRequest, user, redeemed: RedeemedUser) -> None:
     login(request, user, backend=MODEL_BACKEND)
     request.session[SAAS_USER_ID_SESSION_KEY] = redeemed.user_id
+    _note_the_owner(request, redeemed.user_id)
+
+
+def _note_the_owner(request: HttpRequest, saas_user_id: str) -> None:
+    """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index.
+
+    ``login`` gives the session a new key and saves it, unless it flushed another user's session first: then it has
+    no key until it is saved, which happens here, in the login's transaction.
+    """
+    if request.session.session_key is None:
+        request.session.save()
+    SessionOwner.objects.update_or_create(
+        session_id=request.session.session_key,
+        defaults={"saas_user_id": saas_user_id, "host": session_host(request) or ""},
+    )
 
 
 @transaction.atomic
@@ -510,8 +533,9 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     ``verifactu.config.sync`` on the hub's slug, and the number's state of WhatsApp (``whatsapp``), through
     ``whatsapp_inbox.channel.sync`` with the photo's version when the app is on in that business (off, the photo
     applies and the block waits for the next one); both in this same transaction, so their notices go out after its
-    COMMIT (a block out of contract keeps nothing). The rights it carries (plan, modules, members) are only kept
-    until phase 2 applies them.
+    COMMIT (a block out of contract keeps nothing). Its ``members`` apply on the business's memberships
+    (:func:`_apply_members`), in this transaction too. The rest of the rights it carries (plan, modules) are only
+    kept until phase 2 applies them.
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
@@ -524,6 +548,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
         _sync_verifactu(hub, data)
     if data.whatsapp is not None:
         _sync_whatsapp(hub, data)
+    if data.members is not None:
+        _apply_members(hub, data.members)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
     if was_open and registry.is_suspended(hub):
         transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
@@ -531,11 +557,79 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
 
 
 def _wake_open_apps(slug: str) -> None:
-    """The business of ``slug`` just stopped serving the app (suspended, cancelled): every open live stream and print socket
-    of its host re-runs now («*», everything may have changed), hears the host gate again
-    (``base.operations.HubContextBuilder.refresh``) and ends, instead of waiting for the hub's next write or the
-    safety re-run (BILLING-F16 of the SaaS, step 4: the devices with the app open leave for the Hub's page)."""
+    """The business of ``slug`` just stopped serving the app (suspended, cancelled), or some of its sessions ended:
+    every open live stream and print socket of its host re-runs now («*», everything may have changed), hears the host
+    gate and its session again (``base.operations.HubContextBuilder.refresh``) and ends if they no longer hold,
+    instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the SaaS, step 4: the devices with
+    the app open leave for the Hub's page)."""
     notify(Scope("host", slug), [ALL_EVENTS])
+
+
+# ── The sessions of a SaaS account (/internal/sessions/revoke) ───────────────────────────────────────────────────
+
+
+@operation("base.session.revoke", kind="command", permission=None, input=SessionRevokeIn, output=SessionRevokeOut)
+def session_revoke(ctx: OperationContext, data: SessionRevokeIn) -> dict:
+    """End the Hub's sessions of the SaaS account ``data.user_id``: those on the business ``data.hub_id`` or, without
+    it, every one of them, the Hub admin's included (PLAN-SAAS §2.1, OIDC's back-channel logout).
+
+    The SaaS sends it after the COMMIT that removed the person from a business, changed their role or handed the
+    business over (with the business), or after a password change, «sign out everywhere» or deleting the account
+    (without it). The sessions are found through ``SessionOwner``, never by decoding the table's. Idempotent: what
+    already ended counts nothing; a business the registry does not know ends nothing and answers as one without
+    sessions. The hosts whose sessions ended wake after the COMMIT (:func:`_end_sessions`).
+    """
+    internal_only(ctx)
+    owners = SessionOwner.objects.filter(saas_user_id=str(data.user_id))
+    if data.hub_id is not None:
+        slug = Hub.objects.filter(pk=data.hub_id).values_list("slug", flat=True).first()
+        if slug is None:
+            return {"ended": 0}
+        # A session that noted no host (from before the rule) is valid on every host, this one's too.
+        owners = owners.filter(host__in=[slug, ""])
+    return {"ended": _end_sessions(owners)}
+
+
+def _end_sessions(owners) -> int:
+    """Delete the sessions of ``owners`` (their notes go with them) and wake each hub's host they were on after the
+    COMMIT, so a tab open with one of them loses it now (``bye``) instead of at its next write; how many ended."""
+    hosts = set(owners.values_list("host", flat=True))
+    _, deleted = Session.objects.filter(session_key__in=owners.values("session_id")).delete()
+    for host in sorted(hosts - {PLATFORM_SESSION_HOST, ""}):
+        transaction.on_commit(partial(_wake_open_apps, host), robust=True)
+    return deleted.get(Session._meta.label, 0)
+
+
+def _apply_members(hub: Hub, members: list) -> None:
+    """Make the memberships of ``hub`` say what the photo's ``members`` say (HUBS-F26, F27 and F28 of the SaaS).
+
+    A person whose role changed has it now and a person no longer listed loses their membership; either way their
+    sessions on this business end (:func:`_end_sessions`), so the next thing they do runs with the permissions of
+    the photo, not of their login. Nobody is created: a person the Hub has not seen yet takes their role when they
+    first enter (:func:`open_session_from_saas`). Only the copies of SaaS accounts are the photo's (``saas:<id>``):
+    a demo's owner is not.
+    """
+    wanted = {str(member.user_id): member.role for member in members}
+    changed = []
+    memberships = (
+        Membership.objects.select_for_update(of=("self",))
+        .select_related("user")
+        .filter(host=hub.slug, user__username__startswith=SAAS_USERNAME_PREFIX)
+    )
+    for membership in memberships:
+        saas_user_id = membership.user.username.removeprefix(SAAS_USERNAME_PREFIX)
+        role = wanted.get(saas_user_id)
+        if role is None:
+            membership.delete()
+        elif role != membership.role:
+            membership.role = role
+            membership.save(update_fields=["role"])
+        else:
+            continue
+        changed.append(saas_user_id)
+    if changed:
+        # A session that noted no host (from before the rule) is valid on every host, this business's too.
+        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host__in=[hub.slug, ""]))
 
 
 def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
