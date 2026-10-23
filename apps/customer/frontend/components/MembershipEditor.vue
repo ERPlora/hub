@@ -41,11 +41,14 @@ const sameSelection = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((id) => b.includes(id));
 
 const picked = ref<string[]>([...props.selected]);
+/** What the server is known to hold: the card's last result, or what was just saved. */
+let saved: readonly string[] = props.selected;
 /** The user ticked or unticked something not saved yet. */
 const unsaved = ref(false);
 watch(
   () => props.selected,
   (now) => {
+    saved = now;
     if (!unsaved.value) picked.value = [...now];
     else if (sameSelection(picked.value, now)) unsaved.value = false;
   },
@@ -53,6 +56,7 @@ watch(
 watch(
   () => props.customerId,
   () => {
+    saved = props.selected;
     unsaved.value = false;
     picked.value = [...props.selected];
   },
@@ -63,7 +67,7 @@ const shown = computed(() => rows.value.filter((row) => row.is_active || props.s
 
 function toggle(id: string, checked: boolean): void {
   picked.value = checked ? [...picked.value.filter((p) => p !== id), id] : picked.value.filter((p) => p !== id);
-  unsaved.value = !sameSelection(picked.value, props.selected);
+  unsaved.value = !sameSelection(picked.value, saved);
 }
 
 const label = (row: { name: string; is_active: boolean }): string =>
@@ -83,6 +87,7 @@ async function save(): Promise<void> {
     return; // `error` holds it: the block shows it.
   }
   // Saved: the card's live results lead again, unless something was ticked while it was on its way.
+  saved = sending;
   unsaved.value = !sameSelection(picked.value, sending);
   void toastSuccess(t(isGroups.value ? 'customer.membership.groupsSaved' : 'customer.membership.tagsSaved'));
 }

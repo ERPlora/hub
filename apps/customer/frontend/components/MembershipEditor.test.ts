@@ -144,6 +144,24 @@ describe('MembershipEditor', () => {
     ]);
   });
 
+  it('a box unticked right after saving, before the card\'s result arrives, stays unticked', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    const staff = () => s.wrapper.findAllComponents(IonCheckbox)[1];
+    staff().vm.$emit('ionChange', { detail: { checked: true } });
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    await flush();
+    staff().vm.$emit('ionChange', { detail: { checked: false } });
+    await flush();
+    await s.wrapper.setProps({ selected: ['g1', 'g3', 'g2'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', true],
+      ['Staff', false],
+      ['Old (not active)', true],
+    ]);
+  });
+
   it('a tick taken back leaves nothing unsaved: it follows the card again', async () => {
     const s = await setup();
     await s.result(s.call, 'customer.group.list', GROUPS);
