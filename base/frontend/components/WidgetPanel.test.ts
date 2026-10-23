@@ -3,7 +3,7 @@
 // failed read says «Unavailable», never the old figure; no rows say «No data». A panel of its own component
 // mounts that component of its app.
 import { HubIcon } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations';
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
@@ -151,6 +151,79 @@ describe('WidgetPanel', () => {
       await m.result(call, 'demo.item.stats', { rows: [{ day: '2026-10-24', total: 300 }] }, 3);
       expect(bars(m.wrapper).map((bar) => bar.text())).toEqual(['sáb']);
       expect(readout(m.wrapper)).toEqual(['sáb, 24 oct', '3,00\u00a0€']);
+    });
+  });
+
+  // BASE-F06, BASE-F09: Sales' «Recent activity» painted `2026-10-23T02:23:55.572622Z`. Each moment in the device's
+  // time and the person's language, the instant whole in its `<time>`. The device is pinned to Madrid and its clock
+  // to Friday 23 Oct 2026, 12:00 there.
+  describe('a timeline of moments', () => {
+    const timeline = { kind: 'timeline', map: { title: 'who', time: 'at' } } as const;
+    const TODAY = '2026-10-23T02:23:55.572622Z';
+    const YESTERDAY = '2026-10-22T16:10:00Z';
+    const zone = process.env.TZ;
+    const times = (wrapper: { findAll: (s: string) => { text: () => string; attributes: (name: string) => string | undefined }[] }) =>
+      wrapper.findAll('[data-testid="widget-entry"] time').map((time) => [time.text(), time.attributes('datetime'), time.attributes('title')]);
+
+    beforeEach(() => {
+      process.env.TZ = 'Europe/Madrid';
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.setSystemTime(new Date('2026-10-23T10:00:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    });
+
+    it('says when each entry happened in local time, the instant whole in its <time>, never the raw ISO', async () => {
+      const m = await panel(timeline, 'es');
+      const call = await m.live();
+      await m.result(call, 'demo.item.stats', [{ who: '20261023-0002', at: TODAY }, { who: '20261022-0001', at: YESTERDAY }]);
+      expect(times(m.wrapper)).toEqual([
+        ['4:23', TODAY, '23 oct 2026, 4:23'],
+        ['Ayer 18:10', YESTERDAY, '22 oct 2026, 18:10'],
+      ]);
+      expect(m.wrapper.text()).not.toContain('2026-10-2');
+    });
+
+    it("says it in English for an English reader", async () => {
+      const m = await panel(timeline, 'en');
+      const call = await m.live();
+      await m.result(call, 'demo.item.stats', [{ who: 'A', at: TODAY }, { who: 'B', at: YESTERDAY }]);
+      expect(times(m.wrapper).map(([text]) => text)).toEqual(['4:23 AM', 'Yesterday 6:10 PM']);
+    });
+
+    it("a Home left open past midnight moves today's entries to yesterday", async () => {
+      vi.setSystemTime(new Date('2026-10-23T21:59:30Z'));
+      const m = await panel(timeline, 'es');
+      const call = await m.live();
+      await m.result(call, 'demo.item.stats', [{ who: 'A', at: '2026-10-23T21:00:00Z' }]);
+      expect(times(m.wrapper).map(([text]) => text)).toEqual(['23:00']);
+      vi.advanceTimersByTime(60_000);
+      await flush();
+      expect(times(m.wrapper).map(([text]) => text)).toEqual(['Ayer 23:00']);
+    });
+
+    it('keeps its minute clock only while it is mounted', async () => {
+      const m = await panel(timeline, 'es');
+      expect(vi.getTimerCount()).toBe(1);
+      m.wrapper.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('a panel that is no timeline keeps no clock', async () => {
+      await panel({}, 'es');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('a time that is no date is painted as it came, outside a <time>', async () => {
+      const m = await panel(timeline, 'es');
+      const call = await m.live();
+      await m.result(call, 'demo.item.stats', [{ who: 'Ana', at: '10:00' }]);
+      expect(m.wrapper.findAll('[data-testid="widget-entry"] time')).toHaveLength(0);
+      expect(m.wrapper.get('[data-testid="widget-entry-time"]').text()).toBe('10:00');
     });
   });
 

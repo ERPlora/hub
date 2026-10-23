@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4b064c8e41c1552c7df183506810e1afc00f87d3fbab8aa684234d6651e21f81 -->
+<!-- generated from WORKBOOK.md sha256:9cc4db81671a3b25196bbf5791c6cfba73a9e2a8390a35ef5e00f223a5481b78 -->
 
 ## What it is for and who it is for
 
@@ -200,8 +200,12 @@ Steps:
      piece of its app's screen.
   3. In a chart of days, each bar has its weekday under it (or its date, if it spans more than a week) and
      above them show the day and its amount: the last bar's until you tap another.
-  4. At first, the ones each app marks as recommended for the business's sector show.
-  5. Only the panels of the apps that are on and that this person may see show.
+  4. In a timeline, each entry says when it happened, in the device's time: only the time if it was today
+     (9:15 AM); if it was yesterday, Yesterday in front (Yesterday 6:10 PM); if not, the short date with the
+     time (Oct 20, 6:10 PM), with the year if it is another. Holding the pointer over it shows the whole
+     date. With the Home open, today's become yesterday's when the day changes.
+  5. At first, the ones each app marks as recommended for the business's sector show.
+  6. Only the panels of the apps that are on and that this person may see show.
 In: the panels each app that is on declares; each one's data, asked for with the permissions of whoever
 is looking.
 Out: nothing saved in the hub.
