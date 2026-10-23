@@ -33,6 +33,7 @@ from typing import Any
 
 from django.conf import settings
 from django.utils import timezone
+from django.utils.functional import Promise
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
@@ -240,6 +241,20 @@ def item(key: str, app: str, **fields: Any) -> dict:
     }
 
 
+def translated(value: Any) -> Any:
+    """``value`` with its lazy translations, at any depth of its dicts and lists, as text in the language active now.
+
+    A panel's literal props (``options``) may carry them, as the text under a stat's figure; nothing else changes.
+    """
+    if isinstance(value, Promise):
+        return str(value)
+    if isinstance(value, Mapping):
+        return {key: translated(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [translated(item) for item in value]
+    return value
+
+
 def widgets(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_vertical: str) -> list[dict]:
     """The panels the person of ``ctx`` may put on their dashboard."""
     panels = []
@@ -262,7 +277,7 @@ def widgets(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_vertica
                     "operation": widget.operation,
                     "params": dict(widget.params),
                     "map": dict(widget.map),
-                    "options": dict(widget.options),
+                    "options": translated(widget.options),
                     "component": widget.component,
                     "refresh_on": list(widget.refresh_on),
                     "live": widget.operation is not None and live_registry.is_subscribable(widget.operation),

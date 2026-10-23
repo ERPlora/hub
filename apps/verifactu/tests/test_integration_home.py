@@ -215,6 +215,15 @@ def test_whoever_reads_the_records_is_offered_the_four_panels(role):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(("language", "label"), [("en", "In contingency queue"), ("es", "En cola de contingencia")])
+def test_the_queue_panel_says_under_its_figure_what_it_counts(language, label):
+    # The old module's text under the queue's figure (its module.json, `verifactu.contingency` options.label), in the
+    # reader's language (FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT).
+    queue = panels(ctx_for("hub_employee", language=language))["verifactu.contingency"]
+    assert queue["options"] == {"format": "number", "label": label}
+
+
+@pytest.mark.django_db
 def test_each_panel_paints_its_figure_from_its_own_query(issuer):
     for _ in range(2):
         ticket()

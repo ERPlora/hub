@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:45027ada7b323af07961882d38821d26065006ce86c2dbe90b1501ac5c559063 -->
+<!-- generated from WORKBOOK.md sha256:348ab9e922b9315ae5df8683324547a0e86b74ce8670c5f0ca16c9e90d4b1e5c -->
 
 ## What it is for and who it is for
 
@@ -196,8 +196,9 @@ Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
   1. Under the list is the board ("Loading widgets…" while it comes).
-  2. Each panel is a card with its title and icon: a figure, a list with bars, a timeline, a chart or a
-     piece of its app's screen.
+  2. Each panel is a card with its title and icon: a figure (with what it counts under it, if its app says
+     so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the language
+     of whoever is looking.
   3. In a chart of days, each bar has its weekday under it (or its date, if it spans more than a week) and
      above them show the day and its amount: the last bar's until you tap another.
   4. In a timeline, each entry says when it happened, in the device's time: only the time if it was today
