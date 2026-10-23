@@ -706,6 +706,55 @@ def test_set_tags():
     assert excinfo.value.code == "customer.tag_unavailable"
 
 
+@pytest.mark.django_db
+def test_the_refusal_names_the_groups_and_tags_sent_by_id_that_no_longer_exist():
+    # Same code, message and field as before; besides, which of the ids sent are gone, so a client
+    # (the card's editor, CUSTOMER-F06) takes exactly those off its selection. By name there is no id.
+    vip = CustomerGroup.objects.create(name="VIP")
+    loyal = CustomerTag.objects.create(name="Loyal")
+    ana = card("Ana")
+    gone_group, gone_tag = uuid.uuid7(), uuid.uuid7()
+    with pytest.raises(InvalidPayload) as groups:
+        run(
+            "customer.customer.set_groups",
+            SetGroupsIn(id=ana.id, group_ids=[vip.id, gone_group]),
+        )
+    with pytest.raises(InvalidPayload) as tags:
+        run(
+            "customer.customer.set_tags",
+            SetTagsIn(id=ana.id, tag_ids=[gone_tag, loyal.id]),
+        )
+    with pytest.raises(InvalidPayload) as by_name:
+        run("customer.customer.set_groups", SetGroupsIn(id=ana.id, groups=["Nope"]))
+    sent = [json.loads(json.dumps(e.value.envelope(), default=str)) for e in (groups, tags, by_name)]
+    assert sent == [
+        {
+            "error": {
+                "code": "customer.group_unavailable",
+                "message": "That group no longer exists.",
+                "fields": {"groups": "That group no longer exists."},
+                "unavailable_ids": [str(gone_group)],
+            }
+        },
+        {
+            "error": {
+                "code": "customer.tag_unavailable",
+                "message": "That tag no longer exists.",
+                "fields": {"tags": "That tag no longer exists."},
+                "unavailable_ids": [str(gone_tag)],
+            }
+        },
+        {
+            "error": {
+                "code": "customer.group_unavailable",
+                "message": "That group no longer exists.",
+                "fields": {"groups": "That group no longer exists."},
+            }
+        },
+    ]
+    assert (list(ana.groups.all()), list(ana.tags.all())) == ([], [])
+
+
 # customer.customer.delete (CUSTOMER-F07; delete_guarded.pg)
 
 

@@ -507,11 +507,26 @@ def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
     return {"created": created, "skipped": len(rows) - created, "rows": rows}
 
 
+class MembersUnavailable(InvalidPayload):
+    """A group or tag sent by id no longer exists: the usual refusal (code, message, field), plus
+    ``unavailable_ids``, which of the ids sent are gone, so a client takes exactly those off its
+    selection (the card's editor, CUSTOMER-F06) without guessing from a list it may only see part of."""
+
+    def __init__(self, message, *, code: str, fields: dict, unavailable: set[UUID]):
+        super().__init__(message, code=code, fields=fields)
+        self.unavailable_ids = sorted(str(pk) for pk in unavailable)
+
+    def envelope(self) -> dict:
+        envelope = super().envelope()
+        envelope["error"]["unavailable_ids"] = self.unavailable_ids
+        return envelope
+
+
 def _named_ids(
     model, ids: list[UUID], names: list[str], missing, code: str, field: str
 ) -> set[UUID]:
     """The ids of the groups or tags sent by id or by name, held until the COMMIT; one that does not exist
-    (or that was deleted meanwhile) saves nothing."""
+    (or that was deleted meanwhile) saves nothing, and the refusal names the ids that are gone."""
     wanted = set(ids)
     for name in names:
         match = (
@@ -523,8 +538,11 @@ def _named_ids(
         if match is None:
             raise InvalidPayload(missing, code=code, fields={field: missing})
         wanted.add(match)
-    if wanted - set(lock_rows(model, wanted)):
-        raise InvalidPayload(missing, code=code, fields={field: missing})
+    gone = wanted - set(lock_rows(model, wanted))
+    if gone:
+        raise MembersUnavailable(
+            missing, code=code, fields={field: missing}, unavailable=gone
+        )
     return wanted
 
 

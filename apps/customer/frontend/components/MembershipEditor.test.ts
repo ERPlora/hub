@@ -17,6 +17,9 @@ beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
 const group = (id: string, name: string, is_active = true) => ({ id, name, description: '', color: 'primary', sort_order: 0, is_active, customer_count: 1 });
 const GROUPS = pageOf([group('g1', 'VIP'), group('g2', 'Staff'), group('g3', 'Old', false), group('g4', 'Retired', false)]);
+/** The refusal of a save with groups deleted meanwhile: it names them (`unavailable_ids`). */
+const groupGone = (ids: string[]) =>
+  json({ error: { code: 'customer.group_unavailable', message: 'That group no longer exists.', fields: { groups: 'That group no longer exists.' }, unavailable_ids: ids } }, 422);
 /** `n` more active groups, for a business whose list needs the search. */
 const OTHER_GROUPS = (n: number) => Array.from({ length: n }, (_, i) => group(`gx${i}`, `Group ${String(i).padStart(2, '0')}`));
 
@@ -212,9 +215,9 @@ describe('MembershipEditor', () => {
     expect(s.wrapper.find('[data-testid="customer-groups-error"]').exists()).toBe(false);
   });
 
-  // A deletion is only taken off the selection when the server confirms it: the whole list no longer
-  // has it. A searched list hides what does not match, so it proves nothing.
-  it('with a search on, after «That group no longer exists.» the search clears and only the deleted group leaves', async () => {
+  // A deletion is only taken off the selection when the server says so: its refusal names the ids that
+  // are gone. A list the user sees only part of (a search, more than 100) proves nothing.
+  it('with a search on, after «That group no longer exists.» only the group it names leaves; the ticked ones the search hides stay', async () => {
     const s = await setup({ selected: [] });
     await s.result(s.call, 'customer.group.list', pageOf([group('g1', 'VIP'), group('g5', 'Gold'), ...OTHER_GROUPS(98)], 101));
     let call = await s.search('VIP');
@@ -226,26 +229,37 @@ describe('MembershipEditor', () => {
     await flush();
     // Someone deletes Gold.
     await s.result(call, 'customer.group.list', pageOf([]), 2);
-    s.net.onApi((r) =>
-      (sent(r).body as { group_ids: string[] }).group_ids.includes('g5')
-        ? refusal(422, 'customer.group_unavailable', 'That group no longer exists.', { group_ids: 'That group no longer exists.' })
-        : json({ id: 'c1' }),
-    );
+    s.net.onApi((r) => ((sent(r).body as { group_ids: string[] }).group_ids.includes('g5') ? groupGone(['g5']) : json({ id: 'c1' })));
     await s.save().trigger('click');
     await flush();
     expect(s.wrapper.get('[data-testid="customer-groups-error"]').text()).toContain('That group no longer exists.');
-    expect(s.params('customer.group.list')).toEqual([{ limit: 100, sort: 'name' }]);
-    call = await s.live();
-    await s.result(call, 'customer.group.list', pageOf([group('g1', 'VIP'), ...OTHER_GROUPS(99)]));
-    expect(s.wrapper.get('[data-testid="customer-groups-error"]').text()).toContain('That group no longer exists.');
-    expect(s.boxes().filter((b) => b[2]).map((b) => b[1])).toEqual(['VIP']);
+    expect(s.params('customer.group.list')).toEqual([{ limit: 100, sort: 'name', search: 'Gold' }]);
     await s.save().trigger('click');
     await flush();
     expect(s.net.api.map((r) => (sent(r).body as { group_ids: string[] }).group_ids)).toEqual([['g1', 'g5'], ['g1']]);
     expect(toastSuccess).toHaveBeenCalledWith('Groups assigned');
   });
 
-  it('with more than 100 groups the list cannot confirm a deletion: nothing ticked leaves the selection', async () => {
+  it('with more than 100 groups, after the refusal the next save sends the ticked ones that exist and not the deleted one', async () => {
+    const s = await setup({ selected: [] });
+    await s.result(s.call, 'customer.group.list', pageOf([group('g1', 'VIP'), ...OTHER_GROUPS(99)], 140));
+    let call = await s.search('Gold');
+    await s.result(call, 'customer.group.list', pageOf([group('g5', 'Gold')]));
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
+    call = await s.search('');
+    await s.result(call, 'customer.group.list', pageOf([group('g1', 'VIP'), ...OTHER_GROUPS(99)], 139));
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    s.net.onApi((r) => ((sent(r).body as { group_ids: string[] }).group_ids.includes('g5') ? groupGone(['g5']) : json({ id: 'c1' })));
+    await s.save().trigger('click');
+    await flush();
+    await s.save().trigger('click');
+    await flush();
+    expect(s.net.api.map((r) => (sent(r).body as { group_ids: string[] }).group_ids)).toEqual([['g5', 'g1'], ['g1']]);
+    expect(toastSuccess).toHaveBeenCalledWith('Groups assigned');
+  });
+
+  it('a refusal that names no group takes nothing off the selection', async () => {
     const s = await setup({ selected: [] });
     await s.result(s.call, 'customer.group.list', pageOf([group('g1', 'VIP'), ...OTHER_GROUPS(99)], 140));
     let call = await s.search('Gold');
@@ -255,17 +269,28 @@ describe('MembershipEditor', () => {
     await s.result(call, 'customer.group.list', pageOf([group('g1', 'VIP')]));
     s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
     await flush();
-    s.net.onApi(() => refusal(422, 'customer.group_unavailable', 'That group no longer exists.', { group_ids: 'That group no longer exists.' }));
+    s.net.onApi(() => refusal(422, 'customer.group_unavailable', 'That group no longer exists.', { groups: 'That group no longer exists.' }));
     await s.save().trigger('click');
     await flush();
-    call = await s.live();
-    await s.result(call, 'customer.group.list', pageOf([group('g1', 'VIP'), ...OTHER_GROUPS(99)], 139));
     await s.save().trigger('click');
     await flush();
     expect(s.net.api.map((r) => (sent(r).body as { group_ids: string[] }).group_ids)).toEqual([
       ['g5', 'g1'],
       ['g5', 'g1'],
     ]);
+  });
+
+  it('a group of the card deleted before the card\'s result arrives leaves too, once the refusal names it', async () => {
+    const s = await setup({ selected: ['g1'] });
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    s.net.onApi((r) => ((sent(r).body as { group_ids: string[] }).group_ids.includes('g1') ? groupGone(['g1']) : json({ id: 'c1' })));
+    await s.save().trigger('click');
+    await flush();
+    await s.save().trigger('click');
+    await flush();
+    expect(s.net.api.map((r) => (sent(r).body as { group_ids: string[] }).group_ids)).toEqual([['g1', 'g2'], ['g2']]);
   });
 
   it('a ticked group someone else deactivates is no longer seen, and not sent', async () => {
@@ -385,7 +410,7 @@ describe('MembershipEditor', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Tags assigned');
   });
 
-  it('the tags: with a search on, after «That tag no longer exists.» only the deleted tag leaves', async () => {
+  it('the tags: with a search on, after «That tag no longer exists.» only the tag it names leaves', async () => {
     const tag = (id: string, name: string) => ({ id, name, color: 'primary', is_active: true, customer_count: 0 });
     const others = (n: number) => Array.from({ length: n }, (_, i) => tag(`tx${i}`, `Tag ${String(i).padStart(2, '0')}`));
     const s = await setup({ kind: 'tags', selected: [] });
@@ -397,17 +422,12 @@ describe('MembershipEditor', () => {
     await s.result(call, 'customer.tag.list', pageOf([tag('t2', 'New')]));
     s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
     await flush();
-    s.net.onApi((r) =>
-      (sent(r).body as { tag_ids: string[] }).tag_ids.includes('t2')
-        ? refusal(422, 'customer.tag_unavailable', 'That tag no longer exists.', { tag_ids: 'That tag no longer exists.' })
-        : json({ id: 'c1' }),
-    );
+    const tagGone = (ids: string[]) =>
+      json({ error: { code: 'customer.tag_unavailable', message: 'That tag no longer exists.', fields: { tags: 'That tag no longer exists.' }, unavailable_ids: ids } }, 422);
+    s.net.onApi((r) => ((sent(r).body as { tag_ids: string[] }).tag_ids.includes('t2') ? tagGone(['t2']) : json({ id: 'c1' })));
     const save = () => s.wrapper.get('[data-testid="customer-tags-save"]');
     await save().trigger('click');
     await flush();
-    expect(s.params('customer.tag.list')).toEqual([{ limit: 100, sort: 'name' }]);
-    call = await s.live();
-    await s.result(call, 'customer.tag.list', pageOf([tag('t1', 'Loyal'), ...others(99)]));
     await save().trigger('click');
     await flush();
     expect(s.net.api.map((r) => (sent(r).body as { tag_ids: string[] }).tag_ids)).toEqual([['t1', 't2'], ['t1']]);

@@ -103,11 +103,15 @@ async function save(): Promise<void> {
     if (isGroups.value) await setGroups.run({ id: props.customerId, group_ids: sending });
     else await setTags.run({ id: props.customerId, tag_ids: sending });
   } catch {
-    // One was deleted meanwhile, and only the whole list tells which: a searched list hides what does
-    // not match. Clear the search; once the whole list is here, the deleted one is no longer seen and
-    // leaves (`unseen`), and every ticked one that still exists stays ticked.
-    if (command.value.error.value?.code === (isGroups.value ? 'customer.group_unavailable' : 'customer.tag_unavailable')) {
-      search.value = '';
+    // Some were deleted meanwhile and the refusal names them (`unavailable_ids`): exactly those leave the
+    // selection, so the next save works; every ticked one that still exists stays, seen or hidden by a
+    // search. A refusal that names none takes nothing off.
+    const error = command.value.error.value;
+    if (error?.code === (isGroups.value ? 'customer.group_unavailable' : 'customer.tag_unavailable')) {
+      const named = error.details.unavailable_ids;
+      const gone = Array.isArray(named) ? named.filter((id): id is string => typeof id === 'string') : [];
+      ticked.value = ticked.value.filter((id) => !gone.includes(id));
+      saved.value = saved.value.filter((id) => !gone.includes(id));
     }
     return; // `error` holds it: the block shows it.
   }
