@@ -27,6 +27,10 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   ``verifactu.config.sync`` on the hub's slug, and its ``whatsapp`` (the number's state, door 4 of WhatsApp's
   contract) through ``whatsapp_inbox.channel.sync`` with the photo's version, when the app is on in that business.
 
+``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``, PLAN-SAAS §2.1) → ``base.session.revoke``, on the same
+scope: 200 ``{ended}`` with the sessions of that SaaS account it ended, on that business or, without it, everywhere
+(the Hub admin's included); an unknown business ends nothing and answers the same.
+
 The demos (plan 2026-10-17, §1.5 and §1.6), on the same scope:
 
 - ``POST /internal/demos`` (``{session_key, vertical, language}``) → ``base.demo.create``: 201 ``{id, slug,
@@ -240,6 +244,18 @@ def demo_codes(request: HttpRequest, slug: str) -> HttpResponse:
         return _payload_invalid("The body is not a JSON object.")
     answer, refused = _operation_call("base.demo.code_create", {**body, "slug": slug}, _registry_context())
     return refused or JsonResponse(answer.model_dump(mode="json"), status=201)
+
+
+@internal_view
+@require_http_methods(["POST"])
+def sessions_revoke(request: HttpRequest) -> HttpResponse:
+    """``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``, PLAN-SAAS §2.1): end the Hub's sessions of a SaaS
+    account, on one business or everywhere (the Hub admin's included); 200 ``{ended}``, idempotent."""
+    body = _body_object(request)
+    if body is None:
+        return _payload_invalid("The body is not a JSON object.")
+    answer, refused = _operation_call("base.session.revoke", body, _registry_context())
+    return refused or JsonResponse({"ended": answer.ended})
 
 
 # ── erplora.com's WhatsApp doors (doors 1–3 of the inbox's contract) ───────────────────────────────────────────────

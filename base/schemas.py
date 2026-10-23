@@ -108,6 +108,18 @@ class HubStateOut(Schema):
     version: int
 
 
+class SessionRevokeIn(Schema):
+    """``POST /internal/sessions/revoke``: the SaaS account whose sessions end, on one business (``hub_id``) or on
+    every host, the Hub admin's included (without it)."""
+
+    user_id: UUID
+    hub_id: UUID | None = None
+
+
+class SessionRevokeOut(Schema):
+    ended: int
+
+
 class HubGetIn(Schema):
     id: UUID
 

@@ -3,7 +3,7 @@
 An explicit list, read by the ``TenantRouter`` and by ``base/tenancy/tests/test_inventory.py``:
 
 - ``control``: the control database (``default``): the registry (``control``), Django's admin, auth, contenttypes
-  and sessions, and phase 1's ``base.Membership``;
+  and sessions, and phase 1's ``base.Membership`` and ``base.SessionOwner``;
 - ``hub``: a hub's own database: ``base``, ``live`` and every module of ``apps/``;
 - ``contextual``: the database of the context that writes it: the outbox and its deliveries, whose rows a hub's
   command writes in its hub and the registry's operations (``base.hub.*``, the demos) in control
@@ -42,6 +42,12 @@ MODEL_CLASSES: dict[str, tuple[str, str]] = {
         CONTROL,
         "phase 1's session seam: the role of a SaaS user on a host stays in control with Django's sessions "
         "until the hub's own staff and sessions come (plan 2026-10-22, decision 3).",
+    ),
+    "base.sessionowner": (
+        CONTROL,
+        "the index of whose and where every session is (a key to Django's sessions, control's): it lives next to "
+        "the sessions it names, so /internal/sessions/revoke ends them without decoding any (plan 2026-10-22, "
+        "decision 3).",
     ),
     "base.hub": (
         CONTROL,

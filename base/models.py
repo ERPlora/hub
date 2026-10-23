@@ -58,6 +58,31 @@ class Membership(UUIDModel):
         return f"{self.user} @ {self.host} ({self.get_role_display()})"
 
 
+class SessionOwner(UUIDModel):
+    """Whose and where a session of the Hub is: the SaaS account that logged in and the host it noted.
+
+    Written at every login (``base.services``), so ``POST /internal/sessions/revoke`` ends exactly the sessions of
+    one account (on one hub, or everywhere) through this index, never decoding the sessions of the table. It goes
+    with its session (``CASCADE``): a logout or ``clearsessions`` takes it too. Control's, like the sessions.
+    """
+
+    session = models.OneToOneField(
+        "sessions.Session", on_delete=models.CASCADE, related_name="owner", verbose_name=_("session")
+    )
+    saas_user_id = models.CharField(_("SaaS account"), max_length=64)
+    host = models.CharField(_("host"), max_length=63, help_text=_("The hub's slug, or the platform host's mark."))
+    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("session owner")
+        verbose_name_plural = _("session owners")
+        ordering = ["saas_user_id", "host"]
+        indexes = [models.Index(fields=["saas_user_id", "host"], name="base_sessionowner_user_host")]
+
+    def __str__(self) -> str:
+        return f"{self.saas_user_id} @ {self.host}"
+
+
 class TaskSchedule(UUIDModel):
     """When a scheduled task of an app runs next (``base.scheduler``; the old Hub's ``_scheduled_tasks``).
 
