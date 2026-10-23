@@ -103,9 +103,11 @@ async function save(): Promise<void> {
     if (isGroups.value) await setGroups.run({ id: props.customerId, group_ids: sending });
     else await setTags.run({ id: props.customerId, tag_ids: sending });
   } catch {
-    // One deleted meanwhile: what the list no longer has leaves the selection, so the next save works.
+    // One was deleted meanwhile, and only the whole list tells which: a searched list hides what does
+    // not match. Clear the search; once the whole list is here, the deleted one is no longer seen and
+    // leaves (`unseen`), and every ticked one that still exists stays ticked.
     if (command.value.error.value?.code === (isGroups.value ? 'customer.group_unavailable' : 'customer.tag_unavailable')) {
-      ticked.value = ticked.value.filter((id) => rows.value.some((row) => row.id === id));
+      search.value = '';
     }
     return; // `error` holds it: the block shows it.
   }

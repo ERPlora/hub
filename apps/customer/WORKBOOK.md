@@ -322,8 +322,10 @@ lo que has marcado o desmarcado y aún no has guardado se queda como lo dejaste;
 añade, borra o quita y tú no has tocado aparece o desaparece también en tu selección. Solo se guarda
 lo que ves.
 Si falla: un grupo o una etiqueta que otra persona acaba de eliminar: «Ese grupo ya no existe.» /
-«Esa etiqueta ya no existe.», y no se guarda nada; esa casilla sale de tu selección y el siguiente
-**Guardar grupos** o **Guardar etiquetas** funciona. Sin grupos o etiquetas: «No hay grupos.» / «No hay
+«Esa etiqueta ya no existe.», y no se guarda nada; la búsqueda se vacía para enseñar la lista entera,
+esa casilla sale de tu selección (lo demás que marcaste se queda) y el siguiente **Guardar grupos** o
+**Guardar etiquetas** funciona. Con más de 100 grupos o etiquetas la lista no cabe entera y no se quita
+nada que no se vea borrado: vuelve a abrir la ficha. Sin grupos o etiquetas: «No hay grupos.» / «No hay
 etiquetas.».
 Implicados: ninguno
 
