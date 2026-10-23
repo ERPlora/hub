@@ -23,6 +23,7 @@ from base.internal import (
     platform_invoice_get,
     platform_invoice_pdf,
     platform_invoices_health,
+    sessions_revoke,
     whatsapp_channel,
     whatsapp_inbound,
     whatsapp_status,
@@ -53,6 +54,7 @@ urlpatterns = [
     path("internal/hubs/<uuid:hub_id>", hub, name="internal-hub"),
     path("internal/hubs/<uuid:hub_id>/restore", hub_restore, name="internal-hub-restore"),
     path("internal/hubs/<uuid:hub_id>/state", hub_state, name="internal-hub-state"),
+    path("internal/sessions/revoke", sessions_revoke, name="internal-sessions-revoke"),
     path("internal/platform/invoices", platform_invoice_create, name="internal-platform-invoices"),
     path(
         "internal/platform/invoices/health",

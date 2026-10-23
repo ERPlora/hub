@@ -563,3 +563,27 @@ msgstr "identidades del hub"
 #: registry.py
 msgid "This hub cannot be opened right now; try again later."
 msgstr "Este hub no se puede abrir ahora; inténtalo más tarde."
+
+#: models.py:70
+msgid "session"
+msgstr "sesión"
+
+#: models.py:72
+msgid "SaaS account"
+msgstr "cuenta de ERPlora"
+
+#: models.py:73
+msgid "The hub's slug, or the platform host's mark."
+msgstr "La dirección del hub, o la marca del host de la plataforma."
+
+#: models.py:77
+msgid "session owner"
+msgstr "dueño de la sesión"
+
+#: models.py:78
+msgid "session owners"
+msgstr "dueños de las sesiones"
+
+#: operations.py:169
+msgid "Your session ended: sign in again."
+msgstr "Tu sesión ha terminado: vuelve a entrar."

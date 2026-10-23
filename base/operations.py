@@ -111,6 +111,19 @@ class HostClosed(Unauthorized):
     reconnection, like any request, then hears the gate itself."""
 
 
+class SessionEnded(Unauthorized):
+    """The session a live stream or the print socket was opened with ended (the SaaS revoked it, a logout): the
+    stream ends (``bye``) and its reconnection, without that session, is anonymous."""
+
+
+def _session_ended(request: HttpRequest | None) -> bool:
+    """Whether the session ``request`` came with is gone from the session store; a request without one (the
+    system's, a test's) has none to end."""
+    session = getattr(request, "session", None)
+    key = getattr(session, "session_key", None)
+    return key is not None and not session.exists(key)
+
+
 class HubContextBuilder:
     def __init__(self, resolver: HostScopeResolver | None = None) -> None:
         self.resolver = resolver or HostScopeResolver()
@@ -147,10 +160,13 @@ class HubContextBuilder:
         return use_hub(hub)
 
     def refresh(self, ctx: OperationContext) -> OperationContext:
-        """Re-read the registry, the user and its Membership, so a revocation, or a hub that stopped serving the app
-        (suspended, gone, being prepared: ``HostClosed``), reaches the next live re-run."""
+        """Re-read the session, the registry, the user and its Membership, so a session that ended
+        (``/internal/sessions/revoke``, a logout: ``SessionEnded``), a revocation, or a hub that stopped serving the
+        app (suspended, gone, being prepared: ``HostClosed``), reaches the next live re-run."""
         if ctx.actor is None:
             return ctx
+        if _session_ended(ctx.request):
+            raise SessionEnded(gettext("Your session ended: sign in again."), code="base.session_ended")
         refusal = registry.refusal(registry.hub_by_slug(ctx.scope.key))
         if refusal is not None:
             raise HostClosed(refusal.message, code=refusal.code, status=refusal.status)

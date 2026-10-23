@@ -2,7 +2,7 @@
 
 Every model the Hub installs, and every model its migrations ever created, belongs to one database class, from an
 explicit list: ``control`` (the registry, Django's admin, auth, contenttypes and sessions, and phase 1's
-``Membership``), ``hub`` (``base``, ``live`` and every module of ``apps/``), ``contextual`` (the outbox and its
+``Membership`` and ``SessionOwner``), ``hub`` (``base``, ``live`` and every module of ``apps/``), ``contextual`` (the outbox and its
 deliveries: in the database of the context, control's for the registry's events) or ``shared`` (the SaaS's schema).
 A model nobody classified fails here and in the router, never lands anywhere by default. Own models have a UUIDv7
 key.
@@ -44,7 +44,7 @@ def test_the_classes_are_the_plans():
     from live.models import OutboxEvent
 
     from apps.demo.models import Item
-    from base.models import EventDelivery, HubIdentity, Membership, TaskSchedule
+    from base.models import EventDelivery, HubIdentity, Membership, SessionOwner, TaskSchedule
     from control.models import Cluster, DemoCode, Hub, HubDue
     from shared.models import App
 
@@ -59,6 +59,7 @@ def test_the_classes_are_the_plans():
         Session: inventory.CONTROL,
         LogEntry: inventory.CONTROL,
         Membership: inventory.CONTROL,
+        SessionOwner: inventory.CONTROL,
         TaskSchedule: inventory.HUB,
         HubIdentity: inventory.HUB,
         Item: inventory.HUB,
