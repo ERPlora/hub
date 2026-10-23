@@ -7,7 +7,7 @@
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, flush, mountSale, resultFrame, settle } from '../__tests__/mount-sale';
+import { click, flush, mountSale, noTimerOutlivesATest, resultFrame, settle } from '../__tests__/mount-sale';
 import CartLines from '../components/pos/CartLines.vue';
 import PosCatalog from '../components/pos/PosCatalog.vue';
 import { line, memoryStorage, order, preview, product, settings } from '../components/pos/__tests__/fixtures';
@@ -39,6 +39,7 @@ vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => 
   };
 });
 
+noTimerOutlivesATest();
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 afterEach(() => {
   vi.unstubAllGlobals();
