@@ -41,6 +41,11 @@ del hub), el hub manda al SaaS como siempre y se guarda la nueva; solo se guarda
 La spec que prueba el salto mismo lo pide: `login(page, origin, next, cuenta, { fresh: true })` (o `hostPage(…, {
 fresh: true })`). Lo cubre `helpers-login-hub-session.spec.ts`.
 
+Esa sesión es **una sola** en el servidor para todos los contextos que la reutilizan, también los de specs
+distintas: salir del hub en uno la termina en todos (el siguiente login salta otra vez), y lo que una spec deje
+guardado en ella lo hereda la siguiente. Una spec con dos dispositivos de la misma cuenta, o la del cambio de
+empleado por PIN cuando llegue (fase 2) si no rota la clave de sesión, pide `fresh: true` para tener la suya.
+
 Cada paso espera una sexta parte del tiempo del test (30 s con los 180 s de `playwright.config.ts`; más con
 `test.slow()` o `test.setTimeout`) y, si no llega, falla diciendo cuál y cuánto esperó. «code rejected» solo
 sale cuando el SaaS dice que el código no vale; si aún no ha contestado, el error dice «the SaaS did not answer
