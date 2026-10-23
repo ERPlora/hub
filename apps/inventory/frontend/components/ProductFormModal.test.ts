@@ -116,7 +116,10 @@ describe('ProductFormModal: new product', () => {
     ]);
     expect(s.el('inventory-product-tax')?.value).toBe('');
     expect(s.el('inventory-product-unit')?.value).toBe('ud');
-    expect([...s.el('inventory-product-unit')!.querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim())).toContain('Kilogram (kg)');
+    // Each unit by the name the API gives it, which already carries its code («Unit (ud)», once).
+    expect([...s.el('inventory-product-unit')!.querySelectorAll('ion-select-option')].map((o) => o.textContent?.trim())).toEqual(
+      UNITS.rows.map((unit) => unit.name),
+    );
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
   });
 

@@ -118,7 +118,6 @@
       "trackInherit": "Following the hub setting",
       "trackOff": "Catalog only: sales do not move its stock",
       "unit": "Unit of measure",
-      "unitOption": "{name} ({code})",
       "categories": "Categories",
       "categoriesSearch": "Search a category to add",
       "removeCategory": "Remove {name}",

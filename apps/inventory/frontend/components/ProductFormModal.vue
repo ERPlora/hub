@@ -114,8 +114,9 @@ const taxMissing = computed(() => !form.value.tax || (!!props.product?.needs_tax
 const complete = computed(() => !!form.value.name.trim() && !!form.value.sku.trim() && !taxMissing.value);
 const tracksNow = computed(() => form.value.track ?? (props.product ? props.product.tracks_stock : props.hubTracksStock));
 const step = computed(() => props.units.find((unit) => unit.code === form.value.unit)?.increment);
+/** Each unit by the name the API gives it, which already carries its code («Unit (ud)»). */
 const unitOptions = computed(() =>
-  props.units.length ? props.units.map((unit) => ({ code: unit.code, label: t('inventory.form.unitOption', { name: unit.name, code: unit.code }) })) : [{ code: form.value.unit, label: form.value.unit }],
+  props.units.length ? props.units.map((unit) => ({ code: unit.code, label: unit.name })) : [{ code: form.value.unit, label: form.value.unit }],
 );
 
 function set<K extends keyof Fields>(key: K, value: Fields[K]): void {

@@ -131,6 +131,12 @@ describe('TaxCategorySelect', () => {
     expect(s.testid('tax-unconfigured').exists()).toBe(false);
   });
 
+  it('with more categories than one query holds, a chosen one beyond the first page keeps its key in sight', async () => {
+    const s = await setup({ modelValue: 'drink.wine' });
+    await s.show({ ...TAX_CATEGORIES, total: 140 });
+    expect(s.combo().props('modelValue')).toEqual({ id: 'drink.wine', label: 'drink.wine' });
+  });
+
   it('with more categories than one query holds, marks only an empty value', async () => {
     const s = await setup({ modelValue: 'drink.wine', markMissing: true });
     await s.show({ ...TAX_CATEGORIES, total: 140 });

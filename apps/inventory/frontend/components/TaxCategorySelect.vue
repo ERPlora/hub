@@ -10,8 +10,8 @@
 //     at all says where to make them;
 //   - category (`allowDefault`): «— (default)» first, an empty key.
 // The first page is followed live: it names the chosen category and tells «Not configured», «none» and
-// a loading error. With more categories than one query serves, a category is named once a search has
-// offered it, and the «Not configured» mark only knows an empty value.
+// a loading error. With more categories than one query serves, a category beyond the first page is
+// named once picked here (until then, by its key), and the «Not configured» mark only knows an empty value.
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { type OutputOf, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -65,29 +65,23 @@ function optionLabel(row: TaxRow): string {
 
 const asOption = (row: TaxRow): ComboOption => ({ id: row.key, label: optionLabel(row) });
 
-/** The names of the categories a search offered (beyond the first page), by key. */
-const found = ref(new Map<string, string>());
-function remember(options: readonly ComboOption[]): void {
-  const next = new Map(found.value);
-  for (const option of options) next.set(option.id, option.label);
-  found.value = next;
-}
+/** The names of the categories picked here, by key: a search may offer one beyond the first page. */
+const picked = ref(new Map<string, string>());
 
-/** What the field shows: the chosen category, «— (default)», or nothing. */
+/** What the field shows: the chosen category, «— (default)», or nothing (none, or one no longer active). */
 const choice = computed<ComboOption | null>(() => {
   const key = props.modelValue;
   if (key === '') return props.allowDefault ? defaultOption.value : null;
   const row = rows.value.find((r) => r.key === key);
   if (row) return asOption(row);
-  const label = found.value.get(key);
-  return label === undefined ? null : { id: key, label };
+  if (!loaded.value || complete.value) return null;
+  return { id: key, label: picked.value.get(key) ?? key };
 });
 
 async function search(query: string): Promise<ComboOption[]> {
   const text = query.trim();
   const answer = await client.api.call('tax.category.list', { ...PAGE, ...(text ? { search: text } : {}) });
   const options = answer.rows.map(asOption);
-  remember(options);
   return props.allowDefault && !text ? [defaultOption.value, ...options] : options;
 }
 
@@ -101,7 +95,7 @@ const none = computed(() => !props.allowDefault && loaded.value && rows.value.le
 
 function pick(option: ComboOption | null): void {
   const key = option?.id ?? '';
-  if (option) remember([option]);
+  if (option) picked.value = new Map(picked.value).set(option.id, option.label);
   if (key !== props.modelValue) emit('update:modelValue', key);
 }
 </script>
@@ -155,5 +149,7 @@ function pick(option: ComboOption | null): void {
 .tax-category-select__missing {
   justify-self: start;
   margin: 0;
+  /* A document rule: the shell's Tailwind preflight zeroes Ionic's own chip padding (`:host`). */
+  padding-inline: 12px;
 }
 </style>

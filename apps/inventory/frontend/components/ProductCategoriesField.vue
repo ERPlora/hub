@@ -4,7 +4,7 @@
 // most 100 per query) to add one more, and the chosen ones under it as chips, each removed with its
 // button; a category is never added twice nor offered once chosen. Only there when the business has
 // categories: the first page, followed live, decides it and names the chosen ones (with more than one
-// query holds, a category is named once a search has offered it).
+// query holds, one beyond the first page is named once picked here; until then, by its id).
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -35,9 +35,9 @@ const PAGE = { limit: 100, sort: 'name' } as const;
 const { data, status, error } = useLive('inventory.category.list', () => PAGE);
 
 const any = computed(() => (data.value?.total ?? 0) > 0);
-/** The names of the categories a search offered (beyond the first page), by id. */
-const found = ref(new Map<string, string>());
-const nameOf = (id: string): string => data.value?.rows.find((row) => row.id === id)?.name ?? found.value.get(id) ?? id;
+/** The names of the categories picked here, by id: a search may offer one beyond the first page. */
+const picked = ref(new Map<string, string>());
+const nameOf = (id: string): string => data.value?.rows.find((row) => row.id === id)?.name ?? picked.value.get(id) ?? id;
 const chosen = computed(() => props.modelValue.map((id) => ({ id, label: nameOf(id) })));
 
 /** The Combo's pick, shown for one render and then emptied: the field is ready for the next category
@@ -47,14 +47,12 @@ const adding = ref<ComboOption | null>(null);
 async function search(query: string): Promise<ComboOption[]> {
   const text = query.trim();
   const answer = await client.api.call('inventory.category.list', { ...PAGE, ...(text ? { search: text } : {}) });
-  const next = new Map(found.value);
-  for (const row of answer.rows) next.set(row.id, row.name);
-  found.value = next;
   return answer.rows.filter((row) => !props.modelValue.includes(row.id)).map((row) => ({ id: row.id, label: row.name }));
 }
 
 async function add(option: ComboOption | null): Promise<void> {
   if (!option) return;
+  picked.value = new Map(picked.value).set(option.id, option.label);
   if (!props.modelValue.includes(option.id)) emit('update:modelValue', [...props.modelValue, option.id]);
   adding.value = option;
   await nextTick();
@@ -132,7 +130,9 @@ function remove(id: string): void {
   gap: 4px;
 }
 
+/* A document rule: the shell's Tailwind preflight zeroes Ionic's own chip padding (`:host`). */
 .product-categories__chips ion-chip {
   margin: 0;
+  padding-inline: 12px 0;
 }
 </style>

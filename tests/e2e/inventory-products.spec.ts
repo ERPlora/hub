@@ -102,10 +102,12 @@ test('selectores de Inventario (Combo compartido): the product form searches its
     await categories.locator('input').fill(food.name);
     const offered = page.locator('[data-testid^="inventory-product-categories-option-"]');
     await expect(offered).toHaveText([food.name]);
-    await page.screenshot({ path: shot(`FIX-INVENTORY-SEARCHSELECT-TO-COMBO-${label}`) });
     await offered.first().click();
     const chips = form.locator('[data-testid^="inventory-product-categories-chip-"]');
     await expect(chips).toHaveText([drinks.name, food.name]);
+    await expect(offered).toHaveCount(0);
+    await chips.last().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: shot(`FIX-INVENTORY-SEARCHSELECT-TO-COMBO-${label}`) });
 
     // A chosen category is not offered again; the button of its chip takes it away.
     await categories.locator('input').fill(drinks.name);
