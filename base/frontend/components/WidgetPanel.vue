@@ -90,6 +90,15 @@ const points = computed(() => {
 });
 
 const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
+
+/** The chart's bar whose day and amount are said above it (by its row's label): the last one until another is
+ *  tapped or focused, and again when the chosen day is gone (the old hub's gh:hub#2392). */
+const chosen = ref<string>();
+const chosenBar = computed(() => {
+  const current = view.value;
+  if (current.kind !== 'chart') return undefined;
+  return current.bars.find((bar) => bar.key === chosen.value) ?? current.bars.at(-1);
+});
 </script>
 
 <template>
@@ -232,19 +241,42 @@ const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
     <div
       v-else-if="view.kind === 'chart'"
       class="widget-chart"
-      role="img"
-      :aria-label="view.bars.map((bar) => `${bar.label}: ${bar.text}`).join(', ')"
     >
-      <div
-        v-for="bar in view.bars"
-        :key="bar.label"
-        class="widget-chart-col"
+      <p
+        v-if="chosenBar"
+        class="widget-chart-readout"
       >
         <span
-          class="widget-chart-bar"
-          :style="{ height: percent(bar.share) }"
-        />
-        <span class="widget-chart-label">{{ bar.label }}</span>
+          class="widget-chart-amount"
+          data-testid="widget-chart-amount"
+        >{{ chosenBar.text }}</span>
+        <span
+          class="widget-muted"
+          data-testid="widget-chart-day"
+        >{{ chosenBar.detail }}</span>
+      </p>
+      <div
+        class="widget-chart-bars"
+        role="group"
+        :aria-label="widget.title"
+      >
+        <button
+          v-for="bar in view.bars"
+          :key="bar.key"
+          type="button"
+          class="widget-chart-col"
+          data-testid="widget-chart-bar"
+          :aria-label="`${bar.detail}: ${bar.text}`"
+          :aria-pressed="bar.key === chosenBar?.key"
+          @click="chosen = bar.key"
+          @focus="chosen = bar.key"
+        >
+          <span
+            class="widget-chart-bar"
+            :style="{ height: percent(bar.share) }"
+          />
+          <span class="widget-chart-label">{{ bar.label }}</span>
+        </button>
       </div>
     </div>
   </article>
@@ -361,6 +393,26 @@ const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
 
 .widget-chart {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.widget-chart-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin: 0;
+}
+
+.widget-chart-amount {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.widget-chart-bars {
+  display: flex;
   align-items: flex-end;
   gap: 6px;
   height: 120px;
@@ -375,6 +427,18 @@ const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
   gap: 4px;
   height: 100%;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.widget-chart-col:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
 }
 
 .widget-chart-bar {
@@ -382,6 +446,16 @@ const percent = (share: number) => `${Math.round(share * 1000) / 10}%`;
   min-height: 2px;
   border-radius: 4px 4px 0 0;
   background: var(--ion-color-primary);
+  opacity: 0.5;
+}
+
+.widget-chart-col[aria-pressed='true'] .widget-chart-bar {
+  opacity: 1;
+}
+
+.widget-chart-col[aria-pressed='true'] .widget-chart-label {
+  color: var(--ion-text-color, #000);
+  font-weight: 600;
 }
 
 .widget-chart-label {

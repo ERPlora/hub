@@ -106,6 +106,54 @@ describe('WidgetPanel', () => {
     expect(m.wrapper.get('[data-testid="widget-sparkline"] polyline').attributes('points')).toBe('0,40 100,0');
   });
 
+  // BASE-F06 (the old hub's gh:hub#2392): a chart of business days says each day in the person's language, never
+  // `2026-10-23`, and the amount of the chosen bar — the last one (today) until another is tapped or focused.
+  describe('a chart of days', () => {
+    const chart = { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } } as const;
+    const week = { rows: [{ day: '2026-10-21', total: 1250 }, { day: '2026-10-22', total: 0 }, { day: '2026-10-23', total: 500 }] };
+    const bars = (wrapper: { findAll: (s: string) => { text: () => string }[] }) => wrapper.findAll('[data-testid="widget-chart-bar"]');
+    const readout = (wrapper: { get: (s: string) => { text: () => string } }) => [
+      wrapper.get('[data-testid="widget-chart-day"]').text(),
+      wrapper.get('[data-testid="widget-chart-amount"]').text(),
+    ];
+
+    it("names each bar by its weekday and says the last bar's day and amount", async () => {
+      const m = await panel(chart, 'es');
+      const call = await m.live();
+      await m.result(call, 'demo.item.stats', week);
+      const found = m.wrapper.findAll('[data-testid="widget-chart-bar"]');
+      expect(found.map((bar) => bar.text())).toEqual(['mié', 'jue', 'vie']);
+      expect(found.map((bar) => bar.attributes('aria-label'))).toEqual(['mié, 21 oct: 12,50\u00a0€', 'jue, 22 oct: 0,00\u00a0€', 'vie, 23 oct: 5,00\u00a0€']);
+      expect(found.map((bar) => bar.attributes('aria-pressed'))).toEqual(['false', 'false', 'true']);
+      expect(readout(m.wrapper)).toEqual(['vie, 23 oct', '5,00\u00a0€']);
+      expect(m.wrapper.text()).not.toContain('2026-10');
+    });
+
+    it('a tapped or focused bar says its own day and amount', async () => {
+      const m = await panel(chart, 'en');
+      const call = await m.live();
+      await m.result(call, 'demo.item.stats', week);
+      const found = m.wrapper.findAll('[data-testid="widget-chart-bar"]');
+      await found[0].trigger('click');
+      expect(readout(m.wrapper)).toEqual(['Wed, Oct 21', '€12.50']);
+      expect(found.map((bar) => bar.attributes('aria-pressed'))).toEqual(['true', 'false', 'false']);
+      await found[1].trigger('focus');
+      expect(readout(m.wrapper)).toEqual(['Thu, Oct 22', '€0.00']);
+    });
+
+    it('keeps the chosen day when the chart repaints, and goes back to the last one when that day is gone', async () => {
+      const m = await panel(chart, 'es');
+      const call = await m.live();
+      await m.result(call, 'demo.item.stats', week);
+      await m.wrapper.findAll('[data-testid="widget-chart-bar"]')[0].trigger('click');
+      await m.result(call, 'demo.item.stats', { rows: [...week.rows.slice(0, 2), { day: '2026-10-23', total: 750 }] }, 2);
+      expect(readout(m.wrapper)).toEqual(['mié, 21 oct', '12,50\u00a0€']);
+      await m.result(call, 'demo.item.stats', { rows: [{ day: '2026-10-24', total: 300 }] }, 3);
+      expect(bars(m.wrapper).map((bar) => bar.text())).toEqual(['sáb']);
+      expect(readout(m.wrapper)).toEqual(['sáb, 24 oct', '3,00\u00a0€']);
+    });
+  });
+
   it('mounts the component a panel names, from its app', async () => {
     const m = await panel({ kind: null, operation: null, component: 'ItemStats', live: false });
     await vi.waitFor(() => expect(m.wrapper.find('[data-testid="demo-stats"]').exists()).toBe(true));

@@ -147,7 +147,18 @@ export type WidgetView =
   | { kind: 'sparkline'; series: number[]; value: string | undefined }
   | { kind: 'bar-list'; bars: { label: string; value: number; text: string; share: number }[] }
   | { kind: 'timeline'; entries: { title: string; time: string; description: string }[] }
-  | { kind: 'chart'; bars: { label: string; value: number; text: string; share: number }[] };
+  | { kind: 'chart'; bars: ChartBar[] };
+
+/** A bar of a chart: `key` is its row's label as the server sent it; `label` goes under the bar and `detail` says
+ *  it whole (a day: «vie» and «vie, 23 oct»). */
+export interface ChartBar {
+  key: string;
+  label: string;
+  detail: string;
+  value: number;
+  text: string;
+  share: number;
+}
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const numeric = (value: unknown): number => (typeof value === 'number' ? value : Number(value));
@@ -158,6 +169,59 @@ function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown) {
     .filter((bar) => bar.label !== '' && Number.isFinite(bar.value));
   const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => bar.value), 0);
   return read.map((bar) => ({ ...bar, text: formatValue(bar.value, format, locale), share: max > 0 ? bar.value / max : 0 }));
+}
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DAY_MS = 86_400_000;
+
+/** A civil day `YYYY-MM-DD` (a business day has no zone) as its UTC midnight, always formatted in UTC so it never
+ *  moves to the day before or after; an instant or a day the calendar does not have is no day. */
+export function isoDay(value: string): Date | undefined {
+  const match = ISO_DAY.exec(value);
+  if (!match) return undefined;
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const same = date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  return same ? date : undefined;
+}
+
+export type DayStyle = 'weekday' | 'date' | 'full';
+
+const DAY_STYLES: Record<DayStyle, Intl.DateTimeFormatOptions> = {
+  weekday: { weekday: 'short' },
+  date: { day: 'numeric', month: 'short' },
+  full: { weekday: 'short', day: 'numeric', month: 'short' },
+};
+
+const dayFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** A day of `isoDay` in the person's language: «vie» / «Fri», «23 oct» / «Oct 23», «vie, 23 oct» / «Fri, Oct 23». */
+export function formatDay(day: Date, style: DayStyle, locale: string): string {
+  const id = `${locale}|${style}`;
+  let found = dayFormats.get(id);
+  if (!found) {
+    found = new Intl.DateTimeFormat(locale, { ...DAY_STYLES[style], timeZone: 'UTC' });
+    dayFormats.set(id, found);
+  }
+  return found.format(day);
+}
+
+/** A chart's bars, its days named in the person's language (the old hub's gh:hub#2392): a week by its weekdays, a
+ *  longer series by its dates (its weekdays would repeat); a label that is no day stays as it is. */
+function chartBars(widget: WidgetDef, rows: Row[], locale: string, format: unknown): ChartBar[] {
+  const read = bars(widget, rows, locale, format);
+  const days = read.map((bar) => isoDay(bar.label));
+  const times = days.filter((day) => day !== undefined).map((day) => day.getTime());
+  const style: DayStyle = times.length && Math.max(...times) - Math.min(...times) < 7 * DAY_MS ? 'weekday' : 'date';
+  return read.map((bar, index) => {
+    const day = days[index];
+    return {
+      ...bar,
+      key: bar.label,
+      label: day ? formatDay(day, style, locale) : bar.label,
+      detail: day ? formatDay(day, 'full', locale) : bar.label,
+    };
+  });
 }
 
 /** What a declarative panel paints from its operation's result; `empty` = «No data», never a made-up 0. */
@@ -182,11 +246,13 @@ export function widgetView(widget: WidgetDef, result: unknown, locale: string): 
       const last = widget.map.value ? first?.[widget.map.value] : series.at(-1);
       return { kind: 'sparkline', series, value: last === undefined ? undefined : formatValue(last, format, locale) };
     }
-    case 'bar-list':
+    case 'bar-list': {
+      const read = bars(widget, rows, locale, widget.options.valueFormat ?? format);
+      return read.length ? { kind: 'bar-list', bars: read } : { kind: 'empty' };
+    }
     case 'chart': {
-      const read = bars(widget, rows, locale, widget.kind === 'bar-list' ? (widget.options.valueFormat ?? format) : format);
-      if (read.length === 0) return { kind: 'empty' };
-      return { kind: widget.kind, bars: read };
+      const read = chartBars(widget, rows, locale, format);
+      return read.length ? { kind: 'chart', bars: read } : { kind: 'empty' };
     }
     case 'timeline': {
       const entries = rows

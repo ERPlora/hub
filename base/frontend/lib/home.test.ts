@@ -208,6 +208,54 @@ describe('rowsOf / widgetView (BASE-G166)', () => {
   });
 });
 
+// BASE-F06 — a chart of business days (Sales' «Sales, last 7 days»): the old hub's gh:hub#2392 painted each day
+// as `2026-10-17` and no amount at all.
+describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
+  const WEEK = ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
+  const chart = widget('sale.last_7_days', { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } });
+  const days = (labels: string[], total = 0) => ({ rows: labels.map((day) => ({ day, total })) });
+  const barsOf = (result: unknown, locale: string) => {
+    const view = widgetView(chart, result, locale);
+    if (view.kind !== 'chart') throw new Error(`expected a chart, got ${view.kind}`);
+    return view.bars;
+  };
+
+  it("names each day of a week by its short weekday in the person's language, never the raw ISO date", () => {
+    expect(barsOf(days(WEEK), 'es').map((bar) => bar.label)).toEqual(['sáb', 'dom', 'lun', 'mar', 'mié', 'jue', 'vie']);
+    expect(barsOf(days(WEEK), 'en').map((bar) => bar.label)).toEqual(['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  });
+
+  it("says each bar's whole day and its amount in the format the panel declares", () => {
+    const [bar] = barsOf({ rows: [{ day: '2026-10-23', total: 2550 }] }, 'es');
+    expect(bar).toMatchObject({ key: '2026-10-23', label: 'vie', detail: 'vie, 23 oct', text: '25,50\u00a0€' });
+    expect(barsOf({ rows: [{ day: '2026-10-23', total: 500 }] }, 'en')[0]).toMatchObject({ detail: 'Fri, Oct 23', text: '€5.00' });
+  });
+
+  it('a series longer than a week names each day by its date, as its weekdays would repeat', () => {
+    const fortnight = ['2026-10-10', '2026-10-17', '2026-10-23'];
+    expect(barsOf(days(fortnight), 'es').map((bar) => bar.label)).toEqual(['10 oct', '17 oct', '23 oct']);
+    expect(barsOf(days(fortnight), 'en').map((bar) => bar.label)).toEqual(['Oct 10', 'Oct 17', 'Oct 23']);
+  });
+
+  it('a business day is the same day in every time zone: a civil day, never an instant', () => {
+    const zone = process.env.TZ;
+    try {
+      for (const tz of ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati']) {
+        process.env.TZ = tz;
+        expect(barsOf(days(['2026-10-17']), 'es')[0], tz).toMatchObject({ label: 'sáb', detail: 'sáb, 17 oct' });
+      }
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
+  });
+
+  it('a label that is no day stays as it is', () => {
+    const labels = ['Mañana', '2026-02-30', '2026-10-23T02:23:55Z', '17/10/2026'];
+    expect(barsOf(days(labels), 'es').map((bar) => [bar.key, bar.label, bar.detail])).toEqual(labels.map((label) => [label, label, label]));
+  });
+});
+
 describe('activeWidgetKeys (BASE-G167)', () => {
   const catalogue = [widget('a.one', { default: true }), widget('a.two'), widget('b.three', { default: true })];
 
