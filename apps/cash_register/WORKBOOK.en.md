@@ -474,7 +474,7 @@ Steps:
    printer prints it on paper. With the session open it is the "Partial report (X)"; closed, the "Cash
    closing (Z)".
 3. The paper carries the session number with its X or its Z, who opened it (X) or closed it (Z; "Closed by
-   itself" if it closed by itself), the float, the expected cash and, line by line, the sales by payment
+   itself" if it closed by itself), the float and, line by line, the sales by payment
    method, refunds, cash in, cash out, comps, the expected cash and, in the Z, the counted cash and the
    discrepancy.
 4. With Printing not on or with no active receipt printer, the browser's print dialog shows with the same

@@ -24,7 +24,7 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
   avisa y nunca impide; cierre solo al corte del día de una sesión olvidada.
 - **Consultar e imprimir** (F11, F12, F16): detalle de la sesión con movimientos y arqueos, las cifras
   «Sesión actual» y «Descuadres recientes» encima de la tabla, e informe X o Z por la cola de recibos de
-  Impresión (sin ella, por el navegador).
+  Impresión (sin ella, por el navegador); el papel del dispositivo lo titula X o Z como la pantalla.
 
 ## Ficha
 
@@ -64,6 +64,3 @@ pnpm e2e tests/e2e/cash-register-flows.spec.ts tests/e2e/cash-register-settings.
 - Una sesión por cajón, el umbral de descuadre con aprobación y el «no-sale»: «Lo que NO hace, a
   propósito» del WORKBOOK.
 - Los cinco componentes compartidos de [`UI-REQUESTS.md`](UI-REQUESTS.md).
-- El papel del informe en el dispositivo (app nativa, `crates/peripherals`): titula «CIERRE DE CAJA» también
-  el X y su «Diferencia» no es el descuadre; lo arregla la app, no el Hub (el Hub ya envía el tipo de
-  informe y el descuadre).
