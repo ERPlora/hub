@@ -6,6 +6,7 @@ so it has no route here; ``/readyz`` (it reads the database) is a route on the r
 
 from django.contrib import admin
 from django.urls import path, re_path
+from django.utils.translation import gettext_lazy
 from live.csp import csp_report
 from live.live_view import live_stream
 from live.spa import BASE_NON_SPA_PREFIXES, spa_path_pattern
@@ -35,6 +36,11 @@ from config.api import api
 # Prefixes of hub-next on top of the shared ones: the print socket, the public pages and the login
 # through the SaaS.
 NON_SPA_PREFIXES = (*BASE_NON_SPA_PREFIXES, "ws", "p", "auth")
+
+# ERPlora's name on every page of the staff's admin, never «Django administration» (as the SaaS's admin does).
+admin.site.site_header = "ERPlora Hub"
+admin.site.site_title = "ERPlora Hub Admin"
+admin.site.index_title = gettext_lazy("Administration")
 
 urlpatterns = [
     # The deep link of the SaaS admin's «Open in the Hub admin» (PLAN §18.1); before the admin's own

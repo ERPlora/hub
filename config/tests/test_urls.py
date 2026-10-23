@@ -9,6 +9,7 @@ from live.live_view import live_stream
 pytestmark = pytest.mark.django_db
 
 HOST = "a.localhost:8000"
+PLATFORM = "hubs.localhost:8000"
 SHELL_MARK = '<div id="app"></div>'
 
 
@@ -121,6 +122,18 @@ def test_the_admin_is_not_found_on_a_hub_host(client, admin_user, path):
 def test_the_admin_deep_link_wins_over_the_admin_s_own_urls():
     # Otherwise admin/<app_label>/ would take /admin/hub/ (round 13, PLAN §18.1).
     assert resolve("/admin/hub/a/").url_name == "admin-hub"
+
+
+@pytest.mark.parametrize(("language", "index_title"), [("en", "Administration"), ("es", "Administración")])
+def test_the_admin_bears_erploras_name(client, admin_user, language, index_title):
+    # The staff's admin on hubs.<domain> says it is ERPlora's, as the SaaS's does, never «Django administration».
+    client.force_login(admin_user)
+
+    page = client.get("/admin/", HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE=language).content.decode()
+
+    assert f"<title>{index_title} | ERPlora Hub Admin</title>" in page
+    assert ">ERPlora Hub</a>" in page
+    assert "Django" not in page
 
 
 def test_csp_report(client):
