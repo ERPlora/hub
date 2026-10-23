@@ -3,8 +3,8 @@
 // turning the app on is enabling it). «Sending»: «Use my own certificate» (owner and admin; ERPlora files for you when
 // off), with its explanation and «Open Configuration»; «AEAT environment» with its pill and «Go live» (asks first;
 // closed while something is missing, listed above it: the server's opening and its gateway, the approved signed
-// authorisation, the own certificate (one this server can open), the live option of the plan, an active account) or, in production, why records
-// wait (e.g. the live option left the plan) and «Back to testing» (asks first; only until the first production
+// authorisation, the own certificate (one this server can open), an active account; no plan option, PLAN §30) or, in
+// production, why records wait (e.g. the authorisation was revoked) and «Back to testing» (asks first; only until the first production
 // record). «Live test»: «Test the connection» (whoever may send), which presents nothing to the AEAT, and «Create test
 // invoice» (owner and admin, in testing), with the last result. «Responsible declaration»: «Read the signed
 // declaration», its version and the identifying data every record carries (VERIFACTU-F12).

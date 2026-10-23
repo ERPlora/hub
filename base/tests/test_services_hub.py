@@ -203,10 +203,10 @@ class TestStateApply:
         assert hub.state["plan"] == {"slug": "starter"}
 
     def test_the_verifactu_block_and_the_status_reach_verifactu_on_the_hub_s_slug(self, hub):
-        self.apply(4, status="active", verifactu={"live_paid": True})
+        self.apply(4, status="active", verifactu={"representation": {"status": "approved"}})
         config = Config.objects.get()
-        assert (config.live_paid, config.hub_status, config.synced_version, str(config.hub_id)) == (
-            True,
+        assert (config.representation_status, config.hub_status, config.synced_version, str(config.hub_id)) == (
+            "approved",
             "active",
             4,
             str(HUB_ID),

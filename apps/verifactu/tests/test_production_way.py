@@ -54,7 +54,7 @@ def ticket():
 def by_erplora(*, live: bool = False):
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system_context(A),
     )
     if live:

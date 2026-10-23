@@ -20,6 +20,7 @@ from live.models import OutboxEvent
 from apps.invoice.models import Invoice
 from apps.verifactu import certificates, chain, gateway, queries, xsd
 from apps.verifactu.models import (
+    WAIT_REASONS,
     AeatRecord,
     Chain,
     Config,
@@ -364,10 +365,8 @@ def test_a_full_invoice_replacing_a_ticket_declares_the_ticket(issuer):
 def test_production_has_its_own_chain_and_the_real_sites_qr(issuer, settings):
     open_production(settings)
     create(ticket())
-    # In production with its way to the AEAT (approved authorisation and the live option).
-    Config.objects.filter().update(
-        environment="production", representation_status="approved", live_paid=True
-    )
+    # In production with its way to the AEAT: the approved authorisation, on any plan (PLAN §30).
+    Config.objects.filter().update(environment="production", representation_status="approved")
     record = Record.objects.get(pk=create(ticket(2000)).record.id)
     assert (record.environment, record.sequence, record.previous_fingerprint) == (
         "production",
@@ -892,7 +891,7 @@ def test_a_change_of_the_configuration_puts_a_refused_record_back_in_the_queue(
     elif change == "certificate":
         upload()
     else:
-        run("verifactu.config.sync", {"version": 1, "live_paid": True}, system_context(A))
+        run("verifactu.config.sync", {"version": 1, "hub_status": "active"}, system_context(A))
     gateway_answers.set(answering())
 
     run("verifactu.contingency.process")
@@ -947,7 +946,7 @@ def test_an_old_photo_of_the_account_changes_nothing_and_does_not_send_it(
 ):
     run("verifactu.config.sync", {"version": 5}, system_context(A))
     refuse_once(gateway_answers)
-    run("verifactu.config.sync", {"version": 4, "live_paid": True}, system_context(A))
+    run("verifactu.config.sync", {"version": 4, "hub_status": "active"}, system_context(A))
 
     run("verifactu.contingency.process")
 
@@ -1017,9 +1016,7 @@ def test_in_production_erplora_sends_only_with_the_approved_authorisation(
 ):
     open_production(settings)
     # Sealed while it was approved, revoked behind its back: the gateway could not present it, so it waits.
-    Config.objects.create(
-        environment="production", representation_status="approved", live_paid=True
-    )
+    Config.objects.create(environment="production", representation_status="approved")
     create(ticket())
     Config.objects.update(representation_status="revoked")
     assert run("verifactu.contingency.process").reason == "representation_not_approved"
@@ -1531,46 +1528,47 @@ def test_going_live_through_erplora_needs_the_approved_authorisation(issuer, set
     )
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system_context(A),
     )
     config = run("verifactu.config.go_live")
     assert config.environment == "production" and config.production_since is not None
 
 
-def test_going_live_needs_the_live_option_in_the_plan(issuer, settings):
+def test_going_live_through_erplora_asks_for_no_plan_option(issuer, settings):
+    # PLAN §30 (round 2026-10-22b, VeriFactu on Free): the condition of the live option left. Until the SaaS stops
+    # sending it, an older photo still says ``live_paid: false``: it is read by nobody.
     open_production(settings)
     run(
         "verifactu.config.sync",
         {"version": 1, "live_paid": False, "representation": {"status": "approved"}},
         system_context(A),
     )
-    assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.live_option_unpaid"
-    assert Config.objects.get().environment == "testing"
+    assert run("verifactu.config.go_live").environment == "production"
 
 
-def test_going_live_with_the_own_certificate_needs_no_live_option(issuer, settings):
-    # The old Hub's an_own_certificate_needs_no_grant_to_go_live: the own route goes live with its valid
-    # certificate alone; the live option of the plan is ERPlora filing for the business.
+def test_going_live_with_the_own_certificate_needs_no_authorisation(issuer, settings):
+    # The old Hub's an_own_certificate_needs_no_grant_to_go_live (gh:hub#1314): the own route goes live with its
+    # valid certificate alone; ERPlora's approval is ERPlora filing for the business.
     open_production(settings)
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
     assert run("verifactu.config.go_live").environment == "production"
 
 
-def test_in_production_erplora_takes_over_only_with_the_live_option(issuer, settings):
+def test_in_production_erplora_takes_over_with_the_approved_authorisation_alone(issuer, settings):
     open_production(settings)
     own_certificate()
     run("verifactu.config.update", {"route": "own"})
     run("verifactu.config.go_live")
+    erplora = lambda: run("verifactu.config.update", {"route": "erplora"})  # noqa: E731
+    assert code_of(erplora) == "verifactu.representation_not_approved"
+    # An older SaaS still says the live option is unpaid: on any plan the approval is enough (PLAN §30).
     run(
         "verifactu.config.sync",
-        {"version": 1, "representation": {"status": "approved"}},
+        {"version": 1, "live_paid": False, "representation": {"status": "approved"}},
         system_context(A),
     )
-    erplora = lambda: run("verifactu.config.update", {"route": "erplora"})  # noqa: E731
-    assert code_of(erplora) == "verifactu.live_option_unpaid"
-    run("verifactu.config.sync", {"version": 2, "live_paid": True}, system_context(A))
     assert erplora().route == "erplora"
 
 
@@ -1590,7 +1588,6 @@ def test_going_live_needs_an_active_business(issuer, settings, status):
         "verifactu.config.sync",
         {
             "version": 1,
-            "live_paid": True,
             "hub_status": status,
             "representation": {"status": "approved"},
         },
@@ -1608,7 +1605,7 @@ def test_a_demo_hub_never_goes_live(issuer, settings, monkeypatch):
     monkeypatch.setattr(platform, "is_demo_hub", lambda scope: scope == A)
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system_context(A),
     )
     with pytest.raises(Conflict) as refused:
@@ -1628,17 +1625,17 @@ def test_going_live_is_never_open_in_pre(issuer, settings):
     open_production(settings)
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system_context(A),
     )
     assert code_of(lambda: run("verifactu.config.go_live")) == "verifactu.production_closed"
 
 
 def live_through_erplora() -> None:
-    """In production through ERPlora with everything it needs (approved authorisation, live option)."""
+    """In production through ERPlora with everything it needs (the approved authorisation, on any plan)."""
     run(
         "verifactu.config.sync",
-        {"version": 2, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 2, "representation": {"status": "approved"}},
         system_context(A),
     )
     run("verifactu.config.go_live")
@@ -1646,9 +1643,7 @@ def live_through_erplora() -> None:
 
 def close_the_way(problem: str) -> None:
     """What takes the way to the AEAT away from a business already in production, behind its back."""
-    if problem == "live_option_unpaid":
-        run("verifactu.config.sync", {"version": 3, "live_paid": False}, system_context(A))
-    elif problem == "representation_not_approved":
+    if problem == "representation_not_approved":
         run(
             "verifactu.config.sync",
             {"version": 3, "representation": {"status": "revoked"}},
@@ -1660,7 +1655,7 @@ def close_the_way(problem: str) -> None:
 
 @pytest.mark.parametrize(
     "problem",
-    ["live_option_unpaid", "representation_not_approved", "own_certificate_missing"],
+    ["representation_not_approved", "own_certificate_missing"],
 )
 def test_in_production_without_a_way_to_the_aeat_nothing_new_is_sealed(
     issuer, settings, problem
@@ -1704,25 +1699,29 @@ def test_the_reaction_seals_an_invoice_issued_before_the_way_closed(
     assert Record.objects.get().environment == "production"
 
 
-def test_losing_the_live_option_in_production_refuses_new_sales_and_sends_what_was_sealed(
+def test_a_photo_saying_the_live_option_is_unpaid_stops_nothing_in_production(
     issuer, gateway_answers, settings
 ):
-    # Review Focus 3: it does not go back to testing (it has production records); new sales are not sealed
-    # (409 live_option_unpaid) and Settings says so; what was sealed while it could goes out: the option is
-    # the plan's, the record is already the AEAT's (every ticket with a QR reaches it).
+    # PLAN §30 (round 2026-10-22b): ``live_paid`` is no condition. Until the SaaS stops sending it (expand/contract),
+    # an older SaaS's photo still says ``false``: new sales are sealed, Settings shows nothing missing and what
+    # was sealed goes out. No answer names the retired ``live_option_unpaid``.
     open_production(settings)
     live_through_erplora()
-    record = Record.objects.get(pk=create(ticket()).record.id)
-    close_the_way("live_option_unpaid")
-    assert code_of(ticket) == "verifactu.live_option_unpaid"
+    run("verifactu.config.sync", {"version": 3, "live_paid": False}, system_context(A))
+    first = Record.objects.get(pk=create(ticket()).record.id)
+    second = Record.objects.get(pk=create(ticket(2000)).record.id)
+    assert (first.environment, second.environment, second.sequence) == ("production", "production", 2)
+    assert run("verifactu.config.update", {"route": "erplora"}).route == "erplora"
     gateway_answers.set(answering())
-    result = run("verifactu.contingency.process")
-    record.refresh_from_db()
-    assert (result.sent, record.status, record.environment) == (1, "accepted", "production")
+    assert run("verifactu.contingency.process").sent == 2
     config = run("verifactu.config.get")
-    assert (config.environment, config.reasons) == ("production", [])
-    assert config.issue_blocker.code == "live_option_unpaid"
-    assert queries.blockers(Config.objects.get(), "production", A) == []
+    assert (config.environment, config.reasons, config.issue_blocker, config.live_blockers) == (
+        "production",
+        [],
+        None,
+        [],
+    )
+    assert "live_option_unpaid" not in WAIT_REASONS
 
 
 def test_going_live_needs_the_issuer(settings, db):
@@ -1736,7 +1735,7 @@ def test_back_to_testing_until_the_first_production_record(issuer, settings):
     open_production(settings)
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system_context(A),
     )
     run("verifactu.config.go_live")
@@ -1751,15 +1750,17 @@ def test_back_to_testing_until_the_first_production_record(issuer, settings):
 
 def test_the_accounts_photo_is_applied_once_per_version(db):
     sync = lambda data: run("verifactu.config.sync", data, system_context(A))  # noqa: E731
-    assert sync({"version": 2, "live_paid": True}).applied is True
-    assert sync({"version": 2, "live_paid": False}).applied is False
-    assert sync({"version": 1, "live_paid": False}).applied is False
-    assert Config.objects.get().live_paid is True
+    assert sync({"version": 2, "hub_status": "past_due"}).applied is True
+    assert sync({"version": 2, "hub_status": "suspended"}).applied is False
+    assert sync({"version": 1, "hub_status": "suspended"}).applied is False
+    assert Config.objects.get().hub_status == "past_due"
 
 
-def test_the_photo_brings_the_live_option_the_authorisation_and_the_business_status(db):
+def test_the_photo_brings_the_authorisation_and_the_business_status(db):
     sync = lambda data: run("verifactu.config.sync", data, system_context(A))  # noqa: E731
     approved = {"status": "approved", "updated_at": "2026-10-15T10:00:00Z", "reason": ""}
+    # The SaaS still sends ``live_paid`` until the Hub's retirement is out (expand/contract, PLAN §30): the photo
+    # is applied as ever and the field is neither refused nor written (the retired column keeps its default).
     answer = sync(
         {"version": 7, "live_paid": True, "hub_status": "active", "representation": approved}
     )
@@ -1770,19 +1771,15 @@ def test_the_photo_brings_the_live_option_the_authorisation_and_the_business_sta
         config.hub_status,
         config.representation_status,
         config.synced_version,
-    ) == (True, "active", "approved", 7)
-    assert sync({"version": 7, "live_paid": False}).applied is False
+    ) == (False, "active", "approved", 7)
+    assert sync({"version": 7, "hub_status": "past_due"}).applied is False
     assert sync({"version": 5, "hub_status": "suspended"}).applied is False
     config.refresh_from_db()
-    assert (config.live_paid, config.hub_status) == (True, "active")
+    assert config.hub_status == "active"
     assert sync({"version": 8, "hub_status": "past_due"}).applied is True
     config.refresh_from_db()
     # What the photo leaves out stays as it was.
-    assert (config.live_paid, config.hub_status, config.representation_status) == (
-        True,
-        "past_due",
-        "approved",
-    )
+    assert (config.hub_status, config.representation_status) == ("past_due", "approved")
 
 
 def test_nobody_but_the_system_receives_the_accounts_photo(db):

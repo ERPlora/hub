@@ -565,12 +565,14 @@ def test_the_configuration_is_seen_whole_and_only_its_route_is_chosen(config, re
         "representation_status",
         "representation_updated_at",
         "representation_reason",
-        "live_paid",
         "hub_status",
         "hub_id",
         "synced_version",
         "synced_at",
     } <= readonly
+    # The retired live option (PLAN §30, round 2026-10-22b) is not shown: its column only waits to be dropped.
+    assert "live_paid" not in instance.list_display
+    assert "live_paid" not in instance.get_fields(request, config)
 
 
 def config_page(config) -> str:
@@ -583,12 +585,12 @@ def test_the_route_is_chosen_through_its_operation(client, staff, config):
     client.get("/admin/hub/a/", HTTP_HOST=PLATFORM)
     response = client.post(
         config_page(config),
-        {"route": "erplora", "live_paid": "on", "hub_status": "suspended", "_save": "Save"},
+        {"route": "erplora", "hub_status": "suspended", "_save": "Save"},
         HTTP_HOST=PLATFORM,
     )
     assert response.status_code == 302
     config.refresh_from_db()
-    assert (config.route, config.live_paid, config.hub_status) == ("erplora", False, "active")
+    assert (config.route, config.hub_status) == ("erplora", "active")
     assert config.updated_by == "staff"
     assert Event.objects.filter(message_key="route_erplora", actor="staff").exists()
 

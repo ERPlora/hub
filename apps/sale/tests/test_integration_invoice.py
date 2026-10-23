@@ -358,14 +358,14 @@ def test_in_production_without_a_way_to_the_aeat_the_charge_is_refused(issuer, b
     system = system_context(A)
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system,
     )
     run("verifactu.config.go_live")
-    run("verifactu.config.sync", {"version": 2, "live_paid": False}, system)
+    run("verifactu.config.sync", {"version": 2, "representation": {"status": "revoked"}}, system)
     with pytest.raises(Conflict) as refused:
         charge("chain-0099", {"product": "TAP"})
-    assert refused.value.code == "verifactu.live_option_unpaid"
+    assert refused.value.code == "verifactu.representation_not_approved"
     assert not Sale.objects.exists()
     assert not Invoice.objects.exists()
     assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()

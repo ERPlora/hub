@@ -744,7 +744,10 @@ class RepresentationIn(Schema):
 
 
 class ConfigSyncIn(Schema):
-    """The ERPlora account's block of the hub's photo (WORKBOOK «Contrato con el SaaS»)."""
+    """The ERPlora account's block of the hub's photo (WORKBOOK «Contrato con el SaaS»). Any other key is ignored,
+    never refused: the SaaS still sends the retired ``live_paid`` until it stops (PLAN §30, expand/contract)."""
+
+    model_config = ConfigDict(extra="ignore")
 
     version: int = Field(
         ge=0, description="The photo's version; an equal or older one is ignored."
@@ -754,9 +757,6 @@ class ConfigSyncIn(Schema):
     )
     representation: RepresentationIn | None = Field(
         None, description="The signed authorisation's state."
-    )
-    live_paid: bool | None = Field(
-        None, description="The plan includes filing in production (the live option)."
     )
     hub_status: Literal["active", "past_due", "suspended"] | None = Field(
         None, description="The business's commercial status."

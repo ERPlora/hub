@@ -984,16 +984,8 @@ msgid "business status"
 msgstr "estado del negocio"
 
 #: models.py
-msgid "the live option of VeriFactu is not in your plan: add it in your ERPlora account"
-msgstr "la opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora"
-
-#: models.py
 msgid "your ERPlora account has a pending payment or is suspended"
 msgstr "tu cuenta de ERPlora tiene un pago pendiente o está suspendida"
-
-#: services.py
-msgid "The live option of VeriFactu is not in your plan: add it in your ERPlora account."
-msgstr "La opción en vivo de VeriFactu no está en tu plan: añádela en tu cuenta de ERPlora."
 
 #: services.py
 msgid "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."

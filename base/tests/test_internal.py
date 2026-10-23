@@ -244,6 +244,8 @@ def test_the_state_is_only_put(client, db):
 
 
 def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
+    # The SaaS still sends ``live_paid`` until VeriFactu's retirement of it is out (PLAN §30, expand/contract): the
+    # photo is applied as ever and the retired field is written nowhere.
     answer = signed(
         client,
         "put",
@@ -266,7 +268,7 @@ def test_state_applies_the_verifactu_block_on_the_slugs_scope(client, db):
         config.hub_status,
         config.representation_status,
         config.synced_version,
-    ) == (True, "active", "approved", 3)
+    ) == (False, "active", "approved", 3)
 
 
 def test_the_business_status_travels_on_its_own(client, db):
@@ -297,19 +299,19 @@ def test_an_older_photo_is_ignored(client, db):
         client,
         "put",
         PATH,
-        {"slug": "a", "version": 5, "verifactu": {"live_paid": True}},
+        {"slug": "a", "version": 5, "verifactu": {"representation": APPROVED}},
     )
     answer = signed(
         client,
         "put",
         PATH,
-        {"slug": "a", "version": 4, "verifactu": {"live_paid": False}},
+        {"slug": "a", "version": 4, "verifactu": {"representation": {"status": "revoked"}}},
     )
     assert answer.status_code == 200 and answer.json() == {
         "applied": False,
         "version": 5,
     }
-    assert Config.objects.get().live_paid is True
+    assert Config.objects.get().representation_status == "approved"
 
 
 def test_without_the_block_verifactu_is_left_alone(client, db, registered):
