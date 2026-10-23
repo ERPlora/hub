@@ -287,7 +287,8 @@ def test_a_key_of_the_verifactu_block_the_hub_does_not_read_never_refuses_the_ph
     registered.refresh_from_db()
     assert registered.state_version == 2
     config = Config.objects.get()
-    assert (config.representation_status, config.synced_version) == ("approved", 2)
+    # The retired column is written by nobody, whatever the photo says of it.
+    assert (config.representation_status, config.synced_version, config.live_paid) == ("approved", 2, False)
 
 
 def test_the_business_status_travels_on_its_own(client, db):
