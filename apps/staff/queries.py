@@ -33,6 +33,8 @@ from apps.staff.schemas import (
     CommissionSummaryIn,
     CompensationListIn,
     CompensationPage,
+    CurrentMemberIn,
+    CurrentMemberOut,
     MemberDetailOut,
     MemberListIn,
     MemberPage,
@@ -188,6 +190,23 @@ def member_detail(ctx: OperationContext, data: MemberRefIn) -> Member:
     },
 )
 def my_record(ctx: OperationContext, data: MineIn) -> dict:
+    return {"member": own_member(ctx)}
+
+
+@operation(
+    "staff.member.current",
+    kind="query",
+    # No Staff permission: whoever holds the session may know their own record, and a cashier who does
+    # not see the team still sells as herself (SALE-F16). Only the id and the name: never the pay.
+    permission=None,
+    input=CurrentMemberIn,
+    output=CurrentMemberOut,
+    ai={
+        "description": "Returns the id and name of the current user's own staff record: who a sale is "
+        "attributed to when nobody else is named. Empty when the user has no record."
+    },
+)
+def current_record(ctx: OperationContext, data: CurrentMemberIn) -> dict:
     return {"member": own_member(ctx)}
 
 

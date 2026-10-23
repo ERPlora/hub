@@ -118,6 +118,7 @@
       "staffPickerTitle": "Quién atiende esta cuenta",
       "staffPickerHint": "A esta persona se le atribuyen la venta, la comanda de cocina y el informe por persona. Si lo dejas en «Yo», el TPV usa a quien tenga la sesión.",
       "lineStaffPickerHint": "Solo se mueve esta línea. El cierre del día y la comisión salen de aquí, así que es la que tiene que estar bien. El chip de arriba sigue decidiendo a quién va la SIGUIENTE línea.",
+      "staffUnlinked": "Tu cuenta no tiene ficha en Personal: si lo dejas en «Yo», esta venta no contará para nadie.",
       "staffMeOption": "Yo (quien tenga la sesión)",
       "lineStaffTicketOption": "El profesional de la cuenta",
       "staffSearch": "Buscar en el equipo…",

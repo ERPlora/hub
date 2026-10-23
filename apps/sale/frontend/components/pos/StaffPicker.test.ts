@@ -1,6 +1,8 @@
 // «Who is serving this check» / «Whose line is this» (SALE-F16): «Me (whoever is signed in)» — or, for a
 // line, «The check's professional» — and the active team of Staff, searched on the server. The choice
-// in use is marked. A team that cannot be loaded says the sale stays with whoever is signed in.
+// in use is marked. A team that cannot be loaded says the sale stays with whoever is signed in. For the
+// check it asks Staff whose record the session is (`staff.member.current`): without one, it warns that a
+// sale left on «Me» counts for nobody.
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
@@ -31,11 +33,15 @@ const member = (id: string, full_name: string) => ({
   color: '',
 });
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+async function setup(
+  props: Record<string, unknown> = {},
+  locale: 'en' | 'es' = 'en',
+  answer?: { status: number; body: unknown },
+) {
   const open = ref(true);
   const m = await mountSale(
     { setup: () => () => h(StaffPicker, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), mode: 'check', current: null, ...props }) },
-    { locale },
+    { locale, answer },
   );
   await settle();
   await m.live();
@@ -92,6 +98,35 @@ describe('StaffPicker', () => {
     expect(m.find('pos-staff-title').text()).toBe('De quién es esta línea');
     expect(m.find('pos-staff-hint').text()).toContain('Solo se mueve esta línea.');
     expect(m.find('pos-staff-me').text()).toBe('El profesional de la cuenta');
+  });
+
+  // flow: SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»)
+  const CURRENT = '/api/staff/members/current';
+  const asked = (m: Awaited<ReturnType<typeof setup>>) => m.sent().filter((call) => call.path === CURRENT);
+
+  it('for the check, without a record of the session in Staff, warns that a sale left on «Me» counts for nobody', async () => {
+    const m = await setup({}, 'es', { status: 200, body: { member: null } });
+    expect(asked(m)).toHaveLength(1);
+    expect(m.find('pos-staff-unlinked').text()).toBe(
+      'Tu cuenta no tiene ficha en Personal: si lo dejas en «Yo», esta venta no contará para nadie.',
+    );
+    expect(m.find('pos-staff-unlinked').attributes('role')).toBe('status');
+    expect(m.find('pos-staff-me').exists()).toBe(true);
+  });
+
+  it('with a record of the session, or when Staff cannot answer, it does not warn', async () => {
+    const linked = await setup({}, 'en', { status: 200, body: { member: { id: 's1', full_name: 'Marta Ruiz' } } });
+    expect(asked(linked)).toHaveLength(1);
+    expect(linked.find('pos-staff-unlinked').exists()).toBe(false);
+    // Staff off: the list says the team could not be loaded; whose record it is, nobody knows.
+    const off = await setup({}, 'en', { status: 404, body: { error: { code: 'app_inactive', message: 'Off.' } } });
+    expect(off.find('pos-staff-unlinked').exists()).toBe(false);
+  });
+
+  it('for a line it does not ask: the line goes with the check or with the person chosen', async () => {
+    const m = await setup({ mode: 'line' }, 'en', { status: 200, body: { member: null } });
+    expect(asked(m)).toEqual([]);
+    expect(m.find('pos-staff-unlinked').exists()).toBe(false);
   });
 
   it('«Cancel» closes it without choosing', async () => {

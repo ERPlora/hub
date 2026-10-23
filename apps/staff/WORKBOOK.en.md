@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:152c790d94031bd461911efc29e164a5df24df3d93dddd1660d47d1127b27997 -->
+<!-- generated from WORKBOOK.md sha256:769c6eef2f1f34440281168e7b6b4d2b96c40f625760b20fdb4a3e0ffb57e536 -->
 
 ## What it is for and who it is for
 
@@ -470,9 +470,10 @@ Steps:
    due to them (sold × commission ÷ 100, rounded to the cent only once per person; half a cent rounds up).
    At the top, the total sold and the total of commissions.
 4. For another period, choose "Yesterday", "This week", "This month" or "Custom" and set "From" and "To".
-5. It counts what was attributed to each person in Sales: the line they did or, if the line does not say
-   who, the account they served (in a sale of an appointment, the appointment's professional). What is
-   charged without choosing anyone from the team counts for nobody.
+5. It counts what was attributed to each person in Sales: the line they did (an appointment's, to the
+   appointment's professional) or, if the line does not say who, whoever served the check. With «Me» at
+   the till, that is whoever was signed in, if their account has a record in Staff; otherwise that sale
+   counts for nobody.
 In: each record's rate and commission and, from Sales, what each professional sold in the period (refunds
 already taken off: what comes back goes to whoever sold it). Sales is optional.
 Out: read only.
@@ -546,13 +547,14 @@ whoever speaks) and the API, with the same rules and the same permissions. A per
 by their name; if the name fits several, it says which ones and asks to choose
 (`staff.ambiguous_member`).
 
-### What it offers: queries (they read and change nothing; all but the accounts can be followed live)
+### What it offers: queries (they read and change nothing; all but the accounts and the session's record can be followed live)
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The directory, with search, filters and sorting by any column, in pages (up to 100) | see | F09 | `staff.member.list` |
 | A person's record (without pay) | see | F02 | `staff.member.detail` |
 | My record, with my rate and my commission | see | F08 | `staff.member.mine` |
+| The record of whoever holds the session, only its id and name: Sales attributes «Me» to it | anyone signed in | SALE-F16 | `staff.member.current` |
 | Rate, commission and HR notes, with the directory's filters, sorting and pages (the Rate/h column reads the same rows) | see the pay | F21 | `staff.member.compensation` |
 | The commission sheet: who can earn a commission, with their record, their account and their commission | see the pay | F21 | `staff.commission.summary` |
 | What each professional earned in a period (today, yesterday, this week, this month or two days): sold with refunds taken off, commission and totals; it says if the business has no Sales | see the pay (and the Sales figures) | F21 | `staff.commission.report` |

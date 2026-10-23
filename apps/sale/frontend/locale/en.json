@@ -118,6 +118,7 @@
       "staffPickerTitle": "Who is serving this check",
       "staffPickerHint": "The sale, the kitchen ticket and the per-person report are attributed to them. Leave it on «Me» and the till uses whoever is signed in.",
       "lineStaffPickerHint": "Only this line moves. The day's close and the commission are worked out from it, so it is the one that has to be right. The chip at the top keeps deciding who the NEXT line goes to.",
+      "staffUnlinked": "Your account has no record in Staff: left on «Me», this sale counts for nobody.",
       "staffMeOption": "Me (whoever is signed in)",
       "lineStaffTicketOption": "The check's professional",
       "staffSearch": "Search the team…",

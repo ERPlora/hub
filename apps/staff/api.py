@@ -57,6 +57,11 @@ async def member_mine(request):
     return await run_operation(request, queries.my_record)
 
 
+@bind(router, "staff.member.current", "/staff/members/current")
+async def member_current(request):
+    return await run_operation(request, queries.current_record)
+
+
 @bind(router, "staff.member.compensation", "/staff/members/compensation")
 async def member_compensation(request, params: Query[CompensationListIn]):
     return await run_operation(request, queries.compensation, params)

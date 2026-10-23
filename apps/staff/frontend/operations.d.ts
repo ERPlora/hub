@@ -176,6 +176,11 @@ export interface MineOut {
   member: MemberMineOut | null;
 }
 
+/** Who «Me» is at the till (SALE-F16): the id and name of the caller's own record, never the pay. */
+export interface CurrentMemberOut {
+  member: { id: string; full_name: string } | null;
+}
+
 export interface CompensationOut {
   id: string;
   user_id: number | null;
@@ -464,6 +469,7 @@ declare module '@erplora/ui/sdk' {
     'staff.member.list': { input: MemberListIn; output: Page<MemberOut> };
     'staff.member.detail': { input: MemberRefIn; output: MemberDetailOut };
     'staff.member.mine': { input: NoInput; output: MineOut };
+    'staff.member.current': { input: NoInput; output: CurrentMemberOut };
     'staff.member.compensation': { input: CompensationListIn; output: Page<CompensationOut> };
     'staff.member.stats': { input: NoInput; output: MemberStatsOut };
     'staff.member.create': { input: MemberIn; output: MemberDetailOut };

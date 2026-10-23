@@ -1740,6 +1740,27 @@ def _check_drawer(ctx: OperationContext, legs: list[dict]) -> None:
         raise Conflict(str(CASH_REGISTER_CLOSED), code="sale.cash_register_closed")
 
 
+#: Staff's answer to «whose record is the session's?» (SALE-F16): who «Me» is at the till.
+CURRENT_MEMBER = "staff.member.current"
+
+
+def _served_by(ctx: OperationContext, named: UUID | None) -> UUID | None:
+    """Who the sale is attributed to (SALE-F16): whoever the charge names (the person chosen on the chip, or
+    an integration's) or, left on «Me», the Staff record of whoever holds the session, asked by name (Staff is
+    no requirement of Sales; its operation needs no Staff permission, so a cashier who does not see the team
+    still sells as herself). Nobody without a record, without a user behind the session (the platform, an API
+    key) or without Staff (absent or off): the sale counts for nobody, as the till warns. It is the sale's
+    professional, for the lines of the check: a line with its own (an appointment's service) keeps it."""
+    if named is not None:
+        return named
+    try:
+        op = get(CURRENT_MEMBER)
+        current = op(ctx, op.input.model_validate({}))
+    except (UnknownOperation, AppInactive):
+        return None
+    return current.member.id if current.member else None
+
+
 def _number(day: dt.date) -> int:
     """The next number of ``day``: the counter's row raised with ``UPDATE … RETURNING`` (never a sequence)."""
     SaleCounter.objects.bulk_create([SaleCounter(day=day)], ignore_conflicts=True)
@@ -1892,6 +1913,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
             {"order_id": str(order.id), "lines_count": len(lines)},
         )
 
+    served_by = _served_by(ctx, data.staff_id)
     sequence = _number(day)
     principal = max(legs, key=lambda leg: leg["amount"]) if legs else None
     try:
@@ -1914,7 +1936,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                     if invoice
                     else {}
                 ),
-                staff_id=data.staff_id,
+                staff_id=served_by,
                 appointment_id=appointment_id,
                 tax_included=settings.default_tax_included,
                 currency=CURRENCY,
