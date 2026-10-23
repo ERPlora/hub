@@ -217,7 +217,7 @@ async function onAction({ actionId, row }: { actionId: string; row: PriceListOut
       :sort-dir="table.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: PriceListOut) => row.name"
-      :card-icon="() => 'pricetags-outline'"
+      :card-icon="() => 'pricetag'"
       :entity-label="{ one: $t('pricing.lists.entity.one'), many: $t('pricing.lists.entity.many') }"
       :loading="status === 'loading'"
       :error="status === 'error' && !blocked ? $t('pricing.lists.loadError') : undefined"
@@ -255,7 +255,7 @@ async function onAction({ actionId, row }: { actionId: string; row: PriceListOut
       <template #empty>
         <EmptyState
           data-testid="pricing-lists-empty"
-          icon="pricetags-outline"
+          icon="pricetag"
           :heading="table.filtered.value ? $t('pricing.noResults') : $t('pricing.lists.empty')"
           :message="table.filtered.value ? $t('pricing.noResultsMessage') : undefined"
         />

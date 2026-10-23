@@ -325,7 +325,7 @@ function onAction({ actionId, row }: { actionId: string; row: PriceItemOut }): v
           <template #empty>
             <EmptyState
               data-testid="pricing-items-empty"
-              icon="pricetags-outline"
+              icon="pricetag"
               :heading="table.filtered.value ? $t('pricing.noResults') : $t('pricing.items.empty')"
               :message="table.filtered.value ? $t('pricing.noResultsMessage') : undefined"
             />
