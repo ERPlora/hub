@@ -791,6 +791,15 @@ def test_a_date_format_on_a_field_that_is_no_iso_date_is_logged_and_that_text_le
     assert "Year {code:%Y}" in caplog.text
 
 
+def test_a_percent_format_on_a_number_of_the_row_formats_as_before(modules, declare):
+    """``%`` is also a number's percent (``{share:.0%}``): only a text is read as a date, a number formats as it did."""
+    declare("stock.item.changes", {"rows": [{**BOOKING, "share": 0.5}]})
+    modules(module("stock", notices=[notice(title=["{share:.0%} booked"])]))
+
+    [told] = notice_list(ctx())
+    assert told["title"] == "50% booked"
+
+
 def test_the_notices_of_a_module_off_or_out_of_the_store(modules, declare, settings):
     declare("stock.item.changes", CHANGES)
     modules(module("stock", notices=[notice()]), on=[])
