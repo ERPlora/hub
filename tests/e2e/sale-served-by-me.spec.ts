@@ -41,6 +41,8 @@ test.beforeAll(async ({ browser }) => {
   kept = current.data.member?.id ?? null;
   if (kept) psql(`update staff_member set user_id = null where id = '${kept}'`);
   product = await createProduct(context, { name: `E2E Shampoo ${RUN}`, sku: `E2E-ME-${RUN}`, price: 1210, tax_category_key: 'product.generic' });
+  // The owner's session for the fleet's visual sweep of the till (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await context.close();
 });
 
