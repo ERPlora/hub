@@ -4,12 +4,10 @@
 // the server, and the notice stays. Once issued, the live sale drops the notice by itself.
 import { describe, expect, it } from 'vitest';
 
-import { click, EMPLOYEE, mountSale, noTimerOutlivesATest, settle } from '../../__tests__/mount-sale';
+import { click, EMPLOYEE, mountSale, settle } from '../../__tests__/mount-sale';
 import { refused } from '../pos/__tests__/fixtures';
 import { saleOut } from './__tests__/fixtures';
 import PendingDocuments from './PendingDocuments.vue';
-
-noTimerOutlivesATest();
 
 async function setup(options: { locale?: 'en' | 'es'; session?: typeof EMPLOYEE } = {}) {
   // A command, nothing live: no stream to open.

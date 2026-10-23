@@ -84,4 +84,10 @@ describe('vite.config', () => {
     // Vitest's default `exclude` drops every `vite.config.*`, this test included.
     expect(config.test?.exclude).toEqual(['**/node_modules/**', '**/dist/**']);
   });
+
+  it('runs the hub setup before every test file: no real timer outlives a test', () => {
+    // As packages/ui's; proven by its own test (vitest.setup.test.ts), which the suite collects.
+    expect(config.test?.setupFiles).toEqual(['./vitest.setup.ts']);
+    expect(config.test?.include).toEqual(expect.arrayContaining(['vitest.setup.test.ts']));
+  });
 });

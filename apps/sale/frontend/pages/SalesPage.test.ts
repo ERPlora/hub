@@ -10,7 +10,7 @@ import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale, noTimerOutlivesATest } from '../__tests__/mount-sale';
+import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale } from '../__tests__/mount-sale';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import RefundModal from '../components/sales/RefundModal.vue';
@@ -81,7 +81,6 @@ const ROWS = [
 const PAGE = { rows: ROWS, total: 5, limit: 50, offset: 0 };
 const EMPTY = { rows: [], total: 0, limit: 50, offset: 0 };
 
-noTimerOutlivesATest();
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 9, 14, 9, 0));

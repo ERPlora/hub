@@ -6,7 +6,7 @@
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, type MountOptions, mountSale, noTimerOutlivesATest } from '../__tests__/mount-sale';
+import { EMPLOYEE, type MountOptions, mountSale } from '../__tests__/mount-sale';
 import SettingsForm from '../components/backoffice/SettingsForm.vue';
 import SettingsPage from './SettingsPage.vue';
 
@@ -30,8 +30,6 @@ const SETTINGS = {
   receipt_marketing_text: '',
   updated_at: null,
 };
-
-noTimerOutlivesATest();
 
 async function setup(options: MountOptions = {}) {
   const m = await mountSale(SettingsPage, { path: '/sale/settings', ...options });

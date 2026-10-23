@@ -7,9 +7,8 @@
 import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
-import { mount, type VueWrapper } from '@vue/test-utils';
-import { afterEach, beforeAll, beforeEach, expect } from 'vitest';
-import { type Component, createApp, ref, render } from 'vue';
+import { mount } from '@vue/test-utils';
+import { type Component, createApp, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
 import {
@@ -26,7 +25,8 @@ import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
-// happy-dom made to behave as a browser where Ionic's runtime reaches it (the hub has no setup file).
+// happy-dom made to behave as a browser where Ionic's runtime reaches it, by each helper: the hub setup
+// (vitest.setup.ts) only unmounts what a test left mounted and fails one that leaves a real timer armed.
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
@@ -74,9 +74,6 @@ export interface MountOptions {
 
 type Params = Record<string, unknown>;
 
-/** What `mountSale` mounted and no test's end has unmounted yet (see {@link noTimerOutlivesATest}). */
-const mounted = new Set<VueWrapper>();
-
 /** One API call the page made: method, path, query and JSON body. */
 export interface SentCall {
   method: string;
@@ -109,7 +106,6 @@ export async function mountSale(component: Component, options: MountOptions = {}
       stubs: options.stubs,
     },
   });
-  mounted.add(wrapper);
 
   /** Opens the stream; returns the call to push frames into. */
   const live = (): Promise<StreamCall> => harness.goLive();
@@ -177,57 +173,6 @@ export function taxSettings(tax_kind: TerritoryTaxKind): TaxSettingsOut {
 /** Mounts `use` (a composable call) inside a component of the sale app's harness. */
 export function mountComposable(use: () => void, options: Omit<MountOptions, 'props'> = {}) {
   return mountSale(ComposableHost, { ...options, props: { use } });
-}
-
-/**
- * No timer may outlive a test (hub#197): Vitest tears the page's window down at the end of the file, and
- * a timer still armed then fires into a missing window — an «Unhandled error» and exit 1 with every test
- * green. Called at the top of a test file, each test's end leaves the page as a person does (unmounts what
- * `mountSale` mounted: AppPage clears its tabbar's 450 ms scroll hint then, which emptying the document
- * alone does not), empties the document, lets what that sets off run and counts the real timeouts the test
- * armed that are still pending. It watches the real `setTimeout`/`clearTimeout`, not Vitest's fake clock,
- * so it lives with a file's own fake timers (a frozen `Date`); a timeout a test puts on a fake clock dies
- * with that clock: it cannot outlive the page.
- */
-export function noTimerOutlivesATest(): void {
-  const { setTimeout: realSetTimeout, clearTimeout: realClearTimeout } = globalThis;
-  /** The real timeouts the running test armed that have neither run nor been cleared. */
-  const armed = new Set<ReturnType<typeof setTimeout>>();
-  beforeAll(() => {
-    // Vue arms a one-off 3 s timer (its devtools hook) the first time it renders: armed here, before any
-    // test watches, it is not a test's.
-    render(null, document.createElement('div'));
-  });
-  beforeEach(() => {
-    globalThis.setTimeout = ((handler: (...args: unknown[]) => void, timeout?: number, ...args: unknown[]) => {
-      const id = realSetTimeout(() => {
-        armed.delete(id);
-        handler(...args);
-      }, timeout);
-      armed.add(id);
-      return id;
-    }) as typeof setTimeout;
-    globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
-      if (id !== undefined) armed.delete(id);
-      realClearTimeout(id);
-    }) as typeof clearTimeout;
-  });
-  afterEach(async () => {
-    try {
-      for (const wrapper of mounted) wrapper.unmount();
-      mounted.clear();
-      document.body.innerHTML = '';
-      // What clearing the page sets off arms its timers in the next ticks: let them run before counting.
-      await flush();
-      expect(armed.size, 'timers still armed when the test ends').toBe(0);
-    } finally {
-      globalThis.setTimeout = realSetTimeout;
-      globalThis.clearTimeout = realClearTimeout;
-      // A failed test's leftovers must not fire into the next one.
-      for (const id of armed) realClearTimeout(id);
-      armed.clear();
-    }
-  });
 }
 
 /** Lets Vue render and a dialog's `didPresent` (next tick) land. */
