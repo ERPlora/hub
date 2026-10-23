@@ -179,7 +179,7 @@ Fechas, horas e importes salen con el formato del idioma de quien mira y en el r
 | APPOINTMENT-F25 | Un profesional se da de baja con citas futuras | hecho |
 | APPOINTMENT-F26 | Un servicio se archiva con citas o series que lo usan | hecho |
 | APPOINTMENT-F27 | Ver la agenda de la semana | hecho |
-| APPOINTMENT-F28 | Recibir el aviso del sistema de una cita nueva o cancelada | parcial |
+| APPOINTMENT-F28 | Recibir el aviso del sistema de una cita nueva o cancelada | hecho |
 
 Quien pide algo en nombre de la clienta sin ser una persona del equipo (un paso de una automatización, la
 conversación de WhatsApp, la reserva online) se juzga y se contesta **como la clienta**: no tiene las
@@ -680,19 +680,27 @@ Implicados: ninguno
 
 ### APPOINTMENT-F28 Recibir el aviso del sistema de una cita nueva o cancelada
 <!-- origen: old-hub:HUB_SHELL-F66 -->
-Estado: parcial — Citas ya dice qué se avisa y cuándo; falta la campana de la barra de arriba de la app y
-el aviso del dispositivo que lo enseñan, que son del marco común de la app, no de Citas.
+Estado: hecho
 Actor: empleado (las de su agenda), responsable
-Pantalla: ninguna (la campana de la barra de arriba, cuando llegue)
+Pantalla: Aviso del sistema y Agenda
 Pasos:
 1. Una clienta reserva o cancela ella misma (WhatsApp, reserva online).
-2. Al momento, Citas lo cuenta al equipo: qué pasó (reservada o cancelada), quién, qué servicios, el día
-   y la hora listos para decir y con quién, lo más nuevo primero, de las últimas 24 horas.
+2. Al momento, el dispositivo con la aplicación de ERPlora instalada lo avisa con un aviso del sistema,
+   aunque nadie esté mirando la pantalla: «Nueva cita» o «Cita cancelada» con el nombre de la clienta y,
+   debajo, los servicios, el día y la hora, y con quién.
 3. Lo que hace el mostrador no se avisa (quien lo hace ya lo sabe), y un empleado solo oye lo de su
    agenda.
-Entra: las reservas y cancelaciones que hizo la clienta.
-Sale: nada (solo lee); lo enseñará la campana.
-Si falla: si se corta la conexión, al volver llegan otra vez los avisos de las últimas 24 horas.
+4. Al tocar el aviso se abre la Agenda en el día de esa cita.
+5. En Android, la primera vez que hay algo que avisar, la aplicación lo pregunta antes con una frase suya,
+   «Deja que te avisemos», con «Ahora no» y «Activar los avisos»; después pregunta Android. Tras
+   «Ahora no» no se vuelve a preguntar sola.
+Entra: las reservas y cancelaciones que hizo la clienta en las últimas 24 horas.
+Sale: nada (solo lee).
+Si falla: si se corta la conexión o se vuelve a abrir la aplicación, llegan otra vez las de las últimas 24
+horas y el dispositivo no repite un aviso que ya dio; el primer día de un dispositivo solo aprende las que
+ya había, sin avisarlas todas de golpe. En un navegador no hay aviso del sistema: lo que espera se ve en la
+Agenda. En Android, con los avisos negados no sale ninguno. Una clienta cuyos datos se borraron sale sin
+nombre («Nueva cita»).
 Implicados: ninguno
 
 ## Servicios: lo que entra y lo que sale
@@ -850,6 +858,11 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 - Modelos (UUIDv7, sin `hub_id`): `Settings` (una fila), `Counter`, `Appointment`,
   `AppointmentService` (líneas congeladas), `History`, `BlockedTime`, `Recurring` y
   `RecurringService`. Borrar una cita o una serie es lógico (`deleted_at`).
+- **Avisos del dispositivo** (APPOINTMENT-F28): `apps.py` declara `notices` (dos `DeviceNotice`, la reserva y
+  la cancelación, sobre `appointment.appointment.notices`, cuyas filas filtra su `when` por `kind`); `base`
+  los rellena en `base.notice.list` en el idioma de quien mira y la shell de `@erplora/ui` los da una vez
+  por dispositivo con `erplora_notify` de la app instalada. El toque lleva a `/appointment/agenda?date=…`,
+  que la Agenda lee al abrir y al cambiar.
 - Las reacciones (`events.py`) las reparte el relay del outbox del worker (`base/relay.py`, ya en la fase
   1, hub#105): `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y los avisos
   reales de Venta, Clientes y Personal; `test_integration_*.py`, cada reacción con su app.
@@ -866,9 +879,11 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 
 ## Lo que queda fuera
 
-- **La campana y el aviso del dispositivo** de una cita que la clienta reserva o cancela (APPOINTMENT-F28):
-  Citas ya dice qué se avisa; la campana de la barra de arriba es del marco común de la app y está pedida
-  en `UI-REQUESTS.md`.
+- **El contador «por confirmar» en la campana** de la barra de arriba: la campana existe y cuenta lo que
+  declaran las apps; el contador de Citas llega con sus pasos del Inicio. El aviso del dispositivo de una
+  cita que la clienta reserva o cancela ya está (APPOINTMENT-F28).
+- **Volver a activar los avisos negados** desde Sistema (la fila «Los avisos están desactivados» del
+  producto actual): hoy, negados en Android, se activan en los ajustes del sistema.
 - **Recordatorios** («Enviar recordatorios»): el producto actual guardaba el ajuste sin enviar nada; aquí
   no se porta un ajuste que no hace nada. Los mensajes son de la app de WhatsApp y de las
   automatizaciones.
@@ -899,6 +914,10 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 - **Cancelar pide confirmación y deja escribir el motivo; Borrar pide confirmación** y ya no «responde
   bien sin borrar» una cita en curso o completada: la rechaza.
 - **La clienta que pide sobre una cita ajena** recibe el mismo «no existe» que sobre una inexistente.
+- **El aviso del sistema de una cita de la clienta** solo lo da la aplicación instalada, una vez por
+  dispositivo (al reconectar no se repite) y solo a quien ve esa agenda; tocarlo abre la Agenda en el día de
+  la cita (antes, Citas sin más). El navegador no avisa: el mercado avisa al equipo en su aplicación, no en
+  el navegador (Fresha, Booksy, Treatwell, Mindbody, Toast, Lightspeed).
 - **Baja de un profesional**: sus citas futuras pasan a «Sin asignar» y sus series se pausan (antes, Citas
   no escuchaba a Personal). Archivar un servicio no cambia ninguna cita (decisión de mercado).
 - **Un bloqueo de día entero** se juzga igual en la reserva y en las horas libres.

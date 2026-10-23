@@ -51,12 +51,13 @@ Al registrarlos, cambiar `frontend/components/AppointmentList.vue` (`ICONS`) y
 
 - **Qué** (APPOINTMENT-F28, la campana del producto actual, old-hub:HUB_SHELL-F66): una campana en la barra
   de arriba que cuenta lo que declaran los módulos y, con permiso del dispositivo, un aviso del sistema por
-  cada aviso nuevo. Para Citas: suscribirse a `appointment.appointment.notices` (las reservas y
-  cancelaciones que la clienta hizo ella misma, de la agenda que ve quien mira, lo más nuevo primero, cada
-  una con `kind`, `at`, el número, la clienta, los servicios, el día y la hora listos para decir y con
-  quién) y contar `appointment.appointment.count_to_confirm`; un aviso por fila nueva (por `at`), tocarlo
-  abre la agenda en ese día.
-- **Hoy**: la lectura viva existe y está probada; la agenda enseña **N por confirmar**. No hay campana ni
-  aviso del sistema: APPOINTMENT-F28 queda `parcial` con ese motivo.
-- Al llegar: el flujo pasa a `hecho` con su e2e (una reserva por la API con origen WhatsApp hace sonar la
-  campana del equipo, una del mostrador no).
+  cada aviso nuevo; tocarlo abre la agenda en ese día.
+- **Hecho — el aviso del dispositivo** (FIX-UI-SHELL-BELL-APPOINTMENT-NOTICES): Citas declara `notices` en su
+  `LiveAppConfig` (la reserva y la cancelación de la clienta sobre `appointment.appointment.notices`),
+  `base.notice.list` los rellena y la shell (`device-notices.ts` de `@erplora/ui`) los da una vez por
+  dispositivo con `erplora_notify` de la app instalada; el toque abre `/appointment/agenda?date=…`; en
+  Android pide antes el permiso con su frase. El navegador no avisa (decisión de mercado). e2e:
+  `tests/e2e/fix-ui-shell-appointment-notices.spec.ts`.
+- **Hecho — la campana** (BASE-G137, hub#168): existe y cuenta los `bell` de los módulos.
+- **Pendiente — el contador «por confirmar» de Citas en la campana** (`LiveAppConfig.bell` con
+  `appointment.appointment.count_to_confirm`): otra tarea de la cola (FIX-APPOINTMENT-SETUP-HOOKS).
