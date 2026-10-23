@@ -24,7 +24,8 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
   avisa y nunca impide; cierre solo al corte del día de una sesión olvidada.
 - **Consultar e imprimir** (F11, F12, F16): detalle de la sesión con movimientos y arqueos, las cifras
   «Sesión actual» y «Descuadres recientes» encima de la tabla, e informe X o Z por la cola de recibos de
-  Impresión (sin ella, por el navegador); el papel del dispositivo lo titula X o Z como la pantalla.
+  Impresión (sin ella, por el navegador); los dos papeles, el del dispositivo y el del navegador, lo
+  titulan X o Z.
 
 ## Ficha
 
