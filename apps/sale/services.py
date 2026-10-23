@@ -1606,7 +1606,6 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
 #: filed. The route's lacks and the server's (its own certificate it cannot open, no gateway, real filing closed).
 NO_WAY_TO_THE_AEAT = frozenset(
     {
-        "verifactu.live_option_unpaid",
         "verifactu.representation_not_approved",
         "verifactu.own_certificate_missing",
         "verifactu.own_certificate_unreadable",
