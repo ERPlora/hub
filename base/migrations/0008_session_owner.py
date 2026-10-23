@@ -19,9 +19,12 @@ def note_the_live_sessions(apps, schema_editor):
 
     Session = apps.get_model("sessions", "Session")
     SessionOwner = apps.get_model("base", "SessionOwner")
-    alias = schema_editor.connection.alias
-    noted = set(SessionOwner.objects.using(alias).values_list("session_id", flat=True))
-    live = Session.objects.using(alias).filter(expire_date__gt=timezone.now()).values_list("session_key", "session_data")
+    noted = set(SessionOwner.objects.using(schema_editor.connection.alias).values_list("session_id", flat=True))
+    live = (
+        Session.objects.using(schema_editor.connection.alias)
+        .filter(expire_date__gt=timezone.now())
+        .values_list("session_key", "session_data")
+    )
     store = SessionStore()
     owners = []
     for key, data in live:
@@ -31,7 +34,7 @@ def note_the_live_sessions(apps, schema_editor):
         saas_user_id = decoded.get(SAAS_USER_ID_KEY)
         if saas_user_id:
             owners.append(SessionOwner(session_id=key, saas_user_id=str(saas_user_id), host=decoded.get(HOST_KEY) or ""))
-    SessionOwner.objects.using(alias).bulk_create(owners, batch_size=500)
+    SessionOwner.objects.using(schema_editor.connection.alias).bulk_create(owners, batch_size=500)
 
 
 class Migration(migrations.Migration):
