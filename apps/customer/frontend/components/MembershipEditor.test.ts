@@ -78,6 +78,98 @@ describe('MembershipEditor', () => {
     ]);
   });
 
+  // The card's live result arrives again whenever the card changes (its other list saved, a note, someone
+  // else): it must not untick what the user ticked and has not saved yet (hub#114: «Save tags» sent []
+  // right after «Save groups», and the card lost the tag).
+  it('a live result of the card between ticking and «Save groups» keeps the tick, and saving sends it', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    await s.wrapper.setProps({ selected: ['g1', 'g3'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', true],
+      ['Staff', true],
+      ['Old (not active)', true],
+    ]);
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    await flush();
+    expect(sent(s.net.api[0])).toMatchObject({ path: '/api/customer/customers/set_groups', body: { id: 'c1', group_ids: ['g1', 'g3', 'g2'] } });
+  });
+
+  it('someone else\'s change to the card does not undo an unsaved untick either', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: false } });
+    await flush();
+    await s.wrapper.setProps({ selected: ['g1', 'g2', 'g3'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', false],
+      ['Staff', false],
+      ['Old (not active)', true],
+    ]);
+  });
+
+  it('once saved it follows the card again', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    await flush();
+    await s.wrapper.setProps({ selected: ['g1', 'g3', 'g2'] });
+    await s.wrapper.setProps({ selected: ['g2'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', false],
+      ['Staff', true],
+    ]);
+  });
+
+  it('a tick made while «Save groups» is on its way is still unsaved: the card\'s result keeps it', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    const boxes = () => s.wrapper.findAllComponents(IonCheckbox);
+    boxes()[1].vm.$emit('ionChange', { detail: { checked: true } });
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.save().trigger('click');
+    boxes()[0].vm.$emit('ionChange', { detail: { checked: false } });
+    await flush();
+    expect((sent(s.net.api[0]).body as { group_ids: string[] }).group_ids).toEqual(['g1', 'g3', 'g2']);
+    await s.wrapper.setProps({ selected: ['g1', 'g3', 'g2'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', false],
+      ['Staff', true],
+      ['Old (not active)', true],
+    ]);
+  });
+
+  it('a tick taken back leaves nothing unsaved: it follows the card again', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    const staff = () => s.wrapper.findAllComponents(IonCheckbox)[1];
+    staff().vm.$emit('ionChange', { detail: { checked: true } });
+    staff().vm.$emit('ionChange', { detail: { checked: false } });
+    await flush();
+    await s.wrapper.setProps({ selected: ['g2'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', false],
+      ['Staff', true],
+    ]);
+  });
+
+  it('another card starts from its own selection, not from what was ticked on the previous one', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.group.list', GROUPS);
+    s.wrapper.findAllComponents(IonCheckbox)[1].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    await s.wrapper.setProps({ customerId: 'c2', selected: ['g1'] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([
+      ['VIP', true],
+      ['Staff', false],
+    ]);
+  });
+
   it('with more than 100 groups offers a search on the server; what was ticked stays ticked while searching', async () => {
     const s = await setup();
     expect(s.wrapper.find('[data-testid="customer-groups-search"]').exists()).toBe(false);
@@ -119,6 +211,20 @@ describe('MembershipEditor', () => {
     await s.result(s.call, 'customer.tag.list', pageOf([{ id: 't1', name: 'Loyal', color: 'primary', is_active: true, customer_count: 1 }]));
     expect(s.wrapper.get('h3').text()).toBe('Tags');
     expect(s.wrapper.get('[data-testid="customer-tags-save"]').text()).toBe('Save tags');
+  });
+
+  it('the tags keep an unsaved tick through a live result of the card too (after «Save groups»)', async () => {
+    const s = await setup({ kind: 'tags', selected: [] });
+    await s.result(s.call, 'customer.tag.list', pageOf([{ id: 't1', name: 'Loyal', color: 'primary', is_active: true, customer_count: 0 }]));
+    s.wrapper.findAllComponents(IonCheckbox)[0].vm.$emit('ionChange', { detail: { checked: true } });
+    await flush();
+    await s.wrapper.setProps({ selected: [] });
+    expect(s.boxes().map((b) => [b[1], b[2]])).toEqual([['Loyal', true]]);
+    s.net.onApi(() => json({ id: 'c1' }));
+    await s.wrapper.get('[data-testid="customer-tags-save"]').trigger('click');
+    await flush();
+    expect(sent(s.net.api[0])).toMatchObject({ path: '/api/customer/customers/set_tags', body: { id: 'c1', tag_ids: ['t1'] } });
+    expect(toastSuccess).toHaveBeenCalledWith('Tags assigned');
   });
 
   it('a failed load says so', async () => {

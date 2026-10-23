@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // «Groups» or «Tags» of a card (CUSTOMER-F06): a checkbox per group (tag) of the business, followed
 // live; the card's own come ticked. «Save groups» sends the whole selection, which REPLACES the
-// previous one; the card's live result then ticks what the server kept. A group no longer active
-// is still shown on the cards that have it, marked so. Who cannot manage cards only sees.
+// previous one; the card's live result then ticks what the server kept. While a tick is not saved, a
+// live result of the card (its other list saved, someone else's change) does not undo it. A group no
+// longer active is still shown on the cards that have it, marked so. Who cannot manage cards only sees.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -36,11 +37,24 @@ const setGroups = useCommand('customer.customer.set_groups');
 const setTags = useCommand('customer.customer.set_tags');
 const command = computed(() => (isGroups.value ? setGroups : setTags));
 
+const sameSelection = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((id) => b.includes(id));
+
 const picked = ref<string[]>([...props.selected]);
+/** The user ticked or unticked something not saved yet. */
+const unsaved = ref(false);
 watch(
   () => props.selected,
   (now) => {
-    picked.value = [...now];
+    if (!unsaved.value) picked.value = [...now];
+    else if (sameSelection(picked.value, now)) unsaved.value = false;
+  },
+);
+watch(
+  () => props.customerId,
+  () => {
+    unsaved.value = false;
+    picked.value = [...props.selected];
   },
 );
 
@@ -49,6 +63,7 @@ const shown = computed(() => rows.value.filter((row) => row.is_active || props.s
 
 function toggle(id: string, checked: boolean): void {
   picked.value = checked ? [...picked.value.filter((p) => p !== id), id] : picked.value.filter((p) => p !== id);
+  unsaved.value = !sameSelection(picked.value, props.selected);
 }
 
 const label = (row: { name: string; is_active: boolean }): string =>
@@ -60,12 +75,15 @@ const failure = computed(() => {
 });
 
 async function save(): Promise<void> {
+  const sending = [...picked.value];
   try {
-    if (isGroups.value) await setGroups.run({ id: props.customerId, group_ids: picked.value });
-    else await setTags.run({ id: props.customerId, tag_ids: picked.value });
+    if (isGroups.value) await setGroups.run({ id: props.customerId, group_ids: sending });
+    else await setTags.run({ id: props.customerId, tag_ids: sending });
   } catch {
     return; // `error` holds it: the block shows it.
   }
+  // Saved: the card's live results lead again, unless something was ticked while it was on its way.
+  unsaved.value = !sameSelection(picked.value, sending);
   void toastSuccess(t(isGroups.value ? 'customer.membership.groupsSaved' : 'customer.membership.tagsSaved'));
 }
 </script>
