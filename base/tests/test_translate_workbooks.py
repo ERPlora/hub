@@ -8,6 +8,7 @@ the environment or the checkout's ``.env``, like every setting; here only from t
 without it, the command stops before the API with an error that names it.
 """
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -141,6 +142,40 @@ def test_a_translation_with_a_dangling_anchor_is_not_written(tmp_path, installed
         call_command("translate_workbooks")
 
     assert not en_file(config).exists()
+
+
+# ── date patterns: `OS-AAAAMMDD-NNNN` came back untouched from inline code (cart_checkout, kitchen, task) ──
+
+
+@pytest.mark.parametrize("pattern", ["OS-AAAAMMDD-NNNN", "DD/MM/AAAA", "dd/mm/aaaa"])
+def test_a_translation_that_keeps_a_spanish_date_placeholder_is_not_written(tmp_path, installed, translator, pattern):
+    [config] = installed(module(tmp_path))
+    translator(english=ENGLISH.replace("Keeps **things**.", f"Keeps **things**, numbered `{pattern}`."))
+
+    with pytest.raises(CommandError, match=re.escape(pattern)):
+        call_command("translate_workbooks")
+
+    assert not en_file(config).exists()
+
+
+def test_a_translation_with_english_date_placeholders_is_written(tmp_path, installed, translator):
+    [config] = installed(module(tmp_path))
+    english = ENGLISH.replace("Keeps **things**.", "Keeps **things**, numbered `OS-YYYYMMDD-NNNN` on `DD/MM/YYYY`.")
+    translator(english=english)
+
+    call_command("translate_workbooks")
+
+    assert en_file(config).read_text().endswith(english)
+
+
+def test_the_instructions_translate_the_date_placeholders_even_in_inline_code():
+    for spanish, english in (
+        ("`AAAA`", "`YYYY`"),
+        ("`aaaa`", "`yyyy`"),
+        ("`OS-AAAAMMDD-NNNN`", "`OS-YYYYMMDD-NNNN`"),
+        ("`DD/MM/AAAA`", "`DD/MM/YYYY`"),
+    ):
+        assert f"{spanish} is {english}" in translate_workbooks.INSTRUCTIONS
 
 
 def test_check_lists_the_stale_translations_without_the_network(tmp_path, installed, translator):
