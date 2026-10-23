@@ -215,10 +215,6 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
     block = body.get("verifactu")
     if block is not None and not isinstance(block, dict):
         return _payload_invalid("The verifactu block is a JSON object.")
-    live_paid = block.get("live_paid") if block else None
-    if live_paid is not None and type(live_paid) is not bool:
-        # Read as it came: a string such as "false" never turns into a yes.
-        return _payload_invalid("live_paid is true or false.")
     answer, refused = _operation_call(
         "base.hub.state_apply",
         {
