@@ -16,12 +16,10 @@ Lo que la app necesita de `@erplora/ui` y todavía no está. Mientras tanto usa 
 
 ## Componentes
 
-- **`SearchSelect`** — un campo que abre un `ion-modal` con `ion-searchbar` y la lista (o una consulta del
-  servidor con `search` para listas que pasan de 100). API propuesta: `v-model` (valor), `options` o
-  `op` + `params` (consulta paginada), `label`, `error`, `testid`, ranura para pintar la opción. Uso: el país
-  de la ficha (`components/CountrySelect.vue`, ~250 opciones, hoy en cliente) y los selectores de grupos y
-  etiquetas de la ficha (`components/MembershipEditor.vue`, que hoy añade un buscador en el servidor cuando
-  hay más de 100). Es el `ok-combo` del producto.
+- **`SearchSelect`** — cerrada: llegó como `Combo` (`@erplora/ui/components`) y el «País» de la ficha lo usa
+  (`components/CustomerForm.vue`); la copia propia `CountrySelect.vue` se ha borrado. Los «Grupos» y
+  «Etiquetas» de la ficha (`components/MembershipEditor.vue`) no son un combo de un valor, sino casillas de
+  selección múltiple con buscador en el servidor a partir de 100: se quedan así y no piden nada a `ui`.
 - **Panel lateral de alta/edición del `DataTable`** — el `ok-data-table` del producto abría «Añadir» y
   «Editar» en su panel lateral (hoja completa en el móvil). API propuesta: ranura `create` + método
   `open('create' | 'edit', { title })` / `close()`. Uso: alta de cliente (`CustomerCreateModal.vue`) y
