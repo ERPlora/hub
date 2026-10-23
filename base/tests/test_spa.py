@@ -238,3 +238,24 @@ def test_a_file_s_path_with_a_trailing_slash_is_the_same_404_and_no_redirect_to_
     for path in ("/robots.txt", "/robots.txt/"):
         response = client.get(path, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT="*/*")
         assert (response.status_code, dict(response.cookies)) == (404, {}), path
+
+
+# The old hub's <head> (FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE): with /favicon.ico a 404, the shell declares its
+# tab and home-screen icons, static files of the Hub (live.spa, LIVE["spa"]["icons"]), never a CDN.
+HUB_ICONS = [
+    ("icon", "base/icons/favicon.ico", ' sizes="any"'),
+    ("apple-touch-icon", "base/icons/apple-touch-icon.png", ""),
+]
+
+
+@pytest.mark.parametrize("signed_in", [False, True])
+def test_the_shell_declares_the_old_hub_s_icons_from_its_static_files(client, make_user, signed_in):
+    from django.contrib.staticfiles import finders
+
+    if signed_in:
+        client.force_login(make_user("ana", host="a", role="hub_employee"))
+    html = client.get("/demo/items", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT="*/*").content.decode()
+    head = html[: html.index("</head>")]
+    for rel, path, sizes in HUB_ICONS:
+        assert f'<link rel="{rel}" href="/static/{path}"{sizes}>' in head
+        assert finders.find(path), f"{path} is no static file of the Hub"
