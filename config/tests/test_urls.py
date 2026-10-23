@@ -136,6 +136,16 @@ def test_the_admin_bears_erploras_name(client, admin_user, language, index_title
     assert "Django" not in page
 
 
+def test_the_admin_index_names_the_outbox_in_spanish(client, admin_user):
+    # The outbox of packages/live has its section and model named in the staff's language (ERPlora/live#7).
+    client.force_login(admin_user)
+
+    page = client.get("/admin/", HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es").content.decode()
+
+    assert ("Tiempo real" in page, "Eventos de la bandeja de salida" in page) == (True, True)
+    assert "Outbox events" not in page
+
+
 def test_csp_report(client):
     response = client.post(
         "/csp-report/", json.dumps({"csp-report": {"violated-directive": "script-src"}}), content_type="application/json"
