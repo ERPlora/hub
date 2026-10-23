@@ -118,7 +118,7 @@ class VerifactuConfig(LiveAppConfig):
             kind="stat",
             operation="verifactu.stats.contingency_summary",
             map={"value": "queued_count", "severity": "severity"},
-            options={"format": "number"},
+            options={"format": "number", "label": _("In contingency queue")},
         ),
         Widget(
             key="by_status",

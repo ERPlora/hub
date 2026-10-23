@@ -83,6 +83,34 @@ describe('WidgetPanel', () => {
     expect(m.wrapper.get('[data-testid="widget-empty"]').text()).toBe('Sin datos');
   });
 
+  // FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT: a stat says under its figure what it counts, the text its app gives in
+  // `options.label` (already in the reader's language: base translates it); one without it says nothing more.
+  it('says under the figure of a stat what it counts, in its severity', async () => {
+    const stat = { kind: 'stat', map: { value: 'open', severity: 'tone' }, options: { format: 'number', label: 'En cola de contingencia' } } as const;
+    const m = await panel(stat, 'es');
+    const call = await m.live();
+    await m.result(call, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7, tone: 'warning' });
+    expect(value(m.wrapper).text()).toBe('3');
+    expect(m.wrapper.get('[data-testid="widget-label"]').text()).toBe('En cola de contingencia');
+    expect(m.wrapper.get('.widget-stat').attributes('data-severity')).toBe('warning');
+
+    const bare = await panel({ kind: 'stat', map: { value: 'open' } }, 'es');
+    const again = await bare.live();
+    await bare.result(again, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7 });
+    expect(value(bare.wrapper).text()).toBe('3');
+    expect(bare.wrapper.find('[data-testid="widget-label"]').exists()).toBe(false);
+  });
+
+  // The old hub's gh:hub#1105: a kpi under its own title never repeats `options.label` as a second heading.
+  it('a kpi paints only its figure under its title, never its `options.label`', async () => {
+    const m = await panel({ options: { format: 'number', label: 'Records pending submission to the AEAT' } });
+    const call = await m.live();
+    await m.result(call, 'demo.item.stats', { total: 5, open: 3, done: 2, lines: 7 });
+    expect(value(m.wrapper).text()).toBe('3');
+    expect(m.wrapper.find('[data-testid="widget-label"]').exists()).toBe(false);
+    expect(m.wrapper.text()).not.toContain('Records pending submission to the AEAT');
+  });
+
   it('paints a bar-list as one bar per row, as wide as its share', async () => {
     const m = await panel({ kind: 'bar-list', map: { label: 'name', value: 'n' } });
     const call = await m.live();

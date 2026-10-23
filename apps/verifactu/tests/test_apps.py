@@ -299,70 +299,72 @@ def test_the_homes_panels_are_the_old_modules_four():
     event's type in the reader's language (gh:verifactu#139: never its code)."""
     panels = verifactu().widgets
     assert all(isinstance(panel, Widget) for panel in panels)
-    assert [
-        (
-            panel.key,
-            panel.kind,
-            panel.component,
-            panel.operation,
-            panel.size,
-            panel.default,
-            panel.permission,
-            dict(panel.params),
-            dict(panel.map),
-            dict(panel.options),
-        )
-        for panel in panels
-    ] == [
-        (
-            "pending",
-            "kpi",
-            None,
-            "verifactu.stats.compliance_summary",
-            "sm",
-            True,
-            "verifactu.view_record",
-            {},
-            {"value": "pending_count"},
-            {"format": "number"},
-        ),
-        (
-            "contingency",
-            "stat",
-            None,
-            "verifactu.stats.contingency_summary",
-            "sm",
-            False,
-            "verifactu.view_record",
-            {},
-            {"value": "queued_count", "severity": "severity"},
-            {"format": "number"},
-        ),
-        (
-            "by_status",
-            "bar-list",
-            None,
-            "verifactu.stats.records_by_status",
-            "md",
-            False,
-            "verifactu.view_record",
-            {},
-            {"label": "label", "value": "total"},
-            {"valueFormat": "number"},
-        ),
-        (
-            "events",
-            None,
-            "RecentEventsPanel",
-            None,
-            "md",
-            False,
-            "verifactu.view_record",
-            {},
-            {},
-            {},
-        ),
-    ]
+    with translation.override("en"):  # the label is a lazy translation
+        assert [
+            (
+                panel.key,
+                panel.kind,
+                panel.component,
+                panel.operation,
+                panel.size,
+                panel.default,
+                panel.permission,
+                dict(panel.params),
+                dict(panel.map),
+                dict(panel.options),
+            )
+            for panel in panels
+        ] == [
+            (
+                "pending",
+                "kpi",
+                None,
+                "verifactu.stats.compliance_summary",
+                "sm",
+                True,
+                "verifactu.view_record",
+                {},
+                {"value": "pending_count"},
+                {"format": "number"},
+            ),
+            (
+                "contingency",
+                "stat",
+                None,
+                "verifactu.stats.contingency_summary",
+                "sm",
+                False,
+                "verifactu.view_record",
+                {},
+                {"value": "queued_count", "severity": "severity"},
+                # Under its figure, what it counts, as the old one (FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT).
+                {"format": "number", "label": "In contingency queue"},
+            ),
+            (
+                "by_status",
+                "bar-list",
+                None,
+                "verifactu.stats.records_by_status",
+                "md",
+                False,
+                "verifactu.view_record",
+                {},
+                {"label": "label", "value": "total"},
+                {"valueFormat": "number"},
+            ),
+            (
+                "events",
+                None,
+                "RecentEventsPanel",
+                None,
+                "md",
+                False,
+                "verifactu.view_record",
+                {},
+                {},
+                {},
+            ),
+        ]
     # Every business: the old panels named every sector. Grouped under the app's own name in «Customize panel».
     assert all(not panel.verticals and not panel.category for panel in panels)
     component = Path(verifactu().path) / "frontend" / "components" / "RecentEventsPanel.vue"

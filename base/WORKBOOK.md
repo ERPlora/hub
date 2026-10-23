@@ -210,8 +210,9 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
   1. Bajo la lista está el tablero («Cargando widgets…» mientras llega).
-  2. Cada panel es una tarjeta con su título e icono: una cifra, una lista con barras, una cronología, un
-     gráfico o un trozo de la pantalla de su app.
+  2. Cada panel es una tarjeta con su título e icono: una cifra (con debajo lo que cuenta, si su app lo dice),
+     una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en el
+     idioma de quien mira.
   3. En un gráfico de días, cada barra lleva debajo su día de la semana (o su fecha, si abarca más de una
      semana) y encima salen el día y su importe: los de la última barra hasta que tocas otra.
   4. En una cronología, cada entrada dice cuándo pasó, en la hora del dispositivo: solo la hora si fue hoy
