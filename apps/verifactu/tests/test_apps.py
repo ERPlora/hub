@@ -247,13 +247,16 @@ def registry_output(name: str) -> set[str]:
     return set(registry[name].output.model_fields)
 
 
-def test_the_step_is_important_but_never_says_it_stops_the_sale():
+def test_the_step_is_important_in_testing_and_its_text_never_says_it_stops_the_sale():
     """gh:hub#1726: the old checklist painted VeriFactu as «Necesario para vender» while the till sold without it.
-    Testing files without the step, so it is functional («Important»), never base's legal level («Needed to
-    invoice»), and its text names what it is for, not a wall."""
+    Testing files without the step, so there it is functional («Important»); base's legal level («Needed to
+    invoice») is only where the hub files in production, which refuses the sale without it. Its text names what it
+    is for, not a wall, in both."""
     (step,) = verifactu().setup
+    key = f"verifactu.{step.key}"
     assert step.required is True
-    assert home.level_of(f"verifactu.{step.key}", step.required) == home.LEVEL_FUNCTIONAL
+    assert home.level_of(key, step.required, {"environment": "testing"}) == home.LEVEL_FUNCTIONAL
+    assert home.level_of(key, step.required, {"environment": "production"}) == home.LEVEL_LEGAL
     for language in ("en", "es"):
         with translation.override(language):
             text = f"{step.title} {step.description}".lower()

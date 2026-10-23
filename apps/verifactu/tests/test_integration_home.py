@@ -6,16 +6,19 @@ answered by its own query as that person; the photo received in hub B re-runs B'
 base and verifactu run for real: the step and the panels come from VerifactuConfig through base's own queries.
 """
 
+import datetime as dt
 import json
 
 import psycopg
 import pytest
+from django.utils import timezone
 from live.context import system_context
 from live.live_registry import live_registry
 from live.operations import get
 from live.outbox import channel_for
 
 from apps.verifactu import certificates
+from apps.verifactu.models import OwnCertificate
 from apps.verifactu.tests.conftest import A, B, b64, ctx_for, make_p12, manual, run
 from base.schemas import SetupStatusIn, WidgetListIn
 
@@ -109,8 +112,90 @@ def test_the_step_is_in_spanish_for_a_spanish_reader(issuer):
 @pytest.mark.django_db
 @pytest.mark.parametrize("role", ["hub_manager", "hub_employee"])
 def test_whoever_cannot_configure_verifactu_is_not_told_about_the_step(issuer, role):
-    # A functional step goes to whoever can do it; the legal level, which reaches everybody, is base's (LEGAL_STEPS).
+    # In testing a functional step goes to whoever can do it; the legal level, which reaches everybody, is base's
+    # (LEGAL_IN_PRODUCTION) and only where the hub files in production.
     assert STEP not in steps(ctx_for(role))
+
+
+# ── In production the way to the AEAT is a wall (PLAN-HUB round 2026-10-21) ───────────────────────────────────────
+
+
+@pytest.fixture
+def opened(settings):
+    """The prod deployment opened by ERPlora, with its gateway."""
+    settings.ERPLORA_ENVIRONMENT = "prod"
+    settings.VERIFACTU_PRODUCTION_ENABLED = True
+    settings.VERIFACTU_GATEWAY_URL = "http://saas.internal:8001"
+    return settings
+
+
+def status(ctx) -> dict:
+    return get("base.setup.status")(ctx, SetupStatusIn()).model_dump(mode="json")
+
+
+def wall(ctx) -> tuple:
+    """How the person of ``ctx`` is told about the step, and how many walls the strip counts."""
+    document = status(ctx)
+    step = {item["key"]: item for item in document["items"]}.get(STEP)
+    told = (step["level"], step["state"], step["actionable"]) if step else None
+    return told, document["blocking_pending"]
+
+
+def live_by_erplora():
+    photo(1, "approved")
+    run("verifactu.config.go_live")
+
+
+def live_by_own_certificate():
+    run("verifactu.certificate.upload", {"p12_base64": b64(make_p12()), "password": "secret"})
+    run("verifactu.config.update", {"route": "own"})
+    run("verifactu.config.go_live")
+
+
+@pytest.mark.django_db
+def test_in_production_with_the_way_ready_the_step_is_done_and_off_the_strip(issuer, opened):
+    live_by_erplora()
+
+    assert wall(ctx_for("hub_owner")) == (("legal", "done", True), 0)
+    assert wall(ctx_for("hub_employee")) == (None, 0)
+    assert run("verifactu.config.get").issue_blocker is None
+
+
+@pytest.mark.django_db
+def test_in_production_a_revoked_authorisation_is_a_wall_for_everybody(issuer, opened):
+    """Its sales are refused from now on: the Home says so to the owner, and to the person at the till."""
+    live_by_erplora()
+    photo(2, "revoked")
+
+    assert run("verifactu.config.get").issue_blocker.code == "representation_not_approved"
+    assert wall(ctx_for("hub_owner")) == (("legal", "pending", True), 1)
+    for role in ("hub_manager", "hub_employee"):
+        assert wall(ctx_for(role)) == (("legal", "pending", False), 1)
+
+
+@pytest.mark.django_db
+def test_in_production_an_expired_or_removed_own_certificate_is_a_wall(issuer, opened):
+    live_by_own_certificate()
+    assert wall(ctx_for("hub_owner")) == (("legal", "done", True), 0)
+
+    OwnCertificate.objects.update(expires_at=timezone.now() - dt.timedelta(minutes=1))
+    assert run("verifactu.config.get").issue_blocker.code == "own_certificate_missing"
+    assert wall(ctx_for("hub_owner")) == (("legal", "pending", True), 1)
+    assert wall(ctx_for("hub_employee")) == (("legal", "pending", False), 1)
+
+    run("verifactu.certificate.remove")
+    assert wall(ctx_for("hub_owner")) == (("legal", "pending", True), 1)
+
+
+@pytest.mark.django_db
+def test_in_testing_a_revoked_authorisation_stops_nothing(issuer):
+    """gh:hub#1726: a hub in testing sells without a way, so the step stays functional and off the strip."""
+    photo(1, "approved")
+    photo(2, "revoked")
+
+    assert run("verifactu.config.get").issue_blocker is None
+    assert wall(ctx_for("hub_owner")) == (("functional", "pending", True), 0)
+    assert wall(ctx_for("hub_employee")) == (None, 0)
 
 
 @pytest.mark.django_db

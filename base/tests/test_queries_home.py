@@ -342,6 +342,85 @@ def test_the_level_is_bases_never_the_modules(modules, declare):
     assert (items["stock.catalog"]["level"], items["stock.photos"]["level"]) == ("functional", "recommended")
 
 
+# --- VeriFactu's way to the AEAT: a wall only where the hub files in production (PLAN-HUB round 2026-10-21) --------
+
+ROUTE = "verifactu.sending_route"
+
+
+def sending_route(modules, declare, *, environment, ready, permission=None):
+    """VeriFactu's step as base sees it, its query answering the hub's environment and whether its way is ready."""
+    declare(
+        "verifactu.config.get",
+        {"environment": environment, "route_ready_for_production": ready},
+        permission=permission,
+    )
+    route = step("sending_route", "verifactu.config.get", permission="verifactu.configure", required=True,
+                 configured_when=[SetupCheck(field="route_ready_for_production", truthy=True)])
+    modules(module("verifactu", setup=[route], permissions=["verifactu.view_record", "verifactu.configure"]))
+
+
+def seen(document, key=ROUTE):
+    item = by_key(document)[key]
+    return item["level"], item["state"], item["actionable"]
+
+
+def test_in_production_a_way_to_the_aeat_not_ready_is_a_wall_for_everybody(modules, declare):
+    """A hub in production whose way broke (authorisation revoked, certificate expired or removed) has every sale
+    refused: its step is ⛔, counted by the strip, and told to the person at the till too, not actionable."""
+    sending_route(modules, declare, environment="production", ready=False)
+
+    owner, employee = setup_status(ctx("verifactu.configure")), setup_status(ctx())
+
+    assert (seen(owner), owner["blocking_pending"]) == (("legal", "pending", True), 1)
+    assert (seen(employee), employee["blocking_pending"]) == (("legal", "pending", False), 1)
+
+
+def test_in_testing_the_way_stays_functional_and_the_till_sells(modules, declare):
+    """gh:hub#1726: a hub in testing sells without a way to the AEAT, so nothing tells it that it cannot invoice."""
+    sending_route(modules, declare, environment="testing", ready=False)
+
+    owner = setup_status(ctx("verifactu.configure"))
+
+    assert (seen(owner), owner["blocking_pending"]) == (("functional", "pending", True), 0)
+    assert keys(setup_status(ctx())) == []  # a functional step goes to whoever can do it
+
+
+def test_in_production_with_the_way_ready_the_step_is_done_and_off_the_strip(modules, declare):
+    sending_route(modules, declare, environment="production", ready=True)
+
+    owner = setup_status(ctx("verifactu.configure"))
+
+    assert (by_key(owner)[ROUTE]["state"], owner["blocking_pending"]) == ("done", 0)
+    assert keys(setup_status(ctx())) == []  # done: not the till's task
+
+
+def test_whoever_may_not_read_the_way_still_has_its_wall_in_production(modules, declare, caplog):
+    """gh:hub#466: a wall whose query the person may not run is read as the system, never dropped. Outside it the
+    step is as any functional one: whoever may not read its query is not told, and the failure is logged."""
+    sending_route(modules, declare, environment="production", ready=False, permission="verifactu.view_record")
+
+    document = setup_status(ctx())
+
+    assert (seen(document), document["blocking_pending"]) == (("legal", "pending", False), 1)
+
+    sending_route(modules, declare, environment="testing", ready=False, permission="verifactu.view_record")
+    with caplog.at_level(logging.WARNING, logger="base.home"):
+        document = setup_status(ctx("verifactu.configure"))  # may configure it, may not read it
+
+    assert (keys(document), document["blocking_pending"]) == ([], 0)
+    assert f"{ROUTE} left out" in caplog.text
+
+
+def test_only_base_names_the_steps_that_are_walls_in_production(modules, declare):
+    """The level is base's: a module's step whose row says production is no wall unless base lists it."""
+    declare("stock.catalog.status", {"environment": "production", "n": 0})
+    modules(module("stock", setup=[step(required=True, configured_when=[SetupCheck(field="n", truthy=True)])]))
+
+    document = setup_status(ctx())
+
+    assert (seen(document, "stock.catalog"), document["blocking_pending"]) == (("functional", "pending", True), 0)
+
+
 def test_a_national_step_shows_only_in_a_hub_of_its_country(modules, declare):
     declare("stock.catalog.status", {"n": 1})
     modules(module("stock", setup=[step(countries=["ES"])]))
