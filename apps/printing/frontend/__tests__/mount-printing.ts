@@ -21,7 +21,8 @@ import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
-// happy-dom made to behave as a browser where Ionic's runtime reaches it (the hub has no setup file).
+// happy-dom made to behave as a browser where Ionic's runtime reaches it, by each helper: the hub setup
+// (frontend/testing/setup.ts) only unmounts what a test left mounted and fails one that leaves a real timer armed.
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';

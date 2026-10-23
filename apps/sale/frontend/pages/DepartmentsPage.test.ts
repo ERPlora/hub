@@ -8,7 +8,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, mountSale, noTimerOutlivesATest, taxSettings, type MountOptions } from '../__tests__/mount-sale';
+import { BYE, EMPLOYEE, errorFrame, flush, mountSale, taxSettings, type MountOptions } from '../__tests__/mount-sale';
 import DepartmentFormModal from '../components/backoffice/DepartmentFormModal.vue';
 import { plain } from '../lib/format';
 import type { DepartmentOut } from '../operations';
@@ -24,7 +24,6 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
-noTimerOutlivesATest();
 beforeEach(() => mocks.confirm.mockReset());
 
 const OP = 'sale.department.list';
