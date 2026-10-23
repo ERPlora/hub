@@ -1,9 +1,9 @@
 // flow: BASE-F13 (base/WORKBOOK.md) · HUBS-F26 and HUBS-F27 of the SaaS (hubs/WORKBOOK.md)
 // The owner changes an employee's role, or removes them from the business, in erplora.com's panel. The SaaS ends that
 // person's sessions in the Hub (`POST /internal/sessions/revoke`, after its COMMIT) and pushes the photo with the
-// business's members. The employee's open tab loses its session at once (every call answers 401) and, when they come
-// back to the business: with the new role after a change (a manager's «New item»), the SaaS's «You don't have access
-// to this hub» after a removal.
+// business's members. The employee's open tab leaves by itself, never navigated by the test: its live stream hears the
+// end of its session and the SDK reloads the page (`@erplora/ui`, `host-closed.ts`), which goes through the SaaS:
+// back with the new role after a change (a manager's «New item»), «You don't have access to this hub» after a removal.
 // The real Hub and the real SaaS of this run's stack (the SaaS's `HUB_INTERNAL_URL` points here) and fresh accounts
 // signed up on the SaaS's screens; the business is created through the SaaS's API as the panel creates it, so the SaaS
 // registers it in this Hub with the same id. The SaaS's changes are made on its panel, as the owner makes them.
@@ -109,14 +109,24 @@ function rowAction(panel: Page, memberId: string, action: string) {
   return panel.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)').last().getByTestId(`members-row-${memberId}-${action}`);
 }
 
-/** Until the Hub refuses the tab's session: the SaaS's revocation arrived. */
-async function sessionEnded(person: Person, origin: string): Promise<void> {
-  await expect
-    .poll(async () => (await api(person.context, origin, 'GET', '/demo/items')).status, {
-      timeout: SAAS_STEP,
-      message: 'the tab still has its session',
-    })
-    .toBe(401);
+/** The hub's session `person`'s browser holds for `origin` (its own `sessionid`, not the SaaS's). */
+async function hubSession(person: Person, origin: string): Promise<string> {
+  const host = new URL(origin).hostname;
+  const key = (await person.context.cookies(origin)).find((c) => c.name === 'sessionid' && c.domain === host)?.value;
+  if (!key) throw new Error(`no session of ${origin} in the browser`);
+  return key;
+}
+
+/** Whether the Hub still has the session `key`. */
+const sessionAlive = (key: string): boolean => psql(`SELECT count(*) FROM django_session WHERE session_key = '${key}'`) === '1';
+
+/** The documents `page` loads from now on: a reload, the SaaS's sign-in, the way back. */
+function documentsLoaded(page: Page): string[] {
+  const loaded: string[] = [];
+  page.on('response', (response) => {
+    if (response.request().resourceType() === 'document') loaded.push(response.url());
+  });
+  return loaded;
 }
 
 /** `ready` at each size and a capture `APP-HUBS-3-<key>-<size>`; back at 1440 after. */
@@ -164,6 +174,8 @@ test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the busines
     await expect(shown(tab).locator('[data-testid=demo-items-add]')).toHaveCount(0);
   });
 
+  const before = await hubSession(employee, origin);
+  const documents = documentsLoaded(tab);
   const panel = await team(owner, business);
   await rowAction(panel, memberId, 'change_role').click();
   const modal = panel.getByTestId('role-modal');
@@ -173,16 +185,18 @@ test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the busines
   await panel.getByTestId('role-modal-submit').click();
   await expect(modal).toBeHidden();
 
-  // The open tab: its session ended in the Hub, and the photo says the new role.
-  await sessionEnded(employee, origin);
+  // The open tab leaves by itself (the test never navigates it): its stream hears the end of its session, the page
+  // reloads, goes through the SaaS (still signed in there) and comes back with the new role: a manager adds items.
+  await expect(shown(tab).locator('[data-testid=demo-items-add]')).toBeVisible({ timeout: SAAS_STEP });
+  expect(tab.url()).toBe(`${origin}/demo/items`);
+  expect(documents.some((url) => url.startsWith(`${SAAS}/hub-login/`)), documents.join(' ')).toBe(true);
+  expect(sessionAlive(before)).toBe(false);
+  expect(await hubSession(employee, origin)).not.toBe(before);
   expect(
     psql(
       `SELECT state->'members' @> jsonb_build_array(jsonb_build_object('role', 'hub_manager')) FROM base_hub WHERE id = '${business.id}'`,
     ),
   ).toBe('t');
-
-  // Back in: through the SaaS (still signed in there), with the new role: a manager adds items.
-  await login(tab, origin, '/demo/items', employee.credentials);
   await atEverySize(tab, 'BASE-F13-manager', async () => {
     await listReady(tab);
     await expect(shown(tab).locator('[data-testid=demo-items-add]')).toBeVisible();
@@ -191,9 +205,13 @@ test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the busines
 });
 
 test('BASE-F13 (HUBS-F27): a person removed from the business loses their session there and cannot come back', async () => {
+  // Another tab: the one above reloaded a moment ago, and a tab reloads for this at most once every 30 s (the SDK's
+  // guard against a reload loop, `RELOAD_GUARD_MS`, kept in the tab's own storage).
+  tab = await employee.context.newPage();
   await login(tab, origin, '/demo/items', employee.credentials);
   await listReady(tab);
 
+  const before = await hubSession(employee, origin);
   const panel = await team(owner, business);
   await rowAction(panel, memberId, 'remove').click();
   const dialog = panel.getByTestId('remove-dialog');
@@ -201,16 +219,14 @@ test('BASE-F13 (HUBS-F27): a person removed from the business loses their sessio
   await panel.getByTestId('remove-dialog-submit').click();
   await expect(dialog).toBeHidden();
 
-  await sessionEnded(employee, origin);
+  // The open tab leaves by itself for the SaaS, which says they have no access to this hub any more.
+  await expect(tab).toHaveURL(new RegExp(`^${SAAS}/login/error\\?code=not_a_member`), { timeout: SAAS_STEP });
+  expect(sessionAlive(before)).toBe(false);
   expect(
     psql(
       `SELECT count(*) FROM base_membership m JOIN auth_user u ON u.id = m.user_id WHERE m.host = '${business.slug}' AND u.email = '${employee.credentials.email}'`,
     ),
   ).toBe('0');
-
-  // Coming back sends them to the SaaS, which says they have no access to this hub.
-  await tab.goto(`${origin}/demo/items`);
-  await expect(tab).toHaveURL(new RegExp(`^${SAAS}/login/error\\?code=not_a_member`));
   await atEverySize(tab, 'BASE-F13-removed', async () => {
     await expect(tab.getByRole('heading', { name: "You don't have access to this hub" })).toBeVisible();
     await expect(tab.getByTestId('login-error-badge')).toHaveText('403 · No access');
