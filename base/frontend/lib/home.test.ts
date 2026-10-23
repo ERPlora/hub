@@ -1,6 +1,6 @@
 // The rules of the Home that are not the server's (the old hub's `dashboard-heading.ts`, `setup-status.ts`,
 // `dashboard-widgets.ts` and the «My apps» card): pure, so each one is pinned here once.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
 import {
@@ -237,16 +237,23 @@ describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
     expect(barsOf(days(fortnight), 'en').map((bar) => bar.label)).toEqual(['Oct 10', 'Oct 17', 'Oct 23']);
   });
 
-  it('a business day is the same day in every time zone: a civil day, never an instant', () => {
+  it('a business day is the same day in every time zone: a civil day, never an instant', async () => {
     const zone = process.env.TZ;
     try {
       for (const tz of ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati']) {
+        // A page opened in that zone: a fresh module, so no formatter of another zone is reused.
         process.env.TZ = tz;
-        expect(barsOf(days(['2026-10-17']), 'es')[0], tz).toMatchObject({ label: 'sáb', detail: 'sáb, 17 oct' });
+        vi.resetModules();
+        const fresh = await import('./home');
+        expect(fresh.widgetView(chart, days(['2026-10-17']), 'es'), tz).toMatchObject({
+          kind: 'chart',
+          bars: [{ label: 'sáb', detail: 'sáb, 17 oct' }],
+        });
       }
     } finally {
       if (zone === undefined) delete process.env.TZ;
       else process.env.TZ = zone;
+      vi.resetModules();
     }
   });
 
