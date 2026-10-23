@@ -17,6 +17,8 @@ Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`
 - `ion:cloud-upload-outline` — botón **Importar CSV**; hoy `ion:cloud-outline` (`components/CsvButtons.vue`).
 - `ion:print-outline` — botón **Imprimir código de barras** de la ficha; hoy `ion:pricetag-outline`
   (`components/ProductDetailModal.vue`).
+- `ion:trending-down-outline` — panel «Productos con menos stock» del Inicio; hoy `ion:arrow-down-outline`
+  (`widgets` de `apps.py`).
 
 ## Componentes
 
