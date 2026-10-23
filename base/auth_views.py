@@ -22,9 +22,16 @@ jumps to the SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``) with th
 that ``state``, redeems a code the Hub made itself for the browser that owns the demo (``base.services``, never the
 SaaS) and opens the session of the demo's owner; a code that opens nothing goes back to the SaaS's demo door
 (``/demo/?state=failed``), and leaving the demo too (``/demo/``).
+
+Every callback refused for its code or its state counts against the caller (``base.throttle.client_key``: its address,
+or its IPv6 /64): past :data:`CALLBACK_ATTEMPTS`, its next refused callback is answered 429 with ``Retry-After`` and a
+page of the Hub until the window of the first refusal ends. A good code always redeems, so nobody behind the same
+address is locked out; it is not counted, nor what fails on the platform's side (the SaaS away, the Hub's signature) or
+after a good code (a role or a user that cannot enter here).
 """
 
 import logging
+import math
 import re
 from urllib.parse import urlencode
 
@@ -44,6 +51,7 @@ from live.slugs import validate_hub_slug
 
 from base import auth, services
 from base.operations import HostScopeResolver
+from base.throttle import AttemptLimit, client_key
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +61,10 @@ INVALID_NEXT = "invalid_next"
 SAAS_LOGOUT_PATH = "/accounts/logout/"
 #: The 403 of a callback without this browser's state, with a link to sign in again.
 LOGIN_RETRY_TEMPLATE = "base/login_retry.html"
+#: The 429 of a refused callback from a caller past :data:`CALLBACK_ATTEMPTS`.
+TOO_MANY_ATTEMPTS_TEMPLATE = "base/too_many_attempts.html"
+#: Refused callbacks per caller: 10 within 5 minutes of the first (README, «Límites de intentos»).
+CALLBACK_ATTEMPTS = AttemptLimit("callback", attempts=10, window=300)
 _DEEP_LINK_RE = re.compile(r"/admin/hub/(?P<slug>[^/]+)/")
 
 
@@ -98,12 +110,12 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
     next_path = safe_next(request.POST.get("next"))
     if not auth.state_matches(request, request.POST.get("state")):
         logger.warning("Login on hub %r refused: the state is not this browser's (missing, expired or another one).", slug)
-        return _sign_in_again(next_path)
+        return _refused_attempt(request) or _sign_in_again(next_path)
     if _is_demo(request):
         return _demo_callback(request, request.hub, next_path)
     result = auth.redeem_code(request.POST.get("code"), slug)
     if not result.ok:
-        return auth.login_redirect(slug, next_path, error=result.error)
+        return (result.refused and _refused_attempt(request)) or auth.login_redirect(slug, next_path, error=result.error)
     try:
         services.open_session_from_saas(request, result.user, slug)
     except services.InactiveUser:
@@ -119,13 +131,31 @@ def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRed
         logger.warning(
             "Demo login on %r refused: the code is missing, spent, out of its minute or another demo's.", hub.slug
         )
-        return auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
+        return _refused_attempt(request) or auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
     try:
         services.open_demo_session(request, hub)
     except services.InactiveUser:
         logger.warning("Demo login on %r refused: its owner was deactivated.", hub.slug)
         return auth.forget_state(HttpResponseRedirect(auth.demo_failed_url()))
     return auth.forget_state(_with_language(HttpResponseRedirect(next_path), redeemed.language))
+
+
+def _refused_attempt(request: HttpRequest) -> HttpResponse | None:
+    """A refused callback: the 429 when its caller is already past :data:`CALLBACK_ATTEMPTS`, else counted (``None``)."""
+    caller = client_key(request)
+    wait = CALLBACK_ATTEMPTS.wait(caller)
+    if wait:
+        return _too_many_attempts(wait)
+    CALLBACK_ATTEMPTS.failed(caller)
+    return None
+
+
+def _too_many_attempts(wait: int) -> HttpResponse:
+    """429 with ``Retry-After`` and a page of the Hub (no request, no database) that says how long to wait."""
+    page = render_to_string(TOO_MANY_ATTEMPTS_TEMPLATE, {"minutes": math.ceil(wait / 60)})
+    response = HttpResponse(page, status=429)
+    response["Retry-After"] = str(wait)
+    return response
 
 
 def _sign_in_again(next_path: str) -> HttpResponseForbidden:
@@ -143,10 +173,10 @@ def _admin_callback(request: HttpRequest) -> HttpResponse:
         return JsonResponse(error.envelope(), status=error.status)
     if not auth.state_matches(request, request.POST.get("state")):
         logger.warning("Hub admin entry for hub %r refused: the state is not this browser's (missing, expired or another one).", slug)
-        return _sign_in_again(next_path)
+        return _refused_attempt(request) or _sign_in_again(next_path)
     result = auth.redeem_code(request.POST.get("code"), slug, audience=auth.HUB_ADMIN_AUDIENCE)
     if not result.ok:
-        return HttpResponseRedirect(auth.admin_hubs_url(result.error))
+        return (result.refused and _refused_attempt(request)) or HttpResponseRedirect(auth.admin_hubs_url(result.error))
     try:
         services.open_admin_session_from_saas(request, result.user)
     except services.InactiveUser:

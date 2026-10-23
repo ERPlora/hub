@@ -29,6 +29,20 @@ def default_language():
     translation.deactivate()
 
 
+@pytest.fixture(autouse=True)
+def cache_cleared():
+    """Every test starts and ends with an empty cache (the process's memory in the tests).
+
+    The doors count refused attempts per caller in the cache (``base.throttle.AttemptLimit``) and every test client
+    calls from the same address: without this, the failures of earlier tests of the same worker would refuse a later
+    test's first attempt."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
+
+
 #: The hubs every test that uses the database finds in the registry, as ``manage.py seed_local_hubs`` leaves them.
 LOCAL_HUBS = ("a", "b")
 

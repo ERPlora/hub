@@ -56,7 +56,11 @@ code                            close  when
 ``base.hub_suspended``          4402   the business is suspended for an unpaid invoice
 ``print.not_ready``             4400   a frame before ``hello``, or no ``hello`` within 15 s
 ``print.frame_too_large``       4413   a frame over 8 KiB (before anything is parsed)
-``unauthenticated``             4401   no session, one that is not valid here, or one that ended
+``unauthenticated``             4401   no session, one that is not valid here, or one that ended (all but «no
+                                       session» count towards ``base.rate_limited``)
+``base.rate_limited``           4429   a session not valid here from a caller (its address, or its IPv6 /64) that
+                                       had 10 refused within 5 minutes, until that window ends; a valid session
+                                       is never refused for it
 ``print.device_required``       4400   ``hello`` without ``deviceId``
 ``print.host_not_registered``   4403   ``hello`` of a device not set up in printing (or retired), or that reaches
                                        no active printer of this hub
@@ -95,6 +99,7 @@ import asyncio
 import io
 import json
 import logging
+import math
 import re
 import uuid
 from collections.abc import Callable
@@ -114,7 +119,7 @@ from django.core.handlers.asgi import ASGIRequest
 from django.db import close_old_connections
 from django.http import Http404, HttpRequest
 from django.utils import translation
-from django.utils.translation import gettext, gettext_noop
+from django.utils.translation import gettext, gettext_noop, ngettext
 from live.broker import broker
 from live.context import OperationContext, get_builder
 from live.errors import NotFound, OperationError
@@ -124,6 +129,7 @@ from live.operations import UnknownOperation, get
 from base.middleware import HubHostRequiredMiddleware, opened_elsewhere
 from base.operations import HostClosed
 from base.tenancy.context import use_hub
+from base.throttle import AttemptLimit, RateLimited, client_key
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +162,9 @@ FATAL_OPERATION_CODES = frozenset({"permission_denied", "app_inactive", "app_ent
 HANDSHAKE_REFUSED = 4403
 #: Close code when the channel itself fails.
 INTERNAL_ERROR_CLOSE = 1011
+#: Sessions refused per caller (one that is not valid here, or ended): 10 within 5 minutes of the first (README,
+#: «Límites de intentos»). A ``hello`` with no session tried nothing and is not counted.
+SESSION_ATTEMPTS = AttemptLimit("ws_print", attempts=10, window=300)
 
 _CAMEL = re.compile(r"_([a-z])")
 
@@ -505,12 +514,27 @@ class PrintSocket:
         user = AnonymousUser() if opened_elsewhere(self.request) else auth.get_user(self.request)
         held = self.device.ctx.actor if self.device is not None else None
         if not user.is_authenticated or (held is not None and user.pk != held.pk):
+            self._count_refused_session()
             raise Refusal(
                 "unauthenticated",
                 gettext("This connection's session is not valid on this hub: sign in again."),
                 status=401,
             )
         return user
+
+    def _count_refused_session(self) -> None:
+        """One more refused session of this caller; a ``Refusal`` 429 when it is already past :data:`SESSION_ATTEMPTS`."""
+        caller = client_key(self.request)
+        wait = SESSION_ATTEMPTS.wait(caller)
+        if wait:
+            minutes = math.ceil(wait / 60)
+            message = ngettext(
+                "Too many failed sign-ins from this connection. Try again in %(minutes)s minute.",
+                "Too many failed sign-ins from this connection. Try again in %(minutes)s minutes.",
+                minutes,
+            ) % {"minutes": minutes}
+            raise Refusal(RateLimited.code, message, status=RateLimited.status)
+        SESSION_ATTEMPTS.failed(caller)
 
     def _fresh_context(self) -> OperationContext:
         """The ``hello``'s context with its permissions read again, as the live executor does before every run."""

@@ -23,6 +23,7 @@ import time
 
 import pytest
 
+from django.test import Client
 from django.utils.dateparse import parse_datetime
 
 from apps.verifactu.models import Config
@@ -58,11 +59,12 @@ def signed(
     with_v1=True,
     with_v2=False,
     v2_secret=None,
+    **meta,
 ):
-    """``method`` on ``path`` with ``body`` (a dict, or raw bytes), signed as the SaaS signs it."""
+    """``method`` on ``path`` with ``body`` (a dict, or raw bytes), signed as the SaaS signs it (more ``meta``)."""
     raw = body if isinstance(body, bytes) else json.dumps(body).encode()
     ts = str(ts or int(time.time()))
-    headers = {"HTTP_X_ERPLORA_TIMESTAMP": ts, "HTTP_HOST": host}
+    headers = {"HTTP_X_ERPLORA_TIMESTAMP": ts, "HTTP_HOST": host, **meta}
     if with_v1:
         headers["HTTP_X_ERPLORA_SIGNATURE"] = v1(raw, ts, secret)
     if with_v2:
@@ -163,6 +165,75 @@ def test_the_signature_opens_the_door_on_any_host(client, db, host):
     # The platform host (no session: it would go to the SaaS admin), the private name (`hub`, reserved) and a hub's.
     answer = signed(client, "put", PATH, {"slug": "a", "version": 1}, host=host)
     assert answer.status_code == 200
+
+
+# Attempts: past 30 calls with a bad signature from an address in 5 minutes, its next bad one is 429 until the window
+# of the first one ends; a good signature is always heard. The SaaS never signs wrong: this is for whatever else reaches
+# the door (a scanner inside the network).
+
+BAD_SIGNATURES = 30
+
+
+def test_past_thirty_bad_signatures_the_next_bad_one_is_429_with_retry_after(client, db):
+    for _ in range(BAD_SIGNATURES):
+        assert signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 401
+    answer = signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other")
+    assert (answer.status_code, code(answer)) == (429, "base.rate_limited")
+    assert 290 <= int(answer["Retry-After"]) <= 300
+    assert answer["Cache-Control"].startswith("max-age=0")
+
+
+def test_a_good_signature_is_heard_while_the_address_is_past_the_limit(client, db):
+    for _ in range(BAD_SIGNATURES + 1):
+        signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other")
+    assert signed(client, "put", PATH, {"slug": "a", "version": 1}).status_code == 200
+    assert Hub.objects.get(id=HUB_ID).state_version == 1
+
+
+def test_a_good_signature_is_not_counted(client, db):
+    for _ in range(BAD_SIGNATURES - 1):
+        signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other")
+    for version in range(1, 6):
+        assert signed(client, "put", PATH, {"slug": "a", "version": version}).status_code == 200
+    assert signed(client, "put", PATH, {"slug": "a", "version": 9}, secret="other").status_code == 401
+    assert signed(client, "put", PATH, {"slug": "a", "version": 9}, secret="other").status_code == 429
+
+
+def test_the_bad_signatures_count_per_address(db):
+    scanner, other = Client(REMOTE_ADDR="10.0.9.9"), Client(REMOTE_ADDR="10.0.1.20")
+    for _ in range(BAD_SIGNATURES):
+        signed(scanner, "put", PATH, {"slug": "a", "version": 1}, secret="other")
+    assert signed(scanner, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 429
+    assert signed(other, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("caller", "same", "neighbour"),
+    [("203.0.113.7", "203.0.113.7", "203.0.113.8"), ("2001:db8:1:2::7", "2001:db8:1:2:ffff::1", "2001:db8:1:3::7")],
+)
+def test_the_bad_signatures_count_per_address_as_the_proxies_saw_it(db, settings, caller, same, neighbour):
+    settings.TRUSTED_PROXY_HOPS = 1
+    behind = Client(REMOTE_ADDR="10.0.0.5")
+
+    def bad(address):
+        return signed(behind, "put", PATH, {"slug": "a", "version": 1}, secret="other", HTTP_X_FORWARDED_FOR=address)
+
+    for _ in range(BAD_SIGNATURES):
+        bad(caller)
+    assert bad(same).status_code == 429
+    assert bad(neighbour).status_code == 401
+
+
+def test_with_the_cache_away_the_signature_still_decides(client, db, monkeypatch):
+    from django.core.cache import caches
+
+    def away(*args, **kwargs):
+        raise ConnectionError("Valkey is not answering")
+
+    for method in ("get_many", "add", "incr", "set", "touch"):
+        monkeypatch.setattr(caches["default"], method, away)
+    assert signed(client, "put", PATH, {"slug": "a", "version": 1}, secret="other").status_code == 401
+    assert signed(client, "put", PATH, {"slug": "a", "version": 1}).status_code == 200
 
 
 def test_the_state_is_only_put(client, db):

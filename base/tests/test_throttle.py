@@ -5,6 +5,7 @@ and says no past the limit; the route then raises ``RateLimited``, the API's env
 """
 
 import json
+import logging
 import time
 
 import pytest
@@ -12,7 +13,7 @@ from django.core.cache import cache, caches
 from django.test import RequestFactory
 from django.utils import translation
 
-from base.throttle import RateLimited, allow, client_address
+from base.throttle import KEY_PREFIX, AttemptLimit, RateLimited, allow, client_address, client_key
 
 
 @pytest.fixture(autouse=True)
@@ -157,3 +158,126 @@ def test_a_spoofed_entry_never_changes_the_callers_count(settings):
         assert allow(f"acme:{client_address(forwarded(f'{fake}, 203.0.113.7'))}", limit=2, window=60) is (
             fake != "198.51.100.3"
         )
+
+
+# Failed attempts: a door counts what it refused, and past the limit the caller waits for the window's end
+
+
+CALLBACK = AttemptLimit("callback", attempts=3, window=300)
+
+
+def test_a_key_tries_freely_until_its_failures_reach_the_limit():
+    for _ in range(2):
+        CALLBACK.failed("203.0.113.7")
+    assert CALLBACK.wait("203.0.113.7") == 0
+    CALLBACK.failed("203.0.113.7")
+    assert CALLBACK.wait("203.0.113.7") == 300
+
+
+def test_the_wait_is_what_is_left_of_the_window_its_first_failure_opened(monkeypatch):
+    now = time.time()
+    monkeypatch.setattr(time, "time", lambda: now)
+    CALLBACK.failed("203.0.113.7")
+    monkeypatch.setattr(time, "time", lambda: now + 100)
+    CALLBACK.failed("203.0.113.7")
+    CALLBACK.failed("203.0.113.7")
+    assert CALLBACK.wait("203.0.113.7") == 200
+    monkeypatch.setattr(time, "time", lambda: now + 299.5)
+    assert CALLBACK.wait("203.0.113.7") == 1
+    monkeypatch.setattr(time, "time", lambda: now + 301)
+    assert CALLBACK.wait("203.0.113.7") == 0
+    CALLBACK.failed("203.0.113.7")
+    assert CALLBACK.wait("203.0.113.7") == 0, "a new window starts its count again"
+
+
+def test_each_key_and_each_limit_count_on_their_own():
+    for _ in range(3):
+        CALLBACK.failed("203.0.113.7")
+    assert CALLBACK.wait("203.0.113.8") == 0
+    assert AttemptLimit("internal", attempts=3, window=300).wait("203.0.113.7") == 0
+    assert CALLBACK.wait("203.0.113.7") == 300
+
+
+def test_the_parts_make_a_namespaced_key_in_the_throttle_s_corner_of_the_cache():
+    limit = AttemptLimit("pin", attempts=1, window=60)
+    assert limit.key("acme", "42") == "limit:pin:acme:42"
+    limit.failed("acme", "42")
+    assert cache.get(f"{KEY_PREFIX}limit:pin:acme:42") == 1
+    assert cache.get("limit:pin:acme:42") is None
+
+
+def test_a_count_whose_window_end_was_lost_waits_the_whole_window():
+    # The end of the window is a key of its own; a cache that dropped it (evicted) still makes the caller wait, at most
+    # a whole window, never zero.
+    for _ in range(3):
+        CALLBACK.failed("203.0.113.7")
+    cache.delete(f"{KEY_PREFIX}{CALLBACK.key('203.0.113.7')}:until")
+    assert CALLBACK.wait("203.0.113.7") == 300
+
+
+def test_a_window_end_this_clock_sees_as_past_still_waits_a_second():
+    # Valkey keeps the count by its own clock and each task reads the end by its own: a task whose clock runs ahead
+    # sees the end already past while the count is alive. It still refuses (1 s), never 0 or a negative Retry-After.
+    for _ in range(3):
+        CALLBACK.failed("203.0.113.7")
+    cache.set(f"{KEY_PREFIX}{CALLBACK.key('203.0.113.7')}:until", time.time() - 10, timeout=300)
+    assert CALLBACK.wait("203.0.113.7") == 1
+
+
+def test_the_failure_that_reaches_the_limit_is_logged_once(caplog):
+    with caplog.at_level(logging.WARNING, logger="base.throttle"):
+        for _ in range(5):
+            CALLBACK.failed("203.0.113.7")
+    [record] = caplog.records
+    assert record.levelno == logging.WARNING
+    assert "callback" in record.getMessage() and "203.0.113.7" in record.getMessage()
+
+
+def cache_away(*args, **kwargs):
+    raise ConnectionError("Valkey is not answering")
+
+
+def test_with_the_cache_away_the_door_still_checks_and_the_outage_is_logged(monkeypatch, caplog):
+    # Login, printing and the SaaS's calls must not stop with Valkey (as /readyz does not): the credential each door
+    # checks holds on its own, so the limit steps aside, loudly, instead of refusing everyone or failing the request.
+    backend = caches["default"]
+    for method in ("get_many", "add", "incr", "set", "touch"):
+        monkeypatch.setattr(backend, method, cache_away)
+    with caplog.at_level(logging.ERROR, logger="base.throttle"):
+        assert CALLBACK.wait("203.0.113.7") == 0
+        CALLBACK.failed("203.0.113.7")
+    assert [record.levelno for record in caplog.records] == [logging.ERROR, logging.ERROR]
+    assert all("callback" in record.getMessage() and record.exc_info for record in caplog.records)
+
+
+def test_a_public_count_still_fails_loudly_with_the_cache_away(monkeypatch):
+    # ``allow`` (the public website) keeps its rule: no cache, no answer.
+    monkeypatch.setattr(caches["default"], "add", cache_away)
+    with pytest.raises(ConnectionError):
+        allow("acme:203.0.113.7", limit=3, window=60)
+
+
+@pytest.mark.parametrize(("attempts", "window"), [(0, 60), (5, 0), (-1, 60)])
+def test_an_attempt_limit_below_one_is_a_programming_error(attempts, window):
+    with pytest.raises(ValueError):
+        AttemptLimit("callback", attempts=attempts, window=window)
+
+
+# Which caller an attempt limit counts: the address, and for IPv6 its /64 (one subscriber holds a whole /64)
+
+
+@pytest.mark.parametrize(
+    ("address", "key"),
+    [
+        ("203.0.113.7", "203.0.113.7"),
+        ("2001:db8:1:2::7", "2001:db8:1:2::/64"),
+        ("2001:db8:1:2:ffff:ffff:ffff:ffff", "2001:db8:1:2::/64"),
+        ("2001:DB8:1:3::7", "2001:db8:1:3::/64"),
+        ("::ffff:203.0.113.7", "203.0.113.7"),
+        ("", ""),
+        ("not-an-address", "not-an-address"),
+    ],
+)
+def test_the_caller_of_an_attempt_limit_is_its_address_or_its_ipv6_64(settings, address, key):
+    settings.TRUSTED_PROXY_HOPS = 0
+    assert client_key(forwarded(remote=address)) == key

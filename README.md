@@ -182,6 +182,37 @@ Para verlo en local: `curl -i -H 'Host: a.localhost:8000' -H 'Origin: http://a.l
 -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=='
 http://127.0.0.1:8000/ws/print` contesta `101 Switching Protocols`. La e2e es `tests/e2e/ws-print.spec.ts`.
 
+## Límites de intentos
+
+Las puertas que comprueban una credencial cuentan los intentos que **rechazan** por quien llama
+(`base.throttle.client_key`: la IP que vio el ALB según `TRUSTED_PROXY_HOPS`, o su /64 si es IPv6, porque un cliente
+tiene la /64 entera) con `base.throttle.AttemptLimit`, en la caché de Django (Valkey en AWS; la memoria del proceso en
+local). La puerta comprueba **primero** la credencial: lo que acepta nunca cuenta ni se rechaza, así que un dispositivo
+con sesión válida no queda fuera porque otro de la misma red (la tablet con la sesión caducada) haya fallado. Pasado
+el tope, el siguiente intento **rechazado** de quien llama recibe la respuesta del límite hasta que acaba la ventana
+que abrió su primer rechazo. El rechazo que llega al tope queda en el log de `base.throttle` con su clave
+(`limit:<puerta>:<IP>`), nunca con la credencial.
+
+| Puerta | Tope | Qué cuenta | Intento rechazado pasado el tope |
+|---|---|---|---|
+| `/auth/callback` (hub, demo y admin del Hub) | 10 en 5 min | código rechazado por el SaaS o vacío, `state` que no es de este navegador, código de demo que no abre nada | 429 con `Retry-After` y una página del Hub (`en` + `es`) que dice cuántos minutos esperar |
+| `/internal/*` | 30 en 5 min | firma rechazada | 429 `base.rate_limited` con `Retry-After` |
+| `/ws/print` | 10 en 5 min | sesión que no vale en este hub o que terminó | cierre 4429 `base.rate_limited` |
+| web pública (`/api/website/public/*`) | 60 lecturas por hub e IP por minuto | todas | 429 `base.rate_limited` (`allow`, otra cuenta, sin credencial) |
+
+No cuentan, porque nadie ha adivinado nada y contarlos bloquearía a la gente por un fallo de la plataforma: el SaaS
+caído o con error, la firma del propio Hub rechazada por el SaaS, un código bueno cuyo usuario o papel no puede entrar
+aquí y un `hello` de `/ws/print` sin sesión. El SaaS nunca firma mal: el tope de `/internal` es para lo demás que
+llegue a la puerta. Las credenciales (código de un solo uso, firma HMAC, clave de sesión) no se pueden adivinar por
+fuerza: el tope frena el ruido y lo deja en el log. Con Valkey caído, el límite se aparta y deja un error en el log: la
+puerta sigue comprobando su credencial, porque la entrada, la impresión y las llamadas del SaaS no pueden pararse con
+la caché, igual que `/readyz` (la web pública, en cambio, falla con ella). Las pruebas usan siempre la caché en memoria
+(`config/settings_pytest.py`, aunque haya `VALKEY_URL`) y la vacían en cada test (`conftest.py`), porque todas llaman
+desde la misma IP.
+
+El PIN para cambiar de empleado y las API keys (`erpk_live`) aún no existen en el Hub (fase 2); cuando lleguen,
+cuentan con el mismo `AttemptLimit`.
+
 ## Despliegue: `main` → prod, `pre` → pre
 
 `pre` es la preproducción del equipo (`hubs.pre.erplora.com`, `<slug>.pre.erplora.com`): misma Aurora

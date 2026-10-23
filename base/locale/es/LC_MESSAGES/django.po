@@ -564,6 +564,30 @@ msgstr "identidades del hub"
 msgid "This hub cannot be opened right now; try again later."
 msgstr "Este hub no se puede abrir ahora; inténtalo más tarde."
 
+#: templates/base/too_many_attempts.html
+msgid "Too many sign-in attempts"
+msgstr "Demasiados intentos de entrar"
+
+#: templates/base/too_many_attempts.html
+msgid "For your security, signing in from this connection is paused for a while."
+msgstr "Por tu seguridad, la entrada desde esta conexión se ha pausado un rato."
+
+#: templates/base/too_many_attempts.html
+#, python-format
+msgid "Try again in %(minutes)s minute."
+msgid_plural "Try again in %(minutes)s minutes."
+msgstr[0] "Vuelve a intentarlo en %(minutes)s minuto."
+msgstr[1] "Vuelve a intentarlo en %(minutes)s minutos."
+msgstr[2] "Vuelve a intentarlo en %(minutes)s minutos."
+
+#: ws_print.py
+#, python-format
+msgid "Too many failed sign-ins from this connection. Try again in %(minutes)s minute."
+msgid_plural "Too many failed sign-ins from this connection. Try again in %(minutes)s minutes."
+msgstr[0] "Demasiados intentos fallidos de entrar desde esta conexión. Vuelve a intentarlo en %(minutes)s minuto."
+msgstr[1] "Demasiados intentos fallidos de entrar desde esta conexión. Vuelve a intentarlo en %(minutes)s minutos."
+msgstr[2] "Demasiados intentos fallidos de entrar desde esta conexión. Vuelve a intentarlo en %(minutes)s minutos."
+
 #: models.py:70
 msgid "session"
 msgstr "sesión"
