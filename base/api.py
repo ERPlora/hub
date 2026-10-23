@@ -32,3 +32,11 @@ async def bell_counters(request):
 @bind(router, "base.notice.list", "/home/notices")
 async def notice_list(request):
     return await run_operation(request, queries.notice_list)
+
+
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+
+
+@bind(router, "base.app.list", "/apps")
+async def app_list(request):
+    return await run_operation(request, queries.app_list)

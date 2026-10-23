@@ -182,3 +182,20 @@ def test_on_a_business_or_a_slug_without_a_row_there_is_no_demo(slug):
     assert session_me().get("demo", "missing") is None
     ctx = OperationContext(scope=Scope("host", slug), actor=None, permissions=frozenset(), language="en")
     assert get("base.session.me")(ctx, SessionMeIn()).demo is None
+
+
+def test_an_app_the_business_has_no_right_to_is_off_and_out_of_the_menu(make_user, monkeypatch):
+    """BASE-G134: a paid module without its right in the SaaS's photo (``base.entitlement``) is no app of the menu nor
+    of «My apps»; ``off`` tells the shell's gate why its screens do not open."""
+    from django.apps import apps
+
+    from base.models import Hub
+
+    monkeypatch.setattr(apps.get_app_config("demo"), "premium", True)
+    Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "state": {"modules": []}, "state_version": 1})
+    me = session_me(make_user(), {"demo.view"})
+    assert (me["menu"], me["apps"]) == ([], [{"label": "demo", "state": "off"}])
+
+    Hub.objects.filter(slug="a").update(state={"modules": [{"id": "demo", "source": "purchase"}]}, state_version=2)
+    me = session_me(make_user("bea"), {"demo.view"})
+    assert (me["menu"], me["apps"]) == ([DEMO_MENU], [{"label": "demo", "state": "on"}])

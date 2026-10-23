@@ -312,3 +312,39 @@ class NoticeListOut(Schema):
     sources: list[str] = Field(
         description="«<app>.<notice>» of every notice this person hears, told or not: with none, nothing to ask for."
     )
+
+
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+
+
+class AppListIn(Schema):
+    """No input: the business's apps, all of them (the modules of the deployment, a short fixed list)."""
+
+
+class AppOut(Schema):
+    """A module as the Apps screen paints it: from its ``LiveAppConfig``, with its right (``base.entitlement``)."""
+
+    id: str
+    name: str
+    icon: str
+    category: str
+    category_label: str
+    summary: str
+    #: Bought on erplora.com (``premium``): no price here, the Store has it (PLAN §20.4.3).
+    premium: bool
+    #: Where its right comes from: ``free``, ``plan``, ``purchase``, ``required`` (with an app that needs it) or
+    #: ``missing``.
+    right: Literal["free", "plan", "purchase", "required", "missing"]
+    #: ``on``, or ``blocked`` while the business has no right to it (phase 2 adds turned off, activating, failed).
+    state: Literal["on", "blocked"]
+    #: The first screen of its menu this person may open; ``None``: «Open» is not offered.
+    path: str | None
+    #: What it needs, transitively (it comes along with it), and the apps that need it.
+    requires: list[str]
+    required_by: list[str]
+
+
+class AppListOut(Schema):
+    apps: list[AppOut]
+    #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
+    store_url: str

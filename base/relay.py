@@ -6,8 +6,8 @@ it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other 
 
 - **taken**: an event nobody took yet gets one delivery per app that is on and listens to it, and its
   ``delivered_at``, in one transaction (``base.services.relay_take_events``); an app turned on later never
-  receives what came before. Phase 1 has every installed app on (``active_apps``; ``base.session.me`` says the
-  same); phase 2 asks each hub's ``AppActivation``;
+  receives what came before. Phase 1 has every installed app on but a paid one its business has no right to
+  (``active_apps``; ``base.session.me`` says the same); phase 2 asks each hub's ``AppActivation`` too;
 - **delivered**: each delivery runs its app's reaction as the system, in the scope of the hub that recorded the
   event (the reaction's own notice goes to that hub's channel after the COMMIT), and is marked in the same
   transaction, so an app never gets an event twice (``relay_deliver_next``); the events a reaction records are
@@ -35,7 +35,7 @@ from live.live_registry import ALL_EVENTS
 from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 
-from base import services
+from base import entitlement, services
 
 #: How deep a chain of events may go (an event, the event its reaction records, …): the old Hub's.
 MAX_EVENT_DEPTH = 16
@@ -58,8 +58,10 @@ class RelayPass:
 
 
 def active_apps(scope: Scope) -> frozenset[str]:
-    """The apps that are on in ``scope``: in phase 1, every installed app of ours."""
-    return frozenset(config.label for config in all_live_app_configs())
+    """The apps that are on in ``scope``: in phase 1, every installed app of ours but those its business has no right
+    to (``base.entitlement``: a paid module without it in the SaaS's photo)."""
+    blocked = entitlement.blocked_apps(scope)
+    return frozenset(config.label for config in all_live_app_configs() if config.label not in blocked)
 
 
 @cache

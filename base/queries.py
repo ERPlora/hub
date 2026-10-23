@@ -4,17 +4,21 @@
 
 from typing import Any
 
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
 from live.errors import NotFound
+from live.meta import Category
 from live.operations import operation
 
-from base import home
+from base import entitlement, home
+from base.auth import saas_url
 from base.models import EventDelivery, Hub, Membership
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
 from base.schemas import (
+    AppListIn,
+    AppListOut,
     BellCountersIn,
     BellCountersOut,
     DemoSlugIn,
@@ -43,13 +47,15 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     """The user, its permissions, and the menu and apps it may see on this scope, already translated.
 
     Menu and apps list modules only (``home.shown_modules``: the reference app only in development, the tests
-    or a demo's hub): a platform app such as ``base`` is always on and never shows. ``demo`` says when the demo
+    or a demo's hub): a platform app such as ``base`` is always on and never shows. A module its business has no
+    right to (``base.entitlement``) is ``off`` and has no menu: the shell's gate tells why its screens do not open. ``demo`` says when the demo
     ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing else, which
     tells the SPA to send it to the login.
     """
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
     demo = _demo_hub(ctx)
+    blocked = entitlement.blocked_apps(ctx.scope)
     with translation.override(ctx.language):
         visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
@@ -65,9 +71,9 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
                     ],
                 }
                 for config in visible
-                if config.navigation
+                if config.navigation and config.label not in blocked
             ],
-            "apps": [{"label": config.label, "state": "on"} for config in visible],
+            "apps": [{"label": config.label, "state": "off" if config.label in blocked else "on"} for config in visible],
             "language": ctx.language,
             "demo": None if demo is None else {"expires_at": demo.expires_at},
         }
@@ -233,3 +239,47 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         return {"notices": home.device_notices(ctx, modules), "sources": home.notice_sources(ctx, modules)}
+
+
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+
+
+@operation("base.app.list", kind="query", permission=VIEW_HOME, input=AppListIn, output=AppListOut)
+def app_list(ctx: OperationContext, data: AppListIn) -> dict:
+    """The Apps screen: every module the scope shows, from its own config in this process (PLAN §20.4.1; never the
+    SaaS's catalog), with where its right comes from and its state (``base.entitlement``), the first screen this
+    person may open, what it needs (it comes along with it) and what needs it, and erplora.com's Store of this
+    business, where a paid one is bought. Phase 1 has every module the business has a right to on."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    configs = home.shown_modules(demo_hub=bool(hub and hub.is_demo))
+    blocked = entitlement.blocked_apps(ctx.scope)
+    rights = entitlement.entitlements(None if hub is None or hub.is_demo else hub.state, now=timezone.now())
+    needs = {config.label: entitlement.requires_of(config.label) for config in configs}
+    with translation.override(ctx.language):
+        return {
+            "apps": [
+                {
+                    "id": config.label,
+                    "name": str(config.verbose_name),
+                    "icon": config.icon,
+                    "category": config.category,
+                    "category_label": str(Category(config.category).label),
+                    "summary": str(config.summary),
+                    "premium": bool(config.premium),
+                    "right": entitlement.FREE if hub is not None and hub.is_demo else rights[config.label],
+                    "state": "blocked" if config.label in blocked else "on",
+                    "path": None if config.label in blocked else _first_screen(ctx, config),
+                    "requires": sorted(needs[config.label]),
+                    "required_by": sorted(label for label, required in needs.items() if config.label in required),
+                }
+                for config in configs
+            ],
+            "store_url": saas_url(f"/store/modules?business={hub.id}") if hub is not None else "",
+        }
+
+
+def _first_screen(ctx: OperationContext, config: Any) -> str | None:
+    """The first entry of the module's menu, for a person who may see the module; else none."""
+    if not config.navigation or not _can_see(ctx, config):
+        return None
+    return config.navigation[0].path
