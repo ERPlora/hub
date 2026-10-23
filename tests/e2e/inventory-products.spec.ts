@@ -6,7 +6,8 @@
 //     catalog says it cannot be sold, and saving it with that category is refused; picking another
 //     one in the form fixes it;
 //   - INVENTORY-F11: the export downloads the filtered catalog with the headers the import reads;
-//   - the tabs walk the five sections; screenshots of every page in three viewports;
+//   - `/inventory` lands on the dashboard and the tabs walk the five sections; screenshots of every page in three
+//     viewports;
 //   - the list filters behind the table's funnel (price in euros), with its count, at every width; an
 //     amount it cannot read is said under its field and does not filter.
 import { expect, test } from '@playwright/test';
@@ -160,7 +161,11 @@ test('INVENTORY-F11: the export downloads what the search finds, with the header
 });
 
 test('the tabs walk the five sections, each on its address; screenshots of every page in three viewports', async ({ page }) => {
-  await login(page, A, '/inventory');
+  // `/inventory` is no page: the SPA's router sends it to the dashboard. `login` lands on a page (it timed out here
+  // with a session kept by the tests above, FIX-HUB-E2E-INVENTORY-TABS-WALK-TIMEOUT-AFTER-OTHERS), so the walk signs
+  // in on another tab and then asks for `/inventory`, as a person who types it.
+  await login(page, A, '/inventory/settings');
+  await page.goto(`${A}/inventory`);
   await page.waitForURL(/\/inventory\/dashboard$/);
   await shown(page).locator('[data-testid=inventory-dashboard-kpi-tracked]').waitFor();
   const shots: string[] = [];
