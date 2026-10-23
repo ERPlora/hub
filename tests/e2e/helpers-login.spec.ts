@@ -7,9 +7,14 @@
 // form and its code and only hands the hub its one-time code. A SaaS session that ended (a spec signed out
 // there) falls back to the real sign-in, whose session is reused next. And a SaaS slow to answer the code is
 // said as such, with the time waited: «code rejected» is only what the SaaS itself says, and then it does say it.
+// Every login here is about the trip through the SaaS, so it asks for the jump (`fresh: true`): without it, `login`
+// would reuse the hub's session it keeps and never reach the SaaS (FIX-HUB-E2E-HUB-LOGIN-RATELIMIT-429).
 import { type BrowserContext, expect, type Route, test } from '@playwright/test';
 
-import { A, hostPage, listReady, login, SAAS, shot, topbarApps } from './helpers';
+import { A, hostPage, listReady, login, OWNER, SAAS, shot, topbarApps } from './helpers';
+
+/** What `login` is given here: the trip through the SaaS, even with a session of the hub kept. */
+const JUMP = { fresh: true };
 
 const SIGN_IN = `${SAAS}/_allauth/browser/v1/auth/login`;
 const CODE = `${SAAS}/_allauth/browser/v1/auth/code/confirm`;
@@ -57,7 +62,7 @@ test('a second login of the account reuses its SaaS session: no sign-in and no c
   const codes = await holdCodes(context);
   try {
     const page = await context.newPage();
-    await login(page, A);
+    await login(page, A, '/demo/items', OWNER, JUMP);
     await expect(topbarApps(page)).toBeAttached();
     expect(signIns, 'password sign-ins at the SaaS').toEqual([]);
     expect(codes.held, 'codes sent to the SaaS').toEqual([]);
@@ -79,13 +84,13 @@ test('its SaaS session ended, the next login signs in for real and the one after
 
   const again = await browser.newContext({ baseURL: A });
   const signInsAgain = signInsOf(again);
-  await login(await again.newPage(), A);
+  await login(await again.newPage(), A, '/demo/items', OWNER, JUMP);
   expect(signInsAgain, 'the ended session asks for the account again').toHaveLength(1);
   await again.close();
 
   const after = await browser.newContext({ baseURL: A });
   const signInsAfter = signInsOf(after);
-  await login(await after.newPage(), A);
+  await login(await after.newPage(), A, '/demo/items', OWNER, JUMP);
   expect(signInsAfter, 'the new session is reused').toEqual([]);
   await after.close();
 });
@@ -103,7 +108,7 @@ test('a SaaS slow to answer the code: the login says it waited for the answer an
   const context = await browser.newContext({ baseURL: A });
   const codes = await holdCodes(context);
   try {
-    const failure = await login(await context.newPage(), A).then(
+    const failure = await login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
       () => 'signed in',
       (error: unknown) => String(error),
     );
@@ -132,7 +137,7 @@ test('a code the SaaS turns down: the login says «code rejected» and what the 
     await route.fulfill({ response });
   });
   try {
-    const failure = await login(await context.newPage(), A).then(
+    const failure = await login(await context.newPage(), A, '/demo/items', OWNER, JUMP).then(
       () => 'signed in',
       (error: unknown) => String(error),
     );
