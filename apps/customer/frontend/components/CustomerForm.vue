@@ -4,10 +4,14 @@
 // native <details>, closed, as in the product) when adding; in «Edit» everything at once, then the
 // business's custom fields, each with its own control, and «Active». The parent owns the model
 // (`v-model`, `v-model:field-values`) and the submit; the server validates and its 422 comes back in
-// `errors`, painted under its field («More details» opens when the field is in there).
+// `errors`, painted under its field («More details» opens when the field is in there). The country
+// is the shared Combo (the product's `ok-combo`, customers#72): typing its name, or its code, filters
+// the ~250 countries; the card keeps the ISO code, and clearing the field leaves it without one.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { countryName, countryOptions } from '../lib/countries';
 import {
   CHANNELS,
   type CustomerField,
@@ -19,7 +23,6 @@ import {
 } from '../lib/customerForm';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { CustomFieldValueOut } from '../operations';
-import CountrySelect from './CountrySelect.vue';
 
 const form = defineModel<CustomerFields>({ required: true });
 const fieldValues = defineModel<Record<string, string>>('fieldValues', { default: () => ({}) });
@@ -34,7 +37,7 @@ const props = withDefaults(
   { errors: () => ({}), customFields: () => [] },
 );
 
-const { t } = useCustomerI18n();
+const { t, locale } = useCustomerI18n();
 
 const LABELS: Record<Exclude<CustomerField, 'is_active'>, string> = {
   name: 'customer.form.name',
@@ -123,6 +126,17 @@ function optionsOf(field: TextField): { value: string; label: string }[] {
   return values.map((value) => ({ value, label: t(`customer.source.${value}`) }));
 }
 
+/** The countries by their name in the page language, Spain first; the code is also searched. */
+const countries = computed<ComboOption[]>(() =>
+  countryOptions(locale.value).map((o) => ({ id: o.value, label: o.label, hint: o.value })),
+);
+/** The stored country; a code the list does not know is shown as stored and kept until changed. */
+const country = computed<ComboOption | null>(() => {
+  const code = form.value.country.trim();
+  if (!code) return null;
+  return countries.value.find((o) => o.id === code) ?? { id: code, label: countryName(code, locale.value) };
+});
+
 function set(field: CustomerField, value: unknown): void {
   form.value = { ...form.value, [field]: field === 'is_active' ? value === true : String(value ?? '') };
 }
@@ -162,13 +176,15 @@ const fieldInputType = (field: CustomFieldValueOut): InputType =>
           v-for="field in section.fields"
           :key="field"
         >
-          <CountrySelect
+          <Combo
             v-if="kindOf(field) === 'country'"
-            :model-value="form.country"
-            :label="t(LABELS.country)"
             testid="customer-form-country"
-            :error="errors.country"
-            @update:model-value="set('country', $event)"
+            data-field="country"
+            :model-value="country"
+            :options="countries"
+            :label="t(LABELS.country)"
+            :error-text="errors.country"
+            @update:model-value="set('country', $event?.id ?? '')"
           />
           <ion-select
             v-else-if="kindOf(field) === 'select'"

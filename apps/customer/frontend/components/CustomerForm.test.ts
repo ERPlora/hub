@@ -1,14 +1,18 @@
+/* eslint-disable vue/one-component-per-file -- the ion-popover stub and the host of each case */
 // The card's form (CUSTOMER-F01, F04, F11): one form for «Add» and «Edit». Name, phone, email, tax
 // id and company in sight; the rest behind «More details» when adding; in «Edit» everything, the
-// custom fields with their own control and «Active». The server's 422 lands under its field.
+// custom fields with their own control and «Active». The server's 422 lands under its field. The
+// country is the shared Combo (the product's `ok-combo`, customers#72): typed to filter, stored as
+// its ISO code, clearable.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonTextarea } from '@ionic/vue';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
 import { flush, mountCustomer } from '../__tests__/mount-customer';
+import { countryOptions } from '../lib/countries';
 import { blankCustomer, type CustomerFields } from '../lib/customerForm';
 import type { CustomFieldValueOut } from '../operations';
-import CountrySelect from './CountrySelect.vue';
 import CustomerForm from './CustomerForm.vue';
 import source from './CustomerForm.vue?raw';
 
@@ -20,6 +24,21 @@ const FIELDS: CustomFieldValueOut[] = [
   { field_id: 'f5', name: 'First visit', field_type: 'date', options: [], is_required: false, sort_order: 4, value: '' },
   { field_id: 'f6', name: 'Hair type', field_type: 'text', options: [], is_required: false, sort_order: 5, value: '' },
 ];
+
+/** `ion-popover` presents itself only in a real browser: the stub shows the Combo's list while open. */
+const PopoverStub = defineComponent({
+  name: 'IonPopover',
+  inheritAttrs: false,
+  props: { isOpen: Boolean, event: { type: null, default: undefined } },
+  emits: ['didDismiss', 'willPresent', 'didPresent'],
+  setup(props, { slots, attrs }) {
+    return () => (props.isOpen ? h('div', { ...attrs, 'data-stub': 'ion-popover' }, slots.default?.()) : null);
+  },
+});
+
+afterEach(() => {
+  document.body.replaceChildren();
+});
 
 interface Setup {
   mode?: 'create' | 'edit';
@@ -44,7 +63,7 @@ async function setup(options: Setup = {}) {
         customFields: options.customFields ?? [],
       }),
   });
-  const m = await mountCustomer(Host, { locale: options.locale });
+  const m = await mountCustomer(Host, { locale: options.locale, stubs: { IonPopover: PopoverStub }, attachTo: document.body });
   const hook = (id: string) => (c: { attributes(name: string): string | undefined }) =>
     c.attributes('data-testid') === `customer-form-${id}`;
   const input = (id: string) => m.wrapper.findAllComponents(IonInput).find(hook(id));
@@ -53,10 +72,20 @@ async function setup(options: Setup = {}) {
   const checkbox = (id: string) => m.wrapper.findAllComponents(IonCheckbox).find(hook(id));
   const shownFields = () =>
     m.wrapper
-      .findAll('[data-testid^="customer-form-"][data-field]')
+      .findAll('[data-field]')
       .filter((el) => !el.element.closest('details:not([open])'))
       .map((el) => el.attributes('data-field'));
-  return { ...m, form, values, input, select, textarea, checkbox, shownFields };
+  const country = () => m.wrapper.findComponent(Combo);
+  const countryField = () => m.wrapper.get('ion-input[data-testid="customer-form-country"]');
+  /** The ids of the options the country's list shows. */
+  const countryShown = () =>
+    m.wrapper.findAll('[data-testid^="customer-form-country-option-"]').map((o) => o.attributes('data-testid')!.replace('customer-form-country-option-', ''));
+  /** Types in the country field, as a person does. */
+  async function typeCountry(text: string) {
+    countryField().element.dispatchEvent(new CustomEvent('ionInput', { detail: { value: text } }));
+    await flush();
+  }
+  return { ...m, form, values, input, select, textarea, checkbox, shownFields, country, countryField, countryShown, typeCountry };
 }
 
 describe('CustomerForm: «Add» (F01)', () => {
@@ -117,16 +146,8 @@ describe('CustomerForm: «Add» (F01)', () => {
     expect(phone.props('errorText')).toBe('Not a valid phone');
     expect(phone.classes()).toEqual(expect.arrayContaining(['ion-invalid', 'ion-touched']));
     expect((s.wrapper.get('[data-testid="customer-form-more"]').element as HTMLDetailsElement).open).toBe(true);
-    expect(s.wrapper.findComponent(CountrySelect).props('error')).toBe('Choose a country from the list.');
-  });
-
-  it('picks the country from the searchable list, stored as its code', async () => {
-    const s = await setup({ form: { country: 'FR' } });
-    const country = s.wrapper.findComponent(CountrySelect);
-    expect([country.props('modelValue'), country.props('label'), country.props('testid')]).toEqual(['FR', 'Country', 'customer-form-country']);
-    country.vm.$emit('update:modelValue', 'DE');
-    await flush();
-    expect(s.form.value.country).toBe('DE');
+    expect(s.country().props('errorText')).toBe('Choose a country from the list.');
+    expect(s.countryField().classes()).toEqual(expect.arrayContaining(['ion-invalid', 'ion-touched']));
   });
 
   it('source, stage and channel are selects with their names; a card from an import keeps «Import»', async () => {
@@ -137,6 +158,68 @@ describe('CustomerForm: «Add» (F01)', () => {
     expect(texts('preferred_channel')).toEqual(['None', 'Email', 'SMS', 'WhatsApp', 'Phone']);
     const fresh = await setup();
     expect(fresh.select('source')!.findAll('ion-select-option')).toHaveLength(7);
+  });
+});
+
+describe('CustomerForm: the country (F01, F04)', () => {
+  it('is the shared Combo with every country: Spain first, the rest by name, the code as id and hint', async () => {
+    const s = await setup();
+    const country = s.country();
+    expect([country.props('label'), country.props('testid'), country.props('modelValue')]).toEqual(['Country', 'customer-form-country', null]);
+    const options = country.props('options') as ComboOption[];
+    expect(options).toHaveLength(countryOptions('en').length);
+    expect(options.slice(0, 3)).toEqual([
+      { id: 'ES', label: 'Spain', hint: 'ES' },
+      { id: 'AF', label: 'Afghanistan', hint: 'AF' },
+      { id: 'AX', label: 'Åland Islands', hint: 'AX' },
+    ]);
+  });
+
+  it('shows the stored country by its name in the page language', async () => {
+    const s = await setup({ form: { country: 'FR' } });
+    expect(s.country().props('modelValue')).toEqual({ id: 'FR', label: 'France', hint: 'FR' });
+    const es = await setup({ form: { country: 'FR' }, locale: 'es' });
+    expect(es.country().props('modelValue')).toEqual({ id: 'FR', label: 'Francia', hint: 'FR' });
+    expect((es.country().props('options') as ComboOption[])[0]).toEqual({ id: 'ES', label: 'España', hint: 'ES' });
+  });
+
+  it('finds a country while typing its name, without accents or case, or its code', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.typeCountry('alemania');
+    expect(s.countryShown()).toEqual(['DE']);
+    await s.typeCountry('peru');
+    expect(s.countryShown()).toEqual(['PE']);
+    await s.typeCountry('gb');
+    expect(s.countryShown()).toEqual(['GB']);
+    await s.typeCountry('FR');
+    expect(s.countryShown()).toContain('FR');
+  });
+
+  it('a pick stores its two-letter code', async () => {
+    const s = await setup({ form: { country: 'FR' } });
+    await s.typeCountry('germ');
+    await s.wrapper.get('[data-testid="customer-form-country-option-DE"]').trigger('click');
+    await flush();
+    expect(s.form.value.country).toBe('DE');
+    expect(s.country().props('modelValue')).toEqual({ id: 'DE', label: 'Germany', hint: 'DE' });
+  });
+
+  it('clearing the field leaves the card without a country', async () => {
+    const s = await setup({ mode: 'edit', form: { country: 'FR' } });
+    await s.wrapper.get('[data-testid="customer-form-country-clear"]').trigger('click');
+    await flush();
+    expect(s.form.value.country).toBe('');
+    expect(s.country().props('modelValue')).toBeNull();
+  });
+
+  it('a stored code it does not know is shown as stored and kept until someone changes it', async () => {
+    const s = await setup({ mode: 'edit', form: { country: 'XQ' } });
+    expect(s.country().props('modelValue')).toEqual({ id: 'XQ', label: 'XQ' });
+    await s.typeCountry('spa');
+    s.countryField().element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await flush();
+    expect(s.form.value.country).toBe('XQ');
+    expect(s.country().emitted('update:modelValue')).toBeUndefined();
   });
 });
 
@@ -213,7 +296,7 @@ describe('CustomerForm: language and markup', () => {
       'Empresa',
     ]);
     expect(s.wrapper.get('summary').text()).toBe('Más datos');
-    expect(s.wrapper.findComponent(CountrySelect).props('label')).toBe('País');
+    expect(s.country().props('label')).toBe('País');
   });
 
   it('has no OutfitKit tag, and every control with a fill declares mode="md"', () => {

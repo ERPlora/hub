@@ -116,7 +116,6 @@
       "city": "Ciudad",
       "postalCode": "Código postal",
       "country": "País",
-      "countryNone": "Sin país",
       "avatar": "Foto (su dirección)",
       "birthday": "Cumpleaños",
       "anniversary": "Aniversario",
@@ -126,9 +125,7 @@
       "notes": "Notas internas",
       "customFields": "Campos personalizados",
       "active": "Activo",
-      "required": "{name} *",
-      "countrySearch": "Busca un país…",
-      "countryNoMatch": "Ningún país coincide"
+      "required": "{name} *"
     },
     "importCsv": {
       "button": "Importar CSV",
