@@ -127,9 +127,9 @@ def test_erploras_seal_files_erploras_own_records_without_an_authorisation(
         route=Config.Route.ERPLORA, representation_status=Config.Representation.NONE
     )
 
-    assert queries.sending_problem(config, Environment.PRODUCTION, PLATFORM) == ""
+    assert queries.route_problem(config, Environment.PRODUCTION, PLATFORM) == ""
     # Only on ERPlora's own hub (saas#2524): the same tax ID on any other business is no exemption.
-    assert queries.sending_problem(config, Environment.PRODUCTION, A) == "representation_not_approved"
+    assert queries.route_problem(config, Environment.PRODUCTION, A) == "representation_not_approved"
 
 
 def test_any_other_issuer_needs_its_approved_authorisation(db, settings):
@@ -140,7 +140,7 @@ def test_any_other_issuer_needs_its_approved_authorisation(db, settings):
     )
 
     assert (
-        queries.sending_problem(config, Environment.PRODUCTION, A)
+        queries.route_problem(config, Environment.PRODUCTION, A)
         == "representation_not_approved"
     )
 
@@ -245,7 +245,7 @@ def test_a_business_typing_erploras_tax_id_still_needs_its_approved_authorisatio
     run("invoice.issuer.update", ISSUER)
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system_context(A),
     )
     run("verifactu.config.go_live")

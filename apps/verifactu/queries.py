@@ -216,27 +216,13 @@ def _server_problem(environment: str) -> str:
     return ""
 
 
-def sending_problem(config: Config, environment: str, scope: Scope | None) -> str:
-    """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""``: the route's own lack
-    first, then the server's in production (no gateway, closed). What keeps the queue waiting, before the gateway is
-    ever called; the live option never does (what was sealed reaches the AEAT)."""
-    return _route_sending_problem(config, environment, scope) or _server_problem(environment)
-
-
 def route_problem(config: Config, environment: str, scope: Scope | None) -> str:
-    """Why the chosen route cannot file in ``environment`` (a wait code), or ``""`` (VERIFACTU-F04, F08): what keeps
-    it from sending and, on ERPlora's route in production, the live option of the plan (Ioan's model,
-    2026-10-15); the route's own lack before the server's. In production it refuses every new sale
-    (``verifactu.record.create``) and going live."""
-    problem = _route_sending_problem(config, environment, scope)
-    if (
-        not problem
-        and config.route == Config.Route.ERPLORA
-        and environment == Environment.PRODUCTION
-        and not config.live_paid
-    ):
-        problem = "live_option_unpaid"
-    return problem or _server_problem(environment)
+    """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""`` (VERIFACTU-F04, F08):
+    the route's own lack first, then the server's in production (no gateway, closed). It keeps the queue waiting
+    before the gateway is ever called and, in production, refuses every new sale (``verifactu.record.create``) and
+    going live. No plan gates it (PLAN §30, round 2026-10-22b: VeriFactu on Free; ERPlora's route needs its
+    approved authorisation alone)."""
+    return _route_sending_problem(config, environment, scope) or _server_problem(environment)
 
 
 def issue_problem(config: Config, scope: Scope | None) -> str:
@@ -261,11 +247,8 @@ def live_problems(config: Config, scope: Scope) -> list[str]:
             found.append("own_certificate_missing")
         elif not own_certificate_readable(config):
             found.append("own_certificate_unreadable")
-    else:
-        if config.representation_status != Config.Representation.APPROVED:
-            found.append("representation_not_approved")
-        if not config.live_paid:
-            found.append("live_option_unpaid")
+    elif config.representation_status != Config.Representation.APPROVED:
+        found.append("representation_not_approved")
     if config.hub_status != Config.HubStatus.ACTIVE:
         found.append("hub_not_active")
     return found
@@ -283,7 +266,7 @@ def blockers(config: Config, environment: str, scope: Scope | None) -> list[str]
     found = []
     if not gateway.configured():
         found.append("gateway_unavailable")
-    problem = sending_problem(config, environment, scope)
+    problem = route_problem(config, environment, scope)
     if not problem and not own_certificate_readable(config):
         problem = "own_certificate_unreadable"
     if problem and problem not in found:

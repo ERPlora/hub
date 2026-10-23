@@ -74,7 +74,6 @@ from apps.verifactu.queries import (
     production_open,
     route_problem,
     saas_unreachable,
-    sending_problem,
     summary,
     system_for,
     wait,
@@ -154,9 +153,6 @@ PRODUCTION_CLOSED = _(
     "Going live is not open on this server yet: ERPlora opens it when the real submission is ready."
 )
 ISSUER_MISSING = _("Set up the issuer first in Invoicing → Issuer.")
-LIVE_OPTION_UNPAID = _(
-    "The live option of VeriFactu is not in your plan: add it in your ERPlora account."
-)
 HUB_NOT_ACTIVE = _(
     "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."
 )
@@ -873,7 +869,7 @@ def _send_chain(
     strict: bool,
 ) -> None:
     now = timezone.now()
-    problem = sending_problem(config, environment, ctx.scope)
+    problem = route_problem(config, environment, ctx.scope)
     certificate = None
     if not problem:
         try:
@@ -1817,8 +1813,6 @@ def _route_refusal(
             str(REPRESENTATION_NOT_APPROVED),
             code="verifactu.representation_not_approved",
         )
-    if problem == "live_option_unpaid":
-        return Conflict(str(LIVE_OPTION_UNPAID), code="verifactu.live_option_unpaid")
     return None
 
 
@@ -1867,7 +1861,7 @@ def _refuse_on_the_platform_hub(ctx: OperationContext) -> None:
     ai={
         "description": "Go live: from now on every VeriFactu record goes to the real AEAT. It needs the server opened for "
         "it by ERPlora, a business that is not a demo, Invoicing's issuer, a route ready for production (the own valid certificate, or ERPlora's "
-        "approved signed authorisation with the live option in the plan) and an active ERPlora account; it cannot "
+        "approved signed authorisation) and an active ERPlora account; it cannot "
         "go back once a production record is sealed.",
         "risk": "high",
     },
@@ -2027,7 +2021,7 @@ def remove_certificate(ctx: OperationContext, data: NoInput) -> ConfigOut:
     output=ConfigSyncOut,
     ai={
         "description": "System only: the platform hands over the ERPlora account's VeriFactu block (the signed "
-        "authorisation's state, whether the plan includes the live option, the business's status) with its version; "
+        "authorisation's state, the business's status) with its version; "
         "an equal or older version is ignored.",
         "risk": "high",
     },
@@ -2044,8 +2038,6 @@ def sync_config(ctx: OperationContext, data: ConfigSyncIn) -> ConfigSyncOut:
         config.representation_status = data.representation.status
         config.representation_updated_at = data.representation.updated_at
         config.representation_reason = data.representation.reason
-    if data.live_paid is not None:
-        config.live_paid = data.live_paid
     if data.hub_status is not None:
         config.hub_status = data.hub_status
     config.synced_version = data.version

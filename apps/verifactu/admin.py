@@ -15,8 +15,9 @@ delete a sale, it fixes a sending problem.
   puts the records out with the next pass, which goes as soon as the AEAT lets it. A record's ``wait_reason`` is
   kept until that pass: it is what declares the record late (``Incidencia`` S).
 - The configuration: only the route is chosen here, through ``verifactu.config.update`` (its refusal is the form's
-  error). The environment moves through ``go_live`` / ``back_to_testing``; the authorisation, the live option and
-  the business's status come from the SaaS's photo; the certificate is uploaded in the module. None is typed here.
+  error). The environment moves through ``go_live`` / ``back_to_testing``; the authorisation and the business's
+  status come from the SaaS's photo (the retired live option is not shown); the certificate is uploaded in the
+  module. None is typed here.
 - Own certificate: its holder, kind and expiry only; never its sealed material (the .p12 and its password).
 """
 
@@ -175,7 +176,6 @@ class ConfigAdmin(admin.ModelAdmin):
         "environment",
         "route",
         "representation_status",
-        "live_paid",
         "hub_status",
         "synced_at",
     )
@@ -184,7 +184,8 @@ class ConfigAdmin(admin.ModelAdmin):
         return tuple(
             field.name
             for field in Config._meta.concrete_fields
-            if field.name != "route"
+            # ``live_paid`` is retired (PLAN §30): its column only waits to be dropped.
+            if field.name not in ("route", "live_paid")
         )
 
     def get_form(self, request, obj=None, change=False, **kwargs):

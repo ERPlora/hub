@@ -35,10 +35,10 @@ def opened(settings):
 
 @pytest.fixture
 def ready_route(issuer):
-    """ERPlora's approved authorisation with the live option paid: the route to production is ready."""
+    """ERPlora's approved authorisation: the route to production is ready, on any plan (PLAN §30)."""
     run(
         "verifactu.config.sync",
-        {"version": 1, "live_paid": True, "representation": {"status": "approved"}},
+        {"version": 1, "representation": {"status": "approved"}},
         system_context(A),
     )
 

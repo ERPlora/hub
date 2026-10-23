@@ -44,7 +44,8 @@ const CONFIG: ConfigOut = {
   issue_blocker: null,
   live_blockers: [],
 };
-const UNPAID = { code: 'live_option_unpaid', message: 'the live option of VeriFactu is not in your plan: add it in your ERPlora account' };
+const NOT_APPROVED = { code: 'representation_not_approved', message: 'ERPlora still has to approve your signed authorisation to file in production' };
+const NOT_ACTIVE = { code: 'hub_not_active', message: 'your ERPlora account has a pending payment or is suspended' };
 const GATEWAY = { code: 'gateway_unavailable', message: "ERPlora's sending gateway is not configured on this server" };
 const DIAGNOSTIC: DiagnosticOut = {
   ran_at: '2026-10-14T10:00:00Z',
@@ -128,25 +129,22 @@ describe('SettingsPage', () => {
 
   it('in testing it says what keeps it from going live, and «Go live» stays off', async () => {
     const s = await setup({
-      live_blockers: [
-        { code: 'representation_not_approved', message: 'ERPlora still has to approve your signed authorisation to file in production' },
-        UNPAID,
-      ],
+      live_blockers: [NOT_APPROVED, NOT_ACTIVE],
     });
     const blockers = s.find('verifactu-settings-live-blockers').text();
     expect(blockers).toContain('It cannot go live yet:');
     expect(blockers).toContain('ERPlora still has to approve your signed authorisation');
-    expect(blockers).toContain('the live option of VeriFactu is not in your plan');
+    expect(blockers).toContain('your ERPlora account has a pending payment or is suspended');
     expect((s.find('verifactu-settings-go-live').element as unknown as { disabled: boolean }).disabled).toBe(true);
     const ready = await setup();
     expect(ready.find('verifactu-settings-live-blockers').exists()).toBe(false);
   });
 
   it('in production it says when new sales are refused and why records wait, without going back to testing', async () => {
-    const s = await setup({ environment: 'production', can_go_back: false, route_ready: false, issue_blocker: UNPAID, reasons: [GATEWAY] });
+    const s = await setup({ environment: 'production', can_go_back: false, route_ready: false, issue_blocker: NOT_APPROVED, reasons: [GATEWAY] });
     const refused = s.find('verifactu-settings-issue-blocked').text();
     expect(refused).toContain('New sales and invoices are refused until this is fixed:');
-    expect(refused).toContain('the live option of VeriFactu is not in your plan');
+    expect(refused).toContain('ERPlora still has to approve your signed authorisation');
     const waiting = s.find('verifactu-settings-waiting').text();
     expect(waiting).toContain('Records are waiting:');
     expect(waiting).toContain("ERPlora's sending gateway is not configured on this server");
