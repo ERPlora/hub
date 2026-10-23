@@ -177,3 +177,78 @@ for (const size of CASES) {
     }
   });
 }
+
+// The reviewer's FIX of this component (rv-ui-29): between 641 and 1024 px the search box shrinks to leave room for
+// the toolbar (12–22rem) and its example text was cut short with no sign, «Search reference or benefic» at 820 and
+// «…beneficia» at 834. As in the market (Shopify, Square, Gmail) the example text fits whole where it has room and
+// ends in «…» where it has none; the box keeps its widths. Measured with the page in English and in Spanish
+// («Buscar referencia o beneficiario…», the `django_language` the account would pick).
+const SEARCH_SIZES = [
+  { label: '820', width: 820, height: 1180 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+/** The search box's native field: its example text, the room it gives it and the text's own width, in px. */
+interface SearchFit {
+  placeholder: string;
+  box: number;
+  room: number;
+  text: number;
+  textOverflow: string;
+  scrollWidth: number;
+  clientWidth: number;
+}
+
+for (const size of SEARCH_SIZES) {
+  test(`UI DataTable filtro de fechas at ${size.label}: the search box's example text fits whole, or ends in «…» where it has no room`, async ({
+    browser,
+  }) => {
+    const measured: Partial<Record<'en' | 'es', SearchFit>> = {};
+    for (const language of ['en', 'es'] as const) {
+      const context = await browser.newContext({
+        baseURL: A,
+        viewport: { width: size.width, height: size.height },
+        locale: language === 'es' ? 'es-ES' : 'en-US',
+      });
+      try {
+        const page = await context.newPage();
+        await login(page, A, '/payment/payments');
+        if (language === 'es') {
+          await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+          await page.goto(`${A}/payment/payments`);
+          await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+        }
+        await shown(page).locator(`[data-testid=${TABLE}-empty], [data-testid=${TABLE}-row]`).first().waitFor({ state: 'visible' });
+        const input = shown(page).locator(`[data-testid=${TABLE}-search] input`);
+        await expect(input).toHaveAttribute('placeholder', language === 'es' ? 'Buscar referencia o beneficiario…' : 'Search reference or beneficiary…');
+        const own: SearchFit = await input.evaluate((field: HTMLInputElement) => {
+          const style = getComputedStyle(field);
+          const pen = document.createElement('canvas').getContext('2d')!;
+          pen.font = style.font;
+          return {
+            placeholder: field.placeholder,
+            box: field.getBoundingClientRect().width,
+            room: field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+            text: pen.measureText(field.placeholder).width,
+            textOverflow: style.textOverflow,
+            scrollWidth: field.scrollWidth,
+            clientWidth: field.clientWidth,
+          };
+        });
+        measured[language] = own;
+        record(`${KEY}-search-${size.label}-${language}`, own);
+        await page.screenshot({ path: shot(`${KEY}-search-${size.label}${language === 'en' ? '' : '-es'}`) });
+      } finally {
+        await context.close();
+      }
+    }
+    // The native field never reports the cut example text (`scrollWidth` stays its `clientWidth`, measured): the
+    // text's own width, drawn in its font, against the room inside its padding (the icon and the clear button).
+    for (const [language, own] of Object.entries(measured)) {
+      if (own.text > own.room + 0.5) {
+        expect(own.textOverflow, `${language}: «${own.placeholder}» (${own.text.toFixed(1)} px in ${own.room.toFixed(1)} px) ends in «…»`).toBe('ellipsis');
+      }
+    }
+  });
+}
