@@ -196,6 +196,28 @@ def test_a_customer_needs_its_id_or_a_reference(admin_client):
 
 
 @pytest.mark.django_db
+def test_a_deleted_group_is_named_in_the_422(admin_client):
+    customer = post(admin_client, "/customer/customers", {"name": "Ana"}).json()
+    gone = str(uuid.uuid7())
+    response = post(
+        admin_client,
+        "/customer/customers/set_groups",
+        {"id": customer["id"], "group_ids": [gone]},
+    )
+    assert (response.status_code, response.json()) == (
+        422,
+        {
+            "error": {
+                "code": "customer.group_unavailable",
+                "message": "That group no longer exists.",
+                "fields": {"groups": "That group no longer exists."},
+                "unavailable_ids": [gone],
+            }
+        },
+    )
+
+
+@pytest.mark.django_db
 def test_a_limit_over_100_is_422(admin_client):
     response = get(admin_client, "/customer/customers", limit=101)
     assert (response.status_code, set(response.json()["error"]["fields"])) == (

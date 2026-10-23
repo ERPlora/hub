@@ -317,10 +317,14 @@ Pasos:
 Entra: la selección completa de grupos o de etiquetas.
 Sale: la selección SUSTITUYE a la anterior (no se añade), y el aviso de grupos o etiquetas cambiados
 (`customer.customer.groups_changed`, `customer.customer.tags_changed`) si algo cambió. El recuento
-«Clientes» de Grupos y Etiquetas se actualiza solo.
+«Clientes» de Grupos y Etiquetas se actualiza solo. Si otra persona cambia la ficha mientras marcas,
+lo que has marcado o desmarcado y aún no has guardado se queda como lo dejaste; lo que esa persona
+añade, borra o quita y tú no has tocado aparece o desaparece también en tu selección. Guardar nunca
+vuelve a poner lo que otra persona quitó o borró.
 Si falla: un grupo o una etiqueta que otra persona acaba de eliminar: «Ese grupo ya no existe.» /
-«Esa etiqueta ya no existe.», y no se guarda nada. Sin grupos o etiquetas: «No hay grupos.» / «No hay
-etiquetas.».
+«Esa etiqueta ya no existe.», y no se guarda nada; lo que se borró sale de tu selección (lo demás que
+marcaste se queda, aunque la búsqueda lo esconda) y el siguiente **Guardar grupos** o **Guardar
+etiquetas** funciona. Sin grupos o etiquetas: «No hay grupos.» / «No hay etiquetas.».
 Implicados: ninguno
 
 ### CUSTOMER-F07 Eliminar una ficha
