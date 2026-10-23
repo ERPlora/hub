@@ -112,7 +112,14 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await expect(view.getByText('Type an amount, like 12.50')).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toBeVisible();
         await totalFrom('');
+        // «Apply» closed the sheet: opened again, its box no longer warns (else the check below proves nothing).
+        if (folded) await funnel.click();
         await expect(view.getByText('Type an amount, like 12.50')).toHaveCount(0);
+        if (folded) {
+          await expect(sheet).toBeVisible();
+          await view.locator('[data-testid=cart-checkout-carts-filters-close]').click();
+          await expect(sheet).toBeHidden();
+        }
       });
 
       const soon = code(`soon-${width}`);
