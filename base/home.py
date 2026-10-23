@@ -167,8 +167,9 @@ def run_hook(ctx: OperationContext, operation: str, params: Mapping[str, Any]) -
     return first_row(op(ctx, op.input.model_validate(dict(params))).model_dump(mode="json"))
 
 
-def hook_failed(key: str, operation: str) -> None:
-    logger.warning("Home: %s left out, its query %s failed.", key, operation, exc_info=True)
+def hook_failed(key: str, operation: str, error: BaseException | None = None) -> None:
+    """Logs the hook left out with the traceback of ``error`` (outside its ``except``), else of the one handled now."""
+    logger.warning("Home: %s left out, its query %s failed.", key, operation, exc_info=error or True)
 
 
 def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_country: str) -> list[dict]:
@@ -183,15 +184,15 @@ def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_co
             actionable = ctx.has(step.permission)
             if not actionable and not wall:
                 continue
-            denied = False
+            denied: PermissionDenied | None = None
             try:
                 row = run_hook(ctx, step.operation, step.params)
-            except PermissionDenied:
+            except PermissionDenied as error:
                 if not wall:
                     hook_failed(key, step.operation)
                     continue
                 # A wall is a fact about the hub: whoever may not read it still has it in front of the invoice.
-                denied = True
+                denied = error
                 try:
                     row = run_hook(system_context(ctx.scope), step.operation, step.params)
                 except Exception:
@@ -201,9 +202,11 @@ def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_co
                 hook_failed(key, step.operation)
                 continue
             level = level_of(key, step.required, row)
-            if denied and level != LEVEL_LEGAL:
-                # No wall here after all (a hub in testing): the person may not read the step, as any other.
-                hook_failed(key, step.operation)
+            if denied is not None and level != LEVEL_LEGAL:
+                # No wall here after all (a hub in testing): left out, as any step the person may not read; logged
+                # only for whoever may do it (as before), never for whoever is not told about it at all.
+                if actionable:
+                    hook_failed(key, step.operation, denied)
                 continue
             state = STATE_DONE if is_configured(row, step.configured_when) else STATE_PENDING
             if not actionable and (level != LEVEL_LEGAL or state != STATE_PENDING):

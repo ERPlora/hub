@@ -167,6 +167,24 @@ for (const size of SIZES) {
   });
 }
 
+for (const size of SIZES.filter((s) => s.label !== '834')) {
+  test(`BASE-F01 VERIFACTU-F08 at ${size.label}: on VeriFactu's Configuration the strip names the step with no «Configurar» to that same screen`, async ({ browser }) => {
+    await revokedIn('production');
+    const { context, page } = await onHome(browser, { width: size.width, height: size.height });
+    try {
+      await page.goto(`${A}/verifactu/config`);
+      await expect(strip(page).locator('.blocking-strip-title')).toHaveText('Todavía no puedes facturar');
+      await expect(named(page, 'Configura VeriFactu')).toHaveCount(1);
+      await expect(strip(page).locator(`[data-testid="blocking-configure-${STEP}"]`)).toHaveCount(0);
+      await expect(named(page, 'Configura VeriFactu')).not.toContainText('Esto lo tiene que configurar un administrador.');
+      await untilStill(page);
+      await page.screenshot({ path: shot(`${KEY}-config-${size.label}`) });
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 test('BASE-F04 VERIFACTU-F08: in production the employee is told too, in English, with nothing to set up', async ({ browser }) => {
   await revokedIn('production');
   const { context, page } = await onHome(browser, { width: 1440, height: 900 }, { language: 'en', who: EMPLOYEE });

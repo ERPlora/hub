@@ -24,7 +24,9 @@ const onSummary = computed(() => route.path === '/' && route.hash !== ACTIVITY_H
 const shown = computed(() => items.value.length > 0 && !onSummary.value);
 
 const reachable = (path: string) => path !== '' && router.resolve(path).name !== 'not-found';
-const canConfigure = (item: SetupItem) => item.actionable && reachable(item.route);
+// On the very screen that sets the step up, «Set up» would lead nowhere: the step is only named.
+const here = (path: string) => router.resolve(path).path === route.path;
+const canConfigure = (item: SetupItem) => item.actionable && reachable(item.route) && !here(item.route);
 </script>
 
 <template>

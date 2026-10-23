@@ -409,6 +409,19 @@ def test_whoever_may_not_read_the_way_still_has_its_wall_in_production(modules, 
 
     assert (keys(document), document["blocking_pending"]) == ([], 0)
     assert f"{ROUTE} left out" in caplog.text
+    assert "PermissionDenied" in caplog.text  # the denial's own traceback, never «NoneType: None»
+
+
+def test_in_testing_whoever_may_neither_do_nor_read_the_way_is_skipped_without_a_warning(modules, declare, caplog):
+    """No wall in testing: the person at the till is not told about the step, as before, and that is no failure of
+    its query, so no Home of theirs logs one."""
+    sending_route(modules, declare, environment="testing", ready=False, permission="verifactu.view_record")
+
+    with caplog.at_level(logging.WARNING, logger="base.home"):
+        document = setup_status(ctx())  # an employee: may neither configure it nor read it
+
+    assert (keys(document), document["blocking_pending"]) == ([], 0)
+    assert [record.getMessage() for record in caplog.records if record.name == "base.home"] == []
 
 
 def test_only_base_names_the_steps_that_are_walls_in_production(modules, declare):
