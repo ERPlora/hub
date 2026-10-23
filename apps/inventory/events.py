@@ -42,6 +42,12 @@ ALL = [
     CONFIG_UPDATED,
 ]
 
+#: A product added, changed or deleted: what may change how many active products there are («Your catalog»).
+PRODUCT_EVENTS = [PRODUCT_CREATED, PRODUCT_UPDATED, PRODUCT_DELETED]
+#: What re-runs the Panel's figures and its low-stock list, and with them the Home's panels: the settings decide which
+#: articles track stock.
+FIGURE_EVENTS = [*PRODUCT_EVENTS, STOCK_CHANGED, CONFIG_UPDATED]
+
 # The Sales app's events (its WORKBOOK fixes their payload).
 SALE_COMPLETED = "sale.sale.completed"
 SALE_VOIDED = "sale.sale.voided"

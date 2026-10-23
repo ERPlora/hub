@@ -1,7 +1,7 @@
 # Workbook — Inventario (app)
 Prefijo: INVENTORY
 Alcance MVP: transversal
-Estado de la app: en uso; parciales F12 y F28 (esperan al núcleo)
+Estado de la app: en uso; parcial F12 (espera al núcleo)
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -246,7 +246,7 @@ fueran los del negocio.
 | INVENTORY-F25 | Imprimir la etiqueta del código de barras | hecho |
 | INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | hecho |
 | INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | hecho |
-| INVENTORY-F28 | Completar el primer paso «Tu catálogo» | parcial — la cifra de productos activos está; falta la lista «Termina de configurar tu negocio», que es del núcleo y el Hub todavía no tiene |
+| INVENTORY-F28 | Completar el primer paso «Tu catálogo» | hecho |
 
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
 
@@ -630,13 +630,19 @@ Pasos:
    «Stock bajo» (saldo igual o menor que su umbral) y «Valor de existencias» a coste. Tocar una de
    las cuatro primeras lleva a **Productos**.
 2. Debajo, «Productos con stock bajo», del que menos tiene al que más, con su umbral.
+3. En el **Inicio**, los paneles de Inventario: «Productos con stock bajo» (la cifra de «Stock
+   bajo»), «Valor de existencias (a coste)» y «Productos con menos stock» (los cinco que menos
+   tienen, el primero el que menos) salen de serie; «Productos en stock» se añade con ⋮
+   («Personalizar panel»), donde van agrupados bajo «Inventario». El valor sale en la moneda del
+   negocio.
 Entra: los productos activos, físicos y con control de stock. El valor es la suma de coste por
 saldo de los que tienen saldo positivo; un saldo negativo no resta.
 Sale: nada.
 Si falla: «No se pudieron cargar las métricas del inventario.» y el aviso de la tabla con
-«Reintentar». El panel se refresca solo con cualquier movimiento de stock (venta, anulación,
-recepción, recuento, baja) y con cualquier alta, cambio o eliminación de un producto. Las cifras viven
-aquí: el Inicio del negocio es la rejilla de apps, sin paneles.
+«Reintentar»; en el Inicio, un panel que no se puede leer dice «No disponible». El panel y los
+paneles del Inicio se refrescan solos con cualquier movimiento de stock (venta, anulación,
+recepción, recuento, baja), con cualquier alta, cambio o eliminación de un producto y al guardar los
+ajustes. Los paneles del Inicio los ve quien puede ver los productos.
 Implicados: ninguno
 
 ### INVENTORY-F18 Avisar cuando un artículo cruza su mínimo
@@ -877,17 +883,18 @@ Implicados: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
 
 ### INVENTORY-F28 Completar el primer paso «Tu catálogo»
 <!-- origen: old-hub:HUB_SHELL-F27 old-hub:HUB_SHELL-F31 old:inventory/workflow/con-otros-modulos.md#inventory-f28 -->
-Estado: parcial — la cifra de productos activos está; falta la lista «Termina de configurar tu negocio», que es del núcleo y el Hub todavía no tiene
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Inicio: Termina de configurar tu negocio
 Pasos:
 1. En la lista «Termina de configurar tu negocio» sale el paso obligatorio «Tu catálogo» («Añade al
-   menos un producto para que haya algo que vender.»).
+   menos un producto para que haya algo que vender.»), marcado «Importante».
 2. «Configurar» lleva a **Inventario → Productos**.
-3. En cuanto hay un producto activo (físico o de tipo servicio), el paso sale hecho.
+3. En cuanto hay un producto activo (físico o de tipo servicio), el paso sale hecho, sin recargar.
 Entra: el número de productos activos.
 Sale: el paso hecho o pendiente. Lo ve quien puede dar de alta productos.
-Si falla: si se desactivan o eliminan todos los productos, el paso vuelve a pendiente.
+Si falla: si se desactivan o eliminan todos los productos, el paso vuelve a pendiente, también sin
+recargar.
 Implicados: ninguno
 
 ### INVENTORY-F29 Marcar un artículo como agotado
@@ -1070,6 +1077,13 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Libro de movimientos**: `_move` escribe saldo y movimiento juntos con la fila del producto
   bloqueada; varios productos se bloquean por orden de id. El cruce del mínimo se decide una vez por
   operación sobre el total (también suelto + dentro de un menú).
+- **Inicio** (ronda PLAN-HUB 2026-10-21): `setup` y `widgets` de `apps.py`, los del `module.json` viejo (sin
+  `bell`). El paso `inventory.catalog` lee `active_products` de `inventory.stock.get_summary` (orden 30,
+  `required`, permiso `inventory.add_product`, `events.PRODUCT_EVENTS`); los cuatro paneles leen
+  `inventory.stock.get_summary` y `inventory.product.list_low_stock` (`limit` 5) con permiso
+  `inventory.view_product` y `events.FIGURE_EVENTS`, las mismas que re-ejecutan el Panel (`live.py`). Ningún
+  panel fija moneda ni idioma (gh:inventory#123) ni categoría (gh:inventory#126); un KPI no repite su nombre en
+  `options.label` (gh:hub#1105).
 - **Ventas**: `events.REACTIONS` lleva `sale.sale.completed` → `inventory.stock.apply_sale`,
   `sale.sale.voided` → `inventory.stock.restore_sale` y `sale.sale.refunded` →
   `inventory.stock.restore_refund`; `events.react` los ejecuta como sistema, cada uno en su transacción.
