@@ -3,8 +3,8 @@
 // first 20 cards; a pick reads the whole card and hands the sale a COPY of its tax details; «+ New
 // customer «…»» creates one with name and phone (or picks the live card that already has that phone)
 // and assigns it; «Remove customer» leaves the sale without one. The sale owns the hole; this paints it.
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref } from 'vue';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defineComponent, h, ref, render } from 'vue';
 
 import { customerRow, DETAIL, pageOf } from '../__tests__/fixtures';
 import { EMPLOYEE, flush, json, mountCustomer, refusal, sent, VIEWER } from '../__tests__/mount-customer';
@@ -16,8 +16,27 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
-afterEach(() => {
-  document.body.innerHTML = '';
+// No timer may outlive a test: Vitest tears the page's window down at the end of the file, and a timer
+// still armed then (Ionic's searchbar arms one for 300 ms when it loads) fires into a missing
+// `requestAnimationFrame`: an «Unhandled error» and exit 1 with every test green. Fake timeouts that follow
+// the real clock (the harness's flush() still runs) let each test's end count them.
+beforeAll(() => {
+  // Vue arms a one-off 3 s timer (its devtools hook) the first time it renders: armed here, on the real
+  // clock, it is not a test's.
+  render(null, document.createElement('div'));
+});
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true, advanceTimeDelta: 1 });
+});
+afterEach(async () => {
+  try {
+    document.body.innerHTML = '';
+    // What was taken off the page before it loaded arms its timer in the next frames: let them run first.
+    await flush();
+    expect(vi.getTimerCount(), 'timers still armed when the test ends').toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 // DETAIL is Ana García of ACME: the document goes to the company, the screen names the person.
@@ -30,6 +49,18 @@ const SNAPSHOT: CustomerSnapshot = {
   customer_country: 'ES',
 };
 const PHONE_INVALID = 'Not a valid phone of its country: check the digits or write it with its international prefix (+44…).';
+
+/** Waits until Ionic has loaded every component on the page (Stencil marks each one `hydrated`), as a
+ *  browser paints a screen before anyone taps it: a component taken off the page before it loads finishes
+ *  loading off it, and the timer it arms then (the searchbar's) is never cleared. */
+async function loaded(): Promise<void> {
+  const loading = () =>
+    [...document.querySelectorAll('*')].filter(
+      (el) => el.localName.startsWith('ion-') && customElements.get(el.localName) && !el.classList.contains('hydrated'),
+    );
+  for (let frame = 0; frame < 10 && loading().length; frame++) await new Promise(requestAnimationFrame);
+  expect(loading().map((el) => el.localName), 'Ionic components still loading').toEqual([]);
+}
 
 async function setup(initial: CustomerSnapshot | null = null, session?: SessionMe, open = false) {
   const value = ref<CustomerSnapshot | null>(initial);
@@ -44,6 +75,7 @@ async function setup(initial: CustomerSnapshot | null = null, session?: SessionM
       }),
   });
   const m = await mountCustomer(Host, { attachTo: document.body, session });
+  await loaded();
   const el = <T extends HTMLElement = HTMLElement & { value?: string; disabled?: boolean; errorText?: string }>(id: string) =>
     document.querySelector<T>(`[data-testid="${id}"]`);
   const click = async (id: string) => {
