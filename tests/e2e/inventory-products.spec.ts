@@ -23,6 +23,7 @@ import {
   productBySku,
   productRow,
   productsReady,
+  rowAction,
   searchProducts,
   shoot,
   shootFlow,
@@ -290,4 +291,45 @@ test('FIX-DATATABLE-HUB-FILTERS-2A: Products filter by price in euros behind the
   await expect(priceFrom).toHaveClass(/ion-invalid/);
   await expect(priceFrom.locator('.error-text')).toHaveText(/This is not an amount|Esto no es un importe/);
   await page.screenshot({ path: shot('FIX-DATATABLE-HUB-FILTERS-2A-inventory-error-1440') });
+});
+
+// Last of the file: the hundred tax categories it makes stay until `afterAll` cleans them.
+test('selectores de Inventario (Combo compartido): a product whose category and tax category lie beyond the first page opens with their names', async ({
+  page,
+  context,
+}) => {
+  // flow: selectores de Inventario (Combo compartido) — more than one query (100) of each: the form asks for them
+  await login(page, A, '/inventory/products');
+  const tag = stamp();
+  const lower = tag.toLowerCase();
+  const rows = Array.from({ length: 100 }, (_, i) => ({ line: i + 2, name: `E2E Bulk ${tag} ${String(i).padStart(3, '0')}` }));
+  const bulk = await api<{ created: number }>(context, A, 'POST', '/inventory/categories/bulk_create', { rows });
+  expect([bulk.status, bulk.data.created]).toEqual([200, 100]);
+  const far = await api<{ id: string }>(context, A, 'POST', '/inventory/categories', { name: `E2E Zz far ${tag}` });
+  expect(far.status).toBe(201);
+  for (let start = 0; start < 100; start += 10) {
+    const made = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        api(context, A, 'POST', '/tax/categories', { key: `e2e.inv_bulk_${lower}_${start + i}`, name: `E2E bulk tax ${start + i}` }),
+      ),
+    );
+    expect(made.map((res) => res.status)).toEqual(Array(10).fill(201));
+  }
+  const farKey = `e2e.inv_zz_${lower}`;
+  expect((await api(context, A, 'POST', '/tax/categories', { key: farKey, name: `ZZ E2E far tax ${tag}` })).status).toBe(201);
+  const sku = `E2E-FAR-${tag}`;
+  const product = await createProduct(context, { name: 'E2E Far', sku, tax_category_key: farKey, category_ids: [far.data.id] });
+
+  await page.goto(`${A}/inventory/products`);
+  await productsReady(page);
+  await searchProducts(page, sku);
+  await rowAction(page, product.id, 'edit');
+  const form = dialog(page, 'inventory-product-form');
+  await expect(form.locator('[data-testid=inventory-product-tax] input')).toHaveValue(`ZZ E2E far tax ${tag}`);
+  await expect(form.locator('[data-testid^="inventory-product-categories-chip-"]')).toHaveText([`E2E Zz far ${tag}`]);
+  await expect(form.locator('[data-testid=inventory-product-tax-unconfigured]')).toHaveCount(0);
+  await form.locator('[data-testid^="inventory-product-categories-chip-"]').last().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: shot('FIX-INVENTORY-SEARCHSELECT-TO-COMBO-far-1440') });
+  await form.locator('[data-testid=inventory-product-form-cancel]').click();
+  await expect(form).toBeHidden();
 });

@@ -10,13 +10,14 @@
 //     at all says where to make them;
 //   - category (`allowDefault`): «— (default)» first, an empty key.
 // The first page is followed live: it names the chosen category and tells «Not configured», «none» and
-// a loading error. With more categories than one query serves, a category beyond the first page is
-// named once picked here (until then, by its key), and the «Not configured» mark only knows an empty value.
+// a loading error. With more categories than one query serves, a chosen category beyond the first page
+// is asked of Taxes by its key («Loading…» meanwhile) and named the same way; one Taxes no longer lists
+// is «Not configured».
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { type OutputOf, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonChip, IonLabel } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
 import { formatPercent } from '../lib/format';
@@ -65,18 +66,51 @@ function optionLabel(row: TaxRow): string {
 
 const asOption = (row: TaxRow): ComboOption => ({ id: row.key, label: optionLabel(row) });
 
-/** The names of the categories picked here, by key: a search may offer one beyond the first page. */
-const picked = ref(new Map<string, string>());
+/** Categories beyond the first page, by key: picked here or asked of Taxes; `null` = Taxes does not
+ *  list it (no longer active). */
+const named = ref(new Map<string, ComboOption | null>());
+/** Why a key could not be named (the server's message), by key. */
+const failed = ref(new Map<string, string>());
+/** Keys being asked of Taxes. */
+const asking = new Set<string>();
 
-/** What the field shows: the chosen category, «— (default)», or nothing (none, or one no longer active). */
+/** Whether the chosen key lies beyond the first page, which cannot name it. */
+const beyond = computed(
+  () => !!props.modelValue && loaded.value && !complete.value && !rows.value.some((row) => row.key === props.modelValue),
+);
+
+/** Asks Taxes for the chosen category by its key (the list filters by part of it: the exact one is kept). */
+async function nameChosen(): Promise<void> {
+  const key = props.modelValue;
+  if (!beyond.value || named.value.has(key) || asking.has(key)) return;
+  asking.add(key);
+  try {
+    const answer = await client.api.call('tax.category.list', { ...PAGE, key });
+    const row = answer.rows.find((r) => r.key === key);
+    named.value = new Map(named.value).set(key, row ? asOption(row) : null);
+    const rest = new Map(failed.value);
+    rest.delete(key);
+    failed.value = rest;
+  } catch (reason) {
+    failed.value = new Map(failed.value).set(key, reason instanceof Error ? reason.message : String(reason));
+  } finally {
+    asking.delete(key);
+  }
+}
+watch([data, () => props.modelValue], () => void nameChosen(), { immediate: true });
+
+/** What the field shows: the chosen category, «— (default)», «Loading…» while it is asked for, or
+ *  nothing (none, one no longer active, or one that could not be named). */
 const choice = computed<ComboOption | null>(() => {
   const key = props.modelValue;
   if (key === '') return props.allowDefault ? defaultOption.value : null;
   const row = rows.value.find((r) => r.key === key);
   if (row) return asOption(row);
-  if (!loaded.value || complete.value) return null;
-  return { id: key, label: picked.value.get(key) ?? key };
+  if (!beyond.value || failed.value.has(key)) return null;
+  const known = named.value.get(key);
+  return known === undefined ? { id: key, label: t('inventory.common.loading') } : known;
 });
+const failure = computed(() => failed.value.get(props.modelValue));
 
 async function search(query: string): Promise<ComboOption[]> {
   const text = query.trim();
@@ -89,13 +123,15 @@ const missing = computed(
   () =>
     props.markMissing &&
     loaded.value &&
-    (props.modelValue === '' || (complete.value && !rows.value.some((row) => row.key === props.modelValue))),
+    (props.modelValue === '' ||
+      (complete.value && !rows.value.some((row) => row.key === props.modelValue)) ||
+      (beyond.value && named.value.get(props.modelValue) === null)),
 );
 const none = computed(() => !props.allowDefault && loaded.value && rows.value.length === 0);
 
 function pick(option: ComboOption | null): void {
   const key = option?.id ?? '';
-  if (option) picked.value = new Map(picked.value).set(option.id, option.label);
+  if (option?.id) named.value = new Map(named.value).set(option.id, option);
   if (key !== props.modelValue) emit('update:modelValue', key);
 }
 </script>
@@ -130,12 +166,12 @@ function pick(option: ComboOption | null): void {
       {{ t('inventory.tax.none') }}
     </InlineFeedback>
     <InlineFeedback
-      v-if="status === 'error'"
+      v-if="status === 'error' || failure"
       tone="danger"
       :data-testid="`${testid}-error`"
       :heading="t('inventory.tax.loadError')"
     >
-      {{ error?.message }}
+      {{ status === 'error' ? error?.message : failure }}
     </InlineFeedback>
   </div>
 </template>

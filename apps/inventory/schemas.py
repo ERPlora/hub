@@ -288,7 +288,11 @@ class CategoryFiltersIn(Schema):
 
 
 class CategoryListIn(PageIn, CategoryFiltersIn):
-    pass
+    ids: list[UUID] | None = Field(
+        None,
+        max_length=MAX_BATCH,
+        description="Only these categories, by id (to name the categories of a product).",
+    )
 
 
 class MovementListIn(PageIn):

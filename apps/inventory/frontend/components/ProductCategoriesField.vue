@@ -3,13 +3,13 @@
 // and Odoo's tags: a `Combo` of @erplora/ui that searches the business's categories on the server (at
 // most 100 per query) to add one more, and the chosen ones under it as chips, each removed with its
 // button; a category is never added twice nor offered once chosen. Only there when the business has
-// categories: the first page, followed live, decides it and names the chosen ones (with more than one
-// query holds, one beyond the first page is named once picked here; until then, by its id).
+// categories: the first page, followed live, decides it and names the chosen ones; with more than one
+// query holds, the chosen ones beyond it are asked for by id, in one query («Loading…» meanwhile).
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonChip, IonLabel } from '@ionic/vue';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
 
@@ -35,10 +35,39 @@ const PAGE = { limit: 100, sort: 'name' } as const;
 const { data, status, error } = useLive('inventory.category.list', () => PAGE);
 
 const any = computed(() => (data.value?.total ?? 0) > 0);
-/** The names of the categories picked here, by id: a search may offer one beyond the first page. */
-const picked = ref(new Map<string, string>());
-const nameOf = (id: string): string => data.value?.rows.find((row) => row.id === id)?.name ?? picked.value.get(id) ?? id;
+/** The first page holds every category. */
+const complete = computed(() => !!data.value && data.value.total <= data.value.rows.length);
+/** Names of categories beyond the first page, by id: picked here or asked for. */
+const named = ref(new Map<string, string>());
+/** Why the chosen ones beyond the first page could not be named (the server's message). */
+const failure = ref('');
+/** Ids being asked for. */
+const asking = ref(new Set<string>());
+
+const firstName = (id: string): string | undefined => data.value?.rows.find((row) => row.id === id)?.name;
+/** A chip's name; «Loading…» while it is asked for, a dash if it could not be named (or no longer exists). */
+const nameOf = (id: string): string => firstName(id) ?? named.value.get(id) ?? (asking.value.has(id) ? t('inventory.common.loading') : '—');
 const chosen = computed(() => props.modelValue.map((id) => ({ id, label: nameOf(id) })));
+
+/** Asks, in one query, for the chosen categories the first page does not name. */
+async function nameChosen(): Promise<void> {
+  if (!data.value || complete.value) return;
+  const unknown = props.modelValue.filter((id) => firstName(id) === undefined && !named.value.has(id) && !asking.value.has(id));
+  if (!unknown.length) return;
+  asking.value = new Set([...asking.value, ...unknown]);
+  try {
+    const answer = await client.api.call('inventory.category.list', { ...PAGE, ids: unknown });
+    const next = new Map(named.value);
+    for (const row of answer.rows) next.set(row.id, row.name);
+    named.value = next;
+    failure.value = '';
+  } catch (reason) {
+    failure.value = reason instanceof Error ? reason.message : String(reason);
+  } finally {
+    asking.value = new Set([...asking.value].filter((id) => !unknown.includes(id)));
+  }
+}
+watch([data, () => props.modelValue], () => void nameChosen(), { immediate: true });
 
 /** The Combo's pick, shown for one render and then emptied: the field is ready for the next category
  *  (the Combo paints its v-model when it changes). Remounting it instead would orphan its open list. */
@@ -52,7 +81,7 @@ async function search(query: string): Promise<ComboOption[]> {
 
 async function add(option: ComboOption | null): Promise<void> {
   if (!option) return;
-  picked.value = new Map(picked.value).set(option.id, option.label);
+  named.value = new Map(named.value).set(option.id, option.label);
   if (!props.modelValue.includes(option.id)) emit('update:modelValue', [...props.modelValue, option.id]);
   adding.value = option;
   await nextTick();
@@ -107,6 +136,14 @@ function remove(id: string): void {
         </ion-button>
       </ion-chip>
     </div>
+    <InlineFeedback
+      v-if="failure"
+      tone="danger"
+      :data-testid="`${testid}-error`"
+      :heading="t('inventory.form.categoriesLoadError')"
+    >
+      {{ failure }}
+    </InlineFeedback>
   </div>
   <InlineFeedback
     v-else-if="status === 'error'"

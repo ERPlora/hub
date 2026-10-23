@@ -267,6 +267,12 @@ def test_round_trip(admin_client):
     assert post(admin_client, "/inventory/product_categories/add", link).json()["changed"] is True
     assert get(admin_client, "/inventory/product_categories").json()["total"] == 1
 
+    wines = post(admin_client, "/inventory/categories", {"name": "Wines"}).json()
+    # Repeated `ids`, as the SDK sends a list in a query string.
+    asked = get(admin_client, "/inventory/categories", ids=[wines["id"], drinks.json()["id"]]).json()
+    assert [row["name"] for row in asked["rows"]] == ["Drinks", "Wines"]
+    assert get(admin_client, "/inventory/categories", ids=[wines["id"]]).json()["total"] == 1
+
     category = post(admin_client, "/inventory/categories/update", {"category": "Drinks", "color": "#ff0000"})
     assert category.json()["color"] == "#ff0000"
     assert get(admin_client, "/inventory/categories").json()["rows"][0]["product_count"] == 1

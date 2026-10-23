@@ -14,6 +14,7 @@ import {
   type MountOptions,
   ok,
   page,
+  refusal,
   subId,
 } from '../__tests__/mount-inventory';
 import ProductCategoriesField from './ProductCategoriesField.vue';
@@ -102,6 +103,47 @@ describe('ProductCategoriesField', () => {
     await s.choose({ id: 'c9', label: 'Wines' });
     await s.wrapper.setProps({ modelValue: ['c9'] });
     expect(s.chips()).toEqual(['Wines']);
+    // Its name came with the pick: nothing is asked for it.
+    expect(s.searches().filter((q) => 'ids' in q)).toEqual([]);
+  });
+
+  it('names the chosen categories beyond the first page at opening, asking only for those', async () => {
+    const wines = category({ id: 'c9', name: 'Wines', slug: 'wines' });
+    const s = await setup(['c1', 'c9', 'c8'], {
+      first: page([category()], 140, 100),
+      api: () => ok(page([wines, category({ id: 'c8', name: 'Beers', slug: 'beers' })])),
+    });
+    const asked = s.calls('/api/inventory/categories').map((c) => new URL(c.url, 'http://a.localhost').searchParams);
+    expect(asked.map((q) => [q.getAll('ids'), q.get('limit'), q.get('sort')])).toEqual([[['c9', 'c8'], '100', 'name']]);
+    expect(s.chips()).toEqual(['Drinks', 'Wines', 'Beers']);
+  });
+
+  it('a chosen category the server no longer lists shows a dash, not «Loading…»', async () => {
+    const s = await setup(['c9'], { first: page([category()], 140, 100), api: () => ok(page([])) });
+    expect(s.chips()).toEqual(['—']);
+  });
+
+  it('asks nothing more when the first page names every chosen category', async () => {
+    const s = await setup(['c1', 'c2']);
+    expect(s.searches()).toEqual([]);
+  });
+
+  it('with every category on the first page, asks nothing for a chosen one it lacks (it no longer exists)', async () => {
+    const s = await setup(['c1', 'c9']);
+    expect(s.searches()).toEqual([]);
+    expect(s.chips()).toEqual(['Drinks', '—']);
+  });
+
+  it('says «Loading…» on a chip while it names its category', async () => {
+    const s = await setup(['c9'], { first: page([category()], 140, 100), api: () => new Promise<Response>(() => {}) });
+    expect(s.chips()).toEqual(['Loading…']);
+  });
+
+  it('says when the chosen categories could not be named, with the reason', async () => {
+    const s = await setup(['c9'], { first: page([category()], 140, 100), api: () => refusal(503, 'unavailable', 'Try again later.') });
+    const error = s.wrapper.find('[data-testid="cat-error"]');
+    expect(error.text()).toContain('The categories could not be loaded');
+    expect(error.text()).toContain('Try again later.');
   });
 
   it('is not there while the business has no categories', async () => {

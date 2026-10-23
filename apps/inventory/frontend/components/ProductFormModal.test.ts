@@ -29,15 +29,18 @@ const CATEGORIES = page([category(), category({ id: 'c2', name: 'Food', slug: 'f
 const searches = (categories: unknown) => (call: ApiCall) =>
   ok(call.url.startsWith('/api/tax/categories') ? TAX_CATEGORIES : categories);
 
-async function setup(props: Record<string, unknown> = {}, options: { locale?: 'en' | 'es'; categories?: unknown } = {}) {
+async function setup(
+  props: Record<string, unknown> = {},
+  options: { locale?: 'en' | 'es'; categories?: unknown; taxes?: unknown; api?: (call: ApiCall) => Response } = {},
+) {
   const m = await mountInventory(ProductFormModal, {
     props: { open: true, product: null, units: UNITS.rows, ...props },
     locale: options.locale,
     attach: true,
-    api: searches(options.categories ?? CATEGORIES),
+    api: options.api ?? searches(options.categories ?? CATEGORIES),
   });
   const call = await m.live();
-  await m.result(call, 'tax.category.list', TAX_CATEGORIES);
+  await m.result(call, 'tax.category.list', options.taxes ?? TAX_CATEGORIES);
   await m.result(call, 'inventory.category.list', options.categories ?? CATEGORIES);
   const el = (id: string) => document.querySelector<Control>(`[data-testid="${id}"]`);
   async function type(id: string, value: string) {
@@ -252,6 +255,23 @@ describe('ProductFormModal: editing', () => {
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
     await s.choose('inventory-product-tax', 'product.generic');
     expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
+  });
+
+  it('a product whose category and tax category lie beyond the first page opens with their names, never an id or a key', async () => {
+    // More than one query holds (100) of each: the first pages do not name them, so the form asks for them.
+    const wine = { ...TAX_CATEGORIES.rows[0], id: 't9', key: 'drink.wine', name: 'Wine', display_name: 'Wine', rate_pct: '10.00' };
+    const wines = category({ id: 'c9', name: 'Wines', slug: 'wines' });
+    const s = await setup(
+      { product: product({ tax_category_key: 'drink.wine', category_ids: ['c9'] }) },
+      {
+        taxes: { ...TAX_CATEGORIES, total: 140 },
+        categories: page([category()], 140, 100),
+        api: (call) => ok(call.url.startsWith('/api/tax/categories') ? page([wine]) : page([wines])),
+      },
+    );
+    expect(s.el('inventory-product-tax')?.value).toBe('Wine · 10%');
+    expect(s.chips()).toEqual(['Wines']);
+    expect(s.el('inventory-product-tax-unconfigured')).toBeNull();
   });
 
   it('a unit that cannot change with stock says so under the unit', async () => {

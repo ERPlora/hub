@@ -131,17 +131,50 @@ describe('TaxCategorySelect', () => {
     expect(s.testid('tax-unconfigured').exists()).toBe(false);
   });
 
-  it('with more categories than one query holds, a chosen one beyond the first page keeps its key in sight', async () => {
-    const s = await setup({ modelValue: 'drink.wine' });
+  // Beyond the first page (more categories than one query holds), the chosen one is named by asking
+  // Taxes for its key: by its name and rate, never its key; one Taxes no longer lists is «Not configured».
+  const WINE = { ...TAX_CATEGORIES.rows[0], id: 't9', key: 'drink.wine', name: 'Wine', display_name: 'Wine', rate_pct: '10.00' };
+  const SPARKLING = { ...WINE, id: 't10', key: 'drink.wine.sparkling', name: 'Sparkling wine', display_name: 'Sparkling wine' };
+
+  it('names a chosen category beyond the first page by asking Taxes for its key, by its name and rate', async () => {
+    // The list filters by part of the key: the exact one is kept, wherever it comes.
+    const s = await setup({ modelValue: 'drink.wine', markMissing: true }, { api: () => ok(page([SPARKLING, WINE])) });
     await s.show({ ...TAX_CATEGORIES, total: 140 });
-    expect(s.combo().props('modelValue')).toEqual({ id: 'drink.wine', label: 'drink.wine' });
+    expect(s.searches()).toEqual([{ limit: '100', sort: 'display_name', key: 'drink.wine' }]);
+    expect(s.combo().props('modelValue')).toEqual({ id: 'drink.wine', label: 'Wine · 10%' });
+    expect(s.testid('tax-unconfigured').exists()).toBe(false);
   });
 
-  it('with more categories than one query holds, marks only an empty value', async () => {
-    const s = await setup({ modelValue: 'drink.wine', markMissing: true });
+  it('asks nothing more when the first page names the chosen category', async () => {
+    const s = await setup({ modelValue: 'product.generic' });
     await s.show({ ...TAX_CATEGORIES, total: 140 });
-    expect(s.testid('tax-unconfigured').exists()).toBe(false);
-    await s.wrapper.setProps({ modelValue: '' });
+    await s.show(TAX_CATEGORIES);
+    expect(s.searches()).toEqual([]);
+  });
+
+  it('says «Loading…» in the field while it names the chosen category', async () => {
+    const s = await setup({ modelValue: 'drink.wine' }, { api: () => new Promise<Response>(() => {}) });
+    await s.show({ ...TAX_CATEGORIES, total: 140 });
+    expect(s.combo().props('modelValue')).toEqual({ id: 'drink.wine', label: 'Loading…' });
+  });
+
+  it('a chosen category beyond the first page that Taxes no longer lists is «Not configured» and shows none', async () => {
+    const s = await setup({ modelValue: 'old.deactivated', markMissing: true }, { api: () => ok(page([])) });
+    await s.show({ ...TAX_CATEGORIES, total: 140 });
+    expect(s.combo().props('modelValue')).toBeNull();
+    expect(s.marker()).toBe('Not configured · Missing tax category');
+  });
+
+  it('says when the chosen category could not be named, with the reason', async () => {
+    const s = await setup({ modelValue: 'drink.wine' }, { api: () => refusal(503, 'unavailable', 'Try again later.') });
+    await s.show({ ...TAX_CATEGORIES, total: 140 });
+    expect(s.testid('tax-error').text()).toContain('The tax categories could not be loaded');
+    expect(s.testid('tax-error').text()).toContain('Try again later.');
+  });
+
+  it('with more categories than one query holds, marks an empty value', async () => {
+    const s = await setup({ modelValue: '', markMissing: true });
+    await s.show({ ...TAX_CATEGORIES, total: 140 });
     expect(s.testid('tax-unconfigured').exists()).toBe(true);
   });
 
