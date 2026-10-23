@@ -23,9 +23,9 @@ caja ni de stock. Para cobrar está Ventas.
   guarda.
 - **Pedidos** (F08–F11): iniciar desde un carrito activo con número `OS-AAAAMMDD-NNNN` sin huecos por día del
   negocio y el total congelado; marcar pagado, fallido (con motivo) o completado (convierte el carrito).
-- **Consultar** (F12): las pantallas Carritos y Pedidos, con búsqueda, filtros por columna (el Total lee lo
-  que se pega y avisa de lo ambiguo), orden, lista o tarjetas y 50 filas; líneas y detalle de un pedido, por
-  el asistente o la API.
+- **Consultar** (F12): las pantallas Carritos y Pedidos, con búsqueda, filtros por columna tras el embudo de la
+  barra (el Total lee lo que se pega y avisa de lo ambiguo), orden, lista o tarjetas y 50 filas; líneas y
+  detalle de un pedido, por el asistente o la API.
 - **Avisos** (F13): trece eventos al outbox en la transacción del cambio; solo los escucha Automatizaciones
   (FLOW-F21).
 - **Datos personales** (F14): borrar los de un cliente por su email exacto (asistente, API o acción del

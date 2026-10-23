@@ -92,34 +92,33 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await search.fill('');
         await expect(row).toBeVisible();
 
-        // In the cards (390) the filters wait behind the funnel: written in its sheet and applied
-        // (FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390); the list keeps them open and applies as you type.
+        // At every width the filters wait behind the funnel, as the old list (CART_CHECKOUT-F12,
+        // FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL): written in its panel (a sheet in the cards) and applied.
         const funnel = view.locator('[data-testid=cart-checkout-carts-filters-toggle]');
         const sheet = view.locator('[data-testid=cart-checkout-carts-filters-panel]');
-        const folded = await funnel.isVisible();
+        await expect(view.locator('[data-testid=cart-checkout-carts-filters]'), 'no open row of filters').toHaveCount(0);
+        await expect(funnel).toBeVisible();
         async function totalFrom(value: string): Promise<void> {
-          if (folded && !(await sheet.isVisible())) await funnel.click();
-          await (folded ? sheet : view).locator('[data-testid=cart-checkout-carts-filter-total_amount_from] input').fill(value);
-          if (folded) await view.locator('[data-testid=cart-checkout-carts-filters-apply]').click();
+          if (!(await sheet.isVisible())) await funnel.click();
+          await sheet.locator('[data-testid=cart-checkout-carts-filter-total_amount_from] input').fill(value);
+          await view.locator('[data-testid=cart-checkout-carts-filters-apply]').click();
         }
         // «Total from» reads an amount as it is pasted (pm#521): «1.236,06» leaves that cart only.
         await totalFrom('1.236,06');
         await expect(row).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toHaveCount(0);
-        // «1.250» is 1.250 € or 1,25 €: it says so under its box (in the cards, in the sheet) and filters nothing.
+        // «1.250» is 1.250 € or 1,25 €: it says so under its box (in the panel) and filters nothing.
         await totalFrom('1.250');
-        if (folded) await funnel.click();
+        await funnel.click();
         await expect(view.getByText('Type an amount, like 12.50')).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toBeVisible();
         await totalFrom('');
-        // «Apply» closed the sheet: opened again, its box no longer warns (else the check below proves nothing).
-        if (folded) await funnel.click();
+        // «Apply» closed the panel: opened again, its box no longer warns (else the check below proves nothing).
+        await funnel.click();
+        await expect(sheet).toBeVisible();
         await expect(view.getByText('Type an amount, like 12.50')).toHaveCount(0);
-        if (folded) {
-          await expect(sheet).toBeVisible();
-          await view.locator('[data-testid=cart-checkout-carts-filters-close]').click();
-          await expect(sheet).toBeHidden();
-        }
+        await view.locator('[data-testid=cart-checkout-carts-filters-close]').click();
+        await expect(sheet).toBeHidden();
       });
 
       const soon = code(`soon-${width}`);

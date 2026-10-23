@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // Cart & Checkout → Carts (WORKBOOK «Pantallas · Carritos»; CART_CHECKOUT-F01, F05, F06, F12): the live
 // `cart_checkout.cart.list` in a server-side DataTable with the old table's Session, Email, Status, Items
-// and Total, «Search session or email…», filters per column (items and total typed in the unit the column
-// shows), newest first, 50 a page, list or cards. «New cart» opens the form; each row offers «Abandon»
-// (an active cart) and «Delete» (confirmed), only to whoever may; a refusal shows above the table. Changes
-// come back through the stream. There is no screen for a cart's lines (as the old one): the assistant or
+// and Total, «Search session or email…», filters per column behind the toolbar's funnel (as the old one; items
+// and total typed in the unit the column shows), newest first, 50 a page, list or cards. «New cart» opens
+// the form; each row offers «Abandon» (an active cart) and «Delete» (confirmed), only to whoever may; a
+// refusal shows above the table. Changes come back through the stream. There is no screen for a cart's lines (as the old one): the assistant or
 // the API add them.
 import {
   DataTable,
@@ -204,6 +204,7 @@ function onCreated(): void {
       testid="cart-checkout-carts"
       server-side
       searchable
+      filterable
       fill
       :filters="filters"
       :filter-errors="filterErrors"
