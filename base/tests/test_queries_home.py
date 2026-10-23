@@ -546,6 +546,49 @@ def test_the_panels_the_person_may_see(modules):
     assert [w["key"] for w in widget_list(ctx("stock.view"))] == ["stock.today", "stock.private", "stock.chart"]
 
 
+def test_the_texts_of_a_panels_options_are_in_the_persons_language(modules):
+    # FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT: a panel's literal props may carry lazy translations (the text under the
+    # figure of a stat, or deeper in a list or a dict); the list gives them in the reader's language and every other
+    # prop as declared.
+    options = {
+        "format": "number",
+        "label": gettext_lazy("Contingency queue"),
+        "decimals": 0,
+        "compact": False,
+        "legend": [gettext_lazy("Failed events"), 3],
+        "hint": {"text": gettext_lazy("Your team"), "on": True},
+    }
+    modules(
+        module(
+            "stock",
+            widgets=[
+                Widget(key="queue", title=gettext_lazy("Contingency queue"), kind="stat",
+                       operation="stock.item.count", options=options),
+            ],
+        )
+    )
+
+    [spanish] = widget_list(ctx(language="es"))
+    assert spanish["title"] == "Cola de contingencia"
+    assert spanish["options"] == {
+        "format": "number",
+        "label": "Cola de contingencia",
+        "decimals": 0,
+        "compact": False,
+        "legend": ["Eventos caídos", 3],
+        "hint": {"text": "Tu equipo", "on": True},
+    }
+    [english] = widget_list(ctx())
+    assert english["options"] == {
+        "format": "number",
+        "label": "Contingency queue",
+        "decimals": 0,
+        "compact": False,
+        "legend": ["Failed events", 3],
+        "hint": {"text": "Your team", "on": True},
+    }
+
+
 def test_a_panel_says_whether_its_operation_is_a_live_query(modules, monkeypatch):
     # BASE-G168: the Home follows a live query and asks once for one that is not.
     from live.live_registry import live_registry

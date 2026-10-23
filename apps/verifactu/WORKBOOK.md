@@ -846,9 +846,9 @@ Pasos:
    solas.
 2. En el **Inicio**, el panel «Pendientes VeriFactu» (encendido de serie) cuenta lo que aún no está en la AEAT
    (pendiente, enviado sin respuesta o rechazado); desde «Personalizar panel» se añaden «Cola de contingencia» (lo
-   que espera en la cola, en naranja si espera y en rojo si ya ha fallado algún intento), «Registros por estado» y
-   «Eventos AEAT recientes» (los ocho últimos, con su hora, su tipo y su frase). Todos se ponen al día solos y los ve
-   quien puede consultar los registros.
+   que espera en la cola, con «En cola de contingencia» bajo la cifra, en naranja si espera y en rojo si ya ha
+   fallado algún intento), «Registros por estado» y «Eventos AEAT recientes» (los ocho últimos, con su hora, su tipo
+   y su frase). Todos se ponen al día solos y los ve quien puede consultar los registros.
 3. Los resúmenes (pendientes, por estado, cola y últimos eventos) se pueden pedir al asistente o por la API.
 Entra: los registros y los eventos.
 Sale: nada; es consulta.

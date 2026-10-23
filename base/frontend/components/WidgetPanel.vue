@@ -181,6 +181,7 @@ const chosenBar = computed(() => {
       <p
         v-if="view.label"
         class="widget-muted"
+        data-testid="widget-label"
       >
         {{ view.label }}
       </p>
