@@ -10,6 +10,10 @@ Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cam
 - `ion:chatbubble-ellipses-outline` — entrada de menú **Notas rápidas**. Hoy: `ion:chatbubbles-outline`.
 - `ion:flame` y `ion:flame-outline` — la llama de urgencia junto a «Enviar comanda» en «Comanda actual»
   (SALE-F20, KITCHEN-F18), el icono del producto actual. Hoy: `ion:alert-circle` / `ion:alert-circle-outline`.
+- `ion:trending-up-outline` — el panel **Ventas hoy** del Inicio (`apps.py`, `widgets`; SALE-F28), el icono
+  del producto actual. Hoy: `ion:cash-outline` (el que el viejo ponía dentro del panel).
+- `ion:bar-chart-outline` — el panel **Ventas últimos 7 días** del Inicio, el icono del producto actual. Hoy:
+  `ion:calendar-outline`.
 
 ## Plataforma
 
