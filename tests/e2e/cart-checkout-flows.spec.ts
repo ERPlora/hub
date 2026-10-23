@@ -92,16 +92,26 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
         await search.fill('');
         await expect(row).toBeVisible();
 
+        // In the cards (390) the filters wait behind the funnel: written in its sheet and applied
+        // (FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390); the list keeps them open and applies as you type.
+        const funnel = view.locator('[data-testid=cart-checkout-carts-filters-toggle]');
+        const sheet = view.locator('[data-testid=cart-checkout-carts-filters-panel]');
+        const folded = await funnel.isVisible();
+        async function totalFrom(value: string): Promise<void> {
+          if (folded && !(await sheet.isVisible())) await funnel.click();
+          await (folded ? sheet : view).locator('[data-testid=cart-checkout-carts-filter-total_amount_from] input').fill(value);
+          if (folded) await view.locator('[data-testid=cart-checkout-carts-filters-apply]').click();
+        }
         // «Total from» reads an amount as it is pasted (pm#521): «1.236,06» leaves that cart only.
-        const from = view.locator('[data-testid=cart-checkout-carts-filter-total_amount_from] input');
-        await from.fill('1.236,06');
+        await totalFrom('1.236,06');
         await expect(row).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toHaveCount(0);
-        // «1.250» is 1.250 € or 1,25 €: it says so under its box and filters nothing.
-        await from.fill('1.250');
+        // «1.250» is 1.250 € or 1,25 €: it says so under its box (in the cards, in the sheet) and filters nothing.
+        await totalFrom('1.250');
+        if (folded) await funnel.click();
         await expect(view.getByText('Type an amount, like 12.50')).toBeVisible();
         await expect(rowOf(page, 'cart-checkout-carts', firstId)).toBeVisible();
-        await from.fill('');
+        await totalFrom('');
         await expect(view.getByText('Type an amount, like 12.50')).toHaveCount(0);
       });
 
