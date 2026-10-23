@@ -35,6 +35,9 @@ preface, no notes, no code fence around it.
 and blank lines.
 - Leave untouched: inline code and code blocks, identifiers such as `demo.item.created` or \
 `inventory.manage`, URLs and external links, and image paths (`docs/img/...`).
+- Translate the date placeholders of a pattern, even inside inline code: `AAAA` is `YYYY` and \
+`aaaa` is `yyyy` (`OS-AAAAMMDD-NNNN` is `OS-YYYYMMDD-NNNN`, `DD/MM/AAAA` is `DD/MM/YYYY`); the \
+rest of the pattern (`MM`, `DD`, `NNNN`, `hh:mm`) stays as it is.
 - Rewrite every in-page link `(#...)` to point at its translated heading: the heading in lowercase, \
 punctuation removed and spaces as hyphens (`## How to use it` is `#how-to-use-it`).
 - Translate the labels of the app quoted with «...» as the English app shows them, in double quotes.
@@ -44,6 +47,8 @@ MAX_TOKENS = 64000
 #: The Claude API key: without it no call is made.
 API_KEY = "ANTHROPIC_API_KEY"
 _IMAGE_PATH_RE = re.compile(r"docs/img/[^\s)\"'>]+")
+#: A pattern still carrying the Spanish year placeholder (`OS-AAAAMMDD-NNNN`, `DD/MM/AAAA`).
+_SPANISH_DATE_RE = re.compile(r"[\w/:-]*(?:AAAA|aaaa)[\w/:-]*")
 
 
 def translate(source: str) -> str:
@@ -136,6 +141,11 @@ class Command(BaseCommand):
         if lost:
             raise CommandError(
                 f"{config.label}: the translation changed the image paths {', '.join(lost)}: nothing written."
+            )
+        spanish_dates = sorted(set(_SPANISH_DATE_RE.findall(english)))
+        if spanish_dates:
+            raise CommandError(
+                f"{config.label}: the translation kept the Spanish date placeholders {', '.join(spanish_dates)}: nothing written."
             )
         try:
             catalog.check_anchors(english)

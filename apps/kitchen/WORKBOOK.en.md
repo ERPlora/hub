@@ -115,7 +115,7 @@ reloading.
 ### Tickets
 Menu **Kitchen → Tickets**. Table of all the tickets, newest first, 50 per page (another size is chosen
 at the bottom):
-Ticket (full number `AAAAMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes and Total;
+Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes and Total;
 search box "Search ticket or destination…" (by number and label), filters by Type, Priority and Status
 (each one a list with its words: "Dine in", "Rush", "To prepare"…), and table or card view. Actions per
 row, icon only: "Fire", "Ready", "Served", "Recall" and "Cancel" (in the "⋮" menu, with confirmation and an
@@ -282,7 +282,7 @@ Screen: none
 Steps:
 1. The waiter sends the round (KITCHEN-F18) or Sales sends it by itself (through the assistant or the
    API); the one Sales sends by itself reaches Kitchen a moment later, without anyone doing anything.
-2. Kitchen opens a ticket with the day's number (`AAAAMMDD-NNNN`, the business day, Madrid time), the
+2. Kitchen opens a ticket with the day's number (`YYYYMMDD-NNNN`, the business day, Madrid time), the
    check's round, the check's label ("Table 4"), the type, the priority and the waiter.
 3. Each line that is not a service is a dish, in the order of the check, sent to its station
    (KITCHEN-F04); a menu, one dish for each dish chosen (KITCHEN-F06). Service lines are not cooked.
