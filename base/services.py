@@ -628,7 +628,8 @@ def _apply_members(hub: Hub, members: list) -> None:
             continue
         changed.append(saas_user_id)
     if changed:
-        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host=hub.slug))
+        # A session that noted no host (from before the rule) is valid on every host, this business's too.
+        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host__in=[hub.slug, ""]))
 
 
 def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
