@@ -7,6 +7,8 @@
 // and 834 px, in English and in Spanish. Behind the funnel (a `filterable` list such as Invoices, and every list on
 // a phone, ui#28) each range already had its column as a title: there it is said once, «From» / «To» below it.
 // The ends keep their widths (ui#29) and nothing runs past the row, the panel or the sheet.
+// Since FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL Payments is `filterable` as the old list: its two ranges are
+// measured in its panel at every size; Orders keeps the row.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, record, shot, shown, untilStill } from './helpers';
@@ -34,11 +36,11 @@ const ORDERS: List = {
   desk: 'row',
   ranges: [{ column: { en: 'Total', es: 'Total' }, ends: ['total_amount_from', 'total_amount_to'], field: 'text' }],
 };
-// Two ranges in one row: a date range and an amount.
+// Two ranges in one list: a date range and an amount, behind the funnel as in the old list.
 const PAYMENTS: List = {
   path: '/payment/payments',
   table: 'payment-payments',
-  desk: 'row',
+  desk: 'panel',
   ranges: [
     { column: { en: 'Date', es: 'Fecha' }, ends: ['payment_date_from', 'payment_date_to'], field: 'date' },
     { column: { en: 'Amount', es: 'Importe' }, ends: ['amount_from', 'amount_to'], field: 'number' },

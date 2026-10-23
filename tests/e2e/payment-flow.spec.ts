@@ -97,7 +97,8 @@ async function waitForList(page: Page, table: string): Promise<void> {
   await shown(page).locator(`[data-testid=${table}-empty], [data-testid=${table}-row]`).first().waitFor({ state: 'visible' });
 }
 
-/** Sets the Date filter of Payments: in the filter row on a wide screen, in the filters panel where it folds. */
+/** Sets the Date filter of Payments: in the filters panel behind the funnel (the list is `filterable`), or in the
+ *  filter row of a list that opens it. */
 async function filterDates(page: Page, from: string, to: string): Promise<void> {
   const view = shown(page);
   const toggle = view.locator('[data-testid=payment-payments-filters-toggle]');

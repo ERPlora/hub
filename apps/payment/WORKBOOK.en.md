@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ed3044b02e8f28cba83449547543b057b3170825d3c9582d673166aae208237e -->
+<!-- generated from WORKBOOK.md sha256:fe3341da7e0a01d88b46ef66348e57df07370737cf93f98b1b292d8f25e565f8 -->
 
 ## What it is for and who it is for
 
@@ -59,9 +59,10 @@ cannot do does not show, and the app refuses it even if they try through the API
 
 Title "Outgoing payments". A table with the columns **Reference**, **Date**, **Beneficiary**,
 **Amount** and **Status** (and **Method**, which can be shown with the column picker). Search box
-"Search reference or beneficiary…" (it also searches the supplier invoice reference), column filters —
-reference and beneficiary by a piece of the text, the date "from / to", the amount "from / to" in euros,
-the status from a list —, sorting by column, list or card view and 50 rows per page. It is sorted by the
+"Search reference or beneficiary…" (it also searches the supplier invoice reference), column filters
+behind the toolbar's funnel — reference and beneficiary by a piece of the text, the date "from / to", the
+amount "from / to" in euros, the status from a list; they apply with "Apply" and the funnel counts the ones
+in use —, sorting by column, list or card view and 50 rows per page. It is sorted by the
 **payment date**, the most recent on top (not by the date it was entered).
 
 Each row offers the action that is due, named after what it does: **Approve** (Draft), **Mark as sent**
@@ -215,8 +216,9 @@ Screen: Payments
 Steps:
 1. Open **Payments**.
 2. Type in the search box a piece of the reference (the last digits, the date), of the beneficiary or of
-   the supplier invoice, or use the column filters: the **Date** from one day, up to another or between
-   the two; the **Amount** from / to in euros; the **Status** from the list.
+   the supplier invoice, or open the filters with the toolbar's funnel: the **Date** from one day, up to
+   another or between the two; the **Amount** from / to in euros; the **Status** from the list; and press
+   "Apply".
 3. Sort by the column you need.
 In: what the person types.
 Out: nothing; read only. The list updates on its own when another person records or changes a payment.
