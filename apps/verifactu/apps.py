@@ -3,7 +3,11 @@ fingerprint, with their QR, validated against the AEAT's schemas and sent to the
 (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widget
+
+from apps.verifactu import events as E
+
+VIEW = "verifactu.view_record"
 
 
 class VerifactuConfig(LiveAppConfig):
@@ -64,6 +68,78 @@ class VerifactuConfig(LiveAppConfig):
         Nav("recovery", _("Recovery"), "lucide:shield-check", "/verifactu/recovery"),
         Nav("config", _("Configuration"), "ion:key-outline", "/verifactu/config"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/verifactu/settings"),
+    ]
+    # The Home's hooks (PLAN-HUB round 2026-10-21), the old module's module.json `setup` and `widgets` (it had no
+    # `bell`). The step is done once the chosen way could carry the records to the AEAT of production (VERIFACTU-F08,
+    # no plan gating it: PLAN §30), which is what the business has to do; it is functional, never base's legal level:
+    # testing files without it and the till sells (gh:hub#1726). The panels read the queries of the old ones, each
+    # refreshed by the events live.py re-runs it on; the latest events are a component of the app, which names each
+    # event's type in the reader's language (gh:verifactu#139). Registered icons only: the old
+    # `shield-checkmark-outline` and `stats-chart-outline` wait in UI-REQUESTS.md.
+    setup = [
+        SetupStep(
+            key="sending_route",
+            operation="verifactu.config.get",
+            configured_when=[SetupCheck(field="route_ready_for_production", truthy=True)],
+            title=_("Set up VeriFactu"),
+            description=_(
+                "Sign the authorisation for ERPlora to send your invoices to the AEAT, or upload your business "
+                "certificate."
+            ),
+            icon="lucide:shield-check",
+            route="/verifactu/config",
+            permission="verifactu.configure",
+            required=True,
+            refresh_on=[E.CONFIG_CHANGED],
+        )
+    ]
+    widgets = [
+        Widget(
+            key="pending",
+            title=_("VeriFactu pending"),
+            icon="lucide:shield-check",
+            size="sm",
+            permission=VIEW,
+            default=True,
+            refresh_on=E.RECORD_EVENTS,
+            kind="kpi",
+            operation="verifactu.stats.compliance_summary",
+            map={"value": "pending_count"},
+            options={"format": "number"},
+        ),
+        Widget(
+            key="contingency",
+            title=_("Contingency queue"),
+            icon="ion:warning-outline",
+            size="sm",
+            permission=VIEW,
+            refresh_on=E.RECORD_EVENTS,
+            kind="stat",
+            operation="verifactu.stats.contingency_summary",
+            map={"value": "queued_count", "severity": "severity"},
+            options={"format": "number"},
+        ),
+        Widget(
+            key="by_status",
+            title=_("Records by status"),
+            icon="ion:list-outline",
+            size="md",
+            permission=VIEW,
+            refresh_on=E.RECORD_EVENTS,
+            kind="bar-list",
+            operation="verifactu.stats.records_by_status",
+            map={"label": "label", "value": "total"},
+            options={"valueFormat": "number"},
+        ),
+        Widget(
+            key="events",
+            title=_("Recent AEAT events"),
+            icon="ion:time-outline",
+            size="md",
+            permission=VIEW,
+            refresh_on=E.ALL,
+            component="RecentEventsPanel",
+        ),
     ]
     # The queue's send (VERIFACTU-F20): the phase-2 worker runs it on every hub as the system, every minute
     # (cron in UTC); each chain waits the TiempoEsperaEnvio the AEAT answered.

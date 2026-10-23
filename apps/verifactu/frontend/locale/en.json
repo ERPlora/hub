@@ -190,6 +190,7 @@
       "empty": "No events.",
       "loading": "Loading…",
       "loadError": "The events could not be loaded",
+      "panelError": "The latest AEAT events could not be loaded.",
       "entity": {
         "one": "event",
         "many": "events"

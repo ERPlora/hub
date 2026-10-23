@@ -459,6 +459,9 @@ def config_out(config: Config, ctx: OperationContext) -> ConfigOut:
         representation=representation_out(config, nif),
         synced_at=config.synced_at,
         route_ready=not route_problem(config, config.environment, ctx.scope),
+        route_ready_for_production=not _route_sending_problem(
+            config, Environment.PRODUCTION, ctx.scope
+        ),
         reasons=[wait(code) for code in blockers(config, config.environment, ctx.scope)],
         issue_blocker=wait(refused) if refused else None,
         live_blockers=[wait(code) for code in live_problems(config, ctx.scope)],
