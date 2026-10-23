@@ -11,7 +11,7 @@ import datetime as dt
 from uuid import uuid7
 
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
@@ -272,6 +272,31 @@ def test_a_service_without_a_fixed_price_takes_the_amount_typed_within_its_range
     assert refusal.value.code == "sale.service_price_fixed"
     order = add(service_id=str(colour.id), unit_price=7000)
     assert order.lines[0].unit_price == 7000
+
+
+def test_the_range_of_a_service_is_said_with_its_thousands_grouped(db):
+    # hub#1090: «1.000,00 € – 2.500,00 €» in Spanish, never «1000.00 € – 2500.00 €».
+    bridal = svc(
+        "service.service.create",
+        {
+            "name": "Bridal",
+            "pricing_type": "from",
+            "price": 150000,
+            "min_price": 100000,
+            "max_price": 250000,
+            "tax_category_key": "service.generic",
+        },
+    )
+    order = run("sale.order.open", {})
+    for language, low, high in (("es", "1.000,00 €", "2.500,00 €"), ("en", "€1,000.00", "€2,500.00")):
+        with translation.override(language), pytest.raises(Conflict) as refusal:
+            run(
+                "sale.order.add_service_line",
+                {"order_id": str(order.id), "service_id": str(bridal.id), "unit_price": 300000},
+            )
+        assert refusal.value.code == "sale.service_price_out_of_range"
+        message = refusal.value.message.replace("\u00a0", " ").replace("\u202f", " ")
+        assert low in message and high in message
 
 
 def test_an_archived_or_unconfigured_service_is_not_sold(haircut):

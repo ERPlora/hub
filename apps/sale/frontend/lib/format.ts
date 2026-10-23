@@ -25,10 +25,12 @@ function formatter(locale: string, key: string, options: Intl.NumberFormatOption
 
 const missing = (value: unknown) => value === null || value === undefined || value === '' || Number.isNaN(Number(value));
 
-/** `cents` as euros in `locale` («€1,234.56», «1234,56 €»); nothing to show is «—». */
+// Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
+// here beside «1.234,56 €» in the other screens (hub#1090).
+/** `cents` as euros in `locale` («€1,234.56», «1.234,56 €»); nothing to show is «—». */
 export function formatMoney(cents: number | null | undefined, locale: string): string {
   if (missing(cents)) return '—';
-  return formatter(locale, 'money', { style: 'currency', currency: CURRENCY }).format((cents as number) / 100);
+  return formatter(locale, 'money', { style: 'currency', currency: CURRENCY, useGrouping: 'always' }).format((cents as number) / 100);
 }
 
 /** A percentage («21.00» → «21%», «12.50» → «12,5 %»); nothing to show is «—». */

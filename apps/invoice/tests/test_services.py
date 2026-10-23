@@ -536,6 +536,16 @@ def test_a_manual_ticket_stops_at_the_tickets_limit(issuer):
     assert (ticket.invoice_type, ticket.total_amount) == ("F2", 300000)
 
 
+def test_the_tickets_limit_is_said_with_its_thousands_grouped(issuer):
+    # hub#1090: «3.000,00 €» in Spanish and «€3,000.00» in English, never «3000.00 €».
+    over = [{"description": "Course", "quantity": "1", "unit_price": 247935, "tax_rate": "21"}]
+    for language, amount in (("es", "3.000,00 €"), ("en", "€3,000.00")):
+        with translation.override(language), pytest.raises(Conflict) as refused:
+            run("invoice.invoice.create", {"series_code": "TICKET", "lines": over})
+        assert refused.value.code == "invoice.ticket_over_limit"
+        assert amount in refused.value.message.replace("\u00a0", " ").replace("\u202f", " ")
+
+
 # ── Series (INVOICE-F12, F13) ───────────────────────────────────────────────────────────────────
 
 

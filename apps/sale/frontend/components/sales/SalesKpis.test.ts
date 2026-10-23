@@ -86,7 +86,7 @@ describe('SalesKpis', () => {
       ['Tickets', '1234'],
       ['Ingresos', '12.500,50 €'],
       ['Ticket medio', '10,13 €'],
-      ['IVA', '1500,50 €'],
+      ['IVA', '1.500,50 €'],
       ['Descuentos', '25,00 €'],
       ['Anuladas', '3'],
     ]);
@@ -107,12 +107,12 @@ describe('SalesKpis', () => {
     // The territory kept today is another one: what the sales declared wins.
     await s.result('tax.settings.get', taxSettings(tax === 'igic' ? 'vat' : 'igic'));
     await s.result('sale.sale.stats', { ...STATS, tax_kind: tax });
-    expect(s.cards()[3]).toEqual([label, locale === 'es' ? '1500,50 €' : '€1,500.50']);
+    expect(s.cards()[3]).toEqual([label, locale === 'es' ? '1.500,50 €' : '€1,500.50']);
   });
 
   it.each([
     ['en', 'Taxes', '€1,500.50'],
-    ['es', 'Impuestos', '1500,50 €'],
+    ['es', 'Impuestos', '1.500,50 €'],
   ] as const)('sales of more than one tax name it a plain «Taxes» (%s)', async (locale, label, value) => {
     const s = await setup(undefined, locale);
     await s.result('tax.settings.get', taxSettings('igic'));

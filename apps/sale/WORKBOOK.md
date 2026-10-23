@@ -1663,6 +1663,10 @@ administrador y responsable, los mismos que anulan y devuelven).
 36. **Lo vendido por cada profesional resta lo devuelto** (ver 5), a quien vendió lo que vuelve (antes
     una devolución parcial no restaba y la total borraba la venta, así que la suma de las profesionales
     no cuadraba con los «Ingresos» del día).
+37. **Los importes agrupan los millares desde cuatro cifras** (hub#1090): «1.234,56 €» en español, también
+    en los avisos del servidor (el tope del efectivo y del tique, el margen de precio de un servicio, lo que
+    queda por devolver con un medio), que antes decían «1000.00 €». Lo que se teclea (cobro, cantidades,
+    devolución) nunca se agrupa.
 
 ### Lo que NO hace, a propósito
 
