@@ -1,18 +1,18 @@
 // @vitest-environment node
-// The hub setup (setup.ts, `test.setupFiles`) proven for real: Vitest runs __tests__/timers.fixture.ts with the
+// The hub setup (vitest.setup.ts, `test.setupFiles`) proven for real: Vitest runs vitest.setup.fixture.ts with the
 // hub's own config in a process of its own, and each of its tests must end as the setup says — failed when it
 // leaves a real timer armed, passed otherwise (hub#197, hub#199: a timer that outlives a test fires into the
 // torn-down page, an «Unhandled error» and exit 1 with every test green).
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-const HUB_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const FIXTURE = 'frontend/testing/__tests__/timers.fixture.ts';
+const HUB_DIR = dirname(fileURLToPath(import.meta.url));
+const FIXTURE = 'vitest.setup.fixture.ts';
 
 /** Runs the fixture alone with the hub's config (its `include` swapped for the fixture) and the JSON reporter. */
 const RUN = `
@@ -62,7 +62,7 @@ describe('the hub setup', { timeout: 60_000 }, () => {
       const { status, failureMessages } = outcome(title);
       expect(status).toBe('failed');
       expect(failureMessages.join('\n')).toMatch(/real timers still armed when the test ends/);
-      expect(failureMessages.join('\n')).toMatch(/timers\.fixture\.ts/);
+      expect(failureMessages.join('\n')).toMatch(/vitest\.setup\.fixture\.ts/);
     },
   );
 

@@ -1,6 +1,7 @@
-// Runs before every test file of the hub (`test.setupFiles` in vite.config.ts; proven by setup.test.ts): no real
-// timer outlives a test (hub#197, hub#199). Vitest tears the page's window down at the end of a file, and a timer
-// still armed then fires into a missing window — an «Unhandled error» and exit 1 with every test green.
+// Runs before every test file of the hub (`test.setupFiles` in vite.config.ts, as packages/ui's; proven by
+// vitest.setup.test.ts): no real timer outlives a test (hub#197, hub#199). Vitest tears the page's window down at the
+// end of a file, and a timer still armed then fires into a missing window — an «Unhandled error» and exit 1 with
+// every test green.
 // Each test's end leaves the page as a person does: it unmounts what @vue/test-utils mounted and the test did not
 // (AppPage clears its tabbar's 450 ms scroll hint then, which emptying the document alone does not), empties the
 // document, lets what that sets off run, and fails if a real timeout or interval the test armed is still pending,
@@ -16,7 +17,7 @@ import { render, toRaw } from 'vue';
 type Timer = ReturnType<typeof setTimeout>;
 type Handler = (...args: unknown[]) => void;
 
-const HUB_DIR = `${dirname(dirname(dirname(fileURLToPath(import.meta.url))))}/`;
+const HUB_DIR = `${dirname(fileURLToPath(import.meta.url))}/`;
 
 const real = { setTimeout, clearTimeout, setInterval, clearInterval };
 

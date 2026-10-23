@@ -1,6 +1,6 @@
-// Not a test of the hub (no `.test.ts`: the suite never collects it): setup.test.ts runs it on its own, with
-// the hub's config, and reads how each test ended. Each one ends in the state its name says, and the hub
-// setup (frontend/testing/setup.ts) must fail exactly those that leave a real timer armed.
+// Not a test of the hub (no `.test.ts`: the suite never collects it): vitest.setup.test.ts runs it on its own,
+// with the hub's config, and reads how each test ended. Each one ends in the state its name says, and the hub
+// setup (vitest.setup.ts) must fail exactly those that leave a real timer armed.
 import { mount } from '@vue/test-utils';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';

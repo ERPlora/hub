@@ -86,7 +86,8 @@ describe('vite.config', () => {
   });
 
   it('runs the hub setup before every test file: no real timer outlives a test', () => {
-    // frontend/testing/setup.ts, proven by its own test (setup.test.ts).
-    expect(config.test?.setupFiles).toEqual(['frontend/testing/setup.ts']);
+    // As packages/ui's; proven by its own test (vitest.setup.test.ts), which the suite collects.
+    expect(config.test?.setupFiles).toEqual(['./vitest.setup.ts']);
+    expect(config.test?.include).toEqual(expect.arrayContaining(['vitest.setup.test.ts']));
   });
 });

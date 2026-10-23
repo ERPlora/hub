@@ -23,7 +23,7 @@ import en from '../locale/en.json';
 import es from '../locale/es.json';
 
 // happy-dom made to behave as a browser where Ionic's runtime reaches it, by each helper: the hub setup
-// (frontend/testing/setup.ts) only unmounts what a test left mounted and fails one that leaves a real timer armed.
+// (vitest.setup.ts) only unmounts what a test left mounted and fails one that leaves a real timer armed.
 fillHappyDomGaps();
 // What `createShell` does at boot: `ion:` icons paint by name from this registry.
 addIcons(ION_ICONS);

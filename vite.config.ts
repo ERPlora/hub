@@ -43,10 +43,10 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
-    include: ['frontend/**/*.test.ts', 'base/frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts', 'eslint.config.test.ts', 'tsconfig.test.ts', 'tests/e2e/*.test.ts'],
+    include: ['frontend/**/*.test.ts', 'base/frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts', 'vitest.setup.test.ts', 'eslint.config.test.ts', 'tsconfig.test.ts', 'tests/e2e/*.test.ts'],
     // Vitest's default `exclude` drops every `vite.config.*` and `eslint.config.*`.
     exclude: ['**/node_modules/**', '**/dist/**'],
     // No real timer outlives a test (hub#197, hub#199).
-    setupFiles: ['frontend/testing/setup.ts'],
+    setupFiles: ['./vitest.setup.ts'],
   },
 });
