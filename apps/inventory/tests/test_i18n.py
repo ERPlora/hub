@@ -71,6 +71,9 @@ def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages, CSV)."""
     config = apps.get_app_config("inventory")
     lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
+    # The Home's step and panels (gh:hub#868: the old checklist spoke English to a Spanish reader).
+    lazies += [text for step in config.setup for text in (step.title, step.description)]
+    lazies += [panel.title for panel in config.widgets]
     lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
     for model in (Settings, Category, Product, ProductCategory, StockMovement, SaleStock, RefundStock):
         lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]

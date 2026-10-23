@@ -18,6 +18,24 @@ msgstr ""
 msgid "Inventory"
 msgstr "Inventario"
 
+msgid "Your catalog"
+msgstr "Tu catálogo"
+
+msgid "Add at least one product so there is something to sell."
+msgstr "Añade al menos un producto para que haya algo que vender."
+
+msgid "Low-stock products"
+msgstr "Productos con stock bajo"
+
+msgid "Stock value (at cost)"
+msgstr "Valor de existencias (a coste)"
+
+msgid "Products in stock"
+msgstr "Productos en stock"
+
+msgid "Lowest-stock products"
+msgstr "Productos con menos stock"
+
 msgid "single row"
 msgstr "fila única"
 
