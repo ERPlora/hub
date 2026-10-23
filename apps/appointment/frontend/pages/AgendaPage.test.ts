@@ -98,6 +98,35 @@ describe('AgendaPage', () => {
     expect(s.params(LIST).map((params) => params.offset)).toEqual([0, 100, 200]);
   });
 
+  // APPOINTMENT-F28: a tap on the device's notice opens the agenda on the appointment's day (`?date=`), also when the
+  // agenda is already open; a date that does not read leaves it on today.
+  async function openOn(path: string) {
+    const m = await mountAppointment(AgendaPage, { session: OWNER, path });
+    await m.live();
+    await m.result('appointment.settings.get', SETTINGS);
+    await m.reopen();
+    return m;
+  }
+
+  it('opens on the day the address names, and moves to the next one a tap names', async () => {
+    const m = await openOn('/appointment/agenda?date=2026-12-01');
+    expect(m.params(LIST)).toEqual([{ date_from: '2026-12-01', date_to: '2026-12-01', sort: 'start', limit: 100, offset: 0 }]);
+
+    await m.router.push('/appointment/agenda?date=2026-12-05');
+    await m.reopen();
+
+    expect(m.params(LIST)).toEqual([{ date_from: '2026-12-05', date_to: '2026-12-05', sort: 'start', limit: 100, offset: 0 }]);
+  });
+
+  it.each(['/appointment/agenda?date=tomorrow', '/appointment/agenda?date=2026-13-45'])(
+    'a date that does not read leaves it on today (%s)',
+    async (path) => {
+      const m = await openOn(path);
+      const today = m.wrapper.findComponent(AgendaToolbar).props('today') as string;
+      expect(m.params(LIST)[0]).toMatchObject({ date_from: today, date_to: today });
+    },
+  );
+
   it('filters by status and steps the day', async () => {
     const s = await setup();
     s.toolbar().vm.$emit('update:status', 'pending');

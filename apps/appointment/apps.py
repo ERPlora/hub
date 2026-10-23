@@ -1,7 +1,14 @@
 """The appointment app: the salon's diary — who comes, for what, with whom and when."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, DeviceNotice, LiveAppConfig, Nav, SetupCheck
+
+#: What may add a notice: a booking, and a cancellation (the query keeps the customer's own).
+NOTICE_EVENTS = ["appointment.appointment.created", "appointment.appointment.cancelled"]
+#: The old shell's body (old-hub:HUB_SHELL-F66): the services, «{day} at {hour}» and the professional.
+NOTICE_BODY = ["{service_names}", _("{start_date_label} at {start_time_label}"), "{staff_name}"]
+#: A tap opens the agenda on the appointment's day (its start, on the business's clock).
+NOTICE_ROUTE = "/appointment/agenda?date={start:.10}"
 
 
 class AppointmentConfig(LiveAppConfig):
@@ -71,5 +78,29 @@ class AppointmentConfig(LiveAppConfig):
             _("Appointments"),
             "ion:calendar-outline",
             "/appointment/agenda",
+        ),
+    ]
+    # APPOINTMENT-F28 (old-hub:HUB_SHELL-F66): the device is told what the customer booked or cancelled herself, of
+    # the agenda the person sees (the query's rules: never the front desk's, an employee only hears her own).
+    notices = [
+        DeviceNotice(
+            key="booked",
+            operation="appointment.appointment.notices",
+            when=[SetupCheck(field="kind", equals="booked")],
+            title=[_("New appointment · {customer_name}"), _("New appointment")],
+            body=NOTICE_BODY,
+            route=NOTICE_ROUTE,
+            permission="appointment.view_own_appointment",
+            refresh_on=NOTICE_EVENTS,
+        ),
+        DeviceNotice(
+            key="cancelled",
+            operation="appointment.appointment.notices",
+            when=[SetupCheck(field="kind", equals="cancelled")],
+            title=[_("Appointment cancelled · {customer_name}"), _("Appointment cancelled")],
+            body=NOTICE_BODY,
+            route=NOTICE_ROUTE,
+            permission="appointment.view_own_appointment",
+            refresh_on=NOTICE_EVENTS,
         ),
     ]

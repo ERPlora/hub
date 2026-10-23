@@ -6,7 +6,7 @@ import { toast, toastError, toastSuccess } from '@erplora/ui/shell';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, flush, MANAGER, mountSale, settle } from '../__tests__/mount-sale';
+import { click, EMPLOYEE, errorFrame, flush, MANAGER, mountSale, noTimerOutlivesATest, settle } from '../__tests__/mount-sale';
 import CartHeading from '../components/pos/CartHeading.vue';
 import CartLines from '../components/pos/CartLines.vue';
 import DirtyCheckDialog from '../components/pos/DirtyCheckDialog.vue';
@@ -69,6 +69,7 @@ vi.mock('../../../customer/frontend/components/CustomerSearch.vue', async () => 
   };
 });
 
+noTimerOutlivesATest();
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 afterEach(() => {
   vi.unstubAllGlobals();

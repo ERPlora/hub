@@ -15,11 +15,17 @@ panels of the dashboard (``widgets``) and its counters of the bell (``bell``), e
 - whoever lacks a step's permission is not told about it, except a pending ⛔ (``actionable: false``): it is what
   will stop their invoice, whoever clears it (hub#435).
 
+The device's notices (PLAN-HUB round 2026-10-23, ``notices``; ``base.notice.list``) run the same way: every row of
+a notice's query that passes its ``when`` is told, with the texts filled in from the row in the person's language
+(:func:`device_notices`); the shell tells each one once on the device, with the installed app's system notice.
+
 No ORM here: ``queries.py`` reads what the platform's own steps and counters need.
 """
 
+import datetime as dt
 import json
 import logging
+import string
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
@@ -27,7 +33,7 @@ from django.conf import settings
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
-from live.meta import LiveAppConfig, SetupCheck, module_configs
+from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, module_configs
 from live.operations import get
 
 logger = logging.getLogger(__name__)
@@ -269,3 +275,92 @@ def bell_counters(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> li
                     }
                 )
     return counters
+
+
+# --- The device's notices (PLAN-HUB round 2026-10-23) ------------------------------------------------------------
+
+#: What joins the parts of a notice's body (the old shell's «service · day at hour · professional»).
+BODY_JOINER = " · "
+
+
+def rows_of(ctx: OperationContext, operation: str, params: Mapping[str, Any]) -> list[dict]:
+    """Every row of ``operation`` run with ``params`` as the person of ``ctx`` (its ``rows`` or ``items``)."""
+    op = get(operation)
+    result = op(ctx, op.input.model_validate(dict(params))).model_dump(mode="json")
+    for name in ("rows", "items"):
+        rows = result.get(name)
+        if isinstance(rows, list):
+            return rows
+    return []
+
+
+def filled(value: Any) -> bool:
+    return value is not None and (not isinstance(value, str) or bool(value.strip()))
+
+
+def fill(template: Any, row: Mapping[str, Any], key: str) -> str | None:
+    """``template`` with the row's fields, or ``None`` when a field it names is empty; one that does not fit the
+    row (a translation that misnames a field) is logged and is ``None`` too."""
+    text = str(template)
+    try:
+        names = [name for _literal, name, _spec, _conversion in string.Formatter().parse(text) if name is not None]
+        if not all(filled(row.get(name)) for name in names):
+            return None
+        return text.format_map(row)
+    except (KeyError, IndexError, ValueError, TypeError, AttributeError):
+        logger.warning("Device notice %s: its text %r does not fit its rows.", key, text, exc_info=True)
+        return None
+
+
+def told(key: str, app: str, notice: DeviceNotice, row: Mapping[str, Any]) -> dict | None:
+    """The row as the device tells it, or ``None`` when no title of the notice fills in (logged)."""
+    title = next((text for text in (fill(template, row, key) for template in notice.title) if text), None)
+    if title is None:
+        logger.warning("Device notice %s: no title fills in for row %r; left out.", key, row.get("id"))
+        return None
+    parts = [fill(template, row, key) for template in notice.body]
+    return {
+        "key": key,
+        "app": app,
+        "id": str(row["id"]),
+        "at": str(row["at"]),
+        "title": title,
+        "body": BODY_JOINER.join(part for part in parts if part),
+        "route": fill(notice.route, row, key) or "",
+    }
+
+
+def instant(notice: Mapping[str, Any]) -> dt.datetime:
+    moment = dt.datetime.fromisoformat(notice["at"])
+    return moment if moment.tzinfo else moment.replace(tzinfo=dt.UTC)
+
+
+def notice_sources(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> list[str]:
+    """``<app>.<notice>`` of every notice the person of ``ctx`` hears, whether it has rows or not."""
+    return [
+        f"{config.label}.{notice.key}" for config in configs for notice in config.notices if ctx.has(notice.permission)
+    ]
+
+
+def device_notices(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> list[dict]:
+    """The rows the modules' notices tell that the person of ``ctx`` may see, the newest first.
+
+    A notice whose query fails, or whose rows say no ``id`` or no ``at``, is left out and logged; the notices that
+    share a query (and its params) run it once.
+    """
+    notices = []
+    for config in configs:
+        results: dict[str, list[dict]] = {}
+        for notice in config.notices:
+            if not ctx.has(notice.permission):
+                continue
+            key = f"{config.label}.{notice.key}"
+            try:
+                asked = json.dumps([notice.operation, dict(notice.params)], sort_keys=True, default=str)
+                if asked not in results:
+                    results[asked] = rows_of(ctx, notice.operation, notice.params)
+                rows = [row for row in results[asked] if is_configured(row, notice.when)]
+                notices += [item for item in (told(key, config.label, notice, row) for row in rows) if item]
+            except Exception:
+                hook_failed(key, notice.operation)
+    return sorted(notices, key=instant, reverse=True)

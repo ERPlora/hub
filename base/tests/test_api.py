@@ -44,7 +44,12 @@ def test_language_follows_the_request(client):
 
 @pytest.mark.parametrize(
     ("path", "operation"),
-    [("/home/setup", "base.setup.status"), ("/home/widgets", "base.widget.list"), ("/home/bell", "base.bell.counters")],
+    [
+        ("/home/setup", "base.setup.status"),
+        ("/home/widgets", "base.widget.list"),
+        ("/home/bell", "base.bell.counters"),
+        ("/home/notices", "base.notice.list"),
+    ],
 )
 def test_the_homes_routes_are_bound_to_its_queries(path, operation):
     from base.api import router
@@ -67,7 +72,7 @@ def test_the_list_of_an_owner_over_http(client, make_user, settings):
 
 
 def test_an_anonymous_visitor_gets_no_home(client):
-    for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell"):
+    for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell", "/api/home/notices"):
         response = client.get(path, HTTP_HOST="a.localhost:8000")
         assert response.status_code in (401, 403), path
 
@@ -83,4 +88,5 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/home/setup", "base.setup.status"),
         ("GET", "/api/home/widgets", "base.widget.list"),
         ("GET", "/api/home/bell", "base.bell.counters"),
+        ("GET", "/api/home/notices", "base.notice.list"),
     }
