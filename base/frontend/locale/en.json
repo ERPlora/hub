@@ -102,6 +102,58 @@
     "userMenu": {
       "account": "My account",
       "reportProblem": "Report a problem"
+    },
+    "appsPage": {
+      "title": "Apps",
+      "tabs": {
+        "label": "Apps sections",
+        "mine": "My apps",
+        "all": "Add apps",
+        "paid": "Paid"
+      },
+      "columns": {
+        "app": "App",
+        "category": "Category",
+        "summary": "Description",
+        "price": "Price",
+        "comesWith": "Comes with",
+        "state": "Status"
+      },
+      "search": {
+        "mine": "Search your apps…",
+        "all": "Search apps to add…",
+        "paid": "Search paid apps…"
+      },
+      "state": {
+        "on": "Active",
+        "installed": "Installed",
+        "blocked": "Needs a subscription"
+      },
+      "right": {
+        "free": "Free",
+        "plan": "Included in your plan",
+        "purchase": "Subscribed",
+        "required": "Included with {apps}",
+        "missing": "Paid"
+      },
+      "open": "Open",
+      "buy": "Subscribe on erplora.com",
+      "buyWhere": "Subscribed to on erplora.com, from your ERPlora account.",
+      "entity": {
+        "one": "app",
+        "many": "apps"
+      },
+      "loading": "Loading your apps…",
+      "loadingCatalogue": "Loading the catalogue…",
+      "loadError": "We could not read your apps",
+      "loadErrorBody": "There was no answer, or this session is no longer valid: sign in again if it keeps happening.",
+      "retry": "Retry",
+      "empty": {
+        "mine": "You have no apps yet. Open «Add apps» to see them all.",
+        "all": "There are no apps to show.",
+        "paid": "No app is sold separately: every app comes with your plan."
+      },
+      "noResults": "No apps match your search."
     }
   }
 }

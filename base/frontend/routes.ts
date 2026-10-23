@@ -10,6 +10,14 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/HomePage.vue'),
     meta: { auth: true },
   },
+  // ── Apps (APP-BASE-4) ──
+  // The business's apps and the catalogue (BASE-G67…G74): «My apps», `#all` and `#paid`, the old hub's addresses.
+  {
+    path: '/apps',
+    name: 'base-apps',
+    component: () => import('./pages/AppsPage.vue'),
+    meta: { auth: true },
+  },
 ];
 
 export default routes;

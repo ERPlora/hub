@@ -102,6 +102,58 @@
     "userMenu": {
       "account": "Mi cuenta",
       "reportProblem": "Reportar un problema"
+    },
+    "appsPage": {
+      "title": "Apps",
+      "tabs": {
+        "label": "Secciones de Apps",
+        "mine": "Mis apps",
+        "all": "Añadir apps",
+        "paid": "De pago"
+      },
+      "columns": {
+        "app": "App",
+        "category": "Categoría",
+        "summary": "Descripción",
+        "price": "Precio",
+        "comesWith": "Viene con",
+        "state": "Estado"
+      },
+      "search": {
+        "mine": "Buscar en tus apps…",
+        "all": "Buscar apps para añadir…",
+        "paid": "Buscar apps de pago…"
+      },
+      "state": {
+        "on": "Activa",
+        "installed": "Instalada",
+        "blocked": "Necesita suscripción"
+      },
+      "right": {
+        "free": "Gratis",
+        "plan": "Incluida en tu plan",
+        "purchase": "Contratada",
+        "required": "Incluida con {apps}",
+        "missing": "De pago"
+      },
+      "open": "Abrir",
+      "buy": "Contratar en erplora.com",
+      "buyWhere": "Se contrata en erplora.com, desde tu cuenta de ERPlora.",
+      "entity": {
+        "one": "app",
+        "many": "apps"
+      },
+      "loading": "Cargando tus apps…",
+      "loadingCatalogue": "Cargando el catálogo…",
+      "loadError": "No hemos podido leer tus apps",
+      "loadErrorBody": "No ha habido respuesta, o esta sesión ya no es válida: vuelve a entrar si sigue pasando.",
+      "retry": "Reintentar",
+      "empty": {
+        "mine": "Aún no tienes apps. Abre «Añadir apps» para verlas todas.",
+        "all": "No hay apps que enseñar.",
+        "paid": "Ninguna app se vende aparte: todas vienen con tu plan."
+      },
+      "noResults": "No hay apps que coincidan con tu búsqueda."
     }
   }
 }
