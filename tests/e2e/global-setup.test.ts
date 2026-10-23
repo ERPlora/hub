@@ -8,7 +8,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { assertLocalHubsRegistered, assertMigrationsApplied, managePy, type CommandResult, type Spawn } from './global-setup';
+import globalSetup, {
+  assertLocalHubsRegistered,
+  assertMigrationsApplied,
+  managePy,
+  type CommandResult,
+  type Spawn,
+} from './global-setup';
 
 const HUB_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -232,5 +238,46 @@ describe('assertLocalHubsRegistered', () => {
         '`DB_NAME=hub_e2e_8030 uv run python manage.py seed_local_hubs` from this checkout and retry.\n\n' +
         'CommandError: Not ready in the registry: a (missing), b (missing). Run `manage.py seed_local_hubs`.',
     );
+  });
+});
+
+// flow: ninguno — infraestructura del e2e del Hub (`tests/e2e/global-setup.ts`): una pila compartida no admite `--workers` > 1
+// `--workers=N` on the command line overrides `workers: 1` of playwright.config.ts, and Playwright hands globalSetup the
+// resolved count (`--workers=2` → 2, `50%` → half the cores). On 2026-10-23 `--workers=2` ran two specs at once on the one
+// stack: appointment-employee.spec.ts deleted `E2E Apt%`, the rows appointment-agenda.spec.ts was using, and the agenda
+// spent its 180 s waiting for them. The run stops before any check touches a database.
+describe('globalSetup', () => {
+  const READY: CommandResult = { status: 0, stdout: 'a: ready\nb: ready\n', stderr: '' };
+
+  /** A `manage.py` double where every check passes, recording each call. */
+  function readyManagePy(): { calls: string[][]; run: (args: string[]) => CommandResult } {
+    const calls: string[][] = [];
+    return {
+      calls,
+      run: (args) => {
+        calls.push(args);
+        if (args[0] === 'migrate') return UP_TO_DATE;
+        if (args[0] === 'migrate_hubs') return HUBS_UP_TO_DATE;
+        if (args[0] === 'seed_local_hubs') return READY;
+        throw new Error(`unexpected manage.py ${args.join(' ')}`);
+      },
+    };
+  }
+
+  it.each([2, 7])('stops a run of %i workers before checking anything, saying why and how to run it', (workers) => {
+    const manage = readyManagePy();
+
+    expect(() => globalSetup({ workers }, manage.run)).toThrow(
+      `This e2e runs ${workers} workers on one shared stack`,
+    );
+    expect(() => globalSetup({ workers }, manage.run)).toThrow('Run it with `--workers=1` or without `--workers`');
+    expect(manage.calls).toEqual([]);
+  });
+
+  it('runs the database checks with a single worker', () => {
+    const manage = readyManagePy();
+
+    expect(() => globalSetup({ workers: 1 }, manage.run)).not.toThrow();
+    expect(manage.calls.map((args) => args[0])).toEqual(['migrate', 'migrate_hubs', 'seed_local_hubs']);
   });
 });
