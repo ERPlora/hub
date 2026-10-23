@@ -330,7 +330,7 @@ Sale: una venta con una fila por medio; el cambio sale siempre del efectivo y nu
 Si falla: mientras falte dinero, el botón dice «Faltan <importe>»; si los cobros no suman el total al
 céntimo, el servidor lo rechaza: «Los cobros no suman el total de la venta.». En un negocio de España,
 una venta de 1.000 € o más no admite **ningún** cobro en efectivo, tampoco repartido: el botón de
-efectivo sale desactivado con su motivo y el servidor rechaza «Por ley, una venta de 1.000 € o más no
+efectivo sale desactivado con su motivo y el servidor rechaza «Por ley, una venta de 1.000,00 € o más no
 se puede cobrar en efectivo, ni en parte. Cóbrala con tarjeta, Bizum o transferencia.». Partir la
 cuenta en varios cobros (SALE-F22) no lo salta: cuenta la cuenta entera (lo ya cobrado de ella y todo lo
 que le queda), porque la ley suma los pagos en que se fracciona una operación (Ley 7/2012, art. 7.Uno.1,
@@ -365,7 +365,7 @@ cliente. Rellénalos o cóbrala como tique.». El NIF se lee como lo lee Cliente
 español que no cuadra sale bajo su casilla («Ese NIF no es válido.») y el botón dice «Revisa el NIF»;
 fuera de España, sin tipo de documento, «Indica qué tipo de documento es un NIF extranjero…» (el
 servidor lo rechaza igual, 422 en su campo; un NIF-IVA europeo lo comprueba el servidor). Un tique por
-encima del límite también lo rechaza el servidor por cualquier vía: «Por encima de 3.000 € esta venta
+encima del límite también lo rechaza el servidor por cualquier vía: «Por encima de 3.000,00 € esta venta
 no puede ser un tique: cóbrala como factura con los datos del cliente.». El país es un código ISO 3166-1
 (la misma lista que Facturación: «UK» o «EL» no valen, «GB» sí): otro se rechaza con «Escribe el código
 ISO del país, p. ej. ES, FR o GB.» (422 en `customer_country`), también el que traiga una ficha vieja.
