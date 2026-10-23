@@ -18,6 +18,24 @@ msgstr ""
 msgid "Appointments"
 msgstr "Citas"
 
+#, python-brace-format
+msgid "{start_date_label} at {start_time_label}"
+msgstr "{start_date_label} a las {start_time_label}"
+
+#, python-brace-format
+msgid "New appointment · {customer_name}"
+msgstr "Nueva cita · {customer_name}"
+
+msgid "New appointment"
+msgstr "Nueva cita"
+
+#, python-brace-format
+msgid "Appointment cancelled · {customer_name}"
+msgstr "Cita cancelada · {customer_name}"
+
+msgid "Appointment cancelled"
+msgstr "Cita cancelada"
+
 msgid ""
 "Your diary: appointments by professional, free times, repeating bookings and "
 "charging them at the till."

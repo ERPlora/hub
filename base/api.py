@@ -27,3 +27,8 @@ async def widget_list(request):
 @bind(router, "base.bell.counters", "/home/bell")
 async def bell_counters(request):
     return await run_operation(request, queries.bell_counters)
+
+
+@bind(router, "base.notice.list", "/home/notices")
+async def notice_list(request):
+    return await run_operation(request, queries.notice_list)

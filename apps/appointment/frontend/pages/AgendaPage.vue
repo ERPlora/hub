@@ -5,12 +5,14 @@
 // one of them, in windows of 100 —, the agenda's rows (`appointment.agenda.lanes`), the blocks and the
 // bookings to confirm. «Add appointment» and a tapped slot open the booking panel; an appointment opens
 // its panel (or its history once it can no longer move); a drag moves it; the row actions run
-// (`useAgendaActions`). An employee sees her own agenda, and is told when her account has no record.
+// (`useAgendaActions`). An employee sees her own agenda, and is told when her account has no record. The address
+// may name the day (`?date=YYYY-MM-DD`: a tap on the device's notice of a booking, APPOINTMENT-F28).
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { useRoute } from 'vue-router';
 
 import AgendaToolbar, { type AgendaSpan, type AgendaView } from '../components/AgendaToolbar.vue';
 import AppointmentFormModal, { type BookingPreset } from '../components/AppointmentFormModal.vue';
@@ -61,6 +63,21 @@ function setDay(value: string): void {
   dayTouched.value = true;
   day.value = value;
 }
+/** The day the address names (`?date=`), when it is a real date. */
+function askedDay(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : null;
+}
+const route = useRoute();
+watch(
+  () => route.query.date,
+  (value) => {
+    const asked = askedDay(value);
+    if (asked) setDay(asked);
+  },
+  { immediate: true },
+);
 const view = ref<AgendaView>('list');
 const span = ref<AgendaSpan>('day');
 const status = ref('');
