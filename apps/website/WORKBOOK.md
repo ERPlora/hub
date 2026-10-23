@@ -641,13 +641,13 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
 - **Dominio propio para la web** (ADR-0502): HUBS-F17, en «Fuera por ahora» (`## 6`) de `MIGRATION.md` y en PLAN-SAAS
   §8 (ronda 2026-10-22). Llega a la vez con sus tres piezas: la verificación en el SaaS, el certificado en el ALB de
   `aws` y la resolución por host en `base`. Hasta entonces, la web vive solo en la dirección del hub.
-- **Dos arreglos fuera de la app, en la cola** (`TODO.md`, vistos en APP-WEBSITE):
-  - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`): en el host de un hub, `/favicon.ico`, `/robots.txt` o
-    cualquier ruta sin URL propia pedida sin `Accept: text/html` responde la SPA con 200 y una cookie `csrftoken`. La
-    web ya no lo dispara (declara su icono, «El icono de la página» arriba), pero un buscador sigue leyendo un
-    `robots.txt` que es HTML.
-  - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`): en `ImageUpload` la miniatura y su texto se tocan, sin
-    hueco, en los tres tamaños (logotipo, portada, Sobre nosotros y galería).
+- **Dos arreglos fuera de la app** (`TODO.md`, vistos en APP-WEBSITE):
+  - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`), hecho: en el host de un hub, `/favicon.ico`,
+    `/robots.txt` o cualquier ruta que nombra un fichero y no tiene URL propia recibe un 404 sin la SPA ni cookie
+    (antes, la SPA con 200 y `csrftoken`). Un buscador ya no lee HTML como `robots.txt`: el 404 es «sin reglas» y la
+    web sigue indexable. Detalle en «Para quien lo mantiene» de `base/WORKBOOK.md`.
+  - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`), en la cola: en `ImageUpload` la miniatura y su
+    texto se tocan, sin hueco, en los tres tamaños (logotipo, portada, Sobre nosotros y galería).
 - **La fuente del catálogo apagada no se ve en la e2e**: en la fase 1 toda app instalada está activa, así que ese caso
   de WEBSITE-F05 lo cubren pytest (servidor) y Vitest (editor), no Playwright.
 

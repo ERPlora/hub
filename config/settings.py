@@ -489,6 +489,12 @@ LIVE = {
             "ocean",
             "violet",
         ],
+        # The old hub's tab and home-screen icons (its apps/web/public/icons/), static files of base: without a
+        # <link>, the browser asks for /favicon.ico, which names a file and is a plain 404 (base.spa.NOT_A_FILE).
+        "icons": [
+            {"rel": "icon", "path": "base/icons/favicon.ico", "sizes": "any"},
+            {"rel": "apple-touch-icon", "path": "base/icons/apple-touch-icon.png"},
+        ],
     },
     # The repo is its own pnpm workspace (packages/ui is a submodule), so Vite runs from here, with the
     # port Django read (environment or .env): vite.config.ts reads VITE_DEV_PORT from the process

@@ -9,7 +9,7 @@ from django.urls import path, re_path
 from django.utils.translation import gettext_lazy
 from live.csp import csp_report
 from live.live_view import live_stream
-from live.spa import BASE_NON_SPA_PREFIXES, spa_path_pattern
+from live.spa import BASE_NON_SPA_PREFIXES
 
 from base.admin import open_hub
 from base.auth_views import auth_callback, auth_login, auth_logout
@@ -30,7 +30,7 @@ from base.internal import (
     whatsapp_status,
 )
 from base.media import media
-from base.spa import spa
+from base.spa import spa, spa_route
 from config.api import api
 
 # Prefixes of hub-next on top of the shared ones: the print socket, the public pages and the login
@@ -82,5 +82,6 @@ urlpatterns = [
     path("internal/whatsapp/channel", whatsapp_channel, name="internal-whatsapp-channel"),
     # The hub file store's files (base.media), on the hub's own host; /p is the public pages' prefix.
     path("p/media/<str:hub>/<path:name>", media, name="media"),
-    re_path(spa_path_pattern(NON_SPA_PREFIXES), spa, name="spa"),
+    # Last: every other path, save one that names a file (/robots.txt, /favicon.ico), which is a plain 404.
+    re_path(spa_route(NON_SPA_PREFIXES), spa, name="spa"),
 ]

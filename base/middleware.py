@@ -33,7 +33,8 @@ A browser without a session that loads a SPA route jumps to the SaaS's ``/hub-lo
 (PLAN-SAAS §3.1 step 4) with a fresh ``state`` in its cookie (``base.auth.login_redirect``), and the
 SaaS comes back with a one-time code and that ``state`` to ``/auth/callback``. Only page loads of the
 SPA are redirected: anything with a URL of its own in Django (``/api`` answers 401, ``/auth``,
-``/healthz``, static files…) never reaches the SPA view. A request that does not ask for HTML gets
+``/healthz``, static files…) never reaches the SPA view, nor does a path that names a file (``/robots.txt``: a plain
+404 with no cookie, ``base.spa.NOT_A_FILE``). A request that does not ask for HTML gets
 the shell, whose auth gate sends to ``/auth/login``, the same jump. On a demo's host the jump is the demo's, to the
 SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``, plan 2026-10-17 §1.6): there is no account to log in to.
 ``/`` of a hub with a published website is that website instead (``base.public_home``, round 2026-10-21).
