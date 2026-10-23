@@ -81,8 +81,9 @@ también en la app instalada: ninguna vende nada.
 
 ### La franja «Todavía no puedes facturar»
 Encima de cualquier pantalla mientras falta un paso que impide facturar: «No se podrá emitir ningún
-ticket ni factura hasta que configures esto:» y cada paso con «Configurar». En el «Resumen» del Inicio no
-sale (la lista dice lo mismo un poco más abajo); en «Actividad», sí.
+ticket ni factura hasta que configures esto:» y cada paso con «Configurar» (en la pantalla que lo configura,
+solo su nombre). En el «Resumen» del Inicio no sale (la lista dice lo mismo un poco más abajo); en
+«Actividad», sí.
 
 ## Estados de cada pantalla
 
