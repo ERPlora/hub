@@ -97,6 +97,7 @@ from apps.sale.queries import (
     lines_to_charge,
     loose_lines,
     method_display_name,
+    money_text,
     operation_total,
     order_detail,
     payment_method_row,
@@ -255,10 +256,6 @@ CASH_REGISTER_CLOSED = _(
     "The cash register is closed: open a cash session to charge in cash."
 )
 KEY_REUSED = _("That attempt key was already used for another charge. Open it again to charge this one.")
-
-
-def _money(cents: int) -> str:
-    return f"{Decimal(cents) / 100:.2f} €"
 
 
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────────
@@ -1595,7 +1592,7 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
         and any(leg["method"].type == PaymentMethod.Type.CASH for leg in legs)
     ):
         raise Conflict(
-            str(CASH_LIMIT_EXCEEDED) % {"limit": _money(limit)},
+            str(CASH_LIMIT_EXCEEDED) % {"limit": money_text(limit)},
             code="sale.cash_limit_exceeded",
         )
     return legs
@@ -1897,7 +1894,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         and valuation.total > ticket_limit
     ):
         raise Conflict(
-            str(TICKET_OVER_LIMIT) % {"limit": _money(ticket_limit)},
+            str(TICKET_OVER_LIMIT) % {"limit": money_text(ticket_limit)},
             code="sale.ticket_over_limit",
         )
     counter_sale = order.source == Order.Source.COUNTER and not order.lines.exists()
@@ -2396,8 +2393,8 @@ def _refund_legs(sale: Sale, data: RefundIn) -> list[dict]:
         if allocation.amount > option["remaining"]:
             message = str(REFUND_EXCEEDS_TENDER) % {
                 "method": name,
-                "amount": _money(allocation.amount),
-                "remaining": _money(option["remaining"]),
+                "amount": money_text(allocation.amount),
+                "remaining": money_text(option["remaining"]),
             }
             raise Conflict(message, code="sale.refund_exceeds_tender")
         if allocation.to_method_id is None:

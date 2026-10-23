@@ -23,10 +23,11 @@ delete a sale, it fixes a sending problem.
 from contextvars import ContextVar
 from decimal import Decimal
 
+from babel.numbers import format_decimal
 from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
-from django.utils.formats import number_format
+from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import OperationError
@@ -441,7 +442,10 @@ class RecordAdmin(SupportActions, ReadOnlyAdmin):
     def total(self, record: Record) -> str | None:
         if record.total_amount is None:
             return None
-        return f"{number_format(Decimal(record.total_amount) / 100, 2)} €"
+        # Thousands always grouped with the screens' marks («1.234,56 €»; hub#1090): Django's Spanish format
+        # groups with a space.
+        locale = translation.to_locale(translation.get_language() or "en")
+        return f"{format_decimal(Decimal(record.total_amount) / 100, format='#,##0.00', locale=locale)} €"
 
     @admin.display(description=WHY_WAITING)
     def why_waiting(self, record: Record) -> str:

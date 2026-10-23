@@ -144,6 +144,18 @@ def test_the_records_list_shows_what_the_records_screen_showed(client, staff, is
     assert "12.10 €" in html
 
 
+def test_the_records_list_groups_the_thousands_of_a_total(client, staff, issuer):
+    # hub#1090: a total of four digits is «1,234.56 €» in English and «1.234,56 €» in Spanish, never «1234.56 €».
+    lines = [{"description": "Course", "quantity": "1", "unit_price": 102030, "tax_rate": "21"}]
+    invoice = manual(lines, series_code="TICKET")
+    run("verifactu.record.create", {"invoice_id": str(invoice.id)})
+    client.force_login(staff)
+    for language, total in (("en", "1,234.56 €"), ("es", "1.234,56 €")):
+        response = client.get(RECORDS, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE=language)
+        assert response.status_code == 200
+        assert total in response.content.decode().replace("\u00a0", " ")
+
+
 @pytest.mark.parametrize(
     "model", ["config", "owncertificate", "chain", "sendcontrol", "record", "event", "aeatrecord"]
 )
