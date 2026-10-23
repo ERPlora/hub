@@ -144,7 +144,7 @@ describe('RecipientForm', () => {
     expect(['name', 'country', 'tax-id', 'address'].map((f) => s.field(f)?.label)).toEqual(['Nombre o razón social', 'País', 'NIF', 'Domicilio']);
     expect(s.heading()).toEqual([
       'Esta venta no puede ser un tique',
-      'Por encima de 3000,00 € la ley obliga a factura completa. Rellena los datos del cliente y cobra como siempre.',
+      'Por encima de 3.000,00 € la ley obliga a factura completa. Rellena los datos del cliente y cobra como siempre.',
     ]);
     await ionValue(s.field('country'), 'FR');
     expect(s.field('id-type')?.label).toBe('Tipo de documento');

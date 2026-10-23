@@ -9,7 +9,7 @@ from decimal import Decimal
 from uuid import uuid7
 
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
@@ -274,6 +274,31 @@ def test_no_cash_from_one_thousand_euros_in_spain(catalog):
         )
     assert refusal.value.code == "sale.cash_limit_exceeded"
     assert complete(lines=gold, payments=[{"method": "card"}]).total == 120000
+
+
+def plain(text: str) -> str:
+    """Babel's no-break spaces as plain ones (what a person reads)."""
+    return text.replace("\u00a0", " ").replace("\u202f", " ")
+
+
+def test_the_cash_limit_is_said_with_its_thousands_grouped(catalog):
+    # hub#1090: «1.000,00 €» in Spanish and «€1,000.00» in English, as every screen paints money; never
+    # «1000.00 €» (no thousands and the English decimal point in a Spanish sentence).
+    gold = [{"product": "GLD", "quantity": "2"}]
+    for language, amount in (("es", "1.000,00 €"), ("en", "€1,000.00")):
+        with translation.override(language), pytest.raises(Conflict) as refusal:
+            complete(lines=gold, payments=[cash(120000)])
+        assert refusal.value.code == "sale.cash_limit_exceeded"
+        assert amount in plain(refusal.value.message)
+
+
+def test_the_ticket_limit_is_said_with_its_thousands_grouped(product):
+    product("Watch plus", "WCP", 300001, "product.generic")
+    for language, amount in (("es", "3.000,00 €"), ("en", "€3,000.00")):
+        with translation.override(language), pytest.raises(Conflict) as refusal:
+            complete(lines=[{"product": "WCP"}], payments=[{"method": "card"}])
+        assert refusal.value.code == "sale.ticket_over_limit"
+        assert amount in plain(refusal.value.message)
 
 
 def test_just_under_the_cash_limit_is_fine(product):
