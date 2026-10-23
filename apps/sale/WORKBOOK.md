@@ -1498,7 +1498,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   producción sin ruta: `verifactu.representation_not_approved`, `verifactu.own_certificate_missing`,
   `verifactu.own_certificate_unreadable`, `verifactu.gateway_unavailable` o `verifactu.production_closed`,
   que Facturación deja pasar tal cual: `NO_WAY_TO_THE_AEAT`, solo los que VeriFactu devuelve hoy, fijado por
-  `test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today`) rechaza la escritura misma con
+  `test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today` y atado a la fuente de
+  `route_problem` por `test_sales_refuses_every_problem_verifactu_can_find_on_the_route`) rechaza la escritura misma con
   ese 409 y sus palabras: no se cobra, ni se devuelve, ni se anula (reglas de trabajo §15; el
   `enforce_fiscal_road` del Hub antiguo, HUB-1935). La venta guarda el número de su documento y el de la rectificativa de su anulación; la
   devolución, el de la suya; y una venta cobrada como factura, la **copia del destinatario** comprobada

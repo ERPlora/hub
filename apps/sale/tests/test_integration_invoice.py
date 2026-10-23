@@ -447,6 +447,42 @@ def test_sales_refuses_as_without_a_way_exactly_the_codes_verifactu_raises_today
     assert NO_WAY_TO_THE_AEAT == {f"verifactu.{lost}" for lost in WAYS_LOST}
 
 
+def test_sales_refuses_every_problem_verifactu_can_find_on_the_route():
+    # Bound to VeriFactu's source, not to this file's table (the test above): a wait code ``route_problem`` (or
+    # what it calls in ``apps.verifactu.queries``) returns tomorrow that Sales does not refuse would be a sale
+    # charged whose ticket never reaches the AEAT. It shows up here first; then ``WAYS_LOST`` asks for the real way
+    # to lose it. The same for a code VeriFactu retires: dead in Sales. Testing's refusals are no exception, as
+    # there is none (``_refuse_without_a_way`` only refuses in production).
+    import ast
+    import inspect
+
+    from apps.sale.services import NO_WAY_TO_THE_AEAT
+    from apps.verifactu import queries
+
+    functions = {
+        node.name: node
+        for node in ast.parse(inspect.getsource(queries)).body
+        if isinstance(node, ast.FunctionDef)
+    }
+    problems, seen, pending = set(), set(), ["route_problem"]
+    while pending:
+        name = pending.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        for node in ast.walk(functions[name]):
+            if not isinstance(node, ast.Return) or node.value is None:
+                continue
+            for leaf in ast.walk(node.value):
+                if isinstance(leaf, ast.Constant) and isinstance(leaf.value, str) and leaf.value:
+                    problems.add(leaf.value)
+                elif isinstance(leaf, ast.Call) and isinstance(leaf.func, ast.Name):
+                    if leaf.func.id in functions:
+                        pending.append(leaf.func.id)
+    assert problems  # the walk reached VeriFactu's codes, not an empty module
+    assert NO_WAY_TO_THE_AEAT == {f"verifactu.{problem}" for problem in problems}
+
+
 def test_the_seller_without_the_right_to_invoice_still_charges(issuer, bar):
     ctx = ctx_for("hub_employee")
     ctx = type(ctx)(
