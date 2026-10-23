@@ -3,14 +3,18 @@
 The hash is the user part's, not the file's: touching «Para quien lo mantiene» costs nothing. With
 the hash in the header unchanged, no call; otherwise one call and the header with the new hash.
 ``--check`` never reaches the network. The API is always a double here: ``translate`` (one call to
-the Claude API) is replaced, and its own test fakes the SDK client.
+the Claude API) is replaced, and its own test fakes the SDK client. ``ANTHROPIC_API_KEY`` comes from
+the environment or the checkout's ``.env``, like every setting; here only from the test's own (``key``):
+without it, the command stops before the API with an error that names it.
 """
 
 from pathlib import Path
 from types import SimpleNamespace
 
 import anthropic
+import decouple
 import pytest
+from decouple import Config, RepositoryEmpty, RepositoryEnv
 from django.core.management import CommandError, call_command
 
 from base import catalog
@@ -163,6 +167,69 @@ def test_the_real_modules_are_up_to_date(translator):
     call_command("translate_workbooks", "--check")
 
 
+# ── the key: ANTHROPIC_API_KEY, from the environment or the checkout's .env ────────────────────
+
+
+@pytest.fixture
+def key(monkeypatch, tmp_path):
+    """Where ``translate`` looks for the key, this test's only: nowhere until ``environment`` or ``dotenv``."""
+    for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_PROFILE"):
+        monkeypatch.delenv(name, raising=False)
+    # python-decouple's config, as settings.py loaded it: the checkout's .env stays out.
+    monkeypatch.setattr(decouple.config, "config", Config(RepositoryEmpty()))
+
+    def install(*, environment: str | None = None, dotenv: str | None = None) -> None:
+        if environment is not None:
+            monkeypatch.setenv("ANTHROPIC_API_KEY", environment)
+        if dotenv is not None:
+            path = tmp_path / ".env"
+            path.write_text(dotenv, encoding="utf-8")
+            monkeypatch.setattr(decouple.config, "config", Config(RepositoryEnv(str(path))))
+
+    return install
+
+
+@pytest.mark.parametrize(
+    "dotenv",
+    [None, "DEBUG=True\n", "ANTHROPIC_API_KEY=\n"],
+    ids=["no-env-file", "env-file-without-it", "empty-in-env-file"],
+)
+def test_without_a_key_it_stops_before_the_api_naming_the_key_and_where_it_goes(tmp_path, installed, key, dotenv):
+    [config] = installed(module(tmp_path))
+    key(dotenv=dotenv)
+
+    # The real translate and SDK client: the SDK's own TypeError never gets out.
+    with pytest.raises(CommandError) as raised:
+        call_command("translate_workbooks")
+
+    message = str(raised.value)
+    assert "ANTHROPIC_API_KEY" in message and ".env" in message and "--check" in message
+    assert not en_file(config).exists()
+
+
+def test_an_up_to_date_module_needs_no_key(tmp_path, installed, key):
+    [config] = installed(module(tmp_path, en=translated(USER_PART, ENGLISH)))
+    before = en_file(config).read_text()
+    key()
+
+    call_command("translate_workbooks")
+
+    assert en_file(config).read_text() == before
+
+
+def test_check_needs_no_key(tmp_path, installed, key):
+    installed(
+        module(tmp_path, "current", en=translated(USER_PART, ENGLISH)),
+        module(tmp_path, "stale", en=translated("una versión anterior\n", ENGLISH)),
+    )
+    key()
+
+    with pytest.raises(CommandError, match=r"stale") as raised:
+        call_command("translate_workbooks", "--check")
+
+    assert "ANTHROPIC_API_KEY" not in str(raised.value)
+
+
 # ── translate: one call to the Claude API, with fixed instructions ────────────────────────────
 
 
@@ -183,29 +250,35 @@ class FakeStream:
 @pytest.fixture
 def fake_client(monkeypatch):
     def install(*, stop_reason="end_turn", text=ENGLISH, error: Exception | None = None):
-        calls = []
+        """The fake SDK; its ``clients`` are the client's arguments, its ``streams`` each request's."""
+        fake = SimpleNamespace(clients=[], streams=[])
 
         class Messages:
             def stream(self, **kwargs):
-                calls.append(kwargs)
+                fake.streams.append(kwargs)
                 if error is not None:
                     raise error
                 content = [SimpleNamespace(type="thinking", thinking=""), SimpleNamespace(type="text", text=text)]
                 return FakeStream(SimpleNamespace(stop_reason=stop_reason, content=content))
 
-        monkeypatch.setattr(anthropic, "Anthropic", lambda: SimpleNamespace(messages=Messages()))
-        return calls
+        def client(**kwargs):
+            fake.clients.append(kwargs)
+            return SimpleNamespace(messages=Messages())
+
+        monkeypatch.setattr(anthropic, "Anthropic", client)
+        return fake
 
     return install
 
 
-def test_translate_sends_the_user_part_with_the_fixed_instructions_to_the_configured_model(fake_client, settings):
+def test_translate_sends_the_user_part_with_the_fixed_instructions_to_the_configured_model(fake_client, key, settings):
     settings.WORKBOOK_TRANSLATION_MODEL = "claude-test-model"
-    calls = fake_client()
+    key(environment="sk-ant-test-environment")
+    fake = fake_client()
 
     assert translate_workbooks.translate(USER_PART) == ENGLISH
 
-    [call] = calls
+    [call] = fake.streams
     assert call["model"] == "claude-test-model"
     assert call["system"] == translate_workbooks.INSTRUCTIONS
     assert call["messages"] == [{"role": "user", "content": USER_PART}]
@@ -214,13 +287,37 @@ def test_translate_sends_the_user_part_with_the_fixed_instructions_to_the_config
 
 
 @pytest.mark.parametrize("stop_reason", ["max_tokens", "refusal"])
-def test_translate_never_returns_a_cut_or_refused_answer(fake_client, stop_reason):
+def test_translate_never_returns_a_cut_or_refused_answer(fake_client, key, stop_reason):
+    key(environment="sk-ant-test-environment")
     fake_client(stop_reason=stop_reason)
     with pytest.raises(CommandError, match=stop_reason):
         translate_workbooks.translate(USER_PART)
 
 
-def test_translate_reports_an_api_failure(fake_client):
+def test_translate_reports_an_api_failure(fake_client, key):
+    key(environment="sk-ant-test-environment")
     fake_client(error=anthropic.APIConnectionError(request=None))
     with pytest.raises(CommandError, match="Claude API"):
         translate_workbooks.translate(USER_PART)
+
+
+@pytest.mark.parametrize(
+    ("sources", "expected"),
+    [
+        ({"dotenv": "DEBUG=True\nANTHROPIC_API_KEY=sk-ant-test-dotenv\n"}, "sk-ant-test-dotenv"),
+        ({"environment": "sk-ant-test-environment"}, "sk-ant-test-environment"),
+        (
+            {"environment": "sk-ant-test-environment", "dotenv": "ANTHROPIC_API_KEY=sk-ant-test-dotenv\n"},
+            "sk-ant-test-environment",
+        ),
+    ],
+    ids=["env-file", "environment", "environment-wins"],
+)
+def test_the_key_reaches_the_client_from_the_environment_or_the_checkouts_env_file(fake_client, key, sources, expected):
+    """The SDK reads only the environment: a key only in .env never reached it (python-decouple exports nothing)."""
+    key(**sources)
+    fake = fake_client()
+
+    translate_workbooks.translate(USER_PART)
+
+    assert fake.clients == [{"api_key": expected}]
