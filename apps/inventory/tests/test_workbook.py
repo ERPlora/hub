@@ -1,9 +1,10 @@
 """The WORKBOOK's «Lo que necesita de otras apps» names exactly what Inventory uses of the other apps.
 
-Every operation of another app the table names is called by Inventory's code (the server through
-``live.operations.get``, the screens through ``useLive``, ``useCommand`` or the typed client) and every
-model it names is read; the other way round, nothing Inventory calls or reads of another app is missing
-from the table. Tests, migrations and the screens' tests are not Inventory's code.
+Every operation of another app the table names is named by Inventory's code (the server calls it through
+``live.operations.get``, the screens through ``useLive``, ``useCommand`` or the typed client; by name or
+through a constant) and every model it names is read; the other way round, nothing Inventory calls or reads
+of another app is missing from the table. A comment is not code (a commented-out call is no call), and
+tests, migrations and the screens' tests are not Inventory's code.
 """
 
 import ast
@@ -18,8 +19,9 @@ SECTION = "### Lo que necesita de otras apps"
 OPERATION = re.compile(r"(?P<app>[a-z][a-z_]*)\.[a-z_]+\.[a-z_]+")
 MODEL = re.compile(r"(?P<app>[a-z][a-z_]*)\.[A-Z][A-Za-z]*")
 MODELS_MODULE = re.compile(r"apps\.(?P<app>[a-z_]+)\.models")
-# A call whose first argument names an operation: useLive('…'), useCommand('…'), client.api.call('…').
-SCREEN_CALL = re.compile(r"[\w$]+\(\s*(['\"])(?P<name>[a-z][a-z_]*\.[a-z_]+\.[a-z_]+)\1")
+# A one-line string of the screens' code, or a comment to skip (``//``, ``/* */``, ``<!-- -->``): a comment
+# only starts outside a string, so the ``//`` of a URL stays in its string.
+SCREEN_TOKEN = re.compile(r"(['\"`])(?P<text>(?:\\.|(?!\1)[^\\\n])*)\1|/\*.*?\*/|<!--.*?-->|//[^\n]*", re.S)
 
 
 def needs_table(workbook: str) -> list[dict[str, str]]:
@@ -63,33 +65,27 @@ def is_operation(name: str) -> bool:
 
 
 def server_uses() -> set[str]:
-    """The operations the server calls by name (``get("<op>")``) and the models of apps it reads."""
+    """The operations the server names in a string (``get("<op>")`` or a constant it calls) and the models of
+    apps it reads: imported from their ``models`` or named by a foreign key (``"<app>.<Model>"``)."""
     used = set()
     for path in sources(".py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "get"
-                and node.args
-                and isinstance(node.args[0], ast.Constant)
-                and isinstance(node.args[0].value, str)
-            ):
-                used.add(node.args[0].value)
-            elif isinstance(node, ast.ImportFrom) and (found := MODELS_MODULE.fullmatch(node.module or "")):
+            if isinstance(node, ast.ImportFrom) and (found := MODELS_MODULE.fullmatch(node.module or "")):
                 used.update(f"{found['app']}.{alias.name}" for alias in node.names)
-            elif isinstance(node, ast.Constant) and isinstance(node.value, str) and MODEL.fullmatch(node.value):
-                used.add(node.value)  # a foreign key's "<app>.<Model>"
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if MODEL.fullmatch(node.value) or is_operation(node.value):
+                    used.add(node.value)
     return used
 
 
 def screen_uses() -> set[str]:
-    """The operations the screens call: a call whose first argument is an operation's name."""
+    """The operations the screens name in a string outside a comment: the first argument of ``useLive``,
+    ``useCommand`` or ``client.api.call``, or a constant passed to them."""
     return {
-        found["name"]
+        found["text"]
         for path in sources(".ts", ".vue")
-        for found in SCREEN_CALL.finditer(path.read_text(encoding="utf-8"))
-        if is_operation(found["name"])
+        for found in SCREEN_TOKEN.finditer(path.read_text(encoding="utf-8"))
+        if found["text"] and is_operation(found["text"])
     }
 
 

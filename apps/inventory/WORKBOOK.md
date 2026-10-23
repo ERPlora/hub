@@ -1013,7 +1013,7 @@ datos de quien lo provocó.
 
 | De | Para qué | Flujos | Servicio |
 |---|---|---|---|
-| Impuestos | Las categorías fiscales con su tipo, para el selector (también para nombrar la elegida cuando no está entre las primeras) y para importar | F01, F02, F06, F09, F10 | `tax.category.list` |
+| Impuestos | Las categorías fiscales con su tipo, para el selector (también para nombrar la elegida cuando no está entre las primeras) y para importar productos | F01, F02, F06, F09 | `tax.category.list` |
 | Impuestos | Comprobar al guardar o importar que la categoría fiscal elegida existe y sigue activa, y saber qué productos no la tienen (lectura directa: es una app requerida) | F01, F02, F05, F06, F09, F10 | modelo `tax.TaxCategory` |
 | Impuestos | Reconocer el texto de la columna fiscal de un CSV: la clave, el nombre en cualquier idioma o un texto aprendido | F09, F10 | `tax.alias.resolve` |
 | Impuestos | Crear una categoría fiscal o aprender un texto desde la importación | F09 | `tax.category.create`, `tax.alias.create` |
