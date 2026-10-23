@@ -8,7 +8,11 @@
 // a phone, ui#28) each range already had its column as a title: there it is said once, «From» / «To» below it.
 // The ends keep their widths (ui#29) and nothing runs past the row, the panel or the sheet.
 // Since FIX-HUB-PAYMENT-LIST-FILTERS-BEHIND-FUNNEL Payments is `filterable` as the old list: its two ranges are
-// measured in its panel at every size; Orders keeps the row.
+// measured in its panel at every size; since FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL Orders is too, so
+// its Total is measured in its panel as well. No list with a range keeps the filter row on a desk any more: the
+// column heading a range in the row and the ends' widths there (ui#29) are covered today by the Vitest of ui
+// (`DataTable.filters.test.ts` «FIX-UI-DATATABLE-RANGE-FILTER-LABELS: a range says its column on screen» and
+// `DataTable.visual.test.ts`); this spec measures the panel and the sheet.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, record, shot, shown, untilStill } from './helpers';
@@ -27,20 +31,16 @@ interface List {
   path: string;
   table: string;
   ranges: Range[];
-  /** Where its filters are on a desk: the row under the toolbar, or the panel behind the funnel (`filterable`). */
-  desk: 'row' | 'panel';
 }
 const ORDERS: List = {
   path: '/cart_checkout/orders',
   table: 'cart-checkout-orders',
-  desk: 'row',
   ranges: [{ column: { en: 'Total', es: 'Total' }, ends: ['total_amount_from', 'total_amount_to'], field: 'text' }],
 };
 // Two ranges in one list: a date range and an amount, behind the funnel as in the old list.
 const PAYMENTS: List = {
   path: '/payment/payments',
   table: 'payment-payments',
-  desk: 'panel',
   ranges: [
     { column: { en: 'Date', es: 'Fecha' }, ends: ['payment_date_from', 'payment_date_to'], field: 'date' },
     { column: { en: 'Amount', es: 'Importe' }, ends: ['amount_from', 'amount_to'], field: 'number' },
@@ -49,7 +49,6 @@ const PAYMENTS: List = {
 const INVOICES: List = {
   path: '/invoice/invoices',
   table: 'invoice-list',
-  desk: 'panel',
   ranges: [
     { column: { en: 'Total', es: 'Total' }, ends: ['total_amount_from', 'total_amount_to'], field: 'text' },
     { column: { en: 'Date', es: 'Fecha' }, ends: ['issue_date_from', 'issue_date_to'], field: 'date' },
@@ -58,10 +57,10 @@ const INVOICES: List = {
 const HINTS: Record<Language, [string, string]> = { en: ['From', 'To'], es: ['Desde', 'Hasta'] };
 
 const SIZES = [
-  { label: '1440', width: 1440, height: 900, phone: false },
-  { label: '834', width: 834, height: 1112, phone: false },
+  { label: '1440', width: 1440, height: 900 },
+  { label: '834', width: 834, height: 1112 },
   // A phone paints cards: every list folds its filters into the sheet behind the funnel (ui#28).
-  { label: '390', width: 390, height: 844, phone: true },
+  { label: '390', width: 390, height: 844 },
 ] as const;
 
 /** What a range shows on screen, measured in its group (`role=group`, named by its column). */
@@ -89,17 +88,18 @@ async function signedIn(browser: Browser, size: (typeof SIZES)[number], language
   return { context, page };
 }
 
-/** The column filters of a list: the open filter row, or the panel behind the funnel (opened here). */
-async function filters(page: Page, list: List): Promise<{ where: 'row' | 'panel'; scope: Locator }> {
+/** The column filters of a list: no open row, the panel behind the funnel (opened here; a sheet on a phone). */
+async function filters(page: Page, list: List): Promise<Locator> {
   const view = shown(page);
   await view.locator(`[data-testid=${list.table}-empty], [data-testid=${list.table}-row]`).first().waitFor({ state: 'visible' });
+  await expect(view.locator(`[data-testid=${list.table}-filters]`), `${list.path}: no open filter row`).toHaveCount(0);
   const toggle = view.locator(`[data-testid=${list.table}-filters-toggle]`);
-  if (!(await toggle.isVisible())) return { where: 'row', scope: view.locator(`[data-testid=${list.table}-filters]`) };
+  await expect(toggle, `${list.path}: its filters wait behind the funnel`).toBeVisible();
   await toggle.click();
   const panel = view.locator(`[data-testid=${list.table}-filters-panel]`);
   await expect(panel).toBeVisible();
   await untilStill(page);
-  return { where: 'panel', scope: panel };
+  return panel;
 }
 
 async function painted(end: Locator): Promise<Painted> {
@@ -137,15 +137,14 @@ for (const size of SIZES) {
         for (const list of [ORDERS, PAYMENTS, INVOICES]) {
           await page.goto(`${A}${list.path}`);
           await expect(page.locator('html')).toHaveAttribute('lang', language === 'es' ? /^es/ : /^en/);
-          const { where, scope } = await filters(page, list);
-          expect(where, `${list.path}: where the filters are`).toBe(size.phone ? 'panel' : list.desk);
+          const scope = await filters(page, list);
           const area = (await scope.boundingBox())!;
           const measured: Record<string, Painted> = {};
           for (const range of list.ranges) {
             const column = range.column[language];
             const own = await painted(scope.locator(`[data-testid=${list.table}-filter-${range.ends[0]}]`));
             measured[column] = own;
-            const what = `${language} ${list.path} ${where} «${column}»`;
+            const what = `${language} ${list.path} «${column}»`;
             // The column heads its pair on screen, once, before its ends.
             expect(own.heading, `${what}: the column on screen`).toBe(column);
             expect(own.box, `${what}: the column is painted`).not.toBeNull();
@@ -155,26 +154,16 @@ for (const size of SIZES) {
             // Its ends still say «From» / «To» (a date field paints its own «dd/mm/yyyy»).
             expect(own.ends.map((end) => end.placeholder), `${what}: the ends' example texts`).toEqual(HINTS[language]);
             expect(own.ends.map((end) => end.type), `${what}: the ends' fields`).toEqual([range.field, range.field]);
-            // Nothing runs past the row, the panel or the sheet (saas#558).
+            // Nothing runs past the panel or the sheet (saas#558).
             for (const box of [own.box!, ...own.ends]) {
-              expect(box.x, `${what}: starts inside the ${where}`).toBeGreaterThanOrEqual(area.x - 0.5);
-              expect(box.x + box.width, `${what}: ends inside the ${where}`).toBeLessThanOrEqual(area.x + area.width + 0.5);
-            }
-            // In the row the ends keep their widths: a date field's 8.75rem (ui#29), a number's short box.
-            if (where === 'row') {
-              for (const end of own.ends) {
-                if (range.field === 'date') expect(end.width, `${what}: a date end is 8.75rem`).toBeCloseTo(140, 0);
-                else {
-                  expect(end.width, `${what}: a short number box`).toBeGreaterThanOrEqual(88 - 0.5);
-                  expect(end.width, `${what}: a short number box`).toBeLessThanOrEqual(112 + 0.5);
-                }
-              }
+              expect(box.x, `${what}: starts inside the panel`).toBeGreaterThanOrEqual(area.x - 0.5);
+              expect(box.x + box.width, `${what}: ends inside the panel`).toBeLessThanOrEqual(area.x + area.width + 0.5);
             }
           }
           // Two ranges in one list no longer read the same.
           const headings = Object.values(measured).map((own) => own.heading);
           expect(new Set(headings).size, `${language} ${list.path}: one heading per range`).toBe(headings.length);
-          record(`${KEY}-${size.label}-${language}-${list.table}`, { where, area: { x: area.x, width: area.width }, measured });
+          record(`${KEY}-${size.label}-${language}-${list.table}`, { area: { x: area.x, width: area.width }, measured });
           const name = list === PAYMENTS && language === 'en' ? `${KEY}-${size.label}` : `${KEY}-${size.label}-${language}-${list.table}`;
           await page.screenshot({ path: shot(name) });
         }

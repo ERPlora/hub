@@ -305,3 +305,60 @@ describe('CartsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
     expect(listFillProblems(s.wrapper)).toEqual([]);
   });
 });
+
+// flow: CART_CHECKOUT-F12 — the old Carts kept its column filters behind the toolbar's funnel, with no
+// open row (docs/reference/old-hub/cart_checkout-carts-{390,834,1440}.png), as Invoices and Sales (hub#31).
+describe('CartsPage: the column filters wait behind the funnel, as the old table (CART_CHECKOUT-F12)', () => {
+  const ID = 'cart-checkout-carts';
+  type Setup = Awaited<ReturnType<typeof setup>>;
+  type Field = HTMLElement & { errorText?: string };
+  const panel = (s: Setup) => s.find(`${ID}-filters-panel`);
+  const field = (s: Setup, name: string) => panel(s).get(`[data-testid="${ID}-filter-${name}"]`).element as Field;
+  const set = (s: Setup, name: string, event: string, value: string) =>
+    field(s, name).dispatchEvent(new CustomEvent(event, { detail: { value } }));
+  async function openFunnel(s: Setup): Promise<void> {
+    await s.find(`${ID}-filters-toggle`).trigger('click');
+    await flush();
+  }
+
+  it('opens with no row of filters; the funnel opens a panel with Session, Email, Status, Items and Total', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop('filterable')).toBe(true);
+    expect(s.find(`${ID}-filters`).exists(), 'no open row of filters under the toolbar').toBe(false);
+    expect(panel(s).exists()).toBe(false);
+    await openFunnel(s);
+    expect(panel(s).findAll(`[data-testid^="${ID}-filter-"]`).map((el) => el.attributes('data-testid'))).toEqual(
+      ['session_token', 'customer_email', 'status', 'total_items_from', 'total_items_to', 'total_amount_from', 'total_amount_to'].map(
+        (name) => `${ID}-filter-${name}`,
+      ),
+    );
+  });
+
+  it('the panel filters on «Apply», by status and by the total in euros, and the funnel counts them', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    await openFunnel(s);
+    set(s, 'status', 'ionChange', 'active');
+    set(s, 'total_amount_to', 'ionInput', '50');
+    await flush();
+    expect(s.list(), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
+    await panel(s).get(`[data-testid="${ID}-filters-apply"]`).trigger('click');
+    await flush();
+    expect(s.list()).toEqual([{ status: 'active', total_amount_max: 5000, sort: '-created_at', limit: 50, offset: 0 }]);
+    expect(s.find(`${ID}-filters-count`).text()).toBe('2');
+  });
+
+  it('a Total it cannot read filters nothing, marks the funnel and is said under its box in the panel', async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    await openFunnel(s);
+    set(s, 'total_amount_from', 'ionInput', 'doce');
+    await panel(s).get(`[data-testid="${ID}-filters-apply"]`).trigger('click');
+    await flush();
+    expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
+    expect(s.find(`${ID}-filters-toggle`).attributes('data-invalid')).toBe('true');
+    await openFunnel(s);
+    expect(field(s, 'total_amount_from').errorText).toBe('Type an amount, like 12.50');
+  });
+});

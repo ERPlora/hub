@@ -59,8 +59,8 @@ aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 
 Una tabla con las columnas **Sesión**, **Email**, **Estado** (Activo, Abandonado, Convertido,
 Expirado), **Ítems** y **Total**. Buscador «Buscar sesión o email…» (busca en el código de sesión, el
-email y el nombre), filtros por columna — sesión y email por un trozo del texto, el estado por lista,
-los ítems y el total «desde / hasta» —, orden por columna, vista de lista o de tarjetas y 50 filas por
+email y el nombre), filtros por columna tras el embudo de la barra, que abre «Filtros» — sesión y email
+por un trozo del texto, el estado por lista, los ítems y el total «desde / hasta» —, orden por columna, vista de lista o de tarjetas y 50 filas por
 página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito;
 el filtro de Total se escribe en la moneda del negocio (en euros: «12» son 12,00 €) y compara el importe
 tal cual, sin convertir monedas. Se puede pegar con sus puntos de miles («1.250,50») o con el símbolo
@@ -76,8 +76,8 @@ lo hace el asistente o la API.
 
 Una tabla con **Pedido** (su número, siempre entero), **Email**, **Estado** (Iniciado, Pagado, Fallido,
 Completado), **Pago** (el método de pago, texto) y **Total**, en la moneda del pedido. Buscador «Buscar
-pedido o email…», filtros por columna, orden por columna, vista de lista o de tarjetas y 50 filas por
-página, el más reciente arriba. Un pedido fallido enseña su motivo entero debajo del estado.
+pedido o email…», filtros por columna tras el embudo de la barra (Pedido, Email, Estado, Pago y Total),
+orden por columna, vista de lista o de tarjetas y 50 filas por página, el más reciente arriba. Un pedido fallido enseña su motivo entero debajo del estado.
 
 Cada fila ofrece la acción que le toca: **Marcar pagado** (Iniciado), **Completar** (Pagado) y
 **Fallar** (Iniciado o Pagado), que abre un formulario que pide el **motivo**. Mientras una acción de
@@ -319,8 +319,10 @@ Actor: empleado, responsable, administrador, propietario, asistente
 Pantalla: Carritos, Pedidos
 Pasos:
 1. Abre **Carritos** o **Pedidos**.
-2. Busca por sesión, email o nombre (carritos) o por número de pedido o email (pedidos), filtra por
-   columna (el Total, como se escribe o se pega: «12», «12,50», «1.250,50») y ordena.
+2. Busca por sesión, email o nombre (carritos) o por número de pedido o email (pedidos) y ordena. Para
+   filtrar por columna, toca el embudo de la barra: abre «Filtros» con una caja por columna (el Total,
+   como se escribe o se pega: «12», «12,50», «1.250,50»); **Aplicar** filtra y lo cierra, y el embudo
+   cuenta los filtros en uso.
 3. Las líneas de un carrito y el detalle de un pedido (direcciones, métodos, fechas, notas) se leen con
    el asistente o la API: un carrito por su sesión o por el email o el nombre de su cliente, un pedido
    por su número.
