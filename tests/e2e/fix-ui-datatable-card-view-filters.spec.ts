@@ -4,9 +4,10 @@
 // screen before the first card. As in the old hub (docs/reference/old-hub/cart_checkout-carts-390.png), in the
 // cards they wait behind the funnel next to list/cards and «New cart»: it opens the modal sheet (outfitkit#75)
 // with those controls, the ranges inside it (saas#558); «Apply» filters the cards, closes the sheet
-// (outfitkit#207) and the funnel counts 1. The wide list (1440) keeps its filter row open, as before, and
-// picking the cards there folds it with the filter still in use; at 834 the default view follows the same rule.
-// With ui 0c21d14 the row was open in the cards.
+// (outfitkit#207) and the funnel counts 1. With ui 0c21d14 the row was open in the cards.
+// Since FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL (CART_CHECKOUT-F12) Carts is `filterable` as the old list
+// (cart_checkout-carts-{834,1440}.png): the wide list (1440) has no row either, its panel filters and switching to
+// the cards and back keeps the filter in use; at 834, whatever paints by default, the filters wait behind the funnel.
 import { type Page, expect, test } from '@playwright/test';
 
 import { record, shot, shown, untilStill } from './helpers';
@@ -88,7 +89,7 @@ test('UI DataTable filtros en tarjetas at 390: the filters wait behind the funne
   }
 });
 
-test('UI DataTable filtros en tarjetas at 1440: the list keeps its filter row open; the cards fold it and keep the filter in use', async ({ browser }) => {
+test('UI DataTable filtros en tarjetas at 1440: the list keeps its filters behind the funnel too; the cards keep the filter in use', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/cart_checkout/carts', VIEWPORTS.desktop);
   try {
     const { one, two } = await seed(context, 1440);
@@ -98,25 +99,37 @@ test('UI DataTable filtros en tarjetas at 1440: the list keeps its filter row op
     await expect(cardsPainted(page), 'a wide screen paints the list').toHaveCount(0);
 
     const row = hook(page, 'filters');
-    await expect(row, 'the list keeps its filter row open, as before').toBeVisible();
-    await expect(hook(page, 'filters-toggle')).toHaveCount(0);
+    await expect(row, 'no filter row: Carts filters behind the funnel, as the old list').toHaveCount(0);
+    const funnel = hook(page, 'filters-toggle');
+    await expect(funnel).toBeVisible();
     await page.screenshot({ path: shot('FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390-1440') });
 
-    await row.locator(`[data-testid=${TABLE}-filter-session_token] input`).fill(one.session_token);
+    await funnel.click();
+    const panel = hook(page, 'filters-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel, 'on a wide screen the panel sits inside the table, not over it').not.toHaveAttribute('aria-modal', 'true');
+    await panel.locator(`[data-testid=${TABLE}-filter-session_token] input`).fill(one.session_token);
+    await hook(page, 'filters-apply').click();
+    await expect(panel).toBeHidden();
     await expect(rowOf(page, TABLE, two.id)).toHaveCount(0);
     await expect(rowOf(page, TABLE, one.id)).toBeVisible();
 
     await hook(page, 'view-cards').click();
     await expect(cardsPainted(page).first()).toBeVisible();
-    await expect(row, 'the cards fold the row').toHaveCount(0);
+    await expect(row).toHaveCount(0);
     await expect(hook(page, 'filters-count'), 'the filter in use is kept').toHaveText('1');
     await expect(rowOf(page, TABLE, one.id)).toBeVisible();
     await expect(rowOf(page, TABLE, two.id)).toHaveCount(0);
 
     await hook(page, 'view-table').click();
     await expect(cardsPainted(page)).toHaveCount(0);
-    await expect(row.locator(`[data-testid=${TABLE}-filter-session_token] input`)).toHaveValue(one.session_token);
+    await expect(row).toHaveCount(0);
+    await expect(hook(page, 'filters-count')).toHaveText('1');
     await expect(rowOf(page, TABLE, two.id)).toHaveCount(0);
+    await funnel.click();
+    await expect(panel.locator(`[data-testid=${TABLE}-filter-session_token] input`)).toHaveValue(one.session_token);
+    await hook(page, 'filters-close').click();
+    await expect(panel).toBeHidden();
     // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
     if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   } finally {
@@ -124,7 +137,7 @@ test('UI DataTable filtros en tarjetas at 1440: the list keeps its filter row op
   }
 });
 
-test('UI DataTable filtros en tarjetas at 834: what paints by default follows the rule (cards fold the filters, the list opens them)', async ({ browser }) => {
+test('UI DataTable filtros en tarjetas at 834: whatever paints by default, the filters wait behind the funnel', async ({ browser }) => {
   const { context, page } = await signedIn(browser, '/cart_checkout/carts', VIEWPORTS.tablet);
   try {
     const { one } = await seed(context, 834);
@@ -133,13 +146,8 @@ test('UI DataTable filtros en tarjetas at 834: what paints by default follows th
     await expect(rowOf(page, TABLE, one.id)).toBeVisible();
     const cards = (await cardsPainted(page).count()) > 0;
     record('FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390-834', { cards, ...(await toolbar(page)) });
-    if (cards) {
-      await expect(hook(page, 'filters')).toHaveCount(0);
-      await expect(hook(page, 'filters-toggle')).toBeVisible();
-    } else {
-      await expect(hook(page, 'filters')).toBeVisible();
-      await expect(hook(page, 'filters-toggle')).toHaveCount(0);
-    }
+    await expect(hook(page, 'filters'), `no filter row (${cards ? 'cards' : 'list'})`).toHaveCount(0);
+    await expect(hook(page, 'filters-toggle')).toBeVisible();
     await page.screenshot({ path: shot('FIX-UI-DATATABLE-CARD-VIEW-FILTERS-OPEN-390-834') });
   } finally {
     await context.close();

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // Cart & Checkout → Orders (WORKBOOK «Pantallas · Pedidos»; CART_CHECKOUT-F09 to F12): the live
 // `cart_checkout.order.list` in a server-side DataTable with the old table's Order, Email, Status, Payment
-// and Total (in the order's own currency), «Search order or email…», filters per column, newest first, 50
-// a page, list or cards. Each row offers the step it can take — «Mark paid», «Complete», «Fail» (asks
-// for the reason) —, only to whoever may; a refusal shows above the table. No «add»: an order is born
-// from a cart (CART_CHECKOUT-F08). «Paid» is a mark: nothing here charges or is fiscal.
+// and Total (in the order's own currency), «Search order or email…», filters per column behind the toolbar's
+// funnel (as the old one), newest first, 50 a page, list or cards. Each row offers the step it can take —
+// «Mark paid», «Complete», «Fail» (asks for the reason) —, only to whoever may; a refusal shows above the
+// table. No «add»: an order is born from a cart (CART_CHECKOUT-F08). «Paid» is a mark: nothing here charges
+// or is fiscal.
 import {
   DataTable,
   type DataTableAction,
@@ -195,6 +196,7 @@ async function onAction({ actionId, row }: { actionId: string; row: OrderOut }):
       fill
       server-side
       searchable
+      filterable
       :filters="filters"
       :filter-errors="filterErrors"
       :rows="result?.rows ?? []"

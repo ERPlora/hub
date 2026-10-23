@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:eefee95e3a814f9b1e441041560505ad4f761b6604870fec742ef2b3b39636ef -->
+<!-- generated from WORKBOOK.md sha256:2395aace94513f447da014d5af558ecc1e6b4674263f0ea9826b39789f8ea1ef -->
 
 ## What it is for and who it is for
 
@@ -49,8 +49,9 @@ refuses it even if they try it through the API or the assistant.
 
 A table with the columns **Session**, **Email**, **Status** (Active, Abandoned, Converted,
 Expired), **Items** and **Total**. A search box "Search session or email…" (it searches the session
-code, the email and the name), filters per column — session and email by a piece of the text, the status
-from a list, the items and the total "from / to" —, sorting per column, a list or card view and 50 rows
+code, the email and the name), filters per column behind the funnel of the bar, which opens "Filters" —
+session and email by a piece of the text, the status from a list, the items and the total "from / to" —,
+sorting per column, a list or card view and 50 rows
 per page. It is sorted by creation date, the most recent on top. The total shows in the cart's currency;
 the Total filter is typed in the business's currency (in euros: "12" is €12.00) and compares the amount
 as it is, without converting currencies. It can be pasted with its thousands separators ("1,250.50")
@@ -66,8 +67,8 @@ the assistant or the API does that.
 
 A table with **Order** (its number, always whole), **Email**, **Status** (Initiated, Paid, Failed,
 Completed), **Payment** (the payment method, as text) and **Total**, in the order's currency. A search box
-"Search order or email…", filters per column, sorting per column, a list or card view and 50 rows per
-page, the most recent on top. A failed order shows its whole reason under the status.
+"Search order or email…", filters per column behind the funnel of the bar (Order, Email, Status, Payment
+and Total), sorting per column, a list or card view and 50 rows per page, the most recent on top. A failed order shows its whole reason under the status.
 
 Each row offers the action that fits it: **Mark paid** (Initiated), **Complete** (Paid) and
 **Fail** (Initiated or Paid), which opens a form asking for the **reason**. While a row action is
@@ -297,8 +298,10 @@ Actor: employee, manager, administrator, owner, assistant
 Screen: Carts, Orders
 Steps:
 1. Open **Carts** or **Orders**.
-2. Search by session, email or name (carts) or by order number or email (orders), filter per
-   column (the Total, as it is typed or pasted: "12", "12.50", "1,250.50") and sort.
+2. Search by session, email or name (carts) or by order number or email (orders) and sort. To filter
+   per column, tap the funnel of the bar: it opens "Filters" with a box per column (the Total, as it is
+   typed or pasted: "12", "12.50", "1,250.50"); **Apply** filters and closes it, and the funnel counts
+   the filters in use.
 3. The lines of a cart and the detail of an order (addresses, methods, dates, notes) are read with
    the assistant or the API: a cart by its session or by its customer's email or name, an order
    by its number.

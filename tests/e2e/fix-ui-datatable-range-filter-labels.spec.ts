@@ -7,6 +7,8 @@
 // and 834 px, in English and in Spanish. Behind the funnel (a `filterable` list such as Invoices, and every list on
 // a phone, ui#28) each range already had its column as a title: there it is said once, «From» / «To» below it.
 // The ends keep their widths (ui#29) and nothing runs past the row, the panel or the sheet.
+// Since FIX-HUB-CART-CHECKOUT-ORDERS-FILTERS-BEHIND-FUNNEL Orders is `filterable` as the old list: its Total is
+// measured in its panel at every size.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, record, shot, shown, untilStill } from './helpers';
@@ -31,7 +33,7 @@ interface List {
 const ORDERS: List = {
   path: '/cart_checkout/orders',
   table: 'cart-checkout-orders',
-  desk: 'row',
+  desk: 'panel',
   ranges: [{ column: { en: 'Total', es: 'Total' }, ends: ['total_amount_from', 'total_amount_to'], field: 'text' }],
 };
 // Two ranges in one row: a date range and an amount.
