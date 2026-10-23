@@ -99,6 +99,8 @@ async function signedIn(browser: Browser, size: (typeof SIZES)[number]): Promise
   const context = await browser.newContext({ baseURL: A, viewport: { width: size.width, height: size.height }, locale: 'en-US' });
   const page = await context.newPage();
   await login(page, A, '/payment/payments');
+  // The session for the fleet's ui-clip-sweep.sh (`--storage-state`).
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   return { context, page };
 }
 
