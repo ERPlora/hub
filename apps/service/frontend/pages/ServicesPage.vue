@@ -132,7 +132,7 @@ const actions = computed<DataTableAction<ServiceOut>[]>(() => {
   }
   return [
     ...(canChange.value ? [{ id: 'edit', label: t('service.services.actions.edit'), icon: 'create-outline' }] : []),
-    ...(canArchive.value ? [{ id: 'archive', label: t('service.services.actions.archive'), icon: 'file-tray-outline', color: 'danger' }] : []),
+    ...(canArchive.value ? [{ id: 'archive', label: t('service.services.actions.archive'), icon: 'archive-outline', color: 'danger' }] : []),
   ];
 });
 
@@ -243,7 +243,7 @@ function onRowClick(row: ServiceOut): void {
       :sort-dir="table.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: ServiceOut) => row.name"
-      :card-icon="() => 'pricetag-outline'"
+      :card-icon="() => 'briefcase-outline'"
       :entity-label="{ one: $t('service.services.entity.one'), many: $t('service.services.entity.many') }"
       :loading="status === 'loading'"
       :error="status === 'error' && !blocked ? $t('service.services.loadError') : undefined"
@@ -279,7 +279,7 @@ function onRowClick(row: ServiceOut): void {
       <template #empty>
         <EmptyState
           data-testid="service-services-empty"
-          icon="pricetag-outline"
+          icon="briefcase-outline"
           :heading="table.filtered.value ? $t('service.noResults') : $t('service.services.empty')"
           :message="table.filtered.value ? $t('service.noResultsMessage') : undefined"
         />

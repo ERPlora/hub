@@ -81,7 +81,7 @@ def test_pricing_is_a_free_module_of_the_catalog_group():
     assert config in module_configs()
     assert config.category is Category.CATALOG
     assert config.premium is False
-    assert config.icon == "ion:pricetags-outline"
+    assert config.icon == "ion:pricetag"
     assert str(config.verbose_name) == "Price Lists"
 
 
@@ -117,7 +117,7 @@ def test_navigation_is_the_one_entry_of_the_old_module_with_a_registered_icon():
     entries = pricing_app().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.icon, entry.path) for entry in entries] == [
-        ("lists", "Price Lists", "ion:pricetags-outline", "/pricing/lists"),
+        ("lists", "Price Lists", "ion:pricetag", "/pricing/lists"),
     ]
 
 

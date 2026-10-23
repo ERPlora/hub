@@ -10,8 +10,8 @@ class PricingConfig(LiveAppConfig):
     label = "pricing"
     kind = "app"
     verbose_name = _("Price Lists")
-    # Registered in the shell (ION_ICONS); the old module's `pricetag` waits in UI-REQUESTS.md.
-    icon = "ion:pricetags-outline"
+    # The old module's `pricetag`, registered in the shell (ION_ICONS).
+    icon = "ion:pricetag"
     category = Category.CATALOG
     premium = False
     # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
@@ -42,5 +42,5 @@ class PricingConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. One entry, as the old module: lists and rules on one screen.
     navigation = [
-        Nav("lists", _("Price Lists"), "ion:pricetags-outline", "/pricing/lists"),
+        Nav("lists", _("Price Lists"), "ion:pricetag", "/pricing/lists"),
     ]

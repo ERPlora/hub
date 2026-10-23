@@ -37,6 +37,15 @@ describe('the service tabbar', () => {
     expect(tabsIn('es').map((t) => t.label)).toEqual(['Servicios', 'Categorías', 'Bonos y paquetes', 'Ajustes']);
   });
 
+  it("wears the old module's briefcase on Services and its gift on Packages", () => {
+    expect(SERVICE_TABS.map((tab) => [tab.id, tab.icon])).toEqual([
+      ['services', 'ion:briefcase-outline'],
+      ['categories', 'ion:pricetags-outline'],
+      ['packages', 'ion:gift-outline'],
+      ['settings', 'ion:settings-outline'],
+    ]);
+  });
+
   it('gives every tab a registered icon', () => {
     for (const tab of SERVICE_TABS) expect(Object.hasOwn(ION_ICONS, tab.icon.replace(/^ion:/, '')), tab.icon).toBe(true);
   });

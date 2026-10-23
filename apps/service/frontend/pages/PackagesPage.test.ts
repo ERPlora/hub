@@ -67,6 +67,14 @@ describe('PackagesPage', () => {
     expect(s.prop('filterable')).toBe(true);
   });
 
+  it("wears the old module's gift on its cards and its empty list", async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop<() => string>('cardIcon')()).toBe('gift-outline');
+    await s.show(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('icon')).toBe('gift-outline');
+  });
+
   it('none at all says «No packages.»; the Status filter on Deleted is the deleted view', async () => {
     const s = await setup();
     await s.show(page([]));

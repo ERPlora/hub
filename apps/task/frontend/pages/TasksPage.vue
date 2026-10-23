@@ -151,18 +151,18 @@ const columns = computed<DataTableColumn<TaskOut>[]>(() => [
 const mineColumns = computed(() => columns.value.map((column) => ({ ...column, filter: undefined, sortable: false })));
 
 const actions = computed<DataTableAction<TaskOut>[]>(() => [
-  { id: 'detail', label: t('task.actions.detail'), icon: 'chevron-forward-outline', color: 'primary', pinned: true },
+  { id: 'detail', label: t('task.actions.detail'), icon: 'open-outline', color: 'primary', pinned: true },
   {
     id: 'start',
     label: t('task.actions.start'),
-    icon: 'time-outline',
+    icon: 'play-circle-outline',
     color: 'primary',
     hidden: (row) => !row.can_change || row.status === 'in_progress' || isClosed(row.status),
   },
   {
     id: 'complete',
     label: t('task.actions.complete'),
-    icon: 'checkmark-circle-outline',
+    icon: 'checkmark-done-outline',
     color: 'success',
     hidden: (row) => !row.can_change || isClosed(row.status),
   },
@@ -268,7 +268,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       :sort-dir="table.dir.value"
       :views="['table', 'cards']"
       :card-title="(row: TaskOut) => row.title"
-      :card-icon="() => 'checkmark-circle-outline'"
+      :card-icon="() => 'checkbox-outline'"
       :entity-label="{ one: $t('task.tasks.entity.one'), many: $t('task.tasks.entity.many') }"
       :loading="all.status.value === 'loading'"
       :error="all.status.value === 'error' && !blocked ? $t('task.tasks.loadError') : undefined"
@@ -314,7 +314,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #empty>
         <EmptyState
           data-testid="task-tasks-empty"
-          icon="checkmark-circle-outline"
+          icon="checkbox-outline"
           :heading="table.filtered.value ? $t('task.noResults') : $t('task.tasks.empty')"
           :message="table.filtered.value ? $t('task.noResultsMessage') : undefined"
         />
@@ -333,7 +333,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       :page-size="mineTable.pageSize.value"
       :views="['table', 'cards']"
       :card-title="(row: TaskOut) => row.title"
-      :card-icon="() => 'checkmark-circle-outline'"
+      :card-icon="() => 'checkbox-outline'"
       :entity-label="{ one: $t('task.tasks.entity.one'), many: $t('task.tasks.entity.many') }"
       :loading="mine.status.value === 'loading'"
       :error="mine.status.value === 'error' && !blocked ? $t('task.tasks.loadError') : undefined"
@@ -375,7 +375,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #empty>
         <EmptyState
           data-testid="task-mine-empty"
-          icon="checkmark-circle-outline"
+          icon="checkbox-outline"
           :heading="mineTable.filtered.value ? $t('task.noResults') : $t('task.tasks.emptyMine')"
         />
       </template>

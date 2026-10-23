@@ -4,7 +4,7 @@
 import type { ShellTab } from '@erplora/ui/shell';
 
 export const TASK_TABS: readonly Omit<ShellTab, 'label'>[] = Object.freeze([
-  { id: 'tasks', icon: 'ion:checkmark-circle-outline', to: '/task/tasks' },
+  { id: 'tasks', icon: 'ion:checkbox-outline', to: '/task/tasks' },
   { id: 'projects', icon: 'ion:folder-outline', to: '/task/projects' },
 ]);
 

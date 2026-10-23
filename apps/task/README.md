@@ -27,7 +27,7 @@ cambia las suyas (asignadas o creadas por él); el responsable, todas.
 
 | Qué | Valor |
 |---|---|
-| `LiveAppConfig` | `kind = "app"`, icono `ion:checkmark-circle-outline` (el viejo, `ion:checkbox-outline`, espera en `UI-REQUESTS.md`), categoría `organization`, gratuita (`premium = False`) |
+| `LiveAppConfig` | `kind = "app"`, icono `ion:checkbox-outline` (el del módulo viejo), categoría `organization`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` (entra en sus plantillas) |
 | `requires` | `["staff"]`: el responsable y el dueño de un proyecto son fichas de Personal (`staff.Member`) |
 | Usa de otras apps | Personal: `Member` por clave ajena (`assigned_to`, `owner`), `resolve_member` (con bloqueo de la ficha), `actor_user_id` y `own_member`; las pantallas llaman a `staff.member.list` y `staff.member.mine` |
@@ -62,5 +62,4 @@ pnpm e2e tests/e2e/task-flows.spec.ts tests/e2e/task-tasks.spec.ts tests/e2e/tas
 
 - Avisos y recordatorios, registro de tiempo, tareas programadas, adjuntos, incidencias de clientes y editar
   o borrar comentarios: «Lo que NO hace, a propósito» del WORKBOOK.
-- Los iconos del producto actual, el panel lateral del `DataTable` y el selector de color de
-  [`UI-REQUESTS.md`](UI-REQUESTS.md).
+- El panel lateral del `DataTable` y el selector de color de [`UI-REQUESTS.md`](UI-REQUESTS.md).

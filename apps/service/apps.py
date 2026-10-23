@@ -9,8 +9,8 @@ class ServiceConfig(LiveAppConfig):
     label = "service"
     kind = "app"
     verbose_name = _("Services")
-    # Registered in the shell (ION_ICONS); the old module's `briefcase` waits in UI-REQUESTS.md.
-    icon = "ion:pricetag-outline"
+    # The old module's `briefcase`, registered in the shell (ION_ICONS).
+    icon = "ion:briefcase-outline"
     category = Category.CATALOG
     premium = False
     # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
@@ -98,12 +98,12 @@ class ServiceConfig(LiveAppConfig):
         }
     ]
     navigation = [
-        Nav("services", _("Services"), "ion:pricetag-outline", "/service/services"),
+        Nav("services", _("Services"), "ion:briefcase-outline", "/service/services"),
         Nav(
             "categories",
             _("Categories"),
             "ion:pricetags-outline",
             "/service/categories",
         ),
-        Nav("packages", _("Packages"), "ion:ticket-outline", "/service/packages"),
+        Nav("packages", _("Packages"), "ion:gift-outline", "/service/packages"),
     ]

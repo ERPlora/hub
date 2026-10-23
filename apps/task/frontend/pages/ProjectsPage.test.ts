@@ -81,6 +81,15 @@ describe('ProjectsPage', () => {
     expect(s.wrapper.find('[data-testid="task-projects-filters-panel"] [data-testid="task-projects-filter-is_active"]').exists()).toBe(true);
   });
 
+  it("wears the old module's icons: «Open» opens, the folder on its cards and its empty list", async () => {
+    const s = await setup();
+    await s.show(page(ROWS));
+    expect(s.prop<Array<{ id: string; icon?: string }>>('actions').map((a) => [a.id, a.icon])).toEqual([['open', 'open-outline']]);
+    expect(s.prop<() => string>('cardIcon')()).toBe('folder-outline');
+    await s.show(page([]));
+    expect(s.wrapper.findComponent(EmptyState).props('icon')).toBe('folder-outline');
+  });
+
   it('no project at all says «No projects.»', async () => {
     const s = await setup();
     await s.show(page([]));

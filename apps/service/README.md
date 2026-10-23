@@ -35,7 +35,7 @@ y gasta en varias visitas, con su saldo, su caducidad, sus ajustes y cada sesió
 
 | Qué | Valor |
 |---|---|
-| `LiveAppConfig` | `kind = "app"`, icono `ion:pricetag-outline` (el viejo, `ion:briefcase-outline`, espera en `UI-REQUESTS.md`), categoría `catalog`, gratuita (`premium = False`) |
+| `LiveAppConfig` | `kind = "app"`, icono `ion:briefcase-outline` (el del módulo viejo), categoría `catalog`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` (entra en su plantilla; la de restaurante no la trae) |
 | `requires` | `["tax", "staff", "customer"]`: la categoría fiscal es de Impuestos, los profesionales de Personal y la titular de un bono, de Clientes |
 | Usa de otras apps | Impuestos: `tax.TaxCategory` (claves ajenas, con la lectura retenida `FOR KEY SHARE`). Personal: `staff.Member` y `resolve_member`. Clientes: `customer.Customer`, `find_customer` y el bloqueo de la ficha. La venta y la cita de una sesión son identificadores opacos (`sale_id`, `appointment_id`): Ventas y Citas no son requisito |
@@ -74,4 +74,4 @@ pnpm e2e tests/e2e/service-flows.spec.ts tests/e2e/service-catalog.spec.ts tests
 - Vender un bono en el TPV (y, con ello, concederlo al cobrar y anularlo con su venta), importar servicios
   desde un fichero y el paso «Tu catálogo de servicios» de «Termina de configurar tu negocio»: «Lo que queda
   fuera» del WORKBOOK.
-- Los iconos y el panel lateral de [`UI-REQUESTS.md`](UI-REQUESTS.md).
+- El panel lateral de [`UI-REQUESTS.md`](UI-REQUESTS.md).

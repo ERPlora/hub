@@ -30,8 +30,11 @@ describe('the task tabbar', () => {
     expect(tabsIn('es').map((t) => t.label)).toEqual(['Tareas', 'Proyectos']);
   });
 
-  it('wears the old module\'s folder on Projects, now that the shell has it', () => {
-    expect(TASK_TABS.find((tab) => tab.id === 'projects')?.icon).toBe('ion:folder-outline');
+  it("wears the old module's checkbox on Tasks and its folder on Projects", () => {
+    expect(TASK_TABS.map((tab) => [tab.id, tab.icon])).toEqual([
+      ['tasks', 'ion:checkbox-outline'],
+      ['projects', 'ion:folder-outline'],
+    ]);
   });
 
   it('gives every tab a registered icon', () => {

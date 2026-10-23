@@ -33,7 +33,7 @@ cuánto queda.
 
 | Qué | Valor |
 |---|---|
-| `LiveAppConfig` | `kind = "app"`, icono `ion:pricetags-outline` (el viejo, `ion:pricetag`, espera en `UI-REQUESTS.md`), categoría `catalog`, gratuita (`premium = False`) |
+| `LiveAppConfig` | `kind = "app"`, icono `ion:pricetag` (el del módulo viejo), categoría `catalog`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` (entra en sus plantillas) |
 | `requires` | `["inventory", "customer"]`: los precios y las reglas apuntan a productos y categorías de Inventario por clave ajena; el grupo de clientes es un UUID, sin clave ajena (Clientes borra grupos de verdad) |
 | Usa de otras apps | Inventario: `Product`, `ProductCategory`, `UNIT_SPECS`, `fits_unit`, `increment_of`, `find_product`, `find_category` y `held` (retiene lo que una escritura nombra); Clientes: `CustomerGroup`, `find_group` y `find_customer`; Servicios (sin requerirla): `service.service.get` por nombre. Las pantallas llaman a `inventory.product.list`, `inventory.category.list`, `customer.group.list` y `service.service.list` |
@@ -72,4 +72,4 @@ pnpm e2e tests/e2e/pricing-flows.spec.ts tests/e2e/pricing-lists.spec.ts
 - Descuentos por importe del tique, horarios (happy hour), conversión de divisas o de bases fiscales, reglas
   por categoría de servicio y borrar tarifas o reglas: «Lo que NO hace, a propósito» del WORKBOOK.
 - Que Ventas pida el precio a Tarifas: es de Ventas («Contrato con Ventas» del WORKBOOK).
-- El icono del producto actual y el panel lateral del `DataTable` de [`UI-REQUESTS.md`](UI-REQUESTS.md).
+- El panel lateral del `DataTable` de [`UI-REQUESTS.md`](UI-REQUESTS.md).

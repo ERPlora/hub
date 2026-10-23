@@ -65,7 +65,7 @@ def test_task_is_a_free_module_of_the_organization_group():
     assert config in module_configs()
     assert config.category is Category.ORGANIZATION
     assert config.premium is False
-    assert config.icon == "ion:checkmark-circle-outline"
+    assert config.icon == "ion:checkbox-outline"
     assert str(config.verbose_name) == "Tasks"
 
 
@@ -113,7 +113,7 @@ def test_navigation_is_the_two_tabs_of_the_old_module_with_registered_icons():
     entries = task_app().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.icon, entry.path) for entry in entries] == [
-        ("tasks", "Tasks", "ion:checkmark-circle-outline", "/task/tasks"),
+        ("tasks", "Tasks", "ion:checkbox-outline", "/task/tasks"),
         ("projects", "Projects", "ion:folder-outline", "/task/projects"),
     ]
 
