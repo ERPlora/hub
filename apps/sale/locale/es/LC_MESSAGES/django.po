@@ -38,6 +38,18 @@ msgstr "Secciones"
 msgid "Settings"
 msgstr "Ajustes"
 
+msgid "Today's sales"
+msgstr "Ventas hoy"
+
+msgid "Today's tickets"
+msgstr "Tickets hoy"
+
+msgid "Sales, last 7 days"
+msgstr "Ventas últimos 7 días"
+
+msgid "Recent activity"
+msgstr "Actividad reciente"
+
 msgid "Cash"
 msgstr "Efectivo"
 
