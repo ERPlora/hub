@@ -145,3 +145,96 @@ def test_a_visitor_without_a_session_learns_nothing_of_the_hub(client):
     assert 'id="hub-home"' not in html
     assert "Bar Secreto" not in html
     assert str(hub.id) not in html
+
+
+# flow: ninguno — the SPA's answer to a path without a URL of its own (file probes: /robots.txt, /favicon.ico).
+# A path whose last segment has an extension names a file; the SPA has no route like it. A probe for a file Django
+# does not serve (a crawler's robots.txt, a browser's favicon, a scanner's wp-login.php) gets a plain 404: no shell
+# and no cookie, so the website's «no cookies» holds and a crawler reads no HTML as its robots.txt.
+BROWSER_PAGE = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+BROWSER_IMAGE = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+FILE_PROBES = [
+    "/robots.txt",
+    "/favicon.ico",
+    "/sitemap.xml",
+    "/apple-touch-icon.png",
+    "/wp-login.php",
+    "/demo/items/main.js.map",
+    "/.env",
+]
+DEEP_LINK = "/demo/items/0192f0c4-7d2e-7c4a-9b1e-2f6a8d3c5e10"
+
+
+def is_the_shell(response) -> bool:
+    return 'id="spa-config"' in response.content.decode()
+
+
+@pytest.mark.parametrize("path", FILE_PROBES)
+@pytest.mark.parametrize("accept", ["*/*", BROWSER_PAGE, BROWSER_IMAGE])
+def test_a_probe_for_a_file_without_a_session_gets_a_plain_404_with_no_cookie(client, path, accept):
+    response = client.get(path, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=accept)
+    assert (response.status_code, dict(response.cookies)) == (404, {})
+    assert not is_the_shell(response)
+
+
+def test_a_head_of_robots_txt_is_the_same_404(client):
+    response = client.head("/robots.txt", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT="*/*")
+    assert (response.status_code, dict(response.cookies)) == (404, {})
+
+
+def test_a_signed_in_browser_asking_for_the_favicon_gets_the_404_and_no_csrf_cookie(client, settings, make_user):
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    response = client.get("/favicon.ico", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=BROWSER_IMAGE)
+    assert response.status_code == 404
+    assert settings.CSRF_COOKIE_NAME not in response.cookies
+    assert not is_the_shell(response)
+
+
+@pytest.mark.parametrize("path", ["/", "/demo/items", DEEP_LINK, "/demo/items/new"])
+def test_a_signed_in_navigation_still_gets_the_shell_and_its_csrf_cookie(client, settings, make_user, path):
+    # Without the cookie the SDK's first write is refused (403): every page load of the SPA sets it.
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    response = client.get(path, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=BROWSER_PAGE)
+    assert response.status_code == 200 and is_the_shell(response)
+    assert settings.CSRF_COOKIE_NAME in response.cookies
+
+
+def test_a_deep_link_without_a_session_still_jumps_to_the_saas_login(client, settings):
+    response = client.get(DEEP_LINK, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=BROWSER_PAGE)
+    location = urlsplit(response["Location"]) if response.status_code == 302 else None
+    assert location is not None
+    assert f"{location.scheme}://{location.netloc}{location.path}" == f"{settings.SAAS_URL.rstrip('/')}/hub-login/"
+
+
+def test_a_call_without_a_session_that_does_not_ask_for_a_page_still_gets_the_shell_and_its_cookie(client, settings):
+    response = client.get(DEEP_LINK, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT="*/*")
+    assert response.status_code == 200 and is_the_shell(response)
+    assert settings.CSRF_COOKIE_NAME in response.cookies
+
+
+def test_the_home_page_of_a_published_website_is_still_the_website_with_no_cookie(client, monkeypatch):
+    from django.apps import apps
+    from django.http import HttpResponse
+
+    from base import public_home
+
+    class Published:
+        def is_published(self, hub) -> bool:
+            return True
+
+        def respond(self, request) -> HttpResponse:
+            return HttpResponse("<!doctype html><title>Bar A</title>", content_type="text/html; charset=utf-8")
+
+    real = apps.is_installed
+    monkeypatch.setattr(apps, "is_installed", lambda name: True if name == public_home.WEBSITE_APP else real(name))
+    monkeypatch.setattr(public_home, "_provider", Published)
+    response = client.get("/", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=BROWSER_PAGE)
+    assert (response.status_code, dict(response.cookies)) == (200, {})
+    assert "<title>Bar A</title>" in response.content.decode() and not is_the_shell(response)
+
+
+def test_a_file_s_path_with_a_trailing_slash_is_the_same_404_and_no_redirect_to_the_shell(client):
+    # APPEND_SLASH sends a path without a route to the one with a slash when that one resolves: it must not.
+    for path in ("/robots.txt", "/robots.txt/"):
+        response = client.get(path, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT="*/*")
+        assert (response.status_code, dict(response.cookies)) == (404, {}), path

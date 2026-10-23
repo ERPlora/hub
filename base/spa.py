@@ -12,19 +12,33 @@ nor the hub's id.
 ``spa`` is the view ``base.middleware`` knows by identity; it dispatches. A visitor without a session who loads
 ``/`` of a hub with a published website gets that website (``base.public_home``), which never passes through
 ``render_spa``: no CSRF cookie, no ``never_cache``. Everyone else gets the shell.
+
+A path that names a file (:data:`NOT_A_FILE`: ``/robots.txt``, ``/favicon.ico``, ``/wp-login.php``) is no route of
+the SPA (:func:`spa_route`): without a URL of its own it gets Django's plain 404, with no shell and no cookie, with a
+session or without and whatever it accepts. A crawler reads no HTML as the hub's ``robots.txt`` (a 404 there means
+«no rules»), and a browser's ``/favicon.ico`` leaves no ``csrftoken`` on the website's visitor.
 """
 
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_safe
 from live.ninja import run_operation_sync
-from live.spa import render_spa
+from live.spa import render_spa, spa_path_pattern
 
 from base import public_home, queries
 from base.auth import saas_url
 
 SESSION_ME_ID = "session-me"
 HUB_HOME_ID = "hub-home"
+#: A path whose last segment has an extension names a file, and no route of the SPA looks like one (its parameters
+#: are ids). It is the fallback rule of connect-history-api-fallback and of ASP.NET Core's ``{*path:nonfile}``. With a
+#: trailing slash too: else ``APPEND_SLASH`` would send ``/robots.txt`` to ``/robots.txt/``, and that to the shell.
+NOT_A_FILE = r"(?!.*\.[^/]*/?$)"
+
+
+def spa_route(prefixes: tuple[str, ...]) -> str:
+    """The SPA's ``re_path``: every path ``live.spa.spa_path_pattern(prefixes)`` leaves it, save a file's."""
+    return rf"^{NOT_A_FILE}{spa_path_pattern(prefixes)}"
 
 
 @require_safe
