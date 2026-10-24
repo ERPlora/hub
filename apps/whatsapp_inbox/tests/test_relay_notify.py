@@ -29,8 +29,8 @@ from live.operations import get
 from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_member, make_service
 from apps.appointment.tests.conftest import ctx_for as appointment_ctx
 from apps.customer.models import Customer
-from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.flow.models import FlowRun
+from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Message
 from apps.whatsapp_inbox.tests.conftest import B, NOW, card, connect, ctx_for, receive, run, system, template
 from base import catalog, worker
@@ -178,7 +178,7 @@ def restaurant(
     *, minutes_ago: int = 10, templates=(TABLE_CONFIRMED,), auto_confirm: bool = False, language: str = "en", **channel
 ):
     """The owner's restaurant: its number connected, Lucía's conversation (her last message ``minutes_ago``), its
-    lunch and dinner every day, «Las reservas se confirman solas» as given and the inbox's table notice turned on by
+    lunch and dinner every day, «Confirmar solas las reservas nuevas» as given and the inbox's table notice turned on by
     the owner in ``language``."""
     connect(templates=list(templates), **channel)
     receive("wamid.IN", sent_at=(NOW - dt.timedelta(minutes=minutes_ago)).isoformat())
@@ -189,8 +189,14 @@ def restaurant(
 
 def book(phone: str = "600111222", **data):
     """Reservas' real booking for Friday at 21:00, four guests: the phone finds or makes the card (Customers)."""
-    payload = {"guest_name": "Lucía Pérez", "guest_phone": phone, "date": FRIDAY.isoformat(), "time": "21:00",
-               "party_size": 4, **data}
+    payload = {
+        "guest_name": "Lucía Pérez",
+        "guest_phone": phone,
+        "date": FRIDAY.isoformat(),
+        "time": "21:00",
+        "party_size": 4,
+        **data,
+    }
     return run("reservation.reservation.create", payload, ctx_for("hub_admin"))
 
 
