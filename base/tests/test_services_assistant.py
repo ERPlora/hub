@@ -107,6 +107,12 @@ def test_a_write_waits_for_its_card_and_changes_nothing_meanwhile():
     assert "Mesa 4" not in items()
 
 
+def test_the_card_carries_the_business_currency_for_its_amounts():
+    """gh:hub#1045: an amount in cents is painted in the business's currency, with its decimals."""
+    plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
+    assert plan["confirm"]["money"] == {"currency": "EUR", "decimals": 2}
+
+
 def test_the_yes_runs_the_write_as_the_person():
     write = call("demo.item.create", {"name": "Mesa 4"})
     plan = turn(write, decision={"call_id": "c1", "accepted": True})

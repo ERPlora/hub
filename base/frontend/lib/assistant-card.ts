@@ -21,6 +21,8 @@ export interface AssistantCard {
   count: number | null;
   confirm_word: string;
   blocked: boolean;
+  /** The business's currency for its amounts (gh:hub#1045). */
+  money?: Money | null;
 }
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;

@@ -71,6 +71,14 @@ describe('AssistantConfirm', () => {
     expect(wrapper.emitted('decide')).toEqual([[true, '3', false]]);
   });
 
+  it('the amounts in the currency the card brings (gh:hub#1045)', async () => {
+    const m = await mountBase(AssistantConfirm, { locale: 'es', props: { card: { ...NORMAL, money: { currency: 'USD', decimals: 2 } }, more: false } });
+    await flush();
+    expect(body()).toContain('15,00\u00a0$');
+    expect(body()).not.toContain('€');
+    m.wrapper.unmount();
+  });
+
   it('cancelling runs nothing', async () => {
     const { wrapper, dialog } = await card(NORMAL);
     dialog.vm.$emit('cancel');

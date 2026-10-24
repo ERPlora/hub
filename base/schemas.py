@@ -936,6 +936,11 @@ class AssistantFieldOut(Schema):
     value: Any = None
 
 
+class AssistantMoneyOut(Schema):
+    currency: str
+    decimals: int
+
+
 class AssistantCardOut(Schema):
     operation: str
     app: str
@@ -946,6 +951,7 @@ class AssistantCardOut(Schema):
     count: int | None = None
     confirm_word: str = Field(description="What to type to confirm a dangerous write; empty for a normal one.")
     blocked: bool = Field(description="A dangerous write that names no record: not done from the chat.")
+    money: AssistantMoneyOut | None = Field(default=None, description="The business's currency, for its amounts.")
 
 
 class AssistantTurnOut(Schema):

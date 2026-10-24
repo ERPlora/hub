@@ -30,7 +30,7 @@ onMounted(() => follow(props.card));
 watch(() => props.card, follow);
 
 const high = computed(() => shown.value?.risk === 'high');
-const format = computed(() => ({ locale: locale.value, money: props.money, t }));
+const format = computed(() => ({ locale: locale.value, money: props.money ?? shown.value?.money ?? undefined, t }));
 const action = computed(() => (shown.value ? t(actionKey(shown.value.action)) : ''));
 const message = computed(() => {
   const card = shown.value;
