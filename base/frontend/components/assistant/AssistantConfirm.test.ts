@@ -2,9 +2,9 @@
 // line, «Run it» in one click; a dangerous one with every datum and the word (or how many) to type; «Cancel all»
 // when more actions of the turn wait behind it.
 import { ConfirmDialog } from '@erplora/ui/components';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { mountBase } from '../../__tests__/mount-base';
+import { flush, mountBase } from '../../__tests__/mount-base';
 import type { AssistantCard } from '../../lib/assistant-card';
 import AssistantConfirm from './AssistantConfirm.vue';
 
@@ -35,21 +35,29 @@ const HIGH: AssistantCard = {
   confirm_word: '3',
 };
 
-async function card(value: AssistantCard, more = false) {
+afterEach(() => {
+  document.body.innerHTML = '';
+});
+
+/** The dialog's body: Ionic moves the modal's content out of the component's root, into the document. */
+const body = () => document.querySelector<HTMLElement>('[data-testid="assistant-confirm"]')?.textContent ?? '';
+
+async function card(value: AssistantCard | null, more = false) {
   const m = await mountBase(AssistantConfirm, { locale: 'es', props: { card: value, more, money: { currency: 'EUR', decimals: 2 } } });
+  await flush();
   return { ...m, dialog: m.wrapper.findComponent(ConfirmDialog) };
 }
 
 describe('AssistantConfirm', () => {
   it('a normal write: its action, its app and its data in one line, and a click', async () => {
     const { wrapper, dialog } = await card(NORMAL);
+    expect(dialog.props('open')).toBe(true);
     expect(dialog.props('title')).toBe('El asistente quiere ejecutar una acción');
-    expect(wrapper.text()).toContain('Crear en Servicios: Corte caballero · 15,00 € · general');
+    expect(body()).toContain('Crear en Servicios: Corte caballero · 15,00 € · general');
     expect(dialog.props('requireText')).toBeUndefined();
     expect(dialog.props('tone')).toBe('primary');
     dialog.vm.$emit('confirm');
     expect(wrapper.emitted('decide')).toEqual([[true, '', false]]);
-    wrapper.unmount();
   });
 
   it('a dangerous one: every datum by its name, how many, and what to type before it runs', async () => {
@@ -57,27 +65,38 @@ describe('AssistantConfirm', () => {
     expect(dialog.props('tone')).toBe('danger');
     expect(dialog.props('requireText')).toBe('3');
     expect(dialog.props('consequences')).toEqual(['Registros: 3 elementos']);
-    expect(wrapper.text()).toContain('Borrar en Citas. Revisa cada dato antes de seguir.');
-    expect(wrapper.text()).toContain('Afecta a 3 registros.');
+    expect(body()).toContain('Borrar en Citas. Revisa cada dato antes de seguir.');
+    expect(body()).toContain('Afecta a 3 registros.');
     dialog.vm.$emit('confirm');
     expect(wrapper.emitted('decide')).toEqual([[true, '3', false]]);
-    wrapper.unmount();
   });
 
   it('cancelling runs nothing', async () => {
     const { wrapper, dialog } = await card(NORMAL);
     dialog.vm.$emit('cancel');
     expect(wrapper.emitted('decide')).toEqual([[false, '', false]]);
-    wrapper.unmount();
   });
 
   it('«Cancel all» only when more actions wait, and it stops them all', async () => {
     const single = await card(NORMAL);
-    expect(single.wrapper.find('[data-testid="assistant-cancel-all"]').exists()).toBe(false);
+    expect(document.querySelector('[data-testid="assistant-cancel-all"]')).toBeNull();
     single.wrapper.unmount();
+    document.body.innerHTML = '';
     const chain = await card(NORMAL, true);
-    await chain.wrapper.find('[data-testid="assistant-cancel-all"]').trigger('click');
+    document.querySelector<HTMLElement>('[data-testid="assistant-cancel-all"]')!.click();
     expect(chain.wrapper.emitted('decide')).toEqual([[false, '', true]]);
-    chain.wrapper.unmount();
+  });
+
+  it('closed without a card, and it opens when one arrives and closes when it is answered', async () => {
+    const { wrapper, dialog } = await card(null);
+    expect(dialog.props('open')).toBe(false);
+    await wrapper.setProps({ card: NORMAL });
+    await flush();
+    expect(dialog.props('open')).toBe(true);
+    expect(body()).toContain('Crear en Servicios');
+    await wrapper.setProps({ card: null });
+    await flush();
+    expect(dialog.props('open')).toBe(false);
+    expect(wrapper.emitted('decide')).toBeUndefined();
   });
 });
