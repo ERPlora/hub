@@ -14,6 +14,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { api, collectProblems, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, untilStill } from './helpers';
 import { readMailCode } from './mail';
+import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
 
 const PASSWORD = 'Masa-madre-y-centeno-26';
@@ -27,6 +28,8 @@ const OWNER_PIN = '4826';
 const EMPLOYEE_PIN = '9071';
 /** A card's number, one per run: a badge opens one person's door only, and phase 1 keeps every hub's in one table. */
 const BADGE = `77${String(Date.now()).slice(-8)}`;
+/** Where the Sales app's till keeps the check it has on screen (`useCurrentCheck`). */
+const CURRENT_CHECK_KEY = 'erplora.sale.pos.currentCheck';
 
 interface Person {
   context: BrowserContext;
@@ -164,6 +167,8 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
+  // The check of «Switch user» (its title is `e2e …`), with the Sales app's own cleanup.
+  cleanSales();
   // Phase 1 keeps the business's dial in a table every hub of this database shares: back to the factory's.
   psql("UPDATE base_accesssettings SET pin_policy = 'per_shift', pin_inactivity_minutes = 5, pin_length = 4");
   await owner?.context.close();
@@ -295,9 +300,17 @@ test('BASE-G56: a badge that opens nothing says so; the owner’s badge enters a
   expect(await whoIsIn(till, origin)).toBe('Ana López');
 });
 
-test('BASE-G60: «Switch user» over the screen in use: whoever takes over enters with their PIN and the screen stays', async () => {
-  await till.goto(`${origin}/settings`);
-  await expect(shown(till).getByTestId('devices-card')).toBeVisible();
+test('BASE-G60: «Switch user» over the sale in progress: whoever takes over enters with their PIN and the sale stays', async () => {
+  // The sale in progress: a check of the Sales app with a line, the one this till has on screen (it keeps its id).
+  const opened = await api<{ id: string }>(till.context(), origin, 'POST', '/sale/orders', {
+    label: `e2e G60 ${Date.now().toString(36)}`,
+    open_lines: [{ unit_price: 250, tax_category_key: 'restaurant.drink', name: 'Coffee' }],
+  });
+  expect(opened.status, JSON.stringify(opened.data)).toBe(201);
+  await till.evaluate(([key, id]) => localStorage.setItem(key, id), [CURRENT_CHECK_KEY, opened.data.id]);
+  await till.goto(`${origin}/sale/pos`);
+  const coffee = shown(till).locator('.pos-line', { hasText: 'Coffee' });
+  await expect(coffee).toHaveCount(1);
   await userMenu(till, 'switch-user');
   await expect(till).toHaveURL(`${origin}/switch-user`);
   await expect(shown(till)).toContainText('The sale stays open. From now on it is in the name of whoever enters here.');
@@ -306,10 +319,14 @@ test('BASE-G60: «Switch user» over the screen in use: whoever takes over enter
   });
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Bea' }).click();
   await press(till, EMPLOYEE_PIN);
-  await expect(till).toHaveURL(`${origin}/settings`);
+  await expect(till).toHaveURL(`${origin}/sale/pos`);
   await expect(till.locator('ion-toast')).toContainText('Now serving Bea');
   expect(await whoIsIn(till, origin)).toBe('Bea');
+  // The same check, with its line, on the till of whoever took over; still open.
+  await expect(shown(till).locator('.pos-line', { hasText: 'Coffee' })).toHaveCount(1);
+  expect(psql(`SELECT status FROM sale_order WHERE id = '${opened.data.id}'`)).toBe('open');
   // Back is not the screens whoever left had open: the reload replaced the page.
+  await till.goto(`${origin}/settings`);
   await expect(shown(till).getByTestId('devices-admin-only')).toBeVisible();
 });
 
