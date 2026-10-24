@@ -155,15 +155,16 @@ def test_seating_a_reservation_of_an_erased_card_seats_it_without_the_card():
 
 
 def test_a_phone_typed_with_a_chosen_card_is_the_one_kept():
-    # «The guest's name, phone and email are copies of the card unless others are typed» (WORKBOOK F06).
+    # «The guest's name, phone and email are copies of the card unless others are typed» (WORKBOOK F06); the typed
+    # phone is kept as Customers keeps it, in international format.
     card = make_customer("Luis Pérez", phone="600333444", email="luis@x.es")
     out = book(customer_id=str(card.id), guest_name="", guest_phone="611222333")
-    assert (out.customer_id, out.guest_phone, out.guest_email) == (card.id, "611222333", "luis@x.es")
+    assert (out.customer_id, out.guest_phone, out.guest_email) == (card.id, "+34611222333", "luis@x.es")
     entry = run(
         "reservation.waitlist.create",
         {"customer_id": str(card.id), "guest_phone": "622444555", "date": "2026-10-15", "preferred_time": "21:00", "party_size": 2},
     )
-    assert (entry.customer_id, entry.guest_phone) == (card.id, "622444555")
+    assert (entry.customer_id, entry.guest_phone) == (card.id, "+34622444555")
 
 
 def test_a_bad_phone_is_said_before_a_full_slot_is_offered_to_overbook():

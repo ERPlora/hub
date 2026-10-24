@@ -13,7 +13,10 @@ Each one is one transaction with its events in the outbox; a refusal writes noth
   window. Tables' platform operations are called with only ``table.system`` added to the caller's context.
   The events of the contract (``status_changed``, ``updated``) are recorded as well, for the relay.
 - **Customers**: with no card chosen and a phone, the live card with that number is used, or one is
-  created, with the caller's session.
+  created, with the caller's session. A typed phone is kept as Customers keeps it (E.164 in the business's
+  country, ``apps.customer.phones``), whether the card was chosen or found: the inbox finds the guest's
+  conversation by exactly that number (RESERVATION-F19). One that is not a number of its country is refused
+  first, with Customers' reason on the phone field.
 """
 
 import datetime as dt
@@ -32,8 +35,9 @@ from live.models import OutboxEvent
 from live.outbox import record_event
 
 from apps.customer.models import Customer
-from apps.customer.queries import find_customer
-from apps.customer.services import lock_customers
+from apps.customer.phones import InvalidPhone, to_e164
+from apps.customer.queries import business_country, find_customer
+from apps.customer.services import PHONE_INVALID, lock_customers
 from apps.reservation import engine, events
 from apps.reservation.models import (
     ACTOR_MAX_LENGTH,
@@ -361,6 +365,19 @@ def chosen_card(customer_id, customer_said: str | None) -> Customer | None:
     return find_customer(customer_id, customer_said, lock=True)
 
 
+def typed_phone(ctx: OperationContext, raw: str | None) -> str:
+    """The phone the caller typed, as Customers keeps it: E.164, a number without prefix read in the business's
+    country, one with a ``+`` kept in its own; empty stays empty. One that is not a valid number of its country is
+    refused with Customers' reason on the phone field, before any other check (RESERVATION-F06)."""
+    try:
+        return to_e164(raw, business_country(ctx))
+    except InvalidPhone:
+        message = str(PHONE_INVALID)
+        raise InvalidPayload(
+            message, code="reservation.phone_invalid", fields={"guest_phone": message}
+        ) from None
+
+
 def card_for_phone(
     ctx: OperationContext, name: str, phone: str, email: str, source: str
 ) -> Customer:
@@ -412,10 +429,11 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
     },
 )
 def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
+    typed = typed_phone(ctx, data.guest_phone)
     settings = lock_book()
     card = chosen_card(data.customer_id, data.customer)
     name = data.guest_name or (card.name if card else "")
-    phone = data.guest_phone or (card.phone if card else "")
+    phone = typed or (card.phone if card else "")
     email = data.guest_email or (card.email if card else "")
     table = choose_table(data.table_id, data.table, data.zone)
     minutes = data.duration_minutes or settings.default_duration_minutes
@@ -513,6 +531,10 @@ def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
         for field in (*SLOT_FIELDS, *CONTACT_FIELDS, "notes", "internal_notes")
         if field in sent and getattr(data, field) is not None
     }
+    if "guest_phone" in changes:
+        # First, as in booking (RESERVATION-F06): a phone that is not a number is said before the table or the
+        # gate; and before the comparison, so the same number typed another way is no change.
+        changes["guest_phone"] = typed_phone(ctx, changes["guest_phone"])
     old_table = reservation.table
     new_table = old_table
     if data.no_table:
@@ -1020,9 +1042,10 @@ def delete_blocked(ctx: OperationContext, data: BlockedDateRefIn) -> dict:
 )
 def create_entry(ctx: OperationContext, data: WaitlistIn) -> dict:
     # No contact is required (market, duda 7): the phone is only for calling back.
+    typed = typed_phone(ctx, data.guest_phone)
     card = chosen_card(data.customer_id, data.customer)
     name = data.guest_name or (card.name if card else "")
-    phone = data.guest_phone or (card.phone if card else "")
+    phone = typed or (card.phone if card else "")
     email = data.guest_email or (card.email if card else "")
     if card is None and phone:
         card = card_for_phone(ctx, name, phone, email, "walk_in")
