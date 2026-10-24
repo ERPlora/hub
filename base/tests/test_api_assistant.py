@@ -260,3 +260,35 @@ def test_a_write_nobody_may_approve_is_still_refused_flat(client, make_user, gat
     got = frames(post(client, "/assistant/turn", _create_turn()))
     assert (got[0]["outcome"], got[0]["code"]) == ("refused", "not_available")
     assert _items() == 0
+
+
+def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_it_through(client, make_user, gateway, monkeypatch):
+    """What the manager read on the dialog is what runs: a pass granted as «Create an item» on the fingerprint of a
+    turn that renames one spends nothing on the rename (rv-hub-247)."""
+    from django.apps import apps
+    from django.core.cache import cache
+
+    from apps.demo.models import Item
+    from base.models import Approval, Credential
+
+    monkeypatch.setattr(
+        apps.get_app_config("demo"), "approvals", {**APPROVED_CREATE, "demo.item.update": "Change an item"}, raising=False
+    )
+    cache.clear()
+    _employee_and_manager(client, make_user)
+    item = Item.objects.create(name="Mesa 4")
+    arguments = json.dumps({"id": str(item.pk), "name": "Mesa 9"})
+    body = _create_turn()
+    body["pending"][0]["name"] = body["messages"][1]["tool_calls"][0]["function"]["name"] = "demo__item__update"
+    body["pending"][0]["arguments"] = body["messages"][1]["tool_calls"][0]["function"]["arguments"] = arguments
+    asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
+    assert asked["operation"] == "demo.item.update"
+    manager = str(Credential.objects.get(username="saas:4").pk)
+    granted = post(client, "/approvals", {"operation": "demo.item.create", "fingerprint": asked["fingerprint"], "person": manager, "pin": "1357"})
+    assert granted.status_code == 200, granted.content
+    gateway.turn({"type": "text_delta", "text": "No."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", body, HTTP_X_ELEVATION_TOKEN=granted.json()["token"]))
+    assert (got[0]["outcome"], got[0]["code"]) == ("error", "requires_elevation")
+    assert Item.objects.get(pk=item.pk).name == "Mesa 4"
+    assert Approval.objects.get().used_at is None
+    cache.clear()
