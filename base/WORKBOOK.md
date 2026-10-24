@@ -2113,7 +2113,9 @@ Pasos:
      noviembre.». Por debajo del 80 %, nada.
   3. La cuenta se mueve al terminar cada respuesta, sin recargar.
   4. Agotados, la respuesta es «Has usado todos los mensajes del asistente de este mes (300 de 300).» con «Se
-     renuevan el 1 de noviembre.», y no un fallo de conexión.
+     renuevan el 1 de noviembre.», y no un fallo de conexión. El pie dice lo mismo, sin repetir «Mejorar el plan»:
+     «Has usado los 300 mensajes de este mes.» con «Se renuevan el 1 de noviembre.»; también al abrir el panel con
+     el mes ya gastado.
   5. Quien administra el negocio ve, en el navegador, «Mejorar el plan», que abre en otra pestaña la página del plan
      en erplora.com; en la app instalada desde la tienda no sale. Quien no administra ve «Pídele a quien administra el
      negocio que mejore el plan.». No hay paquetes de mensajes: se amplía mejorando de plan.

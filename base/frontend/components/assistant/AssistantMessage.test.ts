@@ -11,9 +11,9 @@ function answer(fields: Partial<Bubble> = {}): Bubble {
   return { id: 'b2', role: 'assistant', text: '', files: [], notices: [], done: true, question: '¿Cuántos?', ...fields };
 }
 
-function mountBubble(bubble: Bubble, extra: Record<string, unknown> = {}) {
+function mountBubble(bubble: Bubble, extra: Record<string, unknown> = {}, locale: 'en' | 'es' = 'es') {
   return mountBase(AssistantMessage, {
-    locale: 'es',
+    locale,
     props: {
       bubble,
       screenExists: (path: string) => ['/settings', '/customer/customers'].includes(path.split('#')[0]),
@@ -95,6 +95,20 @@ describe('AssistantMessage', () => {
     await wrapper.find('[data-testid="assistant-retry"]').trigger('click');
     expect(wrapper.emitted('retry')).toHaveLength(1);
     wrapper.unmount();
+  });
+
+  it('a spent allowance and when it comes back read as two sentences, in both languages', async () => {
+    const spent = answer({ error: 'assistant.quota_exceeded', details: { used: 30, limit: 30, resets_at: '2026-11-01T00:00:00Z' } });
+    const es = await mountBubble(spent);
+    expect(es.wrapper.get('[data-testid="assistant-failure"] p').text()).toBe(
+      'Has usado todos los mensajes del asistente de este mes (30 de 30). Se renuevan el 1 de noviembre.',
+    );
+    es.wrapper.unmount();
+    const en = await mountBubble(spent, {}, 'en');
+    expect(en.wrapper.get('[data-testid="assistant-failure"] p').text()).toBe(
+      "You have used all the assistant's messages of this month (30 of 30). They renew on November 1.",
+    );
+    en.wrapper.unmount();
   });
 
   it('a spent allowance: the numbers, when they come back, and the plan for who may upgrade it (gh:hub#1259)', async () => {

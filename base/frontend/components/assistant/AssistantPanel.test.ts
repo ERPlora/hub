@@ -175,6 +175,39 @@ describe('AssistantPanel', () => {
     expect(m.sent.filter((s) => s.url === '/api/assistant/usage')).toHaveLength(2);
   });
 
+  it('after each turn the foot counts what is left now, with no other reading', async () => {
+    script.push([
+      { type: 'text', text: 'Hola.' },
+      { type: 'usage', used: 26, limit: 30, resets_at: '2026-11-01T00:00:00Z', demo: false },
+      { type: 'done', append: [{ role: 'assistant', content: 'Hola.' }], pending: [], continuation: null },
+    ]);
+    const m = await panel({ usage: { ...USAGE, used: 25 } });
+    await assistant.ask('Hola');
+    await flush();
+    expect(m.wrapper.get('[data-testid="assistant-usage"]').text()).toBe('Te quedan 4 de 30 mensajes este mes. Se renuevan el 1 de noviembre.');
+    expect(m.sent.filter((s) => s.url === '/api/assistant/usage')).toHaveLength(1);
+  });
+
+  it('a turn refused for a spent month: the foot says the same as the answer, without a second «Upgrade plan» (gh:hub#1183)', async () => {
+    script.push([{ type: 'error', code: 'assistant.quota_exceeded', used: 30, limit: 30, resets_at: '2026-11-01T00:00:00Z', demo: false }]);
+    // The business's plan page, as the Home's block gives it: the answer's «Upgrade plan» goes there.
+    const block = Object.assign(document.createElement('script'), { type: 'application/json', id: 'hub-home' });
+    block.textContent = JSON.stringify({ plan_url: 'https://erplora.com/hubs/a/plan' });
+    document.body.append(block);
+    const m = await panel({ usage: { ...USAGE, used: 25 } });
+    await assistant.ask('Hola');
+    await flush();
+    const foot = m.wrapper.get('[data-testid="assistant-usage"]');
+    expect(foot.text()).toBe('Has usado los 30 mensajes de este mes. Se renuevan el 1 de noviembre.');
+    expect(foot.find('a').exists()).toBe(false);
+    expect(m.wrapper.findAll('[data-testid="assistant-upgrade"]')).toHaveLength(1);
+  });
+
+  it('opened with the month already spent, the foot says so', async () => {
+    const m = await panel({ usage: { ...USAGE, used: 30 } });
+    expect(m.wrapper.get('[data-testid="assistant-usage"]').text()).toBe('Has usado los 30 mensajes de este mes. Se renuevan el 1 de noviembre.');
+  });
+
   it('under 80 %, or when the allowance cannot be read, it says nothing of it', async () => {
     const low = await panel();
     expect(low.wrapper.find('[data-testid="assistant-usage"]').exists()).toBe(false);

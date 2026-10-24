@@ -364,21 +364,29 @@ test('BASE-G120 — the conversation stays in the tab across reloads, «New conv
   await expect(panel(page).locator('[data-testid="assistant-bubble-user"]')).toHaveCount(0);
 });
 
-test('BASE-G122 — from 80 % the foot says what is left; a spent month says so, with «Upgrade plan» to the owner and who to ask to an employee', async ({ page, browser }) => {
+test('BASE-G122 — from 80 % the foot says what is left and each answer moves it; a spent month says so in the answer and in the foot, with «Upgrade plan» to the owner and who to ask to an employee', async ({ page, browser }) => {
   await login(page, A, '/');
   spend(25);
   await page.setViewportSize({ width: 1440, height: 900 });
   await home(page);
   await openPanel(page);
-  await expect(panel(page).locator('[data-testid="assistant-usage"]')).toHaveText(/^You have 5 of 30 messages left this month\. They renew on \S+ 1\.$/);
+  const foot = panel(page).locator('[data-testid="assistant-usage"]');
+  await expect(foot).toHaveText(/^You have 5 of 30 messages left this month\. They renew on \S+ 1\.$/);
   await shots(page, 'BASE-G122');
   await page.setViewportSize({ width: 1440, height: 900 });
+  // An answer spends one: the foot counts it at once, with no reload.
+  await ask(page, 'Hola');
+  await expect(lastAnswer(page)).toHaveText(GREETING);
+  await expect(foot).toHaveText(/^You have 4 of 30 messages left this month\. They renew on \S+ 1\.$/);
   spend(30);
   await ask(page, 'Hola');
   const failure = panel(page).locator('[data-testid="assistant-failure"]').last();
-  await expect(failure).toContainText("You have used all the assistant's messages of this month (30 of 30).");
+  await expect(failure).toContainText(/You have used all the assistant's messages of this month \(30 of 30\)\. They renew on \S+ 1\./);
   await expect(failure.locator('[data-testid="assistant-upgrade"]')).toHaveText(/Upgrade plan/);
-  await page.screenshot({ path: shot('APP-BASE-9-BASE-G122-spent-1440') });
+  // The foot says the same as the answer (gh:hub#1183), and «Upgrade plan» only once.
+  await expect(foot).toHaveText(/^You have used all 30 messages of this month\. They renew on \S+ 1\.$/);
+  await expect(panel(page).locator('[data-testid="assistant-upgrade"]')).toHaveCount(1);
+  await shots(page, 'BASE-G122-spent');
 
   const employee = await freshPage(browser);
   await employee.setViewportSize({ width: 1440, height: 900 });

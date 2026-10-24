@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f718481490ac4609f19f85f1052021606852eae63e435c7192e7271dd17f8f54 -->
+<!-- generated from WORKBOOK.md sha256:7f6c7d83e5cbb354dfc334c0e6bb786cd43f9bff89f545135e762796e372be2a -->
 
 ## What it is for and who it is for
 
@@ -2005,7 +2005,9 @@ Steps:
      November 1.". Below 80 %, nothing.
   3. The count moves when each answer ends, without reloading.
   4. Once spent, the answer is "You have used all the assistant's messages of this month (300 of 300)." with "They
-     renew on November 1.", and not a connection failure.
+     renew on November 1.", and not a connection failure. The foot says the same, without repeating "Upgrade plan":
+     "You have used all 300 messages of this month." with "They renew on November 1."; also when the panel opens
+     with the month already spent.
   5. Whoever runs the business sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in
      another tab; in the app installed from the store it does not show. Whoever does not run it sees "Ask whoever
      runs the business to upgrade the plan.". There are no message packs: it is extended by upgrading the plan.

@@ -124,7 +124,16 @@ const renews = computed(() => {
   });
 });
 const usageText = computed(() =>
-  note.value ? [t('base.assistant.usage', { left: note.value.left, limit: note.value.limit }), renews.value].filter(Boolean).join(' ') : '',
+  note.value
+    ? [
+        note.value.left > 0
+          ? t('base.assistant.usage', { left: note.value.left, limit: note.value.limit })
+          : t('base.assistant.usageSpent', { limit: note.value.limit }),
+        renews.value,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : '',
 );
 const noPlan = computed(() => state.usage !== null && state.usage.limit <= 0 && !state.usage.demo);
 

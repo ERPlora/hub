@@ -59,6 +59,11 @@ const renews = computed(() => {
   return t('base.assistant.renews', { date: day });
 });
 
+/** What happened and, for a spent month, when it comes back: two sentences, one space between them. */
+const failureText = computed(() =>
+  failure.value ? [t(failure.value.key, failure.value.values), renews.value].filter(Boolean).join(' ') : '',
+);
+
 const receipts = computed(() =>
   (props.bubble.executed ?? []).map((row) => ({
     outcome: row.outcome,
@@ -188,7 +193,7 @@ const finished = computed(() => props.bubble.done && props.bubble.text !== '' &&
     >
       <p>
         <HubIcon name="ion:alert-circle-outline" />
-        <span>{{ t(failure.key, failure.values) }}<template v-if="renews"> {{ renews }}</template></span>
+        <span>{{ failureText }}</span>
       </p>
       <ion-button
         v-if="failure.recovery === 'retry'"

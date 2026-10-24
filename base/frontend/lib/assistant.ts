@@ -200,6 +200,11 @@ export function createAssistant(deps: AssistantDeps = {}) {
           const details: Record<string, unknown> = { ...rest };
           delete details.type;
           failure = { code, details };
+          // The foot counts what the refusal counts (gh:hub#1183): «5 left» under «30 of 30» contradicts it.
+          if (code === 'assistant.quota_exceeded' && typeof details.used === 'number' && typeof details.limit === 'number') {
+            const resets = details.resets_at;
+            state.usage = { used: details.used, limit: details.limit, resets_at: typeof resets === 'string' ? resets : null, demo: details.demo === true };
+          }
         } else if (frame.type === 'done') doneFrame = frame;
       };
       const body: TurnBody = { messages: forGateway(state.thread.conversation), setup: state.thread.setup };

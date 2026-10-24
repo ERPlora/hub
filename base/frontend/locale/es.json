@@ -819,6 +819,7 @@
       "upgrade": "Mejorar el plan",
       "askOwner": "Pídele a quien administra el negocio que mejore el plan.",
       "usage": "Te quedan {left} de {limit} mensajes este mes.",
+      "usageSpent": "Has usado los {limit} mensajes de este mes.",
       "renews": "Se renuevan el {date}.",
       "offline": "Sin conexión: puedes escribir y enviar cuando vuelva.",
       "files": {

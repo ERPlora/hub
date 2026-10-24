@@ -819,6 +819,7 @@
       "upgrade": "Upgrade plan",
       "askOwner": "Ask whoever runs the business to upgrade the plan.",
       "usage": "You have {left} of {limit} messages left this month.",
+      "usageSpent": "You have used all {limit} messages of this month.",
       "renews": "They renew on {date}.",
       "offline": "No connection: you can write, and send when it is back.",
       "files": {
