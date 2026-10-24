@@ -474,6 +474,8 @@ test('A phone typed without prefix for a chosen card is kept international; one 
     await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
     await page.goto(`${A}/reservation/reservations`);
     await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
     const view = shown(page);
     const guest = `${TAG} Lucía`;
     const card = await post<{ id: string; phone: string }>(context, '/customer/customers', { name: guest, phone: localPhone() });
