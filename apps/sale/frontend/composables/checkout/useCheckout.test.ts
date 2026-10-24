@@ -1,15 +1,25 @@
 // The charge of the sheet (SALE-F01, F06, F14): one attempt key per opening of the sheet, reused on every
 // retry, so the server records at most one sale per attempt; the door (`sale.sale.complete`, or
-// `sale.sale.complete_over_limit` with the same payload when a discount over the cap needs it and the
-// person may approve it); a refusal kept with the server's words; and, when the answer is lost (no
+// `sale.sale.complete_over_limit` with the same payload when a discount over the cap needs it: directly for whoever
+// may approve it, with a manager's approval on this very device for anybody else, BASE-F84); a refusal kept with the server's words; and, when the answer is lost (no
 // network, a 5xx, a proxy's HTML), the recovery: ask `sale.sale.by_idempotency_key` up to twice —
 // charged finishes as a charge, not charged says the server is not answering, unknown sends to Sales.
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import { approvalDialog, asksApproval, CANCELLED } from '../../__tests__/approval-dialog';
 import { EMPLOYEE, flush, MANAGER, mountSale } from '../../__tests__/mount-sale';
 import type { CompleteIn, SaleOut } from '../../operations';
 import { RECOVERY_DELAY_MS, useCheckout } from './useCheckout';
+
+vi.mock('@ionic/vue', async (importOriginal) => {
+  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
+});
+beforeEach(() => {
+  approvalDialog.reset();
+});
 
 type Input = Omit<CompleteIn, 'idempotency_key'>;
 type Checkout = ReturnType<typeof useCheckout>;
@@ -127,13 +137,35 @@ describe('useCheckout', () => {
     expect(s.charged()).toEqual([[SALE]]);
   });
 
-  it('without the permission, the discount refusal is said and nothing else is tried', async () => {
+  it('without the permission, a manager approves it with their PIN and the same attempt is charged once', async () => {
     const s = await setup(EMPLOYEE);
-    const message = 'That discount is over the limit: a manager has to approve it.';
-    s.replies({ [COMPLETE]: [refusal(409, 'sale.discount_over_limit', message)] });
+    const asks = Response.json(asksApproval('sale.sale.complete_over_limit', 'Charge with a discount above the maximum'), { status: 403 });
+    s.replies({
+      [COMPLETE]: [refusal(409, 'sale.discount_over_limit', 'That discount is over the limit.')],
+      [OVER_LIMIT]: [asks, Response.json(SALE)],
+    });
+    const key = s.checkout.key.value;
     await s.checkout.charge(INPUT);
-    expect(s.sent().map((c) => c.path)).toEqual([COMPLETE]);
-    expect(s.checkout.failure.value).toEqual({ kind: 'refused', code: 'sale.discount_over_limit', message });
+    expect(s.sent().map((c) => [c.path, c.body])).toEqual([
+      [COMPLETE, { ...INPUT, idempotency_key: key }],
+      [OVER_LIMIT, { ...INPUT, idempotency_key: key }],
+      [OVER_LIMIT, { ...INPUT, idempotency_key: key }],
+    ]);
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Charge with a discount above the maximum']);
+    expect(s.charged()).toEqual([[SALE]]);
+  });
+
+  it('without the permission, «Cancel» on the approval says its refusal and nothing is charged', async () => {
+    const s = await setup(EMPLOYEE);
+    approvalDialog.answer = CANCELLED;
+    s.replies({
+      [COMPLETE]: [refusal(409, 'sale.discount_over_limit', 'That discount is over the limit.')],
+      [OVER_LIMIT]: [Response.json(asksApproval('sale.sale.complete_over_limit', 'Charge with a discount above the maximum'), { status: 403 })],
+    });
+    await s.checkout.charge(INPUT);
+    expect(s.sent().map((c) => c.path)).toEqual([COMPLETE, OVER_LIMIT]);
+    expect(s.checkout.failure.value).toEqual({ kind: 'refused', code: 'requires_elevation', message: 'This needs a manager’s approval.' });
+    expect(s.charged()).toEqual([]);
   });
 
   it('no answer: asks by the attempt key and, if it was charged, finishes as a charge', async () => {

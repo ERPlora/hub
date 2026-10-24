@@ -195,11 +195,8 @@ function openSheet(open: () => void): void {
 }
 
 const pricing = shallowRef(false);
+/** Open to everyone: whoever may not sell at an open price gets a manager's approval when it is added (SALE-F09). */
 function openPrice(): void {
-  if (!session.can('sale.sell_open_price')) {
-    void toast(t('sale.pos.managerOnly'), 'warning');
-    return;
-  }
   openSheet(() => (pricing.value = true));
 }
 const addOpenLine = (line: OpenLine) =>
@@ -590,7 +587,6 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
       <div class="pos-till__body">
         <PosCatalog
           :show-products="settings.show_products"
-          :can-open-price="session.can('sale.sell_open_price')"
           :show-services="showServices"
           :show-combos="combosOn"
           :fiscal="verifactuOn"
@@ -766,7 +762,7 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
       <DirtyCheckDialog
         :open="!!switchingTo"
         :can-park="settings.enable_parked_tickets"
-        :can-discard="session.can('sale.void_sale')"
+        :can-discard="session.can('sale.add_sale')"
         :pending="sheetPending"
         :error="sheetError"
         @update:open="(open) => !open && (switchingTo = null)"

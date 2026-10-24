@@ -37,7 +37,6 @@ const props = withDefaults(
   defineProps<{
     /** The till settings' «Show products in the till». */
     showProducts: boolean;
-    canOpenPrice: boolean;
     /** «Show services in the till», with Services on and readable (SALE-F38). */
     showServices?: boolean;
     /** Menus on and readable (SALE-F12). */
@@ -196,7 +195,6 @@ function pickService(service: ServiceSaleOut): void {
       :products="shown"
       :loading="showProducts && products.status.value === 'loading'"
       :has-more="showProducts && products.hasMore.value"
-      :can-open-price="canOpenPrice"
       :empty-text="emptyText"
       @pick="pick"
       @open-price="emit('openPrice')"

@@ -44,7 +44,6 @@
       "loadMore": "Cargar más",
       "openPrice": "Precio libre",
       "openPriceTag": "+ €",
-      "managerOnly": "Lo tiene que hacer un responsable",
       "notSellableBadge": "Falta el {tax}",
       "notSellableNoTaxCategory": "No se puede vender: sin categoría fiscal. Falta configurar el {tax}.",
       "soldOutBadge": "Agotado",

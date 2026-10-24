@@ -4,8 +4,9 @@
 //     a repeat with the sale it already has (`already`). It changes only after a definitive refusal,
 //     when the server said nothing was charged under it.
 //   - The door: `sale.sale.complete`; a discount over the business's cap that nobody approved comes back
-//     as `sale.discount_over_limit`, and whoever may approve it (`sale.discount_over_limit`) charges
-//     again through `sale.sale.complete_over_limit` with the same payload and key.
+//     as `sale.discount_over_limit`, and the charge goes again through `sale.sale.complete_over_limit`
+//     with the same payload and key: directly for whoever may approve it (`sale.discount_over_limit`),
+//     with a manager's approval on this very device for anybody else (BASE-F84).
 //   - A lost answer (no network, a 5xx, a page that is not the API's) or the same attempt already being
 //     recorded (`sale.checkout_in_progress`) is never read as «not charged»: the sale is looked up by
 //     its key, up to twice. Charged → it finishes as a charge; not there → the server is not answering
@@ -14,6 +15,7 @@ import { useSession } from '@erplora/ui/shell';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { readonly, shallowRef } from 'vue';
 
+import { throughManager } from '../../lib/approval';
 import type { CompleteIn, SaleOut } from '../../operations';
 
 /** The wait between the two lookups of a lost answer (a restarting server needs a moment). */
@@ -47,14 +49,12 @@ export function useCheckout(options: UseCheckoutOptions) {
   const busy = shallowRef(false);
   const failure = shallowRef<CheckoutFailure | null>(null);
 
-  async function send(input: CompleteIn): Promise<SaleOut> {
-    try {
-      return await client.api.call('sale.sale.complete', input);
-    } catch (error) {
-      const overCap = error instanceof ApiError && error.code === 'sale.discount_over_limit';
-      if (!overCap || !session.can('sale.discount_over_limit')) throw error;
-      return client.api.call('sale.sale.complete_over_limit', input);
-    }
+  function send(input: CompleteIn): Promise<SaleOut> {
+    return throughManager(
+      () => client.api.call('sale.sale.complete', input),
+      () => client.api.call('sale.sale.complete_over_limit', input),
+      { code: 'sale.discount_over_limit', may: session.can('sale.discount_over_limit') },
+    );
   }
 
   const pause = (ms: number) => new Promise<void>((resolve) => client.schedule(resolve, ms));

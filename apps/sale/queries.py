@@ -10,6 +10,7 @@ valuation of a charge (``pricing.value`` over tax's closing), shared by the prev
 
 import datetime as dt
 from collections.abc import Iterable
+from dataclasses import replace
 from decimal import Decimal
 from fractions import Fraction
 from itertools import groupby
@@ -32,7 +33,7 @@ from live.errors import (
     NotFound,
     PermissionDenied,
 )
-from live.operations import UnknownOperation, get, operation
+from live.operations import Operation, UnknownOperation, get, operation
 
 from apps.sale import pricing
 from apps.sale.models import (
@@ -94,6 +95,8 @@ from apps.tax.queries import (
     current_rates,
 )
 from apps.tax.schemas import TAX_KIND_NAMES
+from base.approvals import Approved, digest
+from base.models import Approval
 
 CURRENCY = "EUR"
 #: In a business of Spain, no cash at all from this total on (Ley 7/2012, art. 7), mixed included.
@@ -195,6 +198,38 @@ def business_country() -> str:
 
 def actor(ctx: OperationContext) -> str:
     return str(ctx.actor)[:128] if ctx.actor is not None else ""
+
+
+def approval_of(ctx: OperationContext) -> Approved | None:
+    """The manager's approval the request of ``ctx`` came with (BASE-F84): the command it is for, spent in that
+    command's own transaction before its body runs; ``None`` without one."""
+    marked = getattr(getattr(ctx, "request", None), "approved", None)
+    return marked if isinstance(marked, Approved) else None
+
+
+def authoriser(ctx: OperationContext) -> str:
+    """Who authorised what ``ctx`` does (a discount above the maximum): the manager who approved this very request
+    with their PIN on the cashier's device (BASE-F84), else the caller."""
+    approval = approval_of(ctx)
+    if approval is not None:
+        approved_by = (
+            Approval.objects.filter(token_digest=digest(approval.token), operation=approval.operation)
+            .values_list("approved_by", flat=True)
+            .first()
+        )
+        if approved_by:
+            return approved_by[:128]
+    return actor(ctx)
+
+
+def consequence_context(ctx: OperationContext, op: Operation) -> OperationContext:
+    """The context the command ``op`` of another app runs with as part of the caller's command (``call_app``). When a
+    manager approved that command with their PIN (BASE-F84), what it does on the way goes with it, as when the manager
+    does it themselves: the rectifying invoice in the void or the refund, the voucher's sessions it gives back. Without
+    an approval, or for a read, the caller's own: an approval never opens a query (``base.approvals``)."""
+    if op.kind != "command" or not op.permission or ctx.has(op.permission) or approval_of(ctx) is None:
+        return ctx
+    return replace(ctx, permissions=ctx.permissions | {op.permission})
 
 
 @operation(
@@ -648,7 +683,7 @@ def call_app(ctx: OperationContext, name: str, data: dict, unavailable_code: str
             next(iter(fields.values()), str(invalid)), code="invalid_payload", fields=fields
         ) from None
     try:
-        return op(ctx, payload)
+        return op(consequence_context(ctx, op), payload)
     except AppInactive:
         raise unavailable from None
 

@@ -1,14 +1,24 @@
 // «Open checks» (WORKBOOK «Cuentas abiertas»; SALE-F17, F18): «Park this check» with its hint, «Tap a
 // check to resume it.» and a row per open check of the business (title or amount, time and amount),
 // newest first, 20 at a time, with its bin: a first tap arms it for 3 seconds, a second voids the check.
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { approvalDialog, approvalSettled, asksApproval } from '../../__tests__/approval-dialog';
 import { click, EMPLOYEE, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { orderRow, page, refused } from './__tests__/fixtures';
 import OpenChecksPopover from './OpenChecksPopover.vue';
 
 const OP = 'sale.order.list';
+
+vi.mock('@ionic/vue', async (importOriginal) => {
+  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
+});
+beforeEach(() => {
+  approvalDialog.reset();
+});
 
 async function setup(props: Record<string, unknown> = {}, options: { locale?: 'en' | 'es'; session?: typeof EMPLOYEE } = {}) {
   const m = await mountSale(OpenChecksPopover, {
@@ -109,16 +119,29 @@ describe('OpenChecksPopover: deleting', () => {
     expect(m.find('pos-checks-error').text()).toBe('Esa cuenta ya no está abierta.');
   });
 
-  it('without the permission to void there is no bin on a check with something on it', async () => {
+  it('without the permission to void, a check with something on it is deleted once a manager approves it with their PIN', async () => {
     const m = await setup({}, { session: EMPLOYEE });
     await m.result(OP, page(ROWS));
-    expect(m.find('pos-parked-o2-delete').exists()).toBe(false);
+    const answers = [
+      refused('permission_denied', 'Permission “sale.void_sale” is required.', 403),
+      Response.json(asksApproval('sale.order.void_ordered', 'Delete an open check with something on it'), { status: 403 }),
+    ];
+    m.net.onApi(() => answers.shift() ?? Response.json({}));
+    await click(m.find('pos-parked-o2-delete').element);
+    await click(m.find('pos-parked-o2-delete').element);
+    await approvalSettled();
+    expect(m.sent().map((call) => [call.path, call.body])).toEqual([
+      ['/api/sale/orders/void', { order_id: 'o2' }],
+      ['/api/sale/orders/void_ordered', { order_id: 'o2' }],
+      ['/api/sale/orders/void_ordered', { order_id: 'o2' }],
+    ]);
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Delete an open check with something on it']);
+    expect(m.find('pos-checks-error').exists()).toBe(false);
   });
 
   it('an empty check is deleted by whoever builds checks (a party that left without ordering)', async () => {
     const m = await setup({}, { session: EMPLOYEE });
     await m.result(OP, page([...ROWS, orderRow({ id: 'o4', label: 'Table 4', provisional_total: 0, lines_count: 0 })]));
-    expect(m.find('pos-parked-o3-delete').exists()).toBe(false);
     m.answer(200, {});
     await click(m.find('pos-parked-o4-delete').element);
     await click(m.find('pos-parked-o4-delete').element);

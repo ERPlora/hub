@@ -7,7 +7,8 @@
 // date range replaces the period; an amount it cannot read, or a «to» day before its «from», is said
 // under its field and does not filter), table or
 // cards and 50 a page. A row opens its document; «Document» and «Reprint» for everyone; «Void» and
-// «Refund» by permission, only where they apply; a sale whose fiscal documents wait says «Document
+// «Refund» for everyone too, only where they apply (whoever may not, with a manager's approval on this very
+// device: BASE-F84, the windows ask it); a sale whose fiscal documents wait says «Document
 // pending» under its status and offers «Issue now» (`sale.sale.issue_documents`) to whoever charges. Charges, voids and refunds come back through the
 // stream by themselves: nothing here refetches. Everything the screen shows is the server's.
 import {
@@ -50,8 +51,6 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 const session = useSession();
 const canReports = computed(() => session.can('sale.view_reports'));
-const canVoid = computed(() => session.can('sale.void_sale'));
-const canRefund = computed(() => session.can('sale.refund_sale'));
 const canIssue = computed(() => session.can('sale.take_payment'));
 const t = useT();
 const locale = useLocale();
@@ -188,10 +187,8 @@ const actions = computed<DataTableAction<SaleRow>[]>(() => [
         },
       ]
     : []),
-  ...(canVoid.value ? [{ id: 'void', label: t('sale.sales.actions.void'), icon: 'ban-outline', color: 'danger', hidden: (row: SaleRow) => !voidable(row) }] : []),
-  ...(canRefund.value
-    ? [{ id: 'refund', label: t('sale.sales.actions.refund'), icon: 'lucide:rotate-ccw', color: 'warning', hidden: (row: SaleRow) => !refundable(row) }]
-    : []),
+  { id: 'void', label: t('sale.sales.actions.void'), icon: 'ban-outline', color: 'danger', hidden: (row: SaleRow) => !voidable(row) },
+  { id: 'refund', label: t('sale.sales.actions.refund'), icon: 'lucide:rotate-ccw', color: 'warning', hidden: (row: SaleRow) => !refundable(row) },
 ]);
 
 const docOpen = shallowRef(false);
@@ -210,10 +207,10 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
   if (actionId === 'document') openDocument(row);
   else if (actionId === 'reprint' && !reprinting.value) reprinting.value = row.id;
   else if (actionId === 'issue' && canIssue.value && row.documents_pending && !issuingId.value) void issue(row);
-  else if (actionId === 'void' && canVoid.value && voidable(row)) {
+  else if (actionId === 'void' && voidable(row)) {
     voiding.value = row;
     voidOpen.value = true;
-  } else if (actionId === 'refund' && canRefund.value && refundable(row)) {
+  } else if (actionId === 'refund' && refundable(row)) {
     refunding.value = row;
     refundOpen.value = true;
   }
@@ -350,12 +347,10 @@ function onAction({ actionId, row }: { actionId: string; row: SaleRow }): void {
       @done="reprinting = null"
     />
     <VoidSaleModal
-      v-if="canVoid"
       v-model:open="voidOpen"
       :sale="voiding"
     />
     <RefundModal
-      v-if="canRefund"
       v-model:open="refundOpen"
       :sale="refunding"
     />

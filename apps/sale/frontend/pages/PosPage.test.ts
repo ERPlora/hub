@@ -266,12 +266,12 @@ describe('PosPage: services of Services (SALE-F38)', () => {
 });
 
 describe('PosPage: open price', () => {
-  it('without the permission the tile says a manager has to do it', async () => {
+  it('an employee opens the sheet too: a manager approves the open price when it is added', async () => {
     const s = await setup({ session: EMPLOYEE });
     s.wrapper.findComponent(PosCatalog).vm.$emit('openPrice');
     await settle();
-    expect(toast).toHaveBeenCalledWith('A manager has to do it', 'warning');
-    expect(s.wrapper.findComponent(OpenPriceSheet).props('open')).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
+    expect(s.wrapper.findComponent(OpenPriceSheet).props('open')).toBe(true);
   });
 
   it('with it, the sheet adds an open-price line and closes', async () => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The till's product grid: a tile per product of the category in use, the «Open price» tile always
-// last (SALE-F09; without the permission it says a manager has to do it, and the page answers the
-// tap), «Load more» while the server has more rows than the windows asked, «No products.» (or the
+// last (SALE-F09; the same for everyone: whoever may not sell at an open price gets a manager's
+// approval when the line is added), «Load more» while the server has more rows than the windows asked, «No products.» (or the
 // reason the page passes) when there is nothing, and a spinner until the first answer. The grid
 // scrolls inside its column, so the cart's footer never leaves the screen. The `lead` slot goes first in the
 // grid (the menus of Menus in «All», SALE-F12).
@@ -15,7 +15,6 @@ defineProps<{
   products: readonly ProductOut[];
   loading?: boolean;
   hasMore?: boolean;
-  canOpenPrice?: boolean;
   /** Why there is no grid (Inventory not active, the catalogue did not load); «No products.» by default. */
   emptyText?: string;
 }>();
@@ -60,10 +59,7 @@ const emit = defineEmits<{ pick: [product: ProductOut]; openPrice: []; loadMore:
       </span>
       <span class="pos-open__info">
         <span class="pos-tile__name">{{ $t('sale.pos.openPrice') }}</span>
-        <span
-          class="pos-tile__price"
-          :class="{ 'pos-tile__price--note': !canOpenPrice }"
-        >{{ canOpenPrice ? $t('sale.pos.openPriceTag') : $t('sale.pos.managerOnly') }}</span>
+        <span class="pos-tile__price">{{ $t('sale.pos.openPriceTag') }}</span>
       </span>
     </button>
     <button
@@ -157,12 +153,6 @@ const emit = defineEmits<{ pick: [product: ProductOut]; openPrice: []; loadMore:
   font-size: 0.9rem;
   font-weight: 800;
   color: var(--ion-color-primary, #0091ce);
-}
-.pos-tile__price--note {
-  align-self: flex-start;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--ion-color-medium, #8b897f);
 }
 @media (min-width: 821px) and (max-width: 1100px) {
   .pos-grid {

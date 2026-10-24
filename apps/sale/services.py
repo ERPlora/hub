@@ -68,6 +68,7 @@ from apps.sale.queries import (
     TICKET_LIMIT,
     actor,
     allowed_types,
+    authoriser,
     breakdown_rows,
     business_country,
     call_app,
@@ -1008,7 +1009,8 @@ def void_line(ctx: OperationContext, data: OrderVoidLineIn) -> dict:
     _release_vouchers(ctx, [line])
     line.removed_at = timezone.now()
     line.void_reason = data.reason
-    line.voided_by = actor(ctx)
+    # Who authorised it: the manager who approved it with their PIN on the cashier's device, or who voided it.
+    line.voided_by = authoriser(ctx)
     line.save(update_fields=["removed_at", "void_reason", "voided_by", "updated_at"])
     reference = {"order_id": str(order.id), "line_id": str(line.id)}
     record_event(ctx, events.ORDER_LINE_REMOVED, reference)
@@ -1222,6 +1224,28 @@ VOID_PERMISSION = "sale.void_sale"
     },
 )
 def void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
+    return _void_order(ctx, data)
+
+
+@operation(
+    "sale.order.void_ordered",
+    kind="command",
+    # The manager's door to the very same void for a check with something ordered or charged on it (SALE-F18):
+    # its own permission is the void's, so a cashier's request is one a manager approves with their PIN (BASE-F84).
+    permission=VOID_PERMISSION,
+    input=OrderRefIn,
+    output=OrderOut,
+    ai={
+        "description": "The manager's door to the very same void as sale.order.void, for an open check with something "
+        "ordered or charged on it: kept as voided, never erased. An empty check is voided with sale.order.void.",
+        "risk": "high",
+    },
+)
+def void_ordered(ctx: OperationContext, data: OrderRefIn) -> dict:
+    return _void_order(ctx, data)
+
+
+def _void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
     order = find_order(data.order_id, lock=True)
     if order.status == Order.Status.VOIDED:
         return order_detail(order)
@@ -1284,7 +1308,7 @@ def _set_discount(
     order.discount_percent = percent
     order.discount_amount = amount
     order.discount_approved_by = (
-        actor(ctx) if over_limit and (percent > 0 or amount > 0) else ""
+        authoriser(ctx) if over_limit and (percent > 0 or amount > 0) else ""
     )
     order.save(
         update_fields=[
@@ -1344,7 +1368,7 @@ def _set_line_discount(
     if percent > _cap(over_limit, settings):
         raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
     line.discount_percent = percent
-    line.discount_approved_by = actor(ctx) if over_limit and percent > 0 else ""
+    line.discount_approved_by = authoriser(ctx) if over_limit and percent > 0 else ""
     line.line_total = provisional_total(line)
     line.save(
         update_fields=[

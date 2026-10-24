@@ -50,6 +50,7 @@ ROUTES = {
     ("POST", "/sale/orders/split", "sale.order.split"),
     ("POST", "/sale/orders/merge", "sale.order.merge"),
     ("POST", "/sale/orders/void", "sale.order.void"),
+    ("POST", "/sale/orders/void_ordered", "sale.order.void_ordered"),
     ("POST", "/sale/orders/set_discount", "sale.order.set_discount"),
     (
         "POST",
@@ -114,6 +115,13 @@ def test_every_route_is_bound_to_its_operation():
         for method in route.methods
     }
     assert routes == ROUTES
+
+
+def test_the_spas_route_map_names_every_sale_route(settings):
+    # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
+    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+    mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("sale.")}
+    assert mine == {(method, f"/api{path}", op) for method, path, op in ROUTES}
 
 
 def test_no_sale_operation_republishes_the_tax_of_the_territory():

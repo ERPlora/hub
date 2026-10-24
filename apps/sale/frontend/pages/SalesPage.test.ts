@@ -3,8 +3,8 @@
 // (only for whoever may see the reports), and the live `sale.sale.list` in a server-side DataTable —
 // Date, Number, Customer, Payment, Status («<amount> left to refund» under a sale partly refunded),
 // Total —, search «Search number or customer…», the filters behind the table's funnel, table or cards, 50 a page. A row opens its
-// document; «Document» and «Reprint» for everyone, «Void» and «Refund» by permission and only where
-// they apply. The list re-runs by itself on charges, voids and refunds: nothing here refetches.
+// document; «Document» and «Reprint» for everyone, «Void» and «Refund» too, only where they apply (whoever
+// may not, with a manager's approval: the windows ask it). The list re-runs by itself on charges, voids and refunds: nothing here refetches.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -433,12 +433,14 @@ describe('SalesPage: the row actions (SALE-F29–F31)', () => {
     expect([has('void'), has('refund')]).toEqual([false, true]);
   });
 
-  it('an employee gets Document, Reprint and «Issue now» (she charges), and no void or refund window', async () => {
+  it('an employee gets Document, Reprint, «Issue now» (she charges), and Void and Refund, which a manager approves', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(PAGE);
-    expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['document', 'reprint', 'issue']);
-    expect(s.wrapper.findComponent(VoidSaleModal).exists()).toBe(false);
-    expect(s.wrapper.findComponent(RefundModal).exists()).toBe(false);
+    expect(s.prop<Array<{ id: string }>>('actions').map((a) => a.id)).toEqual(['document', 'reprint', 'issue', 'void', 'refund']);
+    await s.action('s1', 'void');
+    expect(s.wrapper.findComponent(VoidSaleModal).props()).toMatchObject({ open: true, sale: ROWS[0] });
+    await s.action('s4', 'refund');
+    expect(s.wrapper.findComponent(RefundModal).props()).toMatchObject({ open: true, sale: ROWS[3] });
   });
 
   it('a row, or «Document», opens its document (a duplicate when printed)', async () => {

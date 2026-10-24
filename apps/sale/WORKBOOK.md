@@ -157,8 +157,9 @@ Ventana «Cuenta» que abre la impresora del pie: el papel que se lleva a la mes
 Título «Ventas», periodo («Hoy», «7 días», «30 días», «Todo»), seis cifras («Tickets», «Ingresos»,
 «Ticket medio», «IVA», «Descuentos», «Anuladas») y la tabla (Fecha, Número, Cliente, Pago, Estado,
 Total) con el buscador «Buscar número o cliente…», filtros, vista tabla o tarjetas, 50 por página.
-Por fila: «Documento», «Reimprimir» y, según permiso, «Anular» y «Devolver». Vacía: «Aún no hay
-ventas.»; cargando: «Cargando…»; error: el aviso con «Reintentar».
+Por fila: «Documento», «Reimprimir», «Anular» y «Devolver», cada una donde aplica; quien no tiene el
+permiso de anular o de devolver también las ve, y un responsable se lo aprueba con su PIN. Vacía: «Aún
+no hay ventas.»; cargando: «Cargando…»; error: el aviso con «Reintentar».
 
 ### Documento de venta
 Ventana del tique de una venta: el papel tal como se imprime (título «Tique» o «Factura», cabecera,
@@ -177,7 +178,8 @@ puede devolver…»; nada que devolver: «No queda nada por devolver en esta ven
 
 ### Anular venta
 Ventana «Anular la venta <número>»: la explicación, el «Motivo (obligatorio)» y «Anular» /
-«Cancelar». Un rechazo se lee dentro de la ventana, que sigue abierta.
+«Cancelar». Un rechazo se lee dentro de la ventana, que sigue abierta. Sin el permiso de anular,
+«Anular» abre encima «Hace falta una aprobación» (la de la plataforma, BASE-F84).
 
 ### Notas rápidas
 Explicación, tabla (Nota, Posición) con buscador, **+** para añadir y, por fila, «Editar» y
@@ -203,7 +205,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | Error | El aviso con «Reintentar»; un rechazo de una acción sale dentro de su hoja o ventana, junto a su campo. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
-| Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
+| Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». Lo que un responsable puede aprobar con su PIN (anular y devolver una venta, anular una línea enviada, eliminar una cuenta con algo pedido, el precio libre y los descuentos por encima del máximo) sí aparece y, al pulsarlo, pide «Hace falta una aprobación». |
 
 ## Flujos
 
@@ -470,21 +472,27 @@ Implicados: CASH_REGISTER-F04, CASH_REGISTER-F17
 <!-- origen: old:sales/workflow/la-cuenta.md#sales-f09 -->
 Estado: hecho
 Vertical: común
-Actor: responsable (empleado con el permiso de precio libre)
-Pantalla: Vender
+Actor: responsable (empleado con el permiso de precio libre); cajero, con la aprobación de un responsable
+Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Toca la baldosa «Precio libre», al final de la rejilla.
 2. Marca el importe en el teclado y elige la sección en «Sección (IVA)»; cada botón enseña su
    tipo de IVA.
 3. Pulsa «Añadir <importe>»: entra una línea con el nombre de la sección y ese importe. Nunca se
    suma a otra línea.
+4. Si no tienes el permiso de precio libre, al pulsar «Añadir <importe>» sale encima «Hace falta una
+   aprobación» con «Se aprueba: Vender a precio libre»: un responsable la aprueba con su PIN (o su placa)
+   en ese mismo dispositivo (BASE-F84) y la línea entra. Si aún no había cuenta, se abre vacía y la línea
+   espera a la aprobación.
 Entra: las secciones del negocio (SALE-F35) o, si no hay, las categorías de IVA de Impuestos.
 Sale: una línea sin artículo de catálogo, con su importe y su categoría de IVA, que se cobra como
 cualquier otra.
 Si falla: «Añadir» no se puede pulsar sin importe y sección; sin secciones ni categorías, «No hay
-categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.». Sin el permiso de precio libre la baldosa dice «Lo tiene que hacer
-un responsable» y el servidor rechaza la línea por cualquier vía (también al cobrar directamente).
-Implicados: TAX-F18
+categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.». Si en «Hace falta una
+aprobación» se pulsa «Cancelar», la línea no entra y la hoja dice «Esto necesita la aprobación de un
+encargado.». Sin el permiso ni la aprobación, el servidor rechaza la línea por cualquier otra vía
+(también al cobrar directamente).
+Implicados: TAX-F18, BASE-F84
 
 ### SALE-F10 Vender por peso, tecleando la cantidad
 <!-- origen: old:sales/workflow/la-cuenta.md#sales-f10 -->
@@ -597,29 +605,33 @@ Implicados: ninguno
 
 ### SALE-F14 Aplicar un descuento a una línea o a la cuenta
 <!-- origen: old:sales/workflow/la-cuenta.md#sales-f14 qa:modules/sales/apply-discount -->
-Estado: parcial — sin el PIN del encargado en el dispositivo del empleado (elevación de la plataforma): el descuento por encima del máximo lo aplica un responsable desde su sesión
+Estado: parcial — «Hace falta una aprobación» dice qué se aprueba, pero no el porcentaje ni el importe del descuento: la frase la pone la plataforma, fija por acción
 Vertical: común
-Actor: empleado, responsable
-Pantalla: Vender
+Actor: empleado, responsable; por encima del máximo, el cajero con la aprobación de un responsable
+Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Para una línea, toca su etiqueta de precio («Descuento en la línea»); para toda la cuenta, el botón
    de etiqueta del pie («Descuento del ticket»).
 2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda.
 3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
    la fila «Descuento del ticket».
-4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, solo lo puede aplicar un
-   responsable; la cuenta guarda quién lo autorizó y no lo vuelve a comprobar al cobrar.
+4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, lo da un responsable: quien
+   no puede darlo ve encima «Hace falta una aprobación» con «Se aprueba: Descontar una línea por encima
+   del máximo» (o «Se aprueba: Descontar la cuenta por encima del máximo»), y un responsable lo aprueba
+   con su PIN (o su placa) en ese mismo dispositivo (BASE-F84). La cuenta guarda quién lo autorizó y no
+   lo vuelve a comprobar al cobrar; si al cobrar el descuento pasa del máximo sin autorizar, se pregunta
+   igual, con «Se aprueba: Cobrar con un descuento por encima del máximo».
 Entra: «Permitir descuentos» y el descuento máximo de los ajustes.
 Sale: el descuento en la cuenta o en la línea; al cobrar se reparte entre las líneas, la base y el IVA
 declarados ya lo llevan descontado, y la venta guarda el importe descontado.
 Si falla: con «Permitir descuentos» apagado no hay botones y el servidor rechaza «Este negocio no
-permite descuentos.». Por encima del máximo sin ser responsable: «Ese descuento supera lo que este
-negocio permite sin que lo autorice el encargado.» y la cuenta sigue como estaba. Un importe mayor
+permite descuentos.». Por encima del máximo, si en «Hace falta una aprobación» se pulsa «Cancelar», la
+cuenta sigue como estaba y se lee «Esto necesita la aprobación de un encargado.». Un importe mayor
 que la cuenta no se puede aplicar. Si otro dispositivo está cobrando esa cuenta, gana el primero
 (SALE-F01).
-Implicados: ninguno
-Pendiente: el PIN del encargado sobre el dispositivo del empleado llega con la elevación por PIN de la
-plataforma; mientras, el empleado le pasa el dispositivo o el responsable lo aplica desde el suyo.
+Implicados: BASE-F84
+Pendiente: que «Hace falta una aprobación» diga la cifra que se aprueba («un 50 % en la línea»): la
+frase de la acción la pone la plataforma, igual para cada petición.
 
 ### SALE-F15 Invitar una línea
 <!-- origen: old:sales/workflow/la-cuenta.md#sales-f15 -->
@@ -688,23 +700,27 @@ Implicados: CUSTOMER-F19
 <!-- origen: wf:restaurante-dia#rec_restaurante-f14 fi:modules/sales#command-sales-cart-clear-sql-transaccional old:sales/workflow/la-cuenta.md#sales-f18 qa:modules/sales/void-sale -->
 Estado: hecho
 Vertical: común
-Actor: responsable; una cuenta vacía, también el empleado
-Pantalla: Cuentas abiertas
+Actor: responsable; una cuenta vacía, también el empleado; una con algo pedido, el cajero con la aprobación de un responsable
+Pantalla: Cuentas abiertas, Hace falta una aprobación
 Pasos:
 1. En **Cuentas abiertas**, toca la papelera de la cuenta: cambia a «Toca otra vez para eliminar —
    anula la cuenta». Si no se toca en 3 segundos, se desarma.
 2. Toca otra vez: la cuenta desaparece de la lista. También se elimina con «Eliminarla y abrir» al
    cambiar de cuenta.
+3. Si la cuenta tiene algo pedido o cobrado y no tienes el permiso de anular, sale encima «Hace falta una
+   aprobación» con «Se aprueba: Eliminar una cuenta abierta con algo pedido»: un responsable la aprueba
+   con su PIN (o su placa) en ese mismo dispositivo (BASE-F84) y la cuenta se elimina.
 Entra: la cuenta elegida.
 Sale: la cuenta queda anulada, no borrada (avisa: cuenta anulada); lo ya cobrado de ella sigue en sus
 ventas.
 Si falla: «No se ha podido eliminar esa cuenta abierta. Sigue en la lista.». Una cuenta ya cobrada no
-se puede anular: «Esa cuenta ya no está abierta.»; anularla dos veces no hace nada la segunda. Sin
-permiso de anular no hay papelera, salvo en una **cuenta vacía** (sin líneas vivas ni cobros): esa la
-elimina quien monta cuentas, porque un grupo que se va sin pedir no obliga a llamar a un responsable
-(como Mesas al cerrar una mesa vacía, TABLE-F21). Con algo pedido o cobrado, el servidor exige el
-permiso de anular (403).
-Implicados: TABLE-F20, TABLE-F21
+se puede anular: «Esa cuenta ya no está abierta.»; anularla dos veces no hace nada la segunda. Quien
+monta cuentas ve la papelera en todas: una **cuenta vacía** (sin líneas vivas ni cobros) la elimina él
+mismo, porque un grupo que se va sin pedir no obliga a llamar a un responsable (como Mesas al cerrar una
+mesa vacía, TABLE-F21); con algo pedido o cobrado hace falta el permiso de anular o la aprobación de un
+responsable. Si en «Hace falta una aprobación» se pulsa «Cancelar», la cuenta sigue en la lista y
+encima se lee «Esto necesita la aprobación de un encargado.».
+Implicados: TABLE-F20, TABLE-F21, BASE-F84
 
 ### SALE-F19 Abrir la cuenta de una mesa y dejarla en la mesa
 <!-- origen: wf:restaurante-dia#rec_restaurante-f11 old:sales/workflow/sala-y-cocina.md#sales-f19 -->
@@ -739,8 +755,8 @@ Implicados: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24
 <!-- origen: wf:restaurante-dia#rec_restaurante-f07 wf:restaurante-dia#rec_restaurante-f17 wf:restaurante-dia#rec_restaurante-f08 qa:modules/sales/take-order-by-courses wf:restaurante-dia#rec_restaurante-f14 qa:modules/sales/modify-order-after-sending old:sales/workflow/sala-y-cocina.md#sales-f20 -->
 Estado: hecho
 Vertical: restaurante
-Actor: empleado (enviar), responsable (anular)
-Pantalla: Vender
+Actor: empleado (enviar), responsable (anular; el cajero, con la aprobación de un responsable)
+Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Con Cocina activa, la cuenta tiene dos pestañas: «Cuenta», con todas sus líneas, y «Comanda actual»,
    con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
@@ -757,8 +773,12 @@ Pasos:
    autorizarlo un responsable.», los motivos de un toque («Error al pedir», «El cliente lo cambia»,
    «Agotado», «Pedido dos veces») y «O escribe el motivo…». «Anular artículo» no se puede pulsar sin
    motivo.
-6. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
-7. Para seguir lo enviado, en «Cuenta» pulsa «Comandas · N», junto a la cabecera de lo enviado: se abre
+6. Si no tienes el permiso de anular, al pulsar «Anular artículo» sale encima «Hace falta una aprobación»
+   con «Se aprueba: Anular un artículo ya enviado a cocina»: un responsable la aprueba con su PIN (o su
+   placa) en ese mismo dispositivo (BASE-F84). «Cancelar» deja la línea y la hoja dice «Esto necesita la
+   aprobación de un encargado.».
+7. La línea sale de la cuenta, el total baja y la línea guarda el motivo, quién lo autorizó y cuándo.
+8. Para seguir lo enviado, en «Cuenta» pulsa «Comandas · N», junto a la cabecera de lo enviado: se abre
    «Comandas de la cuenta», una tarjeta por ronda (la más reciente arriba) con su estado en cocina, y desde
    ella se marca urgente una ronda que se cocina (KITCHEN-F19, KITCHEN-F20).
 Entra: las líneas pendientes de la cuenta.
@@ -773,7 +793,7 @@ enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (a
 cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29
+Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
 <!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->
@@ -1007,13 +1027,16 @@ Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VE
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 wf:cadena-fiscal#rec_fiscal-f13 qa:modules/sales/void-sale fi:modules/sales#command-sales-void-sql-transaccional old:sales/workflow/historial-y-correcciones.md#sales-f30 -->
 Estado: hecho
 Vertical: común
-Actor: responsable
-Pantalla: Ventas, Anular venta
+Actor: responsable; cajero, con la aprobación de un responsable
+Pantalla: Ventas, Anular venta, Hace falta una aprobación
 Pasos:
 1. En **Ventas**, en una venta Completada sin devoluciones, pulsa «Anular».
 2. Se abre «Anular la venta <número>». Escribe el «Motivo (obligatorio)» y pulsa «Anular», o
    «Cancelar».
-3. Sale «Venta anulada», la ventana se cierra, la fila pasa a Anulada y la cifra «Anuladas» sube.
+3. Si no tienes el permiso de anular, sale encima «Hace falta una aprobación» con «Se aprueba: Anular
+   una venta»: un responsable toca su cara y teclea su PIN (o pasa su placa) en ese mismo dispositivo
+   (BASE-F84). Quien tiene el permiso no ve esta pregunta.
+4. Sale «Venta anulada», la ventana se cierra, la fila pasa a Anulada y la cifra «Anuladas» sube.
 Entra: la venta elegida.
 Sale: la venta marcada como anulada con hora, quién y motivo; no se borra (avisa: venta anulada).
 Con Facturación, la rectificativa del tique entero (R5, serie «RECT») en la misma anulación
@@ -1024,15 +1047,19 @@ Si falla: sin motivo, «Hace falta un motivo para anular una venta»; si se cobr
 completa, «Esta venta lleva factura completa: emite una factura rectificativa en vez de anularla»;
 con devoluciones, «Esta venta ya tiene devoluciones: devuelve el importe que queda en vez de
 anularla»; anulada desde otro dispositivo a la vez, «Esta venta ya está anulada». Un rechazo se lee
-dentro de la ventana, que sigue abierta. Sin permiso no aparece «Anular».
-Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07
+dentro de la ventana, que sigue abierta. Si en «Hace falta una aprobación» se pulsa «Cancelar», no se
+anula nada y la ventana dice «Esto necesita la aprobación de un encargado.». La anulación aprobada hace
+lo mismo que la del responsable, una sola vez: la rectificativa en la misma anulación, las sesiones de
+bono que vuelven, el stock y la ficha del cliente; quién la aprobó queda en **Empleados › Aprobaciones**
+(BASE-F85).
+Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
 
 ### SALE-F31 Devolver una venta (toda, una parte o por otro medio)
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 old:sales/workflow/historial-y-correcciones.md#sales-f31 qa:modules/sales/refund-sale -->
 Estado: hecho
 Vertical: común
-Actor: responsable
-Pantalla: Devolver
+Actor: responsable; cajero, con la aprobación de un responsable
+Pantalla: Devolver, Hace falta una aprobación
 Pasos:
 1. En **Ventas**, en una venta Completada (también con factura), pulsa «Devolver».
 2. «Devolver la venta <número>» enseña una tarjeta por cada forma en que se pagó: «Cobrado», «Ya
@@ -1045,7 +1072,9 @@ Pasos:
    devuelve dinero.
 4. Cambia el «Importe a devolver» de cada forma si solo vuelve una parte. Si el medio original ya no
    está disponible, elige otro en «Devolver por».
-5. Escribe el «Motivo» y pulsa «Devolver <importe>».
+5. Escribe el «Motivo» y pulsa «Devolver <importe>». Si no tienes el permiso de devolver, sale encima
+   «Hace falta una aprobación» con «Se aprueba: Devolver una venta»: un responsable la aprueba con su PIN
+   (o su placa) en ese mismo dispositivo (BASE-F84). Quien tiene el permiso no ve esta pregunta.
 6. Sale «Devolución registrada.»; si ya no queda nada por devolver, la venta pasa a Devuelta; si
    queda, la fila dice «Por devolver <importe>».
 Entra: lo cobrado y lo ya devuelto por cada forma de pago; las líneas de la venta y las que ya
@@ -1058,8 +1087,11 @@ Si falla: «<medio>: <importe> es más que los <importe> que quedan por devolver
 dónde vuelve este dinero.», «Una devolución necesita un motivo.», «No queda dinero por devolver en
 esta venta.». Si otra devolución se lleva a la vez lo último de una línea marcada: «Una de las líneas
 marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para ver lo que queda.». Si
-el hub no contesta, repetir con la misma clave no devuelve dos veces.
-Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10
+el hub no contesta, repetir con la misma clave no devuelve dos veces. Si en «Hace falta una aprobación»
+se pulsa «Cancelar», no se devuelve nada y la ventana dice «Esto necesita la aprobación de un
+encargado.». La devolución aprobada es la misma, una sola vez, con su rectificativa y las sesiones de
+bono que vuelven; quién la aprobó queda en **Empleados › Aprobaciones** (BASE-F85).
+Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
 Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUSTOMER-F22) e Inventario
 repone las unidades que vuelven (INVENTORY-F24), una vez por devolución.
 
@@ -1289,6 +1321,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Divide una cuenta | montar la cuenta | F23 | `sale.order.split` |
 | Junta dos cuentas | montar la cuenta | F24 | `sale.order.merge` |
 | Anula una cuenta abierta (una vacía, sin líneas vivas ni cobros, con solo montar la cuenta) | anular; vacía: montar la cuenta | F18 | `sale.order.void` |
+| La misma anulación de una cuenta con algo pedido o cobrado, la que un responsable aprueba con su PIN | anular | F18 | `sale.order.void_ordered` |
 | Pone el descuento de la cuenta (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_discount`, `sale.order.set_discount_over_limit` |
 | Pone el descuento de una línea (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Pone el título de una cuenta (aparcar) | montar la cuenta | F17 | `sale.order.set_label` |
@@ -1384,6 +1417,14 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`); el
 cajero del producto actual es un empleado.
+
+Lo que el empleado no puede hacer en el TPV lo pide en su propio dispositivo y lo aprueba un responsable
+con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para esa misma petición: anular
+y devolver una venta, anular una línea enviada a cocina, eliminar una cuenta con algo pedido, vender a
+precio libre y los descuentos por encima del máximo. La acción aprobada hace todo lo que hace la del
+responsable (también lo que mueven Facturación y Servicios: la rectificativa y las sesiones de bono que
+vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las cifras, los ajustes y crear medios
+de pago no se aprueban.
 
 Lo que toca la sesión de un bono pide además el permiso de Servicios, porque es Servicios quien la
 mueve con la sesión de quien vende: pagar una línea con bono, deshacerlo, quitar, anular o cobrar una
@@ -1591,6 +1632,19 @@ administrador y responsable, los mismos que anulan y devuelven).
   requiere Ventas) solo desde la pantalla «Elegir mesa», también por el nombre de sus operaciones
   (`useLive`/`useCommand`), sin importar nada de `apps/table`. Todo señalado para una ronda nueva de
   PLAN-HUB (este WORKBOOK no edita los planes).
+- **Aprobación con el PIN de un responsable** (BASE-F84, FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL): `apps.py`
+  `approvals` nombra toda orden del TPV cuyo permiso no tiene el empleado (`sale.sale.void`, `.refund`,
+  `.complete_over_limit`, `sale.order.void_line`, `.void_ordered`, `.add_open_line`,
+  `.set_discount_over_limit`, `.set_line_discount_over_limit`; mercado: Square, Toast, Lightspeed,
+  Shopify «Approval required», Odoo, LS Central, Clover, StoreHub). Eliminar una cuenta con algo pedido
+  tiene su propia puerta, `sale.order.void_ordered` (permiso `sale.void_sale`): la de `sale.order.void`
+  es `sale.add_sale`, porque la vacía la elimina quien monta cuentas (TABLE-F21), y la plataforma aprueba
+  el permiso declarado de la orden. Lo que la orden aprobada pide a otras apps por `call_app`
+  (`consequence_context`: la rectificativa de Facturación, las sesiones que devuelve Servicios) lleva el
+  permiso de esa orden de la otra app, como cuando la hace el responsable; una consulta nunca. Quien
+  autorizó un descuento por encima del máximo o una línea anulada (`discount_approved_by`, `voided_by` de
+  la línea) es el responsable que aprobó (`authoriser`); la venta anulada guarda quién la anuló y el
+  registro de aprobaciones, quién la aprobó.
 
 ### Cambios frente al producto actual
 
@@ -1722,8 +1776,9 @@ administrador y responsable, los mismos que anulan y devuelven).
 
 1. Anular un tique ya remitido a la AEAT: lo decidió Facturación (INVOICE-F07): la anulación emite la
    rectificativa R5 del tique entero, en la misma operación; el registro de VeriFactu es de su app.
-2. El PIN del encargado sobre el dispositivo del empleado (elevación) es de la plataforma; mientras,
-   las acciones de responsable piden a un responsable (F09, F14, F18, F20, F30, F31).
+2. El PIN del encargado sobre el dispositivo del empleado (elevación) es de la plataforma (BASE-F84) y
+   Ventas lo usa desde FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (F09, F14, F18, F20, F30, F31). Falta que el
+   diálogo diga la cifra de un descuento (F14, «Pendiente»).
 3. El nombre legal y el NIF del emisor en el documento: el producto actual los leía del hub
    (`sales.business.get`); aquí la identidad fiscal del negocio vive en el SaaS y el Hub aún no la
    tiene, así que el tique pinta la «Cabecera del recibo» de los ajustes. El documento fiscal (con NIF del

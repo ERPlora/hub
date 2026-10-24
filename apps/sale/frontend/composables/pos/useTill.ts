@@ -7,12 +7,15 @@
 // back whole from every write and from the live `sale.order.get` (`follow`), the newer version wins —
 // so nothing about money is decided here. A refusal shows the server's own sentence; when nobody
 // answered, the product's sentence for that action. A discount above the business's cap goes through
-// the manager's door for whoever holds `sale.discount_over_limit`.
+// the manager's door: directly for whoever holds `sale.discount_over_limit`, with a manager's approval on
+// this very device for anybody else (BASE-F84), as an open price, a line sent to the kitchen voided and a
+// check with something on it deleted do (`apps.py` `approvals`).
 import { useCommand } from '@erplora/ui/sdk';
 import { toastError, useSession } from '@erplora/ui/shell';
 import { computed, type ComputedRef, type Ref, shallowRef } from 'vue';
 
 import { mergeableLine, mergeableServiceLine, plusOne } from '../../components/pos/till';
+import { throughManager, withApproval } from '../../lib/approval';
 import { refusal } from '../../lib/refusal';
 import type { ComboChoiceIn, OpenLineIn, OrderLineOut, OrderOut, SettingsOut } from '../../operations';
 import { useT } from '../useT';
@@ -74,6 +77,8 @@ export interface Till {
 }
 
 const OVER_LIMIT = 'sale.discount_over_limit';
+/** What `sale.order.void` answers for a check with something on it, to whoever may not void it. */
+const NOT_ALLOWED = 'permission_denied';
 
 export function useTill(options: TillOptions): Till {
   const t = useT();
@@ -108,6 +113,7 @@ export function useTill(options: TillOptions): Till {
   const voidLineCommand = useCommand('sale.order.void_line');
   const label = useCommand('sale.order.set_label');
   const voidOrder = useCommand('sale.order.void');
+  const voidOrdered = useCommand('sale.order.void_ordered');
 
   /** Runs `task` after every write before it: one in flight at a time. */
   function serial<T>(task: () => Promise<T>): Promise<T> {
@@ -199,8 +205,15 @@ export function useTill(options: TillOptions): Till {
     return serial(async () => {
       try {
         const id = order.value?.id ?? check.id.value;
-        if (!id) await opened(() => open.run({ ...labelOf(), open_lines: [{ ...line, ...staffOf(staffId) }] }));
-        else accept(await addOpen.run({ order_id: id, ...line, ...staffOf(staffId) }));
+        const typed = { ...line, ...staffOf(staffId) };
+        if (!id && session.can('sale.sell_open_price')) {
+          await opened(() => open.run({ ...labelOf(), open_lines: [typed] }));
+          return { ok: true };
+        }
+        // Whoever may not sell at an open price opens the check empty and the line waits for a manager's approval.
+        if (!id) await opened(() => open.run({ ...labelOf() }));
+        const orderId = (order.value?.id ?? check.id.value) as string;
+        accept(await withApproval(() => addOpen.run({ order_id: orderId, ...typed })));
         return { ok: true };
       } catch (error) {
         return { ok: false, message: wordsOf(error, 'sale.pos.lineNotSaved') };
@@ -298,16 +311,11 @@ export function useTill(options: TillOptions): Till {
   const canGoOver = () => session.can('sale.discount_over_limit');
   const overCap = (percent: string) => Number(percent) > (options.settings()?.max_discount_percent ?? 100);
 
-  /** The ordinary door, or the manager's: above the cap, or when the server says it is above it. */
+  /** The ordinary door, or the manager's: above the cap, or when the server says it is above it (with a manager's
+   *  approval for whoever does not hold the permission). */
   async function throughDoor(ordinary: () => Promise<OrderOut>, manager: () => Promise<OrderOut>, aboveCap: boolean): Promise<OrderOut> {
     if (aboveCap && canGoOver()) return manager();
-    try {
-      return await ordinary();
-    } catch (error) {
-      const code = (error as { code?: string } | null)?.code;
-      if (code === OVER_LIMIT && canGoOver()) return manager();
-      throw error;
-    }
+    return throughManager(ordinary, manager, { code: OVER_LIMIT, may: canGoOver() });
   }
 
   const setLineDiscount = (line: OrderLineOut, percent: string) =>
@@ -331,7 +339,7 @@ export function useTill(options: TillOptions): Till {
     }, 'sale.pos.ticketDiscountFailed');
 
   const voidLine = (line: OrderLineOut, reason: string) =>
-    attempt((id) => voidLineCommand.run({ order_id: id, line_id: line.id, reason }), 'sale.pos.voidLineFailed');
+    attempt((id) => withApproval(() => voidLineCommand.run({ order_id: id, line_id: line.id, reason })), 'sale.pos.voidLineFailed');
 
   async function rename(next: string): Promise<void> {
     if (!order.value && !check.id.value) {
@@ -348,7 +356,16 @@ export function useTill(options: TillOptions): Till {
   }
 
   async function voidCheck(): Promise<WriteResult> {
-    const done = await attempt((id) => voidOrder.run({ order_id: id }), 'sale.pos.discardCheckFailed');
+    // An empty check is whoever builds checks' (TABLE-F21); one with something on it, a manager's (SALE-F18).
+    const done = await attempt(
+      (id) =>
+        throughManager(
+          () => voidOrder.run({ order_id: id }),
+          () => voidOrdered.run({ order_id: id }),
+          { code: NOT_ALLOWED, may: session.can('sale.void_sale') },
+        ),
+      'sale.pos.discardCheckFailed',
+    );
     if (done.ok) release();
     return done;
   }

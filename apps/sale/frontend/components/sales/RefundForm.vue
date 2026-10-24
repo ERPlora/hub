@@ -7,7 +7,8 @@
 // when the window opened and kept on a retry, so a lost answer never refunds twice; a refusal is read
 // inside the window, which stays open. `sale.sale.refund` decides it all again. A line a voucher paid
 // (SALE-F32) gives its session back when it is marked, also with no money at all: a sale paid whole with a
-// voucher (0,00 €) opens with its sessions to mark.
+// voucher (0,00 €) opens with its sessions to mark. Whoever may not refund is asked for a manager's approval
+// (BASE-F84): approved with the manager's PIN, the very same attempt goes once; «Cancel» leaves its refusal here.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastError, toastSuccess } from '@erplora/ui/shell';
@@ -15,6 +16,7 @@ import { IonButton, IonSpinner, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
+import { withApproval } from '../../lib/approval';
 import { formatMoney } from '../../lib/format';
 import { refusal } from '../../lib/refusal';
 import type { RefundOptionsOut, TenderOption } from '../../operations';
@@ -117,13 +119,14 @@ async function confirm(): Promise<void> {
   const lines = refundLines(data.value.lines, picked.value);
   failure.value = '';
   try {
-    await command.run({
+    const input = {
       sale_id: props.saleId,
       reason: reason.value.trim(),
       idempotency_key: key,
       allocations: allocations(tenders.value, amounts.value, destinations.value),
       ...(lines.length ? { lines } : {}),
-    });
+    };
+    await withApproval(() => command.run(input));
   } catch (err) {
     // Unworded (no network, a proxy's page): it may have gone through; the same key never repeats it.
     failure.value = refusal(err, t('sale.refund.unknown'))?.message ?? t('sale.refund.unknown');

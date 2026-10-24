@@ -3,9 +3,11 @@
 // F18). On top, a refusal (sticky); «Park this check» and its hint where parked tickets are allowed;
 // «Open checks — Tap a check to resume it.»; a row per open check of the business but the one on
 // screen, newest first, 20 at a time (title or amount, time and amount), that resumes it; and, for
-// whoever may void — or, on an empty check, for whoever builds checks (a party that left without
-// ordering needs no manager) —, its bin: a first tap arms it for 3 seconds («Tap again to delete — this
-// voids the check»), a second voids it. A voided check leaves the list with the next live result.
+// whoever builds checks, its bin: a first tap arms it for 3 seconds («Tap again to delete — this voids
+// the check»), a second voids it. An empty check is whoever builds checks' (a party that left without
+// ordering needs no manager); one with something on it is a manager's, so whoever may not void asks a
+// manager, who approves it with their PIN on this very device (BASE-F84). A voided check leaves the list
+// with the next live result.
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -13,6 +15,7 @@ import { computed, onBeforeUnmount, shallowRef } from 'vue';
 
 import { useLiveWindows } from '../../composables/useLiveWindows';
 import { useLocale, useT } from '../../composables/useT';
+import { throughManager } from '../../lib/approval';
 import { formatMoney } from '../../lib/format';
 import type { OrderRow } from '../../operations';
 import { refusal } from '../../lib/refusal';
@@ -34,13 +37,14 @@ const session = useSession();
 const client = useLiveClient();
 const canVoid = computed(() => session.can('sale.void_sale'));
 const canBuild = computed(() => session.can('sale.add_sale'));
-/** The server lets whoever builds checks void an empty one; one with lines is a manager's. */
-const deletable = (row: OrderRow) => canVoid.value || (canBuild.value && row.lines_count === 0);
+/** Whoever builds checks deletes them: an empty one by themselves, one with lines with a manager's approval. */
+const canDelete = computed(() => canVoid.value || canBuild.value);
 
 const checks = useLiveWindows<'sale.order.list', OrderRow>('sale.order.list', () => ({ status: 'open' }), 20);
 const rows = computed(() => checks.rows.value.filter((row) => row.id !== props.currentId));
 
 const voiding = useCommand('sale.order.void');
+const voidingOrdered = useCommand('sale.order.void_ordered');
 const armed = shallowRef<string | null>(null);
 const failure = shallowRef<string | null>(null);
 let disarm: (() => void) | undefined;
@@ -58,7 +62,11 @@ async function remove(row: OrderRow): Promise<void> {
   armed.value = null;
   failure.value = null;
   try {
-    await voiding.run({ order_id: row.id });
+    await throughManager(
+      () => voiding.run({ order_id: row.id }),
+      () => voidingOrdered.run({ order_id: row.id }),
+      { code: 'permission_denied', may: canVoid.value },
+    );
   } catch (error) {
     const fallback = t('sale.pos.deleteCheckFailed');
     failure.value = refusal(error, fallback)?.message ?? fallback;
@@ -128,7 +136,7 @@ const meta = (row: OrderRow) => {
         <span class="pos-checks__meta">{{ meta(row) }}</span>
       </button>
       <ion-button
-        v-if="deletable(row)"
+        v-if="canDelete"
         fill="clear"
         class="pos-checks__delete"
         :data-testid="`pos-parked-${row.id}-delete`"
