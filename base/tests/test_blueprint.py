@@ -107,6 +107,21 @@ def test_a_written_file_reads_back_as_the_same_blueprint():
         (zipped({"manifest.json": json.dumps(manifest()), "../evil.json": "[]"}), "unreadable"),
         (zipped({"manifest.json": json.dumps(manifest()), "data/../../evil.json": "[]"}), "unreadable"),
     ],
+    # Named, never by the bytes: a zip carries the second it was written, so two collectors (pytest-xdist's
+    # workers) seconds apart would see different ids and refuse to run («Different tests were collected»).
+    ids=[
+        "not_a_zip",
+        "no_manifest",
+        "manifest_not_json",
+        "another_format",
+        "newer_format_version",
+        "unknown_purpose",
+        "no_name",
+        "rows_not_a_list",
+        "rows_not_objects",
+        "a_path_outside_the_zip",
+        "a_path_climbing_out_of_data",
+    ],
 )
 def test_a_file_that_is_not_a_blueprint_is_refused_with_its_reason(content, reason):
     with pytest.raises(blueprint.BlueprintInvalid) as refused:

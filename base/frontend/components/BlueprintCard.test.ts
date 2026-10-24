@@ -39,10 +39,10 @@ const offered = (m: Awaited<ReturnType<typeof card>>) =>
   m.wrapper.findAll('[data-testid="blueprint-card-template"]').map((row) => row.attributes('data-id'));
 
 describe('BlueprintCard', () => {
-  it('offers up to four templates of the catalogue, in its order, to an administrator of an empty business', async () => {
+  it('offers up to four templates of the catalogue, one per kind of business, in its order, to an administrator of an empty business', async () => {
     const m = await card();
     expect(m.wrapper.get('h2').text()).toBe('Start with a business like yours');
-    expect(offered(m)).toEqual(['restaurant.es', 'hair_salon.es', 'restaurant.en', 'hair_salon.en']);
+    expect(offered(m)).toEqual(['restaurant.es', 'hair_salon.es', 'bakery.es']);
     expect(m.wrapper.get('[data-id="restaurant.es"]').text()).toContain('A restaurant.es ready to use');
   });
 

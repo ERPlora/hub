@@ -346,7 +346,7 @@
         "loading": "Working out what each section has…",
         "loadError": "What each section has could not be worked out.",
         "nothing": "There is nothing to reset: no section has data.",
-        "shared": "Your business still shares its database with others, so it cannot be emptied yet. Undo an import instead, or remove what you want from each app.",
+        "shared": "Resetting the business is not available yet. Undo an import instead, or remove what you want from each app.",
         "submit": "Reset the business",
         "confirmTitle": "This cannot be undone",
         "confirmMessage": "{n} row will be removed for good: | {n} rows will be removed for good:",

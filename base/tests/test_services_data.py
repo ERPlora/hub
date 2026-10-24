@@ -272,6 +272,11 @@ def test_in_phase_1_the_reset_says_why_it_is_not_available_and_removes_nothing(o
 
     assert plan.available is False
     assert refused.value.code == "base.reset_shared_database"
+    # What the person reads says it is not available yet, never that their data sits with other businesses' (nothing
+    # of the infrastructure, nothing that sounds like a leak).
+    assert refused.value.message == (
+        "Restablecer el negocio todavía no está disponible. Deshaz una importación o quita lo que quieras desde cada app."
+    )
     assert total(owner, "table.table.list") == 10
 
 

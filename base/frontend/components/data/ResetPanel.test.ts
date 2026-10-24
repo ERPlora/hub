@@ -166,9 +166,9 @@ describe('ResetPanel', () => {
     expect(confirm.props('error')).toMatchObject({ message: 'The name does not match.' });
   });
 
-  it('in a business that shares its database, says why it cannot be emptied and offers no red button', async () => {
+  it('in a business that shares its database, says the reset is not available yet (never the infrastructure) and offers no red button', async () => {
     const m = await panel(plan({ available: false }));
-    expect(m.wrapper.get('[data-testid="reset-shared"]').text()).toContain('Your business still shares its database with others');
+    expect(m.wrapper.get('[data-testid="reset-shared"]').text()).toContain('Resetting the business is not available yet');
     expect(m.wrapper.find('[data-testid="reset-submit"]').exists()).toBe(false);
     expect(m.wrapper.find('[data-testid="reset-section-inventory"]').exists()).toBe(false);
     // What each section has is still told.

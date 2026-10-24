@@ -218,11 +218,16 @@ export function unloaded(report: LoadReport): string[] {
 
 // ── The Home's templates card (BASE-G131, BASE-F02) ──────────────────────────────────────────────────────────────
 
-/** The card offers at most four, in the catalogue's order (the hub's country, then the person's language). */
+/** The card offers at most four, one per kind of business, in the catalogue's order (the hub's country, then the
+ * person's language): of a vertical in two languages, the first the catalogue gives, theirs when it has it. */
 export const CARD_TEMPLATES = 4;
 
 export function cardTemplates(templates: readonly Template[]): Template[] {
-  return templates.slice(0, CARD_TEMPLATES);
+  const firstOfEachVertical = new Map<string, Template>();
+  for (const item of templates) {
+    if (!firstOfEachVertical.has(item.vertical)) firstOfEachVertical.set(item.vertical, item);
+  }
+  return [...firstOfEachVertical.values()].slice(0, CARD_TEMPLATES);
 }
 
 /** How a load from the card went: all in, in part (what did not), or nothing. */

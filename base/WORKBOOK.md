@@ -872,9 +872,8 @@ Pasos:
      («Escribe «{name}» para confirmar») y pulsa «Borrar definitivamente» (o «Cancelar»).
   5. Sale «Negocio restablecido:» con una línea por sección («{app} — {n} filas borradas») y la lista se
      recalcula.
-  6. Hoy, con la base de datos compartida, sale «Tu negocio aún comparte su base de datos con otros, así que
-     todavía no se puede vaciar. Deshaz una importación o quita lo que quieras desde cada app.», sin casillas
-     ni botón.
+  6. Hoy, con la base de datos compartida, sale «Restablecer el negocio todavía no está disponible. Deshaz una
+     importación o quita lo que quieras desde cada app.», sin casillas ni botón.
 Entra: lo que tiene cada sección y lo marcado.
 Sale: borrado definitivo de lo marcado (`base.hub.data_reset`).
 Si falla: el motivo sale en la ventana, que no se cierra: un nombre que no es el del negocio, «El nombre no
@@ -890,8 +889,8 @@ Pantalla: Inicio · Resumen
 Pasos:
   1. Mientras el negocio no tiene nada de lo que trae una plantilla, quien lo administra ve arriba «Empieza
      con un negocio como el tuyo» («Elige el que más se parezca al tuyo y te dejamos tus apps listas con su
-     catálogo de una vez. Después tendrás que poner tus propios datos.»): hasta cuatro plantillas, primero las
-     de su país y su idioma, con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
+     catálogo de una vez. Después tendrás que poner tus propios datos.»): hasta cuatro plantillas, una por
+     tipo de negocio y en su idioma si la hay (primero las de su país), con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
      copias» y «Ahora no» cierra la tarjeta en este dispositivo.
   2. Pulsa «Usar esta»: «Preparando «{name}»…» mientras se carga, sin pantallas intermedias.
   3. En la misma tarjeta, «Ya tienes tus apps y tu catálogo» («Lo que queda es lo que solo puedes contestar

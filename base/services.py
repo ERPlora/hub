@@ -1171,8 +1171,8 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
         if not answer["available"]:
             raise Conflict(
                 gettext(
-                    "Your business still shares its database with others, so it cannot be emptied yet. Undo a "
-                    "load instead, or remove what you want from each app."
+                    "Resetting the business is not available yet. Undo a load instead, or remove what you want "
+                    "from each app."
                 ),
                 code="base.reset_shared_database",
             )

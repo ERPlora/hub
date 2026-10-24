@@ -213,7 +213,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
     // BASE-G109 — the plan per section and, in phase 1, why the business cannot be emptied.
     await expect(testid(page, 'reset-section').first()).toBeVisible();
-    await expect(testid(page, 'reset-shared')).toContainText('Your business still shares its database with others');
+    await expect(testid(page, 'reset-shared')).toContainText('Resetting the business is not available yet');
     await expect(testid(page, 'reset-submit')).toHaveCount(0);
     await testid(page, 'reset-shared').scrollIntoViewIfNeeded();
     await snap(page, 'BASE-G109', width);

@@ -346,7 +346,7 @@
         "loading": "Calculando lo que tiene cada sección…",
         "loadError": "No se ha podido calcular lo que tiene cada sección.",
         "nothing": "No hay nada que restablecer: ninguna sección tiene datos.",
-        "shared": "Tu negocio aún comparte su base de datos con otros, así que todavía no se puede vaciar. Deshaz una importación o quita lo que quieras desde cada app.",
+        "shared": "Restablecer el negocio todavía no está disponible. Deshaz una importación o quita lo que quieras desde cada app.",
         "submit": "Restablecer el negocio",
         "confirmTitle": "Esto no se puede deshacer",
         "confirmMessage": "Se borrará definitivamente {n} fila: | Se borrarán definitivamente {n} filas:",

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // «Start with a business like yours» on the Home (BASE-G131, BASE-F02; PLAN-HUB round 2026-10-21, the old hub's
 // BlueprintHeroCard): to who administers the hub, while the business has nothing a template brings (`empty` of
-// `base.blueprint.list`, live: the phase-1 hub has every app on, so «base.apps» says nothing here), up to four templates
-// in the catalogue's order with «Use this one», «See all templates» (Settings › Data) and «Not now», remembered on this
+// `base.blueprint.list`, live: the phase-1 hub has every app on, so «base.apps» says nothing here), up to four templates,
+// one per kind of business, in the catalogue's order with «Use this one», «See all templates» (Settings › Data) and «Not now», remembered on this
 // device. «Use this one» loads it in one go (`base.blueprint.import`, never people nor fiscal data) and tells how it went
 // in the card: ready, not all of it (what, «See the report»), not started (why, «Try again») or cut halfway (no retry:
 // part may be in). Once seen, it stays until «Continue» or «Not now», though the business is no longer empty.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d2becdd68b0175a60429665e1ccd4f7e3b033722954de171efa78ce503785c95 -->
+<!-- generated from WORKBOOK.md sha256:357f8e33c16613d1163d33cf5172fb6e6f304643f03fe501bc3ba5703594c203 -->
 
 ## What it is for and who it is for
 
@@ -818,9 +818,8 @@ Steps:
      confirm") and tap "Remove for good" (or "Cancel").
   5. "Business reset:" shows with one line per section ("{app} — {n} rows removed") and the list is worked
      out again.
-  6. Today, with the shared database, "Your business still shares its database with others, so it cannot be
-     emptied yet. Undo an import instead, or remove what you want from each app." shows, with no boxes nor
-     button.
+  6. Today, with the shared database, "Resetting the business is not available yet. Undo an import instead, or
+     remove what you want from each app." shows, with no boxes nor button.
 In: what each section has and what is ticked.
 Out: what is ticked, removed for good (`base.hub.data_reset`).
 If it fails: the reason shows in the dialog, which does not close: a name that is not the business's, "The
@@ -835,8 +834,8 @@ Screen: Home · Summary
 Steps:
   1. While the business has nothing a template brings, who administers it sees on top "Start with a business
      like yours" ("Choose the one most like yours and we leave your apps ready with its catalogue in one go.
-     Then put in your own details."): up to four templates, first those of its country and its language,
-     with their description and "Use this one"; "See all templates" opens "Data and backups" and "Not now"
+     Then put in your own details."): up to four templates, one per kind of business and in their language when
+     there is one (those of its country first), with their description and "Use this one"; "See all templates" opens "Data and backups" and "Not now"
      closes the card on this device.
   2. Tap "Use this one": "Preparing «{name}»…" while it loads, with no screens in between.
   3. In the same card, "Your apps and your catalogue are ready" ("What is left only you can answer: your

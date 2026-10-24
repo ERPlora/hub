@@ -222,6 +222,12 @@ describe('the templates card of the Home (BASE-G131, BASE-F02)', () => {
     expect(cardTemplates(list).map((t) => t.key)).toEqual(['a.es', 'b.es', 'c.es', 'd.es']);
   });
 
+  it('offers one template per kind of business: the first the catalogue gives, in the person\'s language', () => {
+    // A Spanish owner would otherwise read «Restaurante» and «Restaurant» as two different businesses.
+    const list = ['restaurant.es', 'hair_salon.es', 'restaurant.en', 'hair_salon.en', 'bakery.en'].map((key) => template(key));
+    expect(cardTemplates(list).map((t) => t.key)).toEqual(['restaurant.es', 'hair_salon.es', 'bakery.en']);
+  });
+
   it('says how a load from the card went: ready, partial with what did not go in, or not started', () => {
     expect(cardOutcome(load())).toEqual({ kind: 'ready', missing: [] });
     const partial = load({
