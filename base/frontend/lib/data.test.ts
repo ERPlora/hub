@@ -82,15 +82,18 @@ function load(fields: Partial<ImportRow> = {}): ImportRow {
 describe('the address of Settings', () => {
   it('opens the tab the hash names, the old hub’s addresses included (APP-BASE-6)', () => {
     expect(settingsTab('#data')).toBe('data');
+    expect(settingsTab('#general')).toBe('general');
     expect(settingsTab('#business')).toBe('business');
     expect(settingsTab('#tickets')).toBe('tickets');
     // Published versions of VeriFactu still link `#tax`: it was the business's own tab.
     expect(settingsTab('#tax')).toBe('business');
+    // The old hub's General was `#hub` (APP-BASE-3).
+    expect(settingsTab('#hub')).toBe('general');
   });
 
-  it('opens the first tab there is without a hash, or with one it does not have (`#hub`, `#store`, `#permissions`)', () => {
-    for (const hash of ['', '#hub', '#store', '#permissions', '#nonsense']) {
-      expect(settingsTab(hash), hash).toBe('business');
+  it('opens the first tab, «General» as in the old hub, without a hash or with one it does not have (`#store`, `#permissions`)', () => {
+    for (const hash of ['', '#store', '#permissions', '#nonsense']) {
+      expect(settingsTab(hash), hash).toBe('general');
     }
   });
 

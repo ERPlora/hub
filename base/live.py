@@ -1,4 +1,5 @@
-"""Live queries of base: the Home's three and the device's notices, re-run after the events the modules' hooks name.
+"""Live queries of base: the Home's three and the device's notices, re-run after the events the modules' hooks name;
+and the way in's (APP-BASE-3): the grid of «Switch user», the devices, the PIN pad's dial and «My profile».
 
 Each step, panel and counter names in ``refresh_on`` the events that change it (PLAN-HUB round 2026-10-21); base
 follows the union of them per query, fixed from the start like every declaration. The SaaS's photo
@@ -9,6 +10,7 @@ Settings › Data does to the business (a load, an undo, a reset) re-runs them t
 from live.live_registry import live
 from live.meta import module_configs
 
+from base import events
 from base.events import (
     DATA_EVENTS,
     FAILED_EVENT_CREATED,
@@ -58,3 +60,15 @@ live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
 live("base.system.status", on=[HUB_STATE_APPLIED])
 # The log: what a new event brings shows when the tab opens again; a failed event changes the level of its row at once.
 live("base.event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
+
+
+# The way in (APP-BASE-3): the grid of «Switch user» follows the PINs, the people (the photo), the dial and the devices.
+_DEVICES = [events.DEVICE_MODE_CHANGED, events.DEVICE_RENAMED, events.DEVICE_REMOVED, events.DEVICES_PRUNED]
+live(
+    "base.access.faces",
+    on=sorted({events.PIN_SET, HUB_STATE_APPLIED, events.ACCESS_SETTINGS_CHANGED, events.PROFILE_UPDATED, *_DEVICES}),
+)
+live("base.device.list", on=sorted(_DEVICES))
+live("base.device.current", on=sorted({events.DEVICE_MODE_CHANGED, events.DEVICE_REMOVED, events.DEVICES_PRUNED}))
+live("base.access.settings", on=[events.ACCESS_SETTINGS_CHANGED])
+live("base.profile.get", on=sorted({events.PROFILE_UPDATED, events.PIN_SET, events.ACCESS_SETTINGS_CHANGED}))

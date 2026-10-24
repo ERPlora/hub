@@ -2,8 +2,9 @@
 // Settings (APP-BASE-6; the old hub's settings-*.png) in the three viewports, against the real Hub and the real SaaS of
 // this run's stack (the SaaS's `HUB_INTERNAL_URL` points here): a fresh owner signs up on the SaaS's screens and creates
 // a business through its API as the panel does, so the SaaS registers it in this Hub with the same id.
-//   - BASE-G96: «Settings» from the side menu opens «Business»; its three tabs fit the phone; a tab is in the address
-//     (replaced: Back leaves Settings); «Printing» opens the Printing app.
+//   - BASE-G96: «Settings» from the side menu opens its first tab, «General» (APP-BASE-3, as in the old hub), and
+//     «Business» is the next; its four tabs fit the phone; a tab is in the address (replaced: Back leaves Settings);
+//     «Printing» opens the Printing app.
 //   - BASE-G97, G98: «Business» shows the country (Spain) and its currency (EUR · Euro), read-only, and where they change;
 //     «Fiscal data» opens Invoicing's issuer.
 //   - BASE-G99: the owner changes the business's language on erplora.com (HUBS-F15, the panel's own call); the open tab
@@ -121,9 +122,12 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
 
-  // BASE-G96: «Settings» from the side menu opens its first tab, «Business».
+  // BASE-G96: «Settings» from the side menu opens its first tab, «General» (APP-BASE-3); «Business» is the next one.
   await page.locator('ion-item.nav-item', { hasText: 'Settings' }).first().click();
   await expect(page).toHaveURL(new RegExp(`^${origin}/settings`));
+  await expect(shown(page).getByTestId('tab-general')).toHaveClass(/segment-button-checked/);
+  await shown(page).getByTestId('tab-business').click();
+  await expect(page).toHaveURL(`${origin}/settings#business`);
   await expect(rowValue(page, 'name')).toHaveText(/^Ajustes /);
 
   // BASE-G97, G98: the country and its currency, as erplora.com registered the business; nothing to type.
@@ -137,8 +141,8 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   );
   await atEverySize(page, ['BASE-G97', 'BASE-G98'], async () => {
     await expect(rowValue(page, 'currency')).toBeVisible();
-    // gh:hub#2617 — the three tabs fit the phone: none under the edge, none cut.
-    for (const tab of ['business', 'tickets', 'data']) {
+    // gh:hub#2617 — the four tabs fit the phone: none under the edge, none cut.
+    for (const tab of ['general', 'business', 'tickets', 'data']) {
       const box = await shown(page).getByTestId(`tab-${tab}`).boundingBox();
       expect(box, tab).not.toBeNull();
       expect(box!.x, tab).toBeGreaterThanOrEqual(0);

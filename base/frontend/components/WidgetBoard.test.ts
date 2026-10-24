@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations';
-import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
+import { accessibleName, errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import WidgetBoard from './WidgetBoard.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -85,7 +85,7 @@ describe('WidgetBoard', () => {
   it('«Customize panel» lists the active ones and the available ones; adding one keeps it in this browser', async () => {
     const s = await setup('es');
     await s.show(CATALOGUE);
-    expect(s.wrapper.get('[data-testid="widgets-customize"]').attributes('aria-label')).toBe('Personalizar panel');
+    expect(accessibleName(s.wrapper.get('[data-testid="widgets-customize"]').element)).toBe('Personalizar panel');
     await s.customize();
     expect(s.allInDoc('widgets-active-item').map((el) => el.dataset.key)).toEqual(['a.one', 'b.three']);
     expect(s.allInDoc('widgets-available-item').map((el) => el.dataset.key)).toEqual(['a.two']);

@@ -1,0 +1,59 @@
+/* The cards of Settings › General of the way in (APP-BASE-3): «This device», «PIN pad» and «Devices». */
+.settings-card {
+  box-sizing: border-box;
+  padding: 20px;
+  border-radius: var(--ep-radius-lg, 16px);
+  border: 1px solid var(--ion-color-step-150, #d7d8da);
+  background: var(--ion-card-background, var(--ion-background-color));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.settings-card + .settings-card {
+  margin-top: 16px;
+}
+
+.settings-card__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.settings-card__intro,
+.settings-card__note,
+.settings-card__help {
+  margin: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.875rem;
+}
+
+.settings-card__help {
+  display: block;
+  margin-top: 2px;
+}
+
+.settings-card__consequence {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--ep-radius, 12px);
+  background: var(--ion-color-step-50, #f5f6f8);
+  font-size: 0.875rem;
+}
+
+.settings-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-card__label {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.settings-card ion-segment {
+  max-width: 100%;
+}

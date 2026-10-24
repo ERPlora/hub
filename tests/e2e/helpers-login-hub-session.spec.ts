@@ -7,7 +7,22 @@
 // as before, and the new one is kept; `fresh: true` asks for the jump on purpose.
 import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
-import { A, api, B, type Credentials, EMPLOYEE, listReady, login, OWNER, shot, untilStill } from './helpers';
+import { A, api, B, type Credentials, EMPLOYEE, listReady, login, OWNER, psql, shot, untilStill } from './helpers';
+
+/** Where `a`'s photo waits while the spec runs (the table of `base_hub` rows, put back after it). */
+const PHOTO_BACKUP = 'e2e_backup_session_photo';
+
+// What `login` keeps is an account's session, never a device: with a plan in `a`'s photo (Free covers one device, as
+// a run of the WhatsApp spec leaves it), one account's entry in its context would end another's session in its own
+// (BASE-G57) and the kept session would jump again. So `a` has no plan while this spec runs, and its photo back after.
+test.beforeAll(() => {
+  psql(`drop table if exists ${PHOTO_BACKUP}; create table ${PHOTO_BACKUP} as select id, state from base_hub where slug = 'a'`);
+  psql("update base_hub set state = state - 'plan' where slug = 'a'");
+});
+
+test.afterAll(() => {
+  psql(`update base_hub h set state = b.state from ${PHOTO_BACKUP} b where b.id = h.id; drop table ${PHOTO_BACKUP}`);
+});
 
 /** One more than the SaaS lets an account jump in 5 minutes (`HUB_LOGIN_RATELIMIT`, 20/5m by default). */
 const ENTRIES = 21;

@@ -8,7 +8,6 @@ login as before, and a session always gets the shell.
 
 import re
 from datetime import UTC, datetime
-from urllib.parse import urlsplit
 
 import pytest
 from django.core.cache import cache
@@ -22,6 +21,7 @@ from apps.website.render import local_day
 from apps.website import reviews
 from apps.website.tests.conftest import PLACE_ID, B, WEBSITE_JS, ctx_for, full_content, google_reviews
 from base.models import Hub
+from base.tests.test_middleware import jump_target
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("website_manifest")]
 
@@ -50,8 +50,8 @@ def visit(client, method="get", language="en", host="a.localhost:8000", **header
 
 
 def jumps_to_the_login(response) -> bool:
-    location = urlsplit(response["Location"]) if response.status_code == 302 else None
-    return location is not None and f"{location.scheme}://{location.netloc}{location.path}" == f"{SAAS}/hub-login/"
+    # The hub's jump page, on to /auth/login and erplora.com's sign-in (base.auth_views.jump_page), not the website.
+    return jump_target(response).startswith("/auth/login?next=")
 
 
 def test_an_anonymous_visitor_gets_the_published_site_on_the_root_with_a_nonce_free_csp_and_no_cookie(client):

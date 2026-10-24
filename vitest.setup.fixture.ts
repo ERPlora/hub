@@ -1,6 +1,8 @@
 // Not a test of the hub (no `.test.ts`: the suite never collects it): vitest.setup.test.ts runs it on its own,
 // with the hub's config, and reads how each test ended. Each one ends in the state its name says, and the hub
-// setup (vitest.setup.ts) must fail exactly those that leave a real timer armed.
+// setup (vitest.setup.ts) must fail exactly those that leave a real timer armed, and paint the shell's icons as the
+// app does and attach Ionic's elements as a browser would.
+import { IonButton, IonIcon, IonToggle } from '@ionic/vue';
 import { mount } from '@vue/test-utils';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -107,4 +109,39 @@ it('leaves on the page an element that clears its timer when removed', () => {
 
 it('leaves on the page an element whose removal sets off a short timer', () => {
   document.body.append(document.createElement('timer-farewell'));
+});
+
+/** The «Could not load icon» warnings `ion-icon` gives while `paint` runs and the element connects. */
+async function iconWarnings(paint: () => void): Promise<string[]> {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    paint();
+    for (let i = 0; i < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    return warn.mock.calls.map(([message]) => String(message)).filter((message) => message.includes('Could not load icon'));
+  } finally {
+    warn.mockRestore();
+  }
+}
+
+it('paints an icon the shell registers without a warning', async () => {
+  expect(await iconWarnings(() => mount(IonIcon, { props: { name: 'backspace-outline' }, attachTo: document.body }))).toEqual([]);
+});
+
+it('warns about an icon the shell does not register', async () => {
+  const warnings = await iconWarnings(() => mount(IonIcon, { props: { name: 'no-such-icon-outline' }, attachTo: document.body }));
+  // ion-icon tries each time it loads (connecting, then rendering): one warning or more, all about that name.
+  expect(warnings.length).toBeGreaterThan(0);
+  expect(warnings.filter((warning) => !warning.includes('"no-such-icon-outline"'))).toEqual([]);
+});
+
+it('attaches Ionic elements without the errors happy-dom alone makes them log', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    // A button adopts its style sheet (`replaceSync`); a toggle reads the page's direction (`document.dir`).
+    mount(() => [h(IonButton, () => 'Save'), h(IonToggle, () => 'Dark')], { attachTo: document.body });
+    for (let i = 0; i < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(error.mock.calls.map(([first]) => String(first))).toEqual([]);
+  } finally {
+    error.mockRestore();
+  }
 });

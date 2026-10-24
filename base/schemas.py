@@ -726,3 +726,161 @@ class FailedEventRetryAllIn(Schema):
 class FailedEventCountOut(Schema):
     #: How many failed events went back to the queue.
     count: int
+
+
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
+
+
+class AccessDoorIn(Schema):
+    """No input: the door of the browser that asks (its device cookie), with a session or without."""
+
+
+class PinPersonOut(Schema):
+    id: str = Field(description="The person's way in on this hub (what a PIN entry names), never their account.")
+    name: str
+    initials: str
+
+
+class AccessDoorOut(Schema):
+    pin: bool = Field(description="Whether this browser offers the PIN pad: a shared device of the hub that asks.")
+    pin_length: int = Field(description="How many digits a PIN of this business has (4 or 6).")
+    people: list[PinPersonOut] = Field(description="The faces of the grid; none where the PIN is not offered.")
+    wait: int = Field(description="Seconds this address still waits after too many wrong PINs; 0 when it may try.")
+    plan_url: str = Field(description="erplora.com's plans, for «Upgrade plan» when another device's entry ended this one.")
+
+
+class PinSetIn(Schema):
+    pin: str = Field(max_length=16)
+    current: str = Field(default="", max_length=16, description="The PIN it replaces, when the person has one.")
+
+
+class PinSetOut(Schema):
+    set: bool
+
+
+class DeviceCurrentIn(Schema):
+    """No input: the device of the browser that asks (its cookie)."""
+
+
+class DeviceCurrentOut(Schema):
+    known: bool = Field(description="Whether someone entered this hub with an account from this browser.")
+    mode: Literal["shared", "personal"]
+    mode_set_by: str = Field(description="Who chose the mode; empty while it is the factory one.")
+    mode_set_at: dt.datetime | None
+
+
+class DeviceModeIn(Schema):
+    mode: Literal["shared", "personal"]
+
+
+class DeviceListIn(Schema):
+    """No input: every device of the hub."""
+
+
+class DeviceOut(Schema):
+    id: UUID
+    name: str = Field(description="The one the business gave it; empty when it has none.")
+    agent: str = Field(description="«Chrome · Android»: how it is recognised before it has a name.")
+    mode: Literal["shared", "personal"]
+    current: bool = Field(description="The one the person who asks is using.")
+    in_use: bool = Field(description="It has a session open now.")
+    session_until: dt.datetime | None = Field(description="When its open session ends, if it has one.")
+    last_entry_at: dt.datetime
+    last_user: str = Field(description="The name of whoever entered on it last.")
+    created_at: dt.datetime
+    unused: bool = Field(description="Nobody entered on it in 30 days and it is not the one in hand.")
+
+
+class DeviceListOut(Schema):
+    devices: list[DeviceOut] = Field(description="The last entered first.")
+    unused: int = Field(description="How many of them «Remove the unused» would remove.")
+
+
+class DeviceRenameIn(Schema):
+    id: UUID
+    name: str = Field(max_length=80, description="«Bar», «Kitchen»: 60 characters at most once trimmed.")
+
+
+class DeviceByIdIn(Schema):
+    id: UUID
+
+
+class DeviceRemoveOut(Schema):
+    removed: int
+    yours: bool = Field(description="It was the device of the person who removed it: their session ended too.")
+
+
+class DevicePruneIn(Schema):
+    """No input: the devices nobody entered in 30 days, never the one in hand."""
+
+
+class DevicePruneOut(Schema):
+    removed: int
+
+
+class AccessSettingsIn(Schema):
+    """No input."""
+
+
+class AccessSettingsOut(Schema):
+    pin_policy: Literal["always", "per_shift", "never"]
+    pin_inactivity_minutes: Literal[1, 5, 10, 15, 30]
+    pin_length: Literal[4, 6]
+    can_change: bool = Field(description="Whether the person who asks may change them (who runs the hub).")
+
+
+class AccessSettingsUpdateIn(Schema):
+    """Only the fields sent change (each control saves on its own); at least one."""
+
+    pin_policy: Literal["always", "per_shift", "never"] | None = None
+    pin_inactivity_minutes: Literal[1, 5, 10, 15, 30] | None = None
+    pin_length: Literal[4, 6] | None = None
+
+
+class ProfileIn(Schema):
+    """No input: the profile is always the person's who asks."""
+
+
+class ProfileOut(Schema):
+    first_name: str
+    last_name: str
+    contact_email: str
+    avatar_url: str = Field(description="Where this hub serves the photo; empty without one.")
+    language: Literal["", "es", "en"] = Field(description="Empty: the business's.")
+    theme_mode: Literal["", "system", "light", "dark"] = Field(description="Empty: the business's.")
+    palette: str = Field(description="Empty: the business's.")
+    role: str
+    has_pin: bool
+    pin_length: int
+
+
+class ProfileUpdateIn(Schema):
+    first_name: str = Field(max_length=150)
+    last_name: str = Field(default="", max_length=150)
+    contact_email: str = Field(default="", max_length=254)
+
+
+class PreferencesIn(Schema):
+    language: Literal["", "es", "en"]
+    theme_mode: Literal["", "system", "light", "dark"]
+    palette: Literal["", "erplora", "terracotta", "corporate", "minimal", "forest", "ocean", "violet"]
+
+
+class PreferencesOut(Schema):
+    language: str = Field(description="The language now in use: the person's, else the business's.")
+    theme_mode: str
+    palette: str
+
+
+class AvatarIn(Schema):
+    content_type: Literal["image/jpeg", "image/png", "image/webp"]
+    # 2 MB of bytes is 2 796 204 characters of base64.
+    data_base64: str = Field(max_length=2_800_000, description="The photo, in base64 (2 MB at most).")
+
+
+class AvatarOut(Schema):
+    avatar_url: str
+
+
+class AvatarRemoveIn(Schema):
+    """No input: one's own photo."""

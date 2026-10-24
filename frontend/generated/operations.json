@@ -1,663 +1,2706 @@
 {
-  "base.session.me": { "method": "get", "path": "/api/me" },
-  "base.setup.status": { "method": "get", "path": "/api/home/setup" },
-  "base.widget.list": { "method": "get", "path": "/api/home/widgets" },
-  "base.bell.counters": { "method": "get", "path": "/api/home/bell" },
-  "base.notice.list": { "method": "get", "path": "/api/home/notices" },
-  "base.app.list": { "method": "get", "path": "/api/apps" },
-  "base.plan.usage": { "method": "get", "path": "/api/system/plan" },
-  "base.business.get": { "method": "get", "path": "/api/business" },
-  "base.blueprint.list": { "method": "get", "path": "/api/settings/data/blueprints" },
-  "base.blueprint.inspect": { "method": "post", "path": "/api/settings/data/blueprints/inspect" },
-  "base.blueprint.import": { "method": "post", "path": "/api/settings/data/blueprints/import" },
-  "base.blueprint.export": { "method": "get", "path": "/api/settings/data/export" },
-  "base.import.list": { "method": "get", "path": "/api/settings/data/imports" },
-  "base.import.undo": { "method": "post", "path": "/api/settings/data/imports/undo" },
-  "base.dataset.list": { "method": "get", "path": "/api/settings/data/datasets" },
-  "base.hub.reset": { "method": "post", "path": "/api/settings/data/reset" },
-  "base.system.status": { "method": "get", "path": "/api/system/status" },
-  "base.event.list": { "method": "get", "path": "/api/system/events" },
-  "base.failed_event.list": { "method": "get", "path": "/api/system/failed-events" },
-  "base.failed_event.retry": { "method": "post", "path": "/api/system/failed-events/retry" },
-  "base.failed_event.retry_all": { "method": "post", "path": "/api/system/failed-events/retry_all" },
-  "base.failed_event.discard": { "method": "post", "path": "/api/system/failed-events/discard" },
-  "demo.item.list": { "method": "get", "path": "/api/demo/items" },
-  "demo.item.detail": { "method": "get", "path": "/api/demo/items/detail" },
-  "demo.item.stats": { "method": "get", "path": "/api/demo/items/stats" },
-  "demo.item.create": { "method": "post", "path": "/api/demo/items" },
-  "demo.item.update": { "method": "post", "path": "/api/demo/items/update" },
-  "demo.item.delete": { "method": "post", "path": "/api/demo/items/delete" },
-  "demo.item.add_line": { "method": "post", "path": "/api/demo/items/add_line" },
-  "customer.customer.list": { "method": "get", "path": "/api/customer/customers" },
-  "customer.customer.detail": { "method": "get", "path": "/api/customer/customers/detail" },
-  "customer.customer.stats": { "method": "get", "path": "/api/customer/customers/stats" },
-  "customer.customer.by_phone": { "method": "get", "path": "/api/customer/customers/by_phone" },
-  "customer.customer.export": { "method": "get", "path": "/api/customer/customers/export" },
-  "customer.customer.create": { "method": "post", "path": "/api/customer/customers" },
-  "customer.customer.update": { "method": "post", "path": "/api/customer/customers/update" },
-  "customer.customer.import": { "method": "post", "path": "/api/customer/customers/import" },
-  "customer.customer.set_groups": { "method": "post", "path": "/api/customer/customers/set_groups" },
-  "customer.customer.set_tags": { "method": "post", "path": "/api/customer/customers/set_tags" },
-  "customer.customer.delete": { "method": "post", "path": "/api/customer/customers/delete" },
-  "customer.customer.merge": { "method": "post", "path": "/api/customer/customers/merge" },
-  "customer.customer.erase": { "method": "post", "path": "/api/customer/customers/erase" },
-  "customer.group.list": { "method": "get", "path": "/api/customer/groups" },
-  "customer.group.create": { "method": "post", "path": "/api/customer/groups" },
-  "customer.group.update": { "method": "post", "path": "/api/customer/groups/update" },
-  "customer.group.delete": { "method": "post", "path": "/api/customer/groups/delete" },
-  "customer.tag.list": { "method": "get", "path": "/api/customer/tags" },
-  "customer.tag.create": { "method": "post", "path": "/api/customer/tags" },
-  "customer.tag.update": { "method": "post", "path": "/api/customer/tags/update" },
-  "customer.tag.delete": { "method": "post", "path": "/api/customer/tags/delete" },
-  "customer.field.list": { "method": "get", "path": "/api/customer/fields" },
-  "customer.field.create": { "method": "post", "path": "/api/customer/fields" },
-  "customer.field.update": { "method": "post", "path": "/api/customer/fields/update" },
-  "customer.field.delete": { "method": "post", "path": "/api/customer/fields/delete" },
-  "customer.activity.list": { "method": "get", "path": "/api/customer/activity" },
-  "customer.activity.add": { "method": "post", "path": "/api/customer/activity" },
-  "customer.note.add": { "method": "post", "path": "/api/customer/notes" },
-  "customer.purchase.list": { "method": "get", "path": "/api/customer/purchases" },
-  "customer.purchase.divergences": { "method": "get", "path": "/api/customer/purchases/divergences" },
-  "customer.consent.history": { "method": "get", "path": "/api/customer/consents" },
-  "customer.consent.state": { "method": "get", "path": "/api/customer/consents/state" },
-  "customer.consent.grant": { "method": "post", "path": "/api/customer/consents/grant" },
-  "customer.consent.withdraw": { "method": "post", "path": "/api/customer/consents/withdraw" },
-  "customer.health.detail": { "method": "get", "path": "/api/customer/health" },
-  "customer.health.grant": { "method": "post", "path": "/api/customer/health/grant" },
-  "customer.health.withdraw": { "method": "post", "path": "/api/customer/health/withdraw" },
-  "customer.health.update": { "method": "post", "path": "/api/customer/health/update" },
-  "customer.order.list": { "method": "get", "path": "/api/customer/orders" },
-  "customer.order.customer": { "method": "get", "path": "/api/customer/orders/customer" },
-  "customer.order.link": { "method": "post", "path": "/api/customer/orders/link" },
-  "inventory.product.list": { "method": "get", "path": "/api/inventory/products" },
-  "inventory.product.get": { "method": "get", "path": "/api/inventory/products/detail" },
-  "inventory.product.list_for_sale": { "method": "get", "path": "/api/inventory/products/for_sale" },
-  "inventory.product.list_low_stock": { "method": "get", "path": "/api/inventory/products/low_stock" },
-  "inventory.product.export": { "method": "get", "path": "/api/inventory/products/export" },
-  "inventory.product.create": { "method": "post", "path": "/api/inventory/products" },
-  "inventory.product.bulk_create": { "method": "post", "path": "/api/inventory/products/bulk_create" },
-  "inventory.product.update": { "method": "post", "path": "/api/inventory/products/update" },
-  "inventory.product.delete": { "method": "post", "path": "/api/inventory/products/delete" },
-  "inventory.product.set_sold_out": { "method": "post", "path": "/api/inventory/products/sold_out" },
-  "inventory.product.print_label": { "method": "post", "path": "/api/inventory/products/print_label" },
-  "inventory.product_category.list": { "method": "get", "path": "/api/inventory/product_categories" },
-  "inventory.product_category.add": { "method": "post", "path": "/api/inventory/product_categories/add" },
-  "inventory.product_category.remove": { "method": "post", "path": "/api/inventory/product_categories/remove" },
-  "inventory.category.list": { "method": "get", "path": "/api/inventory/categories" },
-  "inventory.category.export": { "method": "get", "path": "/api/inventory/categories/export" },
-  "inventory.category.create": { "method": "post", "path": "/api/inventory/categories" },
-  "inventory.category.bulk_create": { "method": "post", "path": "/api/inventory/categories/bulk_create" },
-  "inventory.category.update": { "method": "post", "path": "/api/inventory/categories/update" },
-  "inventory.category.delete": { "method": "post", "path": "/api/inventory/categories/delete" },
-  "inventory.movement.list": { "method": "get", "path": "/api/inventory/movements" },
-  "inventory.stock.get_summary": { "method": "get", "path": "/api/inventory/stock/summary" },
-  "inventory.stock.receive": { "method": "post", "path": "/api/inventory/stock/receive" },
-  "inventory.stock.count": { "method": "post", "path": "/api/inventory/stock/count" },
-  "inventory.stock.write_off": { "method": "post", "path": "/api/inventory/stock/write_off" },
-  "inventory.unit.list": { "method": "get", "path": "/api/inventory/units" },
-  "inventory.config.get": { "method": "get", "path": "/api/inventory/config" },
-  "inventory.config.update": { "method": "post", "path": "/api/inventory/config" },
-  "tax.category.list": { "method": "get", "path": "/api/tax/categories" },
-  "tax.category.get": { "method": "get", "path": "/api/tax/categories/detail" },
-  "tax.category.create": { "method": "post", "path": "/api/tax/categories" },
-  "tax.rule.list": { "method": "get", "path": "/api/tax/rules" },
-  "tax.rule.status": { "method": "get", "path": "/api/tax/rules/status" },
-  "tax.rule.parent_candidates": { "method": "get", "path": "/api/tax/rules/parent_candidates" },
-  "tax.rule.countries": { "method": "get", "path": "/api/tax/rules/countries" },
-  "tax.rule.create": { "method": "post", "path": "/api/tax/rules" },
-  "tax.rule.bulk_create": { "method": "post", "path": "/api/tax/rules/bulk_create" },
-  "tax.rule.end": { "method": "post", "path": "/api/tax/rules/end" },
-  "tax.rule.deactivate": { "method": "post", "path": "/api/tax/rules/deactivate" },
-  "tax.rule.activate": { "method": "post", "path": "/api/tax/rules/activate" },
-  "tax.alias.list": { "method": "get", "path": "/api/tax/aliases" },
-  "tax.alias.resolve": { "method": "get", "path": "/api/tax/aliases/resolve" },
-  "tax.alias.create": { "method": "post", "path": "/api/tax/aliases" },
-  "tax.rate.calculate": { "method": "get", "path": "/api/tax/rates/calculate" },
-  "tax.settings.get": { "method": "get", "path": "/api/tax/settings" },
-  "tax.settings.update": { "method": "post", "path": "/api/tax/settings" },
-  "staff.member.list": { "method": "get", "path": "/api/staff/members" },
-  "staff.member.detail": { "method": "get", "path": "/api/staff/members/detail" },
-  "staff.member.mine": { "method": "get", "path": "/api/staff/members/mine" },
-  "staff.member.current": { "method": "get", "path": "/api/staff/members/current" },
-  "staff.member.compensation": { "method": "get", "path": "/api/staff/members/compensation" },
-  "staff.member.stats": { "method": "get", "path": "/api/staff/members/stats" },
-  "staff.member.create": { "method": "post", "path": "/api/staff/members" },
-  "staff.member.bulk_create": { "method": "post", "path": "/api/staff/members/bulk_create" },
-  "staff.member.update": { "method": "post", "path": "/api/staff/members/update" },
-  "staff.member.deactivate": { "method": "post", "path": "/api/staff/members/deactivate" },
-  "staff.member.terminate": { "method": "post", "path": "/api/staff/members/terminate" },
-  "staff.commission.summary": { "method": "get", "path": "/api/staff/commissions" },
-  "staff.commission.report": { "method": "get", "path": "/api/staff/commissions/report" },
-  "staff.account.list": { "method": "get", "path": "/api/staff/accounts" },
-  "staff.role.list": { "method": "get", "path": "/api/staff/roles" },
-  "staff.role.create": { "method": "post", "path": "/api/staff/roles" },
-  "staff.role.update": { "method": "post", "path": "/api/staff/roles/update" },
-  "staff.schedule.list": { "method": "get", "path": "/api/staff/schedules" },
-  "staff.schedule.detail": { "method": "get", "path": "/api/staff/schedules/detail" },
-  "staff.schedule.create": { "method": "post", "path": "/api/staff/schedules" },
-  "staff.schedule.update": { "method": "post", "path": "/api/staff/schedules/update" },
-  "staff.schedule.set_active": { "method": "post", "path": "/api/staff/schedules/set_active" },
-  "staff.schedule.delete": { "method": "post", "path": "/api/staff/schedules/delete" },
-  "staff.availability.for_member": { "method": "get", "path": "/api/staff/availability" },
-  "staff.time_off.list": { "method": "get", "path": "/api/staff/time_off" },
-  "staff.time_off.detail": { "method": "get", "path": "/api/staff/time_off/detail" },
-  "staff.time_off.today": { "method": "get", "path": "/api/staff/time_off/today" },
-  "staff.time_off.mine": { "method": "get", "path": "/api/staff/time_off/mine" },
-  "staff.time_off.create": { "method": "post", "path": "/api/staff/time_off" },
-  "staff.time_off.request": { "method": "post", "path": "/api/staff/time_off/request" },
-  "staff.time_off.approve": { "method": "post", "path": "/api/staff/time_off/approve" },
-  "staff.time_off.reject": { "method": "post", "path": "/api/staff/time_off/reject" },
-  "staff.time_off.cancel": { "method": "post", "path": "/api/staff/time_off/cancel" },
-  "staff.settings.get": { "method": "get", "path": "/api/staff/settings" },
-  "staff.settings.update": { "method": "post", "path": "/api/staff/settings" },
-  "sale.sale.list": { "method": "get", "path": "/api/sale/sales" },
-  "sale.sale.complete": { "method": "post", "path": "/api/sale/sales" },
-  "sale.sale.get": { "method": "get", "path": "/api/sale/sales/detail" },
-  "sale.sale.by_idempotency_key": { "method": "get", "path": "/api/sale/sales/by_key" },
-  "sale.sale.stats": { "method": "get", "path": "/api/sale/sales/stats" },
-  "sale.sale.today": { "method": "get", "path": "/api/sale/sales/today" },
-  "sale.sale.last_7_days": { "method": "get", "path": "/api/sale/sales/last_7_days" },
-  "sale.sale.by_staff": { "method": "get", "path": "/api/sale/sales/by_staff" },
-  "sale.sale.complete_over_limit": { "method": "post", "path": "/api/sale/sales/complete_over_limit" },
-  "sale.sale.void": { "method": "post", "path": "/api/sale/sales/void" },
-  "sale.sale.print": { "method": "post", "path": "/api/sale/sales/print" },
-  "sale.sale.refund": { "method": "post", "path": "/api/sale/sales/refund" },
-  "sale.sale.issue_documents": { "method": "post", "path": "/api/sale/sales/issue_documents" },
-  "sale.checkout.preview": { "method": "get", "path": "/api/sale/checkout/preview" },
-  "sale.order.list": { "method": "get", "path": "/api/sale/orders" },
-  "sale.order.open": { "method": "post", "path": "/api/sale/orders" },
-  "sale.order.get": { "method": "get", "path": "/api/sale/orders/detail" },
-  "sale.order.add_line": { "method": "post", "path": "/api/sale/orders/add_line" },
-  "sale.order.add_open_line": { "method": "post", "path": "/api/sale/orders/add_open_line" },
-  "sale.order.add_service_line": { "method": "post", "path": "/api/sale/orders/add_service_line" },
-  "sale.order.add_combo_line": { "method": "post", "path": "/api/sale/orders/add_combo_line" },
-  "sale.order.apply_voucher": { "method": "post", "path": "/api/sale/orders/apply_voucher" },
-  "sale.order.remove_voucher": { "method": "post", "path": "/api/sale/orders/remove_voucher" },
-  "sale.order.update_line": { "method": "post", "path": "/api/sale/orders/update_line" },
-  "sale.order.set_line_staff": { "method": "post", "path": "/api/sale/orders/set_line_staff" },
-  "sale.order.split_line": { "method": "post", "path": "/api/sale/orders/split_line" },
-  "sale.order.remove_line": { "method": "post", "path": "/api/sale/orders/remove_line" },
-  "sale.order.void_line": { "method": "post", "path": "/api/sale/orders/void_line" },
-  "sale.order.fire": { "method": "post", "path": "/api/sale/orders/fire" },
-  "sale.order.print_bill": { "method": "post", "path": "/api/sale/orders/print_bill" },
-  "sale.order.split": { "method": "post", "path": "/api/sale/orders/split" },
-  "sale.order.merge": { "method": "post", "path": "/api/sale/orders/merge" },
-  "sale.order.void": { "method": "post", "path": "/api/sale/orders/void" },
-  "sale.order.set_discount": { "method": "post", "path": "/api/sale/orders/set_discount" },
-  "sale.order.set_discount_over_limit": { "method": "post", "path": "/api/sale/orders/set_discount_over_limit" },
-  "sale.order.set_line_discount": { "method": "post", "path": "/api/sale/orders/set_line_discount" },
-  "sale.order.set_line_discount_over_limit": { "method": "post", "path": "/api/sale/orders/set_line_discount_over_limit" },
-  "sale.order.set_label": { "method": "post", "path": "/api/sale/orders/set_label" },
-  "sale.order.set_appointment": { "method": "post", "path": "/api/sale/orders/set_appointment" },
-  "sale.payment_method.list": { "method": "get", "path": "/api/sale/payment_methods" },
-  "sale.payment_method.create": { "method": "post", "path": "/api/sale/payment_methods" },
-  "sale.settings.get": { "method": "get", "path": "/api/sale/settings" },
-  "sale.settings.update": { "method": "post", "path": "/api/sale/settings" },
-  "sale.pos_settings.get": { "method": "get", "path": "/api/sale/pos_settings" },
-  "sale.department.list": { "method": "get", "path": "/api/sale/departments" },
-  "sale.department.create": { "method": "post", "path": "/api/sale/departments" },
-  "sale.department.update": { "method": "post", "path": "/api/sale/departments/update" },
-  "sale.department.delete": { "method": "post", "path": "/api/sale/departments/delete" },
-  "sale.quick_note.list": { "method": "get", "path": "/api/sale/quick_notes" },
-  "sale.quick_note.create": { "method": "post", "path": "/api/sale/quick_notes" },
-  "sale.quick_note.update": { "method": "post", "path": "/api/sale/quick_notes/update" },
-  "sale.quick_note.delete": { "method": "post", "path": "/api/sale/quick_notes/delete" },
-  "sale.business_day.get": { "method": "get", "path": "/api/sale/business_day" },
-  "sale.refund.list": { "method": "get", "path": "/api/sale/refunds" },
-  "sale.refund.options": { "method": "get", "path": "/api/sale/refunds/options" },
-  "sale.refund.by_idempotency_key": { "method": "get", "path": "/api/sale/refunds/by_key" },
-  "schedule.week.get": { "method": "get", "path": "/api/schedule/week" },
-  "schedule.week.set_day": { "method": "post", "path": "/api/schedule/week/set_day" },
-  "schedule.week.confirm": { "method": "post", "path": "/api/schedule/week/confirm" },
-  "schedule.special_day.list": { "method": "get", "path": "/api/schedule/special_days" },
-  "schedule.special_day.create": { "method": "post", "path": "/api/schedule/special_days" },
-  "schedule.special_day.bulk_create": { "method": "post", "path": "/api/schedule/special_days/bulk_create" },
-  "schedule.special_day.update": { "method": "post", "path": "/api/schedule/special_days/update" },
-  "schedule.special_day.delete": { "method": "post", "path": "/api/schedule/special_days/delete" },
-  "schedule.override.list": { "method": "get", "path": "/api/schedule/overrides" },
-  "schedule.override.create": { "method": "post", "path": "/api/schedule/overrides" },
-  "schedule.override.update": { "method": "post", "path": "/api/schedule/overrides/update" },
-  "schedule.override.delete": { "method": "post", "path": "/api/schedule/overrides/delete" },
-  "schedule.settings.get": { "method": "get", "path": "/api/schedule/settings" },
-  "schedule.settings.update": { "method": "post", "path": "/api/schedule/settings" },
-  "schedule.business.is_open": { "method": "get", "path": "/api/schedule/is_open" },
-  "schedule.hours.for_range": { "method": "get", "path": "/api/schedule/hours" },
-  "service.service.list": { "method": "get", "path": "/api/service/services" },
-  "service.service.create": { "method": "post", "path": "/api/service/services" },
-  "service.service.get": { "method": "get", "path": "/api/service/services/detail" },
-  "service.service.list_for_sale": { "method": "get", "path": "/api/service/services/for_sale" },
-  "service.service.bulk_create": { "method": "post", "path": "/api/service/services/bulk_create" },
-  "service.service.update": { "method": "post", "path": "/api/service/services/update" },
-  "service.service.archive": { "method": "post", "path": "/api/service/services/archive" },
-  "service.service.restore": { "method": "post", "path": "/api/service/services/restore" },
-  "service.catalog.status": { "method": "get", "path": "/api/service/catalog/status" },
-  "service.category.list": { "method": "get", "path": "/api/service/categories" },
-  "service.category.create": { "method": "post", "path": "/api/service/categories" },
-  "service.category.get": { "method": "get", "path": "/api/service/categories/detail" },
-  "service.category.update": { "method": "post", "path": "/api/service/categories/update" },
-  "service.category.delete": { "method": "post", "path": "/api/service/categories/delete" },
-  "service.settings.get": { "method": "get", "path": "/api/service/settings" },
-  "service.settings.update": { "method": "post", "path": "/api/service/settings" },
-  "service.assignment.list": { "method": "get", "path": "/api/service/assignments" },
-  "service.assignment.eligible": { "method": "get", "path": "/api/service/assignments/eligible" },
-  "service.assignment.assign": { "method": "post", "path": "/api/service/assignments/assign" },
-  "service.assignment.update": { "method": "post", "path": "/api/service/assignments/update" },
-  "service.assignment.remove": { "method": "post", "path": "/api/service/assignments/remove" },
-  "service.package.list": { "method": "get", "path": "/api/service/packages" },
-  "service.package.create": { "method": "post", "path": "/api/service/packages" },
-  "service.package.get": { "method": "get", "path": "/api/service/packages/detail" },
-  "service.package.update": { "method": "post", "path": "/api/service/packages/update" },
-  "service.package.delete": { "method": "post", "path": "/api/service/packages/delete" },
-  "service.grant.list": { "method": "get", "path": "/api/service/grants" },
-  "service.grant.create": { "method": "post", "path": "/api/service/grants" },
-  "service.grant.list_orphans": { "method": "get", "path": "/api/service/grants/orphans" },
-  "service.grant.void_check": { "method": "get", "path": "/api/service/grants/void_check" },
-  "service.grant.adjust_check": { "method": "get", "path": "/api/service/grants/adjust_check" },
-  "service.grant.redeem_check": { "method": "get", "path": "/api/service/grants/redeem_check" },
-  "service.grant.tender_options": { "method": "get", "path": "/api/service/grants/tender_options" },
-  "service.grant.void": { "method": "post", "path": "/api/service/grants/void" },
-  "service.grant.adjust": { "method": "post", "path": "/api/service/grants/adjust" },
-  "service.grant.redeem": { "method": "post", "path": "/api/service/grants/redeem" },
-  "service.movement.list": { "method": "get", "path": "/api/service/movements" },
-  "cash_register.settings.get": { "method": "get", "path": "/api/cash_register/settings" },
-  "cash_register.settings.update": { "method": "post", "path": "/api/cash_register/settings" },
-  "cash_register.register.list": { "method": "get", "path": "/api/cash_register/registers" },
-  "cash_register.register.create": { "method": "post", "path": "/api/cash_register/registers" },
-  "cash_register.register.update": { "method": "post", "path": "/api/cash_register/registers/update" },
-  "cash_register.session.list": { "method": "get", "path": "/api/cash_register/sessions" },
-  "cash_register.session.current": { "method": "get", "path": "/api/cash_register/sessions/current" },
-  "cash_register.session.get": { "method": "get", "path": "/api/cash_register/sessions/detail" },
-  "cash_register.session.open": { "method": "post", "path": "/api/cash_register/sessions/open" },
-  "cash_register.session.close": { "method": "post", "path": "/api/cash_register/sessions/close" },
-  "cash_register.session.auto_close": { "method": "post", "path": "/api/cash_register/sessions/auto_close" },
-  "cash_register.session.print": { "method": "post", "path": "/api/cash_register/sessions/print" },
-  "cash_register.movement.list": { "method": "get", "path": "/api/cash_register/movements" },
-  "cash_register.movement.add": { "method": "post", "path": "/api/cash_register/movements" },
-  "cash_register.count.list": { "method": "get", "path": "/api/cash_register/counts" },
-  "cash_register.count.add": { "method": "post", "path": "/api/cash_register/counts" },
-  "cash_register.currency.get": { "method": "get", "path": "/api/cash_register/currency" },
-  "invoice.invoice.list": { "method": "get", "path": "/api/invoice/invoices" },
-  "invoice.invoice.get": { "method": "get", "path": "/api/invoice/invoices/detail" },
-  "invoice.invoice.by_source": { "method": "get", "path": "/api/invoice/invoices/by_source" },
-  "invoice.invoice.document": { "method": "get", "path": "/api/invoice/invoices/document" },
-  "invoice.invoice.print": { "method": "post", "path": "/api/invoice/invoices/print" },
-  "invoice.invoice.line_defaults": { "method": "get", "path": "/api/invoice/invoices/line_defaults" },
-  "invoice.invoice.create": { "method": "post", "path": "/api/invoice/invoices" },
-  "invoice.invoice.create_from_sale": { "method": "post", "path": "/api/invoice/invoices/from_sale" },
-  "invoice.invoice.substitute": { "method": "post", "path": "/api/invoice/invoices/substitute" },
-  "invoice.invoice.mark_paid": { "method": "post", "path": "/api/invoice/invoices/mark_paid" },
-  "invoice.invoice.rectify": { "method": "post", "path": "/api/invoice/invoices/rectify" },
-  "invoice.invoice.rectify_from_refund": { "method": "post", "path": "/api/invoice/invoices/rectify_from_refund" },
-  "invoice.invoice.rectify_from_void": { "method": "post", "path": "/api/invoice/invoices/rectify_from_void" },
-  "invoice.series.list": { "method": "get", "path": "/api/invoice/series" },
-  "invoice.series.peek_next": { "method": "get", "path": "/api/invoice/series/peek_next" },
-  "invoice.series.create": { "method": "post", "path": "/api/invoice/series" },
-  "invoice.series.update": { "method": "post", "path": "/api/invoice/series/update" },
-  "invoice.numbering.status": { "method": "get", "path": "/api/invoice/numbering/status" },
-  "invoice.numbering.gaps": { "method": "get", "path": "/api/invoice/numbering/gaps" },
-  "invoice.numbering.allocations": { "method": "get", "path": "/api/invoice/numbering/allocations" },
-  "invoice.issuer.get": { "method": "get", "path": "/api/invoice/issuer" },
-  "invoice.issuer.update": { "method": "post", "path": "/api/invoice/issuer" },
-  "online_booking.booking.list": { "method": "get", "path": "/api/online_booking/bookings" },
-  "online_booking.booking.get": { "method": "get", "path": "/api/online_booking/bookings/detail" },
-  "online_booking.booking.confirm": { "method": "post", "path": "/api/online_booking/bookings/confirm" },
-  "online_booking.booking.complete": { "method": "post", "path": "/api/online_booking/bookings/complete" },
-  "online_booking.booking.no_show": { "method": "post", "path": "/api/online_booking/bookings/no_show" },
-  "online_booking.booking.cancel": { "method": "post", "path": "/api/online_booking/bookings/cancel" },
-  "online_booking.booking.delete": { "method": "post", "path": "/api/online_booking/bookings/delete" },
-  "online_booking.settings.get": { "method": "get", "path": "/api/online_booking/settings" },
-  "online_booking.settings.update": { "method": "post", "path": "/api/online_booking/settings" },
-  "online_booking.public.page": { "method": "get", "path": "/api/online_booking/public/page" },
-  "online_booking.public.services": { "method": "get", "path": "/api/online_booking/public/services" },
-  "online_booking.public.slots": { "method": "get", "path": "/api/online_booking/public/slots" },
-  "online_booking.public.booking": { "method": "get", "path": "/api/online_booking/public/booking" },
-  "online_booking.public.book": { "method": "post", "path": "/api/online_booking/public/book" },
-  "online_booking.public.cancel": { "method": "post", "path": "/api/online_booking/public/cancel" },
-  "reservation.reservation.list": { "method": "get", "path": "/api/reservation/reservations" },
-  "reservation.reservation.get": { "method": "get", "path": "/api/reservation/reservations/detail" },
-  "reservation.reservation.create": { "method": "post", "path": "/api/reservation/reservations" },
-  "reservation.reservation.update": { "method": "post", "path": "/api/reservation/reservations/update" },
-  "reservation.reservation.confirm": { "method": "post", "path": "/api/reservation/reservations/confirm" },
-  "reservation.reservation.seat": { "method": "post", "path": "/api/reservation/reservations/seat" },
-  "reservation.reservation.complete": { "method": "post", "path": "/api/reservation/reservations/complete" },
-  "reservation.reservation.cancel": { "method": "post", "path": "/api/reservation/reservations/cancel" },
-  "reservation.reservation.no_show": { "method": "post", "path": "/api/reservation/reservations/no_show" },
-  "reservation.reservation.delete": { "method": "post", "path": "/api/reservation/reservations/delete" },
-  "reservation.reservation.release_unconfirmed": { "method": "post", "path": "/api/reservation/reservations/release_unconfirmed" },
-  "reservation.availability.day": { "method": "get", "path": "/api/reservation/availability/day" },
-  "reservation.availability.tables": { "method": "get", "path": "/api/reservation/availability/tables" },
-  "reservation.time_slot.list": { "method": "get", "path": "/api/reservation/time_slots" },
-  "reservation.time_slot.create": { "method": "post", "path": "/api/reservation/time_slots" },
-  "reservation.time_slot.delete": { "method": "post", "path": "/api/reservation/time_slots/delete" },
-  "reservation.blocked_date.list": { "method": "get", "path": "/api/reservation/blocked_dates" },
-  "reservation.blocked_date.create": { "method": "post", "path": "/api/reservation/blocked_dates" },
-  "reservation.blocked_date.delete": { "method": "post", "path": "/api/reservation/blocked_dates/delete" },
-  "reservation.waitlist.list": { "method": "get", "path": "/api/reservation/waitlist" },
-  "reservation.waitlist.create": { "method": "post", "path": "/api/reservation/waitlist" },
-  "reservation.waitlist.update": { "method": "post", "path": "/api/reservation/waitlist/update" },
-  "reservation.waitlist.convert": { "method": "post", "path": "/api/reservation/waitlist/convert" },
-  "reservation.waitlist.delete": { "method": "post", "path": "/api/reservation/waitlist/delete" },
-  "reservation.settings.get": { "method": "get", "path": "/api/reservation/settings" },
-  "reservation.settings.update": { "method": "post", "path": "/api/reservation/settings" },
-  "attendance.record.current": { "method": "get", "path": "/api/attendance/current" },
-  "attendance.record.list": { "method": "get", "path": "/api/attendance/records" },
-  "attendance.record.detail": { "method": "get", "path": "/api/attendance/records/detail" },
-  "attendance.record.export": { "method": "get", "path": "/api/attendance/records/export" },
-  "attendance.record.correct": { "method": "post", "path": "/api/attendance/records/correct" },
-  "attendance.record.clock_in": { "method": "post", "path": "/api/attendance/clock_in" },
-  "attendance.record.clock_out": { "method": "post", "path": "/api/attendance/clock_out" },
-  "attendance.break.start": { "method": "post", "path": "/api/attendance/breaks/start" },
-  "attendance.break.end": { "method": "post", "path": "/api/attendance/breaks/end" },
-  "attendance.correction.list": { "method": "get", "path": "/api/attendance/corrections" },
-  "attendance.presence.list": { "method": "get", "path": "/api/attendance/presence" },
-  "attendance.person.list": { "method": "get", "path": "/api/attendance/people" },
-  "attendance.settings.get": { "method": "get", "path": "/api/attendance/settings" },
-  "attendance.settings.update": { "method": "post", "path": "/api/attendance/settings" },
-  "pricing.price_list.list": { "method": "get", "path": "/api/pricing/price_lists" },
-  "pricing.price_list.get": { "method": "get", "path": "/api/pricing/price_lists/detail" },
-  "pricing.price_list.create": { "method": "post", "path": "/api/pricing/price_lists" },
-  "pricing.price_list.update": { "method": "post", "path": "/api/pricing/price_lists/update" },
-  "pricing.price_list.set_default": { "method": "post", "path": "/api/pricing/price_lists/set_default" },
-  "pricing.price_list.deactivate": { "method": "post", "path": "/api/pricing/price_lists/deactivate" },
-  "pricing.price_list.activate": { "method": "post", "path": "/api/pricing/price_lists/activate" },
-  "pricing.price_item.list": { "method": "get", "path": "/api/pricing/price_items" },
-  "pricing.price_item.add": { "method": "post", "path": "/api/pricing/price_items" },
-  "pricing.price_item.update": { "method": "post", "path": "/api/pricing/price_items/update" },
-  "pricing.price_item.remove": { "method": "post", "path": "/api/pricing/price_items/remove" },
-  "pricing.rule.list": { "method": "get", "path": "/api/pricing/rules" },
-  "pricing.rule.create": { "method": "post", "path": "/api/pricing/rules" },
-  "pricing.rule.update": { "method": "post", "path": "/api/pricing/rules/update" },
-  "pricing.rule.deactivate": { "method": "post", "path": "/api/pricing/rules/deactivate" },
-  "pricing.rule.activate": { "method": "post", "path": "/api/pricing/rules/activate" },
-  "pricing.price.resolve": { "method": "get", "path": "/api/pricing/prices/resolve" },
-  "combo.combo.list": { "method": "get", "path": "/api/combo/combos" },
-  "combo.combo.get": { "method": "get", "path": "/api/combo/combos/detail" },
-  "combo.combo.for_sale": { "method": "get", "path": "/api/combo/combos/for_sale" },
-  "combo.combo.resolve": { "method": "get", "path": "/api/combo/combos/resolve" },
-  "combo.combo.create": { "method": "post", "path": "/api/combo/combos" },
-  "combo.combo.update": { "method": "post", "path": "/api/combo/combos/update" },
-  "combo.combo.delete": { "method": "post", "path": "/api/combo/combos/delete" },
-  "combo.group.create": { "method": "post", "path": "/api/combo/groups" },
-  "combo.group.update": { "method": "post", "path": "/api/combo/groups/update" },
-  "combo.group.delete": { "method": "post", "path": "/api/combo/groups/delete" },
-  "combo.group.reorder": { "method": "post", "path": "/api/combo/groups/reorder" },
-  "combo.option.create": { "method": "post", "path": "/api/combo/options" },
-  "combo.option.bulk_create": { "method": "post", "path": "/api/combo/options/bulk_create" },
-  "combo.option.update": { "method": "post", "path": "/api/combo/options/update" },
-  "combo.option.delete": { "method": "post", "path": "/api/combo/options/delete" },
-  "combo.option.reorder": { "method": "post", "path": "/api/combo/options/reorder" },
-  "appointment.appointment.list": { "method": "get", "path": "/api/appointment/appointments" },
-  "appointment.appointment.get": { "method": "get", "path": "/api/appointment/appointments/detail" },
-  "appointment.appointment.history": { "method": "get", "path": "/api/appointment/appointments/history" },
-  "appointment.appointment.list_for_customer": { "method": "get", "path": "/api/appointment/appointments/for_customer" },
-  "appointment.appointment.count_active_for_service": { "method": "get", "path": "/api/appointment/appointments/count_for_service" },
-  "appointment.appointment.count_to_confirm": { "method": "get", "path": "/api/appointment/appointments/count_to_confirm" },
-  "appointment.appointment.notices": { "method": "get", "path": "/api/appointment/appointments/notices" },
-  "appointment.appointment.create": { "method": "post", "path": "/api/appointment/appointments" },
-  "appointment.appointment.bulk_create": { "method": "post", "path": "/api/appointment/appointments/bulk_create" },
-  "appointment.appointment.reschedule": { "method": "post", "path": "/api/appointment/appointments/reschedule" },
-  "appointment.appointment.update": { "method": "post", "path": "/api/appointment/appointments/update" },
-  "appointment.appointment.confirm": { "method": "post", "path": "/api/appointment/appointments/confirm" },
-  "appointment.appointment.start": { "method": "post", "path": "/api/appointment/appointments/start" },
-  "appointment.appointment.complete": { "method": "post", "path": "/api/appointment/appointments/complete" },
-  "appointment.appointment.mark_no_show": { "method": "post", "path": "/api/appointment/appointments/mark_no_show" },
-  "appointment.appointment.cancel": { "method": "post", "path": "/api/appointment/appointments/cancel" },
-  "appointment.appointment.delete": { "method": "post", "path": "/api/appointment/appointments/delete" },
-  "appointment.appointment.bulk_delete": { "method": "post", "path": "/api/appointment/appointments/bulk_delete" },
-  "appointment.appointment.charge": { "method": "post", "path": "/api/appointment/appointments/charge" },
-  "appointment.agenda.lanes": { "method": "get", "path": "/api/appointment/lanes" },
-  "appointment.availability.slots": { "method": "get", "path": "/api/appointment/availability/slots" },
-  "appointment.availability.check": { "method": "get", "path": "/api/appointment/availability/check" },
-  "appointment.blocked_time.list": { "method": "get", "path": "/api/appointment/blocked_times" },
-  "appointment.blocked_time.create": { "method": "post", "path": "/api/appointment/blocked_times" },
-  "appointment.blocked_time.delete": { "method": "post", "path": "/api/appointment/blocked_times/delete" },
-  "appointment.recurring.list": { "method": "get", "path": "/api/appointment/recurring" },
-  "appointment.recurring.get": { "method": "get", "path": "/api/appointment/recurring/detail" },
-  "appointment.recurring.create": { "method": "post", "path": "/api/appointment/recurring" },
-  "appointment.recurring.materialize": { "method": "post", "path": "/api/appointment/recurring/materialize" },
-  "appointment.recurring.update": { "method": "post", "path": "/api/appointment/recurring/update" },
-  "appointment.recurring.activate": { "method": "post", "path": "/api/appointment/recurring/activate" },
-  "appointment.recurring.deactivate": { "method": "post", "path": "/api/appointment/recurring/deactivate" },
-  "appointment.recurring.delete": { "method": "post", "path": "/api/appointment/recurring/delete" },
-  "appointment.settings.get": { "method": "get", "path": "/api/appointment/settings" },
-  "appointment.settings.update": { "method": "post", "path": "/api/appointment/settings" },
-  "task.task.list": { "method": "get", "path": "/api/task/tasks" },
-  "task.task.mine": { "method": "get", "path": "/api/task/tasks/mine" },
-  "task.task.detail": { "method": "get", "path": "/api/task/tasks/detail" },
-  "task.task.subtasks": { "method": "get", "path": "/api/task/tasks/subtasks" },
-  "task.task.create": { "method": "post", "path": "/api/task/tasks" },
-  "task.task.update": { "method": "post", "path": "/api/task/tasks/update" },
-  "task.task.set_status": { "method": "post", "path": "/api/task/tasks/set_status" },
-  "task.task.complete": { "method": "post", "path": "/api/task/tasks/complete" },
-  "task.task.assign": { "method": "post", "path": "/api/task/tasks/assign" },
-  "task.task.delete": { "method": "post", "path": "/api/task/tasks/delete" },
-  "task.comment.list": { "method": "get", "path": "/api/task/comments" },
-  "task.comment.add": { "method": "post", "path": "/api/task/comments" },
-  "task.project.list": { "method": "get", "path": "/api/task/projects" },
-  "task.project.detail": { "method": "get", "path": "/api/task/projects/detail" },
-  "task.project.create": { "method": "post", "path": "/api/task/projects" },
-  "task.project.update": { "method": "post", "path": "/api/task/projects/update" },
-  "task.project.delete": { "method": "post", "path": "/api/task/projects/delete" },
-  "kitchen.ticket.board": { "method": "get", "path": "/api/kitchen/board" },
-  "kitchen.ticket.all_day": { "method": "get", "path": "/api/kitchen/all_day" },
-  "kitchen.ticket.list": { "method": "get", "path": "/api/kitchen/tickets" },
-  "kitchen.ticket.get": { "method": "get", "path": "/api/kitchen/tickets/detail" },
-  "kitchen.ticket.by_order": { "method": "get", "path": "/api/kitchen/tickets/by_order" },
-  "kitchen.ticket.create": { "method": "post", "path": "/api/kitchen/tickets" },
-  "kitchen.ticket.send": { "method": "post", "path": "/api/kitchen/tickets/send" },
-  "kitchen.ticket.start": { "method": "post", "path": "/api/kitchen/tickets/start" },
-  "kitchen.ticket.ready": { "method": "post", "path": "/api/kitchen/tickets/ready" },
-  "kitchen.ticket.serve": { "method": "post", "path": "/api/kitchen/tickets/serve" },
-  "kitchen.ticket.recall": { "method": "post", "path": "/api/kitchen/tickets/recall" },
-  "kitchen.ticket.cancel": { "method": "post", "path": "/api/kitchen/tickets/cancel" },
-  "kitchen.ticket.delete": { "method": "post", "path": "/api/kitchen/tickets/delete" },
-  "kitchen.ticket.set_rush": { "method": "post", "path": "/api/kitchen/tickets/set_rush" },
-  "kitchen.ticket.reprint": { "method": "post", "path": "/api/kitchen/tickets/reprint" },
-  "kitchen.item.bump": { "method": "post", "path": "/api/kitchen/items/bump" },
-  "kitchen.item.recall": { "method": "post", "path": "/api/kitchen/items/recall" },
-  "kitchen.station.list": { "method": "get", "path": "/api/kitchen/stations" },
-  "kitchen.station.create": { "method": "post", "path": "/api/kitchen/stations" },
-  "kitchen.station.update": { "method": "post", "path": "/api/kitchen/stations/update" },
-  "kitchen.station.delete": { "method": "post", "path": "/api/kitchen/stations/delete" },
-  "kitchen.routing.list": { "method": "get", "path": "/api/kitchen/routing" },
-  "kitchen.routing.set": { "method": "post", "path": "/api/kitchen/routing" },
-  "kitchen.routing.clear": { "method": "post", "path": "/api/kitchen/routing/clear" },
-  "kitchen.settings.get": { "method": "get", "path": "/api/kitchen/settings" },
-  "kitchen.settings.update": { "method": "post", "path": "/api/kitchen/settings" },
-  "kitchen.log.list": { "method": "get", "path": "/api/kitchen/log" },
-  "whatsapp_inbox.conversation.list": { "method": "get", "path": "/api/whatsapp_inbox/conversations" },
-  "whatsapp_inbox.conversation.detail": { "method": "get", "path": "/api/whatsapp_inbox/conversations/detail" },
-  "whatsapp_inbox.conversation.by_phone": { "method": "get", "path": "/api/whatsapp_inbox/conversations/by_phone" },
-  "whatsapp_inbox.conversation.summary": { "method": "get", "path": "/api/whatsapp_inbox/conversations/summary" },
-  "whatsapp_inbox.conversation.mark_read": { "method": "post", "path": "/api/whatsapp_inbox/conversations/mark_read" },
-  "whatsapp_inbox.conversation.assign": { "method": "post", "path": "/api/whatsapp_inbox/conversations/assign" },
-  "whatsapp_inbox.conversation.set_status": { "method": "post", "path": "/api/whatsapp_inbox/conversations/set_status" },
-  "whatsapp_inbox.conversation.link_customer": { "method": "post", "path": "/api/whatsapp_inbox/conversations/link_customer" },
-  "whatsapp_inbox.conversation.erase": { "method": "post", "path": "/api/whatsapp_inbox/conversations/erase" },
-  "whatsapp_inbox.message.list": { "method": "get", "path": "/api/whatsapp_inbox/messages" },
-  "whatsapp_inbox.message.send": { "method": "post", "path": "/api/whatsapp_inbox/messages/send" },
-  "whatsapp_inbox.message.retry": { "method": "post", "path": "/api/whatsapp_inbox/messages/retry" },
-  "whatsapp_inbox.message.notify": { "method": "post", "path": "/api/whatsapp_inbox/messages/notify" },
-  "whatsapp_inbox.note.list": { "method": "get", "path": "/api/whatsapp_inbox/notes" },
-  "whatsapp_inbox.note.add": { "method": "post", "path": "/api/whatsapp_inbox/notes" },
-  "whatsapp_inbox.note.delete": { "method": "post", "path": "/api/whatsapp_inbox/notes/delete" },
-  "whatsapp_inbox.template.list": { "method": "get", "path": "/api/whatsapp_inbox/templates" },
-  "whatsapp_inbox.template.create": { "method": "post", "path": "/api/whatsapp_inbox/templates" },
-  "whatsapp_inbox.template.update": { "method": "post", "path": "/api/whatsapp_inbox/templates/update" },
-  "whatsapp_inbox.template.retry": { "method": "post", "path": "/api/whatsapp_inbox/templates/retry" },
-  "whatsapp_inbox.template.delete": { "method": "post", "path": "/api/whatsapp_inbox/templates/delete" },
-  "whatsapp_inbox.channel.get": { "method": "get", "path": "/api/whatsapp_inbox/channel" },
-  "whatsapp_inbox.channel.prepare": { "method": "post", "path": "/api/whatsapp_inbox/channel/prepare" },
-  "whatsapp_inbox.channel.connect": { "method": "post", "path": "/api/whatsapp_inbox/channel/connect" },
-  "whatsapp_inbox.channel.disconnect": { "method": "post", "path": "/api/whatsapp_inbox/channel/disconnect" },
-  "whatsapp_inbox.agent.list": { "method": "get", "path": "/api/whatsapp_inbox/agents" },
-  "flow.flow.list": { "method": "get", "path": "/api/flow/flows" },
-  "flow.flow.detail": { "method": "get", "path": "/api/flow/flows/detail" },
-  "flow.flow.status": { "method": "get", "path": "/api/flow/flows/status" },
-  "flow.flow.test": { "method": "get", "path": "/api/flow/flows/test" },
-  "flow.flow.create": { "method": "post", "path": "/api/flow/flows" },
-  "flow.flow.update": { "method": "post", "path": "/api/flow/flows/update" },
-  "flow.flow.set_enabled": { "method": "post", "path": "/api/flow/flows/set_enabled" },
-  "flow.flow.duplicate": { "method": "post", "path": "/api/flow/flows/duplicate" },
-  "flow.flow.delete": { "method": "post", "path": "/api/flow/flows/delete" },
-  "flow.flow.grant": { "method": "post", "path": "/api/flow/flows/grant" },
-  "flow.flow.run": { "method": "post", "path": "/api/flow/flows/run" },
-  "flow.run.list": { "method": "get", "path": "/api/flow/runs" },
-  "flow.run.retry": { "method": "post", "path": "/api/flow/runs/retry" },
-  "flow.draft.list": { "method": "get", "path": "/api/flow/drafts" },
-  "flow.draft.propose": { "method": "post", "path": "/api/flow/drafts" },
-  "flow.draft.dismiss": { "method": "post", "path": "/api/flow/drafts/dismiss" },
-  "flow.catalog.read": { "method": "get", "path": "/api/flow/catalog" },
-  "flow.event.sample": { "method": "get", "path": "/api/flow/events/sample" },
-  "flow.secret.list": { "method": "get", "path": "/api/flow/secrets" },
-  "flow.secret.set": { "method": "post", "path": "/api/flow/secrets" },
-  "flow.secret.delete": { "method": "post", "path": "/api/flow/secrets/delete" },
-  "flow.question.list": { "method": "get", "path": "/api/flow/questions" },
-  "flow.question.answer": { "method": "post", "path": "/api/flow/questions/answer" },
-  "flow.recipe.list": { "method": "get", "path": "/api/flow/recipes" },
-  "flow.recipe.enable": { "method": "post", "path": "/api/flow/recipes/enable" },
-  "flow.recipe.disable": { "method": "post", "path": "/api/flow/recipes/disable" },
-  "flow.recipe.restore": { "method": "post", "path": "/api/flow/recipes/restore" },
-  "flow.recipe.repair": { "method": "post", "path": "/api/flow/recipes/repair" },
-  "table.zone.list": { "method": "get", "path": "/api/table/zones" },
-  "table.zone.get": { "method": "get", "path": "/api/table/zones/detail" },
-  "table.zone.create": { "method": "post", "path": "/api/table/zones" },
-  "table.zone.update": { "method": "post", "path": "/api/table/zones/update" },
-  "table.zone.delete": { "method": "post", "path": "/api/table/zones/delete" },
-  "table.table.list": { "method": "get", "path": "/api/table/tables" },
-  "table.table.get": { "method": "get", "path": "/api/table/tables/detail" },
-  "table.table.create": { "method": "post", "path": "/api/table/tables" },
-  "table.table.bulk_create": { "method": "post", "path": "/api/table/tables/bulk_create" },
-  "table.table.update": { "method": "post", "path": "/api/table/tables/update" },
-  "table.table.move": { "method": "post", "path": "/api/table/tables/move" },
-  "table.table.delete": { "method": "post", "path": "/api/table/tables/delete" },
-  "table.session.list": { "method": "get", "path": "/api/table/sessions" },
-  "table.session.get": { "method": "get", "path": "/api/table/sessions/detail" },
-  "table.session.by_order": { "method": "get", "path": "/api/table/sessions/by_order" },
-  "table.session.open": { "method": "post", "path": "/api/table/sessions/open" },
-  "table.session.close": { "method": "post", "path": "/api/table/sessions/close" },
-  "table.session.transfer": { "method": "post", "path": "/api/table/sessions/transfer" },
-  "table.session.merge": { "method": "post", "path": "/api/table/sessions/merge" },
-  "table.session.split": { "method": "post", "path": "/api/table/sessions/split" },
-  "table.session.set_guests": { "method": "post", "path": "/api/table/sessions/set_guests" },
-  "table.session.park": { "method": "post", "path": "/api/table/sessions/park" },
-  "table.session.restore": { "method": "post", "path": "/api/table/sessions/restore" },
-  "table.session.link_order": { "method": "post", "path": "/api/table/sessions/link_order" },
-  "table.session.delete": { "method": "post", "path": "/api/table/sessions/delete" },
-  "table.waiter.list": { "method": "get", "path": "/api/table/waiters" },
-  "table.floor.status": { "method": "get", "path": "/api/table/floor/status" },
-  "table.settings.get": { "method": "get", "path": "/api/table/settings" },
-  "table.settings.update": { "method": "post", "path": "/api/table/settings" },
-  "table.hold.place": { "method": "post", "path": "/api/table/holds" },
-  "table.hold.release": { "method": "post", "path": "/api/table/holds/release" },
-  "payment.payment.list": { "method": "get", "path": "/api/payment/payments" },
-  "payment.payment.get": { "method": "get", "path": "/api/payment/payments/detail" },
-  "payment.payment.create": { "method": "post", "path": "/api/payment/payments" },
-  "payment.payment.approve": { "method": "post", "path": "/api/payment/payments/approve" },
-  "payment.payment.mark_sent": { "method": "post", "path": "/api/payment/payments/mark_sent" },
-  "payment.payment.mark_completed": { "method": "post", "path": "/api/payment/payments/mark_completed" },
-  "payment.payment.cancel": { "method": "post", "path": "/api/payment/payments/cancel" },
-  "payment.method.list": { "method": "get", "path": "/api/payment/methods" },
-  "payment.method.get": { "method": "get", "path": "/api/payment/methods/detail" },
-  "payment.method.create": { "method": "post", "path": "/api/payment/methods" },
-  "payment.method.update": { "method": "post", "path": "/api/payment/methods/update" },
-  "payment.method.deactivate": { "method": "post", "path": "/api/payment/methods/deactivate" },
-  "payment.method.activate": { "method": "post", "path": "/api/payment/methods/activate" },
-  "printing.settings.get": { "method": "get", "path": "/api/printing/settings" },
-  "printing.settings.update": { "method": "post", "path": "/api/printing/settings" },
-  "printing.printer.list": { "method": "get", "path": "/api/printing/printers" },
-  "printing.printer.get": { "method": "get", "path": "/api/printing/printers/detail" },
-  "printing.printer.status": { "method": "get", "path": "/api/printing/printers/status" },
-  "printing.printer.create": { "method": "post", "path": "/api/printing/printers" },
-  "printing.printer.update": { "method": "post", "path": "/api/printing/printers/update" },
-  "printing.printer.test": { "method": "post", "path": "/api/printing/printers/test" },
-  "printing.job.list": { "method": "get", "path": "/api/printing/jobs" },
-  "printing.job.summary": { "method": "get", "path": "/api/printing/jobs/summary" },
-  "printing.job.create": { "method": "post", "path": "/api/printing/jobs" },
-  "printing.job.claim": { "method": "post", "path": "/api/printing/jobs/claim" },
-  "printing.job.complete": { "method": "post", "path": "/api/printing/jobs/complete" },
-  "printing.job.fail": { "method": "post", "path": "/api/printing/jobs/fail" },
-  "printing.job.retry": { "method": "post", "path": "/api/printing/jobs/retry" },
-  "printing.job.cancel": { "method": "post", "path": "/api/printing/jobs/cancel" },
-  "printing.device.list": { "method": "get", "path": "/api/printing/devices" },
-  "printing.device.register": { "method": "post", "path": "/api/printing/devices" },
-  "printing.device.update": { "method": "post", "path": "/api/printing/devices/update" },
-  "printing.device.retire": { "method": "post", "path": "/api/printing/devices/retire" },
-  "modifier.group.list": { "method": "get", "path": "/api/modifier/groups" },
-  "modifier.group.get": { "method": "get", "path": "/api/modifier/groups/detail" },
-  "modifier.group.for_target": { "method": "get", "path": "/api/modifier/groups/for_target" },
-  "modifier.group.create": { "method": "post", "path": "/api/modifier/groups" },
-  "modifier.group.update": { "method": "post", "path": "/api/modifier/groups/update" },
-  "modifier.group.delete": { "method": "post", "path": "/api/modifier/groups/delete" },
-  "modifier.option.list": { "method": "get", "path": "/api/modifier/options" },
-  "modifier.option.create": { "method": "post", "path": "/api/modifier/options" },
-  "modifier.option.update": { "method": "post", "path": "/api/modifier/options/update" },
-  "modifier.option.delete": { "method": "post", "path": "/api/modifier/options/delete" },
-  "modifier.link.list": { "method": "get", "path": "/api/modifier/links" },
-  "modifier.link.attach": { "method": "post", "path": "/api/modifier/links/attach" },
-  "modifier.link.detach": { "method": "post", "path": "/api/modifier/links/detach" },
-  "modifier.selection.resolve": { "method": "get", "path": "/api/modifier/selections/resolve" },
-  "cart_checkout.cart.list": { "method": "get", "path": "/api/cart_checkout/carts" },
-  "cart_checkout.cart.get": { "method": "get", "path": "/api/cart_checkout/carts/detail" },
-  "cart_checkout.cart.create": { "method": "post", "path": "/api/cart_checkout/carts" },
-  "cart_checkout.cart.mark_abandoned": { "method": "post", "path": "/api/cart_checkout/carts/mark_abandoned" },
-  "cart_checkout.cart.delete": { "method": "post", "path": "/api/cart_checkout/carts/delete" },
-  "cart_checkout.cart.clear": { "method": "post", "path": "/api/cart_checkout/carts/clear" },
-  "cart_checkout.cart.cleanup_expired": { "method": "post", "path": "/api/cart_checkout/carts/cleanup_expired" },
-  "cart_checkout.item.list": { "method": "get", "path": "/api/cart_checkout/items" },
-  "cart_checkout.item.get": { "method": "get", "path": "/api/cart_checkout/items/detail" },
-  "cart_checkout.item.add": { "method": "post", "path": "/api/cart_checkout/items" },
-  "cart_checkout.item.update": { "method": "post", "path": "/api/cart_checkout/items/update" },
-  "cart_checkout.item.remove": { "method": "post", "path": "/api/cart_checkout/items/remove" },
-  "cart_checkout.checkout.initiate": { "method": "post", "path": "/api/cart_checkout/checkout/initiate" },
-  "cart_checkout.order.list": { "method": "get", "path": "/api/cart_checkout/orders" },
-  "cart_checkout.order.get": { "method": "get", "path": "/api/cart_checkout/orders/detail" },
-  "cart_checkout.order.mark_paid": { "method": "post", "path": "/api/cart_checkout/orders/mark_paid" },
-  "cart_checkout.order.fail": { "method": "post", "path": "/api/cart_checkout/orders/fail" },
-  "cart_checkout.order.complete": { "method": "post", "path": "/api/cart_checkout/orders/complete" },
-  "cart_checkout.customer.erase": { "method": "post", "path": "/api/cart_checkout/customers/erase" },
-  "verifactu.config.get": { "method": "get", "path": "/api/verifactu/config" },
-  "verifactu.config.update": { "method": "post", "path": "/api/verifactu/config" },
-  "verifactu.config.go_live": { "method": "post", "path": "/api/verifactu/config/go_live" },
-  "verifactu.config.back_to_testing": { "method": "post", "path": "/api/verifactu/config/back_to_testing" },
-  "verifactu.certificate.upload": { "method": "post", "path": "/api/verifactu/certificate" },
-  "verifactu.certificate.remove": { "method": "post", "path": "/api/verifactu/certificate/remove" },
-  "verifactu.representation.submit": { "method": "post", "path": "/api/verifactu/representation" },
-  "verifactu.representation.model": { "method": "get", "path": "/api/verifactu/representation/model" },
-  "verifactu.record.list": { "method": "get", "path": "/api/verifactu/records" },
-  "verifactu.record.get": { "method": "get", "path": "/api/verifactu/records/detail" },
-  "verifactu.record.by_invoice": { "method": "get", "path": "/api/verifactu/records/by_invoice" },
-  "verifactu.record.create": { "method": "post", "path": "/api/verifactu/records" },
-  "verifactu.record.correct": { "method": "post", "path": "/api/verifactu/records/correct" },
-  "verifactu.record.cancel": { "method": "post", "path": "/api/verifactu/records/cancel" },
-  "verifactu.record.transmit": { "method": "post", "path": "/api/verifactu/records/transmit" },
-  "verifactu.record.reconcile": { "method": "post", "path": "/api/verifactu/records/reconcile" },
-  "verifactu.contingency.list": { "method": "get", "path": "/api/verifactu/contingency" },
-  "verifactu.contingency.process": { "method": "post", "path": "/api/verifactu/contingency/process" },
-  "verifactu.contingency.retry": { "method": "post", "path": "/api/verifactu/contingency/retry" },
-  "verifactu.event.list": { "method": "get", "path": "/api/verifactu/events" },
-  "verifactu.stats.compliance_summary": { "method": "get", "path": "/api/verifactu/stats/compliance_summary" },
-  "verifactu.stats.records_by_status": { "method": "get", "path": "/api/verifactu/stats/records_by_status" },
-  "verifactu.stats.contingency_summary": { "method": "get", "path": "/api/verifactu/stats/contingency_summary" },
-  "verifactu.stats.events_recent": { "method": "get", "path": "/api/verifactu/stats/events_recent" },
-  "verifactu.aeat_record.list": { "method": "get", "path": "/api/verifactu/aeat_records" },
-  "verifactu.aeat.query": { "method": "post", "path": "/api/verifactu/aeat/query" },
-  "verifactu.chain.status": { "method": "get", "path": "/api/verifactu/chain/status" },
-  "verifactu.chain.validate": { "method": "post", "path": "/api/verifactu/chain/validate" },
-  "verifactu.chain.recover_from_aeat": { "method": "post", "path": "/api/verifactu/chain/recover_from_aeat" },
-  "verifactu.chain.recover_manual": { "method": "post", "path": "/api/verifactu/chain/recover_manual" },
-  "verifactu.diagnostic.last": { "method": "get", "path": "/api/verifactu/diagnostics/last" },
-  "verifactu.diagnostic.run": { "method": "post", "path": "/api/verifactu/diagnostics/run" },
-  "verifactu.test_invoice.create": { "method": "post", "path": "/api/verifactu/test_invoice" },
-  "website.site.get": { "method": "get", "path": "/api/website/site" },
-  "website.site.save": { "method": "post", "path": "/api/website/site" },
-  "website.site.publish": { "method": "post", "path": "/api/website/site/publish" },
-  "website.site.unpublish": { "method": "post", "path": "/api/website/site/unpublish" },
-  "website.site.preview": { "method": "get", "path": "/api/website/site/preview" },
-  "website.image.upload": { "method": "post", "path": "/api/website/images" },
-  "website.qr.get": { "method": "get", "path": "/api/website/qr" },
-  "website.catalog.categories": { "method": "get", "path": "/api/website/catalog/categories" },
-  "website.public.site": { "method": "get", "path": "/api/website/public/site" },
-  "website.public.catalog": { "method": "get", "path": "/api/website/public/catalog" },
-  "website.public.reviews": { "method": "get", "path": "/api/website/public/reviews" }
+  "base.session.me": {
+    "method": "get",
+    "path": "/api/me"
+  },
+  "base.setup.status": {
+    "method": "get",
+    "path": "/api/home/setup"
+  },
+  "base.widget.list": {
+    "method": "get",
+    "path": "/api/home/widgets"
+  },
+  "base.bell.counters": {
+    "method": "get",
+    "path": "/api/home/bell"
+  },
+  "base.notice.list": {
+    "method": "get",
+    "path": "/api/home/notices"
+  },
+  "base.app.list": {
+    "method": "get",
+    "path": "/api/apps"
+  },
+  "base.plan.usage": {
+    "method": "get",
+    "path": "/api/system/plan"
+  },
+  "base.business.get": {
+    "method": "get",
+    "path": "/api/business"
+  },
+  "base.blueprint.list": {
+    "method": "get",
+    "path": "/api/settings/data/blueprints"
+  },
+  "base.blueprint.inspect": {
+    "method": "post",
+    "path": "/api/settings/data/blueprints/inspect"
+  },
+  "base.blueprint.import": {
+    "method": "post",
+    "path": "/api/settings/data/blueprints/import"
+  },
+  "base.blueprint.export": {
+    "method": "get",
+    "path": "/api/settings/data/export"
+  },
+  "base.import.list": {
+    "method": "get",
+    "path": "/api/settings/data/imports"
+  },
+  "base.import.undo": {
+    "method": "post",
+    "path": "/api/settings/data/imports/undo"
+  },
+  "base.dataset.list": {
+    "method": "get",
+    "path": "/api/settings/data/datasets"
+  },
+  "base.hub.reset": {
+    "method": "post",
+    "path": "/api/settings/data/reset"
+  },
+  "base.system.status": {
+    "method": "get",
+    "path": "/api/system/status"
+  },
+  "base.event.list": {
+    "method": "get",
+    "path": "/api/system/events"
+  },
+  "base.failed_event.list": {
+    "method": "get",
+    "path": "/api/system/failed-events"
+  },
+  "base.failed_event.retry": {
+    "method": "post",
+    "path": "/api/system/failed-events/retry"
+  },
+  "base.failed_event.retry_all": {
+    "method": "post",
+    "path": "/api/system/failed-events/retry_all"
+  },
+  "base.failed_event.discard": {
+    "method": "post",
+    "path": "/api/system/failed-events/discard"
+  },
+  "demo.item.list": {
+    "method": "get",
+    "path": "/api/demo/items"
+  },
+  "demo.item.detail": {
+    "method": "get",
+    "path": "/api/demo/items/detail"
+  },
+  "demo.item.stats": {
+    "method": "get",
+    "path": "/api/demo/items/stats"
+  },
+  "demo.item.create": {
+    "method": "post",
+    "path": "/api/demo/items"
+  },
+  "demo.item.update": {
+    "method": "post",
+    "path": "/api/demo/items/update"
+  },
+  "demo.item.delete": {
+    "method": "post",
+    "path": "/api/demo/items/delete"
+  },
+  "demo.item.add_line": {
+    "method": "post",
+    "path": "/api/demo/items/add_line"
+  },
+  "customer.customer.list": {
+    "method": "get",
+    "path": "/api/customer/customers"
+  },
+  "customer.customer.detail": {
+    "method": "get",
+    "path": "/api/customer/customers/detail"
+  },
+  "customer.customer.stats": {
+    "method": "get",
+    "path": "/api/customer/customers/stats"
+  },
+  "customer.customer.by_phone": {
+    "method": "get",
+    "path": "/api/customer/customers/by_phone"
+  },
+  "customer.customer.export": {
+    "method": "get",
+    "path": "/api/customer/customers/export"
+  },
+  "customer.customer.create": {
+    "method": "post",
+    "path": "/api/customer/customers"
+  },
+  "customer.customer.update": {
+    "method": "post",
+    "path": "/api/customer/customers/update"
+  },
+  "customer.customer.import": {
+    "method": "post",
+    "path": "/api/customer/customers/import"
+  },
+  "customer.customer.set_groups": {
+    "method": "post",
+    "path": "/api/customer/customers/set_groups"
+  },
+  "customer.customer.set_tags": {
+    "method": "post",
+    "path": "/api/customer/customers/set_tags"
+  },
+  "customer.customer.delete": {
+    "method": "post",
+    "path": "/api/customer/customers/delete"
+  },
+  "customer.customer.merge": {
+    "method": "post",
+    "path": "/api/customer/customers/merge"
+  },
+  "customer.customer.erase": {
+    "method": "post",
+    "path": "/api/customer/customers/erase"
+  },
+  "customer.group.list": {
+    "method": "get",
+    "path": "/api/customer/groups"
+  },
+  "customer.group.create": {
+    "method": "post",
+    "path": "/api/customer/groups"
+  },
+  "customer.group.update": {
+    "method": "post",
+    "path": "/api/customer/groups/update"
+  },
+  "customer.group.delete": {
+    "method": "post",
+    "path": "/api/customer/groups/delete"
+  },
+  "customer.tag.list": {
+    "method": "get",
+    "path": "/api/customer/tags"
+  },
+  "customer.tag.create": {
+    "method": "post",
+    "path": "/api/customer/tags"
+  },
+  "customer.tag.update": {
+    "method": "post",
+    "path": "/api/customer/tags/update"
+  },
+  "customer.tag.delete": {
+    "method": "post",
+    "path": "/api/customer/tags/delete"
+  },
+  "customer.field.list": {
+    "method": "get",
+    "path": "/api/customer/fields"
+  },
+  "customer.field.create": {
+    "method": "post",
+    "path": "/api/customer/fields"
+  },
+  "customer.field.update": {
+    "method": "post",
+    "path": "/api/customer/fields/update"
+  },
+  "customer.field.delete": {
+    "method": "post",
+    "path": "/api/customer/fields/delete"
+  },
+  "customer.activity.list": {
+    "method": "get",
+    "path": "/api/customer/activity"
+  },
+  "customer.activity.add": {
+    "method": "post",
+    "path": "/api/customer/activity"
+  },
+  "customer.note.add": {
+    "method": "post",
+    "path": "/api/customer/notes"
+  },
+  "customer.purchase.list": {
+    "method": "get",
+    "path": "/api/customer/purchases"
+  },
+  "customer.purchase.divergences": {
+    "method": "get",
+    "path": "/api/customer/purchases/divergences"
+  },
+  "customer.consent.history": {
+    "method": "get",
+    "path": "/api/customer/consents"
+  },
+  "customer.consent.state": {
+    "method": "get",
+    "path": "/api/customer/consents/state"
+  },
+  "customer.consent.grant": {
+    "method": "post",
+    "path": "/api/customer/consents/grant"
+  },
+  "customer.consent.withdraw": {
+    "method": "post",
+    "path": "/api/customer/consents/withdraw"
+  },
+  "customer.health.detail": {
+    "method": "get",
+    "path": "/api/customer/health"
+  },
+  "customer.health.grant": {
+    "method": "post",
+    "path": "/api/customer/health/grant"
+  },
+  "customer.health.withdraw": {
+    "method": "post",
+    "path": "/api/customer/health/withdraw"
+  },
+  "customer.health.update": {
+    "method": "post",
+    "path": "/api/customer/health/update"
+  },
+  "customer.order.list": {
+    "method": "get",
+    "path": "/api/customer/orders"
+  },
+  "customer.order.customer": {
+    "method": "get",
+    "path": "/api/customer/orders/customer"
+  },
+  "customer.order.link": {
+    "method": "post",
+    "path": "/api/customer/orders/link"
+  },
+  "inventory.product.list": {
+    "method": "get",
+    "path": "/api/inventory/products"
+  },
+  "inventory.product.get": {
+    "method": "get",
+    "path": "/api/inventory/products/detail"
+  },
+  "inventory.product.list_for_sale": {
+    "method": "get",
+    "path": "/api/inventory/products/for_sale"
+  },
+  "inventory.product.list_low_stock": {
+    "method": "get",
+    "path": "/api/inventory/products/low_stock"
+  },
+  "inventory.product.export": {
+    "method": "get",
+    "path": "/api/inventory/products/export"
+  },
+  "inventory.product.create": {
+    "method": "post",
+    "path": "/api/inventory/products"
+  },
+  "inventory.product.bulk_create": {
+    "method": "post",
+    "path": "/api/inventory/products/bulk_create"
+  },
+  "inventory.product.update": {
+    "method": "post",
+    "path": "/api/inventory/products/update"
+  },
+  "inventory.product.delete": {
+    "method": "post",
+    "path": "/api/inventory/products/delete"
+  },
+  "inventory.product.set_sold_out": {
+    "method": "post",
+    "path": "/api/inventory/products/sold_out"
+  },
+  "inventory.product.print_label": {
+    "method": "post",
+    "path": "/api/inventory/products/print_label"
+  },
+  "inventory.product_category.list": {
+    "method": "get",
+    "path": "/api/inventory/product_categories"
+  },
+  "inventory.product_category.add": {
+    "method": "post",
+    "path": "/api/inventory/product_categories/add"
+  },
+  "inventory.product_category.remove": {
+    "method": "post",
+    "path": "/api/inventory/product_categories/remove"
+  },
+  "inventory.category.list": {
+    "method": "get",
+    "path": "/api/inventory/categories"
+  },
+  "inventory.category.export": {
+    "method": "get",
+    "path": "/api/inventory/categories/export"
+  },
+  "inventory.category.create": {
+    "method": "post",
+    "path": "/api/inventory/categories"
+  },
+  "inventory.category.bulk_create": {
+    "method": "post",
+    "path": "/api/inventory/categories/bulk_create"
+  },
+  "inventory.category.update": {
+    "method": "post",
+    "path": "/api/inventory/categories/update"
+  },
+  "inventory.category.delete": {
+    "method": "post",
+    "path": "/api/inventory/categories/delete"
+  },
+  "inventory.movement.list": {
+    "method": "get",
+    "path": "/api/inventory/movements"
+  },
+  "inventory.stock.get_summary": {
+    "method": "get",
+    "path": "/api/inventory/stock/summary"
+  },
+  "inventory.stock.receive": {
+    "method": "post",
+    "path": "/api/inventory/stock/receive"
+  },
+  "inventory.stock.count": {
+    "method": "post",
+    "path": "/api/inventory/stock/count"
+  },
+  "inventory.stock.write_off": {
+    "method": "post",
+    "path": "/api/inventory/stock/write_off"
+  },
+  "inventory.unit.list": {
+    "method": "get",
+    "path": "/api/inventory/units"
+  },
+  "inventory.config.get": {
+    "method": "get",
+    "path": "/api/inventory/config"
+  },
+  "inventory.config.update": {
+    "method": "post",
+    "path": "/api/inventory/config"
+  },
+  "tax.category.list": {
+    "method": "get",
+    "path": "/api/tax/categories"
+  },
+  "tax.category.get": {
+    "method": "get",
+    "path": "/api/tax/categories/detail"
+  },
+  "tax.category.create": {
+    "method": "post",
+    "path": "/api/tax/categories"
+  },
+  "tax.rule.list": {
+    "method": "get",
+    "path": "/api/tax/rules"
+  },
+  "tax.rule.status": {
+    "method": "get",
+    "path": "/api/tax/rules/status"
+  },
+  "tax.rule.parent_candidates": {
+    "method": "get",
+    "path": "/api/tax/rules/parent_candidates"
+  },
+  "tax.rule.countries": {
+    "method": "get",
+    "path": "/api/tax/rules/countries"
+  },
+  "tax.rule.create": {
+    "method": "post",
+    "path": "/api/tax/rules"
+  },
+  "tax.rule.bulk_create": {
+    "method": "post",
+    "path": "/api/tax/rules/bulk_create"
+  },
+  "tax.rule.end": {
+    "method": "post",
+    "path": "/api/tax/rules/end"
+  },
+  "tax.rule.deactivate": {
+    "method": "post",
+    "path": "/api/tax/rules/deactivate"
+  },
+  "tax.rule.activate": {
+    "method": "post",
+    "path": "/api/tax/rules/activate"
+  },
+  "tax.alias.list": {
+    "method": "get",
+    "path": "/api/tax/aliases"
+  },
+  "tax.alias.resolve": {
+    "method": "get",
+    "path": "/api/tax/aliases/resolve"
+  },
+  "tax.alias.create": {
+    "method": "post",
+    "path": "/api/tax/aliases"
+  },
+  "tax.rate.calculate": {
+    "method": "get",
+    "path": "/api/tax/rates/calculate"
+  },
+  "tax.settings.get": {
+    "method": "get",
+    "path": "/api/tax/settings"
+  },
+  "tax.settings.update": {
+    "method": "post",
+    "path": "/api/tax/settings"
+  },
+  "staff.member.list": {
+    "method": "get",
+    "path": "/api/staff/members"
+  },
+  "staff.member.detail": {
+    "method": "get",
+    "path": "/api/staff/members/detail"
+  },
+  "staff.member.mine": {
+    "method": "get",
+    "path": "/api/staff/members/mine"
+  },
+  "staff.member.current": {
+    "method": "get",
+    "path": "/api/staff/members/current"
+  },
+  "staff.member.compensation": {
+    "method": "get",
+    "path": "/api/staff/members/compensation"
+  },
+  "staff.member.stats": {
+    "method": "get",
+    "path": "/api/staff/members/stats"
+  },
+  "staff.member.create": {
+    "method": "post",
+    "path": "/api/staff/members"
+  },
+  "staff.member.bulk_create": {
+    "method": "post",
+    "path": "/api/staff/members/bulk_create"
+  },
+  "staff.member.update": {
+    "method": "post",
+    "path": "/api/staff/members/update"
+  },
+  "staff.member.deactivate": {
+    "method": "post",
+    "path": "/api/staff/members/deactivate"
+  },
+  "staff.member.terminate": {
+    "method": "post",
+    "path": "/api/staff/members/terminate"
+  },
+  "staff.commission.summary": {
+    "method": "get",
+    "path": "/api/staff/commissions"
+  },
+  "staff.commission.report": {
+    "method": "get",
+    "path": "/api/staff/commissions/report"
+  },
+  "staff.account.list": {
+    "method": "get",
+    "path": "/api/staff/accounts"
+  },
+  "staff.role.list": {
+    "method": "get",
+    "path": "/api/staff/roles"
+  },
+  "staff.role.create": {
+    "method": "post",
+    "path": "/api/staff/roles"
+  },
+  "staff.role.update": {
+    "method": "post",
+    "path": "/api/staff/roles/update"
+  },
+  "staff.schedule.list": {
+    "method": "get",
+    "path": "/api/staff/schedules"
+  },
+  "staff.schedule.detail": {
+    "method": "get",
+    "path": "/api/staff/schedules/detail"
+  },
+  "staff.schedule.create": {
+    "method": "post",
+    "path": "/api/staff/schedules"
+  },
+  "staff.schedule.update": {
+    "method": "post",
+    "path": "/api/staff/schedules/update"
+  },
+  "staff.schedule.set_active": {
+    "method": "post",
+    "path": "/api/staff/schedules/set_active"
+  },
+  "staff.schedule.delete": {
+    "method": "post",
+    "path": "/api/staff/schedules/delete"
+  },
+  "staff.availability.for_member": {
+    "method": "get",
+    "path": "/api/staff/availability"
+  },
+  "staff.time_off.list": {
+    "method": "get",
+    "path": "/api/staff/time_off"
+  },
+  "staff.time_off.detail": {
+    "method": "get",
+    "path": "/api/staff/time_off/detail"
+  },
+  "staff.time_off.today": {
+    "method": "get",
+    "path": "/api/staff/time_off/today"
+  },
+  "staff.time_off.mine": {
+    "method": "get",
+    "path": "/api/staff/time_off/mine"
+  },
+  "staff.time_off.create": {
+    "method": "post",
+    "path": "/api/staff/time_off"
+  },
+  "staff.time_off.request": {
+    "method": "post",
+    "path": "/api/staff/time_off/request"
+  },
+  "staff.time_off.approve": {
+    "method": "post",
+    "path": "/api/staff/time_off/approve"
+  },
+  "staff.time_off.reject": {
+    "method": "post",
+    "path": "/api/staff/time_off/reject"
+  },
+  "staff.time_off.cancel": {
+    "method": "post",
+    "path": "/api/staff/time_off/cancel"
+  },
+  "staff.settings.get": {
+    "method": "get",
+    "path": "/api/staff/settings"
+  },
+  "staff.settings.update": {
+    "method": "post",
+    "path": "/api/staff/settings"
+  },
+  "sale.sale.list": {
+    "method": "get",
+    "path": "/api/sale/sales"
+  },
+  "sale.sale.complete": {
+    "method": "post",
+    "path": "/api/sale/sales"
+  },
+  "sale.sale.get": {
+    "method": "get",
+    "path": "/api/sale/sales/detail"
+  },
+  "sale.sale.by_idempotency_key": {
+    "method": "get",
+    "path": "/api/sale/sales/by_key"
+  },
+  "sale.sale.stats": {
+    "method": "get",
+    "path": "/api/sale/sales/stats"
+  },
+  "sale.sale.today": {
+    "method": "get",
+    "path": "/api/sale/sales/today"
+  },
+  "sale.sale.last_7_days": {
+    "method": "get",
+    "path": "/api/sale/sales/last_7_days"
+  },
+  "sale.sale.by_staff": {
+    "method": "get",
+    "path": "/api/sale/sales/by_staff"
+  },
+  "sale.sale.complete_over_limit": {
+    "method": "post",
+    "path": "/api/sale/sales/complete_over_limit"
+  },
+  "sale.sale.void": {
+    "method": "post",
+    "path": "/api/sale/sales/void"
+  },
+  "sale.sale.print": {
+    "method": "post",
+    "path": "/api/sale/sales/print"
+  },
+  "sale.sale.refund": {
+    "method": "post",
+    "path": "/api/sale/sales/refund"
+  },
+  "sale.sale.issue_documents": {
+    "method": "post",
+    "path": "/api/sale/sales/issue_documents"
+  },
+  "sale.checkout.preview": {
+    "method": "get",
+    "path": "/api/sale/checkout/preview"
+  },
+  "sale.order.list": {
+    "method": "get",
+    "path": "/api/sale/orders"
+  },
+  "sale.order.open": {
+    "method": "post",
+    "path": "/api/sale/orders"
+  },
+  "sale.order.get": {
+    "method": "get",
+    "path": "/api/sale/orders/detail"
+  },
+  "sale.order.add_line": {
+    "method": "post",
+    "path": "/api/sale/orders/add_line"
+  },
+  "sale.order.add_open_line": {
+    "method": "post",
+    "path": "/api/sale/orders/add_open_line"
+  },
+  "sale.order.add_service_line": {
+    "method": "post",
+    "path": "/api/sale/orders/add_service_line"
+  },
+  "sale.order.add_combo_line": {
+    "method": "post",
+    "path": "/api/sale/orders/add_combo_line"
+  },
+  "sale.order.apply_voucher": {
+    "method": "post",
+    "path": "/api/sale/orders/apply_voucher"
+  },
+  "sale.order.remove_voucher": {
+    "method": "post",
+    "path": "/api/sale/orders/remove_voucher"
+  },
+  "sale.order.update_line": {
+    "method": "post",
+    "path": "/api/sale/orders/update_line"
+  },
+  "sale.order.set_line_staff": {
+    "method": "post",
+    "path": "/api/sale/orders/set_line_staff"
+  },
+  "sale.order.split_line": {
+    "method": "post",
+    "path": "/api/sale/orders/split_line"
+  },
+  "sale.order.remove_line": {
+    "method": "post",
+    "path": "/api/sale/orders/remove_line"
+  },
+  "sale.order.void_line": {
+    "method": "post",
+    "path": "/api/sale/orders/void_line"
+  },
+  "sale.order.fire": {
+    "method": "post",
+    "path": "/api/sale/orders/fire"
+  },
+  "sale.order.print_bill": {
+    "method": "post",
+    "path": "/api/sale/orders/print_bill"
+  },
+  "sale.order.split": {
+    "method": "post",
+    "path": "/api/sale/orders/split"
+  },
+  "sale.order.merge": {
+    "method": "post",
+    "path": "/api/sale/orders/merge"
+  },
+  "sale.order.void": {
+    "method": "post",
+    "path": "/api/sale/orders/void"
+  },
+  "sale.order.set_discount": {
+    "method": "post",
+    "path": "/api/sale/orders/set_discount"
+  },
+  "sale.order.set_discount_over_limit": {
+    "method": "post",
+    "path": "/api/sale/orders/set_discount_over_limit"
+  },
+  "sale.order.set_line_discount": {
+    "method": "post",
+    "path": "/api/sale/orders/set_line_discount"
+  },
+  "sale.order.set_line_discount_over_limit": {
+    "method": "post",
+    "path": "/api/sale/orders/set_line_discount_over_limit"
+  },
+  "sale.order.set_label": {
+    "method": "post",
+    "path": "/api/sale/orders/set_label"
+  },
+  "sale.order.set_appointment": {
+    "method": "post",
+    "path": "/api/sale/orders/set_appointment"
+  },
+  "sale.payment_method.list": {
+    "method": "get",
+    "path": "/api/sale/payment_methods"
+  },
+  "sale.payment_method.create": {
+    "method": "post",
+    "path": "/api/sale/payment_methods"
+  },
+  "sale.settings.get": {
+    "method": "get",
+    "path": "/api/sale/settings"
+  },
+  "sale.settings.update": {
+    "method": "post",
+    "path": "/api/sale/settings"
+  },
+  "sale.pos_settings.get": {
+    "method": "get",
+    "path": "/api/sale/pos_settings"
+  },
+  "sale.department.list": {
+    "method": "get",
+    "path": "/api/sale/departments"
+  },
+  "sale.department.create": {
+    "method": "post",
+    "path": "/api/sale/departments"
+  },
+  "sale.department.update": {
+    "method": "post",
+    "path": "/api/sale/departments/update"
+  },
+  "sale.department.delete": {
+    "method": "post",
+    "path": "/api/sale/departments/delete"
+  },
+  "sale.quick_note.list": {
+    "method": "get",
+    "path": "/api/sale/quick_notes"
+  },
+  "sale.quick_note.create": {
+    "method": "post",
+    "path": "/api/sale/quick_notes"
+  },
+  "sale.quick_note.update": {
+    "method": "post",
+    "path": "/api/sale/quick_notes/update"
+  },
+  "sale.quick_note.delete": {
+    "method": "post",
+    "path": "/api/sale/quick_notes/delete"
+  },
+  "sale.business_day.get": {
+    "method": "get",
+    "path": "/api/sale/business_day"
+  },
+  "sale.refund.list": {
+    "method": "get",
+    "path": "/api/sale/refunds"
+  },
+  "sale.refund.options": {
+    "method": "get",
+    "path": "/api/sale/refunds/options"
+  },
+  "sale.refund.by_idempotency_key": {
+    "method": "get",
+    "path": "/api/sale/refunds/by_key"
+  },
+  "schedule.week.get": {
+    "method": "get",
+    "path": "/api/schedule/week"
+  },
+  "schedule.week.set_day": {
+    "method": "post",
+    "path": "/api/schedule/week/set_day"
+  },
+  "schedule.week.confirm": {
+    "method": "post",
+    "path": "/api/schedule/week/confirm"
+  },
+  "schedule.special_day.list": {
+    "method": "get",
+    "path": "/api/schedule/special_days"
+  },
+  "schedule.special_day.create": {
+    "method": "post",
+    "path": "/api/schedule/special_days"
+  },
+  "schedule.special_day.bulk_create": {
+    "method": "post",
+    "path": "/api/schedule/special_days/bulk_create"
+  },
+  "schedule.special_day.update": {
+    "method": "post",
+    "path": "/api/schedule/special_days/update"
+  },
+  "schedule.special_day.delete": {
+    "method": "post",
+    "path": "/api/schedule/special_days/delete"
+  },
+  "schedule.override.list": {
+    "method": "get",
+    "path": "/api/schedule/overrides"
+  },
+  "schedule.override.create": {
+    "method": "post",
+    "path": "/api/schedule/overrides"
+  },
+  "schedule.override.update": {
+    "method": "post",
+    "path": "/api/schedule/overrides/update"
+  },
+  "schedule.override.delete": {
+    "method": "post",
+    "path": "/api/schedule/overrides/delete"
+  },
+  "schedule.settings.get": {
+    "method": "get",
+    "path": "/api/schedule/settings"
+  },
+  "schedule.settings.update": {
+    "method": "post",
+    "path": "/api/schedule/settings"
+  },
+  "schedule.business.is_open": {
+    "method": "get",
+    "path": "/api/schedule/is_open"
+  },
+  "schedule.hours.for_range": {
+    "method": "get",
+    "path": "/api/schedule/hours"
+  },
+  "service.service.list": {
+    "method": "get",
+    "path": "/api/service/services"
+  },
+  "service.service.create": {
+    "method": "post",
+    "path": "/api/service/services"
+  },
+  "service.service.get": {
+    "method": "get",
+    "path": "/api/service/services/detail"
+  },
+  "service.service.list_for_sale": {
+    "method": "get",
+    "path": "/api/service/services/for_sale"
+  },
+  "service.service.bulk_create": {
+    "method": "post",
+    "path": "/api/service/services/bulk_create"
+  },
+  "service.service.update": {
+    "method": "post",
+    "path": "/api/service/services/update"
+  },
+  "service.service.archive": {
+    "method": "post",
+    "path": "/api/service/services/archive"
+  },
+  "service.service.restore": {
+    "method": "post",
+    "path": "/api/service/services/restore"
+  },
+  "service.catalog.status": {
+    "method": "get",
+    "path": "/api/service/catalog/status"
+  },
+  "service.category.list": {
+    "method": "get",
+    "path": "/api/service/categories"
+  },
+  "service.category.create": {
+    "method": "post",
+    "path": "/api/service/categories"
+  },
+  "service.category.get": {
+    "method": "get",
+    "path": "/api/service/categories/detail"
+  },
+  "service.category.update": {
+    "method": "post",
+    "path": "/api/service/categories/update"
+  },
+  "service.category.delete": {
+    "method": "post",
+    "path": "/api/service/categories/delete"
+  },
+  "service.settings.get": {
+    "method": "get",
+    "path": "/api/service/settings"
+  },
+  "service.settings.update": {
+    "method": "post",
+    "path": "/api/service/settings"
+  },
+  "service.assignment.list": {
+    "method": "get",
+    "path": "/api/service/assignments"
+  },
+  "service.assignment.eligible": {
+    "method": "get",
+    "path": "/api/service/assignments/eligible"
+  },
+  "service.assignment.assign": {
+    "method": "post",
+    "path": "/api/service/assignments/assign"
+  },
+  "service.assignment.update": {
+    "method": "post",
+    "path": "/api/service/assignments/update"
+  },
+  "service.assignment.remove": {
+    "method": "post",
+    "path": "/api/service/assignments/remove"
+  },
+  "service.package.list": {
+    "method": "get",
+    "path": "/api/service/packages"
+  },
+  "service.package.create": {
+    "method": "post",
+    "path": "/api/service/packages"
+  },
+  "service.package.get": {
+    "method": "get",
+    "path": "/api/service/packages/detail"
+  },
+  "service.package.update": {
+    "method": "post",
+    "path": "/api/service/packages/update"
+  },
+  "service.package.delete": {
+    "method": "post",
+    "path": "/api/service/packages/delete"
+  },
+  "service.grant.list": {
+    "method": "get",
+    "path": "/api/service/grants"
+  },
+  "service.grant.create": {
+    "method": "post",
+    "path": "/api/service/grants"
+  },
+  "service.grant.list_orphans": {
+    "method": "get",
+    "path": "/api/service/grants/orphans"
+  },
+  "service.grant.void_check": {
+    "method": "get",
+    "path": "/api/service/grants/void_check"
+  },
+  "service.grant.adjust_check": {
+    "method": "get",
+    "path": "/api/service/grants/adjust_check"
+  },
+  "service.grant.redeem_check": {
+    "method": "get",
+    "path": "/api/service/grants/redeem_check"
+  },
+  "service.grant.tender_options": {
+    "method": "get",
+    "path": "/api/service/grants/tender_options"
+  },
+  "service.grant.void": {
+    "method": "post",
+    "path": "/api/service/grants/void"
+  },
+  "service.grant.adjust": {
+    "method": "post",
+    "path": "/api/service/grants/adjust"
+  },
+  "service.grant.redeem": {
+    "method": "post",
+    "path": "/api/service/grants/redeem"
+  },
+  "service.movement.list": {
+    "method": "get",
+    "path": "/api/service/movements"
+  },
+  "cash_register.settings.get": {
+    "method": "get",
+    "path": "/api/cash_register/settings"
+  },
+  "cash_register.settings.update": {
+    "method": "post",
+    "path": "/api/cash_register/settings"
+  },
+  "cash_register.register.list": {
+    "method": "get",
+    "path": "/api/cash_register/registers"
+  },
+  "cash_register.register.create": {
+    "method": "post",
+    "path": "/api/cash_register/registers"
+  },
+  "cash_register.register.update": {
+    "method": "post",
+    "path": "/api/cash_register/registers/update"
+  },
+  "cash_register.session.list": {
+    "method": "get",
+    "path": "/api/cash_register/sessions"
+  },
+  "cash_register.session.current": {
+    "method": "get",
+    "path": "/api/cash_register/sessions/current"
+  },
+  "cash_register.session.get": {
+    "method": "get",
+    "path": "/api/cash_register/sessions/detail"
+  },
+  "cash_register.session.open": {
+    "method": "post",
+    "path": "/api/cash_register/sessions/open"
+  },
+  "cash_register.session.close": {
+    "method": "post",
+    "path": "/api/cash_register/sessions/close"
+  },
+  "cash_register.session.auto_close": {
+    "method": "post",
+    "path": "/api/cash_register/sessions/auto_close"
+  },
+  "cash_register.session.print": {
+    "method": "post",
+    "path": "/api/cash_register/sessions/print"
+  },
+  "cash_register.movement.list": {
+    "method": "get",
+    "path": "/api/cash_register/movements"
+  },
+  "cash_register.movement.add": {
+    "method": "post",
+    "path": "/api/cash_register/movements"
+  },
+  "cash_register.count.list": {
+    "method": "get",
+    "path": "/api/cash_register/counts"
+  },
+  "cash_register.count.add": {
+    "method": "post",
+    "path": "/api/cash_register/counts"
+  },
+  "cash_register.currency.get": {
+    "method": "get",
+    "path": "/api/cash_register/currency"
+  },
+  "invoice.invoice.list": {
+    "method": "get",
+    "path": "/api/invoice/invoices"
+  },
+  "invoice.invoice.get": {
+    "method": "get",
+    "path": "/api/invoice/invoices/detail"
+  },
+  "invoice.invoice.by_source": {
+    "method": "get",
+    "path": "/api/invoice/invoices/by_source"
+  },
+  "invoice.invoice.document": {
+    "method": "get",
+    "path": "/api/invoice/invoices/document"
+  },
+  "invoice.invoice.print": {
+    "method": "post",
+    "path": "/api/invoice/invoices/print"
+  },
+  "invoice.invoice.line_defaults": {
+    "method": "get",
+    "path": "/api/invoice/invoices/line_defaults"
+  },
+  "invoice.invoice.create": {
+    "method": "post",
+    "path": "/api/invoice/invoices"
+  },
+  "invoice.invoice.create_from_sale": {
+    "method": "post",
+    "path": "/api/invoice/invoices/from_sale"
+  },
+  "invoice.invoice.substitute": {
+    "method": "post",
+    "path": "/api/invoice/invoices/substitute"
+  },
+  "invoice.invoice.mark_paid": {
+    "method": "post",
+    "path": "/api/invoice/invoices/mark_paid"
+  },
+  "invoice.invoice.rectify": {
+    "method": "post",
+    "path": "/api/invoice/invoices/rectify"
+  },
+  "invoice.invoice.rectify_from_refund": {
+    "method": "post",
+    "path": "/api/invoice/invoices/rectify_from_refund"
+  },
+  "invoice.invoice.rectify_from_void": {
+    "method": "post",
+    "path": "/api/invoice/invoices/rectify_from_void"
+  },
+  "invoice.series.list": {
+    "method": "get",
+    "path": "/api/invoice/series"
+  },
+  "invoice.series.peek_next": {
+    "method": "get",
+    "path": "/api/invoice/series/peek_next"
+  },
+  "invoice.series.create": {
+    "method": "post",
+    "path": "/api/invoice/series"
+  },
+  "invoice.series.update": {
+    "method": "post",
+    "path": "/api/invoice/series/update"
+  },
+  "invoice.numbering.status": {
+    "method": "get",
+    "path": "/api/invoice/numbering/status"
+  },
+  "invoice.numbering.gaps": {
+    "method": "get",
+    "path": "/api/invoice/numbering/gaps"
+  },
+  "invoice.numbering.allocations": {
+    "method": "get",
+    "path": "/api/invoice/numbering/allocations"
+  },
+  "invoice.issuer.get": {
+    "method": "get",
+    "path": "/api/invoice/issuer"
+  },
+  "invoice.issuer.update": {
+    "method": "post",
+    "path": "/api/invoice/issuer"
+  },
+  "online_booking.booking.list": {
+    "method": "get",
+    "path": "/api/online_booking/bookings"
+  },
+  "online_booking.booking.get": {
+    "method": "get",
+    "path": "/api/online_booking/bookings/detail"
+  },
+  "online_booking.booking.confirm": {
+    "method": "post",
+    "path": "/api/online_booking/bookings/confirm"
+  },
+  "online_booking.booking.complete": {
+    "method": "post",
+    "path": "/api/online_booking/bookings/complete"
+  },
+  "online_booking.booking.no_show": {
+    "method": "post",
+    "path": "/api/online_booking/bookings/no_show"
+  },
+  "online_booking.booking.cancel": {
+    "method": "post",
+    "path": "/api/online_booking/bookings/cancel"
+  },
+  "online_booking.booking.delete": {
+    "method": "post",
+    "path": "/api/online_booking/bookings/delete"
+  },
+  "online_booking.settings.get": {
+    "method": "get",
+    "path": "/api/online_booking/settings"
+  },
+  "online_booking.settings.update": {
+    "method": "post",
+    "path": "/api/online_booking/settings"
+  },
+  "online_booking.public.page": {
+    "method": "get",
+    "path": "/api/online_booking/public/page"
+  },
+  "online_booking.public.services": {
+    "method": "get",
+    "path": "/api/online_booking/public/services"
+  },
+  "online_booking.public.slots": {
+    "method": "get",
+    "path": "/api/online_booking/public/slots"
+  },
+  "online_booking.public.booking": {
+    "method": "get",
+    "path": "/api/online_booking/public/booking"
+  },
+  "online_booking.public.book": {
+    "method": "post",
+    "path": "/api/online_booking/public/book"
+  },
+  "online_booking.public.cancel": {
+    "method": "post",
+    "path": "/api/online_booking/public/cancel"
+  },
+  "reservation.reservation.list": {
+    "method": "get",
+    "path": "/api/reservation/reservations"
+  },
+  "reservation.reservation.get": {
+    "method": "get",
+    "path": "/api/reservation/reservations/detail"
+  },
+  "reservation.reservation.create": {
+    "method": "post",
+    "path": "/api/reservation/reservations"
+  },
+  "reservation.reservation.update": {
+    "method": "post",
+    "path": "/api/reservation/reservations/update"
+  },
+  "reservation.reservation.confirm": {
+    "method": "post",
+    "path": "/api/reservation/reservations/confirm"
+  },
+  "reservation.reservation.seat": {
+    "method": "post",
+    "path": "/api/reservation/reservations/seat"
+  },
+  "reservation.reservation.complete": {
+    "method": "post",
+    "path": "/api/reservation/reservations/complete"
+  },
+  "reservation.reservation.cancel": {
+    "method": "post",
+    "path": "/api/reservation/reservations/cancel"
+  },
+  "reservation.reservation.no_show": {
+    "method": "post",
+    "path": "/api/reservation/reservations/no_show"
+  },
+  "reservation.reservation.delete": {
+    "method": "post",
+    "path": "/api/reservation/reservations/delete"
+  },
+  "reservation.reservation.release_unconfirmed": {
+    "method": "post",
+    "path": "/api/reservation/reservations/release_unconfirmed"
+  },
+  "reservation.availability.day": {
+    "method": "get",
+    "path": "/api/reservation/availability/day"
+  },
+  "reservation.availability.tables": {
+    "method": "get",
+    "path": "/api/reservation/availability/tables"
+  },
+  "reservation.time_slot.list": {
+    "method": "get",
+    "path": "/api/reservation/time_slots"
+  },
+  "reservation.time_slot.create": {
+    "method": "post",
+    "path": "/api/reservation/time_slots"
+  },
+  "reservation.time_slot.delete": {
+    "method": "post",
+    "path": "/api/reservation/time_slots/delete"
+  },
+  "reservation.blocked_date.list": {
+    "method": "get",
+    "path": "/api/reservation/blocked_dates"
+  },
+  "reservation.blocked_date.create": {
+    "method": "post",
+    "path": "/api/reservation/blocked_dates"
+  },
+  "reservation.blocked_date.delete": {
+    "method": "post",
+    "path": "/api/reservation/blocked_dates/delete"
+  },
+  "reservation.waitlist.list": {
+    "method": "get",
+    "path": "/api/reservation/waitlist"
+  },
+  "reservation.waitlist.create": {
+    "method": "post",
+    "path": "/api/reservation/waitlist"
+  },
+  "reservation.waitlist.update": {
+    "method": "post",
+    "path": "/api/reservation/waitlist/update"
+  },
+  "reservation.waitlist.convert": {
+    "method": "post",
+    "path": "/api/reservation/waitlist/convert"
+  },
+  "reservation.waitlist.delete": {
+    "method": "post",
+    "path": "/api/reservation/waitlist/delete"
+  },
+  "reservation.settings.get": {
+    "method": "get",
+    "path": "/api/reservation/settings"
+  },
+  "reservation.settings.update": {
+    "method": "post",
+    "path": "/api/reservation/settings"
+  },
+  "attendance.record.current": {
+    "method": "get",
+    "path": "/api/attendance/current"
+  },
+  "attendance.record.list": {
+    "method": "get",
+    "path": "/api/attendance/records"
+  },
+  "attendance.record.detail": {
+    "method": "get",
+    "path": "/api/attendance/records/detail"
+  },
+  "attendance.record.export": {
+    "method": "get",
+    "path": "/api/attendance/records/export"
+  },
+  "attendance.record.correct": {
+    "method": "post",
+    "path": "/api/attendance/records/correct"
+  },
+  "attendance.record.clock_in": {
+    "method": "post",
+    "path": "/api/attendance/clock_in"
+  },
+  "attendance.record.clock_out": {
+    "method": "post",
+    "path": "/api/attendance/clock_out"
+  },
+  "attendance.break.start": {
+    "method": "post",
+    "path": "/api/attendance/breaks/start"
+  },
+  "attendance.break.end": {
+    "method": "post",
+    "path": "/api/attendance/breaks/end"
+  },
+  "attendance.correction.list": {
+    "method": "get",
+    "path": "/api/attendance/corrections"
+  },
+  "attendance.presence.list": {
+    "method": "get",
+    "path": "/api/attendance/presence"
+  },
+  "attendance.person.list": {
+    "method": "get",
+    "path": "/api/attendance/people"
+  },
+  "attendance.settings.get": {
+    "method": "get",
+    "path": "/api/attendance/settings"
+  },
+  "attendance.settings.update": {
+    "method": "post",
+    "path": "/api/attendance/settings"
+  },
+  "pricing.price_list.list": {
+    "method": "get",
+    "path": "/api/pricing/price_lists"
+  },
+  "pricing.price_list.get": {
+    "method": "get",
+    "path": "/api/pricing/price_lists/detail"
+  },
+  "pricing.price_list.create": {
+    "method": "post",
+    "path": "/api/pricing/price_lists"
+  },
+  "pricing.price_list.update": {
+    "method": "post",
+    "path": "/api/pricing/price_lists/update"
+  },
+  "pricing.price_list.set_default": {
+    "method": "post",
+    "path": "/api/pricing/price_lists/set_default"
+  },
+  "pricing.price_list.deactivate": {
+    "method": "post",
+    "path": "/api/pricing/price_lists/deactivate"
+  },
+  "pricing.price_list.activate": {
+    "method": "post",
+    "path": "/api/pricing/price_lists/activate"
+  },
+  "pricing.price_item.list": {
+    "method": "get",
+    "path": "/api/pricing/price_items"
+  },
+  "pricing.price_item.add": {
+    "method": "post",
+    "path": "/api/pricing/price_items"
+  },
+  "pricing.price_item.update": {
+    "method": "post",
+    "path": "/api/pricing/price_items/update"
+  },
+  "pricing.price_item.remove": {
+    "method": "post",
+    "path": "/api/pricing/price_items/remove"
+  },
+  "pricing.rule.list": {
+    "method": "get",
+    "path": "/api/pricing/rules"
+  },
+  "pricing.rule.create": {
+    "method": "post",
+    "path": "/api/pricing/rules"
+  },
+  "pricing.rule.update": {
+    "method": "post",
+    "path": "/api/pricing/rules/update"
+  },
+  "pricing.rule.deactivate": {
+    "method": "post",
+    "path": "/api/pricing/rules/deactivate"
+  },
+  "pricing.rule.activate": {
+    "method": "post",
+    "path": "/api/pricing/rules/activate"
+  },
+  "pricing.price.resolve": {
+    "method": "get",
+    "path": "/api/pricing/prices/resolve"
+  },
+  "combo.combo.list": {
+    "method": "get",
+    "path": "/api/combo/combos"
+  },
+  "combo.combo.get": {
+    "method": "get",
+    "path": "/api/combo/combos/detail"
+  },
+  "combo.combo.for_sale": {
+    "method": "get",
+    "path": "/api/combo/combos/for_sale"
+  },
+  "combo.combo.resolve": {
+    "method": "get",
+    "path": "/api/combo/combos/resolve"
+  },
+  "combo.combo.create": {
+    "method": "post",
+    "path": "/api/combo/combos"
+  },
+  "combo.combo.update": {
+    "method": "post",
+    "path": "/api/combo/combos/update"
+  },
+  "combo.combo.delete": {
+    "method": "post",
+    "path": "/api/combo/combos/delete"
+  },
+  "combo.group.create": {
+    "method": "post",
+    "path": "/api/combo/groups"
+  },
+  "combo.group.update": {
+    "method": "post",
+    "path": "/api/combo/groups/update"
+  },
+  "combo.group.delete": {
+    "method": "post",
+    "path": "/api/combo/groups/delete"
+  },
+  "combo.group.reorder": {
+    "method": "post",
+    "path": "/api/combo/groups/reorder"
+  },
+  "combo.option.create": {
+    "method": "post",
+    "path": "/api/combo/options"
+  },
+  "combo.option.bulk_create": {
+    "method": "post",
+    "path": "/api/combo/options/bulk_create"
+  },
+  "combo.option.update": {
+    "method": "post",
+    "path": "/api/combo/options/update"
+  },
+  "combo.option.delete": {
+    "method": "post",
+    "path": "/api/combo/options/delete"
+  },
+  "combo.option.reorder": {
+    "method": "post",
+    "path": "/api/combo/options/reorder"
+  },
+  "appointment.appointment.list": {
+    "method": "get",
+    "path": "/api/appointment/appointments"
+  },
+  "appointment.appointment.get": {
+    "method": "get",
+    "path": "/api/appointment/appointments/detail"
+  },
+  "appointment.appointment.history": {
+    "method": "get",
+    "path": "/api/appointment/appointments/history"
+  },
+  "appointment.appointment.list_for_customer": {
+    "method": "get",
+    "path": "/api/appointment/appointments/for_customer"
+  },
+  "appointment.appointment.count_active_for_service": {
+    "method": "get",
+    "path": "/api/appointment/appointments/count_for_service"
+  },
+  "appointment.appointment.count_to_confirm": {
+    "method": "get",
+    "path": "/api/appointment/appointments/count_to_confirm"
+  },
+  "appointment.appointment.notices": {
+    "method": "get",
+    "path": "/api/appointment/appointments/notices"
+  },
+  "appointment.appointment.create": {
+    "method": "post",
+    "path": "/api/appointment/appointments"
+  },
+  "appointment.appointment.bulk_create": {
+    "method": "post",
+    "path": "/api/appointment/appointments/bulk_create"
+  },
+  "appointment.appointment.reschedule": {
+    "method": "post",
+    "path": "/api/appointment/appointments/reschedule"
+  },
+  "appointment.appointment.update": {
+    "method": "post",
+    "path": "/api/appointment/appointments/update"
+  },
+  "appointment.appointment.confirm": {
+    "method": "post",
+    "path": "/api/appointment/appointments/confirm"
+  },
+  "appointment.appointment.start": {
+    "method": "post",
+    "path": "/api/appointment/appointments/start"
+  },
+  "appointment.appointment.complete": {
+    "method": "post",
+    "path": "/api/appointment/appointments/complete"
+  },
+  "appointment.appointment.mark_no_show": {
+    "method": "post",
+    "path": "/api/appointment/appointments/mark_no_show"
+  },
+  "appointment.appointment.cancel": {
+    "method": "post",
+    "path": "/api/appointment/appointments/cancel"
+  },
+  "appointment.appointment.delete": {
+    "method": "post",
+    "path": "/api/appointment/appointments/delete"
+  },
+  "appointment.appointment.bulk_delete": {
+    "method": "post",
+    "path": "/api/appointment/appointments/bulk_delete"
+  },
+  "appointment.appointment.charge": {
+    "method": "post",
+    "path": "/api/appointment/appointments/charge"
+  },
+  "appointment.agenda.lanes": {
+    "method": "get",
+    "path": "/api/appointment/lanes"
+  },
+  "appointment.availability.slots": {
+    "method": "get",
+    "path": "/api/appointment/availability/slots"
+  },
+  "appointment.availability.check": {
+    "method": "get",
+    "path": "/api/appointment/availability/check"
+  },
+  "appointment.blocked_time.list": {
+    "method": "get",
+    "path": "/api/appointment/blocked_times"
+  },
+  "appointment.blocked_time.create": {
+    "method": "post",
+    "path": "/api/appointment/blocked_times"
+  },
+  "appointment.blocked_time.delete": {
+    "method": "post",
+    "path": "/api/appointment/blocked_times/delete"
+  },
+  "appointment.recurring.list": {
+    "method": "get",
+    "path": "/api/appointment/recurring"
+  },
+  "appointment.recurring.get": {
+    "method": "get",
+    "path": "/api/appointment/recurring/detail"
+  },
+  "appointment.recurring.create": {
+    "method": "post",
+    "path": "/api/appointment/recurring"
+  },
+  "appointment.recurring.materialize": {
+    "method": "post",
+    "path": "/api/appointment/recurring/materialize"
+  },
+  "appointment.recurring.update": {
+    "method": "post",
+    "path": "/api/appointment/recurring/update"
+  },
+  "appointment.recurring.activate": {
+    "method": "post",
+    "path": "/api/appointment/recurring/activate"
+  },
+  "appointment.recurring.deactivate": {
+    "method": "post",
+    "path": "/api/appointment/recurring/deactivate"
+  },
+  "appointment.recurring.delete": {
+    "method": "post",
+    "path": "/api/appointment/recurring/delete"
+  },
+  "appointment.settings.get": {
+    "method": "get",
+    "path": "/api/appointment/settings"
+  },
+  "appointment.settings.update": {
+    "method": "post",
+    "path": "/api/appointment/settings"
+  },
+  "task.task.list": {
+    "method": "get",
+    "path": "/api/task/tasks"
+  },
+  "task.task.mine": {
+    "method": "get",
+    "path": "/api/task/tasks/mine"
+  },
+  "task.task.detail": {
+    "method": "get",
+    "path": "/api/task/tasks/detail"
+  },
+  "task.task.subtasks": {
+    "method": "get",
+    "path": "/api/task/tasks/subtasks"
+  },
+  "task.task.create": {
+    "method": "post",
+    "path": "/api/task/tasks"
+  },
+  "task.task.update": {
+    "method": "post",
+    "path": "/api/task/tasks/update"
+  },
+  "task.task.set_status": {
+    "method": "post",
+    "path": "/api/task/tasks/set_status"
+  },
+  "task.task.complete": {
+    "method": "post",
+    "path": "/api/task/tasks/complete"
+  },
+  "task.task.assign": {
+    "method": "post",
+    "path": "/api/task/tasks/assign"
+  },
+  "task.task.delete": {
+    "method": "post",
+    "path": "/api/task/tasks/delete"
+  },
+  "task.comment.list": {
+    "method": "get",
+    "path": "/api/task/comments"
+  },
+  "task.comment.add": {
+    "method": "post",
+    "path": "/api/task/comments"
+  },
+  "task.project.list": {
+    "method": "get",
+    "path": "/api/task/projects"
+  },
+  "task.project.detail": {
+    "method": "get",
+    "path": "/api/task/projects/detail"
+  },
+  "task.project.create": {
+    "method": "post",
+    "path": "/api/task/projects"
+  },
+  "task.project.update": {
+    "method": "post",
+    "path": "/api/task/projects/update"
+  },
+  "task.project.delete": {
+    "method": "post",
+    "path": "/api/task/projects/delete"
+  },
+  "kitchen.ticket.board": {
+    "method": "get",
+    "path": "/api/kitchen/board"
+  },
+  "kitchen.ticket.all_day": {
+    "method": "get",
+    "path": "/api/kitchen/all_day"
+  },
+  "kitchen.ticket.list": {
+    "method": "get",
+    "path": "/api/kitchen/tickets"
+  },
+  "kitchen.ticket.get": {
+    "method": "get",
+    "path": "/api/kitchen/tickets/detail"
+  },
+  "kitchen.ticket.by_order": {
+    "method": "get",
+    "path": "/api/kitchen/tickets/by_order"
+  },
+  "kitchen.ticket.create": {
+    "method": "post",
+    "path": "/api/kitchen/tickets"
+  },
+  "kitchen.ticket.send": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/send"
+  },
+  "kitchen.ticket.start": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/start"
+  },
+  "kitchen.ticket.ready": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/ready"
+  },
+  "kitchen.ticket.serve": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/serve"
+  },
+  "kitchen.ticket.recall": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/recall"
+  },
+  "kitchen.ticket.cancel": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/cancel"
+  },
+  "kitchen.ticket.delete": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/delete"
+  },
+  "kitchen.ticket.set_rush": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/set_rush"
+  },
+  "kitchen.ticket.reprint": {
+    "method": "post",
+    "path": "/api/kitchen/tickets/reprint"
+  },
+  "kitchen.item.bump": {
+    "method": "post",
+    "path": "/api/kitchen/items/bump"
+  },
+  "kitchen.item.recall": {
+    "method": "post",
+    "path": "/api/kitchen/items/recall"
+  },
+  "kitchen.station.list": {
+    "method": "get",
+    "path": "/api/kitchen/stations"
+  },
+  "kitchen.station.create": {
+    "method": "post",
+    "path": "/api/kitchen/stations"
+  },
+  "kitchen.station.update": {
+    "method": "post",
+    "path": "/api/kitchen/stations/update"
+  },
+  "kitchen.station.delete": {
+    "method": "post",
+    "path": "/api/kitchen/stations/delete"
+  },
+  "kitchen.routing.list": {
+    "method": "get",
+    "path": "/api/kitchen/routing"
+  },
+  "kitchen.routing.set": {
+    "method": "post",
+    "path": "/api/kitchen/routing"
+  },
+  "kitchen.routing.clear": {
+    "method": "post",
+    "path": "/api/kitchen/routing/clear"
+  },
+  "kitchen.settings.get": {
+    "method": "get",
+    "path": "/api/kitchen/settings"
+  },
+  "kitchen.settings.update": {
+    "method": "post",
+    "path": "/api/kitchen/settings"
+  },
+  "kitchen.log.list": {
+    "method": "get",
+    "path": "/api/kitchen/log"
+  },
+  "whatsapp_inbox.conversation.list": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/conversations"
+  },
+  "whatsapp_inbox.conversation.detail": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/conversations/detail"
+  },
+  "whatsapp_inbox.conversation.by_phone": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/conversations/by_phone"
+  },
+  "whatsapp_inbox.conversation.summary": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/conversations/summary"
+  },
+  "whatsapp_inbox.conversation.mark_read": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/conversations/mark_read"
+  },
+  "whatsapp_inbox.conversation.assign": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/conversations/assign"
+  },
+  "whatsapp_inbox.conversation.set_status": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/conversations/set_status"
+  },
+  "whatsapp_inbox.conversation.link_customer": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/conversations/link_customer"
+  },
+  "whatsapp_inbox.conversation.erase": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/conversations/erase"
+  },
+  "whatsapp_inbox.message.list": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/messages"
+  },
+  "whatsapp_inbox.message.send": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/messages/send"
+  },
+  "whatsapp_inbox.message.retry": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/messages/retry"
+  },
+  "whatsapp_inbox.message.notify": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/messages/notify"
+  },
+  "whatsapp_inbox.note.list": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/notes"
+  },
+  "whatsapp_inbox.note.add": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/notes"
+  },
+  "whatsapp_inbox.note.delete": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/notes/delete"
+  },
+  "whatsapp_inbox.template.list": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/templates"
+  },
+  "whatsapp_inbox.template.create": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/templates"
+  },
+  "whatsapp_inbox.template.update": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/templates/update"
+  },
+  "whatsapp_inbox.template.retry": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/templates/retry"
+  },
+  "whatsapp_inbox.template.delete": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/templates/delete"
+  },
+  "whatsapp_inbox.channel.get": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/channel"
+  },
+  "whatsapp_inbox.channel.prepare": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/channel/prepare"
+  },
+  "whatsapp_inbox.channel.connect": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/channel/connect"
+  },
+  "whatsapp_inbox.channel.disconnect": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/channel/disconnect"
+  },
+  "whatsapp_inbox.agent.list": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/agents"
+  },
+  "flow.flow.list": {
+    "method": "get",
+    "path": "/api/flow/flows"
+  },
+  "flow.flow.detail": {
+    "method": "get",
+    "path": "/api/flow/flows/detail"
+  },
+  "flow.flow.status": {
+    "method": "get",
+    "path": "/api/flow/flows/status"
+  },
+  "flow.flow.test": {
+    "method": "get",
+    "path": "/api/flow/flows/test"
+  },
+  "flow.flow.create": {
+    "method": "post",
+    "path": "/api/flow/flows"
+  },
+  "flow.flow.update": {
+    "method": "post",
+    "path": "/api/flow/flows/update"
+  },
+  "flow.flow.set_enabled": {
+    "method": "post",
+    "path": "/api/flow/flows/set_enabled"
+  },
+  "flow.flow.duplicate": {
+    "method": "post",
+    "path": "/api/flow/flows/duplicate"
+  },
+  "flow.flow.delete": {
+    "method": "post",
+    "path": "/api/flow/flows/delete"
+  },
+  "flow.flow.grant": {
+    "method": "post",
+    "path": "/api/flow/flows/grant"
+  },
+  "flow.flow.run": {
+    "method": "post",
+    "path": "/api/flow/flows/run"
+  },
+  "flow.run.list": {
+    "method": "get",
+    "path": "/api/flow/runs"
+  },
+  "flow.run.retry": {
+    "method": "post",
+    "path": "/api/flow/runs/retry"
+  },
+  "flow.draft.list": {
+    "method": "get",
+    "path": "/api/flow/drafts"
+  },
+  "flow.draft.propose": {
+    "method": "post",
+    "path": "/api/flow/drafts"
+  },
+  "flow.draft.dismiss": {
+    "method": "post",
+    "path": "/api/flow/drafts/dismiss"
+  },
+  "flow.catalog.read": {
+    "method": "get",
+    "path": "/api/flow/catalog"
+  },
+  "flow.event.sample": {
+    "method": "get",
+    "path": "/api/flow/events/sample"
+  },
+  "flow.secret.list": {
+    "method": "get",
+    "path": "/api/flow/secrets"
+  },
+  "flow.secret.set": {
+    "method": "post",
+    "path": "/api/flow/secrets"
+  },
+  "flow.secret.delete": {
+    "method": "post",
+    "path": "/api/flow/secrets/delete"
+  },
+  "flow.question.list": {
+    "method": "get",
+    "path": "/api/flow/questions"
+  },
+  "flow.question.answer": {
+    "method": "post",
+    "path": "/api/flow/questions/answer"
+  },
+  "flow.recipe.list": {
+    "method": "get",
+    "path": "/api/flow/recipes"
+  },
+  "flow.recipe.enable": {
+    "method": "post",
+    "path": "/api/flow/recipes/enable"
+  },
+  "flow.recipe.disable": {
+    "method": "post",
+    "path": "/api/flow/recipes/disable"
+  },
+  "flow.recipe.restore": {
+    "method": "post",
+    "path": "/api/flow/recipes/restore"
+  },
+  "flow.recipe.repair": {
+    "method": "post",
+    "path": "/api/flow/recipes/repair"
+  },
+  "table.zone.list": {
+    "method": "get",
+    "path": "/api/table/zones"
+  },
+  "table.zone.get": {
+    "method": "get",
+    "path": "/api/table/zones/detail"
+  },
+  "table.zone.create": {
+    "method": "post",
+    "path": "/api/table/zones"
+  },
+  "table.zone.update": {
+    "method": "post",
+    "path": "/api/table/zones/update"
+  },
+  "table.zone.delete": {
+    "method": "post",
+    "path": "/api/table/zones/delete"
+  },
+  "table.table.list": {
+    "method": "get",
+    "path": "/api/table/tables"
+  },
+  "table.table.get": {
+    "method": "get",
+    "path": "/api/table/tables/detail"
+  },
+  "table.table.create": {
+    "method": "post",
+    "path": "/api/table/tables"
+  },
+  "table.table.bulk_create": {
+    "method": "post",
+    "path": "/api/table/tables/bulk_create"
+  },
+  "table.table.update": {
+    "method": "post",
+    "path": "/api/table/tables/update"
+  },
+  "table.table.move": {
+    "method": "post",
+    "path": "/api/table/tables/move"
+  },
+  "table.table.delete": {
+    "method": "post",
+    "path": "/api/table/tables/delete"
+  },
+  "table.session.list": {
+    "method": "get",
+    "path": "/api/table/sessions"
+  },
+  "table.session.get": {
+    "method": "get",
+    "path": "/api/table/sessions/detail"
+  },
+  "table.session.by_order": {
+    "method": "get",
+    "path": "/api/table/sessions/by_order"
+  },
+  "table.session.open": {
+    "method": "post",
+    "path": "/api/table/sessions/open"
+  },
+  "table.session.close": {
+    "method": "post",
+    "path": "/api/table/sessions/close"
+  },
+  "table.session.transfer": {
+    "method": "post",
+    "path": "/api/table/sessions/transfer"
+  },
+  "table.session.merge": {
+    "method": "post",
+    "path": "/api/table/sessions/merge"
+  },
+  "table.session.split": {
+    "method": "post",
+    "path": "/api/table/sessions/split"
+  },
+  "table.session.set_guests": {
+    "method": "post",
+    "path": "/api/table/sessions/set_guests"
+  },
+  "table.session.park": {
+    "method": "post",
+    "path": "/api/table/sessions/park"
+  },
+  "table.session.restore": {
+    "method": "post",
+    "path": "/api/table/sessions/restore"
+  },
+  "table.session.link_order": {
+    "method": "post",
+    "path": "/api/table/sessions/link_order"
+  },
+  "table.session.delete": {
+    "method": "post",
+    "path": "/api/table/sessions/delete"
+  },
+  "table.waiter.list": {
+    "method": "get",
+    "path": "/api/table/waiters"
+  },
+  "table.floor.status": {
+    "method": "get",
+    "path": "/api/table/floor/status"
+  },
+  "table.settings.get": {
+    "method": "get",
+    "path": "/api/table/settings"
+  },
+  "table.settings.update": {
+    "method": "post",
+    "path": "/api/table/settings"
+  },
+  "table.hold.place": {
+    "method": "post",
+    "path": "/api/table/holds"
+  },
+  "table.hold.release": {
+    "method": "post",
+    "path": "/api/table/holds/release"
+  },
+  "payment.payment.list": {
+    "method": "get",
+    "path": "/api/payment/payments"
+  },
+  "payment.payment.get": {
+    "method": "get",
+    "path": "/api/payment/payments/detail"
+  },
+  "payment.payment.create": {
+    "method": "post",
+    "path": "/api/payment/payments"
+  },
+  "payment.payment.approve": {
+    "method": "post",
+    "path": "/api/payment/payments/approve"
+  },
+  "payment.payment.mark_sent": {
+    "method": "post",
+    "path": "/api/payment/payments/mark_sent"
+  },
+  "payment.payment.mark_completed": {
+    "method": "post",
+    "path": "/api/payment/payments/mark_completed"
+  },
+  "payment.payment.cancel": {
+    "method": "post",
+    "path": "/api/payment/payments/cancel"
+  },
+  "payment.method.list": {
+    "method": "get",
+    "path": "/api/payment/methods"
+  },
+  "payment.method.get": {
+    "method": "get",
+    "path": "/api/payment/methods/detail"
+  },
+  "payment.method.create": {
+    "method": "post",
+    "path": "/api/payment/methods"
+  },
+  "payment.method.update": {
+    "method": "post",
+    "path": "/api/payment/methods/update"
+  },
+  "payment.method.deactivate": {
+    "method": "post",
+    "path": "/api/payment/methods/deactivate"
+  },
+  "payment.method.activate": {
+    "method": "post",
+    "path": "/api/payment/methods/activate"
+  },
+  "printing.settings.get": {
+    "method": "get",
+    "path": "/api/printing/settings"
+  },
+  "printing.settings.update": {
+    "method": "post",
+    "path": "/api/printing/settings"
+  },
+  "printing.printer.list": {
+    "method": "get",
+    "path": "/api/printing/printers"
+  },
+  "printing.printer.get": {
+    "method": "get",
+    "path": "/api/printing/printers/detail"
+  },
+  "printing.printer.status": {
+    "method": "get",
+    "path": "/api/printing/printers/status"
+  },
+  "printing.printer.create": {
+    "method": "post",
+    "path": "/api/printing/printers"
+  },
+  "printing.printer.update": {
+    "method": "post",
+    "path": "/api/printing/printers/update"
+  },
+  "printing.printer.test": {
+    "method": "post",
+    "path": "/api/printing/printers/test"
+  },
+  "printing.job.list": {
+    "method": "get",
+    "path": "/api/printing/jobs"
+  },
+  "printing.job.summary": {
+    "method": "get",
+    "path": "/api/printing/jobs/summary"
+  },
+  "printing.job.create": {
+    "method": "post",
+    "path": "/api/printing/jobs"
+  },
+  "printing.job.claim": {
+    "method": "post",
+    "path": "/api/printing/jobs/claim"
+  },
+  "printing.job.complete": {
+    "method": "post",
+    "path": "/api/printing/jobs/complete"
+  },
+  "printing.job.fail": {
+    "method": "post",
+    "path": "/api/printing/jobs/fail"
+  },
+  "printing.job.retry": {
+    "method": "post",
+    "path": "/api/printing/jobs/retry"
+  },
+  "printing.job.cancel": {
+    "method": "post",
+    "path": "/api/printing/jobs/cancel"
+  },
+  "printing.device.list": {
+    "method": "get",
+    "path": "/api/printing/devices"
+  },
+  "printing.device.register": {
+    "method": "post",
+    "path": "/api/printing/devices"
+  },
+  "printing.device.update": {
+    "method": "post",
+    "path": "/api/printing/devices/update"
+  },
+  "printing.device.retire": {
+    "method": "post",
+    "path": "/api/printing/devices/retire"
+  },
+  "modifier.group.list": {
+    "method": "get",
+    "path": "/api/modifier/groups"
+  },
+  "modifier.group.get": {
+    "method": "get",
+    "path": "/api/modifier/groups/detail"
+  },
+  "modifier.group.for_target": {
+    "method": "get",
+    "path": "/api/modifier/groups/for_target"
+  },
+  "modifier.group.create": {
+    "method": "post",
+    "path": "/api/modifier/groups"
+  },
+  "modifier.group.update": {
+    "method": "post",
+    "path": "/api/modifier/groups/update"
+  },
+  "modifier.group.delete": {
+    "method": "post",
+    "path": "/api/modifier/groups/delete"
+  },
+  "modifier.option.list": {
+    "method": "get",
+    "path": "/api/modifier/options"
+  },
+  "modifier.option.create": {
+    "method": "post",
+    "path": "/api/modifier/options"
+  },
+  "modifier.option.update": {
+    "method": "post",
+    "path": "/api/modifier/options/update"
+  },
+  "modifier.option.delete": {
+    "method": "post",
+    "path": "/api/modifier/options/delete"
+  },
+  "modifier.link.list": {
+    "method": "get",
+    "path": "/api/modifier/links"
+  },
+  "modifier.link.attach": {
+    "method": "post",
+    "path": "/api/modifier/links/attach"
+  },
+  "modifier.link.detach": {
+    "method": "post",
+    "path": "/api/modifier/links/detach"
+  },
+  "modifier.selection.resolve": {
+    "method": "get",
+    "path": "/api/modifier/selections/resolve"
+  },
+  "cart_checkout.cart.list": {
+    "method": "get",
+    "path": "/api/cart_checkout/carts"
+  },
+  "cart_checkout.cart.get": {
+    "method": "get",
+    "path": "/api/cart_checkout/carts/detail"
+  },
+  "cart_checkout.cart.create": {
+    "method": "post",
+    "path": "/api/cart_checkout/carts"
+  },
+  "cart_checkout.cart.mark_abandoned": {
+    "method": "post",
+    "path": "/api/cart_checkout/carts/mark_abandoned"
+  },
+  "cart_checkout.cart.delete": {
+    "method": "post",
+    "path": "/api/cart_checkout/carts/delete"
+  },
+  "cart_checkout.cart.clear": {
+    "method": "post",
+    "path": "/api/cart_checkout/carts/clear"
+  },
+  "cart_checkout.cart.cleanup_expired": {
+    "method": "post",
+    "path": "/api/cart_checkout/carts/cleanup_expired"
+  },
+  "cart_checkout.item.list": {
+    "method": "get",
+    "path": "/api/cart_checkout/items"
+  },
+  "cart_checkout.item.get": {
+    "method": "get",
+    "path": "/api/cart_checkout/items/detail"
+  },
+  "cart_checkout.item.add": {
+    "method": "post",
+    "path": "/api/cart_checkout/items"
+  },
+  "cart_checkout.item.update": {
+    "method": "post",
+    "path": "/api/cart_checkout/items/update"
+  },
+  "cart_checkout.item.remove": {
+    "method": "post",
+    "path": "/api/cart_checkout/items/remove"
+  },
+  "cart_checkout.checkout.initiate": {
+    "method": "post",
+    "path": "/api/cart_checkout/checkout/initiate"
+  },
+  "cart_checkout.order.list": {
+    "method": "get",
+    "path": "/api/cart_checkout/orders"
+  },
+  "cart_checkout.order.get": {
+    "method": "get",
+    "path": "/api/cart_checkout/orders/detail"
+  },
+  "cart_checkout.order.mark_paid": {
+    "method": "post",
+    "path": "/api/cart_checkout/orders/mark_paid"
+  },
+  "cart_checkout.order.fail": {
+    "method": "post",
+    "path": "/api/cart_checkout/orders/fail"
+  },
+  "cart_checkout.order.complete": {
+    "method": "post",
+    "path": "/api/cart_checkout/orders/complete"
+  },
+  "cart_checkout.customer.erase": {
+    "method": "post",
+    "path": "/api/cart_checkout/customers/erase"
+  },
+  "verifactu.config.get": {
+    "method": "get",
+    "path": "/api/verifactu/config"
+  },
+  "verifactu.config.update": {
+    "method": "post",
+    "path": "/api/verifactu/config"
+  },
+  "verifactu.config.go_live": {
+    "method": "post",
+    "path": "/api/verifactu/config/go_live"
+  },
+  "verifactu.config.back_to_testing": {
+    "method": "post",
+    "path": "/api/verifactu/config/back_to_testing"
+  },
+  "verifactu.certificate.upload": {
+    "method": "post",
+    "path": "/api/verifactu/certificate"
+  },
+  "verifactu.certificate.remove": {
+    "method": "post",
+    "path": "/api/verifactu/certificate/remove"
+  },
+  "verifactu.representation.submit": {
+    "method": "post",
+    "path": "/api/verifactu/representation"
+  },
+  "verifactu.representation.model": {
+    "method": "get",
+    "path": "/api/verifactu/representation/model"
+  },
+  "verifactu.record.list": {
+    "method": "get",
+    "path": "/api/verifactu/records"
+  },
+  "verifactu.record.get": {
+    "method": "get",
+    "path": "/api/verifactu/records/detail"
+  },
+  "verifactu.record.by_invoice": {
+    "method": "get",
+    "path": "/api/verifactu/records/by_invoice"
+  },
+  "verifactu.record.create": {
+    "method": "post",
+    "path": "/api/verifactu/records"
+  },
+  "verifactu.record.correct": {
+    "method": "post",
+    "path": "/api/verifactu/records/correct"
+  },
+  "verifactu.record.cancel": {
+    "method": "post",
+    "path": "/api/verifactu/records/cancel"
+  },
+  "verifactu.record.transmit": {
+    "method": "post",
+    "path": "/api/verifactu/records/transmit"
+  },
+  "verifactu.record.reconcile": {
+    "method": "post",
+    "path": "/api/verifactu/records/reconcile"
+  },
+  "verifactu.contingency.list": {
+    "method": "get",
+    "path": "/api/verifactu/contingency"
+  },
+  "verifactu.contingency.process": {
+    "method": "post",
+    "path": "/api/verifactu/contingency/process"
+  },
+  "verifactu.contingency.retry": {
+    "method": "post",
+    "path": "/api/verifactu/contingency/retry"
+  },
+  "verifactu.event.list": {
+    "method": "get",
+    "path": "/api/verifactu/events"
+  },
+  "verifactu.stats.compliance_summary": {
+    "method": "get",
+    "path": "/api/verifactu/stats/compliance_summary"
+  },
+  "verifactu.stats.records_by_status": {
+    "method": "get",
+    "path": "/api/verifactu/stats/records_by_status"
+  },
+  "verifactu.stats.contingency_summary": {
+    "method": "get",
+    "path": "/api/verifactu/stats/contingency_summary"
+  },
+  "verifactu.stats.events_recent": {
+    "method": "get",
+    "path": "/api/verifactu/stats/events_recent"
+  },
+  "verifactu.aeat_record.list": {
+    "method": "get",
+    "path": "/api/verifactu/aeat_records"
+  },
+  "verifactu.aeat.query": {
+    "method": "post",
+    "path": "/api/verifactu/aeat/query"
+  },
+  "verifactu.chain.status": {
+    "method": "get",
+    "path": "/api/verifactu/chain/status"
+  },
+  "verifactu.chain.validate": {
+    "method": "post",
+    "path": "/api/verifactu/chain/validate"
+  },
+  "verifactu.chain.recover_from_aeat": {
+    "method": "post",
+    "path": "/api/verifactu/chain/recover_from_aeat"
+  },
+  "verifactu.chain.recover_manual": {
+    "method": "post",
+    "path": "/api/verifactu/chain/recover_manual"
+  },
+  "verifactu.diagnostic.last": {
+    "method": "get",
+    "path": "/api/verifactu/diagnostics/last"
+  },
+  "verifactu.diagnostic.run": {
+    "method": "post",
+    "path": "/api/verifactu/diagnostics/run"
+  },
+  "verifactu.test_invoice.create": {
+    "method": "post",
+    "path": "/api/verifactu/test_invoice"
+  },
+  "website.site.get": {
+    "method": "get",
+    "path": "/api/website/site"
+  },
+  "website.site.save": {
+    "method": "post",
+    "path": "/api/website/site"
+  },
+  "website.site.publish": {
+    "method": "post",
+    "path": "/api/website/site/publish"
+  },
+  "website.site.unpublish": {
+    "method": "post",
+    "path": "/api/website/site/unpublish"
+  },
+  "website.site.preview": {
+    "method": "get",
+    "path": "/api/website/site/preview"
+  },
+  "website.image.upload": {
+    "method": "post",
+    "path": "/api/website/images"
+  },
+  "website.qr.get": {
+    "method": "get",
+    "path": "/api/website/qr"
+  },
+  "website.catalog.categories": {
+    "method": "get",
+    "path": "/api/website/catalog/categories"
+  },
+  "website.public.site": {
+    "method": "get",
+    "path": "/api/website/public/site"
+  },
+  "website.public.catalog": {
+    "method": "get",
+    "path": "/api/website/public/catalog"
+  },
+  "website.public.reviews": {
+    "method": "get",
+    "path": "/api/website/public/reviews"
+  },
+  "base.access.door": {
+    "method": "get",
+    "path": "/api/access/door"
+  },
+  "base.pin.set": {
+    "method": "post",
+    "path": "/api/me/pin"
+  },
+  "base.device.current": {
+    "method": "get",
+    "path": "/api/device"
+  },
+  "base.device.mode_set": {
+    "method": "post",
+    "path": "/api/device/mode"
+  },
+  "base.device.list": {
+    "method": "get",
+    "path": "/api/devices"
+  },
+  "base.device.rename": {
+    "method": "post",
+    "path": "/api/devices/rename"
+  },
+  "base.device.remove": {
+    "method": "post",
+    "path": "/api/devices/remove"
+  },
+  "base.device.prune": {
+    "method": "post",
+    "path": "/api/devices/prune"
+  },
+  "base.access.settings": {
+    "method": "get",
+    "path": "/api/access/settings"
+  },
+  "base.access.settings_update": {
+    "method": "post",
+    "path": "/api/access/settings/update"
+  },
+  "base.profile.get": {
+    "method": "get",
+    "path": "/api/me/profile"
+  },
+  "base.profile.update": {
+    "method": "post",
+    "path": "/api/me/profile/update"
+  },
+  "base.profile.preferences_set": {
+    "method": "post",
+    "path": "/api/me/preferences"
+  },
+  "base.profile.avatar_set": {
+    "method": "post",
+    "path": "/api/me/avatar"
+  },
+  "base.profile.avatar_remove": {
+    "method": "post",
+    "path": "/api/me/avatar/remove"
+  }
 }

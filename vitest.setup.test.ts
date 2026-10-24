@@ -80,6 +80,19 @@ describe('the hub setup', { timeout: 60_000 }, () => {
     expect(outcome(title)).toEqual({ status: 'passed', failureMessages: [] });
   });
 
+  // A page mounted alone paints the icons the running app paints (`createShell` registers them): without them each
+  // `ion-icon` warns with its whole element and tries the network, megabytes of output per file that slow the run.
+  it.each([
+    'paints an icon the shell registers without a warning',
+    'warns about an icon the shell does not register',
+    'attaches Ionic elements without the errors happy-dom alone makes them log',
+  ])(
+    'passes the test that %s',
+    (title) => {
+      expect(outcome(title)).toEqual({ status: 'passed', failureMessages: [] });
+    },
+  );
+
   it('clears what a failed test left armed: it never fires into the next test', () => {
     expect(outcome('never runs the timeout the failed test before it left')).toEqual({ status: 'passed', failureMessages: [] });
   });
