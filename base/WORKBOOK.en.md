@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e8077c722e961086aec95e9ab2324a78979cb8538e57be1c684fdb0e7528ceaa -->
+<!-- generated from WORKBOOK.md sha256:d895ee8ef732add2bf1ef0692b7a9bb1785d5149f3b7a18223ab039df3e286f0 -->
 
 ## What it is for and who it is for
 
@@ -69,6 +69,13 @@ also opens with the Home's link ending in `#actividad`.
 ### The bell
 At the top right, after "My apps". Its number adds up the pending notices; tapped, one row per notice
 ("Failed events (2)") that leads to its screen. With nothing: "All caught up. No notifications.".
+
+### The side menu
+On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
+"Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever may open its screen:
+"System", to whoever runs the business; "API", while the API documentation is shown (BASE-F91), and it appears or goes
+when the switch changes, without reloading. An employee sees "Home", "Employees", "Files", "Apps" and "Settings". At
+the bottom, the QR code and "Upgrade plan".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and the brand. It opens this business's plan page on
@@ -157,8 +164,8 @@ From "Profile" in the user menu. At the top, the person (face, name and role); b
 photo), "Preferences" (language and appearance) and "PIN".
 
 ### Settings · General
-What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device", "PIN pad"
-and, for whoever runs the business, "Devices".
+What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device", "PIN pad",
+for whoever runs the business "Devices" and, at the end, "API documentation".
 
 ### Your business is being prepared
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
@@ -174,6 +181,35 @@ changed) and its ⋮: "Open", "Download", "Rename", "Move to…" and "Delete". I
 what does not fit is cut with "…" and the extension always shows whole; on a phone, the size and the date go under
 the name, in grey. Tapping a file opens it in the viewer, with
 its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
+
+### Employees · Staff
+What "Employees" in the side menu opens: the first tab at the bottom, "Staff", with the plan's places, "Invite on
+erplora.com" for whoever runs the business, "People are invited, given a role and removed on erplora.com, in
+“Members” of the business." and the table of people (on a phone, a card per person). The other tabs: "Roles" and,
+only for whoever runs the business, "API keys" and "Approvals"; each one in the address, so "Back" leaves
+Employees.
+
+### Employees · Roles
+The four roles of erplora.com, with where they come from, how many people have them and how many permissions they
+give.
+
+### Employees · API keys
+The keys with which another system calls the business's API: "New API key", the table of keys and, at the bottom,
+"API documentation".
+
+### Employees · Approvals
+The record of what was approved with a manager's PIN, read only.
+
+### A person's page
+From a row of **Employees › Staff**, for whoever runs the business, with the back button: "Their details" (with
+"Open on erplora.com"), "PIN" and "Badge".
+
+### An approval is needed
+Over the screen where the action was tried: what is approved, "Who approves it?" with the faces and the PIN pad, and
+"Cancel".
+
+### API documentation
+With the back button: how the API is called, "Download the OpenAPI file" and a section per app with its calls.
 
 ## States of each screen
 
@@ -210,6 +246,15 @@ On the Files screen:
 | Empty | "No files" and, to whoever administers the business, "Upload a file or drag it here."; a search with no results, "No file in this folder matches “{search}”.". |
 | Error | "The files could not be loaded" with the reason and "Retry", never "No files"; in the viewer, "The file could not be opened" with "The file's content did not arrive. Check the connection and try again.". |
 | No permission | Whoever does not administer the business sees, opens and downloads, without "New folder", "Upload file", "Rename", "Move to…" or "Delete". |
+
+On the Employees screens and the API documentation:
+
+| State | What the person sees |
+|---|---|
+| Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; the faces in grey in "An approval is needed"; "Loading the documentation…". |
+| Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "Nobody has had to approve anything in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
+| Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
+| No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
 
@@ -291,6 +336,21 @@ On the Files screen:
 | BASE-F74 | Preview and download a file | partial |
 | BASE-F75 | Move and rename a file or a folder | done |
 | BASE-F76 | Delete a file or a folder | done |
+| BASE-F77 | Reach the plan's limit of people | done |
+| BASE-F78 | Remove a person's PIN | done |
+| BASE-F79 | Give a person a badge or take it away | done |
+| BASE-F80 | Bring back a person who left the business | done |
+| BASE-F81 | Understand how each person gets in | done |
+| BASE-F82 | See the roles and turn on the ones an app brings | partial |
+| BASE-F83 | Give a person a role | done |
+| BASE-F84 | Approve with a manager's PIN | partial |
+| BASE-F85 | Look up who approved what | done |
+| BASE-F86 | Create an API key and copy its token | partial |
+| BASE-F87 | Rotate an API key | partial |
+| BASE-F88 | Revoke an API key | partial |
+| BASE-F89 | See the API keys and what each one may do | partial |
+| BASE-F90 | Read the API documentation | done |
+| BASE-F91 | Show or hide the API documentation | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -1692,3 +1752,257 @@ If it fails: "Could not delete: {reason}", with "That file or folder no longer e
 session has expired. Sign in again and try once more.". Whoever does not administer the business does not see
 "Delete" and, if they try anyway, reads "Only an administrator can change the files.".
 Involved: none
+
+### BASE-F77 Reach the plan's limit of people
+Status: done
+Actor: owner, administrator
+Screen: Employees · Staff
+Steps:
+  1. In **Employees › Staff**, above the table, how many of the plan's places are taken: "{used} of {limit} places
+     taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people".
+  2. With every place taken, "Every place of your plan is taken" shows with "Remove on erplora.com someone who no
+     longer works here, or move to a plan with more places."; on the web, with "Upgrade plan".
+  3. To invite somebody else, "Invite on erplora.com" leads to "Members" of the business, where the limit applies.
+In: the people of the business and its plan's places, as erplora.com sends them.
+Out: nothing saved.
+If it fails: "The people of this business could not be loaded." with "Retry", never "Nobody is in this business
+yet.".
+Involved: BASE-F81, BASE-F83
+
+### BASE-F78 Remove a person's PIN
+Status: done
+Actor: owner, administrator
+Screen: A person's page
+Steps:
+  1. In **Employees › Staff**, they tap the person: their page opens.
+  2. Under "PIN", "Has a PIN since {when}." and "Remove the PIN".
+  3. They tap it: "Remove the PIN" with "{name} will stop entering the tills with their PIN. With their erplora.com
+     account they still get in.". They confirm with "Remove the PIN".
+  4. "PIN removed." shows and the page says "No PIN: the person chooses it in “My profile” or the first time they
+     enter a till.".
+In: the person.
+Out: the person without a PIN: they leave the faces of the tills at once. Event `base.person.pin_removed`.
+If it fails: "The PIN could not be removed."; only the owner changes the owner's way in: "Only the owner changes
+the owner's way in.".
+Involved: BASE-F81, BASE-F55
+
+### BASE-F79 Give a person a badge or take it away
+Status: done
+Actor: owner, administrator
+Screen: A person's page
+Steps:
+  1. On the person's page, under "Badge": "Pass the card and it fills itself: no need to click here first. You can
+     also type the number, for a key fob or an engraved tag.".
+  2. They pass the card over the reader (or type the number) and tap "Save badge": "Badge saved." and "Has a badge
+     since {when}.".
+  3. To take it away, "Remove the badge": "Badge removed." and "No badge.".
+In: the person and their badge.
+Out: the person's badge, kept without its number (only what lets it be recognised). Events `base.person.badge_set`
+and `base.person.badge_removed`.
+If it fails: "A badge has 4 to 64 characters: letters, digits, “-” and “_”.", "Somebody else already carries that
+badge. A badge says who is at the till: two people cannot share it.", "Too many badges tried. Wait a few minutes
+and try again.", "The badge could not be saved." or "The badge could not be removed.". Nobody registers their own:
+"Nobody registers their own badge: ask another administrator.".
+Involved: BASE-F56, BASE-F81
+
+### BASE-F80 Bring back a person who left the business
+Status: done
+Actor: owner, administrator
+Screen: Employees · Staff
+Steps:
+  1. Whoever left the business is no longer in **Employees › Staff**: they were removed on erplora.com.
+  2. To bring them back, "Invite on erplora.com" and they are invited again in "Members" of the business, with
+     their role.
+  3. When they accept, they are back on the list with what the business kept of them: their PIN and their badge
+     still work.
+In: the invitation on erplora.com.
+Out: the person back in the business, with their PIN and their badge from before.
+If it fails: until they accept, they show as "Not in yet".
+Involved: BASE-F77, BASE-F81
+
+### BASE-F81 Understand how each person gets in
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Employees · Staff
+Steps:
+  1. In **Employees › Staff**, a row per person (on a phone, a card): "User" (with "You" on one's own), "Email"
+     (only for whoever runs the business), "Role", "Access" and "Status".
+  2. "Access" says how they get in: "Account" always, and "PIN" and "Badge" if they have them (for example,
+     "Account + PIN + Badge").
+  3. "Status" says "Active" or, if erplora.com already invited them and they have not come in yet, "Not in yet".
+  4. They search with "Search person…". Whoever runs the business taps a row to open the person's page.
+In: the people of the business.
+Out: nothing saved. It updates by itself when somebody chooses or loses their PIN or their badge.
+If it fails: "The people of this business could not be loaded." with "Retry".
+Involved: BASE-F77, BASE-F78, BASE-F79
+
+### BASE-F82 See the roles and turn on the ones an app brings
+Status: partial — the four roles of erplora.com are shown; no app brings roles of its own to turn on yet
+Actor: owner, administrator, manager, employee
+Screen: Employees · Roles
+Steps:
+  1. In **Employees › Roles**: "These are the roles of this business. Each person gets one when invited on
+     erplora.com, and it is changed there.".
+  2. A row per role: "Owner", "Administrator", "Manager" and "Employee", with "Basic", "Always available", how
+     many people have it and how many permissions it gives.
+  3. Whoever runs the business has "Change roles on erplora.com".
+In: the roles and the people of the business.
+Out: nothing saved.
+If it fails: "The roles could not be loaded." with "Retry".
+Involved: BASE-F83
+
+### BASE-F83 Give a person a role
+Status: done
+Actor: owner, administrator
+Screen: Employees · Roles
+Steps:
+  1. In **Employees › Roles** or on a person's page, "Change roles on erplora.com" or "Open on erplora.com" leads to
+     "Members" of the business.
+  2. There they change the role.
+  3. Back here, the person shows with their new role and what they may do changes at once.
+In: the role chosen on erplora.com.
+Out: the person with their new role, as erplora.com sends it.
+If it fails: whatever erplora.com says.
+Involved: BASE-F82, BASE-F13
+
+### BASE-F84 Approve with a manager's PIN
+Status: partial — the approval works for the actions an app names, but no app asks for it yet (voiding a sale, a discount over the limit)
+Actor: employee, manager
+Screen: An approval is needed
+Steps:
+  1. Somebody tries something their role does not allow and that the app lets a manager approve. Instead of an
+     error, "An approval is needed" shows with "Approving: {action}", in the app's words.
+  2. They read "Ask a manager to enter their PIN to approve it." and "…or to swipe their badge: nothing to press
+     first.".
+  3. Under "Who approves it?", the faces of those who may do it themselves and have a PIN. The manager taps theirs
+     and types their PIN ("Another person" goes back to the faces), or swipes their badge at any moment.
+  4. The action is done once and "Approved by {name}" shows. The session of whoever asked is not closed.
+In: the name and the PIN, or the badge, of whoever approves.
+Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in
+**Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`. It is spent together with the
+action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
+within those two minutes, goes through with it; if it went through, it is not repeated; two at once with the same one,
+only one goes through. Whoever is not of the business gets the refusal of always, without the approval's question.
+If it fails: the dialog stays open with "Those details do not approve this. Check the name and the PIN, and try
+again.", "That person cannot approve this: ask somebody who may do it themselves.", "This no longer needs an
+approval: do it again.", "This is not approved with a PIN.", the wait after too many attempts or "Could not send
+the approval. Check the connection and try again.". With nobody with a PIN who may: "Nobody here can approve this
+with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the app back its refusal.
+Involved: BASE-F85, BASE-F55, BASE-F56
+
+### BASE-F85 Look up who approved what
+Status: done
+Actor: owner, administrator
+Screen: Employees · Approvals
+Steps:
+  1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that needed a
+     manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or
+     delete it.".
+  2. A row per approval, the latest first: "When", "Action" (in words), "Approved by", "Asked by", "With" ("PIN"
+     or "Badge") and "State" ("Used" or "Not used").
+  3. They search with "Search by person or action…".
+In: the record of approvals.
+Out: nothing; it is read only. It updates by itself with each approval.
+If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve
+anything in this business yet.".
+Involved: BASE-F84
+
+### BASE-F86 Create an API key and copy its token
+Status: partial — a business that still shares its database with others cannot have keys: the tab says "Not available yet"
+Actor: owner, administrator
+Screen: Employees · API keys
+Steps:
+  1. In **Employees › API keys**: "A key lets another system (your accountant's, your online shop) read or write
+     this business's data through its API." and "New API key".
+  2. In "New API key", the "Name" ("Accountant — invoices"), the "Requests per minute" ("From 1 to 10,000.") and
+     "What this key may do": "Full access", "Read only", "Write only" or "Per app", ticking "Read" and "Write" on
+     each app.
+  3. They tap "Create key": "API key created" shows with "Copy the token now", "This is the only time the whole
+     secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
+     "Copied"). "Done" closes it.
+In: the name, the pace and what it may do.
+Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
+If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
+app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
+Involved: BASE-F89, BASE-F90
+
+### BASE-F87 Rotate an API key
+Status: partial — a business that still shares its database with others cannot have keys
+Actor: owner, administrator
+Screen: Employees · API keys
+Steps:
+  1. On the key's row, "Rotate".
+  2. "Rotate the API key" with "“{name}” gets a new token. The current one stops working at once."; they confirm
+     with "Rotate".
+  3. The new token shows, only once, with "Copy".
+In: the key.
+Out: the key with a new token; the previous one stops opening anything at once. Event `base.api_key.rotated`.
+If it fails: "The API key could not be rotated.", "That key was revoked: it never works again." or "That key no
+longer exists. Refresh the list and try again.".
+Involved: BASE-F86, BASE-F89
+
+### BASE-F88 Revoke an API key
+Status: partial — a business that still shares its database with others cannot have keys
+Actor: owner, administrator
+Screen: Employees · API keys
+Steps:
+  1. On the key's row, "Revoke".
+  2. "Revoke the API key" with "You are about to revoke “{name}”. Any system using this token loses access at
+     once. This cannot be undone."; they confirm with "Revoke".
+  3. "“{name}” revoked." shows and the row stays as "Revoked", without "Rotate" or "Revoke".
+In: the key.
+Out: the key revoked for good; it is kept on the list. Event `base.api_key.revoked`.
+If it fails: "The API key could not be revoked.".
+Involved: BASE-F89
+
+### BASE-F89 See the API keys and what each one may do
+Status: partial — a business that still shares its database with others cannot have keys: instead, "Not available yet" and "API keys are not available yet in this business." show
+Actor: owner, administrator
+Screen: Employees · API keys
+Steps:
+  1. In **Employees › API keys** (the tab exists only for whoever runs the business), a row per key: "Name",
+     "Token" (only its start), "Permissions", "State" ("Active" or "Revoked"), "Created", "Last use" ("Never" if
+     unused) and "Limit".
+  2. They search with "Search API key…". At the bottom, "API documentation" leads to the documentation.
+In: the business's keys.
+Out: nothing saved. It updates by itself when one is created, rotated or revoked.
+If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
+another system can read or write your business's data.".
+Involved: BASE-F86, BASE-F87, BASE-F88
+
+### BASE-F90 Read the API documentation
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: API documentation
+Steps:
+  1. With the documentation shown (BASE-F91), it opens from "API" in the side menu, from **Settings › General**
+     ("Open the API documentation") or from **Employees › API keys** ("API documentation").
+  2. They read "The API of this business: what its apps publish for other systems. To call it, create a key in
+     Employees › API keys and send it as “Authorization: Bearer <key>”.".
+  3. A section per app, with its calls (the method, the address and what it does); opening one, its "Parameters"
+     and its "Body".
+  4. "Download the OpenAPI file" saves it to take it to another tool.
+In: what the business's apps publish.
+Out: nothing saved. It grows or shrinks with the business's apps.
+If it fails: hidden, "The API documentation is hidden in this business." and, for whoever runs the business,
+"Show it in Settings › General"; if it does not arrive, "Could not load the documentation." with "Retry"; with
+nothing published, "None of this business’s apps publishes its API yet.". If the business cannot have keys yet:
+"API keys are not available yet for this business: you can read the documentation, but no system can call it
+yet.".
+Involved: BASE-F91, BASE-F86
+
+### BASE-F91 Show or hide the API documentation
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. In **Settings › General**, under "API documentation", the switch "Show the API documentation" ("Adds a page
+     with the documentation of the API, for whoever connects another system."). It comes off.
+  2. Turning it on saves it at once and "Open the API documentation" shows and, in the side menu, "API" (between
+     "System" and "Settings"), without reloading; turning it off, both go away.
+In: the switch.
+Out: the business's setting. Event `base.api_doc.settings_changed`.
+If it fails: "Could not save the change." and the switch goes back to what was saved; "Could not load the
+setting." with "Retry". Whoever does not run the business sees it off: "Only who runs the business can change
+it.".
+Involved: BASE-F90

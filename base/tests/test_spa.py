@@ -131,6 +131,8 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
         "plan_url": f"{saas}/store/plans?business={hub.id}",
         "account_url": f"{saas}/account",
         "report_url": f"{saas}/report-a-problem",
+        # APP-BASE-5: «Members» of the business on erplora.com, where people are invited and given a role.
+        "members_url": f"{saas}/businesses/{hub.id}/members",
         # APP-BASE-3: the session's way in (base/tests/test_access_spa.py).
         "access": {"credential": "account", "switch_user": False, "idle_minutes": None},
         "preferences": {"theme_mode": "", "palette": ""},

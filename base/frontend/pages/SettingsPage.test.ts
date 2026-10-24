@@ -21,7 +21,8 @@ async function settings(path = '/settings', locale: 'en' | 'es' = 'en', session?
   });
 }
 
-const GENERAL_CARDS = ['device-mode-card', 'pin-policy-card', 'devices-card'];
+// «API documentation» (APP-BASE-5, BASE-G100) closes General.
+const GENERAL_CARDS = ['device-mode-card', 'pin-policy-card', 'devices-card', 'api-docs-card'];
 
 afterEach(() => {
   document.body.innerHTML = '';

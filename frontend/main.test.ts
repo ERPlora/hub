@@ -16,6 +16,11 @@ vi.mock('@erplora/ui/shell', () => ({
   applyUserThemePreferences: vi.fn(),
   resetUserThemePreferences: vi.fn(),
 }));
+// The side menu's `visible` (base/frontend/lib/sidebar.test.ts runs them): here, which one each entry carries.
+vi.mock('../base/frontend/lib/sidebar', () => ({
+  allowedTo: (permission: string) => `allowedTo:${permission}`,
+  useApiDocsShown: 'useApiDocsShown',
+}));
 vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   createLiveClient: vi.fn(() => sdk.client),
@@ -24,6 +29,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 
 import { createShell, logout } from '@erplora/ui/shell';
 import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
+import { approvalPass } from '../base/frontend/lib/approval';
 
 import { sessionChanged } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE } from '../base/frontend/lib/app-gate';
@@ -152,6 +158,7 @@ describe('main.ts', () => {
     await main.boot({});
     expect(createLiveClient).toHaveBeenCalledWith(expect.objectContaining({ csrfCookieName: 'csrftoken', lang: 'es' }), {
       routes: OPERATION_ROUTES,
+      getElevationToken: approvalPass,
     });
     expect(provideLiveClient).toHaveBeenCalledWith(sdk.client, app);
   });
@@ -180,20 +187,24 @@ describe('main.ts', () => {
   // PLAN-MIGRATIONS §16 (Ioan, 2026-10-17): the old hub's shell, side menu included. Its entries are the
   // platform's, in the old hub's two groups and order, never a module (they open from «My apps» and
   // Home); each shows once its screen exists (the shell checks the router), so today only Home does.
-  it("paints the old hub's side menu: the platform's entries in its two groups, no module", async () => {
+  // APP-BASE-5 (FIX-UI-SIDEBAR-SYSTEM-VISIBLE-TO-EMPLOYEE): each entry only for whoever may open its screen — the
+  // permission its screen's operation asks —, and «API» (the old hub's, between System and Settings) only while the
+  // business shows its API's documentation.
+  it("paints the old hub's side menu: the platform's entries in its two groups, no module, each for who may open it", async () => {
     fakeShell();
     await main.boot({});
     expect(shellOptions().sidebar).toEqual({
       groups: [
         [
-          { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees' },
-          { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files' },
+          { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees', visible: 'allowedTo:base.view_home' },
+          { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files', visible: 'allowedTo:base.view_files' },
         ],
         [
           { id: 'billing', labelKey: 'sidebar.billing', icon: 'ion:card-outline', to: '/billing' },
-          { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps' },
-          { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system' },
-          { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings' },
+          { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps', visible: 'allowedTo:base.view_home' },
+          { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system', visible: 'allowedTo:base.administer_hub' },
+          { id: 'api', labelKey: 'sidebar.api', icon: 'ion:code-slash-outline', to: '/api-docs', visible: 'useApiDocsShown' },
+          { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings', visible: 'allowedTo:base.view_home' },
         ],
       ],
     });

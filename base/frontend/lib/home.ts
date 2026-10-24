@@ -46,6 +46,8 @@ export interface HubHome {
   account_url: string;
   /** erplora.com's form to report a problem to support (the user menu's «Report a problem», PLAN-SAAS §1.1). */
   report_url: string;
+  /** «Members» of this business on erplora.com, where people are invited, given a role and removed (APP-BASE-5). */
+  members_url?: string;
 }
 
 // ── «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164) ────────────────────────────────────

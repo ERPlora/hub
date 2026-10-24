@@ -37,5 +37,18 @@ def test_every_event_is_named_as_the_convention_says():
         "base.device.pruned",
         "base.access.settings_changed",
         "base.profile.updated",
+        # People and permissions (APP-BASE-5): a PIN taken away, a badge given or taken away.
+        "base.person.pin_removed",
+        "base.person.badge_set",
+        "base.person.badge_removed",
+        # The business's API keys (APP-BASE-5).
+        "base.api_key.created",
+        "base.api_key.rotated",
+        "base.api_key.revoked",
+        # A manager's approval given, and spent (APP-BASE-5).
+        "base.approval.granted",
+        "base.approval.used",
+        # The API's documentation shown or hidden (APP-BASE-5).
+        "base.api_doc.settings_changed",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)

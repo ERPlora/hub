@@ -683,6 +683,268 @@
       "loading": "Loading the devices…",
       "loadError": "Could not load the devices. Check the connection and try again."
     },
+    "employees": {
+      "title": "Employees",
+      "tabs": {
+        "label": "Employees sections",
+        "personal": "Staff",
+        "roles": "Roles",
+        "apikeys": "API keys",
+        "approvals": "Approvals"
+      }
+    },
+    "people": {
+      "columns": {
+        "person": "User",
+        "email": "Email",
+        "role": "Role",
+        "access": "Access",
+        "status": "Status"
+      },
+      "ways": {
+        "account": "Account",
+        "pin": "PIN",
+        "badge": "Badge"
+      },
+      "roles": {
+        "hub_owner": "Owner",
+        "hub_admin": "Administrator",
+        "hub_manager": "Manager",
+        "hub_employee": "Employee"
+      },
+      "status": {
+        "active": "Active",
+        "notEntered": "Not in yet"
+      },
+      "you": "You",
+      "search": "Search person…",
+      "empty": "Nobody is in this business yet.",
+      "error": "The people of this business could not be loaded.",
+      "invite": "Invite on erplora.com",
+      "managed": "People are invited, given a role and removed on erplora.com, in “Members” of the business.",
+      "seats": {
+        "used": "{used} of {limit} place taken | {used} of {limit} places taken",
+        "noLimit": "{used} person · no limit | {used} people · no limit",
+        "count": "{used} person | {used} people"
+      },
+      "full": {
+        "heading": "Every place of your plan is taken",
+        "body": "Remove on erplora.com someone who no longer works here, or move to a plan with more places."
+      }
+    },
+    "roles": {
+      "intro": "These are the roles of this business. Each person gets one when invited on erplora.com, and it is changed there.",
+      "columns": {
+        "role": "Role",
+        "origin": "Comes from",
+        "available": "Available",
+        "members": "Members",
+        "permissions": "Permissions"
+      },
+      "basic": "Basic",
+      "always": "Always available",
+      "search": "Search role…",
+      "empty": "This business has no roles.",
+      "error": "The roles could not be loaded.",
+      "change": "Change roles on erplora.com"
+    },
+    "person": {
+      "title": "Person",
+      "loading": "Loading…",
+      "notFound": "This person is not in this business.",
+      "error": "This person could not be opened.",
+      "retry": "Retry",
+      "data": {
+        "heading": "Their details",
+        "managed": "Name, email and role are changed on erplora.com.",
+        "open": "Open on erplora.com",
+        "notEntered": "Not in this hub yet: their PIN and badge are kept for when they come in."
+      },
+      "pin": {
+        "heading": "PIN",
+        "has": "Has a PIN since {when}.",
+        "none": "No PIN: the person chooses it in “My profile” or the first time they enter a till.",
+        "remove": "Remove the PIN",
+        "confirm": {
+          "title": "Remove the PIN",
+          "message": "{name} will stop entering the tills with their PIN. With their erplora.com account they still get in.",
+          "confirm": "Remove the PIN",
+          "cancel": "Cancel"
+        },
+        "removed": "PIN removed.",
+        "failed": "The PIN could not be removed."
+      },
+      "badge": {
+        "heading": "Badge",
+        "label": "Badge",
+        "hint": "Pass the card and it fills itself: no need to click here first. You can also type the number, for a key fob or an engraved tag.",
+        "has": "Has a badge since {when}.",
+        "none": "No badge.",
+        "save": "Save badge",
+        "remove": "Remove the badge",
+        "saved": "Badge saved.",
+        "removed": "Badge removed.",
+        "invalid": "A badge has 4 to 64 characters: letters, digits, “-” and “_”.",
+        "taken": "Somebody else already carries that badge. A badge says who is at the till: two people cannot share it.",
+        "tooMany": "Too many badges tried. Wait a few minutes and try again.",
+        "failed": "The badge could not be saved.",
+        "removeFailed": "The badge could not be removed."
+      },
+      "refused": {
+        "ownerOnly": "Only the owner changes the owner's way in.",
+        "ownBadge": "Nobody registers their own badge: ask another administrator."
+      }
+    },
+    "apiKeys": {
+      "intro": "A key lets another system (your accountant's, your online shop) read or write this business's data through its API.",
+      "new": "New API key",
+      "search": "Search API key…",
+      "empty": "No API keys yet. Create one so that another system can read or write your business's data.",
+      "loadError": "Your API keys could not be loaded.",
+      "unavailableHeading": "Not available yet",
+      "unavailable": "API keys are not available yet in this business.",
+      "never": "Never",
+      "columns": {
+        "name": "Name",
+        "token": "Token",
+        "permissions": "Permissions",
+        "state": "State",
+        "created": "Created",
+        "lastUsed": "Last use",
+        "limit": "Limit"
+      },
+      "modes": {
+        "full": "Full access",
+        "read": "Read only",
+        "write": "Write only",
+        "per_app": "Per app"
+      },
+      "kinds": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "short": {
+        "read": "R",
+        "write": "W"
+      },
+      "states": {
+        "active": "Active",
+        "revoked": "Revoked"
+      },
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "revoked": "“{name}” revoked.",
+      "form": {
+        "title": "New API key",
+        "submit": "Create key",
+        "cancel": "Cancel",
+        "name": "Name",
+        "namePlaceholder": "Accountant — invoices",
+        "rate": "Requests per minute",
+        "rateHint": "From 1 to 10,000.",
+        "mode": "What this key may do",
+        "generalHint": "The general modes cover every app of your business, also the ones you add later.",
+        "perAppHint": "Tick what the key may do on each app.",
+        "app": "App",
+        "noApps": "No app publishes its API yet."
+      },
+      "token": {
+        "title": "API key created",
+        "heading": "Copy the token now",
+        "once": "This is the only time the whole secret is shown. Keep it somewhere safe: it will not be shown again.",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "It could not be copied to the clipboard.",
+        "done": "Done"
+      },
+      "rotateConfirm": {
+        "title": "Rotate the API key",
+        "message": "“{name}” gets a new token. The current one stops working at once.",
+        "confirm": "Rotate"
+      },
+      "revokeConfirm": {
+        "title": "Revoke the API key",
+        "message": "You are about to revoke “{name}”. Any system using this token loses access at once. This cannot be undone.",
+        "confirm": "Revoke"
+      },
+      "errors": {
+        "create": "The API key could not be created.",
+        "rotate": "The API key could not be rotated.",
+        "revoke": "The API key could not be revoked.",
+        "revoked": "That key was revoked: it never works again.",
+        "gone": "That key no longer exists. Refresh the list and try again.",
+        "scopesRequired": "Choose at least one app and what the key may do on it.",
+        "scopeUnknown": "That app does not publish what the key would do on it.",
+        "denied": "Only whoever runs the business manages the API keys."
+      },
+      "docs": "API documentation"
+    },
+    "approval": {
+      "title": "An approval is needed",
+      "approving": "Approving: {action}",
+      "unnamed": "an action this app cannot name",
+      "askPin": "Ask a manager to enter their PIN to approve it.",
+      "orBadge": "…or to swipe their badge: nothing to press first.",
+      "who": "Who approves it?",
+      "another": "Another person",
+      "nobody": "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge.",
+      "loadFailed": "Could not load who can approve it.",
+      "retry": "Retry",
+      "cancel": "Cancel",
+      "approvedBy": "Approved by {name}",
+      "errors": {
+        "refused": "Those details do not approve this. Check the name and the PIN, and try again.",
+        "cannot": "That person cannot approve this: ask somebody who may do it themselves.",
+        "notNeeded": "This no longer needs an approval: do it again.",
+        "notOffered": "This is not approved with a PIN.",
+        "failed": "Could not send the approval. Check the connection and try again."
+      }
+    },
+    "approvals": {
+      "intro": "Each action that needed a manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or delete it.",
+      "search": "Search by person or action…",
+      "empty": "Nobody has had to approve anything in this business yet.",
+      "error": "Could not load the record of approvals.",
+      "used": "Used",
+      "unused": "Not used",
+      "way": {
+        "pin": "PIN",
+        "badge": "Badge"
+      },
+      "columns": {
+        "at": "When",
+        "action": "Action",
+        "approvedBy": "Approved by",
+        "requestedBy": "Asked by",
+        "way": "With",
+        "used": "State"
+      }
+    },
+    "apiDocs": {
+      "title": "API documentation",
+      "intro": "The API of this business: what its apps publish for other systems. To call it, create a key in Employees › API keys and send it as “Authorization: Bearer <key>”.",
+      "keysSoon": "API keys are not available yet for this business: you can read the documentation, but no system can call it yet.",
+      "download": "Download the OpenAPI file",
+      "empty": "None of this business’s apps publishes its API yet.",
+      "error": "Could not load the documentation.",
+      "retry": "Retry",
+      "loading": "Loading the documentation…",
+      "hidden": "The API documentation is hidden in this business.",
+      "showIt": "Show it in Settings › General",
+      "parameters": "Parameters",
+      "body": "Body",
+      "required": "required",
+      "card": {
+        "title": "API documentation",
+        "toggle": "Show the API documentation",
+        "note": "Adds a page with the documentation of the API, for whoever connects another system.",
+        "open": "Open the API documentation",
+        "adminOnly": "Only who runs the business can change it.",
+        "saveFailed": "Could not save the change.",
+        "loadFailed": "Could not load the setting.",
+        "retry": "Retry"
+      }
+    },
     "files": {
       "title": "Files",
       "folders": "Folders",
