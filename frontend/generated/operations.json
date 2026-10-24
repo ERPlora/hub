@@ -31,6 +31,10 @@
     "method": "get",
     "path": "/api/business"
   },
+  "base.location.list": {
+    "method": "get",
+    "path": "/api/locations"
+  },
   "base.blueprint.list": {
     "method": "get",
     "path": "/api/settings/data/blueprints"

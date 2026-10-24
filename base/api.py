@@ -446,3 +446,11 @@ async def assistant_report(request, data: AssistantReportIn):
 @decorate_view(accept_body_up_to(MAX_ASSISTANT_AUDIO_BODY))
 async def assistant_transcribe(request, data: AssistantTranscribeIn):
     return await run_operation(request, services.assistant_transcribe, data)
+
+
+# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+
+
+@bind(router, "base.location.list", "/locations")
+async def location_list(request):
+    return await run_operation(request, queries.location_list)
