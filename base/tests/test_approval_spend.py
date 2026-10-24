@@ -114,3 +114,31 @@ def test_two_at_once_with_the_same_pass_only_one_runs(make_user, monkeypatch):
     assert code(next(a for a in answers.values() if a.status_code == 403)) == "requires_elevation"
     assert state["runs"] == 1
 
+
+
+def test_the_spend_opens_the_transaction_on_the_alias_the_tenancy_gave_never_one_of_its_own(monkeypatch):
+    """rv-hub-244 (ronda 2): ``spending`` never chooses a database: the transaction it opens is on the alias the tenancy
+    handed the command (phase 2, S5: the hub's own), so the pass and the command share one transaction there too.
+    In the shared mode every alias is ``default`` and no request can tell; this pins the contract."""
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    from live.operations import get as get_operation
+
+    from base import approval_spend
+    from base.approvals import Approved
+
+    opened: list[str] = []
+
+    @contextmanager
+    def atomic(using=None, **_kwargs):
+        opened.append(using)
+        yield
+
+    monkeypatch.setattr(approval_spend.transaction, "atomic", atomic)
+    monkeypatch.setattr(approval_spend, "get", lambda name: lambda ctx, data: SimpleNamespace(spent=True))
+    op = get_operation(APPROVABLE)
+    request = SimpleNamespace(approved=Approved(operation=APPROVABLE, permission=op.permission, token="elev_x", fingerprint="f"))
+    with approval_spend.spending(op, SimpleNamespace(request=request), "hub_0123") as alias:
+        assert alias == "hub_0123"
+    assert opened == ["hub_0123"]
