@@ -23,8 +23,6 @@ let juice: Product;
 let cake: Product;
 let customer: { id: string; name: string };
 let methods: Record<string, string>;
-/** Kitchen on in `a` when this file starts: then «Charge» sends what is pending first (sales#439). */
-let kitchenOn = false;
 
 test.afterAll(() => {
   // The kitchen tickets this file's rounds opened (their dishes name its products): they go with their checks, or
@@ -37,8 +35,10 @@ test.afterAll(() => {
   cleanCustomers();
   cleanInventory();
   restoreDrawer();
-  // Charged with Kitchen on, the rounds must be found (the check below is not empty by mistake); otherwise none are sent.
-  if (kitchenOn && charged > 0) expect(tickets, `the rounds of ${RUN} reached the kitchen`).not.toBe('null');
+  // What it charged reached the kitchen: Kitchen is free and on in every business (base.entitlement), and «Charge»
+  // sends what is pending first (sales#439). Not read from `/me`, which the till also reads: a Kitchen said «off» by
+  // mistake would stop both the rounds and this check. Without it the check below would be empty by mistake.
+  if (charged > 0) expect(tickets, `the rounds of ${RUN} reached the kitchen`).not.toBe('null');
   if (tickets === 'null') return;
   expect(
     psql(`select (select count(*) from kitchen_ticket where id::text in (${tickets})) + (select count(*) from kitchen_ticketitem where ticket_id::text in (${tickets})) + (select count(*) from kitchen_logentry where ticket_id::text in (${tickets}))`),
@@ -54,8 +54,6 @@ test.beforeAll(async ({ browser }) => {
   await login(page, A, '/sale/pos');
   // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
   await drawerOff(context);
-  const me = await api<{ apps: { label: string; state: string }[] }>(context, A, 'GET', '/me');
-  kitchenOn = me.data.apps.some((app) => app.label === 'kitchen' && app.state === 'on');
   water = await createProduct(context, { name: `E2E Water ${RUN}`, sku: `E2E-POS-W-${RUN}`, price: 110, tax_category_key: 'restaurant.drink' });
   shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: `E2E-POS-S-${RUN}`, price: 1210, tax_category_key: 'product.generic' });
   juice = await createProduct(context, { name: `E2E Juice ${RUN}`, sku: `E2E-POS-J-${RUN}`, price: 250, tax_category_key: 'restaurant.drink' });
