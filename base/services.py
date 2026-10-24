@@ -71,7 +71,7 @@ from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from base import access, auth, blueprint, events, queries, registry, signing
+from base import access, auth, blueprint, events, queries, registry, signing, system
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST, session_host
@@ -102,6 +102,11 @@ from base.schemas import (
     DemoOut,
     DemoSlugIn,
     DemoStatusOut,
+    FailedEventCountOut,
+    FailedEventDiscardIn,
+    FailedEventIn,
+    FailedEventOutId,
+    FailedEventRetryAllIn,
     HubCancelIn,
     HubOut,
     HubRegisterOut,
@@ -434,6 +439,7 @@ def relay_deliver_next(
             reason = error.code if refused else type(error).__name__
             if delivery.attempts >= max_attempts:
                 delivery.status = EventDelivery.Status.DEAD
+                _tell_failed(Scope(delivery.event.scope_kind, delivery.event.scope_key))
                 logger.exception(
                     "relay: %s gave up on %s (%s) after %d attempts (%s); its writes were undone.",
                     delivery.app_label,
@@ -498,6 +504,15 @@ def _hand_over(
         logger.error(
             "relay: %s (%s) not delivered to %s: %s", row.event.name, row.event_id, row.app_label, row.last_error
         )
+    for scope in {Scope(row.event.scope_kind, row.event.scope_key) for row in rows} if too_deep else ():
+        _tell_failed(scope)
+
+
+def _tell_failed(scope: Scope) -> None:
+    """After the COMMIT, ``scope``'s hub hears that a failed event appeared: its bell and System › Failed events follow
+    at once (BASE-F10, APP-BASE-7). A notice, not an outbox event: a listener of every event that failed on it would
+    feed itself; and none after a rollback."""
+    transaction.on_commit(partial(notify, scope, [events.FAILED_EVENT_CREATED]), robust=True)
 
 
 # ── The registry of hubs: what the SaaS's /internal/hubs/{id} runs (plan 2026-10-17, §1.5) ──────────────────────
@@ -1260,6 +1275,125 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
         removed = blueprint.reset(ctx, chosen)
         record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
         return {**answer, "sections": blueprint.reset_plan(ctx), "apps": removed["apps"]}
+
+
+# ── System: the failed events (APP-BASE-7) ─────────────────────────────────────────────────────────────────────────
+# The old hub's ``/api/hub/events/:id/retry``, ``retry-all`` and ``:id/discard`` (HUB-F55…F57), for who runs the
+# business. A failed event is a delivery the relay gave up on (``dead``): resending puts it back in the queue for the
+# app that had failed only; discarding closes it for good and keeps the row. One hub never touches another's.
+
+
+@operation(
+    "base.failed_event.retry",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=FailedEventIn,
+    output=FailedEventOutId,
+    ai={
+        "description": "Resends one failed event of this hub (by its id, from the list of failed events) once its "
+        "cause is fixed: it goes back to the queue with its attempts at zero, for the app that could not take it "
+        "only. Refused when that app is no longer on in this business.",
+        "risk": "normal",
+    },
+)
+def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
+    """HUB-F55: ``pending`` again, due now, attempts at zero; the relay takes it on its next tick."""
+    from base import relay  # base.relay imports this module
+
+    delivery = _failed_event(ctx, data.id)
+    if delivery.app_label not in relay.active_apps(ctx.scope):
+        raise Conflict(
+            gettext("%(app)s is not on in this business: turn it on, then resend the event.")
+            % {"app": system.app_name(delivery.app_label)},
+            code="base.failed_event_app_off",
+        )
+    _requeue([delivery.pk])
+    record_event(ctx, events.FAILED_EVENT_RETRIED, {"id": str(delivery.pk), "count": 1})
+    return {"id": delivery.pk}
+
+
+@operation(
+    "base.failed_event.retry_all",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=FailedEventRetryAllIn,
+    output=FailedEventCountOut,
+    ai={
+        "description": "Resends every failed event of this hub that can be resent (also those beyond the first page "
+        "of the list), once the cause of a passing failure is fixed. Those for an app that is no longer on stay. "
+        "Says how many went back to the queue.",
+        "risk": "normal",
+    },
+)
+def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -> dict:
+    """HUB-F56: every ``dead`` delivery of the hub whose app is on; another worker's rows wait (``SKIP LOCKED``)."""
+    from base import relay  # base.relay imports this module
+
+    ids = list(
+        EventDelivery.objects.select_for_update(skip_locked=True, of=("self",))
+        .filter(
+            status=EventDelivery.Status.DEAD,
+            event__scope_kind=ctx.scope.kind,
+            event__scope_key=ctx.scope.key,
+            app_label__in=relay.active_apps(ctx.scope),
+        )
+        .values_list("pk", flat=True)
+    )
+    if ids:
+        _requeue(ids)
+        record_event(ctx, events.FAILED_EVENT_RETRIED, {"count": len(ids)})
+    return {"count": len(ids)}
+
+
+@operation(
+    "base.failed_event.discard",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=FailedEventDiscardIn,
+    output=FailedEventOutId,
+    ai={
+        "description": "Discards one failed event of this hub for good (by its id), with an optional reason: it is "
+        "never delivered again and is kept with who discarded it, when and why. Only when it must not be delivered "
+        "(a duplicate, already done by hand): discarding a sale's event for Invoicing leaves that sale without its "
+        "invoice.",
+        "risk": "high",
+    },
+)
+def failed_event_discard(ctx: OperationContext, data: FailedEventDiscardIn) -> dict:
+    """HUB-F57: closed as ``discarded`` with who, when and why; the row and its last error stay for the audit."""
+    delivery = _failed_event(ctx, data.id)
+    delivery.status = EventDelivery.Status.DISCARDED
+    delivery.closed_at = timezone.now()
+    delivery.closed_by = str(ctx.actor)[: EventDelivery._meta.get_field("closed_by").max_length]
+    delivery.close_reason = data.reason.strip()
+    delivery.save(update_fields=["status", "closed_at", "closed_by", "close_reason"])
+    record_event(ctx, events.FAILED_EVENT_DISCARDED, {"id": str(delivery.pk)})
+    return {"id": delivery.pk}
+
+
+def _failed_event(ctx: OperationContext, delivery_id: UUID) -> EventDelivery:
+    """The failed event ``delivery_id`` of the hub of ``ctx``, locked; not found if it is another hub's, or no longer
+    failed (resent, discarded, or delivered in the meantime)."""
+    delivery = (
+        EventDelivery.objects.select_for_update(of=("self",))
+        .filter(
+            pk=delivery_id,
+            status=EventDelivery.Status.DEAD,
+            event__scope_kind=ctx.scope.kind,
+            event__scope_key=ctx.scope.key,
+        )
+        .first()
+    )
+    if delivery is None:
+        raise NotFound(gettext("That failed event is no longer in the queue: refresh the list."))
+    return delivery
+
+
+def _requeue(ids: list[UUID]) -> None:
+    """Back to the queue, due now, with their attempts at zero and no error."""
+    EventDelivery.objects.filter(pk__in=ids).update(
+        status=EventDelivery.Status.PENDING, attempts=0, next_attempt_at=timezone.now(), last_error=""
+    )
 
 
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────

@@ -917,6 +917,84 @@ msgstr "“%(value)s” no es un valor binario válido."
 msgid "No %s matches the given query."
 msgstr "Ningún %s coincide con la consulta."
 
+#: models.py
+msgctxt "event delivery status"
+msgid "Discarded"
+msgstr "Descartado"
+
+#: models.py
+msgid "discarded at"
+msgstr "descartado el"
+
+#: models.py
+msgid "discarded by"
+msgstr "descartado por"
+
+#: models.py
+msgid "why it was discarded"
+msgstr "por qué se descartó"
+
+#: queries.py
+msgid "No app listens to it."
+msgstr "Ninguna app lo escucha."
+
+#: queries.py
+msgid "Waiting to be handed to the apps."
+msgstr "Esperando a repartirse entre las apps."
+
+#: queries.py
+#, python-format
+msgid "Delivered to %(app)s."
+msgstr "Entregado a %(app)s."
+
+#: queries.py
+#, python-format
+msgid "%(app)s could not take it: it is in Failed events."
+msgstr "%(app)s no lo pudo recibir: está en Eventos caídos."
+
+#: queries.py
+#, python-format
+msgid "Discarded for %(app)s."
+msgstr "Descartado para %(app)s."
+
+#: queries.py
+#, python-format
+msgid "%(app)s failed %(count)d time; it is retried by itself."
+msgid_plural "%(app)s failed %(count)d times; it is retried by itself."
+msgstr[0] "%(app)s falló %(count)d vez; se reintenta solo."
+msgstr[1] "%(app)s falló %(count)d veces; se reintenta solo."
+msgstr[2] "%(app)s falló %(count)d veces; se reintenta solo."
+
+#: queries.py
+#, python-format
+msgid "Waiting for %(app)s."
+msgstr "Pendiente para %(app)s."
+
+#: services.py
+#, python-format
+msgid "%(app)s is not on in this business: turn it on, then resend the event."
+msgstr "%(app)s no está activa en este negocio: actívala y vuelve a reenviar el evento."
+
+#: services.py
+msgid "That failed event is no longer in the queue: refresh the list."
+msgstr "Ese evento caído ya no está en la cola: actualiza la lista."
+
+#: error_report.py
+msgid "Sign in to report an error."
+msgstr "Inicia sesión para informar de un error."
+
+#: error_report.py
+msgid "The report is too large."
+msgstr "El informe es demasiado grande."
+
+#: error_report.py
+msgid "The report cannot be read."
+msgstr "No se puede leer el informe."
+
+#: error_report.py
+msgid "Too many reports for now."
+msgstr "Demasiados informes por ahora."
+
 #: auth_views.py:342
 msgid "Wrong PIN."
 msgstr "PIN incorrecto."

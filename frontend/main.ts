@@ -23,6 +23,7 @@ import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
+import { installErrorReport } from '../base/frontend/lib/error-report';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
@@ -168,6 +169,8 @@ export async function boot(
     chrome: CHROME,
   });
   provideLiveClient(client, app);
+  // base's report of the screen's own errors (BASE-G95): what nobody caught goes to the Hub's log by itself.
+  installErrorReport(app);
   // base's app gate (BASE-G132, G134): a screen of an app the session gives `off` mounts «why it does not open» in
   // its address. The page's own after the shell's 404, so only reached by name; the first address is checked once
   // the router is ready, before mounting (the first navigation may have started before the guard was added).

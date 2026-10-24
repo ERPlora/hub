@@ -145,7 +145,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 
   test(`BASE-G81 — Plan and limits at ${width}, followed live`, async ({ browser }) => {
-    const { context, page } = await signedIn(browser, viewport, '/system');
+    // «Plan and limits» is System's second tab (APP-BASE-7): `/system` opens Resources, as the old hub did.
+    const { context, page } = await signedIn(browser, viewport, '/system#plan');
     // A photo without a plan: the limits are not known yet, never a made-up figure.
     await pushPhoto();
     await page.reload();
@@ -193,7 +194,7 @@ test('BASE-G67 BASE-G81 — the employee reads the apps on a phone, and «Plan a
     await expect(testid(page, 'apps-row-demo-open')).toBeInViewport();
     await snap(page, 'BASE-G67-employee', 390);
 
-    await page.goto(`${A}/system`);
+    await page.goto(`${A}/system#plan`);
     await expect(testid(page, 'system-plan-denied')).toBeVisible();
     await expect(testid(page, 'system-plan-retry')).toHaveCount(0);
     await snap(page, 'BASE-G81-employee', 390);

@@ -13,6 +13,7 @@ from live.spa import BASE_NON_SPA_PREFIXES
 
 from base.admin import open_hub
 from base.auth_views import auth_badge, auth_callback, auth_login, auth_logout, auth_pin
+from base.error_report import error_report
 from base.health import readyz
 from base.internal import (
     demo_codes,
@@ -47,8 +48,9 @@ urlpatterns = [
     # admin/<app_label>/, which would otherwise take it.
     path("admin/hub/<str:slug>/", admin.site.admin_view(open_hub), name="admin-hub"),
     path("admin/", admin.site.urls),
-    # Before the API's prefix, which would otherwise answer it.
+    # Before the API's prefix, which would otherwise answer them.
     path("api/live", live_stream, name="live-stream"),
+    path("api/error-report", error_report, name="error-report"),
     path("api/", api.urls),
     path("csp-report/", csp_report, name="csp-report"),
     path("readyz", readyz, name="readyz"),

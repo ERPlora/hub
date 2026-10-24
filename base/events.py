@@ -35,6 +35,15 @@ HUB_DATA_RESET = "base.hub.data_reset"
 #: What Settings › Data does to the business: the Home's queries follow them (BASE-G131).
 DATA_EVENTS = (BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET)
 
+# ── System (APP-BASE-7) ───────────────────────────────────────────────────────────────────────────────────────
+#: The relay gave up on a delivery (its last attempt, or past the deepest level): told to the hub's live queries after
+#: the COMMIT, never recorded in the outbox (a listener of every event failing on it would feed itself).
+FAILED_EVENT_CREATED = "base.failed_event.created"
+#: Who runs the business resent one failed event, or all of them (``count``).
+FAILED_EVENT_RETRIED = "base.failed_event.retried"
+#: Who runs the business discarded a failed event: closed for good, kept for the audit.
+FAILED_EVENT_DISCARDED = "base.failed_event.discarded"
+
 ALL = [
     HUB_REGISTERED,
     HUB_STATE_APPLIED,
@@ -45,6 +54,9 @@ ALL = [
     DEMO_EXPIRED,
     DEMO_PURGED,
     *DATA_EVENTS,
+    FAILED_EVENT_CREATED,
+    FAILED_EVENT_RETRIED,
+    FAILED_EVENT_DISCARDED,
     PIN_SET,
     DEVICE_MODE_CHANGED,
     DEVICE_RENAMED,

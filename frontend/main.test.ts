@@ -37,7 +37,7 @@ const page = { template: '<div />' };
 const LOGIN_URL = '/auth/login';
 
 function fakeShell(isReady: () => Promise<void> = () => Promise.resolve(), current: object = { path: '/', meta: {} }) {
-  const app = { mount: vi.fn() };
+  const app = { mount: vi.fn(), config: {} as { errorHandler?: unknown } };
   const router = {
     isReady: vi.fn(isReady),
     addRoute: vi.fn(),
@@ -374,6 +374,13 @@ describe('main.ts', () => {
     const { router } = fakeShell(undefined, { path: '/stock/items', meta: { app: 'stock' } });
     await main.boot({});
     expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("hands the screen's uncaught errors to base's report before mounting (BASE-G95)", async () => {
+    const { app } = fakeShell();
+    await main.boot({});
+    expect(app.config.errorHandler).toBeTypeOf('function');
+    expect(app.mount).toHaveBeenCalledOnce();
   });
 
   it('lets any other boot failure surface', async () => {

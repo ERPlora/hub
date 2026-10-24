@@ -8,10 +8,19 @@ from live.live_registry import live_registry
 from live.meta import module_configs
 
 from base import live as base_live
-from base.events import BLUEPRINT_IMPORTED, HUB_DATA_RESET, HUB_STATE_APPLIED, IMPORT_UNDONE
+from base.events import (
+    BLUEPRINT_IMPORTED,
+    FAILED_EVENT_CREATED,
+    FAILED_EVENT_DISCARDED,
+    FAILED_EVENT_RETRIED,
+    HUB_DATA_RESET,
+    HUB_STATE_APPLIED,
+    IMPORT_UNDONE,
+)
 
 #: What Settings › Data does to the business (APP-BASE-2): the Home reads itself again after each (BASE-G131).
 DATA = {BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET}
+FAILED_EVENTS = (FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED)
 
 #: The way in's live queries (APP-BASE-3) have their own test: base/tests/test_access_live.py.
 WAY_IN = ("base.access.", "base.device.", "base.profile.")
@@ -34,13 +43,20 @@ def test_the_three_queries_and_their_events():
     assert on == {
         "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED, *DATA}),
         "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED, *DATA}),
-        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA}),
+        # The failed events the relay gives up on, resent or discarded change the bell's row (APP-BASE-7).
+        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA, *FAILED_EVENTS}),
         "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED}),
         # Apps (APP-BASE-4): the photo gives or takes the right to a paid module.
         "base.app.list": [HUB_STATE_APPLIED],
         "base.plan.usage": [HUB_STATE_APPLIED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
         "base.import.list": sorted(DATA),
+        # System (APP-BASE-7): the failed events, and the photo (it turns the app they were for on or off).
+        "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
+        # The status re-runs on the photo and on every reconnection (a deploy's new release shows by itself); the log
+        # also when a failed event appears, is resent or discarded (its level changes).
+        "base.system.status": [HUB_STATE_APPLIED],
+        "base.event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
     }
 
 

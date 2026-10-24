@@ -11,7 +11,10 @@ from live.live_registry import live
 from live.meta import module_configs
 
 from base import events
-from base.events import DATA_EVENTS, HUB_STATE_APPLIED
+from base.events import DATA_EVENTS, FAILED_EVENT_CREATED, FAILED_EVENT_DISCARDED, FAILED_EVENT_RETRIED, HUB_STATE_APPLIED
+
+#: What changes the failed events: the relay gives one up, who runs the business resends or discards one (APP-BASE-7).
+FAILED_EVENTS = [FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED]
 
 
 def events_of(hook: str) -> list[str]:
@@ -22,7 +25,8 @@ def events_of(hook: str) -> list[str]:
 
 live("base.setup.status", on=sorted({*events_of("setup"), *DATA_EVENTS}))
 live("base.widget.list", on=sorted({*events_of("widgets"), *DATA_EVENTS}))
-live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS}))
+# The failed events of System (APP-BASE-7) change the bell's row of them too.
+live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS, *FAILED_EVENTS}))
 live("base.notice.list", on=events_of("notices"))
 
 # ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
@@ -36,6 +40,16 @@ live("base.plan.usage", on=[HUB_STATE_APPLIED])
 # (the Home's card asks whether the business is still empty) and the list of loads of Settings › Data.
 live("base.blueprint.list", on=sorted({HUB_STATE_APPLIED, *DATA_EVENTS}))
 live("base.import.list", on=sorted(DATA_EVENTS))
+
+
+# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
+# The failed events follow the relay, who resends or discards them, and the photo (it turns their app on or off).
+live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
+# The status: the photo, and every reconnection of the stream (a deploy) sends it again with the new release.
+live("base.system.status", on=[HUB_STATE_APPLIED])
+# The log: what a new event brings shows when the tab opens again; a failed event changes the level of its row at once.
+live("base.event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
+
 
 # The way in (APP-BASE-3): the grid of «Switch user» follows the PINs, the people (the photo), the dial and the devices.
 _DEVICES = [events.DEVICE_MODE_CHANGED, events.DEVICE_RENAMED, events.DEVICE_REMOVED, events.DEVICES_PRUNED]

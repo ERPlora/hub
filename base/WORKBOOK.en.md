@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f80aa3ee1dd1238bb73bf92c0c7decac7d61f3ea766bc98aba99155dd0bfd0a4 -->
+<!-- generated from WORKBOOK.md sha256:744a3be58d6f7425176b01dff0b9c8c31f3ad41e2184a32530d60943159f9197 -->
 
 ## What it is for and who it is for
 
@@ -110,6 +110,21 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
 - **Reset**: "Undo an import", with one row per import that can be undone, and "Reset the business", with
   what each section has.
 
+### System · Resources
+From "System" in the side menu. Five tabs at the bottom: "Resources", "Plan and limits", "Updates", "Failed
+events" and "Logs" (this one, only for whoever runs the business); "Resources" opens: "Cloud resources" with the
+"Cloud" pill, the "Database" card and why there are no CPU, memory or connections figures.
+
+### System · Updates
+"What we have updated": the version running, when it was published and that the hub updates itself.
+
+### System · Failed events
+One card per notice between apps that ran out of retries, with "Resend" and "Discard"; on top, "Resend all".
+
+### System · Logs
+"Event log": the "Time", "Level" and "Event" table (on a phone, one card per event), with "Search event…" and the
+level filter.
+
 ### Access
 The way in of a shared till, or of a device whose session another entry closed, with no menu or bar: the logo,
 "Enter your business", the notice of what happened if there is one and a card with two tabs, "PIN" (the faces,
@@ -165,7 +180,7 @@ On the Settings · Data and backups screen:
 | BASE-F07 | Customize the board of panels | done |
 | BASE-F08 | Keep the panels up to date without reloading | done |
 | BASE-F09 | Look at the recent activity | done |
-| BASE-F10 | See in the bell the notices between apps that were not delivered | partial |
+| BASE-F10 | See in the bell the notices between apps that were not delivered | done |
 | BASE-F11 | Go to erplora.com to manage or upgrade the plan | partial |
 | BASE-F12 | Ask the assistant to go over the setup | partial |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
@@ -194,26 +209,35 @@ On the Settings · Data and backups screen:
 | BASE-F36 | Choose which apps, data and tables travel in the export | done |
 | BASE-F37 | Reset the business by sections | partial |
 | BASE-F38 | See the Home up to date after importing a template | done |
-| BASE-F39 | Enter with the erplora.com account | done |
-| BASE-F40 | Enter from the erplora.com panel without typing the password again | done |
-| BASE-F41 | Choose the PIN the first time one enters a till | done |
-| BASE-F42 | Enter with a PIN | done |
-| BASE-F43 | Enter by passing the badge | done |
-| BASE-F44 | Lose the session because it was opened on another device | done |
-| BASE-F45 | The session ends while working | done |
-| BASE-F46 | Close the session of a till nobody touches | done |
-| BASE-F47 | Switch user without losing the sale | done |
-| BASE-F48 | Sign out | done |
-| BASE-F49 | Decide whether this device is shared or personal | done |
-| BASE-F50 | Open a hub that is not set up yet | done |
-| BASE-F51 | Change my details, photo, language and appearance | done |
-| BASE-F52 | Change my PIN from My profile | done |
-| BASE-F53 | Choose how many digits the business's PIN has | done |
-| BASE-F54 | Decide whether the till asks for a PIN and when it asks again | done |
-| BASE-F55 | See the devices someone has entered on | done |
-| BASE-F56 | Name a device | done |
-| BASE-F57 | Remove a device that was lost | done |
-| BASE-F58 | Remove at once the devices nobody uses | done |
+| BASE-F39 | Open System and move between its tabs | done |
+| BASE-F40 | See how much the hub is using | partial |
+| BASE-F41 | Know which version is running and what has been updated | partial |
+| BASE-F42 | See the log of what happened in the system | done |
+| BASE-F43 | See the failed events | done |
+| BASE-F44 | Resend a failed event | done |
+| BASE-F45 | Resend all the failed events | done |
+| BASE-F46 | Discard a failed event | done |
+| BASE-F47 | Report an error of the screen without anyone asking | done |
+| BASE-F48 | Enter with the erplora.com account | done |
+| BASE-F49 | Enter from the erplora.com panel without typing the password again | done |
+| BASE-F50 | Choose the PIN the first time one enters a till | done |
+| BASE-F51 | Enter with a PIN | done |
+| BASE-F52 | Enter by passing the badge | done |
+| BASE-F53 | Lose the session because it was opened on another device | done |
+| BASE-F54 | The session ends while working | done |
+| BASE-F55 | Close the session of a till nobody touches | done |
+| BASE-F56 | Switch user without losing the sale | done |
+| BASE-F57 | Sign out | done |
+| BASE-F58 | Decide whether this device is shared or personal | done |
+| BASE-F59 | Open a hub that is not set up yet | done |
+| BASE-F60 | Change my details, photo, language and appearance | done |
+| BASE-F61 | Change my PIN from My profile | done |
+| BASE-F62 | Choose how many digits the business's PIN has | done |
+| BASE-F63 | Decide whether the till asks for a PIN and when it asks again | done |
+| BASE-F64 | See the devices someone has entered on | done |
+| BASE-F65 | Name a device | done |
+| BASE-F66 | Remove a device that was lost | done |
+| BASE-F67 | Remove at once the devices nobody uses | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -382,14 +406,15 @@ already sales on screen, they stay under the notice.
 Involved: SALE-F28
 
 ### BASE-F10 See in the bell the notices between apps that were not delivered
-Status: partial — the row does not lead anywhere yet: the System screen, where they are resent or discarded, comes later
+Status: done
 Actor: owner, administrator
 Screen: The bell
 Steps:
   1. A notice between apps (for example, "sale charged" towards Invoicing) ran out of retries.
   2. An administrator's bell goes up at once, without waiting or reloading, and opened it shows "Failed
      events" with how many there are.
-  3. When none is left, the row disappears.
+  3. Tapping the row opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
+  4. When none is left, the row disappears.
 In: how many notices of this business were left undelivered, only for whoever runs the business.
 Out: nothing.
 If it fails: an employee or a manager does not see the row. If it cannot ask, the bell keeps what it
@@ -673,7 +698,7 @@ Status: done
 Actor: owner, administrator
 Screen: System · Plan and limits
 Steps:
-  1. They tap "System" in the side menu: "Plan and limits" opens.
+  1. They tap "System" in the side menu and, at the bottom, the "Plan and limits" tab.
   2. They see "Your plan's limits" with "Within the limit" or "Close to the limit", the "People" card (the
      business's active people against the ones the plan allows, with its bar; or "No limit") and the
      "Devices" one: how many have a session open now ("With a session open now.") and, in its tag, "Up to" and
@@ -683,13 +708,13 @@ Steps:
   4. Below: "Plans are managed from your ERPlora account, on erplora.com.". It updates by itself when the plan
      or the people change; the devices' figure, on opening the screen.
 In: the plan's limits erplora.com passes to the hub, the business's active people and the devices with a session
-open on it (the same ones the cap of BASE-F44 counts).
+open on it (the same ones the cap of BASE-F53 counts).
 Out: nothing saved.
 If it fails: "We could not read your plan" — "Check the connection and try again." with "Retry". Whoever does
 not run the business sees "Only whoever runs the business can see the plan and its limits.", without "Retry". While
 the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com
 sends it.".
-Involved: BASE-F44
+Involved: BASE-F53
 
 ### BASE-F29 Choose a template of the catalogue to import
 Status: done
@@ -901,7 +926,174 @@ again." and "See the report", with no retry. If the templates cannot be read, "T
 could not be loaded." with "Retry" and "Not now".
 Involved: BASE-F01, INVENTORY-F12
 
-### BASE-F39 Enter with the erplora.com account
+### BASE-F39 Open System and move between its tabs
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: System · Resources
+Steps:
+  1. They tap "System" in the side menu, or come from the bell's "Failed events" row.
+  2. At the bottom there are five tabs, in this order: "Resources", "Plan and limits", "Updates", "Failed events"
+     and "Logs". "Resources" opens. The tab chosen stays in the address: a link or a reload opens the same one.
+  3. A tab that does not exist opens "Resources"; the old backups one leads to "Settings" › "Data and backups".
+  4. Whoever is neither the owner nor an administrator sees four: "Logs" does not exist for them and, if they ask
+     for it, "Resources" opens. In "Resources" they read "Only the owner or an administrator can see how much the
+     hub is using." and in "Failed events", "Only the owner or an administrator can see the failed events.", with
+     no "Retry".
+In: the person's role in the business; whoever does not run it is never asked for anything the hub would refuse.
+Out: nothing saved.
+If it fails: each tab says its own (BASE-F40 to BASE-F43).
+Involved: none
+
+### BASE-F40 See how much the hub is using
+Status: partial — no CPU, memory or connections of the business: one service serves every business and no figure is its own alone; the size and the use of its database come when each business has its own
+Actor: owner, administrator
+Screen: System · Resources
+Steps:
+  1. They open "System": "Resources" opens. While it loads: "Reading the system…".
+  2. The title is "Cloud resources", with the "Cloud" pill.
+  3. The "Database" card says "PostgreSQL" and, below, "Shared database" (or "Database of its own" when the
+     business has its own).
+  4. Below: "CPU, memory and connections are not measured per business: ERPlora's servers serve every business at
+     once and grow by themselves when needed.". Never a made-up figure or a zero.
+In: which database the business is on.
+Out: nothing saved.
+If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
+try again." with "Retry".
+Involved: none
+
+### BASE-F41 Know which version is running and what has been updated
+Status: partial — the version and its date, yes; without the list of what changed in each app: every app is published together, in a single deployment and without release notes
+Actor: owner, administrator
+Screen: System · Updates
+Steps:
+  1. They open the "Updates" tab. The title is "What we have updated" and a pill says which version the hub is
+     on. While it loads: "Reading the version…".
+  2. Below, the day it was updated or, when that is not known, "We do not know when this version was
+     published.": never a made-up date.
+  3. And: "This hub updates itself when we publish a new version, without stopping the service: there is nothing
+     to install.". There is no button to update.
+  4. Whoever does not run the business sees the title and that text, without the version.
+In: the version running and when it was published.
+Out: nothing saved.
+If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
+try again." with "Retry".
+Involved: none
+
+### BASE-F42 See the log of what happened in the system
+Status: done
+Actor: owner, administrator
+Screen: System · Logs
+Steps:
+  1. They open the "Logs" tab: the title is "Event log". For whoever does not run the business the tab does not
+     exist (BASE-F39).
+  2. They see the last 50 events between the business's apps, newest first, with "Time", "Level" ("Info",
+     "Warning" or "Error", in a pill) and "Event": its name, the app that recorded it and what happened to it in
+     their language (delivered, waiting, in "Failed events"…). Never what it carried.
+  3. They search with "Search event…", filter by level and go 20 at a time. On a phone, each event is a card
+     headed by its time.
+  4. The log gets up to date by itself when a notice fails, is resent or is discarded; the rest, when the tab
+     opens again.
+In: the last events of this business, never another's.
+Out: nothing saved.
+If it fails: "The log could not be loaded. Check the connection and try again." with "Retry". With no events:
+"No events yet: nothing has gone between this business's apps.".
+Involved: none
+
+### BASE-F43 See the failed events
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. They come from the bell's "Failed events" row (BASE-F10) or tap the "Failed events" tab.
+  2. While it loads: "Loading the failed events…". With events: "Fix the cause (a permission, an app that is
+     off…) and resend. The event is never edited: if the cause is still there, it fails again and comes back
+     here.".
+  3. Each notice is a card with its name, how many times it was tried, from which app to which it was going (for
+     instance, from "Sales & POS" to "Invoicing"), when it happened and its last error as it is, with "Resend" and
+     "Discard". On top, "Resend all". If the app it was for is no longer on, the card says it cannot be resent
+     until it is turned on, with no "Resend".
+  4. The 100 most recent show; with more, the screen says how many show out of how many.
+  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded.
+  6. With none: "All in order" — "No failed events. The queue of events lives in the database: a restart never
+     loses it.".
+In: the notices between apps of this business that ran out of retries, never another's.
+Out: nothing saved.
+If it fails: "We could not read the system" — "The queue of failed events could not be loaded. Check the
+connection and try again." with "Retry" in sight: a failure never shows as "All in order". Whoever does not run
+the business reads "Only the owner or an administrator can see the failed events.".
+Involved: none
+
+### BASE-F44 Resend a failed event
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. Whoever fixed the cause (turned the app on, completed the business's details…) taps "Resend" on its card;
+     the button is disabled while it works.
+  2. "Event resent." shows, the card goes away and the bell goes down at once.
+  3. The notice goes back to the queue with its attempts at zero and only the app that had failed gets it; if the
+     cause is still there, it fails again and comes back here.
+In: the notice chosen.
+Out: the notice, back in the queue; `base.failed_event.retried`.
+If it fails: "Could not resend:" and the reason: "that event is no longer in the queue; refresh the list."
+(someone resent or discarded it first), "the app it was for is no longer on in this business; turn it on and
+resend it." or "only the owner or an administrator can do it.".
+Involved: none
+
+### BASE-F45 Resend all the failed events
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. After a failure that knocked over several notices, they fix the cause and tap "Resend all" (it only shows
+     with notices in the list).
+  2. They confirm in "Resend every failed event?" — "The ones that can be resent go back to the queue; those for
+     an app that is off stay here." with "Resend all" (or "Cancel": nothing happens).
+  3. How many were resent shows ("Events resent: 2.") and the list and the bell empty; if there was none that
+     could be resent: "There was nothing to resend.".
+  4. Every notice of the business that can be resent goes back to the queue, also those that do not fit in the
+     list; those for an app that is off stay.
+In: the business's failed notices.
+Out: the notices, back in the queue; `base.failed_event.retried`, with how many.
+If it fails: "Could not resend:" and the reason, as in BASE-F44.
+Involved: none
+
+### BASE-F46 Discard a failed event
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. They decide a notice must never be delivered (it is repeated, it was done by hand) and tap "Discard" on its
+     card.
+  2. The "Discard this event for good?" window opens: it says which notice will never reach which app and that
+     who discarded it, when and why are kept, warns "If it was a sale for Invoicing, that sale stays without its
+     invoice." and asks "Why (optional)".
+  3. They tap "Discard for good" (or "Cancel": nothing happens).
+  4. "Event discarded (kept for the audit)." shows, the card goes away and the bell goes down.
+In: the notice chosen and, if they want, why.
+Out: the notice closed for good, with who, when and why; it is neither deleted nor tried again.
+`base.failed_event.discarded`.
+If it fails: "Could not discard:" and the reason, as in BASE-F44.
+Involved: none
+
+### BASE-F47 Report an error of the screen without anyone asking
+Status: done
+Actor: system
+Screen: none
+Steps:
+  1. The person does nothing: when the screen has an error nobody caught (also while drawing a part of the
+     screen, or in a wait that failed untreated), it is noted by itself.
+  2. It is sent to the hub with no window, no capture and no question, even while the tab is closing.
+  3. An identical error is not sent again within 30 seconds, and at most 50 different ones are remembered.
+  4. The hub leaves it in its error log with the business, the person and the screen where it happened.
+In: the error's message, its trace and the screen, only with a session.
+Out: one line in the hub's error log; nothing is kept in the browser.
+If it fails: nothing visible happens: the sending is not retried and makes no other report. With no session, or
+with more than 30 reports a minute from the same person, the hub does not note it. To tell something by hand,
+"Report a problem" in the user menu.
+Involved: none
+
+### BASE-F48 Enter with the erplora.com account
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -913,7 +1105,7 @@ Steps:
   3. They come back to the business already in, on the screen they had asked for (a link to a tab, such as
      `/settings#data` or `/system#plan`, comes back to that tab) or on **Home**. If this device asks for a PIN,
      the business already enters its tills with a PIN and the person has none yet, it first asks them to choose
-     it (BASE-F41).
+     it (BASE-F50).
 In: the account erplora.com checks; this browser.
 Out: the person's session in this business and this browser turned into a trusted device of the business (it
 shows in "Devices", shared until someone says otherwise). The session lasts a 12-hour shift on a shared device,
@@ -922,7 +1114,7 @@ If it fails: erplora.com says why they do not get in (credentials, verification,
 hub"); the business keeps nothing until it comes back with the person identified.
 Involved: BASE-F13
 
-### BASE-F40 Enter from the erplora.com panel without typing the password again
+### BASE-F49 Enter from the erplora.com panel without typing the password again
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -930,22 +1122,22 @@ Steps:
   1. At erplora.com, with the session open, they tap enter their business.
   2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
 In: the one-time pass erplora.com gives.
-Out: the same as BASE-F39: the session and this browser as a trusted device of the business, so it then offers
+Out: the same as BASE-F48: the session and this browser as a trusted device of the business, so it then offers
 the PIN pad, shows in "Devices" and its mode can be changed.
 If it fails: an expired or already used pass opens nothing: the business asks for erplora.com's sign-in again.
-Involved: BASE-F39
+Involved: BASE-F48
 
-### BASE-F41 Choose the PIN the first time one enters a till
+### BASE-F50 Choose the PIN the first time one enters a till
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Create your PIN
 Steps:
-  1. After entering with the account (BASE-F39) on a shared device of a business that asks for a PIN, where
+  1. After entering with the account (BASE-F48) on a shared device of a business that asks for a PIN, where
      someone else already enters with theirs, and if the person has no PIN yet, "Create your PIN" shows — "With
      it you will enter this till without your password.".
   2. They type the PIN on the keypad of circles: "Choose a {n}-digit PIN" (4 or 6, whatever the business says).
   3. They repeat it: "Confirm your PIN". Once it matches it is saved and they go where they were going.
-  4. "Not now" leaves it for later: they enter all the same and can choose it in **My profile** (BASE-F52).
+  4. "Not now" leaves it for later: they enter all the same and can choose it in **My profile** (BASE-F61).
 In: the session just opened; the business's PIN digits.
 Out: the person's PIN, stored encrypted; their face shows in "Switch user" at once and on the PIN pad of
 **Access** within a minute.
@@ -954,9 +1146,9 @@ Repeated or consecutive digits: "That PIN is too easy to guess: avoid repeated d
 Someone else already uses it: "Another active person already has that PIN: choose a different one.". Without a
 connection: "Could not save the PIN. Try again.". A business in which nobody has a PIN does not ask for it on
 entering: the first one is chosen in **My profile**.
-Involved: BASE-F39, BASE-F52
+Involved: BASE-F48, BASE-F61
 
-### BASE-F42 Enter with a PIN
+### BASE-F51 Enter with a PIN
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -979,9 +1171,9 @@ which nobody ever entered with an account, or that an administrator removed: "Th
 PIN yet. Sign in once here with your account and from then on it will.". Without a connection, "Could not enter.
 Check the connection and try again."; if who works here cannot be read, "Could not load the PIN pad. You can
 still enter with your account.".
-Involved: BASE-F41, BASE-F54
+Involved: BASE-F50, BASE-F63
 
-### BASE-F43 Enter by passing the badge
+### BASE-F52 Enter by passing the badge
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -992,12 +1184,12 @@ Steps:
   3. They come in as the card's owner.
 In: the number the reader reads. It is only listened to on the "PIN" tab of a device that offers the PIN pad and
 in **Switch user**; on "Account" or while the PIN is being chosen, it is not.
-Out: the same as BASE-F42.
+Out: the same as BASE-F51.
 If it fails: a card that is nobody's or whose owner is gone: "That badge opens nothing here. Enter with your PIN
 or ask an administrator."; it counts as a failed attempt. The PIN pad stays available.
-Involved: BASE-F42
+Involved: BASE-F51
 
-### BASE-F44 Lose the session because it was opened on another device
+### BASE-F53 Lose the session because it was opened on another device
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1014,7 +1206,7 @@ Out: the sessions of the devices left over, ended, and the reason kept on each o
 If it fails: with no limit in the plan nothing ends.
 Involved: BASE-F11, BASE-F28
 
-### BASE-F45 The session ends while working
+### BASE-F54 The session ends while working
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1029,9 +1221,9 @@ Steps:
 In: the session that no longer exists.
 Out: nothing saved; the half-made sale is kept by its app.
 If it fails: without a network, the screen does not take the session as ended.
-Involved: BASE-F13, BASE-F57
+Involved: BASE-F13, BASE-F66
 
-### BASE-F46 Close the session of a till nobody touches
+### BASE-F55 Close the session of a till nobody touches
 Status: done
 Actor: system
 Screen: Access
@@ -1044,9 +1236,9 @@ In: the business's minutes, which come with the page itself (there is no separat
 Out: the session closed in the business. The open check is kept by its app.
 If it fails: with "Until signing out", on a personal device or where no PIN is asked nothing closes; even if the
 screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour.
-Involved: BASE-F54
+Involved: BASE-F63
 
-### BASE-F47 Switch user without losing the sale
+### BASE-F56 Switch user without losing the sale
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Switch user
@@ -1067,9 +1259,9 @@ If it fails: wrong PIN: "Wrong PIN." and whoever was in stays in. Too many attem
 and the minutes they have to wait. Nobody with a PIN: "Nobody here has a PIN yet: give one in My profile or in
 Employees.". Without being able to read who works here: "Could not load who works here. Check the connection and
 try again.".
-Involved: BASE-F42, BASE-F43
+Involved: BASE-F51, BASE-F52
 
-### BASE-F48 Sign out
+### BASE-F57 Sign out
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
@@ -1083,7 +1275,7 @@ Out: the session closed in the business.
 If it fails: if the business does not answer, the session expires by itself.
 Involved: none
 
-### BASE-F49 Decide whether this device is shared or personal
+### BASE-F58 Decide whether this device is shared or personal
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1101,9 +1293,9 @@ If it fails: whoever does not run the business sees the options off and "Only an
 people enter on this device.". A browser in which nobody ever entered with the account: "This browser is not a
 device of the business yet: enter once here with your account and you will be able to choose.". Without a
 connection: "Could not change this device. Check the connection and try again.".
-Involved: BASE-F42
+Involved: BASE-F51
 
-### BASE-F50 Open a hub that is not set up yet
+### BASE-F59 Open a hub that is not set up yet
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
@@ -1117,7 +1309,7 @@ If it fails: an address that belongs to no business does not exist; a business t
 is no longer available.".
 Involved: none
 
-### BASE-F51 Change my details, photo, language and appearance
+### BASE-F60 Change my details, photo, language and appearance
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -1141,7 +1333,7 @@ save the photo. Use a JPG, PNG or WebP of up to 2 MB."; preferences: "Could not 
 connection and try again.".
 Involved: none
 
-### BASE-F52 Change my PIN from My profile
+### BASE-F61 Change my PIN from My profile
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -1157,14 +1349,14 @@ match."; easy to guess: "That PIN is too easy to guess: avoid repeated digits (1
 else already uses it: "Another active person already has that PIN: choose a different one."; the current one is
 not it: "That is not your current PIN. Type it right to set a new one."; thirty tries in an hour: "Too many tries
 to change the PIN." and the minutes they have to wait.
-Involved: BASE-F41
+Involved: BASE-F50
 
-### BASE-F53 Choose how many digits the business's PIN has
+### BASE-F62 Choose how many digits the business's PIN has
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
 Steps:
-  1. With the PIN pad on (BASE-F54), under "PIN digits" they choose "4 digits" or "6 digits".
+  1. With the PIN pad on (BASE-F63), under "PIN digits" they choose "4 digits" or "6 digits".
   2. It is saved at once. Below: "Everyone types the same number of digits, which is what lets the keypad enter
      at the last one instead of asking you to confirm. The PINs in use keep working until their owner changes
      them.".
@@ -1172,9 +1364,9 @@ Steps:
 In: the choice.
 Out: the length of the business's PIN. It does not touch the PINs there are.
 If it fails: "Could not change it. Check the connection and try again.".
-Involved: BASE-F54
+Involved: BASE-F63
 
-### BASE-F54 Decide whether the till asks for a PIN and when it asks again
+### BASE-F63 Decide whether the till asks for a PIN and when it asks again
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1195,9 +1387,9 @@ back to asking per shift.
 If it fails: "Could not change it. Check the connection and try again.". If it cannot be read: "Could not load
 how the business asks for the PIN. Check the connection and try again.". Whoever does not run the business sees
 the controls off and "Only an administrator can change whether it asks.".
-Involved: BASE-F42, BASE-F46
+Involved: BASE-F51, BASE-F55
 
-### BASE-F55 See the devices someone has entered on
+### BASE-F64 See the devices someone has entered on
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1214,9 +1406,9 @@ Out: nothing saved.
 If it fails: whoever does not run the business sees "Only an administrator can see and remove the devices.",
 with no list. If it does not arrive: "Could not load the devices. Check the connection and try again.", never
 "Nobody has entered from any device yet.", which is only for a truly empty list.
-Involved: BASE-F56, BASE-F57, BASE-F58
+Involved: BASE-F65, BASE-F66, BASE-F67
 
-### BASE-F56 Name a device
+### BASE-F65 Name a device
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1228,9 +1420,9 @@ In: the name.
 Out: the device's name, the only detail of the row the business decides.
 If it fails: "Could not change the name. Check the connection and try again." or "That name is too long. Give it
 a shorter one and save again.".
-Involved: BASE-F55
+Involved: BASE-F64
 
-### BASE-F57 Remove a device that was lost
+### BASE-F66 Remove a device that was lost
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1246,9 +1438,9 @@ Out: the device forgotten and its sessions ended: the device is cut off, not the
 again with their account.
 If it fails: "Could not remove this device. Check the connection and try again." or "That device is no longer
 registered here. Refresh the list."; what was refused never stays as done.
-Involved: BASE-F45, BASE-F55
+Involved: BASE-F54, BASE-F64
 
-### BASE-F58 Remove at once the devices nobody uses
+### BASE-F67 Remove at once the devices nobody uses
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1260,6 +1452,6 @@ Steps:
      account. Those used in the last 30 days and the one you are using stay.".
   3. They confirm with "Remove".
 In: which devices nobody has used for 30 days.
-Out: those devices forgotten, as in BASE-F57.
+Out: those devices forgotten, as in BASE-F66.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
-Involved: BASE-F57
+Involved: BASE-F66

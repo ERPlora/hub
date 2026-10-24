@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0009_import_batch'),
+        ('base', '0010_event_delivery_discard'),
         ('sessions', '0001_initial'),
     ]
 

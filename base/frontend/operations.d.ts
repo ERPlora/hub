@@ -289,6 +289,52 @@ export interface HubReset {
   apps: Removal[];
 }
 
+// ── System (APP-BASE-7) ──
+
+/** `base.SystemStatusOut`: the release running and where the business's data lives. */
+export interface SystemStatus {
+  /** The commit, short; `dev` locally. */
+  version: string;
+  /** When it was published (ISO 8601), or null: never made up. */
+  released_at: string | null;
+  /** Phase 1: the database every business shares. */
+  shared_database: boolean;
+}
+
+/** `base.EventLogEntryOut`: an event between apps as System › Logs shows it. */
+export interface EventLogEntry {
+  id: string;
+  at: string;
+  level: 'info' | 'warning' | 'error';
+  name: string;
+  app: string;
+  app_name: string;
+  detail: string;
+}
+
+/** `base.FailedEventOut`: a delivery the relay gave up on. */
+export interface FailedEvent {
+  /** The delivery: what is resent or discarded. */
+  id: string;
+  event_id: string;
+  name: string;
+  source_app: string;
+  source_app_name: string;
+  target_app: string;
+  target_app_name: string;
+  attempts: number;
+  occurred_at: string;
+  last_error: string;
+  /** False: the app it was for is no longer on in this business. */
+  retryable: boolean;
+}
+
+/** `base.FailedEventListOut`. */
+export interface FailedEventPage {
+  items: FailedEvent[];
+  total: number;
+}
+
 // ── The way in (APP-BASE-3) ────────────────────────────────────────────────────────────────────────────────────
 
 /** `base.PinPersonOut`: a face of the PIN pad's grid; `id` is what a PIN entry names, never the account. */
@@ -394,6 +440,13 @@ declare module '@erplora/ui/sdk' {
       input: { apps?: string[]; confirm?: string; dry_run?: boolean };
       output: HubReset;
     };
+    // System (APP-BASE-7)
+    'base.system.status': { input: NoInput; output: SystemStatus };
+    'base.event.list': { input: NoInput; output: { entries: EventLogEntry[] } };
+    'base.failed_event.list': { input: { limit?: number; offset?: number }; output: FailedEventPage };
+    'base.failed_event.retry': { input: { id: string }; output: { id: string } };
+    'base.failed_event.retry_all': { input: NoInput; output: { count: number } };
+    'base.failed_event.discard': { input: { id: string; reason?: string }; output: { id: string } };
 
     // The way in (APP-BASE-3)
     'base.access.door': { input: NoInput; output: AccessDoor };

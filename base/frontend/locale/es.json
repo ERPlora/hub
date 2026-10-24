@@ -194,7 +194,6 @@
       "limitHint": "Límite del plan",
       "noLimit": "Sin límite",
       "upTo": "Hasta {n}",
-      "devicesInUse": "Con una sesión abierta ahora.",
       "full": {
         "heading": "Te estás quedando sin margen en tu plan",
         "body": "Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más."
@@ -207,7 +206,8 @@
         "heading": "No hemos podido leer tu plan",
         "body": "Comprueba la conexión y vuelve a intentarlo."
       },
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "devicesInUse": "Con una sesión abierta ahora."
     },
     "settings": {
       "title": "Ajustes",
@@ -378,6 +378,96 @@
       "cutHint": "Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.",
       "report": "Ver el informe",
       "continue": "Continuar"
+    },
+    "system": {
+      "tabs": {
+        "resources": "Recursos",
+        "updates": "Actualizaciones",
+        "events": "Eventos caídos",
+        "logs": "Registros"
+      },
+      "error": {
+        "heading": "No se pudo consultar el sistema",
+        "body": "Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo."
+      },
+      "retry": "Reintentar",
+      "resources": {
+        "heading": "Recursos en la nube",
+        "cloud": "Nube",
+        "database": "Base de datos",
+        "engine": "PostgreSQL",
+        "shared": "Base de datos compartida",
+        "own": "Base de datos propia",
+        "notMeasured": "El uso de CPU, memoria y conexiones no se mide por negocio: los servidores de ERPlora atienden a todos los negocios a la vez y crecen solos cuando hace falta.",
+        "denied": "Solo el dueño o un administrador puede ver cuánto está usando el hub.",
+        "loading": "Consultando el sistema…"
+      },
+      "updates": {
+        "heading": "Qué te hemos actualizado",
+        "loading": "Consultando la versión…",
+        "version": "Vas por la {version}",
+        "auto": "Este hub se actualiza solo cuando publicamos una versión nueva, sin cortar el servicio: no tienes que instalar nada.",
+        "releasedAt": "Actualizado el {date}.",
+        "unknownDate": "No sabemos cuándo se publicó esta versión."
+      },
+      "failed": {
+        "heading": "Eventos caídos",
+        "hint": "Arregla la causa (un permiso, una app parada…) y reenvía. El evento no se edita: si la causa sigue, vuelve a caer aquí.",
+        "attempts": "Intentos: {n}",
+        "route": "De {source} para {target}",
+        "notRetryable": "Este no se puede reenviar: {app} ya no está activa en este negocio. Actívala y vuelve a reenviarlo.",
+        "retry": "Reenviar",
+        "discard": "Descartar",
+        "retryAll": "Reenviar todos",
+        "more": "Se ven los {shown} más recientes de {total}.",
+        "empty": {
+          "heading": "Todo en orden",
+          "body": "No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio nunca la pierde."
+        },
+        "loading": "Cargando los eventos caídos…",
+        "errorBody": "No se pudo cargar la cola de eventos caídos. Comprueba la conexión y reintenta.",
+        "denied": "Solo el dueño o un administrador puede ver los eventos caídos.",
+        "retried": "Evento reenviado.",
+        "retriedAll": "Eventos reenviados: {count}.",
+        "nothingToRetry": "No había nada que reenviar.",
+        "retryAllConfirm": {
+          "title": "¿Reenviar todos los eventos caídos?",
+          "message": "Los que se pueden reenviar vuelven a la cola; los que iban a una app parada se quedan aquí."
+        },
+        "discardConfirm": {
+          "title": "¿Descartar este evento para siempre?",
+          "message": "«{event}» ya no llegará nunca a {app}. Se guarda quién lo descartó, cuándo y por qué.",
+          "consequence": "Si era una venta para Facturación, esa venta se queda sin factura.",
+          "reason": "Por qué (opcional)",
+          "confirm": "Descartar para siempre",
+          "cancel": "Cancelar"
+        },
+        "discarded": "Evento descartado (se guarda para auditoría).",
+        "retryFailed": "No se pudo reenviar: {reason}",
+        "discardFailed": "No se pudo descartar: {reason}",
+        "reasons": {
+          "gone": "ese evento ya no está en la cola; actualiza la lista.",
+          "appOff": "la app a la que iba ya no está activa en este negocio; actívala y vuelve a reenviarlo.",
+          "denied": "solo el dueño o un administrador puede hacerlo.",
+          "unknown": "no se ha podido leer el motivo."
+        }
+      },
+      "log": {
+        "heading": "Registro de eventos",
+        "columns": {
+          "at": "Hora",
+          "level": "Nivel",
+          "event": "Evento"
+        },
+        "levels": {
+          "info": "Información",
+          "warning": "Aviso",
+          "error": "Error"
+        },
+        "search": "Buscar evento…",
+        "empty": "Sin eventos: todavía no ha pasado nada entre las apps de este negocio.",
+        "error": "No se pudo cargar el registro. Comprueba la conexión y reintenta."
+      }
     },
     "pinpad": {
       "erase": "Borrar"
