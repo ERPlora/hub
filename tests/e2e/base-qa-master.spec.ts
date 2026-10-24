@@ -340,6 +340,17 @@ for (const language of LANGUAGES) {
       await menu(page, 'employees', /\/employees/);
       const people = shown(page).locator('[data-testid="people-row"], [data-testid="people-card"]');
       await expect(people.first()).toBeVisible();
+      // In a table row, the owner's name (their address until they give one) never runs under the «You» pill: it ends
+      // in «…». A card, on a phone, breaks it into lines.
+      const contained = await shown(page)
+        .locator('[data-testid="people-row"] .people-name')
+        .evaluateAll((names) =>
+          names.every((el) => {
+            const style = getComputedStyle(el);
+            return el.scrollWidth <= el.clientWidth || (style.overflowX === 'hidden' && style.textOverflow === 'ellipsis');
+          }),
+        );
+      expect(contained, `the owner's name runs out of its box at ${size.label}`).toBe(true);
       await check('employees');
       await people.first().click();
       await expect(page).toHaveURL(/\/employees\/[^/#?]+$/);
