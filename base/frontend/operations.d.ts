@@ -86,11 +86,61 @@ export interface DeviceNoticeRow {
   route: string;
 }
 
+// ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────
+
+/** Where a module's right comes from (`base.entitlement`): free, the plan, a purchase, with an app that needs it,
+ *  or none (it needs a subscription, bought on erplora.com). */
+export type AppRight = 'free' | 'plan' | 'purchase' | 'required' | 'missing';
+
+/** `base.AppOut`: a module of the deployment as the Apps screen paints it. */
+export interface AppRow {
+  id: string;
+  name: string;
+  icon: string;
+  category: string;
+  category_label: string;
+  summary: string;
+  /** Bought on erplora.com; the Store has its price. */
+  premium: boolean;
+  right: AppRight;
+  /** «blocked»: no right to it (phase 2 adds turned off, activating and failed). */
+  state: 'on' | 'blocked';
+  /** The first screen of its menu this person may open; null: no «Open». */
+  path: string | null;
+  /** What it needs, transitively (it comes along with it), and the apps that need it: ids. */
+  requires: string[];
+  required_by: string[];
+}
+
+/** `base.AppListOut`. */
+export interface AppList {
+  apps: AppRow[];
+  /** erplora.com's Store of this business's modules. */
+  store_url: string;
+}
+
+/** `base.LimitOut`: what is in use (null: the Hub does not count it) against the plan's limit (null: none). */
+export interface PlanLimit {
+  used: number | null;
+  limit: number | null;
+}
+
+/** `base.PlanUsageOut`: «Plan and limits» of System. */
+export interface PlanUsage {
+  /** Whether the Hub has the business's plan from erplora.com yet. */
+  known: boolean;
+  people: PlanLimit;
+  devices: PlanLimit;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
     'base.widget.list': { input: NoInput; output: { widgets: WidgetDef[] } };
     'base.bell.counters': { input: NoInput; output: { counters: BellCounter[] } };
     'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
+    // Apps (APP-BASE-4)
+    'base.app.list': { input: NoInput; output: AppList };
+    'base.plan.usage': { input: NoInput; output: PlanUsage };
   }
 }

@@ -58,6 +58,15 @@ msgstr "Base"
 msgid "next must be the deep link /admin/hub/<slug>/ of a hub."
 msgstr "next debe ser el enlace directo /admin/hub/<slug>/ de un hub."
 
+#: entitlement.py:108
+#, python-format
+msgid ""
+"%(app)s needs a subscription this business does not have. It is bought on "
+"erplora.com, in the Store."
+msgstr ""
+"%(app)s necesita una suscripción que este negocio no tiene. Se contrata en "
+"erplora.com, en la Tienda."
+
 #: middleware.py:107 registry.py:85 ws_print.py:244 ws_print.py:246
 msgid "Not found"
 msgstr "No encontrado."
