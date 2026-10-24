@@ -149,7 +149,7 @@
       "loadErrorBody": "There was no answer, or this session is no longer valid: sign in again if it keeps happening.",
       "retry": "Retry",
       "empty": {
-        "mine": "You have no apps yet. Open «Add apps» to see them all.",
+        "mine": "You have no apps yet. Open “Add apps” to see them all.",
         "all": "There are no apps to show.",
         "paid": "No app is sold separately: every app comes with your plan."
       },

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:348ab9e922b9315ae5df8683324547a0e86b74ce8670c5f0ca16c9e90d4b1e5c -->
+<!-- generated from WORKBOOK.md sha256:a25fa5619870ddab6a0653f328e83773e4e2b8a0fd4f30ade66d59ebf0e80812 -->
 
 ## What it is for and who it is for
 
@@ -76,6 +76,21 @@ Over any screen while a step that stops invoicing is missing: "No ticket or invo
 this is set up:" and each step with "Set up" (on the screen that sets it up, only its name). It does not
 show on the Home's "Summary" (the list says the same a little further down); on "Activity", it does.
 
+### Apps
+From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
+apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). Each one, a table (or cards) with its
+search, the filters funnel, the order and "Columns": "App" (icon and name), "Category" and "Status"; in "Add
+apps" and "Paid", also "Description", "Price" and "Comes with". "Open" on the row of an app the person can open.
+
+### The screen of an app that does not open
+In the same address as the app's screen, the reason: "Subscription needed" or "This app is not available in
+this business", with "Go to Apps" (and "Subscribe on erplora.com" for whoever runs the business, in the
+browser).
+
+### System · Plan and limits
+From "System" in the side menu, the "Plan and limits" tab: "Your plan's limits" with "Within the limit" or
+"Close to the limit", the "People" and "Devices" cards and where plans are managed.
+
 ## States of each screen
 
 | State | What the person sees |
@@ -102,6 +117,21 @@ show on the Home's "Summary" (the list says the same a little further down); on 
 | BASE-F11 | Go to erplora.com to manage or upgrade the plan | partial |
 | BASE-F12 | Ask the assistant to go over the setup | partial |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
+| BASE-F14 | See the business's apps | done |
+| BASE-F15 | Open an app from Apps | done |
+| BASE-F16 | Look for an app in the catalogue | done |
+| BASE-F17 | Know how much an app costs before having it | done |
+| BASE-F18 | Install an app | partial |
+| BASE-F19 | Know what else comes with an app | partial |
+| BASE-F20 | Try to use an app that needs a subscription | done |
+| BASE-F21 | See why an app could not be turned on and try again | partial |
+| BASE-F22 | Follow an app being turned on while moving around | partial |
+| BASE-F23 | Turn an app off | partial |
+| BASE-F24 | Turn an app on | partial |
+| BASE-F25 | See an app refuse to be turned off | partial |
+| BASE-F26 | Understand why an app does not open | done |
+| BASE-F27 | See a paid app blocked | done |
+| BASE-F28 | See how much of the plan's limits is in use | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -333,3 +363,244 @@ Out: that person's sessions ended; their role in the business, up to date.
 If it fails: if the hub does not answer at that moment, erplora.com tries again shortly; meanwhile, the
 next time erplora.com passes the business's state to the hub those sessions end too.
 Involved: HUBS-F26, HUBS-F27, HUBS-F28
+
+### BASE-F14 See the business's apps
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Apps
+Steps:
+  1. They tap "Apps" in the side menu. It opens on the "My apps" tab; "Add apps" and "Paid" have their own
+     address too, which can be linked.
+  2. While the list arrives: "Loading your apps…". Then one row (or one card, as chosen) for each app the
+     business has running, with its icon and its name, its "Category" and its "Status" ("Active").
+  3. They search in "Search your apps…" (name, description or category), filter by category with the funnel,
+     sort or choose columns.
+  4. When the business subscribes to an app on erplora.com or stops having it, the list updates by itself,
+     without reloading.
+In: the apps the hub brings and what the business has subscribed to on erplora.com.
+Out: nothing saved.
+If it fails: "We could not read your apps" — "There was no answer, or this session is no longer valid: sign in
+again if it keeps happening." with "Retry"; the list there was stays below (a failure never says there are no
+apps). With no app at all: "You have no apps yet. Open “Add apps” to see them all.".
+Involved: none
+
+### BASE-F15 Open an app from Apps
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Apps
+Steps:
+  1. On the row of an app in "My apps", they tap "Open".
+  2. The first screen of that app the person can see opens.
+In: the app's menu and what the person can see.
+Out: nothing saved.
+If it fails: an app the person cannot open, or that is not running, has no "Open" (it does not show greyed
+out: it does not show). On tapping, it is checked again, in case it just changed: if it is no longer running,
+nothing opens.
+Involved: none
+
+### BASE-F16 Look for an app in the catalogue
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Apps
+Steps:
+  1. In Apps, they tap "Add apps" (every ERPlora app) or "Paid" (only the ones subscribed to separately).
+  2. While it arrives: "Loading the catalogue…". Then one row per app with "App", "Category", "Description",
+     "Price", "Comes with" and "Status" ("Installed" or "Needs a subscription"), with the names and the
+     descriptions in the language of whoever looks.
+  3. They search in "Search apps to add…" (in "Paid", "Search paid apps…") by name, description or
+     category, and filter by category or by status.
+In: the apps the hub brings and what the business has subscribed to on erplora.com.
+Out: nothing saved.
+If it fails: as in "My apps" (BASE-F14). A search without results: "No apps match your search.".
+Involved: APPS-F01
+
+### BASE-F17 Know how much an app costs before having it
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Apps
+Steps:
+  1. In "Add apps" or "Paid", the "Price" column says of each app: "Free" (it comes with any plan), "Included
+     in your plan", "Subscribed", "Included with" and the app that brings it (a paid one that comes with
+     another the business has) or "Paid".
+  2. The amount of a "Paid" app is on erplora.com's Store; whoever runs the business opens it from "Subscribe
+     on erplora.com" (BASE-F20).
+  3. "Paid" gathers only the apps subscribed to separately: a free one never shows there. If none is sold
+     separately: "No app is sold separately: every app comes with your plan.".
+In: whether each app is subscribed to separately and what the business has subscribed to on erplora.com.
+Out: nothing saved. The hub neither charges nor shows amounts: the price and the purchase are erplora.com's.
+If it fails: without the list, as in "My apps" (BASE-F14).
+Involved: APPS-F01, APPS-F07
+
+### BASE-F18 Install an app
+Status: partial — in this phase every ERPlora app already comes running in every business (the paid ones, as soon as they are subscribed to): turning an app on or off per business comes with the activation of apps
+Actor: administrator
+Screen: Apps
+Steps:
+  1. The free apps are already in "My apps" and in the menu; a paid one shows in both by itself, without
+     reloading, as soon as it is subscribed to on erplora.com (BASE-F20).
+  2. In "Add apps", whoever runs the business turns on an app the business does not use: while it is being
+     prepared, the row says "Activating…"; then it becomes "Installed" and the app shows in "My apps" and in
+     the menu.
+In: the chosen app and what the business has subscribed to on erplora.com.
+Out: the app running in this business.
+If it fails: BASE-F21.
+Involved: APPS-F07
+
+### BASE-F19 Know what else comes with an app
+Status: partial — Apps already says what each app brings and which app a paid one comes with; the notice on turning it on, which names what was turned on with it, comes with the activation of apps per business
+Actor: administrator
+Screen: Apps
+Steps:
+  1. In "Add apps", the "Comes with" column names the apps each one needs (for instance, "Sales & POS" comes
+     with "Customers" and "Taxes"): whoever has one also has the ones it brings.
+  2. A paid app the business has because another one it subscribed to needs it says "Included with" and the
+     name of that other one under "Price".
+  3. On turning on an app that needs others, the notice also names the ones turned on with it.
+In: what each app needs.
+Out: nothing saved.
+If it fails: if a paid app brings another paid one that has not been subscribed to, the two are subscribed to
+together: until then, "Needs a subscription".
+Involved: none
+
+### BASE-F20 Try to use an app that needs a subscription
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Apps
+Steps:
+  1. A paid app the business has not subscribed to shows in "Add apps" and in "Paid" with "Needs a
+     subscription", and is neither in "My apps" nor in the menu.
+  2. Whoever runs the business, in the browser, sees "Subscribe on erplora.com" next to it, which opens this
+     business's Store on erplora.com in a new tab: there they see the price and subscribe.
+  3. As soon as erplora.com tells the hub, the app becomes "Installed" and shows in "My apps" and in the menu,
+     without reloading.
+  4. Whoever does not run the business, and anyone in the installed app, sees "Subscribed to on erplora.com,
+     from your ERPlora account." and no button: the hub never sells.
+In: what the business has subscribed to, as erplora.com passes it to the hub.
+Out: nothing saved or charged in the hub.
+If it fails: until erplora.com tells the hub, the app keeps "Needs a subscription"; a screen of it that is
+opened says why (BASE-F27).
+Involved: APPS-F07
+
+### BASE-F21 See why an app could not be turned on and try again
+Status: partial — in this phase every ERPlora app already comes running in every business (the paid ones, as soon as they are subscribed to): turning an app on or off per business comes with the activation of apps
+Actor: administrator
+Screen: Apps
+Steps:
+  1. Turning an app on does not finish: its data could not be prepared.
+  2. Its row says it could not be turned on and offers "Retry", which asks for it again; meanwhile the app does
+     not open.
+In: the reason the hub gives.
+Out: nothing; the app stays as it was.
+If it fails: if it fails again, it says so again with its "Retry".
+Involved: none
+
+### BASE-F22 Follow an app being turned on while moving around
+Status: partial — in this phase every ERPlora app already comes running in every business (the paid ones, as soon as they are subscribed to): turning an app on or off per business comes with the activation of apps
+Actor: administrator
+Screen: Apps
+Steps:
+  1. Whoever runs the business turns an app on (BASE-F18) and goes to another screen.
+  2. The app shows "Activating…" in "My apps" and in the menu until it is ready; then it opens like any other,
+     on every device of the business, without reloading.
+In: how the activation is going.
+Out: nothing saved.
+If it fails: BASE-F21.
+Involved: none
+
+### BASE-F23 Turn an app off
+Status: partial — in this phase every ERPlora app already comes running in every business (the paid ones, as soon as they are subscribed to): turning an app on or off per business comes with the activation of apps
+Actor: administrator
+Screen: Apps
+Steps:
+  1. In "My apps", whoever runs the business turns an app off.
+  2. It asks, with the app's name, and names the apps that go off with it because they need it.
+  3. They confirm: the app and the ones that need it leave the menu and "My apps". Nothing is deleted: on
+     turning it on again it is as it was.
+In: the business's apps and what each one needs.
+Out: the app turned off in this business, with its data intact.
+If it fails: BASE-F25.
+Involved: VERIFACTU-F32
+
+### BASE-F24 Turn an app on
+Status: partial — in this phase every ERPlora app already comes running in every business (the paid ones, as soon as they are subscribed to): turning an app on or off per business comes with the activation of apps
+Actor: administrator
+Screen: Apps
+Steps:
+  1. In "Add apps", whoever runs the business turns on again an app they turned off.
+  2. It asks and names the apps that are turned on with it because it needs them; they confirm and the app comes
+     back to the menu with the data it had.
+In: what the app needs and what the business has subscribed to.
+Out: the app running in this business.
+If it fails: a paid app not subscribed to cannot be turned on: BASE-F20.
+Involved: none
+
+### BASE-F25 See an app refuse to be turned off
+Status: partial — in this phase every ERPlora app already comes running in every business (the paid ones, as soon as they are subscribed to): turning an app on or off per business comes with the activation of apps
+Actor: administrator
+Screen: Apps
+Steps:
+  1. Whoever runs the business tries to turn off an app another running one needs, or VeriFactu with records
+     the AEAT has not accepted yet.
+  2. The hub refuses, changes nothing and says why, with what has to be done first.
+In: the reason of the app that refuses.
+Out: nothing.
+If it fails: without a reason of the app's own, a notice that it could not be changed.
+Involved: VERIFACTU-F32
+
+### BASE-F26 Understand why an app does not open
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: The screen of an app that does not open
+Steps:
+  1. They open a screen of an app (from a link, the history or a tab left open) that cannot be used in this
+     business now.
+  2. Instead of the app, in the same address, while it checks: "Checking why this app does not open…".
+  3. Then, the reason: "Subscription needed" (BASE-F27), or "This app is not available in this business" —
+     "Look for it in Apps, or open another one from the menu."; both with "Go to Apps".
+In: what the business has of each app.
+Out: nothing.
+If it fails: "We could not check why this app does not open" — "Check the connection and try again." with
+"Retry": never a made-up reason. An address that does not exist in the hub says it does not exist, like any
+other. An app the person cannot see opens anyway and each screen says they have no permission.
+Involved: none
+
+### BASE-F27 See a paid app blocked
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: The screen of an app that does not open
+Steps:
+  1. The business stops having a paid app (its subscription on erplora.com ends) or someone opens one it has
+     not subscribed to.
+  2. On opening any of its screens they see "Subscription needed": the app's name and "is disabled because this
+     business does not have its subscription. Your data is safe and comes back as soon as it is subscribed
+     to.", with "Go to Apps" and, for whoever runs the business in the browser, "Subscribe on erplora.com".
+  3. The app leaves the menu and "My apps", and the hub does nothing asked of that app, whether it comes from
+     this screen, from another device, from the assistant or from an integration.
+  4. If it is subscribed to with the screen open, it changes to the app's name with "is ready" — "It can be
+     used now." and "Open" with its name, which opens it up to date.
+In: what the business has subscribed to, as erplora.com passes it to the hub.
+Out: nothing; the app's data is not touched.
+If it fails: if nobody tells the hub when the subscribed period ends, the hub notices by itself when the date
+passes. A demo business has every app, the paid ones too, to try them.
+Involved: APPS-F07
+
+### BASE-F28 See how much of the plan's limits is in use
+Status: partial — without how many devices are in use: the hub does not count its devices yet (it comes with the trusted devices); memory, CPU and database are no longer measured per business (erplora.com measures the use)
+Actor: owner, administrator
+Screen: System · Plan and limits
+Steps:
+  1. They tap "System" in the side menu: "Plan and limits" opens.
+  2. They see "Your plan's limits" with "Within the limit" or "Close to the limit", the "People" card (the
+     business's active people against the ones the plan allows, with its bar; or "No limit") and the
+     "Devices" one ("Up to" and the plan's limit, or "No limit").
+  3. With every place taken: "You are running out of room in your plan" — "Your plan has every place taken, so
+     you cannot add anyone else.", with no button.
+  4. Below: "Plans are managed from your ERPlora account, on erplora.com.". It updates by itself when the plan
+     or the people change.
+In: the plan's limits erplora.com passes to the hub and the business's active people.
+Out: nothing saved.
+If it fails: "We could not read your plan" — "Check the connection and try again." with "Retry". Whoever does
+not run the business sees "Only who runs the business sees the plan and its limits.", without "Retry". While
+the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com
+sends it.".
+Involved: none
