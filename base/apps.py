@@ -16,12 +16,13 @@ class BaseConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # The Home (PLAN-HUB round 2026-10-21): everyone of the hub sees it; whoever runs the hub (the old hub's
     # ``hub.administer``) is told its platform steps and the failed events.
-    permissions = ["base.view_home", "base.administer_hub"]
+    # Files (APP-BASE-8): everyone sees and opens them; who runs the hub uploads, renames and deletes (the old hub's).
+    permissions = ["base.view_home", "base.administer_hub", "base.view_files", "base.upload_files", "base.delete_files"]
     role_permissions = {
         "hub_owner": ["base.*"],
         "hub_admin": ["base.*"],
-        "hub_manager": ["base.view_home"],
-        "hub_employee": ["base.view_home"],
+        "hub_manager": ["base.view_home", "base.view_files"],
+        "hub_employee": ["base.view_home", "base.view_files"],
     }
 
     def ready(self) -> None:
