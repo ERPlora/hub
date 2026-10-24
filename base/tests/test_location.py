@@ -4,8 +4,9 @@ places it works in live inside it, as Square, Shopify, Lightspeed and Odoo keep 
 Every hub's database is born with exactly one default location, «Main» (``base/migrations/0015_location``; a new
 hub inherits it from the template it is cloned from), which the reader sees in their language («Principal» in
 Spanish). At most one is the default and the default is always active. ``base.location.list`` reads them for everyone
-of the hub; nothing writes them yet but the Django admin of the platform host, where which one is the default is read
-only and the default is never deleted. One hub never sees another's.
+of the hub, over ``GET /api/locations`` only: it becomes a live query with the commands that write them. Nothing writes
+them yet but the Django admin of the platform host, where which one is the default is read only and the default is
+never deleted. One hub never sees another's.
 """
 
 from importlib import import_module
@@ -22,7 +23,6 @@ from live.live_registry import live_registry
 from live.operations import get
 
 from base.admin import LocationAdmin
-from base.events import HUB_STATE_APPLIED
 from base.models import DEFAULT_LOCATION_NAME, Location
 from base.schemas import LocationListIn
 from base.tenancy import context, inventory
@@ -264,9 +264,9 @@ def test_an_employee_reads_them_over_http_and_a_stranger_does_not(client, make_u
     assert [row["name"] for row in response.json()["locations"]] == ["Principal"]
 
 
-def test_it_is_live_and_follows_the_saas_photo():
-    assert live_registry.subscribable["base.location.list"] == [HUB_STATE_APPLIED]
-    assert "base.location.list" in live_registry.affected([HUB_STATE_APPLIED])
+def test_it_is_not_live_until_something_writes_a_location():
+    # It becomes a live query with the base.location.* commands and their events; no other event changes a location.
+    assert not live_registry.is_subscribable("base.location.list")
 
 
 # ── The Django admin (platform host) ───────────────────────────────────────────────────────────────────────────────

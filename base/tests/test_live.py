@@ -65,8 +65,6 @@ def test_the_three_queries_and_their_events():
         "base.event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
         # Files (APP-BASE-8): every write of the business's files, and the photo (the plan's space).
         "base.file.list": sorted({HUB_STATE_APPLIED, *FILE_EVENTS}),
-        # Locations (round 2026-10-24b): nothing writes them yet but the admin; the photo re-runs them.
-        "base.location.list": [HUB_STATE_APPLIED],
     }
 
 
