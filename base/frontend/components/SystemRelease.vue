@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // System › Updates, the part of who runs the business (BASE-G89; the old hub's «You are on {version}», HUB_SHELL-F142):
 // the version running, from the live `base.system.status` (a deploy reconnects the stream and the new one shows by
-// itself), and when it was published, or that it is not known: never a made-up date. The old list of what changed per
+// itself), and when it was published, or that it is not known: never a made-up date. Until the status answers it says
+// it is reading, never an empty tab. The old list of what changed per
 // app has no place with one deployment for every app (old-hub HUB_SHELL-F143, retired).
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
@@ -26,8 +27,16 @@ const released = computed(() =>
 
 <template>
   <div class="system-release">
+    <p
+      v-if="data === undefined && !failed"
+      class="system-release-date"
+      data-testid="system-release-loading"
+      role="status"
+    >
+      {{ t('base.system.updates.loading') }}
+    </p>
     <InlineFeedback
-      v-if="failed"
+      v-else-if="failed"
       tone="danger"
       data-testid="system-release-error"
       :heading="t('base.system.error.heading')"

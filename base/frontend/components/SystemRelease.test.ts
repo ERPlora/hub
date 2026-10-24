@@ -28,6 +28,30 @@ describe('SystemRelease', () => {
     expect(m.wrapper.find('[data-testid="system-release-date"]').text()).toMatch(/^Updated on .*2026.*\.$/);
   });
 
+  it('says it is reading the version until the status answers, never an empty tab', async () => {
+    const m = await open();
+    const loading = m.wrapper.find('[data-testid="system-release-loading"]');
+    expect(loading.exists()).toBe(true);
+    expect(loading.attributes('role')).toBe('status');
+    expect(loading.text()).toBe('Reading the version…');
+    expect(m.wrapper.find('[data-testid="system-release-version"]').exists()).toBe(false);
+    await m.result(m.call, OP, STATUS);
+    expect(m.wrapper.find('[data-testid="system-release-loading"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="system-release-version"]').exists()).toBe(true);
+  });
+
+  it('reading, in Spanish', async () => {
+    const m = await open({ locale: 'es' });
+    expect(m.wrapper.find('[data-testid="system-release-loading"]').text()).toBe('Consultando la versión…');
+  });
+
+  it('a failed read is not «reading» any more', async () => {
+    const m = await open();
+    m.call.push(errorFrame(subId(m.client, OP), 'internal_error'));
+    await flush();
+    expect(m.wrapper.find('[data-testid="system-release-loading"]').exists()).toBe(false);
+  });
+
   it('in Spanish, with the date in its format', async () => {
     const m = await open({ locale: 'es' });
     await m.result(m.call, OP, STATUS);

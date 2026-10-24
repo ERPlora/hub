@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:265a8ddc0df6fd743ec95c3b4827d2da5eb37193d3df5f160dba3d89ebe5a15d -->
+<!-- generated from WORKBOOK.md sha256:4f6aeae51d36a0a5fbef6c127bd9e69a4db2dc981288ccb45b9e132e4b4e3951 -->
 
 ## What it is for and who it is for
 
@@ -919,7 +919,7 @@ Actor: owner, administrator
 Screen: System · Updates
 Steps:
   1. They open the "Updates" tab. The title is "What we have updated" and a pill says which version the hub is
-     on.
+     on. While it loads: "Reading the version…".
   2. Below, the day it was updated or, when that is not known, "We do not know when this version was
      published.": never a made-up date.
   3. And: "This hub updates itself when we publish a new version, without stopping the service: there is nothing

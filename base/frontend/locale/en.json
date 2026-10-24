@@ -402,6 +402,7 @@
       },
       "updates": {
         "heading": "What we have updated",
+        "loading": "Reading the version…",
         "version": "You are on {version}",
         "auto": "This hub updates itself when we publish a new version, without stopping the service: there is nothing to install.",
         "releasedAt": "Updated on {date}.",

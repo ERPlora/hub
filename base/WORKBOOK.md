@@ -976,7 +976,7 @@ Actor: propietario, administrador
 Pantalla: Sistema · Actualizaciones
 Pasos:
   1. Abre la pestaña «Actualizaciones». El título es «Qué te hemos actualizado» y una pastilla dice por qué
-     versión va el hub.
+     versión va el hub. Mientras carga: «Consultando la versión…».
   2. Debajo, el día en que se actualizó o, si no se sabe, «No sabemos cuándo se publicó esta versión.»: nunca una
      fecha inventada.
   3. Y: «Este hub se actualiza solo cuando publicamos una versión nueva, sin cortar el servicio: no tienes que

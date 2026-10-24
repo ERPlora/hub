@@ -402,6 +402,7 @@
       },
       "updates": {
         "heading": "Qué te hemos actualizado",
+        "loading": "Consultando la versión…",
         "version": "Vas por la {version}",
         "auto": "Este hub se actualiza solo cuando publicamos una versión nueva, sin cortar el servicio: no tienes que instalar nada.",
         "releasedAt": "Actualizado el {date}.",

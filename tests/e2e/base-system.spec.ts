@@ -86,6 +86,27 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'system-updates')).toContainText('This hub updates itself');
       await snap(page, 'BASE-G89', width);
 
+      // BASE-G89 — until the status answers, the tab says it is reading: never an empty tab.
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => (release = resolve));
+      await page.route(/\/api\/live\b/, async (route) => {
+        await held;
+        await route.continue();
+      });
+      await expect(page).toHaveURL(`${A}/system#updates`);
+      await page.reload();
+      await expect(testid(page, 'tab-updates')).toHaveClass(/segment-button-checked/);
+      await expect(testid(page, 'system-release-loading')).toHaveText('Reading the version…');
+      await expect(testid(page, 'system-release-version')).toHaveCount(0);
+      await page.mouse.move(0, 0);
+      await untilStill(page);
+      await page.screenshot({ path: shot(`APP-BASE-7-BASE-G89-loading-${width}`) });
+      release();
+      // The held streams go on first: unrouting under them would answer them twice.
+      await page.unrouteAll({ behavior: 'wait' });
+      await expect(testid(page, 'system-release-version')).toContainText('You are on ');
+      await expect(testid(page, 'system-release-loading')).toHaveCount(0);
+
       // BASE-G90 — Logs: the hub's last events between apps, searchable.
       plantFailed('a', 'Conflict: Set up the issuer first.');
       await page.goto(`${A}/system#logs`);
