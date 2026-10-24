@@ -157,7 +157,8 @@ para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo,
 lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y el límite del plan («{used} de {limit}»)
 o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las carpetas y luego los archivos, cada uno con su
 icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮: «Abrir», «Descargar», «Renombrar», «Mover a…»
-y «Eliminar». Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en
+y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se corta con «…» y la extensión se ve
+siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris. Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en
 imágenes y PDF).
 
 ## Estados de cada pantalla
@@ -1279,7 +1280,8 @@ Sale: el archivo o la carpeta, en los archivos del negocio (`base.file.uploaded`
 Si falla: cada archivo rechazado dice por qué, sin parar los demás: «No se pudo subir «{name}»: {reason}», con «Ese
 archivo pesa más de 25 MB, lo máximo que admite Archivos.», «Los programas (.{extension}) no se pueden guardar
 en Archivos: podrían dañar a quien los abra.», «No queda espacio para ese archivo: tu plan incluye {space}.» o «El
-archivo no llegó entero. Vuelve a subirlo.». Al crear una carpeta, el diálogo sigue abierto con el motivo: «Ese nombre
+archivo no llegó entero. Vuelve a subirlo.». Lo subido y lo rechazado salen en un solo aviso: se ve un aviso a
+la vez y el nuevo cierra el anterior, nunca uno encima de otro. Al crear una carpeta, el diálogo sigue abierto con el motivo: «Ese nombre
 no es válido. Usa un nombre sin barras ni puntos sueltos.» o «Ya hay un archivo o una carpeta con ese nombre aquí.».
 Quien no administra el negocio no ve los botones y, si lo intenta igual, lee «Solo un administrador puede modificar
 los archivos.».

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8e7b66a272fa1e08cc15da27aaf5f5bc7f97f045aad30701e6a63e10cfb44539 -->
+<!-- generated from WORKBOOK.md sha256:f4139de300287f3040f608be0f0a3e2ff504c2eeae067a7623fe15180191cfe7 -->
 
 ## What it is for and who it is for
 
@@ -143,7 +143,9 @@ which starts at "Files" (the very top), with the open folder highlighted; on a n
 folder" and "Upload file". Below, the open folder's path, with ⋮ beside it to rename, move or delete that folder;
 "Space", with what is used and the plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder
 holds: the folders first and then the files, each with its icon, its name, its size (in the list, also when it
-changed) and its ⋮: "Open", "Download", "Rename", "Move to…" and "Delete". Tapping a file opens it in the viewer, with
+changed) and its ⋮: "Open", "Download", "Rename", "Move to…" and "Delete". In the list, each name takes one line:
+what does not fit is cut with "…" and the extension always shows whole; on a phone, the size and the date go under
+the name, in grey. Tapping a file opens it in the viewer, with
 its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
 
 ## States of each screen
@@ -1208,7 +1210,8 @@ Out: the file or the folder, in the business's files (`base.file.uploaded`, `bas
 If it fails: each refused file says why, without stopping the others: "Could not upload “{name}”: {reason}", with
 "That file weighs more than 25 MB, the most Files takes.", "Programs (.{extension}) can't be kept in Files: they
 could harm whoever opens them.", "There is no space left for that file: your plan includes {space}." or "The file did
-not arrive whole. Upload it again.". When making a folder, the dialog stays open with the reason: "That name is not
+not arrive whole. Upload it again.". What was uploaded and what was refused show in a single notice: one notice shows
+at a time and the new one closes the one before, never one on top of another. When making a folder, the dialog stays open with the reason: "That name is not
 valid. Use a name without slashes or lone dots." or "There is already a file or folder with that name here.".
 Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only an
 administrator can change the files.".
