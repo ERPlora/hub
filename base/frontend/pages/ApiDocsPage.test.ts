@@ -1,12 +1,14 @@
 // The API's documentation (BASE-G150, G04; the old hub's ApiDocsPage, without Swagger UI: production enforces Trusted
-// Types): `base.api_doc.get` asked once (the document is far bigger than a live result may be), one section per app with its routes — method, path, what it does — and each route's
-// parameters and body on opening it; how to call it (a key from Employees › API keys, as a bearer), said too when this
-// business cannot make keys yet; «Download the OpenAPI file». Hidden, it says so, and who runs the business is sent to
-// Settings › General to show it; a document that cannot be read says so with «Retry»; none published, says so.
+// Types): `base.api_doc.get` asked once (the document is far bigger than a live result may be), and only once the live
+// `base.api_doc.settings` says it is shown — hidden, nothing is asked, so no refused request reaches the console; one
+// section per app with its routes — method, path, what it does — and each route's parameters and body on opening it; how
+// to call it (a key from Employees › API keys, as a bearer), said too when this business cannot make keys yet;
+// «Download the OpenAPI file». Hidden, it says so, and who runs the business is sent to Settings › General to show it; a
+// document that cannot be read says so with «Retry»; none published, says so.
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, flush, mountBase } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import { saveFile } from '../lib/data';
 import ApiDocsPage from './ApiDocsPage.vue';
 
@@ -31,11 +33,21 @@ const DOCUMENT = {
 };
 const ANSWER = { document: DOCUMENT, apps: [{ id: 'tax', name: 'Taxes', read: true, write: false }], keys_available: true };
 
-async function open(answer: Response | (() => Response), options: Parameters<typeof mountBase>[1] = {}) {
+const SHOWN = { docs_enabled: true, can_change: true };
+const HIDDEN = { docs_enabled: false, can_change: true };
+
+/** Opens the page and answers its live `base.api_doc.settings` (`settings`; `'error'` = it cannot be read). */
+async function open(
+  answer: Response | (() => Response),
+  { settings = SHOWN, ...options }: Parameters<typeof mountBase>[1] & { settings?: typeof SHOWN | 'error' } = {},
+) {
   const respond = typeof answer === 'function' ? answer : () => answer;
   const m = await mountBase(ApiDocsPage, { path: '/api-docs', routes: ['/api-docs', '/settings'], onApi: respond, ...options });
+  const call = await m.live();
+  if (settings === 'error') call.push(errorFrame(subId(m.client, 'base.api_doc.settings'), 'internal_error'));
+  else await m.result(call, 'base.api_doc.settings', settings);
   await flush();
-  return m;
+  return { ...m, call };
 }
 
 const refusal = (code: string, status: number) => Response.json({ error: { code, message: 'Server words' } }, { status });
@@ -75,24 +87,39 @@ describe('ApiDocsPage', () => {
     expect(JSON.parse(await (blob as Blob).text())).toEqual(DOCUMENT);
   });
 
-  it('hidden, it says so; who runs the business is sent to Settings › General', async () => {
-    const m = await open(() => refusal('base.api_docs_hidden', 409));
+  it('hidden, it says so without asking for the document; who runs the business is sent to Settings › General', async () => {
+    const m = await open(() => refusal('base.api_docs_hidden', 409), { settings: HIDDEN });
+    expect(m.net.api).toHaveLength(0);
     expect(m.wrapper.text()).toContain('The API documentation is hidden in this business.');
     expect(m.wrapper.get('[data-testid="api-docs-show"]').attributes('href')).toBe('/settings');
-    const other = await open(() => refusal('base.api_docs_hidden', 409), { session: EMPLOYEE });
+    const other = await open(() => refusal('base.api_docs_hidden', 409), { settings: HIDDEN, session: EMPLOYEE });
+    expect(other.net.api).toHaveLength(0);
     expect(other.wrapper.find('[data-testid="api-docs-show"]').exists()).toBe(false);
   });
 
-  it('shown or hidden again while the page is kept open, it asks for the document again', async () => {
-    let hiddenNow = true;
-    const m = await open(() => (hiddenNow ? refusal('base.api_docs_hidden', 409) : Response.json(ANSWER)));
-    const call = await m.live();
+  it('hidden between the settings and the document, the server’s refusal says it is hidden too', async () => {
+    const m = await open(() => refusal('base.api_docs_hidden', 409));
+    expect(m.wrapper.text()).toContain('The API documentation is hidden in this business.');
+  });
+
+  it('shown or hidden again while the page is kept open, it asks for the document only when shown', async () => {
+    const m = await open(() => Response.json(ANSWER), { settings: HIDDEN });
     expect(m.client.stream.subscriptions('base.api_doc.settings').map((sub) => sub.params)).toEqual([{}]);
-    await m.result(call, 'base.api_doc.settings', { docs_enabled: false, can_change: true });
-    hiddenNow = false;
-    await m.result(call, 'base.api_doc.settings', { docs_enabled: true, can_change: true }, 2);
+    expect(m.net.api).toHaveLength(0);
+    await m.result(m.call, 'base.api_doc.settings', SHOWN, 2);
     await flush();
-    expect(m.net.api).toHaveLength(2);
+    expect(m.net.api).toHaveLength(1);
+    expect(m.wrapper.find('[data-testid="api-docs-section"]').exists()).toBe(true);
+    await m.result(m.call, 'base.api_doc.settings', HIDDEN, 3);
+    await flush();
+    expect(m.net.api).toHaveLength(1);
+    expect(m.wrapper.text()).toContain('The API documentation is hidden in this business.');
+    expect(m.wrapper.find('[data-testid="api-docs-section"]').exists()).toBe(false);
+  });
+
+  it('settings that cannot be read do not keep the document away: it is asked for all the same', async () => {
+    const m = await open(Response.json(ANSWER), { settings: 'error' });
+    expect(m.net.api).toHaveLength(1);
     expect(m.wrapper.find('[data-testid="api-docs-section"]').exists()).toBe(true);
   });
 

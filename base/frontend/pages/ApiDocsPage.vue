@@ -1,15 +1,17 @@
 <script setup lang="ts">
 // The API's documentation (BASE-G150, G04; the old hub's ApiDocsPage). Not Swagger UI: production enforces Trusted
 // Types, which it does not support; the same document, read here and downloadable for Postman or any other tool. Live
-// `base.api_doc.get`: how to call it (a key from Employees › API keys, as a bearer; said too when this business cannot
-// make keys yet), then one section per app with its routes — method, path, what it does — and, on opening one, its
-// parameters and its body. Hidden, it says so and who runs the business is sent to Settings › General; a document
-// that cannot be read says so with «Retry»; none published, says so.
+// `base.api_doc.get`, asked only once the live `base.api_doc.settings` says it is shown (hidden, nothing is asked, so no
+// refused request reaches the console; settings that cannot be read do not keep it away): how to call it (a key from
+// Employees › API keys, as a bearer; said too when this business cannot make keys yet), then one section per app with
+// its routes — method, path, what it does — and, on opening one, its parameters and its body. Hidden, it says so and
+// who runs the business is sent to Settings › General; a document that cannot be read says so with «Retry»; none
+// published, says so.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, type OutputOf, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed, onMounted, shallowRef, watch } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 
 import { apiDocFileName, apiDocSections } from '../lib/api-docs';
 import { saveFile } from '../lib/data';
@@ -30,14 +32,21 @@ async function refresh(): Promise<void> {
     failure.value = error instanceof ApiError && error.code === 'base.api_docs_hidden' ? 'hidden' : 'failed';
   }
 }
-onMounted(() => void refresh());
-// The page stays alive in the navigation stack: shown or hidden again in Settings, it asks for the document again.
+// The page stays alive in the navigation stack: shown again in Settings, it asks for the document again; hidden, it
+// says so.
 const settings = useLive('base.api_doc.settings', {});
+const shown = computed(() => (settings.error.value ? true : settings.data.value?.docs_enabled));
 watch(
-  () => settings.data.value?.docs_enabled,
-  (now, before) => {
-    if (before !== undefined && now !== before) void refresh();
+  shown,
+  (now) => {
+    if (now === undefined) return;
+    if (now) {
+      void refresh();
+      return;
+    }
+    failure.value = 'hidden';
   },
+  { immediate: true },
 );
 
 const failed = computed(() => failure.value !== null && data.value === undefined);
