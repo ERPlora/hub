@@ -108,7 +108,7 @@ describe('PersonPage', () => {
     const m = await open();
     await m.result(m.call, 'base.person.detail', detail({ ways: { account: true, pin: false, badge: false }, pin_set_at: null }));
     expect(m.wrapper.find('[data-testid="person-pin-remove"]').exists()).toBe(false);
-    expect(m.wrapper.get('[data-testid="person-pin"]').text()).toContain('the person chooses it in «My profile»');
+    expect(m.wrapper.get('[data-testid="person-pin"]').text()).toContain('the person chooses it in “My profile”');
   });
 
   it('a reader’s burst fills the badge, and «Save badge» gives it (BASE-G140)', async () => {
@@ -131,7 +131,7 @@ describe('PersonPage', () => {
     await m.wrapper.get('[data-testid="person-badge-save"]').trigger('click');
     await flush();
     expect(m.wrapper.get('[data-testid="person-badge-error"]').text()).toBe(
-      'A badge has 4 to 64 characters: letters, digits, «-» and «_».',
+      'A badge has 4 to 64 characters: letters, digits, “-” and “_”.',
     );
     expect(posted(m)).toEqual([]);
   });

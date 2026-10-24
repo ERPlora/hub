@@ -924,7 +924,7 @@
       "title": "Documentación de la API",
       "intro": "La API de este negocio: lo que publican sus apps para otros sistemas. Para llamarla, crea una llave en Empleados › API keys y envíala como «Authorization: Bearer <llave>».",
       "keysSoon": "Las API keys todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede llamarla.",
-      "download": "Descargar OpenAPI (JSON)",
+      "download": "Descargar el fichero OpenAPI",
       "empty": "Ninguna app de este negocio publica todavía su API.",
       "error": "No se pudo cargar la documentación.",
       "retry": "Reintentar",

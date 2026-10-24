@@ -170,10 +170,38 @@ foto), «Preferencias» (idioma y apariencia) y «PIN».
 
 ### Ajustes · General
 Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»,
-«Pinpad» y, para quien administra, «Dispositivos».
+«Pinpad», para quien administra «Dispositivos» y, al final, «Documentación de la API».
 
 ### Estamos preparando tu negocio
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
+
+### Empleados · Personal
+Lo que se abre con «Empleados» en el menú lateral: la primera pestaña de abajo, «Personal», con las plazas del plan,
+«Invitar en erplora.com» para quien administra, «Las personas se invitan, se les cambia el rol y se quitan en
+erplora.com, en «Miembros» del negocio.» y la tabla de personas (en el móvil, una tarjeta por persona). Las otras
+pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobaciones»; cada una en la dirección, así que
+«Atrás» sale de Empleados.
+
+### Empleados · Roles
+Los cuatro roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan.
+
+### Empleados · API keys
+Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
+«Documentación de la API».
+
+### Empleados · Aprobaciones
+El registro de lo que se aprobó con el PIN de un responsable, solo de lectura.
+
+### Ficha de una persona
+Desde una fila de **Empleados › Personal**, para quien administra, con el botón de volver: «Sus datos» (con «Abrir
+en erplora.com»), «PIN» y «Placa».
+
+### Hace falta una aprobación
+Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién lo aprueba?» con las caras y el teclado, y
+«Cancelar».
+
+### Documentación de la API
+Con el botón de volver: cómo se llama a la API, «Descargar el fichero OpenAPI» y una sección por app con sus llamadas.
 
 ## Estados de cada pantalla
 
@@ -277,6 +305,21 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F69 | Ponerle nombre a un dispositivo | hecho |
 | BASE-F70 | Quitar un dispositivo que se ha perdido | hecho |
 | BASE-F71 | Quitar de golpe los dispositivos que nadie usa | hecho |
+| BASE-F72 | Llegar al tope de personas del plan | hecho |
+| BASE-F73 | Retirar el PIN a una persona | hecho |
+| BASE-F74 | Dar de alta o retirar la placa de una persona | hecho |
+| BASE-F75 | Reincorporar a una persona que salió del negocio | hecho |
+| BASE-F76 | Entender cómo entra cada persona | hecho |
+| BASE-F77 | Ver los roles y encender los que trae una app | parcial |
+| BASE-F78 | Asignar un rol a una persona | hecho |
+| BASE-F79 | Aprobar con el PIN de un responsable | parcial |
+| BASE-F80 | Consultar quién aprobó qué | hecho |
+| BASE-F81 | Crear una llave de API y copiar su token | parcial |
+| BASE-F82 | Rotar una llave de API | parcial |
+| BASE-F83 | Revocar una llave de API | parcial |
+| BASE-F84 | Ver las llaves de API y qué puede cada una | parcial |
+| BASE-F85 | Consultar la documentación de la API | hecho |
+| BASE-F86 | Mostrar u ocultar la documentación de la API | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -1646,6 +1689,277 @@ Sale: esos dispositivos olvidados, como BASE-F70.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
 Implicados: BASE-F70
 
+### BASE-F72 Llegar al tope de personas del plan
+<!-- origen: old-hub:HUB_SHELL-F83 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Empleados · Personal
+Pasos:
+  1. En **Empleados › Personal**, encima de la tabla, cuántas plazas del plan están ocupadas: «{used} de {limit}
+     plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas».
+  2. Con todas ocupadas sale «Tu plan tiene todas las plazas ocupadas» y «Quita en erplora.com a alguien que ya no
+     trabaje aquí, o pasa a un plan con más plazas.»; en la web, con «Actualizar plan».
+  3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope.
+Entra: las personas del negocio y las plazas de su plan, como las manda erplora.com.
+Sale: nada guardado.
+Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar», nunca «Todavía no hay nadie en este
+negocio.».
+Implicados: BASE-F76, BASE-F78
+
+### BASE-F73 Retirar el PIN a una persona
+<!-- origen: old-hub:HUB_SHELL-F86 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ficha de una persona
+Pasos:
+  1. En **Empleados › Personal**, toca a la persona: se abre su ficha.
+  2. En «PIN», «Tiene PIN desde el {when}.» y «Retirar el PIN».
+  3. Lo pulsa: «Retirar el PIN» con «{name} dejará de entrar en las cajas con su PIN. Con su cuenta de erplora.com
+     sigue entrando.». Confirma con «Retirar el PIN».
+  4. Sale «PIN retirado.» y la ficha dice «Sin PIN: lo elige la propia persona en «Mi perfil» o la primera vez que
+     entra en una caja.».
+Entra: la persona.
+Sale: la persona sin PIN: desaparece de las caras de las cajas al momento. Evento `base.person.pin_removed`.
+Si falla: «No se pudo retirar el PIN.»; el acceso del propietario solo lo cambia el propietario: «Solo el
+propietario cambia el acceso del propietario.».
+Implicados: BASE-F76, BASE-F55
+
+### BASE-F74 Dar de alta o retirar la placa de una persona
+<!-- origen: old-hub:HUB_SHELL-F87 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ficha de una persona
+Pasos:
+  1. En la ficha de la persona, en «Placa»: «Pasa la tarjeta y se rellena sola: no hace falta hacer clic aquí antes.
+     También puedes teclear el número, para un llavero o una etiqueta grabada.».
+  2. Pasa la tarjeta por el lector (o teclea el número) y pulsa «Guardar placa»: «Placa guardada.» y «Tiene placa
+     desde el {when}.».
+  3. Para quitarla, «Retirar la placa»: «Placa retirada.» y «Sin placa.».
+Entra: la persona y su placa.
+Sale: la placa de la persona, guardada sin su número (solo lo que permite reconocerla). Eventos
+`base.person.badge_set` y `base.person.badge_removed`.
+Si falla: «Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».», «Esa placa ya la lleva otra
+persona. La placa dice quién está en la caja, así que no la pueden compartir dos personas.», «Demasiadas placas
+probadas. Espera unos minutos y vuelve a intentarlo.», «No se pudo guardar la placa.» o «No se pudo retirar la
+placa.». Nadie da de alta la suya: «Nadie da de alta su propia placa: pídeselo a otro administrador.».
+Implicados: BASE-F56, BASE-F76
+
+### BASE-F75 Reincorporar a una persona que salió del negocio
+<!-- origen: old-hub:HUB_SHELL-F89 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Empleados · Personal
+Pasos:
+  1. Quien salió del negocio ya no está en **Empleados › Personal**: se quitó en erplora.com.
+  2. Para que vuelva, «Invitar en erplora.com» y se la invita otra vez en «Miembros» del negocio, con su rol.
+  3. Cuando acepta, vuelve a la lista con lo que el negocio guardaba de ella: su PIN y su placa siguen valiendo.
+Entra: la invitación en erplora.com.
+Sale: la persona otra vez en el negocio, con su PIN y su placa de antes.
+Si falla: mientras no acepta, sale como «Aún no ha entrado».
+Implicados: BASE-F72, BASE-F76
+
+### BASE-F76 Entender cómo entra cada persona
+<!-- origen: old-hub:HUB_SHELL-F90 -->
+Estado: hecho
+Actor: propietario, administrador, encargado, empleado
+Pantalla: Empleados · Personal
+Pasos:
+  1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya),
+     «Email» (solo para quien administra), «Rol», «Acceso» y «Estado».
+  2. «Acceso» dice cómo entra: «Cuenta» siempre, y «PIN» y «Placa» si los tiene (por ejemplo, «Cuenta + PIN +
+     Placa»).
+  3. «Estado» dice «Activo» o, si erplora.com ya la invitó y aún no ha entrado, «Aún no ha entrado».
+  4. Busca con «Buscar persona…». Quien administra toca una fila para abrir su ficha.
+Entra: las personas del negocio.
+Sale: nada guardado. Se pone al día sola cuando alguien elige o pierde su PIN o su placa.
+Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar».
+Implicados: BASE-F72, BASE-F73, BASE-F74
+
+### BASE-F77 Ver los roles y encender los que trae una app
+<!-- origen: old-hub:HUB_SHELL-F91 -->
+Estado: parcial — se ven los cuatro roles de erplora.com; ninguna app trae todavía roles propios que encender
+Actor: propietario, administrador, encargado, empleado
+Pantalla: Empleados · Roles
+Pasos:
+  1. En **Empleados › Roles**: «Estos son los roles de este negocio. Cada persona recibe uno al invitarla en
+     erplora.com, y allí se cambia.».
+  2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
+     disponible», cuántas personas lo tienen y cuántos permisos da.
+  3. Quien administra tiene «Cambiar roles en erplora.com».
+Entra: los roles y las personas del negocio.
+Sale: nada guardado.
+Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
+Implicados: BASE-F78
+
+### BASE-F78 Asignar un rol a una persona
+<!-- origen: old-hub:HUB_SHELL-F92 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Empleados · Roles
+Pasos:
+  1. En **Empleados › Roles** o en la ficha de una persona, «Cambiar roles en erplora.com» o «Abrir en
+     erplora.com» lleva a «Miembros» del negocio.
+  2. Allí le cambia el rol.
+  3. Al volver, la persona sale con su rol nuevo y lo que puede hacer cambia al momento.
+Entra: el rol que se elige en erplora.com.
+Sale: la persona con su rol nuevo, como lo manda erplora.com.
+Si falla: lo que diga erplora.com.
+Implicados: BASE-F77, BASE-F13
+
+### BASE-F79 Aprobar con el PIN de un responsable
+<!-- origen: old-hub:HUB_SHELL-F51 -->
+Estado: parcial — la aprobación funciona para las acciones que una app nombre, pero ninguna app la pide todavía (anular una venta, un descuento por encima del tope)
+Actor: empleado, encargado
+Pantalla: Hace falta una aprobación
+Pasos:
+  1. Alguien intenta algo que su rol no permite y que la app deja aprobar a un responsable. En lugar de un error
+     sale «Hace falta una aprobación» con «Se aprueba: {action}», en palabras de la app.
+  2. Lee «Pide a un encargado que introduzca su PIN para aprobarlo.» y «…o que pase su placa: no hace falta pulsar
+     nada antes.».
+  3. En «¿Quién lo aprueba?», las caras de quienes pueden hacerlo ellos mismos y tienen PIN. El responsable toca la
+     suya y teclea su PIN («Otra persona» vuelve a las caras), o pasa su placa en cualquier momento.
+  4. La acción se hace una vez y sale «Aprobado por {name}». La sesión de quien lo pidió no se cierra.
+Entra: el nombre y el PIN, o la placa, de quien aprueba.
+Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
+**Empleados › Aprobaciones**. Eventos `base.approval.granted` y `base.approval.used`.
+Si falla: el diálogo se queda abierto con «Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a
+intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.», «Esto ya no necesita
+aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.», la espera tras demasiados intentos o «No se pudo
+enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.». Sin nadie con PIN que pueda: «Aquí nadie puede
+aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» devuelve a la app su rechazo.
+Implicados: BASE-F80, BASE-F55, BASE-F56
+
+### BASE-F80 Consultar quién aprobó qué
+<!-- origen: old-hub:HUB_SHELL-F93 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Empleados · Aprobaciones
+Pasos:
+  1. En **Empleados › Aprobaciones** (la pestaña solo existe para quien administra): «Cada acción que necesitó el PIN
+     de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo
+     ni borrarlo.».
+  2. Una fila por aprobación, la última primero: «Cuándo», «Acción» (en palabras), «Autorizado por», «Lo pidió»,
+     «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
+  3. Busca con «Buscar por persona o acción…».
+Entra: el registro de aprobaciones.
+Sale: nada; es solo lectura. Se pone al día sola con cada aprobación.
+Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido
+que autorizar nada en este negocio.».
+Implicados: BASE-F79
+
+### BASE-F81 Crear una llave de API y copiar su token
+<!-- origen: old-hub:HUB_SHELL-F94 -->
+Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves: la pestaña dice «Todavía no disponible»
+Actor: propietario, administrador
+Pantalla: Empleados · API keys
+Pasos:
+  1. En **Empleados › API keys**: «Una llave deja que otro sistema (el de tu gestoría, tu tienda online) lea o
+     escriba datos de este negocio por su API.» y «Nueva API key».
+  2. En «Nueva API key», el «Nombre» («Gestoría — facturas»), las «Peticiones por minuto» («De 1 a 10.000.») y
+     «Qué puede hacer esta key»: «Acceso total», «Solo lectura», «Solo escritura» o «Por app», marcando en cada app
+     «Lectura» y «Escritura».
+  3. Pulsa «Crear key»: sale «API key creada» con «Copia el token ahora», «Este es el único momento en que se
+     muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.» y «Copiar» (dos segundos
+     dice «Copiado»). «Hecho» la cierra.
+Entra: el nombre, el ritmo y lo que puede hacer.
+Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
+Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
+publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
+Implicados: BASE-F84, BASE-F85
+
+### BASE-F82 Rotar una llave de API
+<!-- origen: old-hub:HUB_SHELL-F95 -->
+Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves
+Actor: propietario, administrador
+Pantalla: Empleados · API keys
+Pasos:
+  1. En la fila de la llave, «Rotar».
+  2. «Rotar la API key» con ««{name}» recibe un token nuevo. El actual deja de funcionar de inmediato.»; confirma con
+     «Rotar».
+  3. Sale el token nuevo, una sola vez, con «Copiar».
+Entra: la llave.
+Sale: la llave con un token nuevo; el anterior deja de abrir nada al momento. Evento `base.api_key.rotated`.
+Si falla: «No se pudo rotar la API key.», «Esa key está revocada: no vuelve a funcionar.» o «Esa key ya no existe.
+Actualiza la lista y vuelve a intentarlo.».
+Implicados: BASE-F81, BASE-F84
+
+### BASE-F83 Revocar una llave de API
+<!-- origen: old-hub:HUB_SHELL-F96 -->
+Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves
+Actor: propietario, administrador
+Pantalla: Empleados · API keys
+Pasos:
+  1. En la fila de la llave, «Revocar».
+  2. «Revocar API key» con «Vas a revocar «{name}». Cualquier sistema que use este token dejará de tener acceso de
+     inmediato. Esta acción no se puede deshacer.»; confirma con «Revocar».
+  3. Sale ««{name}» revocada.» y la fila queda como «Revocada», sin «Rotar» ni «Revocar».
+Entra: la llave.
+Sale: la llave revocada para siempre; se guarda en la lista. Evento `base.api_key.revoked`.
+Si falla: «No se pudo revocar la API key.».
+Implicados: BASE-F84
+
+### BASE-F84 Ver las llaves de API y qué puede cada una
+<!-- origen: old-hub:HUB_SHELL-F97 -->
+Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves: en su lugar sale «Todavía no disponible» y «Las API keys todavía no están disponibles en este negocio.»
+Actor: propietario, administrador
+Pantalla: Empleados · API keys
+Pasos:
+  1. En **Empleados › API keys** (la pestaña solo existe para quien administra), una fila por llave: «Nombre»,
+     «Token» (solo su principio), «Permisos», «Estado» («Activa» o «Revocada»), «Creada», «Último uso» («Nunca» si
+     no se ha usado) y «Límite».
+  2. Busca con «Buscar API key…». Al pie, «Documentación de la API» lleva a la documentación.
+Entra: las llaves del negocio.
+Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
+Si falla: «No se pudieron cargar tus API keys.» con «Reintentar»; sin ninguna, «Aún no hay API keys. Crea una para
+que un sistema externo pueda leer o escribir datos de tu negocio.».
+Implicados: BASE-F81, BASE-F82, BASE-F83
+
+### BASE-F85 Consultar la documentación de la API
+<!-- origen: old-hub:HUB_SHELL-F98 -->
+Estado: hecho
+Actor: propietario, administrador, encargado, empleado
+Pantalla: Documentación de la API
+Pasos:
+  1. Con la documentación mostrada (BASE-F86), se abre desde **Ajustes › General** («Abrir la documentación de la
+     API») o desde **Empleados › API keys** («Documentación de la API»).
+  2. Lee «La API de este negocio: lo que publican sus apps para otros sistemas. Para llamarla, crea una llave en
+     Empleados › API keys y envíala como «Authorization: Bearer <llave>».».
+  3. Una sección por app, con sus llamadas (el método, la dirección y qué hace); al abrir una, sus «Parámetros» y su
+     «Cuerpo».
+  4. «Descargar el fichero OpenAPI» la guarda para llevarla a otra herramienta.
+Entra: lo que publican las apps del negocio.
+Sale: nada guardado. Crece o mengua con las apps del negocio.
+Si falla: oculta, «La documentación de la API está oculta en este negocio.» y, para quien administra, «Muéstrala en
+Ajustes › General»; si no llega, «No se pudo cargar la documentación.» con «Reintentar»; sin nada publicado,
+«Ninguna app de este negocio publica todavía su API.». Si el negocio aún no puede tener llaves: «Las API keys
+todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede
+llamarla.».
+Implicados: BASE-F86, BASE-F81
+
+### BASE-F86 Mostrar u ocultar la documentación de la API
+<!-- origen: old-hub:HUB_SHELL-F161 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · General
+Pasos:
+  1. En **Ajustes › General**, en «Documentación de la API», el interruptor «Mostrar documentación de la API»
+     («Añade una página con la documentación de la API, para quien conecte otro sistema.»). Viene apagado.
+  2. Al encenderlo se guarda al instante y sale «Abrir la documentación de la API»; al apagarlo, desaparece.
+Entra: el interruptor.
+Sale: el ajuste del negocio. Evento `base.api_doc.settings_changed`.
+Si falla: «No se pudo guardar el cambio.» y el interruptor vuelve a lo guardado; «No se pudo cargar el ajuste.» con
+«Reintentar». A quien no administra le sale apagado: «Solo quien administra el negocio puede cambiarlo.».
+Implicados: BASE-F85
+
+En las pantallas de Empleados y en la Documentación de la API:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | La tabla en gris en «Personal», «Roles», «API keys» y «Aprobaciones»; «Cargando…» en la ficha de una persona; las caras en gris en «Hace falta una aprobación»; «Cargando la documentación…». |
+| Vacío | «Todavía no hay nadie en este negocio.», «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.», «Todavía nadie ha tenido que autorizar nada en este negocio.», «Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.» y «Ninguna app de este negocio publica todavía su API.». |
+| Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
+| Sin permiso | Quien no administra no tiene las pestañas «API keys» ni «Aprobaciones» (su dirección abre «Personal»), no ve el email de nadie ni abre la ficha de una persona; en Ajustes, «Solo quien administra el negocio puede cambiarlo.». Con la documentación oculta: «La documentación de la API está oculta en este negocio.». |
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -1877,6 +2191,38 @@ Implicados: BASE-F70
   `tests/e2e/base-access.spec.ts` (dos personas, dos dispositivos, plan Gratis, una cuenta de Ventas abierta durante
   el cambio de usuario).
 
+- Personas y permisos (APP-BASE-5): las personas son `Membership` (control) más la foto de erplora.com
+  (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
+  el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
+  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.list` (rutas `/api/people…`,
+  `/api/roles`). El PIN y la placa son los de APP-BASE-3 (`Credential`): mismo hash, mismos frenos.
+- Llaves de API: `base.models.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
+  principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
+  operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
+  por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia): en el modo compartido de la fase 1 una
+  llave abriría otros negocios, así que `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no
+  entra (test A≠B en `base/tests/test_api_keys.py`).
+- Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
+  (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca). `base/approvals.py` pone su puerta
+  (`ApprovalDoor`) delante de la sesión en toda orden: a quien le falta el permiso le responde 403
+  `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo);
+  `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.pin_owner`,
+  `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
+  pase de un uso (120 s, `X-Elevation-Token`); la puerta lo gasta (`base.approval.spend`, sin ruta) y
+  `base.operations` añade ese permiso a esa llamada. En el cliente, `withApproval(() => command.run(input))` de
+  `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
+  `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
+- Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
+  tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`); el ajuste es
+  `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
+  aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral del hub viejo
+  necesita que el menú admita una entrada condicionada (cambio de `packages/ui`): hoy se llega desde Ajustes y desde
+  Empleados › API keys.
+- Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py` y `test_api_docs.py`; Vitest de
+  `base/frontend/lib/{people,approval,api-docs}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
+  ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
+  `tests/e2e/base-employees.spec.ts`.
+
 ## Lo que NO hace, a propósito
 
 - No inventa cifras: un panel o un paso que no se puede comprobar no sale o dice «No disponible».
@@ -1897,3 +2243,6 @@ Implicados: BASE-F70
   en las caras de una caja.
 - No tiene contraseña propia: la cuenta es la de erplora.com; el PIN y la placa solo abren una caja en la que ya se
   entró con una cuenta.
+- No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
+  enlaza a «Miembros».
+- No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.

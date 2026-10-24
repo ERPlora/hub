@@ -1492,11 +1492,11 @@ msgstr "aprobaciones"
 
 #: people.py:35
 msgid "Only the owner changes the owner's way in."
-msgstr "Solo el propietario cambia cómo entra el propietario."
+msgstr "Solo el propietario cambia el acceso del propietario."
 
 #: people.py:36
 msgid "Nobody registers their own badge: ask another administrator."
-msgstr "Nadie registra su propia placa: pídeselo a otro administrador."
+msgstr "Nadie da de alta su propia placa: pídeselo a otro administrador."
 
 #: queries.py:1131
 msgid "That person is not in this business."
@@ -1525,11 +1525,11 @@ msgstr "Demasiadas placas probadas."
 
 #: services.py:1946
 msgid "A badge has 4 to 64 characters: letters, digits, «-» and «_»."
-msgstr "Una placa tiene de 4 a 64 caracteres: letras, cifras, «-» y «_»."
+msgstr "Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_»."
 
 #: services.py:1953 services.py:1964
 msgid "Somebody else already carries that badge. A badge says who is at the till: two people cannot share it."
-msgstr "Esa placa ya la lleva otra persona. Una placa dice quién está en la caja: dos personas no pueden compartirla."
+msgstr "Esa placa ya la lleva otra persona. La placa dice quién está en la caja, así que no la pueden compartir dos personas."
 
 #: services.py:1987
 msgid "This person has no badge to remove."
@@ -1541,27 +1541,27 @@ msgstr "Las API keys todavía no están disponibles para este negocio."
 
 #: services.py:2014
 msgid "Choose at least one app and what the key may do on it."
-msgstr "Elige al menos una app y qué puede hacer la llave en ella."
+msgstr "Elige al menos una app y qué puede hacer la key en ella."
 
 #: services.py:2022
 msgid "That app does not publish what the key would do on it."
-msgstr "Esa app no publica lo que la llave haría en ella."
+msgstr "Esa app no publica lo que la key haría en ella."
 
 #: services.py:2052
 msgid "Give the key a name."
-msgstr "Ponle un nombre a la llave."
+msgstr "Ponle un nombre a la key."
 
 #: services.py:2069
 msgid "That key no longer exists. Refresh the list and try again."
-msgstr "Esa llave ya no existe. Actualiza la lista y vuelve a intentarlo."
+msgstr "Esa key ya no existe. Actualiza la lista y vuelve a intentarlo."
 
 #: services.py:2071
 msgid "That key was revoked: it never works again."
-msgstr "Esa llave se revocó: no vuelve a funcionar."
+msgstr "Esa key está revocada: no vuelve a funcionar."
 
 #: services.py:2137
 msgid "Too many keys tried from here."
-msgstr "Demasiadas llaves probadas desde aquí."
+msgstr "Demasiadas keys probadas desde aquí."
 
 #: services.py:2147
 msgid "This API key may not do that on this app."

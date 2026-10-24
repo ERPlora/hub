@@ -721,7 +721,7 @@
       "empty": "Nobody is in this business yet.",
       "error": "The people of this business could not be loaded.",
       "invite": "Invite on erplora.com",
-      "managed": "People are invited, given a role and removed on erplora.com, in «Members» of the business.",
+      "managed": "People are invited, given a role and removed on erplora.com, in “Members” of the business.",
       "seats": {
         "used": "{used} of {limit} places taken",
         "noLimit": "{used} people · no limit",
@@ -763,7 +763,7 @@
       "pin": {
         "heading": "PIN",
         "has": "Has a PIN since {when}.",
-        "none": "No PIN: the person chooses it in «My profile» or the first time they enter a till.",
+        "none": "No PIN: the person chooses it in “My profile” or the first time they enter a till.",
         "remove": "Remove the PIN",
         "confirm": {
           "title": "Remove the PIN",
@@ -784,7 +784,7 @@
         "remove": "Remove the badge",
         "saved": "Badge saved.",
         "removed": "Badge removed.",
-        "invalid": "A badge has 4 to 64 characters: letters, digits, «-» and «_».",
+        "invalid": "A badge has 4 to 64 characters: letters, digits, “-” and “_”.",
         "taken": "Somebody else already carries that badge. A badge says who is at the till: two people cannot share it.",
         "tooMany": "Too many badges tried. Wait a few minutes and try again.",
         "failed": "The badge could not be saved.",
@@ -833,7 +833,7 @@
       },
       "rotate": "Rotate",
       "revoke": "Revoke",
-      "revoked": "«{name}» revoked.",
+      "revoked": "“{name}” revoked.",
       "form": {
         "title": "New API key",
         "submit": "Create key",
@@ -859,12 +859,12 @@
       },
       "rotateConfirm": {
         "title": "Rotate the API key",
-        "message": "«{name}» gets a new token. The current one stops working at once.",
+        "message": "“{name}” gets a new token. The current one stops working at once.",
         "confirm": "Rotate"
       },
       "revokeConfirm": {
         "title": "Revoke the API key",
-        "message": "You are about to revoke «{name}». Any system using this token loses access at once. This cannot be undone.",
+        "message": "You are about to revoke “{name}”. Any system using this token loses access at once. This cannot be undone.",
         "confirm": "Revoke"
       },
       "errors": {
@@ -922,9 +922,9 @@
     },
     "apiDocs": {
       "title": "API documentation",
-      "intro": "The API of this business: what its apps publish for other systems. To call it, create a key in Employees › API keys and send it as «Authorization: Bearer <key>».",
+      "intro": "The API of this business: what its apps publish for other systems. To call it, create a key in Employees › API keys and send it as “Authorization: Bearer <key>”.",
       "keysSoon": "API keys are not available yet for this business: you can read the documentation, but no system can call it yet.",
-      "download": "Download OpenAPI (JSON)",
+      "download": "Download the OpenAPI file",
       "empty": "None of this business’s apps publishes its API yet.",
       "error": "Could not load the documentation.",
       "retry": "Retry",
