@@ -21,6 +21,7 @@ from django.utils import timezone
 from base import access
 from base.models import AccessSettings, Credential, Hub, Membership, TrustedDevice
 from base.tests.test_access_account import enter
+from base.tests.test_middleware import through_the_jump
 
 pytestmark = pytest.mark.django_db
 
@@ -71,7 +72,7 @@ class TestThePinPadOrTheSaas:
             AccessSettings.objects.create(pin_policy=access.NEVER)
         if how != "nobody_with_a_pin":
             with_pin(ana)
-        response = page(client)
+        response = through_the_jump(client, page(client))
         assert response["Location"].startswith(f"{SAAS_LOGIN}?hub=a&next=/sale/pos&state=")
 
     def test_the_access_page_itself_is_the_spa_without_a_session(self, client, ana, spa_manifest):
@@ -98,7 +99,7 @@ class TestThePinPadOrTheSaas:
 
         slug = new_demo()
         response = client.get("/demo/items", HTTP_HOST=host_of(slug), HTTP_ACCEPT="text/html")
-        assert "/demo/enter/" in response["Location"]
+        assert "/demo/enter/" in through_the_jump(client, response, host_of(slug))["Location"]
 
 
 class TestWhatTheAccessPageSays:
@@ -118,7 +119,7 @@ class TestWhatTheAccessPageSays:
             a_device(client, mode=access.PERSONAL)
         client.force_login(ana)
         Session.objects.all().delete()
-        assert page(client)["Location"].startswith(SAAS_LOGIN)
+        assert through_the_jump(client, page(client))["Location"].startswith(SAAS_LOGIN)
 
     def test_another_device_s_entry_says_the_plan_covers_fewer_devices(self, client, ana):
         a_device(client, mode=access.PERSONAL, ended_reason=TrustedDevice.EndedReason.DEVICE_LIMIT)

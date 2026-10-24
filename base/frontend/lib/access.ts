@@ -57,6 +57,13 @@ export function safeNext(raw: unknown): string {
   return raw;
 }
 
+/** `next` with the fragment of the Access page's own address (`/login?next=/settings#data`): the browser keeps a
+ * link's fragment over the jump to `/login`, and the person goes back to the tab it named (BASE-G52). A `next` that
+ * names its own fragment keeps it. */
+export function nextWithHash(next: string, hash: string): string {
+  return hash && !next.includes('#') ? `${next}${hash}` : next;
+}
+
 // ── The badge reader ─────────────────────────────────────────────────────────────────────────────────────────────
 
 /** The longest gap between two keys of one burst: five times the slowest reader, half a fast person's. */

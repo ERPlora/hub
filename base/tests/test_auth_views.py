@@ -30,6 +30,7 @@ from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
 from base.services import demo_code_create, demo_create
+from base.tests.test_middleware import through_the_jump
 
 pytestmark = pytest.mark.django_db
 
@@ -570,7 +571,8 @@ class TestDemoLoginStart:
         assert (cookie["path"], cookie["max-age"], cookie["httponly"]) == ("/auth/callback", 600, True)
 
     def test_a_page_of_the_demo_without_a_session_jumps_there_too(self, client, demo):
-        response = client.get("/demo/items", HTTP_HOST=host_of(demo), HTTP_ACCEPT="text/html")
+        page = client.get("/demo/items", HTTP_HOST=host_of(demo), HTTP_ACCEPT="text/html")
+        response = through_the_jump(client, page, host_of(demo))
         assert response.status_code == 302
         assert response["Location"].startswith(f"{SAAS_DEMO_ENTER}?hub={demo}&next=/demo/items&state=")
         assert STATE_COOKIE in response.cookies

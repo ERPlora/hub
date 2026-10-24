@@ -458,6 +458,10 @@ msgstr ""
 msgid "Sign in again"
 msgstr "Volver a entrar"
 
+#: templates/base/jump.html:25
+msgid "Continue to sign in"
+msgstr "Continuar para entrar"
+
 #: templates/base/login_retry.html:19
 msgid "We could not finish signing you in"
 msgstr "No hemos podido terminar de iniciar tu sesión"

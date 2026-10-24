@@ -121,6 +121,22 @@ describe('LoginPage — the PIN pad of a shared till', () => {
   });
 });
 
+describe('LoginPage — a link with a fragment (BASE-G52)', () => {
+  it('a right PIN goes back to the tab the link named', async () => {
+    access.enterWith.mockResolvedValue('/settings#data');
+    const { wrapper, press } = await login([PIN_DOOR], '/login?next=%2Fsettings#data');
+    await wrapper.findAll('[data-testid="pin-face"]')[0].trigger('click');
+    await press('4826');
+    expect(access.enterWith).toHaveBeenCalledWith('/auth/pin', { person: 'c-ana', pin: '4826', next: '/settings#data' });
+  });
+
+  it('«Enter with your account» takes the fragment to erplora.com and back', async () => {
+    const { wrapper } = await login([NO_PIN], '/login?next=%2Fsettings#data');
+    await wrapper.get('[data-testid="access-account"]').trigger('click');
+    expect(access.leaveTo).toHaveBeenCalledWith('/auth/login?account=1&next=%2Fsettings%23data');
+  });
+});
+
 describe('LoginPage — the account', () => {
   it('without a PIN pad, only «Enter with your account», to erplora.com’s sign-in for this hub', async () => {
     const { wrapper } = await login([NO_PIN]);

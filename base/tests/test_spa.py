@@ -8,6 +8,8 @@ import pytest
 from django.utils.csp import CSP
 from live.csp import base_policy, debug_policy
 
+from base.tests.test_middleware import through_the_jump
+
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("spa_manifest")]
 
 
@@ -203,7 +205,8 @@ def test_a_signed_in_navigation_still_gets_the_shell_and_its_csrf_cookie(client,
 
 
 def test_a_deep_link_without_a_session_still_jumps_to_the_saas_login(client, settings):
-    response = client.get(DEEP_LINK, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=BROWSER_PAGE)
+    page = client.get(DEEP_LINK, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=BROWSER_PAGE)
+    response = through_the_jump(client, page)
     location = urlsplit(response["Location"]) if response.status_code == 302 else None
     assert location is not None
     assert f"{location.scheme}://{location.netloc}{location.path}" == f"{settings.SAAS_URL.rstrip('/')}/hub-login/"

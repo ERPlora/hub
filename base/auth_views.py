@@ -39,9 +39,11 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib.auth import logout
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse
+from django.middleware.csp import get_nonce
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import translation
+from django.utils.cache import add_never_cache_headers
 from django.utils.translation import gettext
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
@@ -65,6 +67,8 @@ SAAS_LOGOUT_PATH = "/accounts/logout/"
 LOGIN_RETRY_TEMPLATE = "base/login_retry.html"
 #: The 429 of a refused callback from a caller past :data:`CALLBACK_ATTEMPTS`.
 TOO_MANY_ATTEMPTS_TEMPLATE = "base/too_many_attempts.html"
+#: The page of a page load without a session on its way to erplora.com, which keeps the link's fragment.
+JUMP_TEMPLATE = "base/jump.html"
 #: Refused callbacks per caller: 10 within 5 minutes of the first (README, «Límites de intentos»).
 CALLBACK_ATTEMPTS = AttemptLimit("callback", attempts=10, window=300)
 _DEEP_LINK_RE = re.compile(r"/admin/hub/(?P<slug>[^/]+)/")
@@ -275,18 +279,37 @@ NOTICE_DEVICE_LIMIT = "device_limit"
 
 
 def way_in(request: HttpRequest, next_path: str) -> HttpResponseRedirect:
-    """Where a browser without a session goes to enter this hub (BASE-G55, G57, G58): the hub's Access page when it is
-    a shared device of the hub of a business that asks, with somebody to choose (telling, if so, that the session
-    ended), or when another device's entry ended this one (the plan covers fewer devices); else erplora.com's sign-in
-    for this hub, as always, which brings the person straight back while its own session lives (a demo, its own
-    door)."""
+    """Where a browser without a session goes to enter this hub (BASE-G55, G57, G58): the hub's Access page
+    (:func:`access_page_url`), else erplora.com's sign-in for this hub, as always, which brings the person straight
+    back while its own session lives (a demo, its own door)."""
+    access_page = access_page_url(request, next_path)
+    if access_page is not None:
+        return HttpResponseRedirect(access_page)
     slug = HostScopeResolver().resolve(request).key
+    return auth.demo_login_redirect(slug, next_path) if _is_demo(request) else auth.login_redirect(slug, next_path)
+
+
+def access_page_url(request: HttpRequest, next_path: str) -> str | None:
+    """The hub's Access page for a browser without a session, or ``None``: when it is a shared device of the hub of a
+    business that asks, with somebody to choose (telling, if so, that the session ended), or when another device's
+    entry ended this one (the plan covers fewer devices). Never on a demo's host."""
     if _is_demo(request):
-        return auth.demo_login_redirect(slug, next_path)
+        return None
     notice = _notice(request)
-    if notice == NOTICE_DEVICE_LIMIT or queries.pin_door_open(request, slug):
-        return HttpResponseRedirect(f"{ACCESS_PAGE}?{urlencode({'next': next_path, **({'notice': notice} if notice else {})})}")
-    return auth.login_redirect(slug, next_path)
+    if notice == NOTICE_DEVICE_LIMIT or queries.pin_door_open(request, HostScopeResolver().resolve(request).key):
+        return f"{ACCESS_PAGE}?{urlencode({'next': next_path, **({'notice': notice} if notice else {})})}"
+    return None
+
+
+def jump_page(request: HttpRequest, next_path: str) -> HttpResponse:
+    """The page a page load without a session answers when it goes on to erplora.com or a demo's door (BASE-G52): its
+    script sends to :func:`auth_login` with the fragment of the link (``/settings#data``), which the browser never
+    sends to the server and the way back through erplora.com would lose; ``/auth/login`` jumps on with a fresh state.
+    Never cached (it carries the response's CSP nonce)."""
+    target = f"{reverse('auth-login')}?{urlencode({'next': next_path})}"
+    response = HttpResponse(render_to_string(JUMP_TEMPLATE, {"target": target, "csp_nonce": get_nonce(request)}))
+    add_never_cache_headers(response)
+    return response
 
 
 def _notice(request: HttpRequest) -> str:

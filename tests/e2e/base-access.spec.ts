@@ -385,8 +385,11 @@ test('BASE-G58: the till’s session ends while working: its next page is its PI
       'SELECT count(*) FROM ended',
   );
   expect(ended, 'the till’s session, and only it').toBe('1');
-  await till.goto(`${origin}/settings`);
-  await expect(till).toHaveURL(/\/login\?next=%2Fsettings&notice=ended$/, { timeout: SAAS_STEP });
+  // A link to a tab (BASE-G52), opened as a page load (from /settings itself it would be a jump inside the shell): the
+  // PIN pad keeps its fragment, and the entry goes back to that tab.
+  await till.goto('about:blank');
+  await till.goto(`${origin}/settings#data`);
+  await expect(till).toHaveURL(/\/login\?next=%2Fsettings&notice=ended#data$/, { timeout: SAAS_STEP });
   await expect(shown(till).getByTestId('access-notice')).toContainText('Your session has ended');
   await expect(shown(till).getByTestId('access-tabs')).toBeVisible();
   await atEverySize(till, 'BASE-G58', async () => {
@@ -394,7 +397,8 @@ test('BASE-G58: the till’s session ends while working: its next page is its PI
   });
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
   await press(till, OWNER_PIN);
-  await expect(till).toHaveURL(`${origin}/settings`);
+  await expect(till).toHaveURL(`${origin}/settings#data`);
+  await expect(shown(till).getByTestId('tab-data')).toHaveClass(/segment-button-checked/);
   expect(await whoIsIn(till, origin)).toBe('Ana López');
   // At most, the live stream heard the end first (a 401 the SDK reads as «the session ended», `host-closed.ts`).
   const during = refused.slice(2);
@@ -403,7 +407,8 @@ test('BASE-G58: the till’s session ends while working: its next page is its PI
 
 test('BASE-G66 BASE-G65: the device nobody uses goes; removing the one in hand ends its session', async () => {
   psql(`UPDATE base_trusteddevice SET last_entry_at = now() - interval '40 days' WHERE name = 'Office'`);
-  await till.reload();
+  // A page load of Settings › General (BASE-G58 left the till on its Data tab).
+  await till.goto(`${origin}/settings`);
   const devices = shown(till).getByTestId('devices-card');
   await expect(devices.getByTestId('devices-prune')).toHaveText(/Remove the (device|\d+ devices) unused for 30 days/);
   await devices.getByTestId('devices-prune').click();

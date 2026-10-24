@@ -13,6 +13,7 @@ import {
   enterWith,
   onSessionChanged,
   readAccess,
+  nextWithHash,
   safeNext,
   sessionChanged,
   startWayIn,
@@ -86,6 +87,20 @@ describe('safeNext', () => {
     [42, '/'],
   ])('%s → %s', (raw, expected) => {
     expect(safeNext(raw)).toBe(expected);
+  });
+});
+
+describe('nextWithHash', () => {
+  // A link with a fragment opened without a session reaches the Access page as «/login?next=/settings#data»: the
+  // browser keeps the fragment on the page's own address, so it goes back on `next` (BASE-G52).
+  it.each([
+    ['/settings', '#data', '/settings#data'],
+    ['/settings?tab=1', '#data', '/settings?tab=1#data'],
+    ['/settings', '', '/settings'],
+    ['/settings#business', '#data', '/settings#business'],
+    ['/', '#plan', '/#plan'],
+  ])('%s + %s → %s', (next, hash, expected) => {
+    expect(nextWithHash(next, hash)).toBe(expected);
   });
 });
 

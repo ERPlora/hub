@@ -13,7 +13,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
 import { useRoute } from 'vue-router';
 
 import PinDoor from '../components/PinDoor.vue';
-import { createBadgeReader, enterWith, leaveTo, safeNext } from '../lib/access';
+import { createBadgeReader, enterWith, leaveTo, nextWithHash, safeNext } from '../lib/access';
 import { useBaseI18n } from '../lib/i18n';
 import type { AccessDoor } from '../operations';
 
@@ -23,7 +23,7 @@ const { t } = useBaseI18n();
 const route = useRoute();
 const client = useLiveClient();
 
-const next = computed(() => safeNext(route.query.next));
+const next = computed(() => nextWithHash(safeNext(route.query.next), route.hash));
 const notice = computed(() => {
   const value = route.query.notice;
   return value === 'ended' || value === 'device_limit' ? value : null;
