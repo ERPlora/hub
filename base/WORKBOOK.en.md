@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:04e056c30fb549c495c76917852fab27dce397578d9e2c1a064a883d6349d0e0 -->
+<!-- generated from WORKBOOK.md sha256:e0439dd043e95c25a4e714e3bc6d179bf3330d2f2599880a0dc8f0555392c459 -->
 
 ## What it is for and who it is for
 
@@ -301,21 +301,21 @@ On the Employees screens and the API documentation:
 | BASE-F69 | Name a device | done |
 | BASE-F70 | Remove a device that was lost | done |
 | BASE-F71 | Remove at once the devices nobody uses | done |
-| BASE-F72 | Reach the plan's limit of people | done |
-| BASE-F73 | Remove a person's PIN | done |
-| BASE-F74 | Give a person a badge or take it away | done |
-| BASE-F75 | Bring back a person who left the business | done |
-| BASE-F76 | Understand how each person gets in | done |
-| BASE-F77 | See the roles and turn on the ones an app brings | partial |
-| BASE-F78 | Give a person a role | done |
-| BASE-F79 | Approve with a manager's PIN | partial |
-| BASE-F80 | Look up who approved what | done |
-| BASE-F81 | Create an API key and copy its token | partial |
-| BASE-F82 | Rotate an API key | partial |
-| BASE-F83 | Revoke an API key | partial |
-| BASE-F84 | See the API keys and what each one may do | partial |
-| BASE-F85 | Read the API documentation | done |
-| BASE-F86 | Show or hide the API documentation | done |
+| BASE-F77 | Reach the plan's limit of people | done |
+| BASE-F78 | Remove a person's PIN | done |
+| BASE-F79 | Give a person a badge or take it away | done |
+| BASE-F80 | Bring back a person who left the business | done |
+| BASE-F81 | Understand how each person gets in | done |
+| BASE-F82 | See the roles and turn on the ones an app brings | partial |
+| BASE-F83 | Give a person a role | done |
+| BASE-F84 | Approve with a manager's PIN | partial |
+| BASE-F85 | Look up who approved what | done |
+| BASE-F86 | Create an API key and copy its token | partial |
+| BASE-F87 | Rotate an API key | partial |
+| BASE-F88 | Revoke an API key | partial |
+| BASE-F89 | See the API keys and what each one may do | partial |
+| BASE-F90 | Read the API documentation | done |
+| BASE-F91 | Show or hide the API documentation | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -1610,7 +1610,7 @@ Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
 Involved: BASE-F70
 
-### BASE-F72 Reach the plan's limit of people
+### BASE-F77 Reach the plan's limit of people
 Status: done
 Actor: owner, administrator
 Screen: Employees · Staff
@@ -1624,9 +1624,9 @@ In: the people of the business and its plan's places, as erplora.com sends them.
 Out: nothing saved.
 If it fails: "The people of this business could not be loaded." with "Retry", never "Nobody is in this business
 yet.".
-Involved: BASE-F76, BASE-F78
+Involved: BASE-F81, BASE-F83
 
-### BASE-F73 Remove a person's PIN
+### BASE-F78 Remove a person's PIN
 Status: done
 Actor: owner, administrator
 Screen: A person's page
@@ -1641,9 +1641,9 @@ In: the person.
 Out: the person without a PIN: they leave the faces of the tills at once. Event `base.person.pin_removed`.
 If it fails: "The PIN could not be removed."; only the owner changes the owner's way in: "Only the owner changes
 the owner's way in.".
-Involved: BASE-F76, BASE-F55
+Involved: BASE-F81, BASE-F55
 
-### BASE-F74 Give a person a badge or take it away
+### BASE-F79 Give a person a badge or take it away
 Status: done
 Actor: owner, administrator
 Screen: A person's page
@@ -1660,9 +1660,9 @@ If it fails: "A badge has 4 to 64 characters: letters, digits, “-” and “_�
 badge. A badge says who is at the till: two people cannot share it.", "Too many badges tried. Wait a few minutes
 and try again.", "The badge could not be saved." or "The badge could not be removed.". Nobody registers their own:
 "Nobody registers their own badge: ask another administrator.".
-Involved: BASE-F56, BASE-F76
+Involved: BASE-F56, BASE-F81
 
-### BASE-F75 Bring back a person who left the business
+### BASE-F80 Bring back a person who left the business
 Status: done
 Actor: owner, administrator
 Screen: Employees · Staff
@@ -1675,9 +1675,9 @@ Steps:
 In: the invitation on erplora.com.
 Out: the person back in the business, with their PIN and their badge from before.
 If it fails: until they accept, they show as "Not in yet".
-Involved: BASE-F72, BASE-F76
+Involved: BASE-F77, BASE-F81
 
-### BASE-F76 Understand how each person gets in
+### BASE-F81 Understand how each person gets in
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Employees · Staff
@@ -1691,9 +1691,9 @@ Steps:
 In: the people of the business.
 Out: nothing saved. It updates by itself when somebody chooses or loses their PIN or their badge.
 If it fails: "The people of this business could not be loaded." with "Retry".
-Involved: BASE-F72, BASE-F73, BASE-F74
+Involved: BASE-F77, BASE-F78, BASE-F79
 
-### BASE-F77 See the roles and turn on the ones an app brings
+### BASE-F82 See the roles and turn on the ones an app brings
 Status: partial — the four roles of erplora.com are shown; no app brings roles of its own to turn on yet
 Actor: owner, administrator, manager, employee
 Screen: Employees · Roles
@@ -1706,9 +1706,9 @@ Steps:
 In: the roles and the people of the business.
 Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry".
-Involved: BASE-F78
+Involved: BASE-F83
 
-### BASE-F78 Give a person a role
+### BASE-F83 Give a person a role
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles
@@ -1720,9 +1720,9 @@ Steps:
 In: the role chosen on erplora.com.
 Out: the person with their new role, as erplora.com sends it.
 If it fails: whatever erplora.com says.
-Involved: BASE-F77, BASE-F13
+Involved: BASE-F82, BASE-F13
 
-### BASE-F79 Approve with a manager's PIN
+### BASE-F84 Approve with a manager's PIN
 Status: partial — the approval works for the actions an app names, but no app asks for it yet (voiding a sale, a discount over the limit)
 Actor: employee, manager
 Screen: An approval is needed
@@ -1742,9 +1742,9 @@ again.", "That person cannot approve this: ask somebody who may do it themselves
 approval: do it again.", "This is not approved with a PIN.", the wait after too many attempts or "Could not send
 the approval. Check the connection and try again.". With nobody with a PIN who may: "Nobody here can approve this
 with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the app back its refusal.
-Involved: BASE-F80, BASE-F55, BASE-F56
+Involved: BASE-F85, BASE-F55, BASE-F56
 
-### BASE-F80 Look up who approved what
+### BASE-F85 Look up who approved what
 Status: done
 Actor: owner, administrator
 Screen: Employees · Approvals
@@ -1759,9 +1759,9 @@ In: the record of approvals.
 Out: nothing; it is read only. It updates by itself with each approval.
 If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve
 anything in this business yet.".
-Involved: BASE-F79
+Involved: BASE-F84
 
-### BASE-F81 Create an API key and copy its token
+### BASE-F86 Create an API key and copy its token
 Status: partial — a business that still shares its database with others cannot have keys: the tab says "Not available yet"
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -1778,9 +1778,9 @@ In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
 app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
-Involved: BASE-F84, BASE-F85
+Involved: BASE-F89, BASE-F90
 
-### BASE-F82 Rotate an API key
+### BASE-F87 Rotate an API key
 Status: partial — a business that still shares its database with others cannot have keys
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -1793,9 +1793,9 @@ In: the key.
 Out: the key with a new token; the previous one stops opening anything at once. Event `base.api_key.rotated`.
 If it fails: "The API key could not be rotated.", "That key was revoked: it never works again." or "That key no
 longer exists. Refresh the list and try again.".
-Involved: BASE-F81, BASE-F84
+Involved: BASE-F86, BASE-F89
 
-### BASE-F83 Revoke an API key
+### BASE-F88 Revoke an API key
 Status: partial — a business that still shares its database with others cannot have keys
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -1807,9 +1807,9 @@ Steps:
 In: the key.
 Out: the key revoked for good; it is kept on the list. Event `base.api_key.revoked`.
 If it fails: "The API key could not be revoked.".
-Involved: BASE-F84
+Involved: BASE-F89
 
-### BASE-F84 See the API keys and what each one may do
+### BASE-F89 See the API keys and what each one may do
 Status: partial — a business that still shares its database with others cannot have keys: instead, "Not available yet" and "API keys are not available yet in this business." show
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -1822,14 +1822,14 @@ In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
 If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
 another system can read or write your business's data.".
-Involved: BASE-F81, BASE-F82, BASE-F83
+Involved: BASE-F86, BASE-F87, BASE-F88
 
-### BASE-F85 Read the API documentation
+### BASE-F90 Read the API documentation
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: API documentation
 Steps:
-  1. With the documentation shown (BASE-F86), it opens from **Settings › General** ("Open the API documentation")
+  1. With the documentation shown (BASE-F91), it opens from **Settings › General** ("Open the API documentation")
      or from **Employees › API keys** ("API documentation").
   2. They read "The API of this business: what its apps publish for other systems. To call it, create a key in
      Employees › API keys and send it as “Authorization: Bearer <key>”.".
@@ -1843,9 +1843,9 @@ If it fails: hidden, "The API documentation is hidden in this business." and, fo
 nothing published, "None of this business’s apps publishes its API yet.". If the business cannot have keys yet:
 "API keys are not available yet for this business: you can read the documentation, but no system can call it
 yet.".
-Involved: BASE-F86, BASE-F81
+Involved: BASE-F91, BASE-F86
 
-### BASE-F86 Show or hide the API documentation
+### BASE-F91 Show or hide the API documentation
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1858,4 +1858,4 @@ Out: the business's setting. Event `base.api_doc.settings_changed`.
 If it fails: "Could not save the change." and the switch goes back to what was saved; "Could not load the
 setting." with "Retry". Whoever does not run the business sees it off: "Only who runs the business can change
 it.".
-Involved: BASE-F85
+Involved: BASE-F90

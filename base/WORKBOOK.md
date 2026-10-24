@@ -305,21 +305,21 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F69 | Ponerle nombre a un dispositivo | hecho |
 | BASE-F70 | Quitar un dispositivo que se ha perdido | hecho |
 | BASE-F71 | Quitar de golpe los dispositivos que nadie usa | hecho |
-| BASE-F72 | Llegar al tope de personas del plan | hecho |
-| BASE-F73 | Retirar el PIN a una persona | hecho |
-| BASE-F74 | Dar de alta o retirar la placa de una persona | hecho |
-| BASE-F75 | Reincorporar a una persona que salió del negocio | hecho |
-| BASE-F76 | Entender cómo entra cada persona | hecho |
-| BASE-F77 | Ver los roles y encender los que trae una app | parcial |
-| BASE-F78 | Asignar un rol a una persona | hecho |
-| BASE-F79 | Aprobar con el PIN de un responsable | parcial |
-| BASE-F80 | Consultar quién aprobó qué | hecho |
-| BASE-F81 | Crear una llave de API y copiar su token | parcial |
-| BASE-F82 | Rotar una llave de API | parcial |
-| BASE-F83 | Revocar una llave de API | parcial |
-| BASE-F84 | Ver las llaves de API y qué puede cada una | parcial |
-| BASE-F85 | Consultar la documentación de la API | hecho |
-| BASE-F86 | Mostrar u ocultar la documentación de la API | hecho |
+| BASE-F77 | Llegar al tope de personas del plan | hecho |
+| BASE-F78 | Retirar el PIN a una persona | hecho |
+| BASE-F79 | Dar de alta o retirar la placa de una persona | hecho |
+| BASE-F80 | Reincorporar a una persona que salió del negocio | hecho |
+| BASE-F81 | Entender cómo entra cada persona | hecho |
+| BASE-F82 | Ver los roles y encender los que trae una app | parcial |
+| BASE-F83 | Asignar un rol a una persona | hecho |
+| BASE-F84 | Aprobar con el PIN de un responsable | parcial |
+| BASE-F85 | Consultar quién aprobó qué | hecho |
+| BASE-F86 | Crear una llave de API y copiar su token | parcial |
+| BASE-F87 | Rotar una llave de API | parcial |
+| BASE-F88 | Revocar una llave de API | parcial |
+| BASE-F89 | Ver las llaves de API y qué puede cada una | parcial |
+| BASE-F90 | Consultar la documentación de la API | hecho |
+| BASE-F91 | Mostrar u ocultar la documentación de la API | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -1689,7 +1689,7 @@ Sale: esos dispositivos olvidados, como BASE-F70.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
 Implicados: BASE-F70
 
-### BASE-F72 Llegar al tope de personas del plan
+### BASE-F77 Llegar al tope de personas del plan
 <!-- origen: old-hub:HUB_SHELL-F83 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1704,9 +1704,9 @@ Entra: las personas del negocio y las plazas de su plan, como las manda erplora.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar», nunca «Todavía no hay nadie en este
 negocio.».
-Implicados: BASE-F76, BASE-F78
+Implicados: BASE-F81, BASE-F83
 
-### BASE-F73 Retirar el PIN a una persona
+### BASE-F78 Retirar el PIN a una persona
 <!-- origen: old-hub:HUB_SHELL-F86 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1722,9 +1722,9 @@ Entra: la persona.
 Sale: la persona sin PIN: desaparece de las caras de las cajas al momento. Evento `base.person.pin_removed`.
 Si falla: «No se pudo retirar el PIN.»; el acceso del propietario solo lo cambia el propietario: «Solo el
 propietario cambia el acceso del propietario.».
-Implicados: BASE-F76, BASE-F55
+Implicados: BASE-F81, BASE-F55
 
-### BASE-F74 Dar de alta o retirar la placa de una persona
+### BASE-F79 Dar de alta o retirar la placa de una persona
 <!-- origen: old-hub:HUB_SHELL-F87 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1742,9 +1742,9 @@ Si falla: «Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y �
 persona. La placa dice quién está en la caja, así que no la pueden compartir dos personas.», «Demasiadas placas
 probadas. Espera unos minutos y vuelve a intentarlo.», «No se pudo guardar la placa.» o «No se pudo retirar la
 placa.». Nadie da de alta la suya: «Nadie da de alta su propia placa: pídeselo a otro administrador.».
-Implicados: BASE-F56, BASE-F76
+Implicados: BASE-F56, BASE-F81
 
-### BASE-F75 Reincorporar a una persona que salió del negocio
+### BASE-F80 Reincorporar a una persona que salió del negocio
 <!-- origen: old-hub:HUB_SHELL-F89 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1756,9 +1756,9 @@ Pasos:
 Entra: la invitación en erplora.com.
 Sale: la persona otra vez en el negocio, con su PIN y su placa de antes.
 Si falla: mientras no acepta, sale como «Aún no ha entrado».
-Implicados: BASE-F72, BASE-F76
+Implicados: BASE-F77, BASE-F81
 
-### BASE-F76 Entender cómo entra cada persona
+### BASE-F81 Entender cómo entra cada persona
 <!-- origen: old-hub:HUB_SHELL-F90 -->
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado
@@ -1773,9 +1773,9 @@ Pasos:
 Entra: las personas del negocio.
 Sale: nada guardado. Se pone al día sola cuando alguien elige o pierde su PIN o su placa.
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar».
-Implicados: BASE-F72, BASE-F73, BASE-F74
+Implicados: BASE-F77, BASE-F78, BASE-F79
 
-### BASE-F77 Ver los roles y encender los que trae una app
+### BASE-F82 Ver los roles y encender los que trae una app
 <!-- origen: old-hub:HUB_SHELL-F91 -->
 Estado: parcial — se ven los cuatro roles de erplora.com; ninguna app trae todavía roles propios que encender
 Actor: propietario, administrador, encargado, empleado
@@ -1789,9 +1789,9 @@ Pasos:
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
-Implicados: BASE-F78
+Implicados: BASE-F83
 
-### BASE-F78 Asignar un rol a una persona
+### BASE-F83 Asignar un rol a una persona
 <!-- origen: old-hub:HUB_SHELL-F92 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1804,9 +1804,9 @@ Pasos:
 Entra: el rol que se elige en erplora.com.
 Sale: la persona con su rol nuevo, como lo manda erplora.com.
 Si falla: lo que diga erplora.com.
-Implicados: BASE-F77, BASE-F13
+Implicados: BASE-F82, BASE-F13
 
-### BASE-F79 Aprobar con el PIN de un responsable
+### BASE-F84 Aprobar con el PIN de un responsable
 <!-- origen: old-hub:HUB_SHELL-F51 -->
 Estado: parcial — la aprobación funciona para las acciones que una app nombre, pero ninguna app la pide todavía (anular una venta, un descuento por encima del tope)
 Actor: empleado, encargado
@@ -1827,9 +1827,9 @@ intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda h
 aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.», la espera tras demasiados intentos o «No se pudo
 enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.». Sin nadie con PIN que pueda: «Aquí nadie puede
 aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» devuelve a la app su rechazo.
-Implicados: BASE-F80, BASE-F55, BASE-F56
+Implicados: BASE-F85, BASE-F55, BASE-F56
 
-### BASE-F80 Consultar quién aprobó qué
+### BASE-F85 Consultar quién aprobó qué
 <!-- origen: old-hub:HUB_SHELL-F93 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1845,9 +1845,9 @@ Entra: el registro de aprobaciones.
 Sale: nada; es solo lectura. Se pone al día sola con cada aprobación.
 Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido
 que autorizar nada en este negocio.».
-Implicados: BASE-F79
+Implicados: BASE-F84
 
-### BASE-F81 Crear una llave de API y copiar su token
+### BASE-F86 Crear una llave de API y copiar su token
 <!-- origen: old-hub:HUB_SHELL-F94 -->
 Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves: la pestaña dice «Todavía no disponible»
 Actor: propietario, administrador
@@ -1865,9 +1865,9 @@ Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
 publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
-Implicados: BASE-F84, BASE-F85
+Implicados: BASE-F89, BASE-F90
 
-### BASE-F82 Rotar una llave de API
+### BASE-F87 Rotar una llave de API
 <!-- origen: old-hub:HUB_SHELL-F95 -->
 Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves
 Actor: propietario, administrador
@@ -1881,9 +1881,9 @@ Entra: la llave.
 Sale: la llave con un token nuevo; el anterior deja de abrir nada al momento. Evento `base.api_key.rotated`.
 Si falla: «No se pudo rotar la API key.», «Esa key está revocada: no vuelve a funcionar.» o «Esa key ya no existe.
 Actualiza la lista y vuelve a intentarlo.».
-Implicados: BASE-F81, BASE-F84
+Implicados: BASE-F86, BASE-F89
 
-### BASE-F83 Revocar una llave de API
+### BASE-F88 Revocar una llave de API
 <!-- origen: old-hub:HUB_SHELL-F96 -->
 Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves
 Actor: propietario, administrador
@@ -1896,9 +1896,9 @@ Pasos:
 Entra: la llave.
 Sale: la llave revocada para siempre; se guarda en la lista. Evento `base.api_key.revoked`.
 Si falla: «No se pudo revocar la API key.».
-Implicados: BASE-F84
+Implicados: BASE-F89
 
-### BASE-F84 Ver las llaves de API y qué puede cada una
+### BASE-F89 Ver las llaves de API y qué puede cada una
 <!-- origen: old-hub:HUB_SHELL-F97 -->
 Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves: en su lugar sale «Todavía no disponible» y «Las API keys todavía no están disponibles en este negocio.»
 Actor: propietario, administrador
@@ -1912,15 +1912,15 @@ Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
 Si falla: «No se pudieron cargar tus API keys.» con «Reintentar»; sin ninguna, «Aún no hay API keys. Crea una para
 que un sistema externo pueda leer o escribir datos de tu negocio.».
-Implicados: BASE-F81, BASE-F82, BASE-F83
+Implicados: BASE-F86, BASE-F87, BASE-F88
 
-### BASE-F85 Consultar la documentación de la API
+### BASE-F90 Consultar la documentación de la API
 <!-- origen: old-hub:HUB_SHELL-F98 -->
 Estado: hecho
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Documentación de la API
 Pasos:
-  1. Con la documentación mostrada (BASE-F86), se abre desde **Ajustes › General** («Abrir la documentación de la
+  1. Con la documentación mostrada (BASE-F91), se abre desde **Ajustes › General** («Abrir la documentación de la
      API») o desde **Empleados › API keys** («Documentación de la API»).
   2. Lee «La API de este negocio: lo que publican sus apps para otros sistemas. Para llamarla, crea una llave en
      Empleados › API keys y envíala como «Authorization: Bearer <llave>».».
@@ -1934,9 +1934,9 @@ Ajustes › General»; si no llega, «No se pudo cargar la documentación.» con
 «Ninguna app de este negocio publica todavía su API.». Si el negocio aún no puede tener llaves: «Las API keys
 todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede
 llamarla.».
-Implicados: BASE-F86, BASE-F81
+Implicados: BASE-F91, BASE-F86
 
-### BASE-F86 Mostrar u ocultar la documentación de la API
+### BASE-F91 Mostrar u ocultar la documentación de la API
 <!-- origen: old-hub:HUB_SHELL-F161 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1949,7 +1949,7 @@ Entra: el interruptor.
 Sale: el ajuste del negocio. Evento `base.api_doc.settings_changed`.
 Si falla: «No se pudo guardar el cambio.» y el interruptor vuelve a lo guardado; «No se pudo cargar el ajuste.» con
 «Reintentar». A quien no administra le sale apagado: «Solo quien administra el negocio puede cambiarlo.».
-Implicados: BASE-F85
+Implicados: BASE-F90
 
 En las pantallas de Empleados y en la Documentación de la API:
 
