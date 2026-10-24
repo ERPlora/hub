@@ -37,10 +37,12 @@ const number = (n: number) => new Intl.NumberFormat(locale.value).format(n);
 const seatsText = computed(() => {
   const value = seats.value;
   if (!value) return '';
-  if (value.limit !== null) return t('base.people.seats.used', { used: number(value.used), limit: number(value.limit) });
+  // `n` picks the singular or the plural: of the places for «{used} of {limit}», of the people otherwise.
+  if (value.limit !== null)
+    return t('base.people.seats.used', { used: number(value.used), limit: number(value.limit), n: value.limit });
   return value.known
-    ? t('base.people.seats.noLimit', { used: number(value.used) })
-    : t('base.people.seats.count', { used: number(value.used) });
+    ? t('base.people.seats.noLimit', { used: number(value.used), n: value.used })
+    : t('base.people.seats.count', { used: number(value.used), n: value.used });
 });
 
 const access = (row: Person) => accessKeys(row.ways).map((key) => t(key)).join(' + ');

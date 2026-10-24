@@ -723,9 +723,9 @@
       "invite": "Invite on erplora.com",
       "managed": "People are invited, given a role and removed on erplora.com, in “Members” of the business.",
       "seats": {
-        "used": "{used} of {limit} places taken",
-        "noLimit": "{used} people · no limit",
-        "count": "{used} people"
+        "used": "{used} of {limit} place taken | {used} of {limit} places taken",
+        "noLimit": "{used} person · no limit | {used} people · no limit",
+        "count": "{used} person | {used} people"
       },
       "full": {
         "heading": "Every place of your plan is taken",

@@ -85,6 +85,20 @@ describe('PeopleList', () => {
     expect(m.wrapper.find('[data-testid="people-seats"]').text()).toBe('3 people');
   });
 
+  it('one person, or a plan of one place, is said in the singular', async () => {
+    const m = await open({ locale: 'es' });
+    const one = PEOPLE.slice(0, 1);
+    await m.result(m.call, 'base.person.list', { people: one, seats: { known: false, used: 1, limit: null, full: false } });
+    expect(m.wrapper.find('[data-testid="people-seats"]').text()).toBe('1 persona');
+    await m.result(m.call, 'base.person.list', { people: one, seats: { known: true, used: 1, limit: null, full: false } }, 2);
+    expect(m.wrapper.find('[data-testid="people-seats"]').text()).toBe('1 persona · sin límite');
+    await m.result(m.call, 'base.person.list', { people: one, seats: { known: true, used: 1, limit: 1, full: true } }, 3);
+    expect(m.wrapper.find('[data-testid="people-seats"]').text()).toBe('1 de 1 plaza ocupada');
+    const en = await open();
+    await en.result(en.call, 'base.person.list', { people: one, seats: { known: false, used: 1, limit: null, full: false } });
+    expect(en.wrapper.find('[data-testid="people-seats"]').text()).toBe('1 person');
+  });
+
   it('every place taken (BASE-G138): why, and «Upgrade plan» on the web', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
     const m = await open({ locale: 'es' });

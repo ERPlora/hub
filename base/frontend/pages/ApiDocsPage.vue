@@ -6,10 +6,10 @@
 // parameters and its body. Hidden, it says so and who runs the business is sent to Settings › General; a document
 // that cannot be read says so with «Retry»; none published, says so.
 import { InlineFeedback } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
+import { ApiError, type OutputOf, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, onMounted, shallowRef, watch } from 'vue';
 
 import { apiDocFileName, apiDocSections } from '../lib/api-docs';
 import { saveFile } from '../lib/data';
@@ -18,10 +18,30 @@ import { useBaseI18n } from '../lib/i18n';
 const { t } = useBaseI18n();
 const session = useSession();
 const admin = computed(() => session.can('base.administer_hub'));
-const { data, status, error, refresh } = useLive('base.api_doc.get', {});
+const client = useLiveClient();
+const data = shallowRef<OutputOf<'base.api_doc.get'>>();
+const failure = shallowRef<'hidden' | 'failed' | null>(null);
 
-const failed = computed(() => status.value === 'error' && data.value === undefined);
-const hidden = computed(() => failed.value && error.value?.code === 'base.api_docs_hidden');
+async function refresh(): Promise<void> {
+  failure.value = null;
+  try {
+    data.value = await client.api.call('base.api_doc.get', {});
+  } catch (error) {
+    failure.value = error instanceof ApiError && error.code === 'base.api_docs_hidden' ? 'hidden' : 'failed';
+  }
+}
+onMounted(() => void refresh());
+// The page stays alive in the navigation stack: shown or hidden again in Settings, it asks for the document again.
+const settings = useLive('base.api_doc.settings', {});
+watch(
+  () => settings.data.value?.docs_enabled,
+  (now, before) => {
+    if (before !== undefined && now !== before) void refresh();
+  },
+);
+
+const failed = computed(() => failure.value !== null && data.value === undefined);
+const hidden = computed(() => failure.value === 'hidden');
 const sections = computed(() => (data.value ? apiDocSections(data.value.document, data.value.apps) : []));
 
 function download(): void {
@@ -34,6 +54,7 @@ function download(): void {
 <template>
   <AppPage
     :title="t('base.apiDocs.title')"
+    back-href="/settings"
     content-layout="detail"
   >
     <div class="api-docs">

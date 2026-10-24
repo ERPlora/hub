@@ -1,0 +1,162 @@
+// Employees and the API's documentation (APP-BASE-5; the old hub's EmployeesPage, docs/reference/old-hub/employees-*.png
+// and settings-permissions-*.png) in the three viewports, as the owner of hub `a`: «Staff» with the plan's places and how
+// each person gets in, «Roles», «API keys» (hub `a` still shares phase 1's database: «Not available yet», and the way to
+// the documentation) and «Approvals» (nobody approved anything yet); a person's page, giving and taking away a badge
+// (one per run: phase 1 keeps every hub's badges in one table); the API's documentation, hidden, shown from Settings ›
+// General and read; and the employee, who has no «API keys» nor «Approvals» and whose `#apikeys` opens «Staff». Each
+// flow leaves its capture `APP-BASE-5-<G key>-<width>` once nothing scrolls sideways.
+//
+// «An approval is needed» (BASE-G136) has no screen of its own: it opens over an app's when the app asks for it, and no
+// app does yet; its dialog is ApprovalDialog.test.ts's and the server's base/tests/test_approvals.py's.
+// flow: BASE-G138 BASE-G139 BASE-G140 BASE-G142 BASE-G143 BASE-G144 BASE-G145 BASE-G146 BASE-G149 BASE-G150 BASE-G100
+// BASE-G10 BASE-G11 BASE-G02 BASE-G04 BASE-G05
+import { type Browser, expect, type Page, test } from '@playwright/test';
+
+import { A, collectProblems, EMPLOYEE, hostPage, psql, shot, shown, untilStill } from './helpers';
+
+const VIEWPORTS = {
+  390: { width: 390, height: 844 },
+  834: { width: 834, height: 1112 },
+  1440: { width: 1440, height: 900 },
+} as const;
+
+/** A card's number, one per run: a badge opens one person's door only. */
+const BADGE = `55${String(Date.now()).slice(-8)}`;
+
+function hideTheDocs(): void {
+  psql('delete from base_apisettings');
+}
+
+test.beforeAll(hideTheDocs);
+test.afterAll(hideTheDocs);
+test.describe.configure({ mode: 'serial' });
+
+/** The capture of a flow, once the screen settled. */
+async function snap(page: Page, key: string, width: number): Promise<void> {
+  await page.mouse.move(0, 0);
+  await expect(shown(page).locator('[data-testid$="-loading"]:visible')).toHaveCount(0);
+  await untilStill(page);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, `${key} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: shot(`APP-BASE-5-${key}-${width}`) });
+}
+
+const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
+
+async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string, employee = false) {
+  return hostPage(browser, A, { viewport, next, credentials: employee ? EMPLOYEE : undefined });
+}
+
+/** No console error nor uncaught error on the page. */
+async function noProblems(problems: Awaited<ReturnType<typeof collectProblems>>): Promise<void> {
+  const seen = await problems();
+  expect(seen.console).toEqual([]);
+  expect(seen.page).toEqual([]);
+}
+
+/** Opens a tab of the footer tabbar (`tab-<id>`). */
+async function tab(page: Page, id: string): Promise<void> {
+  await testid(page, `tab-${id}`).click();
+  await expect(testid(page, `tab-${id}`)).toHaveClass(/segment-button-checked/);
+}
+
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-G11 BASE-G138 BASE-G142 BASE-G143 BASE-G144 — Employees, its people and its roles at ${width}`, async ({ browser }) => {
+    const { context, page } = await signedIn(browser, viewport, '/employees');
+    const problems = await collectProblems(page);
+    await expect(page.getByRole('heading', { name: 'Employees' }).first()).toBeVisible();
+    // «Staff»: the plan's places, invitations on erplora.com, and how each person gets in.
+    await expect(testid(page, 'people-seats')).toBeVisible();
+    await expect(testid(page, 'people-invite')).toHaveAttribute('href', /\/members$/);
+    const people = shown(page).locator('[data-testid="people-row"], [data-testid="people-card"]');
+    await expect(people.first()).toBeVisible();
+    await expect(shown(page).getByText('Account').first()).toBeVisible();
+    await snap(page, 'BASE-G142', width);
+    // «Roles»: the four of erplora.com.
+    await tab(page, 'roles');
+    await expect(page).toHaveURL(/\/employees#roles$/);
+    await expect(shown(page).locator('[data-testid="roles-row"], [data-testid="roles-card"]')).toHaveCount(4);
+    await expect(testid(page, 'roles-change')).toHaveAttribute('href', /\/members$/);
+    await snap(page, 'BASE-G143', width);
+    await noProblems(problems);
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+    await context.close();
+  });
+
+  test(`BASE-G146 BASE-G149 BASE-G145 — API keys and Approvals at ${width}`, async ({ browser }) => {
+    const { context, page } = await signedIn(browser, viewport, '/employees#apikeys');
+    const problems = await collectProblems(page);
+    // Hub `a` shares phase 1's database: no key yet, and the way to the documentation.
+    await expect(testid(page, 'api-keys-unavailable')).toContainText('API keys are not available yet in this business.');
+    await expect(testid(page, 'api-keys-docs')).toHaveAttribute('href', '/api-docs');
+    await snap(page, 'BASE-G146', width);
+    await tab(page, 'approvals');
+    await expect(page).toHaveURL(/\/employees#approvals$/);
+    await expect(shown(page).getByText('Each action that needed a manager')).toBeVisible();
+    await expect(shown(page).getByText('Nobody has had to approve anything in this business yet.')).toBeVisible();
+    await snap(page, 'BASE-G145', width);
+    await noProblems(problems);
+    await context.close();
+  });
+
+  test(`BASE-G10 BASE-G139 BASE-G140 — a person's page, a badge given and taken away at ${width}`, async ({ browser }) => {
+    // The employee enters once, so the business has them (a fresh e2e database has only who entered).
+    const visit = await signedIn(browser, viewport, '/', true);
+    await visit.context.close();
+    const { context, page } = await signedIn(browser, viewport, '/employees');
+    const problems = await collectProblems(page);
+    const employee = shown(page).locator('[data-testid="people-row"], [data-testid="people-card"]').filter({ hasText: 'Employee' });
+    await employee.first().click();
+    await expect(page).toHaveURL(/\/employees\/[^/#]+$/);
+    await expect(testid(page, 'person-pin')).toContainText('No PIN');
+    const field = testid(page, 'person-badge-input').locator('input');
+    await field.fill(BADGE);
+    await testid(page, 'person-badge-save').click();
+    await expect(testid(page, 'person-badge')).toContainText('Has a badge since');
+    await snap(page, 'BASE-G140', width);
+    await testid(page, 'person-badge-remove').click();
+    await expect(testid(page, 'person-badge')).toContainText('No badge.');
+    await snap(page, 'BASE-G139', width);
+    await noProblems(problems);
+    await context.close();
+  });
+
+  test(`BASE-G100 BASE-G150 — the API's documentation, hidden, shown and read at ${width}`, async ({ browser }) => {
+    hideTheDocs();
+    const { context, page } = await signedIn(browser, viewport, '/api-docs');
+    const problems = await collectProblems(page);
+    await expect(testid(page, 'api-docs-hidden')).toContainText('The API documentation is hidden in this business.');
+    await testid(page, 'api-docs-show').click();
+    await expect(page).toHaveURL(/\/settings/);
+    const card = testid(page, 'api-docs-card');
+    await card.scrollIntoViewIfNeeded();
+    await testid(page, 'api-docs-toggle').click();
+    await expect(testid(page, 'api-docs-open')).toBeVisible();
+    await snap(page, 'BASE-G100', width);
+    await testid(page, 'api-docs-open').click();
+    await expect(page).toHaveURL(/\/api-docs$/);
+    await expect(shown(page).locator('[data-testid="api-docs-section"]').first()).toBeVisible();
+    await expect(testid(page, 'api-docs-keys-soon')).toBeVisible();
+    const route = shown(page).locator('[data-testid="api-docs-route"]').first();
+    await route.locator('summary').click();
+    await expect(route).toHaveAttribute('open', '');
+    await snap(page, 'BASE-G150', width);
+    await noProblems(problems);
+    await context.close();
+  });
+
+  test(`BASE-G11 — the employee has no API keys nor Approvals at ${width}`, async ({ browser }) => {
+    const { context, page } = await signedIn(browser, viewport, '/employees#apikeys', true);
+    const problems = await collectProblems(page);
+    await expect(shown(page).locator('[data-testid="people-row"], [data-testid="people-card"]').first()).toBeVisible();
+    await expect(shown(page).locator('ion-segment-button[data-testid^="tab-"]')).toHaveCount(2);
+    await expect(testid(page, 'tab-personal')).toHaveClass(/segment-button-checked/);
+    await expect(testid(page, 'tab-apikeys')).toHaveCount(0);
+    await expect(testid(page, 'tab-approvals')).toHaveCount(0);
+    await snap(page, 'BASE-G11-employee', width);
+    await noProblems(problems);
+    await context.close();
+  });
+}

@@ -336,7 +336,19 @@ onBeforeUnmount(() => stopReader?.());
 .person-facts dd {
   min-width: 0;
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+
+/* On a phone each value goes under its label: an email never breaks in the middle. */
+@media (max-width: 480px) {
+  .person-facts {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .person-facts dd + dt {
+    margin-top: 8px;
+  }
 }
 
 .person-link {

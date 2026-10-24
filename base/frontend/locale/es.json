@@ -723,9 +723,9 @@
       "invite": "Invitar en erplora.com",
       "managed": "Las personas se invitan, se les cambia el rol y se quitan en erplora.com, en «Miembros» del negocio.",
       "seats": {
-        "used": "{used} de {limit} plazas ocupadas",
-        "noLimit": "{used} personas · sin límite",
-        "count": "{used} personas"
+        "used": "{used} de {limit} plaza ocupada | {used} de {limit} plazas ocupadas",
+        "noLimit": "{used} persona · sin límite | {used} personas · sin límite",
+        "count": "{used} persona | {used} personas"
       },
       "full": {
         "heading": "Tu plan tiene todas las plazas ocupadas",

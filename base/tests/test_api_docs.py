@@ -131,11 +131,12 @@ API_DOC_ROUTES = {
 }
 
 
-def test_it_follows_being_shown_or_hidden_and_the_photo():
+def test_the_switch_is_followed_live_and_the_document_is_asked_once():
+    """The whole document is far bigger than a live result may be (``live.sse.MAX_RESULT_BYTES``): never live."""
     from live.live_registry import live_registry
 
     from base import events
 
     on = live_registry.subscribable
     assert on["base.api_doc.settings"] == [events.API_DOC_SETTINGS_CHANGED]
-    assert on["base.api_doc.get"] == sorted({events.API_DOC_SETTINGS_CHANGED, events.HUB_STATE_APPLIED})
+    assert "base.api_doc.get" not in on

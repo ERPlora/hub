@@ -2213,7 +2213,8 @@ En las pantallas de Empleados y en la Documentación de la API:
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
   `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
-  tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`); el ajuste es
+  tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
+  en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo); el ajuste es
   `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
   aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral del hub viejo
   necesita que el menú admita una entrada condicionada (cambio de `packages/ui`): hoy se llega desde Ajustes y desde
