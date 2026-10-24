@@ -103,6 +103,111 @@
       "account": "My account",
       "reportProblem": "Report a problem"
     },
+    "appsPage": {
+      "title": "Apps",
+      "tabs": {
+        "label": "Apps sections",
+        "mine": "My apps",
+        "all": "Add apps",
+        "paid": "Paid"
+      },
+      "columns": {
+        "app": "App",
+        "category": "Category",
+        "summary": "Description",
+        "price": "Price",
+        "comesWith": "Comes with",
+        "state": "Status"
+      },
+      "search": {
+        "mine": "Search your apps…",
+        "all": "Search apps to add…",
+        "paid": "Search paid apps…"
+      },
+      "state": {
+        "on": "Active",
+        "installed": "Installed",
+        "blocked": "Needs a subscription"
+      },
+      "right": {
+        "free": "Free",
+        "plan": "Included in your plan",
+        "purchase": "Subscribed",
+        "required": "Included with {apps}",
+        "missing": "Paid"
+      },
+      "open": "Open",
+      "buy": "Subscribe on erplora.com",
+      "buyWhere": "Subscribed to on erplora.com, from your ERPlora account.",
+      "entity": {
+        "one": "app",
+        "many": "apps"
+      },
+      "loading": "Loading your apps…",
+      "loadingCatalogue": "Loading the catalogue…",
+      "loadError": "We could not read your apps",
+      "loadErrorBody": "There was no answer, or this session is no longer valid: sign in again if it keeps happening.",
+      "retry": "Retry",
+      "empty": {
+        "mine": "You have no apps yet. Open “Add apps” to see them all.",
+        "all": "There are no apps to show.",
+        "paid": "No app is sold separately: every app comes with your plan."
+      },
+      "noResults": "No apps match your search."
+    },
+    "appBlocked": {
+      "checking": "Checking why this app does not open…",
+      "subscription": {
+        "heading": "Subscription needed",
+        "body": "{app} is disabled because this business does not have its subscription. Your data is safe and comes back as soon as it is subscribed to."
+      },
+      "ready": {
+        "heading": "{app} is ready",
+        "body": "It can be used now.",
+        "open": "Open {app}"
+      },
+      "missing": {
+        "heading": "This app is not available in this business",
+        "body": "Look for it in Apps, or open another one from the menu."
+      },
+      "error": {
+        "heading": "We could not check why this app does not open",
+        "body": "Check the connection and try again."
+      },
+      "toApps": "Go to Apps"
+    },
+    "systemPlan": {
+      "title": "System",
+      "tabs": {
+        "label": "System sections",
+        "plan": "Plan and limits"
+      },
+      "heading": "Your plan's limits",
+      "status": {
+        "within": "Within the limit",
+        "close": "Close to the limit"
+      },
+      "people": "People",
+      "devices": "Devices",
+      "limitHint": "Plan limit",
+      "noLimit": "No limit",
+      "upTo": "Up to {n}",
+      "notCounted": "n/a",
+      "devicesNotCounted": "The hub does not count its devices yet.",
+      "full": {
+        "heading": "You are running out of room in your plan",
+        "body": "Your plan has every place taken, so you cannot add anyone else."
+      },
+      "unknown": "We do not know this business's plan yet: it shows up as soon as erplora.com sends it.",
+      "managed": "Plans are managed from your ERPlora account, on erplora.com.",
+      "loading": "Loading your plan…",
+      "denied": "Only whoever runs the business can see the plan and its limits.",
+      "error": {
+        "heading": "We could not read your plan",
+        "body": "Check the connection and try again."
+      },
+      "retry": "Retry"
+    },
     "settings": {
       "title": "Settings",
       "tabs": {

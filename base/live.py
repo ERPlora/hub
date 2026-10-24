@@ -23,6 +23,12 @@ live("base.widget.list", on=sorted({*events_of("widgets"), *DATA_EVENTS}))
 live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS}))
 live("base.notice.list", on=events_of("notices"))
 
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+# The SaaS's photo gives or takes the right to a paid module (base.entitlement): the Apps screen follows it.
+live("base.app.list", on=[HUB_STATE_APPLIED])
+# The plan and the members come in the photo too: «Plan and limits» follows it.
+live("base.plan.usage", on=[HUB_STATE_APPLIED])
+
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
 # A load, an undo or a reset re-runs the Home (above: BASE-G131, the Home up to date without reloading), the catalogue
 # (the Home's card asks whether the business is still empty) and the list of loads of Settings › Data.

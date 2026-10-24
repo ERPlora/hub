@@ -469,8 +469,9 @@ WORKBOOK_TRANSLATION_MODEL = config(
 LIVE = {
     "context_builder": "base.operations.HubContextBuilder",
     "control_alias": "default",
-    # Every operation's transaction opens on the alias of its use_hub; the registry's, on control (phase 2, S1).
-    "operation_database": "base.tenancy.context.operation_database",
+    # Every operation's transaction opens on the alias of its use_hub; the registry's, on control (phase 2, S1). An
+    # operation of an app the business has no right to answers 402 before (base.entitlement, BASE-G12).
+    "operation_database": "base.entitlement.operation_database",
     # Hub slugs (live.slugs): 3–63 characters in production; local development also opens the
     # one-letter demo hubs a and b (a.localhost:8000, b.localhost:8000).
     "hub_slug_min_length": 1 if DEBUG else 3,

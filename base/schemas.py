@@ -314,6 +314,62 @@ class NoticeListOut(Schema):
     )
 
 
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+
+
+class AppListIn(Schema):
+    """No input: the business's apps, all of them (the modules of the deployment, a short fixed list)."""
+
+
+class AppOut(Schema):
+    """A module as the Apps screen paints it: from its ``LiveAppConfig``, with its right (``base.entitlement``)."""
+
+    id: str
+    name: str
+    icon: str
+    category: str
+    category_label: str
+    summary: str
+    #: Bought on erplora.com (``premium``): no price here, the Store has it (PLAN §20.4.3).
+    premium: bool
+    #: Where its right comes from: ``free``, ``plan``, ``purchase``, ``required`` (with an app that needs it) or
+    #: ``missing``.
+    right: Literal["free", "plan", "purchase", "required", "missing"]
+    #: ``on``, or ``blocked`` while the business has no right to it (phase 2 adds turned off, activating, failed).
+    state: Literal["on", "blocked"]
+    #: The first screen of its menu this person may open; ``None``: «Open» is not offered.
+    path: str | None
+    #: What it needs, transitively (it comes along with it), and the apps that need it.
+    requires: list[str]
+    required_by: list[str]
+
+
+class AppListOut(Schema):
+    apps: list[AppOut]
+    #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
+    store_url: str
+
+
+class PlanUsageIn(Schema):
+    """No input: the plan of the business of the request."""
+
+
+class LimitOut(Schema):
+    #: How much is in use; ``None`` when the Hub does not count it (never a made-up figure).
+    used: int | None
+    #: The plan's limit; ``None`` when it has none (0 in the SaaS's plan) or the plan is not known.
+    limit: int | None
+
+
+class PlanUsageOut(Schema):
+    """``base.plan.usage``: the plan's limits (the SaaS's photo, ``plan``) against what the business uses."""
+
+    #: Whether the Hub has the business's plan from erplora.com (a demo, or a business without a photo yet, has not).
+    known: bool
+    people: LimitOut
+    devices: LimitOut
+
+
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
 
 #: A file uploaded in base64: 5 MB of zip is 6 990 508 characters.

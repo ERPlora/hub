@@ -1,5 +1,6 @@
-// base's `routes.ts`: the Home at `/` (APP-BASE-1) and Settings at `/settings` (APP-BASE-2, the old hub's address,
-// with its old `/import` and `/export` pages landing on Data); main.ts reads the default export.
+// base's `routes.ts`: the Home at `/` (APP-BASE-1), Apps at `/apps` and System at `/system` (APP-BASE-4), and Settings
+// at `/settings` (APP-BASE-2, the old hub's address, with its old `/import` and `/export` pages landing on Data);
+// main.ts reads the default export.
 import type { RouteComponent } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +9,8 @@ import routes from './routes';
 // The pages, stubbed: this file checks which page each route loads and that it loads it on demand (their own
 // tests mount them).
 vi.mock('./pages/HomePage.vue', () => ({ default: { name: 'HomePage' } }));
+vi.mock('./pages/AppsPage.vue', () => ({ default: { name: 'AppsPage' } }));
+vi.mock('./pages/SystemPage.vue', () => ({ default: { name: 'SystemPage' } }));
 vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 
 async function page(path: string): Promise<string> {
@@ -17,11 +20,18 @@ async function page(path: string): Promise<string> {
 }
 
 describe('base routes', () => {
-  it("puts the Home at `/`, under a name of its own (the shell's grid keeps `home`), and Settings at `/settings`", () => {
+  it("puts the Home at `/`, under a name of its own (the shell's grid keeps `home`), Apps, System and Settings", () => {
     expect(routes.filter((r) => r.component).map((r) => [r.path, r.name, r.meta?.auth])).toEqual([
       ['/', 'base-home', true],
+      ['/apps', 'base-apps', true],
+      ['/system', 'base-system', true],
       ['/settings', 'base-settings', true],
     ]);
+  });
+
+  it('loads Apps on demand: its tabs are the address hash (`#all`, `#paid`), so one route', async () => {
+    const loader = routes[1].component as () => Promise<{ default: RouteComponent }>;
+    expect(((await loader()).default as { name: string }).name).toBe('AppsPage');
   });
 
   it('loads each page on demand', async () => {
@@ -35,5 +45,10 @@ describe('base routes', () => {
       '/import': { path: '/settings', hash: '#data' },
       '/export': { path: '/settings', query: { data: 'export' }, hash: '#data' },
     });
+  });
+
+  it('loads System on demand', async () => {
+    const loader = routes[2].component as () => Promise<{ default: RouteComponent }>;
+    expect(((await loader()).default as { name: string }).name).toBe('SystemPage');
   });
 });

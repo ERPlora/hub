@@ -17,6 +17,7 @@ from live.context import Scope
 from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
+from base.events import HUB_STATE_APPLIED
 from base.models import Hub
 from base.tests.test_internal import HUB_ID, PATH, signed
 
@@ -93,3 +94,20 @@ def test_the_delete_that_ends_a_business_wakes_its_open_apps_too(client, acme, l
 
     signed(client, "delete", f"/internal/hubs/{HUB_ID}", {})  # already cancelled: nothing changed, nobody woken
     assert "*" not in heard(on_acme, timeout=0.5)
+
+
+def test_every_new_photo_reaches_the_live_queries_of_its_business_only(client, acme, listening):
+    # The live queries that follow the photo (the Home's three, Apps, «Plan and limits»: base/live.py) listen on the
+    # business's channel; the photo is applied as the platform (/internal), so its event went to the platform's
+    # channel only and nothing of the business moved until a reload. Now it reaches the business after the COMMIT,
+    # and no other business hears it; a photo already seen tells nobody.
+    on_acme = listening(ACME)
+    on_other = listening(Scope("host", "other"))
+    plan = {"slug": "starter", "max_users": 3, "max_devices": 2}
+
+    assert signed(client, "put", PATH, {"slug": "acme", "version": 1, "plan": plan}).json()["applied"] is True
+    assert HUB_STATE_APPLIED in heard(on_acme)
+    assert heard(on_other, timeout=0.5) == set()
+
+    assert signed(client, "put", PATH, {"slug": "acme", "version": 1, "plan": plan}).json()["applied"] is False
+    assert heard(on_acme, timeout=0.5) == set()

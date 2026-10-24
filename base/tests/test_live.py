@@ -29,6 +29,9 @@ def test_the_three_queries_and_their_events():
         "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED, *DATA}),
         "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA}),
         "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED}),
+        # Apps (APP-BASE-4): the photo gives or takes the right to a paid module.
+        "base.app.list": [HUB_STATE_APPLIED],
+        "base.plan.usage": [HUB_STATE_APPLIED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
         "base.import.list": sorted(DATA),
     }

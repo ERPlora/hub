@@ -7,8 +7,8 @@ Estado de la app: en construcción (2026-10-22)
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
 > (el del hub viejo: saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
 > la actividad), con lo que acompaña a cualquier pantalla: la campana, «Actualizar plan» y la franja que
-> avisa cuando todavía no se puede facturar. También las plantillas: la tarjeta del Inicio y Ajustes › Datos y
-> copias (importar, exportar, deshacer y restablecer).
+> avisa cuando todavía no se puede facturar. También «Apps», «Plan y límites» de Sistema y las plantillas: la
+> tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer).
 
 ## Para qué sirve y para quién
 
@@ -91,6 +91,22 @@ ticket ni factura hasta que configures esto:» y cada paso con «Configurar» (e
 solo su nombre). En el «Resumen» del Inicio no sale (la lista dice lo mismo un poco más abajo); en
 «Actividad», sí.
 
+### Apps
+Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
+«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Cada una, una tabla (o
+tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y nombre), «Categoría» y
+«Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con». «Abrir» en la fila de una
+app que la persona puede abrir.
+
+### La pantalla de una app que no se abre
+En la misma dirección de la pantalla de la app, el motivo: «Suscripción necesaria» o «Esta app no está
+disponible en este negocio», con «Ir a Apps» (y «Contratar en erplora.com» para quien administra, en el
+navegador).
+
+### Sistema · Plan y límites
+Desde «Sistema» en el menú lateral, la pestaña «Plan y límites»: «Los límites de tu plan» con «Dentro del
+límite» o «Cerca del límite», las tarjetas «Personas» y «Dispositivos» y dónde se gestionan los planes.
+
 ### Ajustes · Datos y copias
 Se abre con «Ajustes» en el menú lateral. Abajo, la pestaña «Datos y copias» (las demás pestañas de Ajustes
 del hub viejo llegan con sus flujos). Arriba, un selector con «Importar» (lo que se abre), «Exportar» y
@@ -139,16 +155,31 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | parcial |
 | BASE-F12 | Pedirle al asistente que repase la configuración | parcial |
 | BASE-F13 | Perder el acceso al cambiar de rol o al salir del negocio | hecho |
-| BASE-F14 | Elegir una plantilla del catálogo para importar | hecho |
-| BASE-F15 | Subir un fichero para importar | hecho |
-| BASE-F16 | Revisar y cargar lo que trae el fichero | hecho |
-| BASE-F17 | Leer el informe de la importación | hecho |
-| BASE-F18 | Volver al informe de una importación que no entró entera y reintentar | hecho |
-| BASE-F19 | Deshacer una importación | hecho |
-| BASE-F20 | Exportar una copia de seguridad o una plantilla | hecho |
-| BASE-F21 | Elegir qué apps, datos y tablas viajan en la exportación | hecho |
-| BASE-F22 | Restablecer el negocio por secciones | parcial |
-| BASE-F23 | Ver Inicio al día después de importar una plantilla | hecho |
+| BASE-F14 | Ver las apps del negocio | hecho |
+| BASE-F15 | Abrir una app desde Apps | hecho |
+| BASE-F16 | Buscar una app en el catálogo | hecho |
+| BASE-F17 | Saber cuánto cuesta una app antes de tenerla | hecho |
+| BASE-F18 | Instalar una app | parcial |
+| BASE-F19 | Saber qué más viene con una app | parcial |
+| BASE-F20 | Intentar usar una app que necesita suscripción | hecho |
+| BASE-F21 | Ver por qué no se ha podido activar una app y reintentarlo | parcial |
+| BASE-F22 | Seguir la activación de una app mientras se navega | parcial |
+| BASE-F23 | Desactivar una app | parcial |
+| BASE-F24 | Activar una app | parcial |
+| BASE-F25 | Ver que una app se niega a desactivarse | parcial |
+| BASE-F26 | Entender por qué una app no se abre | hecho |
+| BASE-F27 | Ver una app de pago bloqueada | hecho |
+| BASE-F28 | Ver cuánto de los límites del plan se está usando | parcial |
+| BASE-F29 | Elegir una plantilla del catálogo para importar | hecho |
+| BASE-F30 | Subir un fichero para importar | hecho |
+| BASE-F31 | Revisar y cargar lo que trae el fichero | hecho |
+| BASE-F32 | Leer el informe de la importación | hecho |
+| BASE-F33 | Volver al informe de una importación que no entró entera y reintentar | hecho |
+| BASE-F34 | Deshacer una importación | hecho |
+| BASE-F35 | Exportar una copia de seguridad o una plantilla | hecho |
+| BASE-F36 | Elegir qué apps, datos y tablas viajan en la exportación | hecho |
+| BASE-F37 | Restablecer el negocio por secciones | parcial |
+| BASE-F38 | Ver Inicio al día después de importar una plantilla | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -183,7 +214,7 @@ Pasos:
   2. Arriba, el nombre del negocio (el de erplora.com) y «Hoy» con la fecha larga en el idioma de la
      aplicación; mientras el negocio no tiene nombre, «Buenos días», «Buenas tardes» o «Buenas noches».
   3. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
-     para quien lo administra, BASE-F23), «Mis apps», «Termina de configurar tu negocio» y el tablero de
+     para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
      paneles.
   4. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
 Entra: el nombre del negocio y la fecha del dispositivo.
@@ -393,7 +424,264 @@ Si falla: si el hub no responde en ese momento, erplora.com lo vuelve a intentar
 siguiente vez que erplora.com le pase al hub el estado del negocio también se cierran esas sesiones.
 Implicados: HUBS-F26, HUBS-F27, HUBS-F28
 
-### BASE-F14 Elegir una plantilla del catálogo para importar
+### BASE-F14 Ver las apps del negocio
+<!-- origen: old-hub:HUB_SHELL-F105 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Apps
+Pasos:
+  1. Pulsa «Apps» en el menú lateral. Se abre en la pestaña «Mis apps»; «Añadir apps» y «De pago» tienen
+     también su dirección, que se puede enlazar.
+  2. Mientras llega la lista: «Cargando tus apps…». Después, una fila (o una tarjeta, a elegir) por cada app que
+     el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»).
+  3. Busca en «Buscar en tus apps…» (nombre, descripción o categoría), filtra por categoría con el embudo,
+     ordena o elige columnas.
+  4. Cuando el negocio contrata una app en erplora.com o deja de tenerla, la lista se pone al día sola, sin
+     recargar.
+Entra: las apps que trae el hub y lo que el negocio tiene contratado en erplora.com.
+Sale: nada guardado.
+Si falla: «No hemos podido leer tus apps» — «No ha habido respuesta, o esta sesión ya no es válida: vuelve a
+entrar si sigue pasando.» con «Reintentar»; la lista que ya había se queda debajo (un fallo nunca dice que no
+hay apps). Sin ninguna app: «Aún no tienes apps. Abre «Añadir apps» para verlas todas.».
+Implicados: ninguno
+
+### BASE-F15 Abrir una app desde Apps
+<!-- origen: old-hub:HUB_SHELL-F106 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Apps
+Pasos:
+  1. En la fila de una app de «Mis apps», pulsa «Abrir».
+  2. Se abre la primera pantalla de esa app que la persona puede ver.
+Entra: el menú de la app y lo que la persona puede ver.
+Sale: nada guardado.
+Si falla: una app que la persona no puede abrir, o que no está en marcha, no lleva «Abrir» (no sale apagado: no
+sale). Al pulsarlo se vuelve a comprobar, por si acaba de cambiar: si ya no está en marcha, no abre nada.
+Implicados: ninguno
+
+### BASE-F16 Buscar una app en el catálogo
+<!-- origen: old-hub:HUB_SHELL-F107 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Apps
+Pasos:
+  1. En Apps, pulsa «Añadir apps» (todas las apps de ERPlora) o «De pago» (solo las que se contratan aparte).
+  2. Mientras llega: «Cargando el catálogo…». Después, una fila por app con «App», «Categoría», «Descripción»,
+     «Precio», «Viene con» y «Estado» («Instalada» o «Necesita suscripción»), con los nombres y las
+     descripciones en el idioma de quien mira.
+  3. Busca en «Buscar apps para añadir…» (en «De pago», «Buscar apps de pago…») por nombre, descripción o
+     categoría, y filtra por categoría o por estado.
+Entra: las apps que trae el hub y lo que el negocio tiene contratado en erplora.com.
+Sale: nada guardado.
+Si falla: como en «Mis apps» (BASE-F14). Una búsqueda sin resultados: «No hay apps que coincidan con tu
+búsqueda.».
+Implicados: APPS-F01
+
+### BASE-F17 Saber cuánto cuesta una app antes de tenerla
+<!-- origen: old-hub:HUB_SHELL-F108 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Apps
+Pasos:
+  1. En «Añadir apps» o «De pago», la columna «Precio» dice de cada app: «Gratis» (va con cualquier plan),
+     «Incluida en tu plan», «Contratada», «Incluida con» y la app que la trae (una de pago que viene con otra que
+     el negocio tiene) o «De pago».
+  2. El importe de una app «De pago» está en la Tienda de erplora.com; quien administra el negocio la abre desde
+     «Contratar en erplora.com» (BASE-F20).
+  3. «De pago» reúne solo las apps que se contratan aparte: una gratis nunca sale ahí. Si ninguna se vende
+     aparte: «Ninguna app se vende aparte: todas vienen con tu plan.».
+Entra: si cada app se contrata aparte y lo que el negocio tiene contratado en erplora.com.
+Sale: nada guardado. El hub no cobra ni enseña importes: el precio y la compra son de erplora.com.
+Si falla: sin la lista, como en «Mis apps» (BASE-F14).
+Implicados: APPS-F01, APPS-F07
+
+### BASE-F18 Instalar una app
+<!-- origen: old-hub:HUB_SHELL-F109 -->
+Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Actor: administrador
+Pantalla: Apps
+Pasos:
+  1. Las apps gratis ya están en «Mis apps» y en el menú; una de pago aparece sola en los dos, sin recargar, en
+     cuanto se contrata en erplora.com (BASE-F20).
+  2. En «Añadir apps», quien administra activa una app que el negocio no usa: mientras se prepara, la fila dice
+     «Activando…»; después pasa a «Instalada» y la app sale en «Mis apps» y en el menú.
+Entra: la app elegida y lo que el negocio tiene contratado en erplora.com.
+Sale: la app en marcha en este negocio.
+Si falla: BASE-F21.
+Implicados: APPS-F07
+
+### BASE-F19 Saber qué más viene con una app
+<!-- origen: old-hub:HUB_SHELL-F110 -->
+Estado: parcial — Apps ya dice lo que trae cada app y con qué app viene una de pago; el aviso al encenderla, que nombra lo que se encendió con ella, llega con la activación de apps por negocio
+Actor: administrador
+Pantalla: Apps
+Pasos:
+  1. En «Añadir apps», la columna «Viene con» nombra las apps que necesita cada una (por ejemplo, «Ventas / TPV»
+     viene con «Clientes» e «Impuestos»): quien tiene una tiene también las que trae.
+  2. Una app de pago que el negocio tiene porque la necesita otra que ha contratado dice en «Precio» «Incluida
+     con» y el nombre de esa otra.
+  3. Al encender una app que necesita otras, el aviso nombra también las que se encendieron con ella.
+Entra: lo que necesita cada app.
+Sale: nada guardado.
+Si falla: si una app de pago trae otra de pago que no se ha contratado, las dos se contratan juntas: hasta
+entonces, «Necesita suscripción».
+Implicados: ninguno
+
+### BASE-F20 Intentar usar una app que necesita suscripción
+<!-- origen: old-hub:HUB_SHELL-F111 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Apps
+Pasos:
+  1. Una app de pago que el negocio no tiene contratada sale en «Añadir apps» y en «De pago» con «Necesita
+     suscripción», y no está en «Mis apps» ni en el menú.
+  2. Quien administra el negocio, en el navegador, ve a su lado «Contratar en erplora.com», que abre la Tienda de
+     erplora.com de este negocio en una pestaña nueva: allí ve el precio y la contrata.
+  3. En cuanto erplora.com se lo dice al hub, la app pasa a «Instalada» y aparece en «Mis apps» y en el menú, sin
+     recargar.
+  4. Quien no administra el negocio, y cualquiera en la app instalada, ve «Se contrata en erplora.com, desde tu
+     cuenta de ERPlora.» y ningún botón: el hub nunca vende.
+Entra: lo que el negocio tiene contratado, tal y como erplora.com se lo pasa al hub.
+Sale: nada guardado ni cobrado en el hub.
+Si falla: hasta que erplora.com se lo dice al hub, la app sigue con «Necesita suscripción»; una pantalla suya
+que se abra dice por qué (BASE-F27).
+Implicados: APPS-F07
+
+### BASE-F21 Ver por qué no se ha podido activar una app y reintentarlo
+<!-- origen: old-hub:HUB_SHELL-F112 -->
+Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Actor: administrador
+Pantalla: Apps
+Pasos:
+  1. La activación de una app no termina: sus datos no se han podido preparar.
+  2. Su fila dice que no se ha podido activar y ofrece «Reintentar», que la vuelve a pedir; mientras tanto la app
+     no se abre.
+Entra: el motivo que da el hub.
+Sale: nada; la app sigue como estaba.
+Si falla: si vuelve a fallar, vuelve a decirlo con su «Reintentar».
+Implicados: ninguno
+
+### BASE-F22 Seguir la activación de una app mientras se navega
+<!-- origen: old-hub:HUB_SHELL-F113 -->
+Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Actor: administrador
+Pantalla: Apps
+Pasos:
+  1. Quien administra activa una app (BASE-F18) y se va a otra pantalla.
+  2. La app sale «Activando…» en «Mis apps» y en el menú hasta que está lista; entonces se abre como cualquier
+     otra, en todos los dispositivos del negocio, sin recargar.
+Entra: cómo va la activación.
+Sale: nada guardado.
+Si falla: BASE-F21.
+Implicados: ninguno
+
+### BASE-F23 Desactivar una app
+<!-- origen: old-hub:HUB_SHELL-F122 -->
+Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Actor: administrador
+Pantalla: Apps
+Pasos:
+  1. En «Mis apps», quien administra desactiva una app.
+  2. Le pregunta, con el nombre de la app, y nombra las apps que se apagan con ella porque la necesitan.
+  3. Confirma: la app y las que la necesitan salen del menú y de «Mis apps». No se borra nada: al volver a
+     activarla queda como estaba.
+Entra: las apps del negocio y lo que necesita cada una.
+Sale: la app apagada en este negocio, con sus datos intactos.
+Si falla: BASE-F25.
+Implicados: VERIFACTU-F32
+
+### BASE-F24 Activar una app
+<!-- origen: old-hub:HUB_SHELL-F123 -->
+Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Actor: administrador
+Pantalla: Apps
+Pasos:
+  1. En «Añadir apps», quien administra vuelve a activar una app que apagó.
+  2. Le pregunta y nombra las apps que se encienden con ella porque las necesita; confirma y la app vuelve al menú
+     con los datos que tenía.
+Entra: lo que necesita la app y lo que el negocio tiene contratado.
+Sale: la app en marcha en este negocio.
+Si falla: una app de pago sin contratar no se puede activar: BASE-F20.
+Implicados: ninguno
+
+### BASE-F25 Ver que una app se niega a desactivarse
+<!-- origen: old-hub:HUB_SHELL-F125 -->
+Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Actor: administrador
+Pantalla: Apps
+Pasos:
+  1. Quien administra intenta desactivar una app que otra en marcha necesita, o VeriFactu con registros que la
+     AEAT aún no ha aceptado.
+  2. El hub se niega, no cambia nada y dice por qué, con lo que hay que hacer antes.
+Entra: el motivo de la app que se niega.
+Sale: nada.
+Si falla: sin motivo propio de la app, un aviso de que no se ha podido cambiar.
+Implicados: VERIFACTU-F32
+
+### BASE-F26 Entender por qué una app no se abre
+<!-- origen: old-hub:HUB_SHELL-F41 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: La pantalla de una app que no se abre
+Pasos:
+  1. Abre una pantalla de una app (desde un enlace, el historial o una pestaña que se quedó abierta) que en este
+     negocio no se puede usar ahora.
+  2. En lugar de la app, en la misma dirección, mientras lo comprueba: «Comprobando por qué no se abre esta
+     app…».
+  3. Después, el motivo: «Suscripción necesaria» (BASE-F27), o «Esta app no está disponible en este negocio» —
+     «Búscala en Apps, o abre otra desde el menú.»; los dos con «Ir a Apps».
+Entra: lo que el negocio tiene de cada app.
+Sale: nada.
+Si falla: «No se ha podido comprobar por qué no se abre esta app» — «Comprueba la conexión y vuelve a
+intentarlo.» con «Reintentar»: nunca un motivo inventado. Una dirección que no existe en el hub dice que no
+existe, como cualquier otra. Una app que la persona no puede ver se abre igual y cada pantalla dice que no tiene
+permiso.
+Implicados: ninguno
+
+### BASE-F27 Ver una app de pago bloqueada
+<!-- origen: old-hub:HUB_SHELL-F49 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: La pantalla de una app que no se abre
+Pasos:
+  1. El negocio deja de tener una app de pago (su suscripción en erplora.com termina) o alguien abre una que no
+     ha contratado.
+  2. Al abrir cualquier pantalla suya ve «Suscripción necesaria»: el nombre de la app y «está deshabilitada porque
+     este negocio no tiene su suscripción. Tus datos están a salvo y vuelven en cuanto se contrate.», con «Ir a
+     Apps» y, para quien administra en el navegador, «Contratar en erplora.com».
+  3. La app sale del menú y de «Mis apps», y el hub no hace nada de lo que se le pida a esa app, venga de esta
+     pantalla, de otro dispositivo, del asistente o de una integración.
+  4. Si se contrata con la pantalla abierta, cambia al nombre de la app con «ya está lista» — «Ya se puede
+     usar.» y «Abrir» con su nombre, que la abre al día.
+Entra: lo que el negocio tiene contratado, tal y como erplora.com se lo pasa al hub.
+Sale: nada; los datos de la app no se tocan.
+Si falla: si nadie avisa al hub cuando termina el periodo contratado, el hub lo nota solo al pasar la fecha. Un
+negocio de demostración tiene todas las apps, también las de pago, para probarlas.
+Implicados: APPS-F07
+
+### BASE-F28 Ver cuánto de los límites del plan se está usando
+<!-- origen: old-hub:HUB_SHELL-F128 -->
+Estado: parcial — sin cuántos dispositivos se usan: el hub aún no lleva la cuenta de sus dispositivos (llega con los dispositivos de confianza); la memoria, la CPU y la base de datos ya no se miden por negocio (el uso lo mide erplora.com)
+Actor: propietario, administrador
+Pantalla: Sistema · Plan y límites
+Pasos:
+  1. Pulsa «Sistema» en el menú lateral: se abre «Plan y límites».
+  2. Ve «Los límites de tu plan» con «Dentro del límite» o «Cerca del límite», la tarjeta «Personas» (las
+     personas activas del negocio frente a las que permite el plan, con su barra; o «Sin límite») y la de
+     «Dispositivos» («Hasta» y el tope del plan, o «Sin límite»).
+  3. Con todas las plazas ocupadas: «Te estás quedando sin margen en tu plan» — «Tu plan tiene todas las plazas
+     ocupadas, así que no puedes añadir a nadie más.», sin botón.
+  4. Abajo: «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.». Se pone al día solo cuando
+     cambian el plan o las personas.
+Entra: los topes del plan que erplora.com le pasa al hub y las personas activas del negocio.
+Sale: nada guardado.
+Si falla: «No hemos podido leer tu plan» — «Comprueba la conexión y vuelve a intentarlo.» con «Reintentar».
+Quien no administra el negocio ve «Solo quien administra el negocio ve el plan y sus límites.», sin
+«Reintentar». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en
+cuanto erplora.com lo envíe.».
+Implicados: ninguno
+
+### BASE-F29 Elegir una plantilla del catálogo para importar
 <!-- origen: old-hub:HUB_SHELL-F175 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -408,7 +696,7 @@ Pasos:
      las del idioma de la persona.
   3. «Buscar plantillas» busca por el nombre, la descripción o las apps que trae.
   4. Pulsa «Usar plantilla» en la que le sirva: el botón gira mientras se lee y se abre «Revisa lo que
-     trae» (BASE-F16).
+     trae» (BASE-F31).
 Entra: las plantillas del Hub, una por sector e idioma (hoy restaurante y peluquería, en español y en
 inglés).
 Sale: nada guardado hasta cargarla.
@@ -419,7 +707,7 @@ fichero: {reason}» y se queda en la elección. Quien no administra el negocio l
 puede ver e importar plantillas.».
 Implicados: INVENTORY-F12
 
-### BASE-F15 Subir un fichero para importar
+### BASE-F30 Subir un fichero para importar
 <!-- origen: old-hub:HUB_SHELL-F176 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -427,7 +715,7 @@ Pantalla: Ajustes · Datos y copias › Importar
 Pasos:
   1. En «Importar», pulsa «Subir desde archivo» y elige un .blueprint.zip: una copia de seguridad de este
      negocio o una plantilla que exportó otro.
-  2. Mientras se lee, el botón gira. Después se abre «Revisa lo que trae» (BASE-F16).
+  2. Mientras se lee, el botón gira. Después se abre «Revisa lo que trae» (BASE-F31).
   3. Tras un error se puede elegir el mismo fichero otra vez.
 Entra: el fichero, de 5 MB como mucho.
 Sale: nada guardado hasta cargarlo.
@@ -435,7 +723,7 @@ Si falla: «No se pudo leer el fichero: {reason}» con el motivo (no es un .blue
 hizo una versión más nueva de ERPlora o pasa de 5 MB) y se queda en la elección.
 Implicados: ninguno
 
-### BASE-F16 Revisar y cargar lo que trae el fichero
+### BASE-F31 Revisar y cargar lo que trae el fichero
 <!-- origen: old-hub:HUB_SHELL-F177 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -450,7 +738,7 @@ Pasos:
      una plantilla se quedan fuera: «Datos personales: solo se cargan desde una copia de seguridad.». Lo que
      el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí».
   3. Desmarca las apps que no quiera y pulsa «Importar» («Importando…»), o «Elegir otro» para volver.
-  4. Al terminar sale el informe (BASE-F17). Lo que ya había en el negocio se queda como estaba: no se
+  4. Al terminar sale el informe (BASE-F32). Lo que ya había en el negocio se queda como estaba: no se
      duplica ni se sobrescribe.
 Entra: la plantilla o el fichero y las apps marcadas.
 Sale: en cada app marcada, lo que trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus
@@ -461,7 +749,7 @@ menos una app.» y no se puede importar; si ninguna de sus apps está encendida,
 cargarse en tu negocio: ninguna de sus apps está encendida.».
 Implicados: INVENTORY-F12
 
-### BASE-F17 Leer el informe de la importación
+### BASE-F32 Leer el informe de la importación
 <!-- origen: old-hub:HUB_SHELL-F178 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -481,7 +769,7 @@ Si falla: una etiqueta que la pantalla no conoce sale como «Falló» con su tex
 éxito.
 Implicados: ninguno
 
-### BASE-F18 Volver al informe de una importación que no entró entera y reintentar
+### BASE-F33 Volver al informe de una importación que no entró entera y reintentar
 <!-- origen: old-hub:HUB_SHELL-F179 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -503,7 +791,7 @@ Sale: lo que faltaba, si ahora entra, y el informe nuevo (`base.blueprint.import
 Si falla: «El reintento falló: {reason}» y el informe sigue a la vista.
 Implicados: ninguno
 
-### BASE-F19 Deshacer una importación
+### BASE-F34 Deshacer una importación
 <!-- origen: old-hub:HUB_SHELL-F180 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -524,7 +812,7 @@ Si falla: el motivo sale en la propia ventana, que no se cierra (en el hub viejo
 importación ya deshecha, «Esta importación ya se deshizo.».
 Implicados: ninguno
 
-### BASE-F20 Exportar una copia de seguridad o una plantilla
+### BASE-F35 Exportar una copia de seguridad o una plantilla
 <!-- origen: old-hub:HUB_SHELL-F173 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -536,7 +824,7 @@ Pasos:
      nombre final del archivo («Archivo: {file}»).
   3. Responde «¿Para qué es este archivo?»: «Copia de seguridad de este negocio» (la que viene marcada; lleva
      también los clientes) o «Plantilla para compartir» (nunca lleva clientes).
-  4. Elige las apps y sus datos (BASE-F21) y pulsa «Exportar» («Exportando…»).
+  4. Elige las apps y sus datos (BASE-F36) y pulsa «Exportar» («Exportando…»).
   5. El archivo baja con el navegador y sale «{file} descargado.».
 Entra: el nombre, el idioma, para qué es y lo marcado.
 Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas; nunca personas, PIN
@@ -545,7 +833,7 @@ Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre 
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.».
 Implicados: ninguno
 
-### BASE-F21 Elegir qué apps, datos y tablas viajan en la exportación
+### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 <!-- origen: old-hub:HUB_SHELL-F174 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -567,7 +855,7 @@ Si falla: «No se han podido cargar las apps de este negocio.» con «Reintentar
 se puede exportar.
 Implicados: ninguno
 
-### BASE-F22 Restablecer el negocio por secciones
+### BASE-F37 Restablecer el negocio por secciones
 <!-- origen: old-hub:HUB_SHELL-F181 -->
 Estado: parcial — mientras el negocio comparte su base de datos con otros negocios no se puede vaciar: la pantalla lo explica y no ofrece el botón; se podrá cuando cada negocio tenga la suya
 Actor: propietario, administrador
@@ -594,7 +882,7 @@ coincide.». Quien no administra el negocio lee «Solo un administrador puede de
 restablecer el negocio.».
 Implicados: ninguno
 
-### BASE-F23 Ver Inicio al día después de importar una plantilla
+### BASE-F38 Ver Inicio al día después de importar una plantilla
 <!-- origen: old-hub:HUB_SHELL-F39 old-hub:HUB_SHELL-F26 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -612,7 +900,7 @@ Pasos:
      que resolvió la plantilla y los paneles se refrescan. Igual tras cargar una plantilla o un fichero desde
      «Datos y copias».
 Entra: las plantillas y si el negocio todavía está vacío.
-Sale: lo que trae la plantilla, como en BASE-F16 (`base.blueprint.imported`).
+Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`).
 Si falla: si no entró todo, «No todo ha entrado» con «Estas no han entrado: {apps}.» (o «Hay algo más que
 no ha entrado.») y «Ver el informe»; si no se pudo abrir, «No se ha podido abrir esa plantilla» con «No ha
 cambiado nada en tu negocio: {reason}» e «Intentar otra vez»; si se cortó a medias, «La configuración no ha
@@ -694,7 +982,7 @@ Implicados: BASE-F01, INVENTORY-F12
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
   `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
-- Plantillas y Ajustes › Datos (BASE-F14–F23, APP-BASE-2): `base/blueprint.py` (sin ORM) tiene el formato
+- Plantillas y Ajustes › Datos (BASE-F29–F38, APP-BASE-2): `base/blueprint.py` (sin ORM) tiene el formato
   `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
   `data/<app>.<parte>.json`; 5 MB, 50 MB al descomprimir y 200 entradas como mucho; `BlueprintInvalid.reason`),
   el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.template_apps(vertical)`) y las siete
@@ -717,6 +1005,33 @@ Implicados: BASE-F01, INVENTORY-F12
   `test_services_data.py`, `test_queries_data.py`; Vitest en `base/frontend/**`; e2e `tests/e2e/base-data.spec.ts`
   (vacía lo que trae una plantilla por las operaciones de cada app antes de empezar).
 
+- **Apps (APP-BASE-4: BASE-F14…F28).** `base/entitlement.py` aplica el derecho de uso (PLAN §20.4–§20.5): un
+  módulo con `premium = False` siempre lo tiene; uno con `premium = True` necesita su id en `modules[]` de la última
+  foto (`Hub.state`, `source` `plan` o `purchase`, con `valid_until` leído contra el reloj) o el de un módulo que lo
+  requiere (cierre por `requires`, que solo conoce el Hub); un slug sin módulo se ignora y queda en el log; un hub de
+  demo tiene todos. Lo bloqueado: 402 `app_entitlement_blocked` en toda operación de esa app
+  (`LIVE["operation_database"] = base.entitlement.operation_database`, que delega en el de la tenencia), fuera de
+  `base.relay.active_apps` (relay e Inicio), `off` y sin menú en `base.session.me`. Sin ningún módulo de pago en el
+  despliegue (hoy) no se lee nada. Tests: `base/tests/test_entitlement.py` (dos hubs, demo, fin del derecho, 402).
+- `base.app.list` (`GET /api/apps`, `base.view_home`, viva con `base.hub.state_applied`): los módulos de
+  `home.shown_modules` desde su `LiveAppConfig` (nunca el catálogo del SaaS), con `right`, `state`, `path` (primera
+  entrada del menú si la persona ve la app), `icon` (el de la primera entrada del menú, el que pinta el shell, como el
+  lanzador y «Mis apps»: el `icon` del módulo es el de la Tienda, horneado aparte, y `HubIcon` rechaza un nombre no
+  registrado, que dejaba la pantalla en blanco), `requires` (cierre) y `required_by`, y `store_url` =
+  `SAAS_URL/store/modules?business=<id del hub>`. La foto se aplica como la plataforma (`/internal`): tras su COMMIT,
+  `base.hub.state_apply` avisa también al canal del propio negocio (`base/tests/test_hub_state_wake.py`), que es
+  donde escuchan las consultas vivas que la siguen. `base.plan.usage` (`GET /api/system/plan`, `base.administer_hub`,
+  viva con la foto): `plan.max_users`/`max_devices` de la foto (0 = sin tope) frente a las `Membership` activas del
+  host; los dispositivos, sin cuenta. Tests: `base/tests/test_queries_apps.py`.
+- Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`, las del hub viejo;
+  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, hoy solo «Plan y límites»; las demás pestañas de Sistema
+  llegan con su parte) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
+  de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
+  en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
+  «Contratar en erplora.com» solo con `base.administer_hub` y `useSurface().isWeb`. e2e: `tests/e2e/base-apps.spec.ts`.
+- Fase 1: no hay activación por negocio (`AppActivation`, `base.app.*`, 202 «Activando…», 409 `base.app_required`,
+  el veto de VeriFactu): BASE-F18, F19 (su aviso), F21–F25 quedan `parcial` hasta la fase 2 (FIX-BASE-APP-TURN-OFF-VETO).
+
 ## Lo que NO hace, a propósito
 
 - No inventa cifras: un panel o un paso que no se puede comprobar no sale o dice «No disponible».
@@ -726,3 +1041,6 @@ Implicados: BASE-F01, INVENTORY-F12
   archivos ni imágenes.
 - No tiene formulario de soporte propio: «Reportar un problema» abre el de erplora.com, que manda el aviso
   con la cuenta y el negocio; el hub no guarda nada.
+- No vende ni enseña importes: el precio y la compra de una app de pago son de la Tienda de erplora.com, y en la
+  app instalada ni siquiera lleva a ella.
+- No pregunta a erplora.com al abrir una app: usa lo último que erplora.com le pasó del negocio.

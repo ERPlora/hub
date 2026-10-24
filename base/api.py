@@ -41,6 +41,19 @@ async def notice_list(request):
     return await run_operation(request, queries.notice_list)
 
 
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+
+
+@bind(router, "base.app.list", "/apps")
+async def app_list(request):
+    return await run_operation(request, queries.app_list)
+
+
+@bind(router, "base.plan.usage", "/system/plan")
+async def plan_usage(request):
+    return await run_operation(request, queries.plan_usage)
+
+
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
 #: The upload's body: 5 MB of zip in base64 (6 990 508 characters) and its JSON around it.
 MAX_BLUEPRINT_BODY = 7_100_000
