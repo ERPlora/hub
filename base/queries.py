@@ -281,6 +281,13 @@ def person_label(user) -> str:
     return user.get_full_name() or user.get_username()
 
 
+def face_name(user) -> str:
+    """How ``user`` shows on the grid of a till (BASE-G55, G60), seen by anyone at it: their name, never an email (the
+    SaaS names an account without a name by its address: then the part before the «@»; gh:hub#2536)."""
+    label = person_label(user)
+    return label.split("@", 1)[0] if "@" in label else label
+
+
 def device_of(request: HttpRequest | None, *, for_update: bool = False) -> TrustedDevice | None:
     """The hub's device this browser's cookie names, or ``None`` (no request or cookie, or a device the hub does not
     know: never one in which nobody entered with an account, nor one that was removed)."""
@@ -357,7 +364,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
     wait = access.PIN_ADDRESS_LIMIT.wait(ctx.scope.key, client_key(ctx.request)) if offered else 0
     people = [] if not offered or wait else pin_people(ctx.scope.key)
     faces = sorted(
-        ({"id": str(credential.pk), "name": (name := person_label(user)), "initials": access.initials(name)}
+        ({"id": str(credential.pk), "name": (name := face_name(user)), "initials": access.initials(name)}
          for credential, user in people),
         key=lambda face: face["name"].casefold(),
     )

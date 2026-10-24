@@ -75,6 +75,15 @@ class TestTheDoor:
         assert {p["id"] for p in answer["people"]} == {str(c.pk) for c in Credential.objects.all()}
         assert "example.com" not in json.dumps(answer) and "saas:" not in json.dumps(answer)
 
+    def test_an_account_without_a_name_is_on_the_grid_without_its_email(self, client, make_user):
+        # The SaaS names a person without a name by their email (`full_name or email`); the grid is seen by anyone at
+        # the till, so it shows the part before the «@», never the address (gh:hub#2536).
+        a_device(client)
+        with_pin(make_user("saas:5", host="a", first_name="carla.ruiz@example.com", email="carla.ruiz@example.com"), "4826")
+        faces = door(client)["people"]
+        assert [(p["name"], p["initials"]) for p in faces] == [("carla.ruiz", "C")]
+        assert "example.com" not in json.dumps(faces)
+
     def test_only_the_active_people_of_this_hub(self, client, ana, make_user):
         a_device(client)
         with_pin(ana, "4826")
