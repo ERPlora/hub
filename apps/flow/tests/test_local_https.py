@@ -33,9 +33,12 @@ def unstarted():
     thread = threading.Thread(target=lambda: None, name="Thread-0 (process_request_thread)")
     with threading._active_limbo_lock:
         threading._limbo[thread] = thread
-    yield thread
-    with threading._active_limbo_lock:
-        del threading._limbo[thread]
+    try:
+        assert thread in threading.enumerate()  # CPython internals: if they change, this fails instead of a no-op
+        yield thread
+    finally:
+        with threading._active_limbo_lock:
+            del threading._limbo[thread]
 
 
 @pytest.fixture
