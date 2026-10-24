@@ -173,3 +173,17 @@ def test_a_bad_phone_writes_nobody_on_the_waitlist(lucia):
     assert WaitlistEntry.objects.count() == 0
     assert Customer.objects.count() == cards
     assert not OutboxEvent.objects.filter(name__startswith="reservation.").exists()
+
+
+def test_a_bad_changed_phone_is_said_before_an_unknown_table(lucia):
+    # RESERVATION-F08 takes F06's order: the phone's reason comes before any other check, a table that is not
+    # there included (the assistant may say «mesa 99» and a wrong number in one breath).
+    out = book(customer_id=str(lucia.id), guest_name="", guest_phone="")
+    error = refused(
+        lambda: run(
+            "reservation.reservation.update",
+            {"id": str(out.id), "guest_phone": "600111", "table_id": "0199f3a0-0000-7000-8000-000000000000"},
+        )
+    )
+    assert_phone_refusal(error)
+    assert Reservation.objects.get(pk=out.id).guest_phone == LUCIA

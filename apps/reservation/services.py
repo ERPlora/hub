@@ -531,15 +531,16 @@ def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
         for field in (*SLOT_FIELDS, *CONTACT_FIELDS, "notes", "internal_notes")
         if field in sent and getattr(data, field) is not None
     }
+    if "guest_phone" in changes:
+        # First, as in booking (RESERVATION-F06): a phone that is not a number is said before the table or the
+        # gate; and before the comparison, so the same number typed another way is no change.
+        changes["guest_phone"] = typed_phone(ctx, changes["guest_phone"])
     old_table = reservation.table
     new_table = old_table
     if data.no_table:
         new_table = None
     elif data.table_id is not None or data.table:
         new_table = choose_table(data.table_id, data.table, data.zone)
-    if "guest_phone" in changes:
-        # Before the comparison: the same number typed another way is no change.
-        changes["guest_phone"] = typed_phone(ctx, changes["guest_phone"])
     changes = {
         field: value
         for field, value in changes.items()
