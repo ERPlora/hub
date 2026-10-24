@@ -119,12 +119,16 @@ class EventDelivery(UUIDModel):
     never gets an event twice. A reaction that fails waits a little longer each time (``next_attempt_at``) and,
     after its last attempt or past the deepest level of events an event can start (``depth``), stays ``dead``
     with what went wrong. Phase 2 keeps it in each hub's database, beside its outbox.
+
+    Who runs the business sees the ones given up in System › Failed events (APP-BASE-7): resending one puts it back
+    ``pending``; discarding it closes it for good (``discarded``), with who, when and why, and keeps the row.
     """
 
     class Status(models.TextChoices):
         PENDING = "pending", pgettext_lazy("event delivery status", "Pending")
         DELIVERED = "delivered", pgettext_lazy("event delivery status", "Delivered")
         DEAD = "dead", pgettext_lazy("event delivery status", "Given up")
+        DISCARDED = "discarded", pgettext_lazy("event delivery status", "Discarded")
 
     event = models.ForeignKey(
         "live.OutboxEvent", on_delete=models.CASCADE, related_name="+", verbose_name=_("event")
@@ -136,6 +140,9 @@ class EventDelivery(UUIDModel):
     next_attempt_at = models.DateTimeField(_("next attempt"))
     last_error = models.TextField(_("last error"), blank=True)
     delivered_at = models.DateTimeField(_("delivered at"), null=True, blank=True)
+    closed_at = models.DateTimeField(_("discarded at"), null=True, blank=True)
+    closed_by = models.CharField(_("discarded by"), max_length=128, blank=True, db_default="")
+    close_reason = models.CharField(_("why it was discarded"), max_length=500, blank=True, db_default="")
 
     class Meta:
         verbose_name = _("event delivery")

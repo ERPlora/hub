@@ -376,6 +376,96 @@
       "cutHint": "Part of it may be in already. Check it in Settings › Data before trying again.",
       "report": "See the report",
       "continue": "Continue"
+    },
+    "system": {
+      "tabs": {
+        "resources": "Resources",
+        "updates": "Updates",
+        "events": "Failed events",
+        "logs": "Logs"
+      },
+      "error": {
+        "heading": "We could not read the system",
+        "body": "The figures and the logs are not available right now. You can try again."
+      },
+      "retry": "Retry",
+      "resources": {
+        "heading": "Cloud resources",
+        "cloud": "Cloud",
+        "database": "Database",
+        "engine": "PostgreSQL",
+        "shared": "Shared database",
+        "own": "Database of its own",
+        "notMeasured": "CPU, memory and connections are not measured per business: ERPlora's servers serve every business at once and grow by themselves when needed.",
+        "denied": "Only the owner or an administrator can see how much the hub is using.",
+        "loading": "Reading the system…"
+      },
+      "updates": {
+        "heading": "What we have updated",
+        "loading": "Reading the version…",
+        "version": "You are on {version}",
+        "auto": "This hub updates itself when we publish a new version, without stopping the service: there is nothing to install.",
+        "releasedAt": "Updated on {date}.",
+        "unknownDate": "We do not know when this version was published."
+      },
+      "failed": {
+        "heading": "Failed events",
+        "hint": "Fix the cause (a permission, an app that is off…) and resend. The event is never edited: if the cause is still there, it fails again and comes back here.",
+        "attempts": "Attempts: {n}",
+        "route": "From {source} to {target}",
+        "notRetryable": "This one cannot be resent: {app} is no longer on in this business. Turn it on and resend it.",
+        "retry": "Resend",
+        "discard": "Discard",
+        "retryAll": "Resend all",
+        "more": "Showing the {shown} most recent of {total}.",
+        "empty": {
+          "heading": "All in order",
+          "body": "No failed events. The queue of events lives in the database: a restart never loses it."
+        },
+        "loading": "Loading the failed events…",
+        "errorBody": "The queue of failed events could not be loaded. Check the connection and try again.",
+        "denied": "Only the owner or an administrator can see the failed events.",
+        "retried": "Event resent.",
+        "retriedAll": "Events resent: {count}.",
+        "nothingToRetry": "There was nothing to resend.",
+        "retryAllConfirm": {
+          "title": "Resend every failed event?",
+          "message": "The ones that can be resent go back to the queue; those for an app that is off stay here."
+        },
+        "discardConfirm": {
+          "title": "Discard this event for good?",
+          "message": "“{event}” will never reach {app} again. Who discarded it, when and why are kept.",
+          "consequence": "If it was a sale for Invoicing, that sale stays without its invoice.",
+          "reason": "Why (optional)",
+          "confirm": "Discard for good",
+          "cancel": "Cancel"
+        },
+        "discarded": "Event discarded (kept for the audit).",
+        "retryFailed": "Could not resend: {reason}",
+        "discardFailed": "Could not discard: {reason}",
+        "reasons": {
+          "gone": "that event is no longer in the queue; refresh the list.",
+          "appOff": "the app it was for is no longer on in this business; turn it on and resend it.",
+          "denied": "only the owner or an administrator can do it.",
+          "unknown": "the reason could not be read."
+        }
+      },
+      "log": {
+        "heading": "Event log",
+        "columns": {
+          "at": "Time",
+          "level": "Level",
+          "event": "Event"
+        },
+        "levels": {
+          "info": "Info",
+          "warning": "Warning",
+          "error": "Error"
+        },
+        "search": "Search event…",
+        "empty": "No events yet: nothing has gone between this business's apps.",
+        "error": "The log could not be loaded. Check the connection and try again."
+      }
     }
   }
 }

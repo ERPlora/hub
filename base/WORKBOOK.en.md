@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:357f8e33c16613d1163d33cf5172fb6e6f304643f03fe501bc3ba5703594c203 -->
+<!-- generated from WORKBOOK.md sha256:4f6aeae51d36a0a5fbef6c127bd9e69a4db2dc981288ccb45b9e132e4b4e3951 -->
 
 ## What it is for and who it is for
 
@@ -108,6 +108,21 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
 - **Reset**: "Undo an import", with one row per import that can be undone, and "Reset the business", with
   what each section has.
 
+### System · Resources
+From "System" in the side menu. Five tabs at the bottom: "Resources", "Plan and limits", "Updates", "Failed
+events" and "Logs" (this one, only for whoever runs the business); "Resources" opens: "Cloud resources" with the
+"Cloud" pill, the "Database" card and why there are no CPU, memory or connections figures.
+
+### System · Updates
+"What we have updated": the version running, when it was published and that the hub updates itself.
+
+### System · Failed events
+One card per notice between apps that ran out of retries, with "Resend" and "Discard"; on top, "Resend all".
+
+### System · Logs
+"Event log": the "Time", "Level" and "Event" table (on a phone, one card per event), with "Search event…" and the
+level filter.
+
 ## States of each screen
 
 | State | What the person sees |
@@ -139,7 +154,7 @@ On the Settings · Data and backups screen:
 | BASE-F07 | Customize the board of panels | done |
 | BASE-F08 | Keep the panels up to date without reloading | done |
 | BASE-F09 | Look at the recent activity | done |
-| BASE-F10 | See in the bell the notices between apps that were not delivered | partial |
+| BASE-F10 | See in the bell the notices between apps that were not delivered | done |
 | BASE-F11 | Go to erplora.com to manage or upgrade the plan | partial |
 | BASE-F12 | Ask the assistant to go over the setup | partial |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
@@ -168,6 +183,15 @@ On the Settings · Data and backups screen:
 | BASE-F36 | Choose which apps, data and tables travel in the export | done |
 | BASE-F37 | Reset the business by sections | partial |
 | BASE-F38 | See the Home up to date after importing a template | done |
+| BASE-F39 | Open System and move between its tabs | done |
+| BASE-F40 | See how much the hub is using | partial |
+| BASE-F41 | Know which version is running and what has been updated | partial |
+| BASE-F42 | See the log of what happened in the system | done |
+| BASE-F43 | See the failed events | done |
+| BASE-F44 | Resend a failed event | done |
+| BASE-F45 | Resend all the failed events | done |
+| BASE-F46 | Discard a failed event | done |
+| BASE-F47 | Report an error of the screen without anyone asking | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -336,14 +360,15 @@ already sales on screen, they stay under the notice.
 Involved: SALE-F28
 
 ### BASE-F10 See in the bell the notices between apps that were not delivered
-Status: partial — the row does not lead anywhere yet: the System screen, where they are resent or discarded, comes later
+Status: done
 Actor: owner, administrator
 Screen: The bell
 Steps:
   1. A notice between apps (for example, "sale charged" towards Invoicing) ran out of retries.
   2. An administrator's bell goes up at once, without waiting or reloading, and opened it shows "Failed
      events" with how many there are.
-  3. When none is left, the row disappears.
+  3. Tapping the row opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
+  4. When none is left, the row disappears.
 In: how many notices of this business were left undelivered, only for whoever runs the business.
 Out: nothing.
 If it fails: an employee or a manager does not see the row. If it cannot ask, the bell keeps what it
@@ -627,7 +652,7 @@ Status: partial — without how many devices are in use: the hub does not count 
 Actor: owner, administrator
 Screen: System · Plan and limits
 Steps:
-  1. They tap "System" in the side menu: "Plan and limits" opens.
+  1. They tap "System" in the side menu and, at the bottom, the "Plan and limits" tab.
   2. They see "Your plan's limits" with "Within the limit" or "Close to the limit", the "People" card (the
      business's active people against the ones the plan allows, with its bar; or "No limit") and the
      "Devices" one ("Up to" and the plan's limit, or "No limit").
@@ -852,3 +877,170 @@ be opened" with "Nothing has changed in your business: {reason}" and "Try again"
 again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with
 could not be loaded." with "Retry" and "Not now".
 Involved: BASE-F01, INVENTORY-F12
+
+### BASE-F39 Open System and move between its tabs
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: System · Resources
+Steps:
+  1. They tap "System" in the side menu, or come from the bell's "Failed events" row.
+  2. At the bottom there are five tabs, in this order: "Resources", "Plan and limits", "Updates", "Failed events"
+     and "Logs". "Resources" opens. The tab chosen stays in the address: a link or a reload opens the same one.
+  3. A tab that does not exist opens "Resources"; the old backups one leads to "Settings" › "Data and backups".
+  4. Whoever is neither the owner nor an administrator sees four: "Logs" does not exist for them and, if they ask
+     for it, "Resources" opens. In "Resources" they read "Only the owner or an administrator can see how much the
+     hub is using." and in "Failed events", "Only the owner or an administrator can see the failed events.", with
+     no "Retry".
+In: the person's role in the business; whoever does not run it is never asked for anything the hub would refuse.
+Out: nothing saved.
+If it fails: each tab says its own (BASE-F40 to BASE-F43).
+Involved: none
+
+### BASE-F40 See how much the hub is using
+Status: partial — no CPU, memory or connections of the business: one service serves every business and no figure is its own alone; the size and the use of its database come when each business has its own
+Actor: owner, administrator
+Screen: System · Resources
+Steps:
+  1. They open "System": "Resources" opens. While it loads: "Reading the system…".
+  2. The title is "Cloud resources", with the "Cloud" pill.
+  3. The "Database" card says "PostgreSQL" and, below, "Shared database" (or "Database of its own" when the
+     business has its own).
+  4. Below: "CPU, memory and connections are not measured per business: ERPlora's servers serve every business at
+     once and grow by themselves when needed.". Never a made-up figure or a zero.
+In: which database the business is on.
+Out: nothing saved.
+If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
+try again." with "Retry".
+Involved: none
+
+### BASE-F41 Know which version is running and what has been updated
+Status: partial — the version and its date, yes; without the list of what changed in each app: every app is published together, in a single deployment and without release notes
+Actor: owner, administrator
+Screen: System · Updates
+Steps:
+  1. They open the "Updates" tab. The title is "What we have updated" and a pill says which version the hub is
+     on. While it loads: "Reading the version…".
+  2. Below, the day it was updated or, when that is not known, "We do not know when this version was
+     published.": never a made-up date.
+  3. And: "This hub updates itself when we publish a new version, without stopping the service: there is nothing
+     to install.". There is no button to update.
+  4. Whoever does not run the business sees the title and that text, without the version.
+In: the version running and when it was published.
+Out: nothing saved.
+If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
+try again." with "Retry".
+Involved: none
+
+### BASE-F42 See the log of what happened in the system
+Status: done
+Actor: owner, administrator
+Screen: System · Logs
+Steps:
+  1. They open the "Logs" tab: the title is "Event log". For whoever does not run the business the tab does not
+     exist (BASE-F39).
+  2. They see the last 50 events between the business's apps, newest first, with "Time", "Level" ("Info",
+     "Warning" or "Error", in a pill) and "Event": its name, the app that recorded it and what happened to it in
+     their language (delivered, waiting, in "Failed events"…). Never what it carried.
+  3. They search with "Search event…", filter by level and go 20 at a time. On a phone, each event is a card
+     headed by its time.
+  4. The log gets up to date by itself when a notice fails, is resent or is discarded; the rest, when the tab
+     opens again.
+In: the last events of this business, never another's.
+Out: nothing saved.
+If it fails: "The log could not be loaded. Check the connection and try again." with "Retry". With no events:
+"No events yet: nothing has gone between this business's apps.".
+Involved: none
+
+### BASE-F43 See the failed events
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. They come from the bell's "Failed events" row (BASE-F10) or tap the "Failed events" tab.
+  2. While it loads: "Loading the failed events…". With events: "Fix the cause (a permission, an app that is
+     off…) and resend. The event is never edited: if the cause is still there, it fails again and comes back
+     here.".
+  3. Each notice is a card with its name, how many times it was tried, from which app to which it was going (for
+     instance, from "Sales & POS" to "Invoicing"), when it happened and its last error as it is, with "Resend" and
+     "Discard". On top, "Resend all". If the app it was for is no longer on, the card says it cannot be resent
+     until it is turned on, with no "Resend".
+  4. The 100 most recent show; with more, the screen says how many show out of how many.
+  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded.
+  6. With none: "All in order" — "No failed events. The queue of events lives in the database: a restart never
+     loses it.".
+In: the notices between apps of this business that ran out of retries, never another's.
+Out: nothing saved.
+If it fails: "We could not read the system" — "The queue of failed events could not be loaded. Check the
+connection and try again." with "Retry" in sight: a failure never shows as "All in order". Whoever does not run
+the business reads "Only the owner or an administrator can see the failed events.".
+Involved: none
+
+### BASE-F44 Resend a failed event
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. Whoever fixed the cause (turned the app on, completed the business's details…) taps "Resend" on its card;
+     the button is disabled while it works.
+  2. "Event resent." shows, the card goes away and the bell goes down at once.
+  3. The notice goes back to the queue with its attempts at zero and only the app that had failed gets it; if the
+     cause is still there, it fails again and comes back here.
+In: the notice chosen.
+Out: the notice, back in the queue; `base.failed_event.retried`.
+If it fails: "Could not resend:" and the reason: "that event is no longer in the queue; refresh the list."
+(someone resent or discarded it first), "the app it was for is no longer on in this business; turn it on and
+resend it." or "only the owner or an administrator can do it.".
+Involved: none
+
+### BASE-F45 Resend all the failed events
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. After a failure that knocked over several notices, they fix the cause and tap "Resend all" (it only shows
+     with notices in the list).
+  2. They confirm in "Resend every failed event?" — "The ones that can be resent go back to the queue; those for
+     an app that is off stay here." with "Resend all" (or "Cancel": nothing happens).
+  3. How many were resent shows ("Events resent: 2.") and the list and the bell empty; if there was none that
+     could be resent: "There was nothing to resend.".
+  4. Every notice of the business that can be resent goes back to the queue, also those that do not fit in the
+     list; those for an app that is off stay.
+In: the business's failed notices.
+Out: the notices, back in the queue; `base.failed_event.retried`, with how many.
+If it fails: "Could not resend:" and the reason, as in BASE-F44.
+Involved: none
+
+### BASE-F46 Discard a failed event
+Status: done
+Actor: owner, administrator
+Screen: System · Failed events
+Steps:
+  1. They decide a notice must never be delivered (it is repeated, it was done by hand) and tap "Discard" on its
+     card.
+  2. The "Discard this event for good?" window opens: it says which notice will never reach which app and that
+     who discarded it, when and why are kept, warns "If it was a sale for Invoicing, that sale stays without its
+     invoice." and asks "Why (optional)".
+  3. They tap "Discard for good" (or "Cancel": nothing happens).
+  4. "Event discarded (kept for the audit)." shows, the card goes away and the bell goes down.
+In: the notice chosen and, if they want, why.
+Out: the notice closed for good, with who, when and why; it is neither deleted nor tried again.
+`base.failed_event.discarded`.
+If it fails: "Could not discard:" and the reason, as in BASE-F44.
+Involved: none
+
+### BASE-F47 Report an error of the screen without anyone asking
+Status: done
+Actor: system
+Screen: none
+Steps:
+  1. The person does nothing: when the screen has an error nobody caught (also while drawing a part of the
+     screen, or in a wait that failed untreated), it is noted by itself.
+  2. It is sent to the hub with no window, no capture and no question, even while the tab is closing.
+  3. An identical error is not sent again within 30 seconds, and at most 50 different ones are remembered.
+  4. The hub leaves it in its error log with the business, the person and the screen where it happened.
+In: the error's message, its trace and the screen, only with a session.
+Out: one line in the hub's error log; nothing is kept in the browser.
+If it fails: nothing visible happens: the sending is not retried and makes no other report. With no session, or
+with more than 30 reports a minute from the same person, the hub does not note it. To tell something by hand,
+"Report a problem" in the user menu.
+Involved: none
