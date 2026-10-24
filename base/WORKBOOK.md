@@ -1045,7 +1045,7 @@ Pasos:
   3. El aviso vuelve a la cola con los intentos a cero y solo lo recibe la app que había fallado; si la causa
      sigue, vuelve a caer aquí.
 Entra: el aviso elegido.
-Sale: el aviso, pendiente de nuevo; `base.failed_event.retried`.
+Sale: el aviso, otra vez en la cola; `base.failed_event.retried`.
 Si falla: «No se pudo reenviar:» y el motivo: «ese evento ya no está en la cola; actualiza la lista.» (alguien lo
 reenvió o lo descartó antes), «la app a la que iba ya no está activa en este negocio; actívala y vuelve a
 reenviarlo.» o «solo el dueño o un administrador puede hacerlo.».
@@ -1066,7 +1066,7 @@ Pasos:
   4. Vuelven a la cola todos los reenviables del negocio, también los que no caben en la lista; los que iban a una
      app parada se quedan.
 Entra: los avisos caídos de este negocio.
-Sale: los avisos, pendientes de nuevo; `base.failed_event.retried`, con cuántos.
+Sale: los avisos, otra vez en la cola; `base.failed_event.retried`, con cuántos.
 Si falla: «No se pudo reenviar:» y el motivo, como en BASE-F44.
 Implicados: ninguno
 
