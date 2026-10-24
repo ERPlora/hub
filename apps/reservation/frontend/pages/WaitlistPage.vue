@@ -19,6 +19,7 @@ import { useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 
+import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -78,7 +79,15 @@ const columns = computed<DataTableColumn<WaitlistOut>[]>(() => [
     format: (_, row) => formatTime(row.preferred_time, locale.value),
   },
   { key: 'guest_name', label: t('reservation.waitlist.columns.guest'), sortable: true, priority: 'high', cell: 'guest', filter: { type: 'text' } },
-  { key: 'guest_phone', label: t('reservation.waitlist.columns.phone'), sortable: true, priority: 'low', filter: { type: 'text' } },
+  // As Customers paints it (+34 600 111 222): the waitlist keeps it in E.164; the filter is the server's, by digits.
+  {
+    key: 'guest_phone',
+    label: t('reservation.waitlist.columns.phone'),
+    sortable: true,
+    priority: 'low',
+    format: (_, row) => formatPhone(row.guest_phone),
+    filter: { type: 'text' },
+  },
   { key: 'party_size', label: t('reservation.waitlist.columns.party'), sortable: true, align: 'right', format: (_, row) => String(row.party_size) },
   {
     key: 'is_contacted',

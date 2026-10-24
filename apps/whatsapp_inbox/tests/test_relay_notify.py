@@ -291,13 +291,54 @@ def test_without_a_conversation_of_exactly_the_reservation_s_number_nothing_leav
 
 def test_a_number_that_is_not_international_tells_nobody(restaurant_clock, tick, door):
     restaurant()
-    lucia = card("Lucía Pérez", "600111222")  # her card says +34600111222, the reservation keeps what was typed
-    act("reservation.reservation.confirm", book(customer_id=str(lucia.id)).id)
+    lucia = card("Lucía Pérez", "600111222")  # her card says +34600111222
+    # A row kept as typed, from before Reservas wrote the phone as Customers does: the recipe never guesses it.
+    reservation = make_reservation(
+        FRIDAY, "21:00", status="pending", customer=Customer.objects.get(pk=lucia.id), guest_phone="600111222"
+    )
+    act("reservation.reservation.confirm", reservation.id)
     tick()
     [run_row] = table_runs()
     assert run_row.status == "stopped"
     assert [entry["step"] for entry in run_row.log if entry["outcome"] == "stopped"] == ["s4"]
     assert not outbound() and door.call_count == 0
+
+
+def test_a_local_number_typed_with_her_card_chosen_tells_her_once(restaurant_clock, tick, door):
+    # RESERVATION-F06: the staff pick Lucía's card and type her number without prefix; Reservas keeps it as
+    # Customers does (+34600111222), so confirming tells her in her conversation.
+    restaurant()
+    lucia = card("Lucía Pérez", "600111222")
+    reservation = book(customer_id=str(lucia.id), guest_name="")
+    assert reservation.guest_phone == ANA
+    act("reservation.reservation.confirm", reservation.id)
+    tick()
+    [run_row] = table_runs()
+    assert run_row.status == "succeeded"
+    [message] = outbound()
+    assert message.conversation.phone == ANA
+    assert [json.loads(call.request.content)["to"] for call in door.calls] == [ANA]
+
+
+def test_a_guest_of_another_country_with_the_same_digits_is_never_taken_for_the_local_one(restaurant_clock, tick, door):
+    # erplora-old/whatsapp_inbox#199: +33 600 111 222 (France) and 600 111 222 (Spain) share their national digits.
+    restaurant()
+    receive("wamid.FR", phone="33600111222", sent_at=(NOW - dt.timedelta(minutes=5)).isoformat())
+    french = book(guest_name="Camille Martin", guest_phone="+33 6 00 11 12 22")
+    local = book(guest_name="Lucía Pérez", guest_phone="600111222", time="13:30")
+    assert (french.guest_phone, local.guest_phone) == ("+33600111222", ANA)
+    assert french.customer_id != local.customer_id
+    act("reservation.reservation.confirm", french.id)
+    tick()
+    [message] = outbound()
+    assert message.conversation.phone == "+33600111222"
+    act("reservation.reservation.confirm", local.id)
+    tick()
+    assert [(row.conversation.phone, row.body.endswith("table for 4.")) for row in outbound()] == [
+        ("+33600111222", True),
+        (ANA, True),
+    ]
+    assert [json.loads(call.request.content)["to"] for call in door.calls] == ["+33600111222", ANA]
 
 
 def test_without_a_phone_on_the_reservation_it_stops_before_it_looks(restaurant_clock, tick, door):
