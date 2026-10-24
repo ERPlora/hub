@@ -57,13 +57,21 @@ describe('FilePreview', () => {
     const image = inDoc('file-preview-image') as HTMLImageElement;
     expect(image.getAttribute('src')).toBe('/api/files/raw?path=Facturas%2Ffoto.png&inline=true');
     expect(image.getAttribute('alt')).toBe('foto.png');
+    // Fitted, like Drive's viewer: never larger than the file itself, nor than the viewer's width or height (the
+    // stage pads 16 px a side); the zoom multiplies that. Here a 40×80 picture: its width is half its height.
+    Object.defineProperty(image, 'naturalWidth', { value: 40 });
+    Object.defineProperty(image, 'naturalHeight', { value: 80 });
+    image.dispatchEvent(new Event('load'));
+    await flush();
+    const fit = 'min(40px, 100cqw - 32px, (100cqh - 32px) * 0.5)';
+    expect(image.style.width).toBe(`calc(${fit} * 1)`);
     inDoc('file-preview-zoom-in')?.click();
     await flush();
-    expect(image.style.width).toBe('125%');
+    expect(image.style.width).toBe(`calc(${fit} * 1.25)`);
     inDoc('file-preview-zoom-out')?.click();
     inDoc('file-preview-zoom-out')?.click();
     await flush();
-    expect(image.style.width).toBe('75%');
+    expect(image.style.width).toBe(`calc(${fit} * 0.75)`);
     expect(fetchFile).not.toHaveBeenCalled();
   });
 

@@ -446,6 +446,29 @@ describe('FilesPage · rename and move (BASE-G85)', () => {
     expect(posted(m)).toEqual([['/api/files/move', { path: 'marzo.pdf', to: 'Contratos' }]]);
     expect(toastSuccess).toHaveBeenCalledWith('Moved to “Contratos”.');
   });
+
+  it('«Files» of the tree takes what comes from a folder, never what is already at the top', async () => {
+    const over = () => {
+      const event = new Event('dragover', { bubbles: true, cancelable: true });
+      m.wrapper.find('[data-testid="files-root"]').element.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    const m = await open(
+      { path: '/files?folder=Facturas', onApi: () => reply(200, { path: 'nota.pdf', name: 'nota.pdf' }) },
+      listing({ folder: 'Facturas', crumbs: [{ path: 'Facturas', name: 'Facturas' }], files: [file('Facturas/nota.pdf')] }),
+    );
+    await m.wrapper.find('[data-item="Facturas/nota.pdf"]').trigger('dragstart', { dataTransfer: { setData: vi.fn(), effectAllowed: '' } });
+    expect(over()).toBe(true);
+    await m.wrapper.find('[data-testid="files-root"]').trigger('drop');
+    await flush();
+    expect(posted(m)).toEqual([['/api/files/move', { path: 'Facturas/nota.pdf', to: '' }]]);
+
+    const top = await open();
+    await top.wrapper.find('[data-item="marzo.pdf"]').trigger('dragstart', { dataTransfer: { setData: vi.fn(), effectAllowed: '' } });
+    const event = new Event('dragover', { bubbles: true, cancelable: true });
+    top.wrapper.find('[data-testid="files-root"]').element.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
 });
 
 describe('FilesPage · delete (BASE-G86)', () => {

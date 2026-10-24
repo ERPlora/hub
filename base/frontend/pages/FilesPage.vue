@@ -405,7 +405,7 @@ async function askDelete(entry: Entry): Promise<void> {
             data-testid="files-root"
             :aria-current="!folder ? 'true' : undefined"
             @click="openFolder('')"
-            @dragover.prevent="canMove && dragging ? undefined : undefined"
+            @dragover="canMove && dragging && parentOf(dragging) ? $event.preventDefault() : undefined"
             @drop.prevent="canMove && dragging && parentOf(dragging) ? dropOnFolder('') : undefined"
           >
             <HubIcon
@@ -922,8 +922,8 @@ async function askDelete(entry: Entry): Promise<void> {
 }
 
 .files-root-open {
-  background: var(--ion-color-primary-tint, #e6f0ff);
-  color: var(--ion-color-primary-shade, #0b5ed7);
+  background: var(--ep-primary-tint, #e6f0ff);
+  color: var(--ep-primary-text, #0b5ed7);
   font-weight: 600;
 }
 
@@ -1116,8 +1116,8 @@ async function askDelete(entry: Entry): Promise<void> {
 }
 
 .files-destination-on {
-  background: var(--ion-color-primary-tint, #e6f0ff);
-  color: var(--ion-color-primary-shade, #0b5ed7);
+  background: var(--ep-primary-tint, #e6f0ff);
+  color: var(--ep-primary-text, #0b5ed7);
   font-weight: 600;
 }
 

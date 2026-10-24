@@ -29,6 +29,8 @@ const rows = ref<string[][]>([]);
 const pdfPages = shallowRef<HTMLCanvasElement[]>([]);
 const pdfTotal = ref(0);
 const zoom = ref(100);
+/** The image's own size once it loaded: the fit is worked out from it. */
+const natural = ref<{ width: number; height: number } | null>(null);
 const pdfHost = useTemplateRef<HTMLElement>('pdfHost');
 /** The file this load is for: a later one wins, an earlier answer is dropped. */
 let loading = 0;
@@ -45,6 +47,7 @@ async function load(file: FileItem): Promise<void> {
   rows.value = [];
   pdfPages.value = [];
   zoom.value = 100;
+  natural.value = null;
   if (!['pdf', 'text', 'table', 'json'].includes(file.preview)) {
     state.value = 'ready';
     return;
@@ -105,7 +108,22 @@ watch([pdfPages, pdfHost], async () => {
   host.replaceChildren(...pdfPages.value);
 });
 
-const scaled = computed(() => ({ width: `${zoom.value}%` }));
+/** A PDF fits the viewer's width (as PDF viewers open); the zoom is a share of it. */
+const pdfScaled = computed(() => ({ width: `${zoom.value}%` }));
+/** An image fits the viewer as Drive's does: never larger than itself, nor than the stage's width or height (16 px of
+ *  padding a side, `cqw`/`cqh` of the viewer's body); the zoom multiplies that. */
+const imageScaled = computed(() => {
+  const size = natural.value;
+  if (!size?.width || !size.height) return {};
+  const fit = `min(${size.width}px, 100cqw - 32px, (100cqh - 32px) * ${size.width / size.height})`;
+  return { width: `calc(${fit} * ${zoom.value / 100})`, maxWidth: 'none' };
+});
+
+function imageLoaded(event: Event): void {
+  const image = event.target as HTMLImageElement;
+  natural.value = { width: image.naturalWidth, height: image.naturalHeight };
+  state.value = 'ready';
+}
 
 function zoomBy(step: number): void {
   zoom.value = Math.min(300, Math.max(25, zoom.value + step));
@@ -207,8 +225,8 @@ function mediaFailed(): void {
             data-testid="file-preview-image"
             :src="inlineUrl"
             :alt="file.name"
-            :style="scaled"
-            @load="state = 'ready'"
+            :style="imageScaled"
+            @load="imageLoaded($event)"
             @error="mediaFailed()"
           >
           <audio
@@ -246,7 +264,7 @@ function mediaFailed(): void {
               ref="pdfHost"
               class="file-preview-pdf"
               data-testid="file-preview-pdf"
-              :style="scaled"
+              :style="pdfScaled"
             />
             <div
               v-else-if="kind === 'table'"
@@ -326,6 +344,8 @@ function mediaFailed(): void {
 .file-preview-body {
   flex: 1;
   overflow: auto;
+  /* The image's fit reads the body's size (`cqw`, `cqh`). */
+  container-type: size;
 }
 
 .file-preview-stage {
@@ -345,9 +365,9 @@ function mediaFailed(): void {
 }
 
 .file-preview-image {
-  max-width: none;
+  /* Until it loaded and its fit is known: never wider than the viewer. */
+  max-width: 100%;
   height: auto;
-  object-fit: contain;
 }
 
 .file-preview-audio {

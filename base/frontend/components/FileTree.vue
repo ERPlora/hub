@@ -105,8 +105,8 @@ function dropped(event: DragEvent, path: string): void {
 }
 
 .file-tree-open {
-  background: var(--ion-color-primary-tint, #e6f0ff);
-  color: var(--ion-color-primary-shade, #0b5ed7);
+  background: var(--ep-primary-tint, #e6f0ff);
+  color: var(--ep-primary-text, #0b5ed7);
   font-weight: 600;
 }
 
