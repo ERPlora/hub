@@ -143,6 +143,34 @@ CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportad
 Cada ejecución crea dos demos en la BD de la pila y las deja purgadas (lápidas `DEMO_TOMBSTONE_DAYS`); no gasta el
 tope de demos vivas (`MAX_CONCURRENT_DEMOS`).
 
+## El asistente (`base-assistant.spec.ts`)
+
+Prueba el asistente del Hub (BASE-F92…F106) con sus dependencias de verdad: el Hub de la pila, la pasarela del SaaS de
+la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor falso
+`tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que la propia spec
+arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni
+escribe una clave real. Pide tres cosas al SaaS de la pila:
+
+- **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
+  `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`
+  (y `demo_seed`, como el resto de specs con las cuentas de demo). La spec lo comprueba al arrancar y, si falta, cae
+  con «not seeded with this provider».
+- **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS: sin ella el dictado responde 503.
+- **`E2E_SAAS_DB`**, si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`): la spec fija en ella los
+  mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
+
+```bash
+# El SaaS de la pila (8871), desde su worktree:
+env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-local \
+  HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
+  HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
+  EMAIL_FILE_PATH="$PWD/.mail-8871" uv run python manage.py runserver 127.0.0.1:8871
+# La spec, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
+CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
+```
+
+La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
+
 ## La página a la vista y los diálogos
 
 `shown(page)` (`helpers.ts`) es la página que enseña `IonRouterOutlet`, nunca un diálogo abierto encima: Ionic Vue

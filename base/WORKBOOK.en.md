@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d895ee8ef732add2bf1ef0692b7a9bb1785d5149f3b7a18223ab039df3e286f0 -->
+<!-- generated from WORKBOOK.md sha256:b56ec2de54bc6435c21165c202634531d61c77991671d84d46d8450c2dc281a7 -->
 
 ## What it is for and who it is for
 
@@ -17,6 +17,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
   language, as erplora.com has them, and where to go to change them.
 - **The business's files**, in "Files": the documents the team keeps in folders (suppliers' invoices,
   contracts, letters, photos), to open, download and tidy them from any device.
+- **The assistant**, with the sparkles in the top bar: they ask it about the business, writing or by voice, and it
+  does what the person could do with their buttons, always after they confirm it.
 
 Who uses it:
 
@@ -67,8 +69,9 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
-At the top right, after "My apps". Its number adds up the pending notices; tapped, one row per notice
-("Failed events (2)") that leads to its screen. With nothing: "All caught up. No notifications.".
+At the top right, after "My apps" and the assistant's sparkles; on a phone, both go inside "More options", which
+carries its number. Its number adds up the pending notices; tapped, one row per notice ("Failed events (2)") that
+leads to its screen. With nothing: "All caught up. No notifications.".
 
 ### The side menu
 On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
@@ -211,6 +214,20 @@ Over the screen where the action was tried: what is approved, "Who approves it?"
 ### API documentation
 With the back button: how the API is called, "Download the OpenAPI file" and a section per app with its calls.
 
+### Assistant
+The panel the "Assistant" sparkles of the top bar open (on a phone, inside "More options"), on the right. On a tablet
+or a computer it stays beside the screen and pushes it, so they keep working with it open; on a phone it covers it,
+over a dark veil. At the top, "Assistant", "New conversation" once there is one and the "Close" ×. In the middle, the
+conversation: empty, the sparkles, the welcome sentence and the setup's shortcuts; then, the messages, each answer
+with its "Go to …" buttons, its notices and the receipts of what was done. At the bottom, the foot's notices (no
+connection, the messages left this month, a plan without the assistant) and the "Write a message…" box with "Attach a
+file", "Dictate by voice" and "Send".
+
+### Assistant confirmation card
+It shows over everything, also with the panel closed, when the assistant wants to change something: "Run this
+action?", what it will do, in which app and with which data, and "Run it" and "Cancel" ("Cancel all" when more wait
+behind it). In a dangerous action, each datum on its own line and a box to type what it asks before "Run it".
+
 ## States of each screen
 
 | State | What the person sees |
@@ -228,6 +245,15 @@ On the Settings · Business screen:
 | Empty | A demo has no name nor country: those rows read "—", and below, "This demo has no business on erplora.com: its data does not change.". |
 | Error | "Couldn’t load the business’s data" with "Nothing has changed. Check the connection and try again." and "Retry"; never a blank card. |
 | No permission | Whoever does not administer the business sees it the same, without "Change on erplora.com" and with "Only the owner or an administrator changes them, on erplora.com."; "Fiscal data" does not show to whoever may not write the issuer. |
+
+In the assistant's panel:
+
+| State | What the person sees |
+|---|---|
+| Loading | Three dots that move in the assistant's bubble until the first text arrives ("The assistant is writing" for the screen reader), and "Transcribing…" while what was dictated is turned into text. |
+| Empty | The sparkles, "Ask me about your sales, your stock or anything about your business." (opened from the setup, "Review your business's setup. Choose an option or write your question.") and the shortcuts. An answer that ends without saying anything: "(no answer)". |
+| Error | In the bubble, with its way out: "The assistant could not be reached. Check the connection and try again.", "The assistant is not available right now. Try again in a few minutes." or "The answer was cut off.", with "Try again"; "This conversation is too long: start a new one." with "New conversation"; "Your session has ended. Sign in again to keep talking." with "Sign in again". Without Internet, in the foot, "No connection: you can write, and send when it is back.". |
+| No permission | What the person cannot do with their buttons, the assistant cannot either: it is not offered and, if it tries, the receipt reads "Not done, not allowed: …". With the month's messages spent, whoever does not run the business sees "Ask whoever runs the business to upgrade the plan." instead of "Upgrade plan". |
 
 On the Settings · Data and backups screen:
 
@@ -271,7 +297,7 @@ On the Employees screens and the API documentation:
 | BASE-F09 | Look at the recent activity | done |
 | BASE-F10 | See in the bell the notices between apps that were not delivered | done |
 | BASE-F11 | Go to erplora.com to manage or upgrade the plan | partial |
-| BASE-F12 | Ask the assistant to go over the setup | partial |
+| BASE-F12 | Ask the assistant to go over the setup | done |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
 | BASE-F14 | See the business's apps | done |
 | BASE-F15 | Open an app from Apps | done |
@@ -351,6 +377,21 @@ On the Employees screens and the API documentation:
 | BASE-F89 | See the API keys and what each one may do | partial |
 | BASE-F90 | Read the API documentation | done |
 | BASE-F91 | Show or hide the API documentation | done |
+| BASE-F92 | Open and close the assistant's panel | done |
+| BASE-F93 | Ask the assistant and read how it writes | done |
+| BASE-F94 | Attach a file or dictate by voice | done |
+| BASE-F95 | Read the answer: text, lists, tables and links | done |
+| BASE-F96 | Go to a screen from an answer | done |
+| BASE-F97 | Confirm an action before it runs | done |
+| BASE-F98 | Dangerous actions: type to confirm, or not from the chat | done |
+| BASE-F99 | Check what the assistant says against what it really did | done |
+| BASE-F100 | What the assistant can do depending on who asks: permissions and a manager's PIN | done |
+| BASE-F101 | Ask it for several things in a row | done |
+| BASE-F102 | The conversation: what is kept, where and when it is deleted | done |
+| BASE-F103 | The assistant in the setup | done |
+| BASE-F104 | See the assistant's plan, the usage limit and extend it | done |
+| BASE-F105 | Report a bad answer | done |
+| BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -551,17 +592,17 @@ button that does nothing).
 Involved: none
 
 ### BASE-F12 Ask the assistant to go over the setup
-Status: partial — the Hub does not have the assistant's chat yet: the list is already within the assistant's reach, but there is no "Ask the assistant" button
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
-  1. From the assistant, the person asks it to go over the business's setup.
+  1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list.
 In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
-Involved: none
+Involved: BASE-F103
 
 ### BASE-F13 Lose access on a role change or on leaving the business
 Status: done
@@ -2006,3 +2047,335 @@ If it fails: "Could not save the change." and the switch goes back to what was s
 setting." with "Retry". Whoever does not run the business sees it off: "Only who runs the business can change
 it.".
 Involved: BASE-F90
+
+### BASE-F92 Open and close the assistant's panel
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
+     closes it. On a phone, the sparkles and the bell go together in "More options" (with the bell's number), so the
+     title stays centred: there, "Assistant" opens the panel and "Notifications", the bell.
+  2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
+     they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
+  3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the
+     panel), by tapping the veil on a phone, by tapping the sparkles again or with "Go to …" in an answer
+     (BASE-F96).
+  4. If it is left open, it stays open on changing screen and on reloading: the device only remembers whether it was
+     open or closed.
+In: the session.
+Out: on opening it, the panel reads the assistant's messages the business has left this month (BASE-F104) and the
+list of what is left to set up, for its shortcuts (BASE-F103); closing it asks for nothing.
+If it fails: it has no failure of its own. Without a session (the way in, the PIN) there are no sparkles. Closing the
+panel does not cut an answer already on its way: it keeps being written and, if it asks for a confirmation, the card
+shows over whatever screen is there (BASE-F97).
+Involved: BASE-F93, BASE-F97, BASE-F103, BASE-F104
+
+### BASE-F93 Ask the assistant and read how it writes
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. With the conversation empty, the panel shows the sparkles, "Ask me about your sales, your stock or anything
+     about your business." and the setup's shortcuts (BASE-F103).
+  2. They write in "Write a message…" and press Enter or "Send". With a keyboard, Shift+Enter starts a new line; on a
+     touch screen, Enter starts a new line and "Send" sends. "Send" is off with the box empty and no attachments.
+  3. Their message shows on the right just as they wrote it. Below, the assistant's bubble, with three dots that move
+     until the first text arrives.
+  4. While it answers, "Send" becomes "Stop", "Attach a file" and "Dictate by voice" turn off and the answer keeps
+     appearing; the conversation scrolls down by itself. They can already write the next question, but it is not
+     sent until this one ends.
+  5. If the assistant ends without saying anything, the bubble reads "(no answer)".
+  6. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
+  7. Under each finished answer, "Read aloud" reads it with the device's own voice, if it has one, and "Stop
+     reading" stops it.
+In: what the person writes; the whole conversation travels with each question (BASE-F102).
+Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
+If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
+"Stop" does not undo an action that had already been done.
+Involved: BASE-F102, BASE-F104, BASE-F106
+
+### BASE-F94 Attach a file or dictate by voice
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. To attach, they tap "Attach a file" and choose one or several: images, PDF, Word, Excel, text or CSV. Each one
+     shows over the box with its name and its "Remove attachment" ×.
+  2. They go with the next message, with or without text, and stay in the person's bubble by their name. They travel
+     only once, with that question: afterwards the conversation only remembers what they were called.
+  3. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser asks for
+     permission to use the microphone. While it records, the button turns red and is called "Stop recording"; after
+     two minutes it stops by itself.
+  4. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
+     itself**: the person reviews it and taps "Send", and what they ask goes through its card like any other request
+     (BASE-F97).
+In: the files (8 MB each and 20 MB among all those of a question) or the recording.
+Out: the file travels with the question to erplora.com, which reads it; the recording goes through the business to
+erplora.com's transcription. The browser never talks to erplora.com directly.
+If it fails: in one line over the box, and the file is not attached: "menu.pdf is too large: 8 MB at most per file.",
+"The files of one question add up to 20 MB at most.", "menu.zip cannot be attached: images, PDF, Word, Excel, text
+or CSV." or "menu.pdf could not be read.". With the microphone blocked, "Microphone access is blocked. Allow it in
+your browser to dictate."; a recording too long, "The recording is too long: dictate a shorter message."; no voice,
+"Nothing was heard. Try again closer to the microphone."; and if it cannot be transcribed, "The audio could not be
+transcribed. Try again.".
+Involved: BASE-F93, BASE-F97
+
+### BASE-F95 Read the answer: text, lists, tables and links
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. The answer is painted with its format: bold, italics, code, headings, bulleted or numbered lists and tables.
+  2. A table fits in the bubble: its cells break the text instead of widening the panel, also on a phone.
+  3. A link is read by its text, without brackets nor address. It can only be tapped if it leads to a screen of this
+     business (BASE-F96); any other address, from outside or made up, stays as text.
+  4. What the panel does not understand (code blocks, images, quotes) stays as plain text. The person's message
+     always shows just as they wrote it.
+In: the assistant's text.
+Out: nothing; it is only painted. The panel never paints HTML that comes in an answer.
+If it fails: a badly written answer reads as text: it is never lost nor breaks the panel.
+Involved: BASE-F96
+
+### BASE-F96 Go to a screen from an answer
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. If the answer names a screen of this business, "Go to …" with its name shows under the bubble (up to four,
+     without repeating) and the mention itself can be tapped.
+  2. It can lead to Home, Employees, Apps, Settings, My profile, Files (for whoever sees them), System (for whoever
+     runs the business) and the screens in the menu of each app that is on.
+  3. The button uses the name the person sees in the menu ("Go to Settings", "Go to Home" and, for an app, its name
+     and the screen's), never the address.
+  4. Tapping it opens that screen and the panel closes so it can be seen.
+In: the screens the answer names; those of this business and of its apps that are on.
+Out: the screen opened; nothing is asked for.
+If it fails: a screen this business does not have (that of an app that is off, a made-up address) does not show as a
+button nor as a link, and the answer carries the notice of BASE-F99. If the person may not see the screen they reach,
+that screen tells them.
+Involved: BASE-F92, BASE-F99
+
+### BASE-F97 Confirm an action before it runs
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant confirmation card
+Steps:
+  1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes").
+  2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one
+     line, for example "Create in Services: Haircut · €15.00 · 30". An amount shows in the business's currency (never
+     in cents), a yes or a no as "Yes" or "No" and a list by how many items it carries.
+  3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
+     on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
+  4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
+     asks for its own.
+  5. Under the answer stays the receipt of each action of the turn: "Done: Create in Services", or "Not done,
+     cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …".
+In: the action, its data and its risk, as its app declares them; the business's currency.
+Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
+If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
+"Not done, it failed: …". If the page is reloaded with the card open nothing is done, and the answer ends in "The
+answer was cut off." with "Try again".
+Involved: BASE-F98, BASE-F99, BASE-F101
+
+### BASE-F98 Dangerous actions: type to confirm, or not from the chat
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant confirmation card
+Steps:
+  1. An action its app marks as dangerous is not confirmed with one click: the card says, for example, "Delete in
+     Services. Check each datum before going on.", puts each datum on its own line and asks "To confirm, type
+     CONFIRM:".
+  2. If the action names the records one by one, it says how many ("It acts on 3 records.") and asks to type that
+     number instead of the word.
+  3. If it does not name them (all of them, or those matching a filter), it is not done from the chat: no card shows, the answer reads "I
+     cannot tell how many records this would change, so I do not do it from here. Open its screen, where you can see
+     them." and the assistant explains where it is done.
+  4. "Run it" can only be tapped when what was typed matches (regardless of capitals and of the spaces at the ends),
+     and the business checks it again before doing it.
+  5. Resetting the business and exporting a copy are never done from the chat: they are done in Settings › Data and
+     backups.
+In: the risk the app declares in each action, and its data.
+Out: if accepted, as in BASE-F97.
+If it fails: what was typed and does not match does not let it run; cancelling does nothing and the assistant counts
+it as cancelled.
+Involved: BASE-F35, BASE-F37, BASE-F97
+
+### BASE-F99 Check what the assistant says against what it really did
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. When each answer ends, the panel compares it with what was really done in that turn: it does not trust what the
+     answer says about itself.
+  2. If it says it changed something ("I have created…", "has been saved…", "se ha guardado…") and in the turn no action
+     was done (or it was cancelled, failed or was not allowed), "The assistant said it made a change, but no action
+     was run. Nothing was changed." shows outside the bubble.
+  3. If it writes an identifier that no lookup of the turn returned and that the person did not write: "This answer
+     shows an identifier the assistant did not really read. Do not trust it.".
+  4. If it points to a screen this business does not have: "This answer points to a screen that does not exist
+     here.", and without "Go to …" (BASE-F96).
+  5. The notices carry their alert icon, are not written by the assistant and stay with the message, also on
+     reloading. A clean answer carries none.
+  6. The receipts of BASE-F97 say what was really done, action by action.
+In: what was done in the turn, with its result, and what its lookups returned.
+Out: the notices and the receipts, kept with the conversation.
+If it fails: "Done" means the action of its app ended without an error: if an app answers fine without having changed
+anything, it is that action that has to say so. If the turn ends in an error, the bubble carries its failure
+(BASE-F106), the notices of what it got to say and the receipts of what was indeed done.
+Involved: BASE-F96, BASE-F97, BASE-F106
+
+### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. The assistant works with the session of whoever is in front of it: it sees and does what that person would see
+     and do with their buttons, in the business's apps that are on, and nothing else. An action they have no
+     permission for is not offered to the assistant, which tells them so; one its app lets a manager approve is, as
+     its button on the screen is.
+  2. That action comes with its card, like any other. Tapping "Run it" opens "An approval is needed", the same as on
+     the screen: a manager taps their face and types their PIN, or swipes their badge, and the action is done once,
+     with whoever asked for it as its author. It is recorded in **Employees › Approvals**.
+  3. If nobody approves it ("Cancel"), it is not done: the receipt reads "Not done, cancelled: …" and the assistant
+     knows it.
+  4. If it tries anyway an action without permission that nobody can approve, it is not done: the receipt reads "Not
+     done, not allowed: …" and the assistant explains it cannot.
+  5. What the assistant tells (lists, figures) is what that person may read.
+In: the session of whoever asks, which signs each action; for what a manager approves, their PIN or their badge.
+Out: the action done with that person as its author. The approval is good for that action of that conversation, once
+and for two minutes, and it is spent together with the action (BASE-F84).
+If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
+says so. An approval already used or expired does not let the action through: the receipt reads "Not done, it
+failed: …" and the assistant tells it.
+Involved: BASE-F13, BASE-F84, BASE-F97
+
+### BASE-F101 Ask it for several things in a row
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. The person asks for a chain ("create the category Drinks and the product Draught beer at €2.50").
+  2. The assistant solves it in rounds: it reads what it needs without asking, asks for an action, it is done and it
+     goes on. All it says goes to the same bubble.
+  3. Each action that changes something asks for its own card (BASE-F97), one after the other: accepting the first
+     does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
+     those left.
+  4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
+  5. A request allows six rounds at most: it is a brake against loops, not an allowance. Past them, "I stopped: this
+     needed too many steps. Ask for it in parts.".
+In: the request; the result of each action, which goes back to the assistant.
+Out: as many actions as cards accepted, each in its app and with its receipt.
+If it fails: if an action fails half way, the assistant gets it and tells it; the earlier ones are not undone. With
+the network cut half way, BASE-F106.
+Involved: BASE-F97, BASE-F106
+
+### BASE-F102 The conversation: what is kept, where and when it is deleted
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. The conversation lives only in that browser tab: the business does not keep it. Reloading the page brings it
+     back; closing the tab loses it. Closing the panel does not delete it.
+  2. An answer that was being written on reloading stays with what had arrived and "The answer was cut off.", with
+     "Try again".
+  3. "New conversation", at the top of the panel, empties it and starts from scratch.
+  4. On signing out (also when the till closes by itself for inactivity) it is deleted, and the answer that was
+     arriving is cut. On switching user with a PIN, that of whoever left is deleted along with what they had written
+     without sending and their attachments, and whoever arrives finds the panel closed and empty.
+  5. What is kept: what the person wrote (of their attachments, only the name), what the assistant answered, its
+     notices and its receipts.
+In: the panel's messages; the sign-outs and the user switches.
+Out: nothing outside the browser; with each question, the whole conversation travels to answer it.
+If it fails: if the browser does not let it be kept (private mode, full storage), the conversation goes on while the
+tab is open, but does not survive a reload. A kept one that cannot be read, or another person's, starts empty. A
+conversation that is too long says "This conversation is too long: start a new one." with "New conversation".
+Involved: BASE-F59, BASE-F60, BASE-F61
+
+### BASE-F103 The assistant in the setup
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. On the Home, while something is left, "Finish setting up your business" carries "Ask the assistant". It opens
+     the panel with "Review your business's setup. Choose an option or write your question.".
+  2. Opened from the bar, the empty conversation offers the same shortcuts: "What is left to set up?" and, for each
+     pending step this person can do (up to four, in the list's order), "How do I set up “Your team”?", with the
+     step's name as it shows in the list. The steps only an administrator can do and the "Not available yet" ones do
+     not show as shortcuts.
+  3. Tapping a shortcut asks it at once.
+  4. From the setup (the button or a shortcut), before each question the assistant reads the list again: what is
+     pending, what stops invoicing, what is done and what is an administrator's. A business that gets set up half way
+     through the chat stops being described as not set up.
+  5. What they ask it to do (turn an app on, load a template) goes through its card (BASE-F97).
+In: the list of what is missing, with what that person may see (BASE-F01).
+Out: the list, for the assistant; the normal conversation.
+If it fails: if the list cannot be read, the assistant knows it and does not say the business is set up, and the
+shortcuts are left at "What is left to set up?". Each step keeps its "Set up" in the list: with the assistant down,
+nobody is left without a way out.
+Involved: BASE-F01, BASE-F12, BASE-F97
+
+### BASE-F104 See the assistant's plan, the usage limit and extend it
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. On opening the panel, the assistant's messages the business has left this month are read. If they cannot be
+     read, nothing is shown: never a made-up number.
+  2. From 80 %, the foot says, for example, "You have 30 of 300 messages left this month." with "They renew on
+     November 1.". Below 80 %, nothing.
+  3. The count moves when each answer ends, without reloading.
+  4. Once spent, the answer is "You have used all the assistant's messages of this month (300 of 300)." with "They
+     renew on November 1.", and not a connection failure. The foot says the same, without repeating "Upgrade plan":
+     "You have used all 300 messages of this month." with "They renew on November 1."; also when the panel opens
+     with the month already spent.
+  5. Whoever runs the business sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in
+     another tab; in the app installed from the store it does not show. Whoever does not run it sees "Ask whoever
+     runs the business to upgrade the plan.". There are no message packs: it is extended by upgrading the plan.
+  6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
+     plan" for whoever runs the business; the panel opens anyway.
+In: the messages used, the limit and the day they renew, from erplora.com.
+Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
+If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
+answering is what counts.
+Involved: BASE-F11, BASE-F106
+
+### BASE-F105 Report a bad answer
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. Under each finished answer shows "Report a problem"; not on the one still being written nor under a failure
+     without an answer, which is not the assistant's.
+  2. "Report this answer" opens: "If this answer of the assistant looks wrong or harmful, send it to us and we will
+     review it.", with "What is wrong with it?" ("It is wrong", already ticked; "It is harmful or offensive", "It did
+     not do what I asked" or "Something else") and "Comment (optional)".
+  3. "Report" sends it with the question that led to it; "Cancel" sends nothing.
+  4. "Thank you, we have received your report." shows and it closes.
+In: the answer, the question, the reason and the comment.
+Out: the report, for erplora.com's team to review. Anyone can report.
+If it fails: "The report could not be sent. Try again.", and the window stays open with what was chosen and written.
+Involved: none
+
+### BASE-F106 The assistant without a connection, with the service down or without a plan
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Assistant
+Steps:
+  1. Without Internet on the device, the foot says "No connection: you can write, and send when it is back." and
+     "Send" turns off until it is back.
+  2. If the question does not reach erplora.com, the bubble reads "The assistant could not be reached. Check the
+     connection and try again." with "Try again".
+  3. If erplora.com or its service fail, "The assistant is not available right now. Try again in a few minutes." with
+     "Try again". If the answer is cut half way, what was written stays, with "The answer was cut off." and "Try
+     again".
+  4. With too many questions in a row, "Too many questions in a row: wait 60 seconds and try again.".
+  5. If the session ends half way through the chat, "Your session has ended. Sign in again to keep talking." with
+     "Sign in again".
+  6. Running out of messages or having a plan without the assistant is no breakdown: BASE-F104.
+  7. "Try again" asks the same question again: it is never lost.
+In: what happened to the question.
+Out: the failure, in the bubble and kept with the conversation (BASE-F102); it does not reach the assistant as if it
+had said it.
+If it fails: a failure with nothing written leaves no empty bubble: only the sentence with its way out.
+Involved: BASE-F93, BASE-F102, BASE-F104

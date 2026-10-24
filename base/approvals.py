@@ -22,9 +22,11 @@ import secrets
 from dataclasses import dataclass
 
 from django.apps import apps
+from django.core import checks
 from django.http import HttpRequest
 from django.utils.translation import gettext
 from live.errors import OperationError
+from live.meta import all_live_app_configs
 from live.operations import Operation, get
 from ninja import NinjaAPI
 from ninja.security import django_auth
@@ -49,8 +51,9 @@ def digest(token: str) -> str:
 
 
 def label_of(op: Operation | None) -> str | None:
-    """What approving ``op`` approves, in words, when its own app names it and it is a command with a permission."""
-    if op is None or op.kind != "command" or not op.permission:
+    """What approving ``op`` approves, in words, when its own app names it and it is a command with a permission that
+    opens its transaction: the pass is spent in it (``base.approval_spend``), so a ``database=False`` one never is."""
+    if op is None or op.kind != "command" or not op.permission or not op.database:
         return None
     try:
         config = apps.get_app_config(op.app_label)
@@ -167,3 +170,28 @@ def install(api: NinjaAPI) -> list[str]:
                 route.auth_callbacks = [*keys, ApprovalDoor(op.name), *rest]
                 installed.append(op.name)
     return installed
+
+
+@checks.register("base")
+def check_approvals(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E004``: a command an app names as approvable opens its transaction, where the manager's pass is spent
+    (``base.approval_spend``); one declared ``database=False`` (live#10) has none, and is said at start."""
+    errors: list[checks.CheckMessage] = []
+    for config in all_live_app_configs():
+        named = getattr(config, "approvals", None)
+        for name in named if isinstance(named, dict) else ():
+            try:
+                op = get(name)
+            except Exception:
+                continue
+            if op.kind == "command" and not op.database:
+                errors.append(
+                    checks.Error(
+                        f"{config.label} names {name} as approvable, but it touches no database (database=False).",
+                        hint="A manager's pass is spent in the transaction of the command it lets through: approve a "
+                        "command that opens one, or do not name it in approvals.",
+                        obj=config,
+                        id="base.E004",
+                    )
+                )
+    return errors

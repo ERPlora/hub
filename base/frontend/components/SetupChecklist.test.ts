@@ -5,7 +5,8 @@ import { IonProgressBar } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SetupItem, SetupStatus } from '../operations';
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
+import { createAssistant, installAssistant } from '../lib/assistant';
 import SetupChecklist from './SetupChecklist.vue';
 
 function item(key: string, fields: Partial<SetupItem> = {}): SetupItem {
@@ -155,5 +156,22 @@ describe('SetupChecklist', () => {
     const error = s.wrapper.get('[data-testid="setup-error"]');
     expect(error.text()).toContain('Could not load what is left to set up');
     expect(error.find('[data-testid="setup-retry"]').exists()).toBe(true);
+  });
+  // BASE-G121 (gh:hub#373): «Ask the assistant» opens its panel on the setup; every step keeps its own «Set up».
+  it('«Ask the assistant» opens the assistant on the setup, while something is left', async () => {
+    const assistant = createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined });
+    installAssistant(assistant);
+    try {
+      const s = await setup({ locale: 'es' });
+      await s.show(status([item('base.business', { state: 'pending' }), item('base.team', { state: 'done' })]));
+      const ask = s.wrapper.get('[data-testid="setup-review"]');
+      expect(ask.text()).toBe('Pedírselo al asistente');
+      await ask.trigger('click');
+      expect([assistant.state.open, assistant.state.thread.setup]).toEqual([true, true]);
+      await s.show(status([item('base.business', { state: 'done' })]), 2);
+      expect(s.wrapper.find('[data-testid="setup-review"]').exists()).toBe(false);
+    } finally {
+      installAssistant(undefined);
+    }
   });
 });

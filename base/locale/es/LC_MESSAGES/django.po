@@ -1649,3 +1649,63 @@ msgstr "Elige quién lo aprueba y escribe su PIN."
 #: services.py:2238
 msgid "That person cannot approve this: ask somebody who may do it themselves."
 msgstr "Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo."
+
+#: base/assistant.py
+msgctxt "base"
+msgid "CONFIRM"
+msgstr "CONFIRMAR"
+
+#: base/services.py
+msgctxt "base"
+msgid "Home"
+msgstr "Inicio"
+
+#: base/services.py
+msgctxt "base"
+msgid "Apps"
+msgstr "Apps"
+
+#: base/services.py
+msgctxt "base"
+msgid "Settings"
+msgstr "Ajustes"
+
+#: base/services.py
+msgctxt "base"
+msgid "My profile"
+msgstr "Mi perfil"
+
+#: base/services.py
+msgctxt "base"
+msgid "Files"
+msgstr "Archivos"
+
+#: base/services.py
+msgctxt "base"
+msgid "Employees"
+msgstr "Empleados"
+
+#: base/services.py
+msgctxt "base"
+msgid "System"
+msgstr "Sistema"
+
+#: base/services.py
+msgid "Sign in to talk to the assistant."
+msgstr "Entra para hablar con el asistente."
+
+#: base/services.py
+msgid "The report could not be sent: try again in a moment."
+msgstr "No se ha podido enviar la denuncia: inténtalo de nuevo en un momento."
+
+#: base/services.py
+msgid "The recording is too long: dictate a shorter message."
+msgstr "La grabación es demasiado larga: dicta un mensaje más corto."
+
+#: base/services.py
+msgid "The audio could not be transcribed: try again."
+msgstr "No se ha podido transcribir el audio: inténtalo de nuevo."
+
+#: base/queries.py
+msgid "The assistant's plan could not be read now."
+msgstr "Ahora no se puede leer el plan del asistente."

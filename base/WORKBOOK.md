@@ -11,7 +11,7 @@ Estado de la app: en construcción (2026-10-22)
 > tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer). El acceso (entrar con la
 > cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los dispositivos) está en sus propias pantallas,
 > más abajo.
-> Y «Archivos»: los documentos del negocio, en carpetas.
+> Y «Archivos»: los documentos del negocio, en carpetas; y el asistente, en su panel, al final.
 
 ## Para qué sirve y para quién
 
@@ -29,6 +29,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
   los tiene erplora.com, y adónde ir para cambiarlos.
 - **Los archivos del negocio**, en «Archivos»: los documentos que el equipo guarda en carpetas (facturas de
   proveedores, contratos, cartas, fotos), para abrirlos, descargarlos y ordenarlos desde cualquier dispositivo.
+- **El asistente**, con los destellos de la barra de arriba: se le pregunta por el negocio, escribiendo o con la voz,
+  y hace lo que la persona podría hacer con sus botones, siempre después de que ella lo confirme.
 
 Quién lo usa:
 
@@ -80,8 +82,9 @@ La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método»,
 Se abre también con el enlace del Inicio terminado en `#actividad`.
 
 ### La campana
-Arriba a la derecha, después de «Mis apps». Su número suma los avisos pendientes; al tocarla, una fila
-por aviso («Eventos caídos (2)») que lleva a su pantalla. Sin nada: «Todo al día. Sin notificaciones.».
+Arriba a la derecha, después de «Mis apps» y de los destellos del asistente; en un móvil, las dos van dentro de
+«Más opciones», que lleva su número. Su número suma los avisos pendientes; al tocarla, una fila por aviso («Eventos
+caídos (2)») que lleva a su pantalla. Sin nada: «Todo al día. Sin notificaciones.».
 
 ### El menú lateral
 A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y las entradas de la plataforma en dos
@@ -225,6 +228,20 @@ Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién 
 ### Documentación de la API
 Con el botón de volver: cómo se llama a la API, «Descargar el fichero OpenAPI» y una sección por app con sus llamadas.
 
+### Asistente
+El panel que se abre con los destellos «Asistente» de la barra de arriba (en un móvil, dentro de «Más opciones»), a la
+derecha. En una tableta o un ordenador se queda al lado de la pantalla y la empuja, así que se sigue trabajando con él
+abierto; en un móvil la tapa, sobre un velo oscuro. Arriba, «Asistente», «Nueva conversación» cuando ya hay una y la ×
+«Cerrar». En medio, la conversación: vacía, los destellos, la frase de bienvenida y los atajos de la puesta en marcha;
+luego, los mensajes, cada respuesta con sus botones «Ir a …», sus avisos y los recibos de lo que se hizo. Abajo, los
+avisos del pie (sin conexión, los mensajes que quedan este mes, un plan sin asistente) y el cuadro «Escribe un
+mensaje…» con «Adjuntar archivo», «Dictar por voz» y «Enviar».
+
+### Tarjeta de confirmación del asistente
+Sale encima de todo, también con el panel cerrado, cuando el asistente quiere cambiar algo: «¿Ejecutar esta acción?»,
+qué va a hacer, en qué app y con qué datos, y «Ejecutar» y «Cancelar» («Cancelar todo» cuando detrás esperan más). En
+una acción peligrosa, cada dato en su línea y un cuadro para escribir lo que pide antes de «Ejecutar».
+
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
@@ -242,6 +259,15 @@ En la pantalla Ajustes · Negocio:
 | Vacío | Una demo no tiene nombre ni país: esas filas dicen «—», y debajo, «Esta demo no tiene un negocio en erplora.com: sus datos no se cambian.». |
 | Error | «No se pudieron cargar los datos del negocio» con «Nada ha cambiado. Comprueba la conexión y vuelve a intentarlo.» y «Reintentar»; nunca la tarjeta en blanco. |
 | Sin permiso | Quien no administra el negocio lo ve igual, sin «Cambiar en erplora.com» y con «Solo el propietario o un administrador los cambian, en erplora.com.»; «Datos fiscales» no le sale a quien no puede escribir el emisor. |
+
+En el panel del asistente:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | Tres puntos que se mueven en la burbuja del asistente hasta que llega el primer texto («El asistente está escribiendo» para el lector de pantalla), y «Transcribiendo…» mientras se pasa a texto lo dictado. |
+| Vacío | Los destellos, «Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.» (abierto desde la puesta en marcha, «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.») y los atajos. Una respuesta que acaba sin decir nada: «(sin respuesta)». |
+| Error | En la burbuja, con su salida: «No se pudo contactar con el asistente. Comprueba la conexión y vuelve a intentarlo.», «El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.» o «La respuesta se cortó.», con «Reintentar»; «Esta conversación es demasiado larga: empieza una nueva.» con «Nueva conversación»; «Tu sesión ha terminado. Vuelve a entrar para seguir hablando.» con «Volver a entrar». Sin Internet, en el pie, «Sin conexión: puedes escribir y enviar cuando vuelva.». |
+| Sin permiso | Lo que la persona no puede hacer con sus botones, el asistente tampoco: no se le ofrece y, si lo intenta, el recibo dice «No se hizo, sin permiso: …». Con los mensajes del mes agotados, quien no administra ve «Pídele a quien administra el negocio que mejore el plan.» en lugar de «Mejorar el plan». |
 
 En la pantalla Ajustes · Datos y copias:
 
@@ -276,7 +302,7 @@ En la pantalla Archivos:
 | BASE-F09 | Consultar la actividad reciente | hecho |
 | BASE-F10 | Ver en la campana los avisos entre apps que no se entregaron | hecho |
 | BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | parcial |
-| BASE-F12 | Pedirle al asistente que repase la configuración | parcial |
+| BASE-F12 | Pedirle al asistente que repase la configuración | hecho |
 | BASE-F13 | Perder el acceso al cambiar de rol o al salir del negocio | hecho |
 | BASE-F14 | Ver las apps del negocio | hecho |
 | BASE-F15 | Abrir una app desde Apps | hecho |
@@ -356,6 +382,21 @@ En la pantalla Archivos:
 | BASE-F89 | Ver las llaves de API y qué puede cada una | parcial |
 | BASE-F90 | Consultar la documentación de la API | hecho |
 | BASE-F91 | Mostrar u ocultar la documentación de la API | hecho |
+| BASE-F92 | Abrir y cerrar el panel del asistente | hecho |
+| BASE-F93 | Preguntar al asistente y leer cómo escribe | hecho |
+| BASE-F94 | Adjuntar un archivo o dictar por voz | hecho |
+| BASE-F95 | Leer la respuesta: texto, listas, tablas y enlaces | hecho |
+| BASE-F96 | Ir a una pantalla desde una respuesta | hecho |
+| BASE-F97 | Confirmar una acción antes de que se ejecute | hecho |
+| BASE-F98 | Acciones peligrosas: escribir para confirmar, o no desde el chat | hecho |
+| BASE-F99 | Comprobar lo que dice el asistente contra lo que de verdad hizo | hecho |
+| BASE-F100 | Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable | hecho |
+| BASE-F101 | Pedirle varias cosas seguidas | hecho |
+| BASE-F102 | La conversación: qué se guarda, dónde y cuándo se borra | hecho |
+| BASE-F103 | El asistente en la puesta en marcha | hecho |
+| BASE-F104 | Ver el plan del asistente, el límite de uso y ampliarlo | hecho |
+| BASE-F105 | Informar de una respuesta mala | hecho |
+| BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -567,17 +608,17 @@ Implicados: ninguno
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
 <!-- origen: old-hub:HUB_SHELL-F30 -->
-Estado: parcial — el Hub aún no tiene el chat del asistente: la lista ya está al alcance del asistente, pero no hay botón «Pedírselo al asistente»
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
-  1. Desde el asistente, la persona le pide que repase la configuración del negocio.
+  1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
      dónde se hace; cada paso sigue teniendo su «Configurar» en la lista.
 Entra: la lista de lo que falta, con los permisos de quien pregunta.
 Sale: nada guardado.
 Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
-Implicados: ninguno
+Implicados: BASE-F103
 
 ### BASE-F13 Perder el acceso al cambiar de rol o al salir del negocio
 <!-- origen: old-saas:SAAS_AUTH-F22 -->
@@ -2115,6 +2156,352 @@ En las pantallas de Empleados y en la Documentación de la API:
 | Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
 | Sin permiso | Quien no administra no tiene las pestañas «API keys» ni «Aprobaciones» (su dirección abre «Personal»), no ve el email de nadie ni abre la ficha de una persona; en Ajustes, «Solo quien administra el negocio puede cambiarlo.». Con la documentación oculta: «La documentación de la API está oculta en este negocio.». |
 
+### BASE-F92 Abrir y cerrar el panel del asistente
+<!-- origen: old-hub:HUB_SHELL-F185 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
+     pulsarlos lo cierra. En un móvil, los destellos y la campana van juntos en «Más opciones» (con el número de la
+     campana), para que el título siga centrado: ahí, «Asistente» abre el panel y «Notificaciones», la campana.
+  2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
+     empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
+  3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
+     del panel), tocando el velo en el móvil, volviendo a pulsar los destellos o con «Ir a …» en una respuesta
+     (BASE-F96).
+  4. Si se deja abierto, sigue abierto al cambiar de pantalla y al recargar: el dispositivo recuerda solo si estaba
+     abierto o cerrado.
+Entra: la sesión.
+Sale: al abrirlo, el panel lee los mensajes del asistente que le quedan al negocio este mes (BASE-F104) y la lista de
+lo que falta por configurar, para sus atajos (BASE-F103); cerrarlo no pide nada.
+Si falla: no tiene fallo propio. Sin sesión (la entrada, el PIN) no hay destellos. Cerrar el panel no corta una
+respuesta que ya viene: sigue escribiéndose y, si pide confirmación, la tarjeta sale encima de la pantalla que haya
+(BASE-F97).
+Implicados: BASE-F93, BASE-F97, BASE-F103, BASE-F104
+
+### BASE-F93 Preguntar al asistente y leer cómo escribe
+<!-- origen: old-hub:HUB_SHELL-F186 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Con la conversación vacía, el panel enseña los destellos, «Pregúntame por tus ventas, tu inventario o cualquier
+     cosa de tu negocio.» y los atajos de la puesta en marcha (BASE-F103).
+  2. Escribe en «Escribe un mensaje…» y pulsa Intro o «Enviar». Con teclado, Mayús+Intro salta de línea; en una
+     pantalla táctil, Intro salta de línea y se envía con «Enviar». «Enviar» no se activa con el cuadro vacío y sin
+     adjuntos.
+  3. Su mensaje sale a la derecha tal cual lo escribió. Debajo, la burbuja del asistente, con tres puntos que se
+     mueven hasta que llega el primer texto.
+  4. Mientras responde, «Enviar» se convierte en «Detener», «Adjuntar archivo» y «Dictar por voz» se apagan y la
+     respuesta va apareciendo; la conversación baja sola hasta el final. Se puede ir escribiendo la siguiente
+     pregunta, pero no se envía hasta que acaba esta.
+  5. Si el asistente acaba sin decir nada, la burbuja dice «(sin respuesta)».
+  6. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
+  7. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del propio dispositivo, si la tiene, y
+     «Dejar de leer» la para.
+Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
+Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
+Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. «Detener» no deshace
+una acción que ya se había hecho.
+Implicados: BASE-F102, BASE-F104, BASE-F106
+
+### BASE-F94 Adjuntar un archivo o dictar por voz
+<!-- origen: old-hub:HUB_SHELL-F187 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Para adjuntar, pulsa «Adjuntar archivo» y elige uno o varios: imágenes, PDF, Word, Excel, texto o CSV. Cada uno
+     sale sobre el cuadro con su nombre y su × «Quitar adjunto».
+  2. Se envían con el siguiente mensaje, con texto o sin él, y en la burbuja de la persona quedan con su nombre.
+     Viajan una sola vez, con esa pregunta: después la conversación solo recuerda cómo se llamaban.
+  3. Para dictar, pulsa «Dictar por voz» (solo sale si el dispositivo puede grabar). El navegador pide permiso para
+     el micrófono. Mientras graba, el botón se pone rojo y se llama «Detener la grabación»; a los dos minutos para
+     solo.
+  4. Al parar sale «Transcribiendo…» y el texto cae en el cuadro, detrás de lo que hubiera escrito. **No se envía
+     solo**: la persona lo revisa y pulsa «Enviar», y lo que pida pasa por su tarjeta como cualquier otra petición
+     (BASE-F97).
+Entra: los archivos (8 MB cada uno y 20 MB entre todos los de una pregunta) o la grabación.
+Sale: el archivo viaja con la pregunta a erplora.com, que lo lee; la grabación pasa por el negocio a la
+transcripción de erplora.com. El navegador nunca habla directamente con erplora.com.
+Si falla: en una línea sobre el cuadro, y el archivo no se adjunta: «menu.pdf es demasiado grande: 8 MB como mucho
+por archivo.», «Los archivos de una pregunta suman 20 MB como mucho.», «menu.zip no se puede adjuntar: imágenes,
+PDF, Word, Excel, texto o CSV.» o «No se ha podido leer menu.pdf.». Con el micrófono denegado, «El acceso al
+micrófono está denegado. Permítelo en tu navegador para dictar.»; una grabación demasiado larga, «La grabación es
+demasiado larga: dicta un mensaje más corto.»; sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del
+micrófono.»; y si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.».
+Implicados: BASE-F93, BASE-F97
+
+### BASE-F95 Leer la respuesta: texto, listas, tablas y enlaces
+<!-- origen: old-hub:HUB_SHELL-F188 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. La respuesta se pinta con formato: negrita, cursiva, código, encabezados, listas con viñetas o numeradas y
+     tablas.
+  2. Una tabla cabe en la burbuja: sus celdas parten el texto en lugar de ensanchar el panel, también en un móvil.
+  3. Un enlace se lee por su texto, sin corchetes ni dirección. Solo se puede pulsar si lleva a una pantalla de este
+     negocio (BASE-F96); cualquier otra dirección, de fuera o inventada, se queda como texto.
+  4. Lo que el panel no entiende (bloques de código, imágenes, citas) se queda como texto corriente. El mensaje de la
+     persona sale siempre tal cual lo escribió.
+Entra: el texto del asistente.
+Sale: nada; solo se pinta. El panel nunca pinta HTML que venga en una respuesta.
+Si falla: una respuesta mal escrita se lee como texto: nunca se pierde ni rompe el panel.
+Implicados: BASE-F96
+
+### BASE-F96 Ir a una pantalla desde una respuesta
+<!-- origen: old-hub:HUB_SHELL-F189 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Si la respuesta nombra una pantalla de este negocio, bajo la burbuja sale «Ir a …» con su nombre (hasta cuatro,
+     sin repetir) y la propia mención se puede pulsar.
+  2. Puede llevar al Inicio, a Empleados, a Apps, a Ajustes, a Mi perfil, a Archivos (a quien los ve), a Sistema (a
+     quien administra) y a las pantallas del menú de cada app encendida.
+  3. El botón usa el nombre que la persona ve en el menú («Ir a Ajustes», «Ir a Inicio» y, para una app, su nombre y
+     el de la pantalla), nunca la dirección.
+  4. Al pulsarlo se abre esa pantalla y el panel se cierra para que se vea.
+Entra: las pantallas que nombra la respuesta; las de este negocio y las de sus apps encendidas.
+Sale: la pantalla abierta; no se pide nada.
+Si falla: una pantalla que este negocio no tiene (la de una app apagada, una dirección inventada) no sale como botón
+ni como enlace, y la respuesta lleva el aviso de BASE-F99. Si la persona no puede ver la pantalla a la que llega, se
+lo dice esa pantalla.
+Implicados: BASE-F92, BASE-F99
+
+### BASE-F97 Confirmar una acción antes de que se ejecute
+<!-- origen: old-hub:HUB_SHELL-F190 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Tarjeta de confirmación del asistente
+Pasos:
+  1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»).
+  2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
+     línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe sale en la moneda del negocio (nunca
+     en céntimos), un sí o un no como «Sí» o «No» y una lista por cuántos elementos lleva.
+  3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
+     botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
+  4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
+  5. Bajo la respuesta queda el recibo de cada acción del turno: «Hecho: Crear en Servicios», o «No se hizo,
+     cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …».
+Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio.
+Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
+Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
+falló: …». Si se recarga la página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se
+cortó.» con «Reintentar».
+Implicados: BASE-F98, BASE-F99, BASE-F101
+
+### BASE-F98 Acciones peligrosas: escribir para confirmar, o no desde el chat
+<!-- origen: old-hub:HUB_SHELL-F191 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Tarjeta de confirmación del asistente
+Pasos:
+  1. Una acción que su app marca como peligrosa no se confirma con un clic: la tarjeta dice, por ejemplo, «Borrar en
+     Servicios. Revisa cada dato antes de seguir.», pone cada dato en su línea y pide «Para confirmar, escribe
+     CONFIRMAR:».
+  2. Si la acción nombra los registros uno a uno, dice cuántos («Afecta a 3 registros.») y pide escribir ese número
+     en lugar de la palabra.
+  3. Si no los nombra (todos, o los que cumplen un filtro), no se hace desde el chat: no sale tarjeta, la respuesta dice «No puedo
+     saber cuántos registros cambiaría esto, así que no lo hago desde aquí. Ábrelo en su pantalla, donde puedes
+     verlos.» y el asistente explica dónde se hace.
+  4. «Ejecutar» solo se puede pulsar cuando lo escrito coincide (sin importar las mayúsculas ni los espacios de los
+     extremos), y el negocio lo vuelve a comprobar antes de hacerlo.
+  5. Restablecer el negocio y exportar una copia nunca se hacen desde el chat: se hacen en Ajustes › Datos y copias.
+Entra: el riesgo que la app declara en cada acción y sus datos.
+Sale: si se acepta, como BASE-F97.
+Si falla: lo escrito que no coincide no deja ejecutar; cancelar no hace nada y el asistente lo cuenta como cancelado.
+Implicados: BASE-F35, BASE-F37, BASE-F97
+
+### BASE-F99 Comprobar lo que dice el asistente contra lo que de verdad hizo
+<!-- origen: old-hub:HUB_SHELL-F192 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Al acabar cada respuesta, el panel la compara con lo que de verdad se hizo en ese turno: no se fía de lo que la
+     respuesta dice de sí misma.
+  2. Si dice que cambió algo («he creado…», «se ha guardado…», «has been updated…») y en el turno no se hizo ninguna
+     acción (o se canceló, falló o no tenía permiso), sale, fuera de la burbuja, «El asistente ha dicho que hizo un
+     cambio, pero no se ejecutó ninguna acción. No se ha modificado nada.».
+  3. Si escribe un identificador que ninguna consulta del turno devolvió y que la persona no escribió: «Esta
+     respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.».
+  4. Si señala una pantalla que este negocio no tiene: «Esta respuesta señala una pantalla que no existe aquí.», y
+     sin «Ir a …» (BASE-F96).
+  5. Los avisos llevan su icono de alerta, no los escribe el asistente y se quedan con el mensaje, también al
+     recargar. Una respuesta limpia no lleva ninguno.
+  6. Los recibos de BASE-F97 dicen qué se hizo de verdad, acción por acción.
+Entra: lo que se hizo en el turno, con su resultado, y lo que devolvieron sus consultas.
+Sale: los avisos y los recibos, guardados con la conversación.
+Si falla: «Hecho» quiere decir que la acción de su app acabó sin error: si una app responde bien sin haber cambiado
+nada, es esa acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
+avisos de lo que llegó a decir y los recibos de lo que sí se hizo.
+Implicados: BASE-F96, BASE-F97, BASE-F106
+
+### BASE-F100 Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable
+<!-- origen: old-hub:HUB_SHELL-F193 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. El asistente trabaja con la sesión de quien está delante: ve y hace lo que esa persona vería y haría con sus
+     botones, en las apps encendidas del negocio, y nada más. Una acción para la que no tiene permiso no se le ofrece
+     al asistente, que así se lo dice; la que su app deja aprobar a un responsable sí, igual que su botón en la
+     pantalla.
+  2. Esa acción sale con su tarjeta, como cualquier otra. Al pulsar «Ejecutar» se abre «Hace falta una aprobación», la
+     misma de la pantalla: un responsable toca su cara y teclea su PIN, o pasa su placa, y la acción se hace una vez,
+     con quien la pidió como autor. Queda anotada en **Empleados › Aprobaciones**.
+  3. Si nadie la aprueba («Cancelar»), no se hace: el recibo dice «No se hizo, cancelado: …» y el asistente lo sabe.
+  4. Si aun así intenta una acción sin permiso que nadie puede aprobar, no se hace: el recibo dice «No se hizo, sin
+     permiso: …» y el asistente explica que no puede.
+  5. Lo que el asistente cuenta (listas, cifras) es lo que esa persona puede leer.
+Entra: la sesión de quien pregunta, que firma cada acción; para lo que aprueba un responsable, su PIN o su placa.
+Sale: la acción hecha con esa persona como autora. La aprobación vale para esa acción de esa conversación, una sola
+vez y durante dos minutos, y se gasta junto con la acción (BASE-F84).
+Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Una
+aprobación ya usada o caducada no deja pasar la acción: el recibo dice «No se hizo, falló: …» y el asistente lo
+cuenta.
+Implicados: BASE-F13, BASE-F84, BASE-F97
+
+### BASE-F101 Pedirle varias cosas seguidas
+<!-- origen: old-hub:HUB_SHELL-F194 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. La persona pide una cadena («crea la categoría Bebidas y el producto Caña a 2,50 €»).
+  2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar, pide una acción, se hace y sigue. Todo lo
+     que dice va a la misma burbuja.
+  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F97), una detrás de otra: aceptar la primera no acepta
+     las siguientes. Si detrás esperan más, la tarjeta lleva «Cancelar todo», que cancela esta y las que faltan.
+  4. Si cancela una, el asistente lo sabe y decide cómo seguir. Lo ya hecho se queda hecho.
+  5. Una petición admite como mucho seis rondas: es un freno contra los bucles, no un cupo. Pasadas, «He parado: esto
+     necesitaba demasiados pasos. Pídelo por partes.».
+Entra: la petición; el resultado de cada acción, que vuelve al asistente.
+Sale: tantas acciones como tarjetas aceptadas, cada una en su app y con su recibo.
+Si falla: si una acción falla a mitad, el asistente lo recibe y lo cuenta; las anteriores no se deshacen. Con la red
+cortada a mitad, BASE-F106.
+Implicados: BASE-F97, BASE-F106
+
+### BASE-F102 La conversación: qué se guarda, dónde y cuándo se borra
+<!-- origen: old-hub:HUB_SHELL-F195 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. La conversación vive solo en esa pestaña del navegador: el negocio no la guarda. Recargar la página la recupera;
+     cerrar la pestaña la pierde. Cerrar el panel no la borra.
+  2. Una respuesta que se estaba escribiendo al recargar se queda con lo que había llegado y «La respuesta se
+     cortó.», con «Reintentar».
+  3. «Nueva conversación», arriba del panel, la vacía y empieza de cero.
+  4. Al cerrar sesión (también cuando la caja se cierra sola por inactividad) se borra, y se corta la respuesta que
+     estuviera llegando. Al cambiar de usuario con PIN, la de quien se fue se borra con lo que hubiera escrito sin
+     enviar y sus adjuntos, y quien llega encuentra el panel cerrado y vacío.
+  5. Se guarda lo que escribió la persona (de sus adjuntos, solo el nombre), lo que respondió el asistente, sus avisos
+     y sus recibos.
+Entra: los mensajes del panel; los cierres de sesión y los cambios de usuario.
+Sale: nada fuera del navegador; con cada pregunta, la conversación entera viaja para responderla.
+Si falla: si el navegador no deja guardar (modo privado, almacenamiento lleno), la conversación sigue mientras la
+pestaña está abierta, pero no sobrevive a una recarga. Una guardada que no se puede leer, o de otra persona, empieza
+vacía. Una conversación demasiado larga dice «Esta conversación es demasiado larga: empieza una nueva.» con «Nueva
+conversación».
+Implicados: BASE-F59, BASE-F60, BASE-F61
+
+### BASE-F103 El asistente en la puesta en marcha
+<!-- origen: old-hub:HUB_SHELL-F196 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. En el Inicio, mientras falta algo, «Termina de configurar tu negocio» lleva «Pedírselo al asistente». Abre el
+     panel con «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.».
+  2. Abierto desde la barra, la conversación vacía ofrece los mismos atajos: «¿Qué falta por configurar?» y, por cada
+     paso pendiente que esta persona puede hacer (hasta cuatro, en el orden de la lista), «¿Cómo configuro «Tu
+     equipo»?», con el nombre del paso tal como sale en la lista. Los pasos que solo puede hacer un administrador y los
+     «Todavía no disponible» no salen como atajo.
+  3. Pulsar un atajo lo pregunta en el acto.
+  4. Desde la puesta en marcha (el botón o un atajo), antes de cada pregunta el asistente vuelve a leer la lista: lo
+     pendiente, lo que impide facturar, lo hecho y lo que le toca a un administrador. Un negocio que se configura a
+     mitad de la charla deja de describirse como sin configurar.
+  5. Lo que pida hacer (encender una app, cargar una plantilla) pasa por su tarjeta (BASE-F97).
+Entra: la lista de lo que falta, con lo que esa persona puede ver (BASE-F01).
+Sale: la lista, para el asistente; la conversación normal.
+Si falla: si la lista no se puede leer, el asistente lo sabe y no dice que el negocio está configurado, y los atajos
+se quedan en «¿Qué falta por configurar?». Cada paso sigue teniendo su «Configurar» en la lista: con el asistente
+caído nadie se queda sin salida.
+Implicados: BASE-F01, BASE-F12, BASE-F97
+
+### BASE-F104 Ver el plan del asistente, el límite de uso y ampliarlo
+<!-- origen: old-hub:HUB_SHELL-F197 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Al abrir el panel se leen los mensajes del asistente que le quedan al negocio este mes. Si no se pueden leer, no
+     se enseña nada: nunca un número inventado.
+  2. Desde el 80 %, el pie dice, por ejemplo, «Te quedan 30 de 300 mensajes este mes.» con «Se renuevan el 1 de
+     noviembre.». Por debajo del 80 %, nada.
+  3. La cuenta se mueve al terminar cada respuesta, sin recargar.
+  4. Agotados, la respuesta es «Has usado todos los mensajes del asistente de este mes (300 de 300).» con «Se
+     renuevan el 1 de noviembre.», y no un fallo de conexión. El pie dice lo mismo, sin repetir «Mejorar el plan»:
+     «Has usado los 300 mensajes de este mes.» con «Se renuevan el 1 de noviembre.»; también al abrir el panel con
+     el mes ya gastado.
+  5. Quien administra el negocio ve, en el navegador, «Mejorar el plan», que abre en otra pestaña la página del plan
+     en erplora.com; en la app instalada desde la tienda no sale. Quien no administra ve «Pídele a quien administra el
+     negocio que mejore el plan.». No hay paquetes de mensajes: se amplía mejorando de plan.
+  6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar el plan» para quien
+     administra; el panel se abre igual.
+Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.com.
+Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
+Si falla: si no se puede leer el plan, no se enseña nada y se puede preguntar igual: lo que diga erplora.com al
+responder es lo que vale.
+Implicados: BASE-F11, BASE-F106
+
+### BASE-F105 Informar de una respuesta mala
+<!-- origen: old-hub:HUB_SHELL-F198 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Bajo cada respuesta terminada sale «Denunciar un problema»; no en la que aún se escribe ni bajo un fallo sin
+     respuesta, que no es del asistente.
+  2. Se abre «Denunciar esta respuesta»: «Si esta respuesta del asistente te parece incorrecta o dañina, envíanosla y
+     la revisaremos.», con «¿Qué le pasa?» («Es incorrecta», ya marcada; «Es dañina u ofensiva», «No hace lo que
+     pedí» u «Otra cosa») y «Comentario (opcional)».
+  3. «Denunciar» la envía con la pregunta que la provocó; «Cancelar» no manda nada.
+  4. Sale «Gracias, hemos recibido tu denuncia.» y se cierra.
+Entra: la respuesta, la pregunta, el motivo y el comentario.
+Sale: la denuncia, para que el equipo de erplora.com la revise. Cualquier persona puede denunciar.
+Si falla: «No se pudo enviar la denuncia. Inténtalo de nuevo.», y la ventana sigue abierta con lo elegido y lo
+escrito.
+Implicados: ninguno
+
+### BASE-F106 El asistente sin conexión, con el servicio caído o sin plan
+<!-- origen: old-hub:HUB_SHELL-F199 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Asistente
+Pasos:
+  1. Sin Internet en el dispositivo, el pie dice «Sin conexión: puedes escribir y enviar cuando vuelva.» y «Enviar»
+     se apaga hasta que vuelve.
+  2. Si la pregunta no llega a erplora.com, la burbuja dice «No se pudo contactar con el asistente. Comprueba la
+     conexión y vuelve a intentarlo.» con «Reintentar».
+  3. Si erplora.com o su servicio fallan, «El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos
+     minutos.» con «Reintentar». Si la respuesta se corta a mitad, lo escrito se queda, con «La respuesta se cortó.»
+     y «Reintentar».
+  4. Con demasiadas preguntas seguidas, «Demasiadas preguntas seguidas: espera 60 segundos y vuelve a intentarlo.».
+  5. Si la sesión termina a mitad de la charla, «Tu sesión ha terminado. Vuelve a entrar para seguir hablando.» con
+     «Volver a entrar».
+  6. Quedarse sin mensajes o tener un plan sin asistente no es una avería: BASE-F104.
+  7. «Reintentar» vuelve a hacer la misma pregunta: nunca se pierde.
+Entra: lo que pasó con la pregunta.
+Sale: el fallo, en la burbuja y guardado con la conversación (BASE-F102); al asistente no le llega como si lo hubiera
+dicho él.
+Si falla: un fallo sin nada escrito no deja una burbuja vacía: solo la frase con su salida.
+Implicados: BASE-F93, BASE-F102, BASE-F104
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -2366,6 +2753,45 @@ En las pantallas de Empleados y en la Documentación de la API:
   enseña. Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
   `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A).
+- **Asistente** (APP-BASE-9, BASE-F92…F106; PLAN §30, ronda 2026-10-22b): es **plataforma** dentro de `base/`, no un
+  módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
+  del shell y del Inicio. `base/assistant.py` (sin ORM) tiene el catálogo de herramientas (`catalog`: toda
+  `@operation` de las apps activas cuyo `ai=` tiene descripción y cuyo permiso tiene la persona, o que su app deja
+  aprobar a un responsable (`approvals.label_of`), salvo las «Not an assistant tool» / «System only», las sin permiso,
+  las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
+  preguntas; `base.setup.status` y `base.business.get` siempre), la tarjeta (`card`: `ai={"risk": "high"}` pide
+  `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `base`, o el número de `ids`; sin `ids`, `blocked`), la
+  comparación del servidor (`confirmed`, como `ConfirmDialog`: sin mayúsculas ni espacios de los extremos),
+  `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
+  puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report` y `/internal/speech/transcribe`, con
+  el HMAC de `base.signing`).
+- Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
+  (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
+  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; el «sí» a una escritura que la persona no puede hacer y un
+  responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
+  con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
+  instrucciones con las pantallas que puede enlazar
+  y, con `setup`, la lista de `base.setup.status` releída), `base.assistant.usage` (query), `base.assistant.report` y
+  `base.assistant.transcribe` (command). Rutas en `base/api.py` (`/api/assistant/turn`, `usage`, `report`,
+  `transcribe`): el turno responde en streaming (`text/event-stream`, `turn_response`) a **una** petición `fetch` +
+  `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`, `error` y `done`), no una
+  segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un proveedor.
+- Panel: `base/frontend/components/assistant/` (`AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
+  `AssistantComposer`, `AssistantConfirm` sobre `ConfirmDialog`, `AssistantReport` sobre `FormModal`, `AssistantEmpty`
+  y `AssistantButton`), montado por `createShell({ chrome: { topbar: TopbarChrome, background: BackgroundChrome } })`
+  en `frontend/main.ts`, sin tocar `packages/ui`. Estado por pestaña en `base/frontend/lib/assistant.ts`; la
+  conversación, en `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o
+  cerrado en `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida
+  antes de `logout` (también el bloqueo por inactividad). Comprobaciones de la respuesta en `lib/assistant-grounding.ts`,
+  formato en `lib/assistant-markdown.ts` (nunca `v-html`), adjuntos y voz en `lib/assistant-input.ts`
+  (`MediaRecorder`, dos minutos), atajos, fallos y cupo en `lib/assistant-guide.ts`. Desde 768 px el panel se ancla
+  (clase `assistant-docked` en `<html>`, que empuja el pane); por debajo, velo.
+- Tests: `base/tests/test_assistant.py`, `test_services_assistant.py` y `test_api_assistant.py` (con la pasarela
+  falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant*.test.ts`,
+  `components/assistant/*.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`; e2e
+  `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
+  `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1 que habla la API de OpenAI; receta en
+  `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
 
 - Personas y permisos (APP-BASE-5): las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
@@ -2379,7 +2805,8 @@ En las pantallas de Empleados y en la Documentación de la API:
   llave abriría otros negocios, así que `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no
   entra (test A≠B en `base/tests/test_api_keys.py`).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
-  (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca). `base/approvals.py` pone su puerta
+  (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
+  transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
   (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
   `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
   quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre;
@@ -2434,3 +2861,8 @@ En las pantallas de Empleados y en la Documentación de la API:
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
+- El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
+  sesión o cambiar de usuario.
+- El asistente no busca en Internet ni convierte divisas (llegan con la etapa ERP), y no hace nada que la persona no
+  pueda hacer con sus botones, ni sin su «Ejecutar».
+- La voz con la que lee una respuesta es la del propio dispositivo; el Hub no genera audio.

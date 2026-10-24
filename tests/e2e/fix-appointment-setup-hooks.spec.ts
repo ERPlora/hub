@@ -9,7 +9,7 @@
 // Citas's settings are put back as they were.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, bellBadge, login, openBell, psql, shot, shown, untilStill } from './helpers';
 import { FLOW_VIEWPORTS, post } from './service-helpers';
 
 const KEY = 'FIX-APPOINTMENT-SETUP-HOOKS';
@@ -154,19 +154,10 @@ async function settled(streams: number[]): Promise<void> {
   await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
 }
 
-const bell = (page: Page): Locator => shown(page).locator('[data-testid="hub-bell"]');
-const badge = (page: Page): Locator => bell(page).locator('[data-testid="hub-bell-badge"]');
+const badge = (page: Page): Locator => bellBadge(page);
 const toConfirmRow = (page: Page): Locator =>
   page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: /^\s*Citas por confirmar \(\d+\)\s*$/ });
 
-/** Opens the bell and waits until its popover is presented (Ionic animates it in a shadow root). */
-async function openBell(page: Page): Promise<void> {
-  const presented = page.evaluate(
-    () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-  );
-  await bell(page).click();
-  await presented;
-}
 
 /** The badge says `total`, or is not shown at zero. */
 async function badgeSays(page: Page, total: number): Promise<void> {

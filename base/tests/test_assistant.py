@@ -1,0 +1,353 @@
+"""The Hub's assistant without the ORM (``base/assistant.py``, APP-BASE-9; PLAN §30): which operations are its tools
+for this person, the few it offers in a turn, how a write is shown before it runs, how a tool runs as the person, and
+the signed calls to erplora.com's gateway (``/internal/assistant/*``, ``/internal/speech/transcribe``).
+
+The gateway is ``fake_gateway.FakeGateway``: a real HTTP server on 127.0.0.1 that answers in the gateway's contract.
+"""
+
+import asyncio
+import json
+
+import pytest
+from live.context import OperationContext, Scope
+from live.operations import get
+
+from base import assistant, entitlement
+from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
+
+A = Scope("host", "a")
+MANAGER = frozenset({"base.view_home", "demo.*"})
+EMPLOYEE = frozenset({"base.view_home", "demo.view"})
+
+
+def ctx(permissions=MANAGER, *, actor="ana", language="en", scope=A):
+    return OperationContext(scope=scope, actor=actor, permissions=frozenset(permissions), language=language)
+
+
+
+# ── Tools: what the assistant may use for this person (BASE-G118; gh:hub#11) ─────────────────────────────────────
+
+
+def test_a_tool_is_named_without_dots_and_read_back_from_its_name():
+    assert assistant.tool_name("cash_register.session.close") == "cash_register__session__close"
+    tools = assistant.catalog(ctx({"*"}))
+    assert assistant.operation_of("demo__item__create", tools).name == "demo.item.create"
+    assert assistant.operation_of("demo__item__nothing", tools) is None
+
+
+def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
+    names = set(assistant.catalog(ctx(EMPLOYEE)))
+    assert "demo.item.list" in names
+    # Without «demo.manage» the write is not even offered (the old hub's: as if it did not exist).
+    assert "demo.item.create" not in names
+    assert "base.access.settings_update" not in names
+
+
+@pytest.mark.parametrize(
+    "name, why",
+    [
+        ("base.pin.set", "«Not an assistant tool»: a PIN is typed on the pad"),
+        ("base.hub.reset", "never from the chat: it empties the business"),
+        ("base.app.list", "no description for the assistant"),
+        ("base.demo.create", "the system's (no permission declared)"),
+    ],
+)
+def test_what_is_not_a_tool_is_never_offered_even_to_who_may_do_everything(name, why):
+    assert name not in assistant.catalog(ctx({"*"})), why
+
+
+def test_an_app_the_business_has_no_right_to_offers_no_tool(monkeypatch):
+    monkeypatch.setattr(entitlement, "blocked_apps", lambda scope: frozenset({"demo"}))
+    assert not [name for name in assistant.catalog(ctx({"*"})) if name.startswith("demo.")]
+
+
+def test_the_assistants_own_operations_are_not_its_tools():
+    assert not [name for name in assistant.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
+
+
+# ── By relevance: a turn offers the tools of what was asked, never the whole catalogue (PLAN §30) ─────────────────
+
+
+def test_a_turn_offers_at_most_its_share_of_the_catalogue():
+    tools = assistant.catalog(ctx({"*"}))
+    assert len(tools) > assistant.MAX_TOOLS
+    assert len(assistant.relevant(tools, ["hola"], "es")) <= assistant.MAX_TOOLS
+
+
+def test_the_app_named_in_the_persons_own_language_comes_first():
+    tools = assistant.catalog(ctx({"*"}))
+    offered = assistant.relevant(tools, ["¿Cuántos clientes tengo este mes?"], "es")
+    # After the two reads always at hand (``ALWAYS``), the app the person named.
+    first = [op.name for op in offered if op.name not in assistant.ALWAYS][:5]
+    assert first and all(name.startswith("customer.") for name in first), first
+    assert "customer.customer.list" in first
+
+
+def test_what_the_person_asks_to_do_ranks_the_operation_that_does_it():
+    tools = assistant.catalog(ctx({"*"}))
+    offered = [op.name for op in assistant.relevant(tools, ["crea un servicio Corte caballero a 15 €"], "es")]
+    assert "service.service.create" in offered
+
+
+def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
+    """gh:hub#1044: asked «what version of ERPlora do I have?», the old assistant said there was none."""
+    tools = assistant.catalog(ctx({"base.view_home", "base.administer_hub"}))
+    offered = [op.name for op in assistant.relevant(tools, ["¿Qué versión de ERPlora tengo?"], "es")]
+    assert "base.system.status" in offered
+    assert "base.system.status" not in assistant.catalog(ctx(EMPLOYEE))
+
+
+def test_the_checklist_read_is_always_at_hand():
+    tools = assistant.catalog(ctx({"*"}))
+    assert "base.setup.status" in [op.name for op in assistant.relevant(tools, ["zzz"], "es")]
+
+
+def test_a_tool_is_offered_in_the_gateways_format():
+    spec = assistant.tool_spec(get("demo.item.create"))
+    assert spec["type"] == "function"
+    assert spec["name"] == "demo__item__create"
+    assert spec["description"].startswith("Creates a demo item")
+    assert spec["parameters"]["properties"]["name"]["type"] == "string"
+
+
+# ── The card of a write (BASE-G115, G116; gh:hub#1045) ───────────────────────────────────────────────────────────
+
+
+def test_a_normal_write_asks_a_click_and_shows_what_it_will_send():
+    card = assistant.card(get("demo.item.create"), {"name": "Mesa 4", "note": None}, "es")
+    assert (card["risk"], card["confirm_word"], card["blocked"]) == ("normal", "", False)
+    assert card["app"] == "demo"
+    fields = {field["name"]: field for field in card["fields"]}
+    assert fields["name"] == {**fields["name"], "kind": "text", "value": "Mesa 4"}
+    assert fields["note"]["kind"] == "empty"
+
+
+def test_an_amount_in_cents_is_marked_as_money_for_the_card():
+    card = assistant.card(get("service.service.create"), {"name": "Corte", "price": 1500}, "es")
+    price = next(field for field in card["fields"] if field["name"] == "price")
+    assert (price["kind"], price["value"]) == ("money", 1500)
+
+
+def test_a_dangerous_write_asks_to_type_a_word_in_the_persons_language():
+    assert assistant.card(get("demo.item.delete"), {"id": "x"}, "es")["confirm_word"] == "CONFIRMAR"
+    assert assistant.card(get("demo.item.delete"), {"id": "x"}, "en")["confirm_word"] == "CONFIRM"
+
+
+def test_a_dangerous_write_over_named_records_asks_to_type_how_many():
+    card = assistant.card(get("appointment.appointment.bulk_delete"), {"ids": ["a", "b", "c"]}, "es")
+    assert (card["count"], card["confirm_word"], card["blocked"]) == (3, "3", False)
+
+
+def test_a_dangerous_write_that_names_no_record_is_not_done_from_the_chat():
+    card = assistant.card(get("appointment.appointment.bulk_delete"), {"ids": []}, "es")
+    assert card["blocked"] is True
+
+
+def test_the_typed_confirmation_is_compared_as_the_platforms_dialog_does():
+    """As ``ConfirmDialog`` of ``@erplora/ui`` (the dialog that asks it): spaces around and case ignored, accents not."""
+    card = assistant.card(get("demo.item.delete"), {"id": "x"}, "es")
+    assert assistant.confirmed(card, "  CONFIRMAR ")
+    assert assistant.confirmed(card, "confirmar")
+    assert not assistant.confirmed(card, "CONFIRMA")
+    assert not assistant.confirmed(card, "")
+    normal = assistant.card(get("demo.item.create"), {"name": "x"}, "es")
+    assert assistant.confirmed(normal, "")
+
+
+# ── A tool runs as the person, by its own operation (BASE-G115, G118) ────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_a_tool_runs_by_its_operation_with_the_persons_permissions():
+    outcome = assistant.run_tool(ctx(), get("demo.item.create"), '{"name": "Mesa 4"}')
+    assert outcome.outcome == "ok"
+    created = json.loads(outcome.content)
+    listed = assistant.run_tool(ctx(EMPLOYEE), get("demo.item.list"), "{}")
+    assert created["id"] in listed.content
+
+
+@pytest.mark.django_db
+def test_a_tool_the_person_may_not_use_is_refused_and_writes_nothing():
+    outcome = assistant.run_tool(ctx(EMPLOYEE), get("demo.item.create"), '{"name": "Mesa 4"}')
+    assert (outcome.outcome, outcome.code) == ("refused", "permission_denied")
+    assert "Mesa 4" not in assistant.run_tool(ctx(EMPLOYEE), get("demo.item.list"), "{}").content
+
+
+@pytest.mark.django_db
+def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
+    outcome = assistant.run_tool(ctx(), get("demo.item.create"), '{"name": ""}')
+    assert (outcome.outcome, outcome.code) == ("error", "invalid_payload")
+    assert "name" in json.loads(outcome.content)["error"]["fields"]
+    broken = assistant.run_tool(ctx(), get("demo.item.create"), "{not json")
+    assert (broken.outcome, broken.code) == ("error", "invalid_payload")
+
+
+# ── The instructions of a turn (gh:hub#1039, #1045, #1046) ───────────────────────────────────────────────────────
+
+
+def test_the_instructions_set_the_language_the_money_and_the_screens():
+    text = assistant.instructions(language="es", currency="EUR", business="Bar Pepe", screens={"/settings": "Ajustes"})
+    # gh:hub#1046: the old assistant answered anything (films, cinemas) on the business's allowance.
+    assert "Only help with this business and with using ERPlora" in text
+    assert "Spanish" in text
+    assert "EUR" in text and "cents" in text
+    assert "[Ajustes](/settings)" in text
+    assert "Bar Pepe" in text
+
+
+def test_the_setup_block_carries_what_is_pending_and_who_does_it():
+    status = {
+        "total": 3,
+        "pending": 2,
+        "unavailable": 0,
+        "blocking_pending": 1,
+        "items": [
+            {"key": "base.business", "title": "Los datos de tu negocio", "state": "pending", "level": "legal",
+             "actionable": True, "route": "/settings#business", "description": "Razón social y NIF."},
+            {"key": "invoice.series", "title": "Tu numeración", "state": "pending", "level": "functional",
+             "actionable": False, "route": "/m/invoice", "description": ""},
+            {"key": "base.apps", "title": "Tus apps", "state": "done", "level": "recommended",
+             "actionable": True, "route": "/apps", "description": ""},
+        ],
+    }
+    block = assistant.setup_block(status)
+    assert "Los datos de tu negocio" in block and "/settings#business" in block
+    assert "Tu numeración" in block and "administrator" in block
+    assert "Tus apps" in block
+    assert "could not be read" in assistant.setup_block(None)
+
+
+# ── The gateway's doors, signed (BASE-G122, G123, G112, G124) ────────────────────────────────────────────────────
+
+
+def test_the_allowance_is_asked_signed_and_for_this_business(gateway):
+    gateway.reply("/internal/assistant/usage", json={"used": 8, "limit": 10, "resets_at": "2026-11-01T00:00:00Z", "demo": False})
+    assert assistant.usage(A) == {"used": 8, "limit": 10, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
+    seen = gateway.sent("/internal/assistant/usage")[0]
+    assert seen.body == {"hub": "a"}
+    assert signed(seen)
+
+
+def test_a_gateway_that_does_not_answer_is_said_never_made_up(settings):
+    settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
+    with pytest.raises(assistant.GatewayError) as caught:
+        assistant.usage(A)
+    assert caught.value.code == "assistant.unreachable"
+
+
+def test_a_report_goes_to_erplora_with_the_question_and_the_answer(gateway):
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    answer = assistant.report(A, message_id="m1", reason="incorrect", comment="", question="¿Qué vendí?", answer="Nada")
+    assert answer == {"sent": True, "duplicate": False}
+    seen = gateway.sent("/internal/assistant/report")[0]
+    assert seen.body == {"hub": "a", "message_id": "m1", "reason": "incorrect", "comment": "", "question": "¿Qué vendí?", "answer": "Nada"}
+    assert signed(seen)
+
+
+def test_a_report_that_could_not_be_sent_says_so(gateway):
+    gateway.reply("/internal/assistant/report", status=503, json={"error": {"code": "assistant.report_not_sent", "message": "x"}})
+    with pytest.raises(assistant.GatewayError) as caught:
+        assistant.report(A, message_id="m1", reason="other", comment="", question="", answer="x")
+    assert caught.value.code == "assistant.report_not_sent"
+
+
+def test_a_dictation_is_transcribed_by_erplora(gateway):
+    gateway.reply("/internal/speech/transcribe", json={"text": "cobra la mesa 4", "language": "es"})
+    assert assistant.transcribe(A, audio="UklGRg==", mime_type="audio/webm", language="es") == {"text": "cobra la mesa 4", "language": "es"}
+    assert gateway.sent("/internal/speech/transcribe")[0].body == {"hub": "a", "audio": "UklGRg==", "mime_type": "audio/webm", "language": "es"}
+
+
+# ── The turn, streamed (BASE-G111, G119, G122, G124) ─────────────────────────────────────────────────────────────
+
+
+def frames_of(**kwargs):
+    async def collect():
+        return [frame async for frame in assistant.stream_turn(A, **kwargs)]
+
+    return asyncio.run(collect())
+
+
+TURN = {"messages": [{"role": "user", "content": "hola"}], "tools": [], "instructions": "x", "continuation": None}
+
+
+def test_the_answer_arrives_piece_by_piece_and_closes_with_what_to_keep(gateway):
+    gateway.turn(
+        {"type": "text_delta", "text": "Hola"},
+        {"type": "text_delta", "text": ", Ana"},
+        {"type": "response", "output": [], "usage": {}, "continuation": None},
+        {"type": "usage", "used": 3, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False},
+    )
+    frames = frames_of(**TURN)
+    assert [frame["type"] for frame in frames] == ["text", "text", "usage", "done"]
+    assert "".join(frame["text"] for frame in frames if frame["type"] == "text") == "Hola, Ana"
+    assert frames[-1]["append"] == [{"role": "assistant", "content": "Hola, Ana"}]
+    assert frames[-1]["pending"] == []
+    sent = gateway.sent("/internal/assistant/chat/stream")[0]
+    assert sent.body["hub"] == "a" and sent.body["messages"] == TURN["messages"]
+    assert signed(sent)
+
+
+def test_the_tools_the_model_asks_for_wait_with_their_continuation(gateway):
+    call = {"type": "function_call", "name": "demo__item__list", "call_id": "c1", "arguments": "{}"}
+    gateway.turn(call, {"type": "response", "output": [call], "usage": {}, "continuation": "tok"})
+    done = frames_of(**TURN)[-1]
+    assert done["pending"] == [{"call_id": "c1", "name": "demo__item__list", "arguments": "{}"}]
+    assert done["continuation"] == "tok"
+    assert done["append"] == [
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"id": "c1", "type": "function", "function": {"name": "demo__item__list", "arguments": "{}"}}
+        ]}
+    ]
+
+
+def test_an_allowance_spent_is_not_a_breakdown(gateway):
+    gateway.reply(
+        "/internal/assistant/chat/stream",
+        status=429,
+        json={"error": {"code": "assistant.quota_exceeded", "message": "x", "upgrade_required": True, "used": 30,
+                        "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}},
+    )
+    error = frames_of(**TURN)[-1]
+    assert error["type"] == "error"
+    assert (error["code"], error["used"], error["limit"]) == ("assistant.quota_exceeded", 30, 30)
+
+
+@pytest.mark.parametrize(
+    "status, code, expected",
+    [
+        (503, "assistant.no_model", "assistant.unavailable"),
+        (503, "assistant.provider_not_configured", "assistant.unavailable"),
+        (403, "hub_inactive", "assistant.unavailable"),
+        (413, "payload_too_large", "assistant.too_large"),
+        (429, "rate_limited", "assistant.rate_limited"),
+    ],
+)
+def test_a_refusal_of_the_gateway_is_one_of_ours(gateway, status, code, expected):
+    """gh:hub#1738: the old hub said «Could not reach the assistant» for any refusal; each one is said as it is."""
+    gateway.reply("/internal/assistant/chat/stream", status=status, json={"error": {"code": code, "message": "x"}}, headers={"Retry-After": "40"})
+    error = frames_of(**TURN)[-1]
+    assert (error["type"], error["code"]) == ("error", expected)
+
+
+def test_a_provider_that_fails_half_way_keeps_what_was_said(gateway):
+    gateway.turn(
+        {"type": "text_delta", "text": "Tienes"},
+        {"type": "error", "code": "assistant.provider_unavailable", "message": "x", "retriable": True},
+    )
+    frames = frames_of(**TURN)
+    assert [frame["type"] for frame in frames] == ["text", "error", "done"]
+    assert frames[1] == {"type": "error", "code": "assistant.provider_failed", "retriable": True}
+    assert frames[-1]["append"] == [{"role": "assistant", "content": "Tienes"}]
+
+
+def test_a_connection_that_dies_half_way_is_said(gateway):
+    gateway.turn({"type": "text_delta", "text": "Tienes"}, {"type": "text_delta", "text": " 3"}, cut_after=1)
+    frames = frames_of(**TURN)
+    assert [frame["type"] for frame in frames] == ["text", "error", "done"]
+    assert frames[1]["code"] == "assistant.cut"
+
+
+def test_a_gateway_out_of_reach_is_said(settings):
+    settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
+    error = frames_of(**TURN)[-1]
+    assert (error["type"], error["code"]) == ("error", "assistant.unreachable")

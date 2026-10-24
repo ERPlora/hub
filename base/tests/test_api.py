@@ -116,6 +116,11 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/files/rename", "base.file.rename"),
         ("POST", "/api/files/move", "base.file.move"),
         ("POST", "/api/files/delete", "base.file.delete"),
+        # Assistant (APP-BASE-9)
+        ("POST", "/api/assistant/turn", "base.assistant.turn"),
+        ("GET", "/api/assistant/usage", "base.assistant.usage"),
+        ("POST", "/api/assistant/report", "base.assistant.report"),
+        ("POST", "/api/assistant/transcribe", "base.assistant.transcribe"),
     } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS}
 
 

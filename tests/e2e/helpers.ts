@@ -434,6 +434,38 @@ export async function openApps(page: Page): Promise<Locator> {
   return sheet;
 }
 
+/** Whether the page is a phone's (under 768 px): base folds the assistant's sparkles and the bell into «More options». */
+export const compactBar = (page: Page): boolean => (page.viewportSize()?.width ?? 1280) < 768;
+
+/** The bell's count on the screen on view: on the bell, or on a phone's «More options», which carries it. */
+export const bellBadge = (page: Page): Locator =>
+  shown(page).locator(compactBar(page) ? '[data-testid=topbar-chrome-more-badge]' : '[data-testid=hub-bell] [data-testid=hub-bell-badge]');
+
+/**
+ * Opens the bell's list (BASE-F10) and resolves once it is presented: the bell itself, or on a phone its row in «More
+ * options» (TopbarChrome.vue). Ionic animates a popover in a shadow root, so it waits for its `ionPopoverDidPresent`.
+ */
+export async function openBell(page: Page): Promise<void> {
+  const presented = page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const done = (event: Event) => {
+          if (!(event.target as Element).querySelector('[data-testid^="hub-bell-"]')) return;
+          document.removeEventListener('ionPopoverDidPresent', done);
+          resolve();
+        };
+        document.addEventListener('ionPopoverDidPresent', done);
+      }),
+  );
+  if (compactBar(page)) {
+    await shown(page).locator('[data-testid=topbar-chrome-more]').click();
+    await page.locator('ion-popover [data-testid=topbar-chrome-more-bell]').click();
+  } else {
+    await shown(page).locator('[data-testid=hub-bell]').click();
+  }
+  await presented;
+}
+
 /** Waits until the list painted its first result (empty state or rows). */
 export async function listReady(page: Page): Promise<void> {
   await shown(page)

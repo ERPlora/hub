@@ -604,6 +604,26 @@ export interface ApprovalPass {
   expires_in: number;
 }
 
+// ── Assistant (APP-BASE-9) ──
+
+/** `base.AssistantUsageOut`: this month's messages of the assistant, as erplora.com counts them. */
+export interface AssistantUsage {
+  used: number;
+  /** 0: the plan has no assistant. */
+  limit: number;
+  resets_at: string | null;
+  demo: boolean;
+}
+
+/** `base.AssistantReportIn`. */
+export interface AssistantReportInput {
+  message_id: string;
+  reason: 'incorrect' | 'harmful' | 'instructions' | 'other';
+  comment?: string;
+  question?: string;
+  answer: string;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
@@ -693,5 +713,12 @@ declare module '@erplora/ui/sdk' {
     'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[]; keys_available: boolean } };
     'base.api_doc.settings': { input: NoInput; output: { docs_enabled: boolean; can_change: boolean } };
     'base.api_doc.settings_update': { input: { docs_enabled: boolean }; output: { docs_enabled: boolean; can_change: boolean } };
+    // Assistant (APP-BASE-9); its turn is a stream the panel reads itself (lib/assistant-stream.ts).
+    'base.assistant.usage': { input: NoInput; output: AssistantUsage };
+    'base.assistant.report': { input: AssistantReportInput; output: { sent: boolean; duplicate: boolean } };
+    'base.assistant.transcribe': {
+      input: { audio: string; mime_type: string; language?: string };
+      output: { text: string; language: string };
+    };
   }
 }

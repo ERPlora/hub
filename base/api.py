@@ -410,3 +410,39 @@ async def api_doc_settings(request):
 @bind(router, "base.api_doc.settings_update", "/api-docs/settings/update")
 async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
     return await run_operation(request, services.api_doc_settings_update, data)
+
+
+# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+
+from base import assistant  # noqa: E402 - the assistant's block keeps its imports with it
+from base.schemas import AssistantReportIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
+
+#: A turn's body: the conversation and the attachments of its last question, in base64 (the gateway takes 32 MB).
+MAX_ASSISTANT_TURN_BODY = 32 * 1024 * 1024
+#: A dictation: 2 MB of audio in base64 and its JSON around it.
+MAX_ASSISTANT_AUDIO_BODY = 3_000_000
+
+
+# The 200 is a stream (text/event-stream) of the turn's frames (base/assistant.py ``turn_frames``), not the JSON of
+# its operation's output, which is what the stream is made of.
+@bind(router, "base.assistant.turn", "/assistant/turn")
+@decorate_view(accept_body_up_to(MAX_ASSISTANT_TURN_BODY))
+async def assistant_turn(request, data: AssistantTurnIn):
+    plan = await run_operation(request, services.assistant_turn, data)
+    return assistant.turn_response(request, plan.model_dump(mode="json"))
+
+
+@bind(router, "base.assistant.usage", "/assistant/usage")
+async def assistant_usage(request):
+    return await run_operation(request, queries.assistant_usage)
+
+
+@bind(router, "base.assistant.report", "/assistant/report")
+async def assistant_report(request, data: AssistantReportIn):
+    return await run_operation(request, services.assistant_report, data)
+
+
+@bind(router, "base.assistant.transcribe", "/assistant/transcribe")
+@decorate_view(accept_body_up_to(MAX_ASSISTANT_AUDIO_BODY))
+async def assistant_transcribe(request, data: AssistantTranscribeIn):
+    return await run_operation(request, services.assistant_transcribe, data)

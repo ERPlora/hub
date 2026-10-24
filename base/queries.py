@@ -1474,3 +1474,38 @@ def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
     """BASE-G84: the file, described; ``base.api`` streams its bytes to the person who asked."""
     with translation.override(ctx.language):
         return files.describe(storages["hub_files"], hub_id(ctx.scope), data.path)
+
+
+# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+
+from live.errors import OperationError  # noqa: E402 - the assistant's block keeps its imports with it
+
+from base import assistant  # noqa: E402
+from base.schemas import AssistantUsageIn, AssistantUsageOut  # noqa: E402
+
+
+@operation(
+    "base.assistant.usage",
+    kind="query",
+    permission=VIEW_HOME,
+    input=AssistantUsageIn,
+    output=AssistantUsageOut,
+    ai={"description": "Not an assistant tool (the panel's own footer: the messages of the month left)."},
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    database=False,
+)
+def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
+    """This month's messages of the assistant as erplora.com counts them (BASE-G122): used, of how many, and when
+    they come back. What cannot be read is an error, never a number made up."""
+    try:
+        usage = assistant.usage(ctx.scope)
+    except assistant.GatewayError:
+        raise OperationError(
+            gettext("The assistant's plan could not be read now."), code="base.assistant_unavailable", status=503
+        ) from None
+    return {
+        "used": int(usage.get("used") or 0),
+        "limit": int(usage.get("limit") or 0),
+        "resets_at": usage.get("resets_at"),
+        "demo": bool(usage.get("demo")),
+    }
