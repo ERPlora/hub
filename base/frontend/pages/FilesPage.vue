@@ -21,7 +21,7 @@ import {
   IonSelect,
   IonSelectOption,
 } from '@ionic/vue';
-import { computed, ref, useTemplateRef } from 'vue';
+import { type ComponentPublicInstance, computed, ref, useTemplateRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import FilePreview from '../components/FilePreview.vue';
@@ -47,6 +47,7 @@ import {
   tooLarge,
 } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
+import { nameSearchbar } from '../lib/searchbar';
 import type { FileItem } from '../operations';
 
 /** A file or a folder of the open folder, as the actions take it. */
@@ -129,6 +130,12 @@ function openFolder(path: string): void {
 }
 
 const folderLabel = (path: string) => (path ? nameOf(path) : t('base.files.root'));
+
+// The search box named by its hint, in the person's language: Ionic names its input «search text» (BASE-G152).
+const searchbar = useTemplateRef<ComponentPublicInstance>('searchbar');
+watch([() => searchbar.value?.$el as Element | undefined, locale], ([bar]) => void nameSearchbar(bar, () => t('base.files.search')), {
+  flush: 'post',
+});
 
 // ── Upload (BASE-G83) ──
 const picker = useTemplateRef<HTMLInputElement>('picker');
@@ -456,6 +463,7 @@ async function askDelete(entry: Entry): Promise<void> {
         <section class="files-card files-main">
           <header class="files-toolbar">
             <ion-searchbar
+              ref="searchbar"
               class="files-search"
               data-testid="files-search"
               :value="search"
