@@ -13,6 +13,11 @@ by its marker (``<folder>/.keep``), and renaming or moving copies every key and 
 never overwrites in silence: an upload takes «name (1).ext» when «name.ext» is taken (Google Drive, Dropbox), and a
 new folder, a rename or a move onto a taken name is refused. Programs (Gmail's blocked list) are never kept.
 
+A listing reads the open folder alone (``Delimiter``); the tree of folders and what the files take come from the hub's
+index, kept in the cache between operations (an upload adds its bytes, any other write forgets it), so a batch of
+uploads and the listings after each walk the files once. What the apps keep is counted at every call: the space
+stays exact for the plan's limit.
+
 These functions take the store and the hub's id, and raise ``live`` errors in the language that is active: the
 operations (``base.queries``, ``base.services``) give them the hub of the request and the plan's space.
 """
@@ -30,6 +35,7 @@ from typing import Literal
 from urllib.parse import quote
 
 from botocore.exceptions import BotoCoreError, ClientError
+from django.core.cache import cache
 from django.core.files.base import ContentFile, File
 from django.core.files.storage import FileSystemStorage, Storage
 from django.http import FileResponse
@@ -53,6 +59,9 @@ MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_NAME_BYTES = 255
 #: The longest name of a new folder, in characters (the old hub's dialog).
 MAX_FOLDER_NAME = 100
+#: How long a hub's index (its folders and what its files take) is kept: every write of Files updates or forgets it,
+#: so this only bounds what an update lost while the cache was away could leave behind.
+INDEX_SECONDS = 600
 #: How many times an upload takes the next free name because another upload of that name wrote it first.
 MAX_NAME_RACES = 10
 #: The longest path under the root, in UTF-8 bytes: with ``hub-<hex>/files/`` (43), an S3 key's 1024 at most.
@@ -284,46 +293,156 @@ def _refuse_program(name: str) -> None:
 
 
 def listing(store: Storage, hub: uuid.UUID, folder: str) -> dict:
-    """The tree of folders, the files of ``folder`` and the space the hub's whole prefix takes, in one scan."""
+    """The tree of folders (the kept index), the files of ``folder`` read alone, and the space the hub's whole prefix
+    takes: what its files take (kept) and what its apps keep (counted now)."""
     folder = clean_path(folder)
-    stored = scan(store, hub_prefix(hub))
-    folders: set[str] = set()
-    here = []
-    start = len(ROOT) + 1
-    for item in stored:
-        if not item.key.startswith(f"{ROOT}/"):
-            continue
-        path = item.key[start:]
-        parts = path.split("/")
-        if not all(_is_name(part) for part in parts[:-1]) or not (parts[-1] == MARKER or _is_name(parts[-1])):
-            continue  # a key the manager would not have written (another tool's): never shown
-        folders.update("/".join(parts[:index]) for index in range(1, len(parts)))
-        if parts[-1] != MARKER and "/".join(parts[:-1]) == folder:
-            content_type, preview = served(parts[-1])
-            here.append(
-                {
-                    "path": path,
-                    "name": parts[-1],
-                    "size": item.size,
-                    "modified": item.modified,
-                    "content_type": content_type,
-                    "preview": preview,
-                }
-            )
-    if folder and folder not in folders:
+    index = _index(store, hub)
+    if folder and folder not in index.folders:
         raise NotFound(gettext("That folder no longer exists. Refresh the list."), code="base.file_folder_missing")
+    here = []
+    for item in _folder_files(store, hub, folder):
+        if item.key == MARKER or not _is_name(item.key):
+            continue  # a key the manager would not have written (another tool's): never shown
+        content_type, preview = served(item.key)
+        here.append(
+            {
+                "path": f"{folder}/{item.key}" if folder else item.key,
+                "name": item.key,
+                "size": item.size,
+                "modified": item.modified,
+                "content_type": content_type,
+                "preview": preview,
+            }
+        )
     return {
         "folder": folder,
         "crumbs": _crumbs(folder),
-        "folders": _tree(folders, ""),
+        "folders": _tree(set(index.folders), ""),
         "files": sorted(here, key=lambda item: _order(item["name"])),
-        "used_bytes": sum(item.size for item in stored),
+        "used_bytes": index.files_bytes + _apps_bytes(store, hub),
     }
 
 
 def used_bytes(store: Storage, hub: uuid.UUID) -> int:
-    """What the hub's whole prefix takes in the store: its files and its modules'."""
-    return sum(item.size for item in scan(store, hub_prefix(hub)))
+    """What the hub's whole prefix takes in the store: its files (the kept index) and its apps' (counted now)."""
+    return _index(store, hub).files_bytes + _apps_bytes(store, hub)
+
+
+def _folder_files(store: Storage, hub: uuid.UUID, folder: str) -> list[Stored]:
+    """The keys right in ``folder``, not in its sub-folders, read alone (on S3, ``ListObjectsV2`` with ``Delimiter``)."""
+    key = _key(hub, folder)
+    with _store():
+        if isinstance(store, S3Storage):
+            pages = store.connection.meta.client.get_paginator("list_objects_v2").paginate(
+                Bucket=store.bucket_name, Prefix=f"{key}/", Delimiter="/"
+            )
+            start = len(key) + 1
+            return [
+                Stored(item["Key"][start:], int(item["Size"]), item.get("LastModified"))
+                for page in pages
+                for item in page.get("Contents", [])
+            ]
+        try:
+            _folders, names = store.listdir(key)
+        except NOT_A_FOLDER:
+            return []
+        return [Stored(name, store.size(f"{key}/{name}"), _modified(store, f"{key}/{name}")) for name in names]
+
+
+def _apps_bytes(store: Storage, hub: uuid.UUID) -> int:
+    """What the hub's apps keep beside its files (the website's images): counted at every call, never kept, because
+    the apps write there without Files knowing. It is small: the apps' own folders, never the business's files."""
+    prefix = hub_prefix(hub)
+    with _store():
+        if isinstance(store, S3Storage):
+            pages = store.connection.meta.client.get_paginator("list_objects_v2").paginate(
+                Bucket=store.bucket_name, Prefix=f"{prefix}/", Delimiter="/"
+            )
+            size, folders = 0, []
+            for page in pages:
+                size += sum(int(item["Size"]) for item in page.get("Contents", []))
+                folders += [entry["Prefix"].rstrip("/") for entry in page.get("CommonPrefixes", [])]
+        else:
+            try:
+                below, names = store.listdir(prefix)
+            except NOT_A_FOLDER:
+                return 0
+            size = sum(store.size(f"{prefix}/{name}") for name in names)
+            folders = [f"{prefix}/{folder}" for folder in below]
+    return size + sum(item.size for folder in folders if folder != _base(hub) for item in scan(store, folder))
+
+
+# ── The index: a hub's folders and what its files take, kept between operations ──────────────────────────────
+
+
+@dataclass(frozen=True)
+class Index:
+    """The folders of a hub's files (their paths under the root) and what the files take, from one walk of the root."""
+
+    folders: frozenset[str]
+    files_bytes: int
+
+
+def _index_keys(hub: uuid.UUID) -> tuple[str, str, str]:
+    return f"base.files:{hub.hex}:folders", f"base.files:{hub.hex}:bytes", f"base.files:{hub.hex}:generation"
+
+
+def _cached(what: str, call, default):
+    """``call()`` on the cache, or ``default`` when the cache does not answer: the store is then walked, which costs
+    time and never a wrong listing (the cache is a shortcut, Valkey in AWS)."""
+    try:
+        return call()
+    except Exception:  # whatever the cache backend raises when it is away: said in the log, the store answers
+        logger.warning("files: the cache could not %s", what, exc_info=True)
+        return default
+
+
+def _index(store: Storage, hub: uuid.UUID) -> Index:
+    """The kept index of ``hub``, or one walk of its files' root (kept for the next operations)."""
+    folders_key, bytes_key, generation_key = _index_keys(hub)
+    kept = _cached("read the index", lambda: cache.get_many([folders_key, bytes_key, generation_key]), {})
+    if folders_key in kept and bytes_key in kept:
+        return Index(frozenset(kept[folders_key]), int(kept[bytes_key]))
+    generation = kept.get(generation_key, 0)
+    folders: set[str] = set()
+    size = 0
+    for item in scan(store, _base(hub)):
+        size += item.size
+        parts = item.key.split("/")
+        if all(_is_name(part) for part in parts[:-1]) and (parts[-1] == MARKER or _is_name(parts[-1])):
+            folders.update("/".join(parts[:index]) for index in range(1, len(parts)))
+    # Kept only if no write of Files came while walking (each one moves the generation): never what the walk missed.
+    if _cached("read the index", lambda: cache.get(generation_key, 0), None) == generation:
+        _cached(
+            "keep the index",
+            lambda: cache.set_many({folders_key: sorted(folders), bytes_key: size}, INDEX_SECONDS),
+            None,
+        )
+    return Index(frozenset(folders), size)
+
+
+def _changed(hub: uuid.UUID, *, uploaded: int | None = None) -> None:
+    """After a write of Files: an upload adds its bytes to the kept index (its folder was there already); any other
+    write forgets the index, walked again by the next operation. Both move the generation first."""
+    folders_key, bytes_key, generation_key = _index_keys(hub)
+
+    def move_generation() -> None:
+        cache.add(generation_key, 0, None)
+        cache.incr(generation_key)
+
+    _cached("move the generation", move_generation, None)
+    if uploaded is None:
+        _cached("forget the index", lambda: cache.delete_many([folders_key, bytes_key]), None)
+        return
+
+    def count() -> bool:
+        try:
+            cache.incr(bytes_key, uploaded)
+        except ValueError:  # Django's answer for a key that is not kept: nothing to add to, the next listing walks
+            return False
+        return True
+
+    _cached("count the upload", count, False)
 
 
 def _order(name: str) -> tuple[str, str]:
@@ -370,6 +489,7 @@ def upload(
         final = _free_name(store, hub, folder, name)
         path = _join(folder, final)
         if _create(store, _key(hub, path), content):
+            _changed(hub, uploaded=len(content))
             return {"path": path, "name": final, "size": len(content)}
     raise Conflict(gettext("There is already a file or folder with that name here."), code="base.file_exists")
 
@@ -436,8 +556,11 @@ def create_folder(store: Storage, hub: uuid.UUID, parent: str, name: str) -> dic
     _require_folder(store, hub, parent)
     path = _join(parent, name)
     _refuse_taken(store, hub, path)
-    with _store():
-        store.save(_key(hub, f"{path}/{MARKER}"), ContentFile(b""))
+    try:
+        with _store():
+            store.save(_key(hub, f"{path}/{MARKER}"), ContentFile(b""))
+    finally:
+        _changed(hub)
     return {"path": path, "name": name}
 
 
@@ -513,7 +636,14 @@ def move(store: Storage, hub: uuid.UUID, path: str, to: str) -> dict:
 
 def _relocate(store: Storage, hub: uuid.UUID, source: str, target: str, kind: str) -> None:
     """Copy every key of ``source`` to ``target``, then delete the old ones: an object store has no rename. If a copy
-    fails, the copies made are deleted and nothing moved."""
+    fails, the copies made are deleted and nothing moved. Either way the hub's index is forgotten."""
+    try:
+        _copy_and_delete(store, hub, source, target, kind)
+    finally:
+        _changed(hub)
+
+
+def _copy_and_delete(store: Storage, hub: uuid.UUID, source: str, target: str, kind: str) -> None:
     if kind == "file":
         pairs = [(source, target)]
     else:
@@ -570,14 +700,17 @@ def delete(store: Storage, hub: uuid.UUID, path: str) -> dict:
     """Delete the file at ``path``, or the folder and everything in it; there is no bin."""
     path = clean_path(path)
     kind = _require(store, hub, path)
-    with _store():
-        if kind == "file":
-            store.delete(_key(hub, path))
-        else:
-            for item in scan(store, _key(hub, path)):
-                store.delete(_key(hub, f"{path}/{item.key}"))
-            _prune(store, _key(hub, path))
-    _keep_folder(store, hub, posixpath.dirname(path))
+    try:
+        with _store():
+            if kind == "file":
+                store.delete(_key(hub, path))
+            else:
+                for item in scan(store, _key(hub, path)):
+                    store.delete(_key(hub, f"{path}/{item.key}"))
+                _prune(store, _key(hub, path))
+        _keep_folder(store, hub, posixpath.dirname(path))
+    finally:
+        _changed(hub)
     return {"path": path, "folder": kind == "folder"}
 
 

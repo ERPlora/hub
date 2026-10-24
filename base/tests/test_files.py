@@ -476,6 +476,87 @@ def test_on_disk_a_folder_moved_or_deleted_leaves_no_empty_directory_behind(disk
     assert list(root.iterdir()) == []
 
 
+def walks(monkeypatch):
+    """The prefixes ``base.files.scan`` walks key by key."""
+    seen: list[str] = []
+    real = files.scan
+    monkeypatch.setattr(files, "scan", lambda store, prefix: seen.append(prefix) or real(store, prefix))
+    return seen
+
+
+def test_a_batch_of_uploads_and_the_listing_after_each_walk_the_business_files_at_most_once(store, monkeypatch):
+    # rv-hub-240: each upload walked the hub's whole prefix for the plan's space, and so did the live listing re-run
+    # after each one: a batch of N walked it 2N times.
+    seen = walks(monkeypatch)
+    for number in range(4):
+        files.upload(store, A, "", f"factura-{number}.pdf", PDF, limit_bytes=1024**3)
+        listing = files.listing(store, A, "")
+    assert names(listing) == [f"factura-{number}.pdf" for number in range(4)]
+    assert listing["used_bytes"] == 4 * len(PDF)
+    assert seen.count(f"{hub_prefix(A)}/{files.ROOT}") <= 1
+    assert hub_prefix(A) not in seen
+
+
+def test_listing_a_folder_never_walks_the_others(store, monkeypatch):
+    files.create_folder(store, A, "", "Facturas")
+    files.create_folder(store, A, "", "Contratos")
+    files.upload(store, A, "Contratos", "alquiler.pdf", PDF)
+    files.listing(store, A, "")
+    seen = walks(monkeypatch)
+    assert names(files.listing(store, A, "Facturas")) == []
+    assert [prefix for prefix in seen if f"/{files.ROOT}" in prefix or prefix == hub_prefix(A)] == []
+
+
+def test_the_tree_and_the_space_follow_every_write_of_files_and_what_the_apps_keep(store):
+    assert files.listing(store, A, "")["used_bytes"] == 0  # kept from here on
+    files.create_folder(store, A, "", "Facturas")
+    assert tree(files.listing(store, A, "")["folders"]) == [("Facturas", [])]
+    files.upload(store, A, "Facturas", "marzo.pdf", PDF)
+    assert files.listing(store, A, "Facturas")["used_bytes"] == len(PDF)
+    store.save(f"{hub_prefix(A)}/website/img/logo.png", ContentFile(b"1234567"))  # an app's own file, at once
+    assert files.used_bytes(store, A) == len(PDF) + 7
+    files.rename(store, A, "Facturas", "Facturación")
+    assert tree(files.listing(store, A, "")["folders"]) == [("Facturación", [])]
+    files.create_folder(store, A, "", "2026")
+    files.move(store, A, "Facturación", "2026")
+    assert tree(files.listing(store, A, "")["folders"]) == [("2026", [("2026/Facturación", [])])]
+    files.delete(store, A, "2026/Facturación/marzo.pdf")
+    assert files.listing(store, A, "2026/Facturación")["used_bytes"] == 7
+    files.delete(store, A, "2026")
+    listing = files.listing(store, A, "")
+    assert (tree(listing["folders"]), listing["used_bytes"]) == ([], 7)
+    assert files.listing(store, B, "")["used_bytes"] == 0  # each hub its own
+
+
+def test_a_walk_a_write_came_during_is_never_kept(store, monkeypatch):
+    # Another device makes a folder while this listing walks the files: the walk did not see it and is not kept, so
+    # the next listing shows the folder (each write of Files moves the index's generation).
+    real = files.scan
+
+    def another_device_writes(walked_store, prefix):
+        found = real(walked_store, prefix)
+        files.create_folder(store, A, "", "Nueva")
+        return found
+
+    monkeypatch.setattr(files, "scan", another_device_writes)
+    assert tree(files.listing(store, A, "")["folders"]) == []
+    monkeypatch.setattr(files, "scan", real)
+    assert tree(files.listing(store, A, "")["folders"]) == [("Nueva", [])]
+
+
+def test_a_cache_that_does_not_answer_costs_a_walk_never_a_wrong_listing(store, monkeypatch):
+    from django.core.cache import cache
+
+    def down(*args, **kwargs):
+        raise ConnectionError("valkey away")
+
+    for method in ("get_many", "set_many", "add", "incr", "delete_many", "get"):
+        monkeypatch.setattr(cache, method, down)
+    files.upload(store, A, "", "a.pdf", PDF, limit_bytes=1024**3)
+    listing = files.listing(store, A, "")
+    assert (names(listing), listing["used_bytes"]) == (["a.pdf"], len(PDF))
+
+
 def stale_free_name(monkeypatch, *names):
     """Two uploads of one name at once: each works out the free name before either writes, so the second one's first
     answer is the name the first one is writing now (``names``); then the real one."""
@@ -525,24 +606,44 @@ def objects(*pairs):
     }
 
 
-def test_on_s3_the_listing_and_the_space_come_from_one_listing_of_the_hub_s_prefix(s3):
+def folder_page(*pairs, folders=()):
+    """A ``ListObjectsV2`` page with ``Delimiter``: the keys right in the folder and its sub-folders' prefixes."""
+    return {**objects(*pairs), "CommonPrefixes": [{"Prefix": prefix} for prefix in folders]}
+
+
+def test_on_s3_a_listing_reads_the_open_folder_alone_and_walks_the_files_once_for_the_tree_and_the_space(s3):
+    # rv-hub-240: every listing walked the hub's whole prefix (a request per thousand keys) for the tree and the space.
+    # The tree of folders and what the business's files take are kept (``base.files`` index) and the open folder is
+    # read alone (``Delimiter``); what the apps keep is added at once, so the space stays exact for the plan's limit.
     storage, stubber = s3
-    prefix = hub_prefix(A)
+    prefix, bucket = hub_prefix(A), "erplora-test-hubs"
+    walk_files = {"Bucket": bucket, "Prefix": f"{prefix}/files/"}
+    read_folder = {"Bucket": bucket, "Prefix": f"{prefix}/files/Facturas/", "Delimiter": "/"}
+    read_hub = {"Bucket": bucket, "Prefix": f"{prefix}/", "Delimiter": "/"}
+    walk_website = {"Bucket": bucket, "Prefix": f"{prefix}/website/"}
+    folder = folder_page((f"{prefix}/files/Facturas/{files.MARKER}", 0), (f"{prefix}/files/Facturas/marzo.pdf", 300))
+    hub = folder_page(folders=[f"{prefix}/files/", f"{prefix}/website/"])
+    website = objects((f"{prefix}/website/img/abc.png", 7))
+    # The first listing walks the business's files once: the tree and what they take.
     stubber.add_response(
         "list_objects_v2",
         objects(
             (f"{prefix}/files/Facturas/{files.MARKER}", 0),
             (f"{prefix}/files/Facturas/marzo.pdf", 300),
             (f"{prefix}/files/a.pdf", 20),
-            (f"{prefix}/website/img/abc.png", 7),
         ),
-        {"Bucket": "erplora-test-hubs", "Prefix": f"{prefix}/"},
+        walk_files,
     )
-    listing = files.listing(storage, A, "Facturas")
+    for _listing in range(2):  # then each listing reads the open folder and what the apps keep, never the rest
+        stubber.add_response("list_objects_v2", folder, read_folder)
+        stubber.add_response("list_objects_v2", hub, read_hub)
+        stubber.add_response("list_objects_v2", website, walk_website)
+    for _listing in range(2):
+        listing = files.listing(storage, A, "Facturas")
+        assert tree(listing["folders"]) == [("Facturas", [])]
+        assert [(item["name"], item["size"]) for item in listing["files"]] == [("marzo.pdf", 300)]
+        assert listing["used_bytes"] == 327
     stubber.assert_no_pending_responses()
-    assert tree(listing["folders"]) == [("Facturas", [])]
-    assert [(item["name"], item["size"]) for item in listing["files"]] == [("marzo.pdf", 300)]
-    assert listing["used_bytes"] == 327
 
 
 def put_if_free(stubber, key, *, taken=False):
