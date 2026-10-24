@@ -154,6 +154,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, 'failed-events-retry-all').click();
       const confirm = page.locator('.ep-confirm-dialog').last();
       await expect(confirm).toContainText('Resend every failed event?');
+      // In the DOM is not on screen: the capture waits for the dialog presented whole.
+      await expect(confirm.getByRole('button', { name: 'Resend all' })).toBeInViewport({ ratio: 1 });
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-7-BASE-G93-${width}`) });
       await confirm.getByRole('button', { name: 'Resend all' }).click();
