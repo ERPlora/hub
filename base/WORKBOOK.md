@@ -1247,7 +1247,7 @@ Implicados: ninguno
   (`POST /api/system/failed-events/discard`: estado `discarded` con `closed_at`, `closed_by` y `close_reason`, migración
   `0010_event_delivery_discard`; la fila no se borra). Una que ya no está `dead` o es de otro host: 404 `not_found`.
   Cada uno anota su evento en el outbox.
-- El relay (`base/relay.py`, `_deliver_one` en `services.py`) avisa `base.failed_event.created` al host tras el COMMIT
+- El relay (`base/relay.py`, `relay_deliver_next` en `services.py`) avisa `base.failed_event.created` al host tras el COMMIT
   cuando se rinde (último intento o más allá de la profundidad máxima); no va al outbox (un oyente de todo evento que
   fallara en él se alimentaría solo). `base/live.py` re-ejecuta `base.failed_event.list`, `base.event.list` y
   `base.bell.counters` con `created`, `retried` y `discarded`; `base.system.status`, con `base.hub.state_applied`. Tests:

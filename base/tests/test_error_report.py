@@ -95,7 +95,9 @@ def test_without_a_session_nothing_is_logged(client, caplog):
 @pytest.mark.parametrize(
     "body",
     ["not json", json.dumps(["a list"]), json.dumps({"kind": "error"}), json.dumps({**REPORT, "message": ""}),
-     json.dumps({**REPORT, "kind": "whatever"}), json.dumps({**REPORT, "message": 42})],
+     json.dumps({**REPORT, "kind": "whatever"}), json.dumps({**REPORT, "message": 42}),
+     # A kind that is no text (a list, an object) is refused the same, never a crash.
+     json.dumps({**REPORT, "kind": ["error"]}), json.dumps({**REPORT, "kind": {"k": "error"}})],
 )
 def test_a_report_that_cannot_be_read_is_refused_without_a_line(owner, caplog, body):
     with caplog.at_level(logging.INFO, logger="base.error_report"):

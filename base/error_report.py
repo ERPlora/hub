@@ -73,12 +73,15 @@ def _read(body: bytes) -> dict[str, Any] | None:
         data = json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
         return None
-    if not isinstance(data, dict) or data.get("kind") not in KINDS:
+    if not isinstance(data, dict):
+        return None
+    kind = data.get("kind")
+    if not isinstance(kind, str) or kind not in KINDS:
         return None
     message = data.get("message")
     if not isinstance(message, str) or not message.strip():
         return None
-    report = {"kind": data["kind"], "message": message[:MESSAGE_LENGTH]}
+    report = {"kind": kind, "message": message[:MESSAGE_LENGTH]}
     stack = data.get("stack")
     report["stack"] = stack[:STACK_LENGTH] if isinstance(stack, str) else ""
     for field, length in FIELDS.items():
