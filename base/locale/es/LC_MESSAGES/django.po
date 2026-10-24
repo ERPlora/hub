@@ -760,3 +760,19 @@ msgstr "%(app)s no está activa en este negocio: actívala y vuelve a reenviar e
 #: services.py
 msgid "That failed event is no longer in the queue: refresh the list."
 msgstr "Ese evento caído ya no está en la cola: actualiza la lista."
+
+#: error_report.py
+msgid "Sign in to report an error."
+msgstr "Inicia sesión para informar de un error."
+
+#: error_report.py
+msgid "The report is too large."
+msgstr "El informe es demasiado grande."
+
+#: error_report.py
+msgid "The report cannot be read."
+msgstr "No se puede leer el informe."
+
+#: error_report.py
+msgid "Too many reports for now."
+msgstr "Demasiados informes por ahora."
