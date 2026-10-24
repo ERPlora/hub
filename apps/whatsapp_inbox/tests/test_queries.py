@@ -412,8 +412,11 @@ def test_with_nobody_waiting_the_count_is_one_row_of_zero():
 def test_the_count_is_the_summarys_waiting_for_an_answer(three):
     run("whatsapp_inbox.conversation.set_status", {"id": str(three["Bea"].id), "status": "closed"})
     run("whatsapp_inbox.conversation.mark_read", {"id": str(three["Carla"].id)})
+    echo("34600333333")
     summary = run("whatsapp_inbox.conversation.summary", {})
-    assert waiting_count()["count"] == summary.awaiting_reply == 2
+    # Carla, read and answered from the phone, is open but waits no more: open and waiting are not the same count.
+    assert (summary.open, summary.awaiting_reply) == (2, 1)
+    assert waiting_count()["count"] == summary.awaiting_reply
 
 
 def test_a_customer_writing_again_counts_her_again(three):
