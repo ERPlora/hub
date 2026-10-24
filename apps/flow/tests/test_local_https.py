@@ -25,6 +25,23 @@ def escaped(monkeypatch):
 
 
 @pytest.fixture
+def unstarted():
+    """A thread named as a request that ``threading.enumerate()`` already lists but that has not started:
+    ``Thread.start()`` leaves every new thread so for a moment (in ``_limbo``), a request of this test's server
+    or of another one in the same process. Waiting for the answers must not join it: ``join`` refuses a thread
+    that has not started, and under xdist that turned the deploy after hub#237 red."""
+    thread = threading.Thread(target=lambda: None, name="Thread-0 (process_request_thread)")
+    with threading._active_limbo_lock:
+        threading._limbo[thread] = thread
+    try:
+        assert thread in threading.enumerate()  # CPython internals: if they change, this fails instead of a no-op
+        yield thread
+    finally:
+        with threading._active_limbo_lock:
+            del threading._limbo[thread]
+
+
+@pytest.fixture
 def answering(tmp_path):
     """The server, started for this test alone; ``next(answering, None)`` stops it as the fixture of the flow
     tests does, and so says what it kept."""
@@ -33,14 +50,10 @@ def answering(tmp_path):
     answering.close()  # a test that failed before stopping it
 
 
-def _requests():
-    """The requests the server is answering: its threads run ``process_request_thread``."""
-    return [thread for thread in threading.enumerate() if thread.name.endswith("(process_request_thread)")]
-
-
-def _answered():
-    for thread in _requests():
-        thread.join(timeout=10)
+def _answered(server):
+    """Waits for the requests the server took: its own threads, all started."""
+    for request in list(server["requests"]):
+        request.join(timeout=10)
 
 
 def _ask(server, path):
@@ -78,11 +91,11 @@ def _hang_up_while_it_writes(server):
 
 def _hang_up_while_it_reads(server):
     """Announces a body that never comes and hangs up while the server waits for it."""
-    before = set(_requests())
+    taken = len(server["requests"])
     _hang_up_once(
         server,
         b"POST /orders HTTP/1.1\r\nHost: localhost\r\nContent-Length: 10\r\n\r\n",
-        lambda: set(_requests()) - before,
+        lambda: len(server["requests"]) > taken,
     )
 
 
@@ -94,13 +107,13 @@ def _hang_up_while_it_reads(server):
     ],
 )
 def test_a_client_that_hangs_up_is_no_error_and_the_server_answers_the_next_one(
-    answering, escaped, capsys, hang_up, cuts
+    answering, escaped, capsys, unstarted, hang_up, cuts
 ):
     server = next(answering)
     Handler.seen.clear()
 
     hang_up(server)
-    _answered()
+    _answered(server)
 
     assert capsys.readouterr().err == ""  # nothing printed from its threads
     assert escaped == []
@@ -111,7 +124,7 @@ def test_a_client_that_hangs_up_is_no_error_and_the_server_answers_the_next_one(
 
 
 def test_an_error_that_is_not_a_hang_up_is_kept_and_stopping_the_server_fails_on_it(
-    answering, escaped, capsys, monkeypatch
+    answering, escaped, capsys, unstarted, monkeypatch
 ):
     def broken(handler):
         raise RuntimeError("the handler broke")
@@ -121,7 +134,7 @@ def test_an_error_that_is_not_a_hang_up_is_kept_and_stopping_the_server_fails_on
 
     with pytest.raises(http.client.RemoteDisconnected):
         _ask(server, "/ok")
-    _answered()
+    _answered(server)
 
     assert capsys.readouterr().err == ""  # nothing printed from its threads
     assert escaped == []
@@ -131,7 +144,7 @@ def test_an_error_that_is_not_a_hang_up_is_kept_and_stopping_the_server_fails_on
         next(answering, None)
 
 
-def test_stopping_the_server_waits_for_the_answers_it_is_still_writing(answering):
+def test_stopping_the_server_waits_for_the_answers_it_is_still_writing(answering, unstarted):
     server = next(answering)
     Handler.seen.clear()
 

@@ -118,13 +118,15 @@ class Handler(BaseHTTPRequestHandler):
 
 class DualStack(ThreadingHTTPServer):
     """``localhost`` gives ::1 and 127.0.0.1: the server answers on both. Its request threads are waited for
-    when it stops: none outlives it."""
+    when it stops: none outlives it. Each one, once running, is in ``requests``: a test waits there for its own
+    answers, never for whatever ``threading.enumerate()`` lists (a thread not started yet among them)."""
 
     address_family = socket.AF_INET6
     daemon_threads = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.requests: list[threading.Thread] = []
         self.hangups: list[OSError] = []
         self.errors: list[BaseException] = []
 
@@ -132,13 +134,17 @@ class DualStack(ThreadingHTTPServer):
         self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         super().server_bind()
 
+    def process_request_thread(self, request, client_address):
+        self.requests.append(threading.current_thread())  # from inside: it has started, so it can be joined
+        super().process_request_thread(request, client_address)
+
     def handle_error(self, request, client_address):
         self.errors.append(sys.exception())
 
 
 def start(directory):
-    """Starts the server; yields ``{"port", "ca", "hangups", "errors"}`` until it is stopped, and stopping it
-    fails on the errors its requests kept."""
+    """Starts the server; yields ``{"port", "ca", "requests", "hangups", "errors"}`` until it is stopped, and
+    stopping it fails on the errors its requests kept."""
     cert_file, key_file = _certificate(directory)
     httpd = DualStack(("::", 0), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -147,7 +153,13 @@ def start(directory):
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     try:
-        yield {"port": httpd.server_address[1], "ca": str(cert_file), "hangups": httpd.hangups, "errors": httpd.errors}
+        yield {
+            "port": httpd.server_address[1],
+            "ca": str(cert_file),
+            "requests": httpd.requests,
+            "hangups": httpd.hangups,
+            "errors": httpd.errors,
+        }
     finally:
         httpd.shutdown()
         httpd.server_close()
