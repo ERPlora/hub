@@ -35,6 +35,9 @@ describe('TemplateCatalog', () => {
   it('paints each template with its language and country by name, its version and what it brings', async () => {
     const m = await catalog({}, 'es');
     await m.result(m.call, 'base.blueprint.list', { templates: [template('restaurant.es')], empty: true });
+    // Cards first, with the list/cards switch of the old hub's catalogue.
+    expect(m.wrapper.find('[data-testid="templates-view"]').exists()).toBe(true);
+    expect(m.wrapper.find('.data-table__cards, [data-view="cards"]').exists()).toBe(true);
     const row = m.wrapper.get('[data-testid="templates-row"]');
     expect(row.attributes('data-id')).toBe('restaurant.es');
     const text = row.text();

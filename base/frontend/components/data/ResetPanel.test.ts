@@ -80,12 +80,14 @@ describe('ResetPanel', () => {
     expect(confirm.props('message')).toBe('The 14 rows this import brought will be removed. What you created afterwards stays.');
     confirm.vm.$emit('confirm');
     await settle();
-    expect(m.sent.at(-1)).toEqual({ url: '/api/settings/data/imports/undo', body: { id: load().id } });
+    expect(m.sent.filter((call) => call.url.endsWith('/undo'))).toEqual([{ url: '/api/settings/data/imports/undo', body: { id: load().id } }]);
     expect(confirm.props('open')).toBe(false);
     const result = m.wrapper.get('[data-testid="undo-result"]').text();
     expect(result).toContain('Inventory — 12 rows removed');
     expect(result).toContain('Inventory — 1 row could not be removed');
     expect(result).toContain('Products: in use');
+    // What each section has changed: the plan is read again.
+    expect(m.sent.filter((call) => call.url.endsWith('/reset')).map((call) => call.body)).toEqual([{ dry_run: true }, { dry_run: true }]);
   });
 
   it('a refused undo stays in the dialog with the reason (hub#2720)', async () => {

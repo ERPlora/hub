@@ -53,6 +53,11 @@ export function exportFileName(name: string, language: string): string {
   return `${slugify(name) || 'blueprint'}_${slugify(language) || 'xx'}.blueprint.zip`;
 }
 
+/** The file's name to start with: the business's, or its address while it has none (as the server's `confirm_with`). */
+export function defaultExportName(business: string | undefined, hostname: string): string {
+  return business?.trim() || hostname.split('.')[0] || '';
+}
+
 /** What the person ticked: the apps registered, the ones whose data travels and the tables unmarked. */
 export interface ExportChoice {
   apps: ReadonlySet<string>;

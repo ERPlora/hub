@@ -837,7 +837,7 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
             report = _call(ctx, "inventory.product.bulk_create", rows=cells)
         except (OperationError, pydantic.ValidationError) as exc:
             for row in chunk:
-                loaded.refuse(_text(row, "sku") or _text(row, "name"), _reason(exc))
+                loaded.refuse(_text(row, "name") or _text(row, "sku"), _reason(exc))
             continue
         for outcome in report.rows:
             row = chunk[outcome.line - start - 1]
@@ -846,7 +846,8 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
             elif outcome.status == "skipped":
                 loaded.already += 1
             else:
-                loaded.refuse(outcome.key or _text(row, "name"), outcome.reason)
+                # Named as the person knows it (hub#1891): its name, its code only without one.
+                loaded.refuse(_text(row, "name") or outcome.key or _text(row, "sku"), outcome.reason)
     if not by_sku:
         return
     categories = {_key(row.name): row.id for row in _pages(ctx, "inventory.category.list")}

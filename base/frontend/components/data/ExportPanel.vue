@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Settings › Data › Export (BASE-G101, BASE-G102; the old hub's ExportPanel): only for who administers the hub. The
-// file's name (the business's to start: the old hub's «hub» was a defect) and language, with the final file name under
+// file's name (the business's, or the hub's address without one: the old hub's «hub» was a defect) and language, with the final file name under
 // them; «Backup of this business» (its customers too) or «Template to share» (never personal data); the apps on, each
 // with «App» (the file registers it) and «Data» (its data travels) and, under a marked «Data», one box per table with
 // its rows. While no table is unmarked, «all» is sent, so a new table never stays out unseen. «Export» asks the server
@@ -22,6 +22,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import {
   base64ToBlob,
+  defaultExportName,
   type ExportChoice,
   exportFileName,
   exportInput,
@@ -49,7 +50,7 @@ const client = useLiveClient();
 const apps = ref<AppDatasets[] | undefined>();
 const loadFailed = ref(false);
 const choice = ref<ExportChoice>({ apps: new Set(), data: new Set(), excluded: new Set() });
-const name = ref(readJsonBlock<HubHome>('hub-home')?.name ?? '');
+const name = ref(defaultExportName(readJsonBlock<HubHome>('hub-home')?.name, window.location.hostname));
 const language = ref<string>(LANGUAGES.find((code) => locale.value.startsWith(code)) ?? 'en');
 const purpose = ref<BlueprintPurpose>('backup');
 const pending = ref(false);

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flush, mountBase } from '../__tests__/mount-base';
 import HomePage from './HomePage.vue';
 
-const STUBS = { HomeMyApps: true, SetupChecklist: true, WidgetBoard: true, HomeActivity: true };
+const STUBS = { BlueprintCard: true, HomeMyApps: true, SetupChecklist: true, WidgetBoard: true, HomeActivity: true };
 
 function embed(name: string) {
   document.head.innerHTML = `<script id="hub-home" type="application/json">${JSON.stringify({ name, plan_url: 'x' })}</script>`;
@@ -53,11 +53,13 @@ describe('HomePage', () => {
     expect(m.wrapper.get('[data-testid="home-date"]').text()).toBe('Today, Thursday, October 22');
   });
 
-  it('«Summary»: «My apps», then the checklist, then the board', async () => {
+  it('«Summary»: the templates card, «My apps», then the checklist, then the board', async () => {
     embed('Bar');
     const m = await home();
-    const order = m.wrapper.findAll('home-my-apps-stub, setup-checklist-stub, widget-board-stub').map((el) => el.element.tagName.toLowerCase());
-    expect(order).toEqual(['home-my-apps-stub', 'setup-checklist-stub', 'widget-board-stub']);
+    const order = m.wrapper
+      .findAll('blueprint-card-stub, home-my-apps-stub, setup-checklist-stub, widget-board-stub')
+      .map((el) => el.element.tagName.toLowerCase());
+    expect(order).toEqual(['blueprint-card-stub', 'home-my-apps-stub', 'setup-checklist-stub', 'widget-board-stub']);
     expect(m.wrapper.find('home-activity-stub').exists()).toBe(false);
   });
 

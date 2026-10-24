@@ -43,6 +43,7 @@ function choose(event: CustomEvent<{ value?: string | number }>): void {
         v-for="item in DATA_SECTIONS"
         :key="item"
         :value="item"
+        :data-testid="`data-section-${item}`"
       >
         <ion-label>{{ t(LABEL[item]) }}</ion-label>
       </ion-segment-button>

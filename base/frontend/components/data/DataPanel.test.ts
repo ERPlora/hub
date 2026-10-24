@@ -21,10 +21,12 @@ afterEach(() => {
 describe('DataPanel', () => {
   it('offers Import, Export and Reset, and opens Import', async () => {
     const m = await panel();
-    expect(m.wrapper.findAll('ion-segment-button').map((b) => (b.element as HTMLElement & { value?: string }).value)).toEqual([
-      'import',
-      'export',
-      'reset',
+    expect(
+      m.wrapper.findAll('ion-segment-button').map((b) => [(b.element as HTMLElement & { value?: string }).value, b.attributes('data-testid')]),
+    ).toEqual([
+      ['import', 'data-section-import'],
+      ['export', 'data-section-export'],
+      ['reset', 'data-section-reset'],
     ]);
     // Ionic's labels render their text apart from the button's own: read from the panel's.
     expect(m.wrapper.get('[data-testid="data-sections"]').html()).toMatch(/Import[\s\S]*Export[\s\S]*Reset/);

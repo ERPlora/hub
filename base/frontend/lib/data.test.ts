@@ -10,6 +10,7 @@ import {
   cardOutcome,
   cardTemplates,
   dataSection,
+  defaultExportName,
   exportFileName,
   exportInput,
   freshExportChoice,
@@ -99,6 +100,13 @@ describe('the export (BASE-G101, BASE-G102)', () => {
     expect(exportFileName('Bar Pepe', 'es')).toBe('bar-pepe_es.blueprint.zip');
     expect(exportFileName('  Peluquería  Ñandú! ', 'es')).toBe('peluqueria-nandu_es.blueprint.zip');
     expect(exportFileName('???', '')).toBe('blueprint_xx.blueprint.zip');
+  });
+
+  it("names the file after the business, or the hub's address while it has no name", () => {
+    expect(defaultExportName('Bar Pepe', 'bar-pepe.erplora.com')).toBe('Bar Pepe');
+    expect(defaultExportName('  ', 'bar-pepe.erplora.com')).toBe('bar-pepe');
+    expect(defaultExportName(undefined, 'a.localhost')).toBe('a');
+    expect(defaultExportName(undefined, '')).toBe('');
   });
 
   it('starts with every app registered and no data, as the old hub', () => {

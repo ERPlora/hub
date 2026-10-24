@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // The Home (BASE-G127; the old hub's dashboard, PLAN-HUB round 2026-10-21): headed by the business's name (the
-// SaaS's, `hub-home`), or a greeting by the hour while it has none, and today's date. «Summary»: «My apps» (it
-// goes first and works with no data), «Finish setting up your business» and the board of the apps' panels;
-// each zone reads its own data and fails on its own. «Activity»: the last sales. The tab lives in the address
-// (`/#actividad`), so it can be linked and Back leaves the Home instead of walking its tabs.
+// SaaS's, `hub-home`), or a greeting by the hour while it has none, and today's date. «Summary»: the templates card
+// while the business is empty (BASE-G131), «My apps» (it works with no data), «Finish setting up your business» and
+// the board of the apps' panels; each zone reads its own data and fails on its own. «Activity»: the last sales. The
+// tab lives in the address (`/#actividad`), so it can be linked and Back leaves the Home instead of walking its tabs.
 import { AppPage, type ShellTab } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import BlueprintCard from '../components/BlueprintCard.vue';
 import HomeActivity from '../components/HomeActivity.vue';
 import HomeMyApps from '../components/HomeMyApps.vue';
 import SetupChecklist from '../components/SetupChecklist.vue';
@@ -68,6 +69,7 @@ const tab = computed<Tab>({
           {{ today }}
         </p>
       </header>
+      <BlueprintCard />
       <HomeMyApps />
       <SetupChecklist />
       <WidgetBoard />

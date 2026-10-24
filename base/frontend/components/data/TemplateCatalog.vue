@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // «Choose what to load» (BASE-G103; the old hub's ImportPanel catalogue): ONE live read of `base.blueprint.list` — the
-// hub's country first, then the person's language — painted in the DataTable as cards or a list, with «Search
-// templates» over the name, the description and the apps it brings. Language and country by name («España», not
-// «ES»). «Use template» emits the template; the page reads it (`busy` spins its button meanwhile).
+// hub's country first, then the person's language — painted in the DataTable as cards (or a list: its switch), with
+// «Search templates» over the name, the description and the apps it brings. Language and country by name («España»,
+// not «ES»). «Use template» emits the template; the page reads it (`busy` spins its button meanwhile).
 import { DataTable, type DataTableAction, type DataTableActionEvent, type DataTableColumn } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';
@@ -94,6 +94,7 @@ function onAction(event: DataTableActionEvent<Row>): void {
     :search-placeholder="t('base.data.import.search')"
     :empty-message="noMatch ? t('base.data.import.noMatch') : t('base.data.import.empty')"
     :error="error"
+    views
     default-view="cards"
     :page-size-chooser="false"
     testid="templates"

@@ -276,6 +276,26 @@ def test_a_row_an_app_refuses_fails_alone_and_the_rest_loads(ctx):
     assert result.report["status"] == "partial"
 
 
+def test_a_refused_row_is_named_as_the_person_knows_it_by_its_name_and_by_its_code_only_without_one(ctx):
+    """hub#1891: the report speaks of a product by its name; its code (SKU) only when it has no name."""
+    bundle = restaurant_bundle(
+        **{
+            "inventory.product": [
+                {"name": "Tarta mala", "sku": "BAD-02", "price": "abc", "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": []},
+                {"name": "", "sku": "BAD-01", "price": 100, "cost": 0, "stock": "", "low_stock_threshold": "", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "", "categories": []},
+            ]
+        }
+    )
+
+    result = blueprint.apply(ctx, bundle, apps=None)
+
+    inventory = next(app for app in result.report["apps"] if app["id"] == "inventory")
+    products = next(dataset for dataset in inventory["datasets"] if dataset["key"] == "inventory.product")
+    assert products["failed"] == 2
+    assert products["problems"][0].startswith("«Tarta mala»:")
+    assert products["problems"][1].startswith("«BAD-01»:")
+
+
 def test_a_product_whose_category_is_not_there_is_created_and_the_missing_link_is_told(ctx):
     bundle = restaurant_bundle(
         **{

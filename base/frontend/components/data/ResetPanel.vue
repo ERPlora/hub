@@ -66,6 +66,8 @@ async function undo(): Promise<void> {
     const answer = await client.api.call('base.import.undo', { id: undoing.value.id });
     undone.value = removalLines(answer.apps);
     undoOpen.value = false;
+    // What each section has changed.
+    void readPlan();
   } catch (error) {
     undoError.value = asError(error);
   } finally {
