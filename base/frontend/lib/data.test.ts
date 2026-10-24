@@ -129,6 +129,9 @@ describe('the export (BASE-G101, BASE-G102)', () => {
     expect(input.data).toEqual([]);
     // Marking the data of an unregistered app does nothing.
     expect(exportInput(toggleData(choice, 'inventory', true), APPS, { name: 'B', language: 'es', purpose: 'backup' }).data).toEqual([]);
+    // Its «Data» box is unticked too: ticking the app again does not bring its data back.
+    expect(choice.data.has('inventory')).toBe(false);
+    expect(exportInput(toggleApp(choice, 'inventory', true), APPS, { name: 'B', language: 'es', purpose: 'backup' }).data).toEqual([]);
   });
 
   it('sends «all» (no dataset named) while no table is unmarked, so a new one never stays out unseen', () => {

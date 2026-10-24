@@ -154,7 +154,6 @@
         "country": "País",
         "version": "Versión",
         "brings": "Trae",
-        "reading": "Leyendo el fichero…",
         "readError": "No se pudo leer el fichero: {reason}",
         "tooBig": "el fichero pasa de 5 MB."
       },

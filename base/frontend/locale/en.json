@@ -154,7 +154,6 @@
         "country": "Country",
         "version": "Version",
         "brings": "It brings",
-        "reading": "Reading the file…",
         "readError": "The file could not be read: {reason}",
         "tooBig": "the file is larger than 5 MB."
       },

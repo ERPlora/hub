@@ -96,6 +96,9 @@ describe('ImportPanel', () => {
   it('a file: reads it in base64 and reviews it; one over 5 MB is refused before it is sent', async () => {
     const m = await panel({ '/api/settings/data/blueprints/inspect': () => Response.json(summary({ source: 'file' })) });
     const input = m.wrapper.get('[data-testid="import-file"]').element as HTMLInputElement;
+    // What the page writes in the input's value: a file input only takes '' (emptied for the same file again).
+    const written: string[] = [];
+    Object.defineProperty(input, 'value', { get: () => 'C:\\fakepath\\chosen.zip', set: (value: string) => void written.push(value), configurable: true });
     const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.blueprint.zip');
     Object.defineProperty(input, 'files', { value: [big], configurable: true });
     input.dispatchEvent(new Event('change'));
@@ -108,8 +111,8 @@ describe('ImportPanel', () => {
     await settle();
     expect(m.calls.at(-1)).toEqual({ url: '/api/settings/data/blueprints/inspect', body: { file_base64: 'UEsDBA==' } });
     expect(m.wrapper.find('[data-testid="review"]').exists()).toBe(true);
-    // The same file can be chosen again after an error: the input is emptied.
-    expect(input.value).toBe('');
+    // The same file can be chosen again after an error: the input is emptied each time.
+    expect(written).toEqual(['', '']);
   });
 
   it('an import refused stays on the review with the reason', async () => {
