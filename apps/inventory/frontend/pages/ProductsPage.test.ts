@@ -114,6 +114,8 @@ describe('ProductsPage: the list', () => {
     ]);
     const chip = s.testid('inventory-products-unconfigured-p3');
     expect(chip.find('span').text()).toBe('Not configured · Missing tax category');
+    // FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED - Cut to «…» in a narrow column, its whole text stays on hand.
+    expect(chip.attributes('title')).toBe('Not configured · Missing tax category');
     await chip.trigger('click');
     await flush();
     const form = s.wrapper.findComponent(ProductFormModal);
