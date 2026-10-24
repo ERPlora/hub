@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Sales & POS → Sell (WORKBOOK «Vender»; SALE-F01, F05, F09, F13–F22, F27, F38). The till: the catalogue
 // and the check side by side (23–24.5rem on a desktop); on a phone (narrower than 821px or 500px tall or
-// less) the check is a drawer from the right that the cart button opens. The page wires the pieces:
+// less), and wherever the till itself is narrower than both need (beside the docked assistant on a tablet), the
+// check is a drawer from the right that the cart button opens. The page wires the pieces:
 // the till settings, the check and its writes (`useTill`), the live check and its preview (mounted
 // only while there is one), the customer (the Customers app's search; linked to the check by
 // `customer.order.link`, read back on resuming), who serves, the sheets, the pre-bill, the checkout
@@ -523,7 +524,14 @@ const prebillOpen = shallowRef(false);
 
 // ── Layout: the phone's drawer and its button ────────────────────────────────────────────────────
 const PHONE = '(max-width: 820px), (max-height: 500px)';
-const phone = shallowRef(false);
+/** The till's own width under which the catalogue and the check no longer fit side by side (FIX-SALE-POS-NO-SPEAK-KEY:
+ *  the docked assistant takes up to 420px of a tablet). Without it, the narrowest two-column till is a 992px
+ *  window with the side menu, about 720px. */
+const NARROW_TILL = 700;
+const phoneWindow = shallowRef(false);
+const narrowTill = shallowRef(false);
+const phone = computed(() => phoneWindow.value || narrowTill.value);
+const tillBox = useTemplateRef<HTMLElement>('tillBox');
 const cartOpen = shallowRef(false);
 /** On a phone the open cart is a modal dialog over the till: focus inside, trapped, back to the button. */
 const drawerOpen = computed(() => phone.value && cartOpen.value);
@@ -531,7 +539,18 @@ const drawer = useTemplateRef<HTMLElement>('drawer');
 const fab = useTemplateRef<{ $el: HTMLElement }>('fab');
 const drawerFocus = useDrawerFocus({ container: drawer, open: cartOpen, enabled: phone, returnTo: () => fab.value?.$el });
 let media: MediaQueryList | undefined;
-const onMedia = () => (phone.value = !!media?.matches);
+const onMedia = () => (phoneWindow.value = !!media?.matches);
+const resize =
+  typeof ResizeObserver === 'undefined'
+    ? undefined
+    : new ResizeObserver((entries) => {
+        const width = entries.at(-1)?.contentRect.width;
+        if (width) narrowTill.value = width < NARROW_TILL;
+      });
+watch(tillBox, (box) => {
+  resize?.disconnect();
+  if (box) resize?.observe(box);
+});
 
 const itemCount = computed(() =>
   Math.round(lines.value.reduce((sum, line) => sum + (line.unit === 'ud' ? Number(line.quantity) : 1), 0)),
@@ -544,7 +563,10 @@ onMounted(() => {
   media?.addEventListener('change', onMedia);
   if (till.orderId.value) void loadCustomer(till.orderId.value);
 });
-onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
+onBeforeUnmount(() => {
+  media?.removeEventListener('change', onMedia);
+  resize?.disconnect();
+});
 </script>
 
 <template>
@@ -579,8 +601,9 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
     </div>
     <div
       v-else
+      ref="tillBox"
       class="pos-till"
-      :class="{ 'pos-till--cart-open': cartOpen }"
+      :class="{ 'pos-till--cart-open': cartOpen, 'pos-till--phone': phone }"
       data-testid="pos-till"
       @keydown.esc="cartOpen = false"
     >
@@ -854,44 +877,43 @@ onBeforeUnmount(() => media?.removeEventListener('change', onMedia));
     grid-template-columns: minmax(0, 1fr) 22rem;
   }
 }
-/* The phone (and a phone on its side): the catalogue alone, the check a drawer from the right. */
-@media not all and (min-width: 821px) and (min-height: 501px) {
-  .pos-till__body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .pos-till__fab {
-    display: inline-flex;
-  }
-  .pos-till__cart {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 60;
-    width: min(100%, 27rem);
-    visibility: hidden;
-    transform: translateX(100%);
-    transition:
-      transform 0.25s ease,
-      visibility 0s linear 0.25s;
-  }
-  .pos-till--cart-open .pos-till__cart {
-    visibility: visible;
-    transform: none;
-    transition:
-      transform 0.25s ease,
-      visibility 0s;
-  }
-  .pos-till__backdrop {
-    position: absolute;
-    inset: 0;
-    z-index: 55;
-    display: block;
-    background: rgba(0, 0, 0, 0.5);
-  }
+/* The phone (and a phone on its side, and a till too narrow for both): the catalogue alone, the check a drawer
+   from the right. */
+.pos-till--phone .pos-till__body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.pos-till--phone .pos-till__fab {
+  display: inline-flex;
+}
+.pos-till--phone .pos-till__cart {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  width: min(100%, 27rem);
+  visibility: hidden;
+  transform: translateX(100%);
+  transition:
+    transform 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+.pos-till--phone.pos-till--cart-open .pos-till__cart {
+  visibility: visible;
+  transform: none;
+  transition:
+    transform 0.25s ease,
+    visibility 0s;
+}
+.pos-till--phone .pos-till__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  display: block;
+  background: rgba(0, 0, 0, 0.5);
 }
 @media (max-height: 500px) {
-  .pos-till__cart {
+  .pos-till--phone .pos-till__cart {
     width: min(100%, 34rem);
   }
 }

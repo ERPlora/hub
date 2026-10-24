@@ -13,6 +13,7 @@ import PosCatalog from './PosCatalog.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ServiceGrid from './ServiceGrid.vue';
+import SpeakKey from './SpeakKey.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
@@ -143,6 +144,16 @@ describe('PosCatalog: search', () => {
     await s.reopen();
     expect(s.wrapper.emitted('add')).toEqual([[coffee]]);
     expect(s.wrapper.findComponent(ProductSearch).exists()).toBe(false);
+  });
+});
+
+describe('PosCatalog: the «Speak» key (PLAN §30 point 4)', () => {
+  it('sits in the strip, with products hidden too (who sees it: SpeakKey.test.ts)', async () => {
+    for (const showProducts of [true, false]) {
+      const s = await setup({ showProducts });
+      expect(s.wrapper.get('.pos-catalog__bar').findComponent(SpeakKey).exists(), `showProducts=${showProducts}`).toBe(true);
+      s.wrapper.unmount();
+    }
   });
 });
 

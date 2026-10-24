@@ -32,6 +32,17 @@
       "screenMenu": "Screen",
       "fullscreen": "Full screen",
       "exitFullscreen": "Exit full screen",
+      "speak": {
+        "label": "Speak",
+        "stop": "Stop",
+        "listening": "Listening…",
+        "transcribing": "Transcribing…",
+        "offline": "No connection: talking to the assistant needs the internet.",
+        "denied": "Microphone access is blocked. Allow it in your browser to speak.",
+        "empty": "Nothing was heard. Try again closer to the microphone.",
+        "tooLong": "The recording is too long: say something shorter.",
+        "failed": "The audio could not be transcribed. Try again."
+      },
       "categories": "Categories",
       "all": "All",
       "more": "More…",
