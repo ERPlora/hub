@@ -2,7 +2,7 @@
 
 The inbox is live (WHATSAPP_INBOX-F03): a message arriving, sent or read, an assignment, a status, a
 card joined or the channel's state (erplora.com's photo, or its answer when the number is connected or disconnected
-from Settings, F01, F02) re-run what shows them. A customer card renamed, merged, deleted or erased
+from Settings, F01, F02) re-run what shows them; who waits for an answer (F09) follows what changes it. A customer card renamed, merged, deleted or erased
 re-runs the lists that paint its name. The exact-number lookup (for other apps) and the team (a picker)
 are asked once, not followed.
 """
@@ -48,3 +48,6 @@ live(
     on=[E.CHANNEL_SYNCED, E.TEMPLATE_CREATED, E.TEMPLATE_UPDATED, E.TEMPLATE_DELETED],
 )
 live("whatsapp_inbox.channel.get", on=CHANNEL)
+# Who waits for an answer (F09): the bell's count, and the device's notices, whose title is a card's name.
+live("whatsapp_inbox.conversation.count_awaiting_reply", on=E.AWAITING_REPLY_EVENTS)
+live("whatsapp_inbox.conversation.notices", on=[*E.AWAITING_REPLY_EVENTS, *CARD])

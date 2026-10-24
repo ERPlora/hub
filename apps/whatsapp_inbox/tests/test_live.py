@@ -33,6 +33,8 @@ INBOX = [
 
 #: The number's state: erplora.com's photo, and its answer when the business connects or disconnects it here.
 CHANNEL = [E.CHANNEL_SYNCED, E.CHANNEL_CONNECTED, E.CHANNEL_DISCONNECTED]
+#: What changes whether a conversation waits for an answer: a message in or out, its status, its erasure.
+AWAITING = [E.MESSAGE_RECEIVED, E.MESSAGE_SENT, E.STATUS_CHANGED, E.ERASED]
 
 
 def inbox_queries():
@@ -68,6 +70,10 @@ def test_each_screen_and_its_events():
         "whatsapp_inbox.note.list": [E.NOTE_ADDED, E.NOTE_DELETED, E.ERASED],
         "whatsapp_inbox.template.list": [E.CHANNEL_SYNCED, E.TEMPLATE_CREATED, E.TEMPLATE_UPDATED, E.TEMPLATE_DELETED],
         "whatsapp_inbox.channel.get": CHANNEL,
+        # WHATSAPP_INBOX-F09: who waits for an answer, for the bell and the device's notices (a card's name is the
+        # notice's title).
+        "whatsapp_inbox.conversation.count_awaiting_reply": AWAITING,
+        "whatsapp_inbox.conversation.notices": [*AWAITING, *CARD],
     }
 
 
@@ -87,6 +93,8 @@ def test_a_message_arriving_re_runs_the_inbox_the_thread_and_the_summary():
         "whatsapp_inbox.conversation.list",
         "whatsapp_inbox.conversation.detail",
         "whatsapp_inbox.conversation.summary",
+        "whatsapp_inbox.conversation.count_awaiting_reply",
+        "whatsapp_inbox.conversation.notices",
         "whatsapp_inbox.message.list",
     }
 

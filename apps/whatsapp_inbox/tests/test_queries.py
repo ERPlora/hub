@@ -368,3 +368,107 @@ def test_a_reference_by_voice_ignores_accents_case_emoji_and_extra_spaces(three)
     receive("wamid.y", "34600666666", contact_name="Ana Lopez")
     with pytest.raises(Conflict):
         run("whatsapp_inbox.conversation.detail", {"conversation": "ana lopez"})
+
+
+# ── Who waits for an answer: the bell's count and the device's notices (WHATSAPP_INBOX-F09) ─────────────────
+
+
+def answer(conversation: Conversation, text: str = "¡Hola! Sí, a las 17:00.") -> None:
+    """The team answers ``conversation`` from the Hub (its delivery to erplora.com is left for after the COMMIT)."""
+    run(
+        "whatsapp_inbox.message.send",
+        {"id": str(conversation.id), "text": text, "client_message_id": "0199e000-0000-7000-8000-0000000000f1"},
+    )
+
+
+def echo(phone: str, wa_id: str = "wamid.echo", minutes_ago: int = 1) -> None:
+    """The business answers from its own phone: erplora.com hands the Hub the echo of that message."""
+    receive(wa_id, phone, direction="outbound", text="Te llamo ahora", contact_name="", sent_at=at(minutes_ago))
+
+
+def waiting_count(ctx=None) -> dict:
+    return run("whatsapp_inbox.conversation.count_awaiting_reply", {}, ctx).model_dump()
+
+
+def test_the_count_is_the_open_conversations_whose_last_message_is_the_customers(three):
+    connect()
+    answer(three["Ana"])
+    echo("34600222222")
+    receive("wamid.d", "34600444444", contact_name="Dora", sent_at=at(8))
+    run("whatsapp_inbox.conversation.set_status", {"id": str(three["Carla"].id), "status": "pending"})
+    receive("wamid.e", "34600555555", contact_name="Eva", sent_at=at(7))
+    run("whatsapp_inbox.conversation.set_status", {"id": str(Conversation.objects.get(contact_name="Eva").id), "status": "closed"})
+    receive("wamid.f", "34600666666", contact_name="Fina", sent_at=at(6))
+    run("whatsapp_inbox.conversation.erase", {"id": str(Conversation.objects.get(contact_name="Fina").id)})
+
+    # Answered from the Hub (Ana) or from the phone (Bea), pending (Carla), closed (Eva) or erased (Fina): only Dora waits.
+    assert waiting_count(ctx_for("hub_employee")) == {"count": 1}
+
+
+def test_with_nobody_waiting_the_count_is_one_row_of_zero():
+    assert waiting_count() == {"count": 0}
+
+
+def test_the_count_is_the_summarys_waiting_for_an_answer(three):
+    run("whatsapp_inbox.conversation.set_status", {"id": str(three["Bea"].id), "status": "closed"})
+    run("whatsapp_inbox.conversation.mark_read", {"id": str(three["Carla"].id)})
+    echo("34600333333")
+    summary = run("whatsapp_inbox.conversation.summary", {})
+    # Carla, read and answered from the phone, is open but waits no more: open and waiting are not the same count.
+    assert (summary.open, summary.awaiting_reply) == (2, 1)
+    assert waiting_count()["count"] == summary.awaiting_reply
+
+
+def test_a_customer_writing_again_counts_her_again(three):
+    connect()
+    answer(three["Ana"])
+    run("whatsapp_inbox.conversation.set_status", {"id": str(three["Bea"].id), "status": "closed"})
+    assert waiting_count() == {"count": 1}
+    # After the answer (sent at NOW, the fixed clock): Ana writes again, and Bea, closed, opens it again by writing.
+    later = (NOW + dt.timedelta(minutes=1)).isoformat()
+    receive("wamid.a2", "34600111111", contact_name="Ana", text="¿Y el jueves?", sent_at=later)
+    receive("wamid.b2", "34600222222", contact_name="Bea", text="Otra cosa", sent_at=later)
+    assert waiting_count() == {"count": 3}
+
+
+def notices(params=None, ctx=None) -> list[dict]:
+    return run("whatsapp_inbox.conversation.notices", params or {}, ctx).model_dump(mode="json")["rows"]
+
+
+def test_the_notices_are_the_customers_left_waiting_the_newest_first(three):
+    lopez = card("Ana López", "600111111")
+    run("whatsapp_inbox.conversation.link_customer", {"id": str(three["Ana"].id), "customer_id": str(lopez.id)})
+    receive("wamid.c2", "34600333333", contact_name="Carla", text="¿Me confirmas?", sent_at=at(2))
+
+    rows = notices(ctx=ctx_for("hub_employee"))
+
+    assert [(row["id"], row["display_name"], row["last_message_preview"]) for row in rows] == [
+        (str(three["Carla"].id), "Carla", "¿Me confirmas?"),
+        (str(three["Ana"].id), "Ana López", "Hola, ¿tenéis hora mañana?"),
+        (str(three["Bea"].id), "Bea", "Hola, ¿tenéis hora mañana?"),
+    ]
+    # Each one is the customer's last message: a new one is told again.
+    assert [row["at"] for row in rows] == [
+        (NOW - dt.timedelta(minutes=minutes)).isoformat().replace("+00:00", "Z") for minutes in (2, 10, 20)
+    ]
+
+
+def test_an_answered_pending_closed_erased_or_old_conversation_is_not_told(three):
+    connect()
+    answer(three["Ana"])
+    run("whatsapp_inbox.conversation.set_status", {"id": str(three["Bea"].id), "status": "pending"})
+    run("whatsapp_inbox.conversation.erase", {"id": str(three["Carla"].id)})
+    receive("wamid.d", "34600444444", contact_name="Dora", sent_at=at(25 * 60))
+    receive("wamid.e", "34600555555", contact_name="", sent_at=at(3))
+
+    # Dora wrote 25 hours ago (beyond the last day); a customer with no WhatsApp name is told by her number.
+    assert [row["display_name"] for row in notices()] == ["+34600555555"]
+    assert [row["display_name"] for row in notices({"since": at(26 * 60)})] == ["+34600555555", "Dora"]
+    assert len(notices({"since": at(26 * 60), "limit": 1})) == 1
+
+
+def test_the_notices_are_whoever_may_read_the_inbox(three):
+    with pytest.raises(PermissionDenied):
+        notices(ctx=ctx_for("nobody"))
+    with pytest.raises(PermissionDenied):
+        waiting_count(ctx_for("nobody"))

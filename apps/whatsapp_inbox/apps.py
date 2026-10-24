@@ -6,7 +6,9 @@ come in through ``/internal`` and go out through it (WORKBOOK «Contrato con el 
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import BellCounter, Category, DeviceNotice, LiveAppConfig, Nav
+
+from apps.whatsapp_inbox.events import AWAITING_REPLY_EVENTS, NOTICE_EVENTS
 
 
 class WhatsappInboxConfig(LiveAppConfig):
@@ -71,4 +73,32 @@ class WhatsappInboxConfig(LiveAppConfig):
             "ion:settings-outline",
             "/whatsapp_inbox/settings",
         ),
+    ]
+    # The Home's hooks (PLAN-HUB round 2026-10-21; WHATSAPP_INBOX-F09): the old module's counter of the bell
+    # (``whatsapp_inbox.needs_attention``, whatsapp_inbox#244), here the customers waiting for an answer the inbox's
+    # summary counts, leading to the inbox. No steps of «Finish setting up your business» nor panels of the dashboard:
+    # the old module had none.
+    bell = [
+        BellCounter(
+            key="awaiting_reply",
+            operation="whatsapp_inbox.conversation.count_awaiting_reply",
+            route="/whatsapp_inbox/inbox",
+            label=_("WhatsApp customers waiting for an answer"),
+            icon="ion:chatbubbles-outline",
+            permission="whatsapp_inbox.view",
+            refresh_on=AWAITING_REPLY_EVENTS,
+        )
+    ]
+    # hub#2303 (round 2026-10-23): the installed app tells the device of each message of a customer left waiting for
+    # an answer, with who and what she wrote; a tap opens that conversation in the inbox.
+    notices = [
+        DeviceNotice(
+            key="awaiting_reply",
+            operation="whatsapp_inbox.conversation.notices",
+            title=[_("WhatsApp · {display_name}"), _("WhatsApp customer waiting for an answer")],
+            body=["{last_message_preview}"],
+            route="/whatsapp_inbox/inbox?conversation={id}",
+            permission="whatsapp_inbox.view",
+            refresh_on=NOTICE_EVENTS,
+        )
     ]
