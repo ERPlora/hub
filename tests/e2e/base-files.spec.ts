@@ -277,6 +277,19 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.mouse.move(0, 0);
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G83-notices-${width}`) });
+
+      // BASE-G83 — a batch with a file kept and one refused: one notice, its sentences one after the other on one line
+      // (a notice paints a line break as a bare space), what was kept first and the refusal with its reason.
+      await upload(page, [
+        { name: 'kept.txt', mimeType: 'text/plain', buffer: Buffer.from('kept') },
+        { name: 'virus.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') },
+      ]);
+      const both = "Files uploaded. Could not upload “virus.exe”: Programs (.exe) can't be kept in Files: they could harm whoever opens them.";
+      await expect.poll(() => paintedNotices(page)).toEqual([both]);
+      await expect(toast(page, both)).toBeInViewport({ ratio: 1 });
+      await page.mouse.move(0, 0);
+      await untilStill(page);
+      await page.screenshot({ path: shot(`APP-BASE-8-BASE-G83-batch-notice-${width}`) });
     } finally {
       await wipe(context, A).catch(() => undefined);
       await context.close();
