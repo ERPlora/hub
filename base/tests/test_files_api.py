@@ -10,6 +10,7 @@ safe to show, as an attachment: never from ``/p/media/`` (public), never a URL o
 import base64
 import json
 
+import psycopg
 import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
@@ -20,6 +21,8 @@ from live.live_registry import live_registry
 from live.meta import all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import get
+from live.outbox import channel_for
+from psycopg.conninfo import make_conninfo
 
 from base import events, files
 from base.models import Hub
@@ -411,3 +414,43 @@ def test_the_business_files_are_never_public(client, make_user, store):
         assert http(client, "get", f"/p/media/{a.id.hex}/{path}").status_code == 404
     owner(client, make_user)
     assert http(client, "get", f"/p/media/{a.id.hex}/files/Facturas/marzo.pdf").status_code == 404
+
+
+# ── Live: a write in hub B reaches B's channel only ─────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def listen(django_db_setup):
+    from django.db import connections
+
+    params = connections["default"].settings_dict
+    dsn = make_conninfo(
+        dbname=params["NAME"], user=params["USER"], password=params["PASSWORD"], host=params["HOST"], port=params["PORT"]
+    )
+    sessions = []
+
+    def open_session(scope):
+        session = psycopg.connect(dsn, autocommit=True)
+        sessions.append(session)
+        session.execute(f"LISTEN {channel_for(scope)}")
+        return session
+
+    yield open_session
+    for session in sessions:
+        session.close()
+
+
+def received(session, timeout=1.0, stop_after=None):
+    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout, stop_after=stop_after)]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_an_upload_in_b_wakes_b_only_after_the_commit_and_re_runs_its_listing(listen):
+    on_a, on_b = listen(A), listen(B)
+
+    run("base.file.upload", ctx(scope=B), folder="", name="b.pdf", content_base64=b64())
+
+    assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["base.file.uploaded"]})]
+    assert received(on_a, timeout=0.3) == []
+    assert "base.file.list" in live_registry.affected(["base.file.uploaded"])
+    assert [item["name"] for item in run("base.file.list", ctx(scope=A))["files"]] == []
