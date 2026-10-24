@@ -99,3 +99,11 @@ async def dataset_list(request):
 @bind(router, "base.hub.reset", "/settings/data/reset")
 async def hub_reset(request, data: HubResetIn):
     return await run_operation(request, services.hub_reset, data)
+
+
+# ── Business settings and the hub's context (APP-BASE-6) ──
+
+
+@bind(router, "base.business.get", "/business")
+async def business_get(request):
+    return await run_operation(request, queries.business_get)

@@ -9,7 +9,7 @@ Settings › Data does to the business (a load, an undo, a reset) re-runs them t
 from live.live_registry import live
 from live.meta import module_configs
 
-from base.events import DATA_EVENTS, HUB_STATE_APPLIED
+from base.events import DATA_EVENTS, HUB_REGISTERED, HUB_STATE_APPLIED
 
 
 def events_of(hook: str) -> list[str]:
@@ -34,3 +34,8 @@ live("base.plan.usage", on=[HUB_STATE_APPLIED])
 # (the Home's card asks whether the business is still empty) and the list of loads of Settings › Data.
 live("base.blueprint.list", on=sorted({HUB_STATE_APPLIED, *DATA_EVENTS}))
 live("base.import.list", on=sorted(DATA_EVENTS))
+
+# ── Business settings and the hub's context (APP-BASE-6) ──
+# The SaaS registers the business again when its owner changes its name, time zone or language on erplora.com
+# (HUBS-F15): Settings › Business follows it without reloading.
+live("base.business.get", on=[HUB_REGISTERED])

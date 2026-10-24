@@ -8,7 +8,7 @@ from live.live_registry import live_registry
 from live.meta import module_configs
 
 from base import live as base_live
-from base.events import BLUEPRINT_IMPORTED, HUB_DATA_RESET, HUB_STATE_APPLIED, IMPORT_UNDONE
+from base.events import BLUEPRINT_IMPORTED, HUB_DATA_RESET, HUB_REGISTERED, HUB_STATE_APPLIED, IMPORT_UNDONE
 
 #: What Settings › Data does to the business (APP-BASE-2): the Home reads itself again after each (BASE-G131).
 DATA = {BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET}
@@ -34,6 +34,8 @@ def test_the_three_queries_and_their_events():
         "base.plan.usage": [HUB_STATE_APPLIED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
         "base.import.list": sorted(DATA),
+        # Business settings (APP-BASE-6): the SaaS registers the business again when it changes on erplora.com.
+        "base.business.get": [HUB_REGISTERED],
     }
 
 
