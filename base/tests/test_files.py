@@ -577,3 +577,19 @@ def test_a_refusal_reaches_a_spanish_person_in_spanish(store):
     with translation.override("es"):
         message = str(pytest.raises(InvalidPayload, files.upload, store, A, "", "setup.exe", b"MZ").value)
     assert message == "Los programas (.exe) no se pueden guardar en Archivos: podrían dañar a quien los abra."
+
+
+# ── No ORM: the store only ────────────────────────────────────────────────────────────────────────────────────
+
+
+def test_files_touches_no_model_nor_database():
+    """``base/files.py`` is in ``ORM_EXCEPTIONS`` (tests/test_guardrails.py) for its Storage ``save``/``delete``: it
+    keeps no metadata, so it imports no model, no ``django.db`` and no ``live.models``; the ORM stays in the doors."""
+    import ast
+
+    tree = ast.parse(Path(files.__file__).read_text())
+    imported = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)} | {
+        alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
+    }
+    assert not {name for name in imported if name and (name.startswith("django.db") or name.endswith("models"))}
+    assert "objects" not in {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
