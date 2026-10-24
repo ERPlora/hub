@@ -222,6 +222,21 @@ describe('failures (BASE-G124, G122)', () => {
   });
 });
 
+describe('the month’s messages (BASE-G122)', () => {
+  it('each answer moves the count without a reload: its usage frame is the plan’s now (gh:hub#1183)', async () => {
+    const { post } = hub(
+      [{ type: 'text', text: 'Hola.' }, { type: 'usage', used: 25, limit: 30, resets_at: '2026-11-01T00:00:00Z', demo: false }, done()],
+      [{ type: 'text', text: 'Otra.' }, { type: 'usage', used: 26, limit: 30, resets_at: '2026-11-01T00:00:00Z', demo: false }, done()],
+    );
+    const assistant = assistantWith(post);
+    assistant.state.usage = { used: 24, limit: 30, resets_at: '2026-11-01T00:00:00Z', demo: false };
+    await assistant.ask('Hola');
+    expect(assistant.state.usage).toEqual({ used: 25, limit: 30, resets_at: '2026-11-01T00:00:00Z', demo: false });
+    await assistant.ask('Otra');
+    expect(assistant.state.usage?.used).toBe(26);
+  });
+});
+
 describe('the conversation (BASE-G120)', () => {
   it('is kept in this tab and comes back for the same person', async () => {
     const storage = memoryStorage();
