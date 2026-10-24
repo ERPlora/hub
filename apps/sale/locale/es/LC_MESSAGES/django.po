@@ -828,3 +828,27 @@ msgstr "Ya pagado · %(name)s"
 #, python-format
 msgid "Discount of %(amount)s, already applied to the amounts above."
 msgstr "Descuento de %(amount)s, ya aplicado en los importes de arriba."
+
+msgid "Void a sale"
+msgstr "Anular una venta"
+
+msgid "Refund a sale"
+msgstr "Devolver una venta"
+
+msgid "Void an item already sent to the kitchen"
+msgstr "Anular un artículo ya enviado a cocina"
+
+msgid "Discount a line above the maximum"
+msgstr "Descontar una línea por encima del máximo"
+
+msgid "Discount the check above the maximum"
+msgstr "Descontar la cuenta por encima del máximo"
+
+msgid "Charge with a discount above the maximum"
+msgstr "Cobrar con un descuento por encima del máximo"
+
+msgid "Sell at an open price"
+msgstr "Vender a precio libre"
+
+msgid "Delete an open check with something on it"
+msgstr "Eliminar una cuenta abierta con algo pedido"

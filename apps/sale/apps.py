@@ -59,6 +59,19 @@ class SaleConfig(LiveAppConfig):
             "sale.view_paymentmethod",
         ],
     }
+    # What a manager approves on the spot with their PIN on the cashier's own device (BASE-F84; the old hub's
+    # HUB_SHELL-F51; Square, Toast, Lightspeed and Shopify's manager override), in the words the dialog «An approval
+    # is needed» says: every command of the till whose permission the employee lacks. Who holds it is never asked.
+    approvals = {
+        "sale.sale.void": _("Void a sale"),
+        "sale.sale.refund": _("Refund a sale"),
+        "sale.order.void_line": _("Void an item already sent to the kitchen"),
+        "sale.order.set_line_discount_over_limit": _("Discount a line above the maximum"),
+        "sale.order.set_discount_over_limit": _("Discount the check above the maximum"),
+        "sale.sale.complete_over_limit": _("Charge with a discount above the maximum"),
+        "sale.order.add_open_line": _("Sell at an open price"),
+        "sale.order.void_ordered": _("Delete an open check with something on it"),
+    }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: the old `storefront` (filled) and
     # `chatbubble-ellipses-outline` wait in UI-REQUESTS.md. The departments of the open price read

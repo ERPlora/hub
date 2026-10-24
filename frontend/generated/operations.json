@@ -763,6 +763,10 @@
     "method": "post",
     "path": "/api/sale/orders/void"
   },
+  "sale.order.void_ordered": {
+    "method": "post",
+    "path": "/api/sale/orders/void_ordered"
+  },
   "sale.order.set_discount": {
     "method": "post",
     "path": "/api/sale/orders/set_discount"

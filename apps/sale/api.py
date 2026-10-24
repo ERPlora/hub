@@ -231,6 +231,11 @@ async def order_void(request, data: OrderRefIn):
     return await run_operation(request, services.void_order, data)
 
 
+@bind(router, "sale.order.void_ordered", "/sale/orders/void_ordered")
+async def order_void_ordered(request, data: OrderRefIn):
+    return await run_operation(request, services.void_ordered, data)
+
+
 @bind(router, "sale.order.set_discount", "/sale/orders/set_discount")
 async def order_set_discount(request, data: OrderSetDiscountIn):
     return await run_operation(request, services.set_discount, data)

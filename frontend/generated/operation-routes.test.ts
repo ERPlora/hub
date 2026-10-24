@@ -206,6 +206,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.order.split': { method: 'post', path: '/api/sale/orders/split' },
       'sale.order.merge': { method: 'post', path: '/api/sale/orders/merge' },
       'sale.order.void': { method: 'post', path: '/api/sale/orders/void' },
+      'sale.order.void_ordered': { method: 'post', path: '/api/sale/orders/void_ordered' },
       'sale.order.set_discount': { method: 'post', path: '/api/sale/orders/set_discount' },
       'sale.order.set_discount_over_limit': { method: 'post', path: '/api/sale/orders/set_discount_over_limit' },
       'sale.order.set_line_discount': { method: 'post', path: '/api/sale/orders/set_line_discount' },

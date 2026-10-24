@@ -912,6 +912,7 @@ declare module '@erplora/ui/sdk' {
     'sale.order.split': { input: OrderSplitIn; output: OrderSplitOut };
     'sale.order.merge': { input: OrderMergeIn; output: OrderOut };
     'sale.order.void': { input: OrderRefIn; output: OrderOut };
+    'sale.order.void_ordered': { input: OrderRefIn; output: OrderOut };
     'sale.order.set_discount': { input: OrderSetDiscountIn; output: OrderOut };
     'sale.order.set_discount_over_limit': { input: OrderSetDiscountIn; output: OrderOut };
     'sale.order.set_line_discount': { input: OrderSetLineDiscountIn; output: OrderOut };
