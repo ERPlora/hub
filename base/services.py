@@ -38,7 +38,7 @@ from uuid import UUID
 import pydantic
 from django.conf import settings
 from django.contrib.auth import get_user_model, login
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.sessions.models import Session
 from django.db import IntegrityError, connection, transaction
@@ -47,9 +47,9 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import HttpRequest
 from django.utils import timezone
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from live.context import OperationContext, Scope, system_context
-from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied, Unauthorized
 from live.live_registry import ALL_EVENTS
 from live.models import OutboxEvent
 from live.operations import get as get_operation
@@ -61,7 +61,17 @@ from base import access, auth, events, queries, registry, signing
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST, session_host
-from base.models import DemoCode, EventDelivery, Hub, Membership, SessionOwner, TaskSchedule, TrustedDevice
+from base.models import (
+    Credential,
+    DemoCode,
+    EventDelivery,
+    Hub,
+    Membership,
+    SessionOwner,
+    TaskSchedule,
+    TrustedDevice,
+)
+from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas import (
     DemoCodeIn,
     DemoCodeOut,
@@ -78,6 +88,8 @@ from base.schemas import (
     HubSeedLocalOut,
     HubStateIn,
     HubStateOut,
+    PinSetIn,
+    PinSetOut,
     SessionRevokeIn,
     SessionRevokeOut,
 )
@@ -1028,11 +1040,6 @@ def reap_demo_tombstones(now: dt.datetime | None = None) -> int:
 
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
 
-#: Where an entry leaves the token of this browser's device for its response (``base.auth_views`` sets the cookie):
-#: renewed at every entry with the account, a new one when the browser had none or its device was removed.
-DEVICE_TOKEN_ATTR = "hub_device_token"
-
-
 def trust_device(request: HttpRequest, user) -> TrustedDevice:
     """This browser's device of the hub, made a trusted one by an entry with the account (BASE-G52, G53).
 
@@ -1040,7 +1047,7 @@ def trust_device(request: HttpRequest, user) -> TrustedDevice:
     new token. Its last person in and entry are now's, and a notice of sessions it lost (``ended_reason``) is read.
     """
     now = timezone.now()
-    device = device_of(request, for_update=True)
+    device = queries.device_of(request, for_update=True)
     if device is None:
         token = access.new_device_token()
         device = TrustedDevice.objects.create(
@@ -1053,17 +1060,8 @@ def trust_device(request: HttpRequest, user) -> TrustedDevice:
     else:
         token = request.COOKIES[access.DEVICE_COOKIE]
         _entered(device, user, now)
-    setattr(request, DEVICE_TOKEN_ATTR, token)
+    setattr(request, access.DEVICE_TOKEN_ATTR, token)
     return device
-
-
-def device_of(request: HttpRequest, *, for_update: bool = False) -> TrustedDevice | None:
-    """The hub's device this browser's cookie names, or ``None`` (no cookie, or a device the hub does not know)."""
-    token = request.COOKIES.get(access.DEVICE_COOKIE, "")
-    if not token:
-        return None
-    devices = TrustedDevice.objects.select_for_update() if for_update else TrustedDevice.objects
-    return devices.filter(token_digest=access.token_digest(token)).first()
 
 
 def _entered(device: TrustedDevice, user, now: dt.datetime) -> None:
@@ -1099,3 +1097,74 @@ def _end_other_devices(slug: str, device: TrustedDevice) -> None:
     TrustedDevice.objects.filter(pk__in=devices).update(
         ended_reason=TrustedDevice.EndedReason.DEVICE_LIMIT, ended_at=now
     )
+
+
+@transaction.atomic
+def open_session_on_device(request: HttpRequest, user, device: TrustedDevice, credential: str) -> None:
+    """Log ``user`` in on the hub's ``device`` with its PIN or its badge (BASE-G55, G56, G60), for a shift (or what the
+    device and the business allow). Over someone else's session («Switch user») ``login`` ends that one only now, once
+    the new one is being opened in this transaction: a refused PIN never reaches here and changes nothing."""
+    device = TrustedDevice.objects.select_for_update().get(pk=device.pk)
+    _entered(device, user, timezone.now())
+    _log_in(request, user, saas_user_id_of(user), device=device, credential=credential)
+    _end_other_devices(session_host(request) or "", device)
+
+
+def saas_user_id_of(user) -> str:
+    """The SaaS account a customer copy stands for (``saas:<id>`` → ``<id>``; :func:`username_for`)."""
+    return user.get_username().removeprefix(SAAS_USERNAME_PREFIX)
+
+
+@operation("base.pin.set", kind="command", permission=VIEW_HOME, input=PinSetIn, output=PinSetOut)
+def pin_set(ctx: OperationContext, data: PinSetIn) -> dict:
+    """Choose or change one's own PIN (BASE-G54, G126): the business's length, digits only, not guessable, with the
+    current one when there is one, and not the PIN of another active person of this hub. Every try counts against
+    the person's budget (``access.PIN_CHANGE_LIMIT``), the accepted ones too: «already taken» tells something."""
+    if ctx.actor is None or not hasattr(ctx.actor, "get_username"):
+        raise Unauthorized(gettext("Sign in to choose your PIN."), code="base.sign_in_required")
+    username = ctx.actor.get_username()
+    wait = access.PIN_CHANGE_LIMIT.wait(ctx.scope.key, username)
+    if wait:
+        raise OperationError(
+            too_many_message(wait, gettext("Too many tries to change the PIN.")), code="base.too_many_pin_changes", status=429
+        )
+    access.PIN_CHANGE_LIMIT.failed(ctx.scope.key, username)
+    length = queries.access_settings().pin_length
+    problem = access.pin_problem(data.pin, length)
+    if problem is not None:
+        raise InvalidPayload(_PIN_PROBLEMS[problem](length), code=f"base.pin_{problem}", fields={"pin": problem})
+    credential = Credential.objects.select_for_update().filter(username=username).first()
+    if credential is not None and credential.pin_hash and not check_password(data.current, credential.pin_hash):
+        raise PermissionDenied(
+            gettext("That is not your current PIN. Type it right to set a new one."), code="base.pin_current_wrong"
+        )
+    if any(check_password(data.pin, other.pin_hash) for other, _ in queries.pin_people(ctx.scope.key, exclude=username)):
+        raise Conflict(
+            gettext("Another active person already has that PIN: choose a different one."), code="base.pin_taken"
+        )
+    if credential is None:
+        credential = Credential(username=username)
+    credential.pin_hash, credential.pin_set_at = make_password(data.pin, hasher=PIN_HASHER), timezone.now()
+    credential.save()
+    record_event(ctx, events.PIN_SET, {})
+    return {"set": True}
+
+
+#: argon2id, as the old Hub (``crates/runtime/src/identity.rs``): a PIN is short, so its hash must be slow.
+PIN_HASHER = "argon2"
+
+_PIN_PROBLEMS = {
+    access.PIN_LENGTH: lambda length: gettext("The PIN must have %(length)s digits.") % {"length": length},
+    access.PIN_DIGITS: lambda length: gettext("The PIN takes digits only."),
+    access.PIN_GUESSABLE: lambda length: gettext(
+        "That PIN is too easy to guess: avoid repeated digits (1111) and runs (1234)."
+    ),
+}
+
+
+def too_many_message(wait: int, lead: str) -> str:
+    """«<lead> Wait N minutes and try again.», the minutes rounded up."""
+    minutes = max(1, -(-wait // 60))
+    return f"{lead} " + ngettext(
+        "Wait %(minutes)s minute and try again.", "Wait %(minutes)s minutes and try again.", minutes
+    ) % {"minutes": minutes}

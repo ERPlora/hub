@@ -3,7 +3,10 @@
 ``base.bell.counters``; their rules are ``base.home``'s)."""
 
 from typing import Any
+from uuid import UUID
 
+from django.contrib.auth.hashers import check_password
+from django.http import HttpRequest
 from django.utils import translation
 from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
@@ -11,10 +14,14 @@ from live.errors import NotFound
 from live.operations import operation
 
 from base import access, home
-from base.models import AccessSettings, EventDelivery, Hub, Membership, Profile
+from base.models import AccessSettings, Credential, EventDelivery, Hub, Membership, Profile, TrustedDevice
+from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
+from base.throttle import client_key
 from base.schemas import (
+    AccessDoorIn,
+    AccessDoorOut,
     BellCountersIn,
     BellCountersOut,
     DemoSlugIn,
@@ -32,10 +39,6 @@ from base.schemas import (
     WidgetListIn,
     WidgetListOut,
 )
-
-#: Everyone of the hub sees the Home; who runs it (owner, admin) is told the platform's steps and counters.
-VIEW_HOME = "base.view_home"
-ADMINISTER_HUB = "base.administer_hub"
 
 
 @operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut)
@@ -254,3 +257,95 @@ def person_label(user) -> str:
     if profile is not None and (name := f"{profile.first_name} {profile.last_name}".strip()):
         return name
     return user.get_full_name() or user.get_username()
+
+
+def device_of(request: HttpRequest | None, *, for_update: bool = False) -> TrustedDevice | None:
+    """The hub's device this browser's cookie names, or ``None`` (no request or cookie, or a device the hub does not
+    know: never one in which nobody entered with an account, nor one that was removed)."""
+    token = request.COOKIES.get(access.DEVICE_COOKIE, "") if request is not None else ""
+    if not token:
+        return None
+    devices = TrustedDevice.objects.select_for_update() if for_update else TrustedDevice.objects
+    return devices.filter(token_digest=access.token_digest(token)).first()
+
+
+def pin_people(slug: str, *, exclude: str = "") -> list[tuple[Credential, Any]]:
+    """The active people of ``slug`` with a PIN, with their user (but ``exclude``, a username); in no order.
+
+    Two reads, never a join: who is a member is control's (``Membership``) and the PINs are the hub's."""
+    users = {
+        membership.user.get_username(): membership.user
+        for membership in Membership.objects.filter(host=slug, user__is_active=True).select_related("user")
+    }
+    users.pop(exclude, None)
+    credentials = Credential.objects.filter(username__in=list(users)).exclude(pin_hash="")
+    return [(credential, users[credential.username]) for credential in credentials]
+
+
+def pin_owner(slug: str, person: str, pin: str) -> Any | None:
+    """The active person of ``slug`` whose way in is ``person`` and whose PIN is ``pin``; else ``None``, whatever
+    failed (an unknown id, another hub's person, a deactivated one, no PIN, a wrong one: the door says the same)."""
+    try:
+        person_id = UUID(person)
+    except (TypeError, ValueError):
+        return None
+    credential = Credential.objects.filter(pk=person_id).exclude(pin_hash="").first()
+    if credential is None:
+        return None
+    membership = (
+        Membership.objects.filter(host=slug, user__username=credential.username, user__is_active=True)
+        .select_related("user")
+        .first()
+    )
+    if membership is None or not check_password(pin, credential.pin_hash):
+        return None
+    return membership.user
+
+
+def pin_door_open(request: HttpRequest, slug: str) -> bool:
+    """Whether this browser enters ``slug`` by the PIN pad: a shared device of the hub, a business that asks, and
+    somebody of it with a PIN to choose."""
+    device = device_of(request)
+    if device is None or not access.pin_offered(device.mode, access_settings().pin_policy):
+        return False
+    return bool(pin_people(slug))
+
+
+@operation("base.access.door", kind="query", permission=None, input=AccessDoorIn, output=AccessDoorOut)
+def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
+    """The way in of the browser that asks (BASE-G55): on a shared device of the hub of a business that asks, the
+    people of this hub with a PIN, by name and initials (never their email nor account) and the PIN's length.
+
+    The grid reaches only whom the PIN would let in (the old Hub's HUB-F133): anyone else, and an address that tried
+    too many wrong PINs (with how long it still waits), hears the same answer with nobody in it."""
+    settings = access_settings()
+    device = device_of(ctx.request)
+    offered = device is not None and access.pin_offered(device.mode, settings.pin_policy)
+    wait = access.PIN_ADDRESS_LIMIT.wait(ctx.scope.key, client_key(ctx.request)) if offered else 0
+    people = [] if not offered or wait else pin_people(ctx.scope.key)
+    faces = sorted(
+        ({"id": str(credential.pk), "name": (name := person_label(user)), "initials": access.initials(name)}
+         for credential, user in people),
+        key=lambda face: face["name"].casefold(),
+    )
+    return {"pin": offered and (bool(faces) or wait > 0), "pin_length": settings.pin_length, "people": faces, "wait": wait}
+
+
+def language_of(user, slug: str) -> str:
+    """The language a person works in on ``slug``: their «My profile» choice, else the business's."""
+    chosen = Profile.objects.filter(username=user.get_username()).values_list("language", flat=True).first()
+    if chosen:
+        return chosen
+    return Hub.objects.filter(slug=slug).values_list("language", flat=True).first() or ""
+
+
+def device_of_entry(request: HttpRequest) -> TrustedDevice | None:
+    """The device an entry of this request was made on: the token it just left (a new device's) or the cookie's."""
+    token = getattr(request, access.DEVICE_TOKEN_ATTR, None)
+    if token:
+        return TrustedDevice.objects.filter(token_digest=access.token_digest(token)).first()
+    return device_of(request)
+
+
+def has_pin(user) -> bool:
+    return Credential.objects.filter(username=user.get_username()).exclude(pin_hash="").exists()

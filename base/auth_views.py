@@ -30,6 +30,7 @@ address is locked out; it is not counted, nor what fails on the platform's side 
 after a good code (a role or a user that cannot enter here).
 """
 
+import json
 import logging
 import math
 import re
@@ -37,7 +38,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.auth import logout
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import translation
@@ -49,7 +50,8 @@ from django.views.decorators.http import require_POST, require_safe
 from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
-from base import access, auth, services
+from base import access, auth, queries, services
+from base.models import SessionOwner
 from base.operations import HostScopeResolver
 from base.throttle import AttemptLimit, client_key
 
@@ -74,11 +76,12 @@ def auth_login(request: HttpRequest) -> HttpResponseRedirect:
     """``/auth/login?next=<path>``: the jump to the SaaS's login of this hub, with a fresh ``state``."""
     if getattr(request, "platform_host", False):
         return _admin_login(request)
-    slug = HostScopeResolver().resolve(request).key
     next_path = safe_next(request.GET.get("next"))
-    if _is_demo(request):
-        return auth.demo_login_redirect(slug, next_path)
-    return auth.login_redirect(slug, next_path)
+    if request.GET.get("account"):
+        # «Enter with your account» of the hub's Access page: erplora.com's sign-in, whatever the device offers.
+        slug = HostScopeResolver().resolve(request).key
+        return auth.demo_login_redirect(slug, next_path) if _is_demo(request) else auth.login_redirect(slug, next_path)
+    return way_in(request, next_path)
 
 
 def _is_demo(request: HttpRequest) -> bool:
@@ -121,7 +124,8 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
     except services.InactiveUser:
         logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
         return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
-    return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(next_path), result.user.locale)))
+    landing = _choose_a_pin_first(request, next_path, slug)
+    return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(landing), result.user.locale)))
 
 
 def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRedirect:
@@ -220,15 +224,20 @@ def _with_language(response: HttpResponse, locale: str) -> HttpResponse:
 
 @require_POST
 def auth_logout(request: HttpRequest) -> HttpResponseRedirect:
-    """Close the Hub's session, then the SaaS's (its page asks to confirm); a demo's goes back to the demo door."""
+    """Close the Hub's session, then the SaaS's (its page asks to confirm); a demo's goes back to the demo door. On a
+    device with the PIN pad (BASE-G61) it goes back to the hub's Access: the next person enters with their PIN, and
+    erplora.com's session in this browser is whoever made it a device's, not the person signing out."""
     demo = _is_demo(request)
+    pin_pad = not demo and _hub_slug_of(request) is not None and queries.pin_door_open(request, _hub_slug_of(request))
     logout(request)
+    if pin_pad:
+        return HttpResponseRedirect(ACCESS_PAGE)
     return HttpResponseRedirect(auth.saas_url(auth.DEMO_DOOR_PATH if demo else SAAS_LOGOUT_PATH))
 
 
 def with_device(request: HttpRequest, response: HttpResponse) -> HttpResponse:
     """``response`` with the cookie of this browser's device when the entry left its token (``base.services``)."""
-    token = getattr(request, services.DEVICE_TOKEN_ATTR, None)
+    token = getattr(request, access.DEVICE_TOKEN_ATTR, None)
     if token:
         access.set_device_cookie(response, token, secure=settings.SESSION_COOKIE_SECURE)
     return response
@@ -246,3 +255,127 @@ def _supported_language(locale: str) -> str | None:
         return translation.get_supported_language_variant(locale) if locale else None
     except LookupError:
         return None
+
+
+# ── The way in on a device of the hub: the PIN and the badge (APP-BASE-3) ─────────────────────────────────────────
+
+#: The hub's «Access» (``base/frontend/routes.ts``): the PIN pad, «Enter with your account» and what happened.
+ACCESS_PAGE = "/login"
+#: «Choose your PIN» after an entry with the account on a device that asks (BASE-G54).
+PIN_SETUP_PAGE = "/pin/setup"
+#: What the Access page tells (``?notice=``): the session ended, or another device's entry ended it.
+NOTICE_ENDED = "ended"
+NOTICE_DEVICE_LIMIT = "device_limit"
+
+
+def way_in(request: HttpRequest, next_path: str) -> HttpResponseRedirect:
+    """Where a browser without a session goes to enter this hub (BASE-G55, G57, G58): the hub's Access page when it is
+    a shared device of the hub of a business that asks, with somebody to choose, or when the Access page has something
+    to tell; else erplora.com's sign-in for this hub, as always (a demo, its own door)."""
+    slug = HostScopeResolver().resolve(request).key
+    if _is_demo(request):
+        return auth.demo_login_redirect(slug, next_path)
+    notice = _notice(request)
+    if notice or queries.pin_door_open(request, slug):
+        return HttpResponseRedirect(f"{ACCESS_PAGE}?{urlencode({'next': next_path, **({'notice': notice} if notice else {})})}")
+    return auth.login_redirect(slug, next_path)
+
+
+def _notice(request: HttpRequest) -> str:
+    """Why this browser has no session, when it had one: another device's entry ended it, or it ended (it expired, it
+    was revoked, its device removed): the session cookie came and no session answers it."""
+    device = queries.device_of(request)
+    if device is not None and device.ended_reason == device.EndedReason.DEVICE_LIMIT:
+        return NOTICE_DEVICE_LIMIT
+    if settings.SESSION_COOKIE_NAME in request.COOKIES and not request.user.is_authenticated:
+        return NOTICE_ENDED
+    return ""
+
+
+def _choose_a_pin_first(request: HttpRequest, next_path: str, slug: str) -> str:
+    """``next`` after an entry with the account, or «Choose your PIN» first (BASE-G54) when this device asks, the
+    business already enters its tills by PIN (somebody else of it has one) and the person has none yet. The page lets
+    them leave it for later. A business nobody of which has a PIN is never asked: its first PIN is chosen in «My
+    profile» or given in Personal, as Square and Toast hand out their passcodes."""
+    device = queries.device_of_entry(request)
+    if device is None or not access.pin_offered(device.mode, queries.access_settings().pin_policy):
+        return next_path
+    me = request.user.get_username()
+    if queries.has_pin(request.user) or not queries.pin_people(slug, exclude=me):
+        return next_path
+    return f"{PIN_SETUP_PAGE}?{urlencode({'next': next_path})}"
+
+
+def _hub_slug_of(request: HttpRequest) -> str | None:
+    hub = getattr(request, "hub", None)
+    return hub.slug if hub is not None else None
+# Django views like the callback, not ninja routes: they open a session (``login`` needs the request), which no
+# operation does. JSON in and out, from the SPA's PIN pad, behind Django's CSRF check (the SPA's ``X-CSRFToken``).
+
+
+@require_POST
+@never_cache
+def auth_pin(request: HttpRequest) -> HttpResponse:
+    """``POST /auth/pin {person, pin, next}``: the session of the person of this hub whose PIN it is (BASE-G55, G60).
+
+    In this order (the old Hub's HUB-F133): the address is not braked, the browser is a shared device of the hub of a
+    business that asks, the person is not braked and the PIN is the right one of an active person of this hub. A
+    wrong one counts against the person and the address; a right one starts the person's count again."""
+    door = _device_door(request)
+    if isinstance(door, HttpResponse):
+        return door
+    slug, device, body = door
+    person = str(body.get("person", ""))[:64]
+    wait = access.PIN_PERSON_LIMIT.wait(slug, person)
+    if wait:
+        return _pin_too_many(wait)
+    user = queries.pin_owner(slug, person, str(body.get("pin", ""))[:16])
+    if user is None:
+        access.PIN_PERSON_LIMIT.failed(slug, person)
+        access.PIN_ADDRESS_LIMIT.failed(slug, client_key(request))
+        return _refused(401, "base.pin_incorrect", gettext("Wrong PIN."))
+    access.PIN_PERSON_LIMIT.clear(slug, person)
+    return _entered(request, user, device, SessionOwner.Credential.PIN, slug, body)
+
+
+def _device_door(request: HttpRequest):
+    """The hub, the device and the body of a PIN or badge entry, or the response that refuses it."""
+    if getattr(request, "platform_host", False):
+        raise Http404("The platform host has no PIN pad.")
+    slug = HostScopeResolver().resolve(request).key
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        return _refused(422, "base.invalid_payload", gettext("The request could not be read."))
+    wait = access.PIN_ADDRESS_LIMIT.wait(slug, client_key(request))
+    if wait:
+        return _pin_too_many(wait)
+    device = queries.device_of(request)
+    if device is None:
+        return _refused(
+            403,
+            "base.device_not_trusted",
+            gettext("This device does not work with a PIN yet. Sign in once here with your account and from then on it will."),
+        )
+    if not access.pin_offered(device.mode, queries.access_settings().pin_policy):
+        return _refused(403, "base.pin_not_offered", gettext("This device does not ask for a PIN: sign in with your account."))
+    return slug, device, body
+
+
+def _entered(request: HttpRequest, user, device, credential: str, slug: str, body: dict) -> HttpResponse:
+    services.open_session_on_device(request, user, device, credential)
+    response = JsonResponse({"next": safe_next(body.get("next"))})
+    return _with_language(response, queries.language_of(user, slug))
+
+
+def _refused(status: int, code: str, message: str) -> JsonResponse:
+    error = OperationError(message, code=code, status=status)
+    return JsonResponse(error.envelope(), status=error.status)
+
+
+def _pin_too_many(wait: int) -> JsonResponse:
+    response = _refused(429, "base.too_many_attempts", services.too_many_message(wait, gettext("Too many wrong attempts.")))
+    response["Retry-After"] = str(wait)
+    return response

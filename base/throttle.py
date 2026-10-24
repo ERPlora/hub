@@ -133,6 +133,16 @@ class AttemptLimit:
             )
 
 
+    def clear(self, *parts: str) -> None:
+        """Forget the refused attempts of ``parts`` (a right PIN starts its person's count again). A cache that does
+        not answer leaves them (logged): they end with their window."""
+        cache_key = f"{KEY_PREFIX}{self.key(*parts)}"
+        try:
+            cache.delete_many([cache_key, cache_key + UNTIL_SUFFIX])
+        except Exception:
+            logger.exception("Attempt limit %r did not forget %s: the cache did not answer.", self.name, self.key(*parts))
+
+
 def client_address(request: HttpRequest) -> str:
     """The caller's address as the proxies in front of the Hub saw it, the one a limit counts.
 

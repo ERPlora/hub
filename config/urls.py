@@ -12,7 +12,7 @@ from live.live_view import live_stream
 from live.spa import BASE_NON_SPA_PREFIXES
 
 from base.admin import open_hub
-from base.auth_views import auth_callback, auth_login, auth_logout
+from base.auth_views import auth_callback, auth_login, auth_logout, auth_pin
 from base.health import readyz
 from base.internal import (
     demo_codes,
@@ -55,6 +55,7 @@ urlpatterns = [
     path("auth/login", auth_login, name="auth-login"),
     path("auth/callback", auth_callback, name="auth-callback"),
     path("auth/logout", auth_logout, name="auth-logout"),
+    path("auth/pin", auth_pin, name="auth-pin"),
     path("internal/demos", demos, name="internal-demos"),
     path("internal/demos/<str:slug>/codes", demo_codes, name="internal-demo-codes"),
     path("internal/hubs/<uuid:hub_id>", hub, name="internal-hub"),

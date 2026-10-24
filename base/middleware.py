@@ -37,7 +37,9 @@ SPA are redirected: anything with a URL of its own in Django (``/api`` answers 4
 404 with no cookie, ``base.spa.NOT_A_FILE``). A request that does not ask for HTML gets
 the shell, whose auth gate sends to ``/auth/login``, the same jump. On a demo's host the jump is the demo's, to the
 SaaS's ``/demo/enter/`` (``base.auth.demo_login_redirect``, plan 2026-10-17 §1.6): there is no account to log in to.
-``/`` of a hub with a published website is that website instead (``base.public_home``, round 2026-10-21).
+``/`` of a hub with a published website is that website instead (``base.public_home``, round 2026-10-21). Which way in
+is ``base.auth_views.way_in``'s (APP-BASE-3): a shared device of the hub with the PIN pad, or a browser whose session
+ended, goes to the hub's own Access page (``/login``, which this gate leaves alone) instead of the SaaS's.
 
 ``HubDatabaseMiddleware`` (phase 2, S1; plan 2026-10-22): right after the host gate, the rest of the request runs in
 its database context: ``use_hub(request.hub)`` on a hub's host; on the platform host, the hub the admin chose
@@ -69,7 +71,7 @@ from live.api_errors import DEFAULT_API_PREFIX
 from live.errors import NotFound
 
 from base import registry
-from base.auth import admin_hubs_url, demo_login_redirect, login_redirect, saas_url
+from base.auth import admin_hubs_url, saas_url
 from base.health import READYZ_PATH
 from base.models import Hub
 from base.operations import HostScopeResolver, is_platform_host
@@ -204,11 +206,12 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
         if request.path_info == "/" and website_enabled(request):
             # The hub's published website is its home page for a visitor (base.public_home); staff sign in from it.
             return None
-        slug = HostScopeResolver().resolve(request).key
-        hub = getattr(request, "hub", None)
-        if hub is not None and hub.is_demo:
-            return demo_login_redirect(slug, request.get_full_path())
-        return login_redirect(slug, request.get_full_path())
+        from base.auth_views import ACCESS_PAGE, way_in
+
+        if request.path_info == ACCESS_PAGE:
+            # The hub's Access page (APP-BASE-3) is the SPA's own way in: it never jumps anywhere by itself.
+            return None
+        return way_in(request, request.get_full_path())
 
 
 #: What the platform host runs in without a hub chosen for the admin (phase 1's one database, S1–S4).

@@ -312,3 +312,32 @@ class NoticeListOut(Schema):
     sources: list[str] = Field(
         description="«<app>.<notice>» of every notice this person hears, told or not: with none, nothing to ask for."
     )
+
+
+# ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
+
+
+class AccessDoorIn(Schema):
+    """No input: the door of the browser that asks (its device cookie), with a session or without."""
+
+
+class PinPersonOut(Schema):
+    id: str = Field(description="The person's way in on this hub (what a PIN entry names), never their account.")
+    name: str
+    initials: str
+
+
+class AccessDoorOut(Schema):
+    pin: bool = Field(description="Whether this browser offers the PIN pad: a shared device of the hub that asks.")
+    pin_length: int = Field(description="How many digits a PIN of this business has (4 or 6).")
+    people: list[PinPersonOut] = Field(description="The faces of the grid; none where the PIN is not offered.")
+    wait: int = Field(description="Seconds this address still waits after too many wrong PINs; 0 when it may try.")
+
+
+class PinSetIn(Schema):
+    pin: str = Field(max_length=16)
+    current: str = Field(default="", max_length=16, description="The PIN it replaces, when the person has one.")
+
+
+class PinSetOut(Schema):
+    set: bool

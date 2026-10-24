@@ -14,6 +14,11 @@ from live.meta import all_live_app_configs, permissions_for_role
 from base.models import Membership
 
 
+#: Everyone of the hub sees the Home; who runs it (owner, admin) is told the platform's steps and counters, and keeps
+#: its devices and the way in (APP-BASE-3). Here, not in ``base.queries``, so ``base.services`` can name them too.
+VIEW_HOME = "base.view_home"
+ADMINISTER_HUB = "base.administer_hub"
+
 #: Customer roles that run the hub: every permission of every app, whether the app lists them or not.
 FULL_ACCESS_ROLES = frozenset({Membership.Role.OWNER, Membership.Role.ADMIN})
 

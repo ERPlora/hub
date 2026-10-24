@@ -13,6 +13,8 @@ DEMO_CREATED = "base.demo.created"
 DEMO_CODE_CREATED = "base.demo.code_created"
 DEMO_EXPIRED = "base.demo.expired"
 DEMO_PURGED = "base.demo.purged"
+#: Someone chose or changed their PIN (APP-BASE-3): the grid of «Switch user» has another face. Names nobody.
+PIN_SET = "base.pin.set"
 
 ALL = [
     HUB_REGISTERED,
@@ -23,4 +25,5 @@ ALL = [
     DEMO_CODE_CREATED,
     DEMO_EXPIRED,
     DEMO_PURGED,
+    PIN_SET,
 ]

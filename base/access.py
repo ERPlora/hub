@@ -25,6 +25,8 @@ import hmac
 import re
 import secrets
 
+from base.throttle import AttemptLimit
+
 # ── The business's dial ──────────────────────────────────────────────────────────────────────────────────────────
 
 ALWAYS = "always"
@@ -63,6 +65,9 @@ DEVICE_MODES = (SHARED, PERSONAL)
 DEVICE_COOKIE = "hub_device"
 #: As long as a browser keeps a cookie (Chrome caps an expiry at 400 days); every entry renews it.
 DEVICE_COOKIE_MAX_AGE = 400 * 24 * 60 * 60
+#: Where an entry leaves the token of this browser's device for its response (``base.auth_views`` sets the cookie):
+#: renewed at every entry with the account, a new one when the browser had none or its device was removed.
+DEVICE_TOKEN_ATTR = "hub_device_token"
 #: A device nobody entered in this long is «unused» (the old Hub's cleanup, Google's and Apple's device lists).
 UNUSED_AFTER = dt.timedelta(days=30)
 #: The longest name the business gives a device («Bar», «Kitchen», «Office laptop»).
@@ -169,3 +174,14 @@ def set_device_cookie(response, token: str, *, secure: bool) -> None:
     response.set_cookie(
         DEVICE_COOKIE, token, max_age=DEVICE_COOKIE_MAX_AGE, path="/", secure=secure, httponly=True, samesite="Lax"
     )
+
+
+# ── The brakes on whoever tries PINs (the old Hub's HUB-F135) ────────────────────────────────────────────────────
+# ``base.throttle.AttemptLimit``s, counted in the cache (Valkey in AWS) and keyed by the hub's slug first.
+
+#: Wrong PINs (or badges) for one person (or card): 5 within 5 minutes; a right one starts the count again.
+PIN_PERSON_LIMIT = AttemptLimit("pin", attempts=5, window=300)
+#: Wrong PINs or badges from one address (``base.throttle.client_key``), whoever they named: 20 within 15 minutes.
+PIN_ADDRESS_LIMIT = AttemptLimit("pin-address", attempts=20, window=900)
+#: Tries to choose one's own PIN: 30 an hour, the accepted ones too (a PIN «already taken» tells something).
+PIN_CHANGE_LIMIT = AttemptLimit("pin-change", attempts=30, window=3600)

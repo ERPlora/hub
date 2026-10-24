@@ -3,7 +3,8 @@
 from live.ninja import bind, run_operation
 from ninja import Router
 
-from base import queries
+from base import queries, services
+from base.schemas import PinSetIn
 
 router = Router(tags=["base"])
 
@@ -32,3 +33,17 @@ async def bell_counters(request):
 @bind(router, "base.notice.list", "/home/notices")
 async def notice_list(request):
     return await run_operation(request, queries.notice_list)
+
+
+# ── The way in (APP-BASE-3) ────────────────────────────────────────────────────────────────────────────────────────
+
+
+# auth=None: the PIN pad is the door of a browser without a session (its device cookie decides what it shows).
+@bind(router, "base.access.door", "/access/door", auth=None)
+async def access_door(request):
+    return await run_operation(request, queries.access_door)
+
+
+@bind(router, "base.pin.set", "/me/pin")
+async def pin_set(request, data: PinSetIn):
+    return await run_operation(request, services.pin_set, data)
