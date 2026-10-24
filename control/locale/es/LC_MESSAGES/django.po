@@ -69,3 +69,30 @@ msgstr "reservado hasta"
 
 msgid "oldest fiscal record pending since"
 msgstr "registro fiscal pendiente más antiguo desde"
+
+# The registry's own words, with their context: without one, «state» would be every module's state too (they
+# load after the platform; APP-BASE-3).
+#: models.py
+msgctxt "hub registry"
+msgid "slug"
+msgstr "dirección"
+
+msgctxt "hub registry"
+msgid "state"
+msgstr "foto del SaaS"
+
+msgctxt "hub registry"
+msgid "created at"
+msgstr "creado el"
+
+msgctxt "hub registry"
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "hub registry"
+msgid "ready at"
+msgstr "listo el"
+
+msgctxt "hub registry"
+msgid "cancelled at"
+msgstr "cancelado el"

@@ -162,10 +162,6 @@ msgctxt "event delivery status"
 msgid "Given up"
 msgstr "Abandonado"
 
-#: models.py:110
-msgid "event"
-msgstr "evento"
-
 #: models.py:113
 msgid "depth"
 msgstr "profundidad"
@@ -228,10 +224,6 @@ msgctxt "hub status"
 msgid "Purged"
 msgstr "Purgado"
 
-#: models.py:167
-msgid "slug"
-msgstr "dirección"
-
 #: models.py:169
 msgid "country"
 msgstr "país"
@@ -260,29 +252,9 @@ msgstr "caduca el"
 msgid "demo session"
 msgstr "sesión de la demo"
 
-#: models.py:177
-msgid "state"
-msgstr "foto del SaaS"
-
 #: models.py:178
 msgid "state version"
 msgstr "versión del estado"
-
-#: models.py:179
-msgid "created at"
-msgstr "creado el"
-
-#: models.py:180
-msgid "updated at"
-msgstr "actualizado el"
-
-#: models.py:181
-msgid "ready at"
-msgstr "listo el"
-
-#: models.py:182
-msgid "cancelled at"
-msgstr "cancelado el"
 
 #: models.py:183
 msgid "purged at"
@@ -1179,11 +1151,6 @@ msgstr "dígitos del PIN"
 msgid "badge key"
 msgstr "clave de las placas"
 
-#: models.py:194
-#| msgid "updated at"
-msgid "updated by"
-msgstr "cambiado por"
-
 #: models.py:197 models.py:198
 msgid "way in settings"
 msgstr "ajustes de entrada"
@@ -1311,3 +1278,28 @@ msgstr "Escribe un correo de contacto válido."
 #: services.py:1441
 msgid "The photo could not be saved. Use a JPG, PNG or WebP of up to 2 MB."
 msgstr "No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB."
+
+#: models.py:79
+msgctxt "session owner"
+msgid "created at"
+msgstr "creado el"
+
+#: models.py:193
+msgctxt "access settings"
+msgid "updated at"
+msgstr "actualizado el"
+
+#: models.py:195
+msgctxt "access settings"
+msgid "updated by"
+msgstr "cambiado por"
+
+#: models.py:242
+msgctxt "profile"
+msgid "updated at"
+msgstr "actualizado el"
+
+#: models.py:303
+msgctxt "event delivery"
+msgid "event"
+msgstr "evento"

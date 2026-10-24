@@ -76,7 +76,7 @@ class SessionOwner(UUIDModel):
     )
     saas_user_id = models.CharField(_("SaaS account"), max_length=64)
     host = models.CharField(_("host"), max_length=63, help_text=_("The hub's slug, or the platform host's mark."))
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    created_at = models.DateTimeField(pgettext_lazy("session owner", "created at"), auto_now_add=True)
     # APP-BASE-3: the hub's device the session was opened on (a ``TrustedDevice``'s id: a hub's row, so no foreign key
     # from control) and how its person proved who they are. A session with no device (the admin's, a demo's) has none.
     device_id = models.UUIDField(_("device"), null=True, blank=True)
@@ -190,8 +190,10 @@ class AccessSettings(UUIDModel):
     pin_inactivity_minutes = models.PositiveSmallIntegerField(_("ask again after (minutes)"), default=5)
     pin_length = models.PositiveSmallIntegerField(_("PIN digits"), default=4)
     badge_key = models.CharField(_("badge key"), max_length=64, blank=True, editable=False)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    updated_by = models.CharField(_("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    updated_at = models.DateTimeField(pgettext_lazy("access settings", "updated at"), auto_now=True)
+    updated_by = models.CharField(
+        pgettext_lazy("access settings", "updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
+    )
 
     class Meta:
         verbose_name = _("way in settings")
@@ -237,7 +239,7 @@ class Profile(UUIDModel):
     language = models.CharField(_("language"), max_length=8, choices=Language.choices, blank=True)
     theme_mode = models.CharField(_("appearance"), max_length=8, choices=ThemeMode.choices, blank=True)
     palette = models.CharField(_("palette"), max_length=16, blank=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    updated_at = models.DateTimeField(pgettext_lazy("profile", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("profile")
@@ -295,7 +297,10 @@ class EventDelivery(UUIDModel):
         DISCARDED = "discarded", pgettext_lazy("event delivery status", "Discarded")
 
     event = models.ForeignKey(
-        "live.OutboxEvent", on_delete=models.CASCADE, related_name="+", verbose_name=_("event")
+        "live.OutboxEvent",
+        on_delete=models.CASCADE,
+        related_name="+",
+        verbose_name=pgettext_lazy("event delivery", "event"),
     )
     app_label = models.CharField(_("app"), max_length=100)
     depth = models.PositiveSmallIntegerField(_("depth"), default=0)
