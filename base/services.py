@@ -2032,6 +2032,8 @@ def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
         }
         if ctx.has(ADMINISTER_HUB):
             screens["/system"] = pgettext("base", "System")
+        if ctx.has(queries.VIEW_FILES):
+            screens["/files"] = pgettext("base", "Files")
         for config in assistant.active_apps(ctx.scope).values():
             for nav in getattr(config, "navigation", []) or []:
                 screens.setdefault(nav.path, f"{config.verbose_name} › {nav.label}")

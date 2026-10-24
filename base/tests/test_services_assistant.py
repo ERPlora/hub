@@ -292,3 +292,10 @@ def test_a_blocked_write_does_not_run_even_with_a_yes_and_the_word_typed():
 def test_the_system_screen_is_linked_only_to_who_administers():
     assert "](/system)" in run("base.assistant.turn", {"base.view_home", "base.administer_hub"}, messages=[ASK])["instructions"]
     assert "/system" not in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]
+
+
+def test_the_files_screen_is_linked_to_who_sees_the_files():
+    """BASE-F72 (APP-BASE-8): «Files» is a screen of the platform; the old panel could name it but never link it."""
+    text = run("base.assistant.turn", {"base.view_home", "base.view_files"}, messages=[ASK])["instructions"]
+    assert "[Archivos](/files)" in text
+    assert "/files" not in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]

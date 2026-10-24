@@ -1390,6 +1390,11 @@ msgstr "Mi perfil"
 
 #: base/services.py
 msgctxt "base"
+msgid "Files"
+msgstr "Archivos"
+
+#: base/services.py
+msgctxt "base"
 msgid "System"
 msgstr "Sistema"
 
