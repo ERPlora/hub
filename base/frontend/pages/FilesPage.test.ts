@@ -168,6 +168,18 @@ describe('FilesPage · see (BASE-G82)', () => {
     expect(m.router.currentRoute.value.query.folder).toBeUndefined();
   });
 
+  it('while another folder loads, «Loading files…» shows: never the files of the folder before', async () => {
+    const m = await open();
+    expect(m.wrapper.find('[data-item="marzo.pdf"]').exists()).toBe(true);
+    await m.wrapper.find('[data-testid="files-tree"] [data-folder="Contratos"]').trigger('click');
+    await flush();
+    expect(m.wrapper.find('[data-testid="files-loading"]').text()).toContain('Loading files');
+    expect(m.wrapper.find('[data-item="marzo.pdf"]').exists()).toBe(false);
+    await m.result(m.call, OP, listing({ folder: 'Contratos', crumbs: [{ path: 'Contratos', name: 'Contratos' }], files: [file('Contratos/nda.pdf')] }));
+    expect(m.wrapper.find('[data-testid="files-loading"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-item="Contratos/nda.pdf"]').exists()).toBe(true);
+  });
+
   it('a folder in the list opens with a tap', async () => {
     const m = await open();
     await m.wrapper.find('[data-item="Facturas"] [data-testid="files-item-main"]').trigger('click');
