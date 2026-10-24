@@ -166,17 +166,19 @@ def compiled(path: Path) -> dict[str, str]:
     return {key: text for key, text in entries.items() if isinstance(key, str) and key}
 
 
-def test_what_live_also_translates_says_the_same_here():
-    """``live`` goes first in ``INSTALLED_APPS``: Django's joined catalogue keeps its Spanish for a message both
-    translate without context, so the app's own wording would never reach the user (a custom number field refused
-    with live's «Introduce un número.», never with the app's)."""
-    live = compiled(
-        Path(apps.get_app_config("live").path) / "locale" / "es" / "LC_MESSAGES" / "django.mo"
-    )
+def test_what_an_earlier_app_also_translates_says_the_same_here():
+    """Django joins every catalogue of a language in one, and the first app in ``INSTALLED_APPS`` wins a message
+    two translate without context: ``live`` goes first, so the app's own wording never reached the user (a custom
+    number field refused with live's «Introduce un número.», never with the app's); ``auth``'s «Correo
+    electrónico» named the channel «Email» in the admin. What an app before this one says, this one says too."""
+    configs = list(apps.get_app_configs())
+    earlier = configs[: configs.index(apps.get_app_config("customer"))]
     ours = compiled(LOCALE / "django.mo")
     assert sorted(
-        f"{message!r}: live «{text}», customer «{ours[message]}»"
-        for message, text in live.items()
+        f"{message!r}: {config.label} «{text}», customer «{ours[message]}»"
+        for config in earlier
+        if (path := Path(config.path) / "locale" / "es" / "LC_MESSAGES" / "django.mo").exists()
+        for message, text in compiled(path).items()
         if "\x04" not in message and message in ours and ours[message] != text
     ) == []
 

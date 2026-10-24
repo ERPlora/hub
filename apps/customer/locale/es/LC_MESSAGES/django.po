@@ -118,7 +118,7 @@ msgid "None"
 msgstr "Ninguno"
 
 msgid "Email"
-msgstr "Email"
+msgstr "Correo electrónico"
 
 msgid "SMS"
 msgstr "SMS"
