@@ -244,7 +244,13 @@ class TestThePassIsBound:
         assert code(post(client, SETTINGS, CHANGE, **with_pass(token))) == "requires_elevation"
 
     def test_a_token_nobody_minted_authorises_nothing(self, client, adam, eva):
+        """Also with a real pass waiting for this same request: the pass is the token, not the request it names."""
         assert code(post(client, SETTINGS, CHANGE, **with_pass("elev_forged"))) == "requires_elevation"
+        token = granted(client)
+        forged = "elev_" + "f" * (len(token) - len("elev_"))
+        assert code(post(client, SETTINGS, CHANGE, **with_pass(forged))) == "requires_elevation"
+        assert Approval.objects.get().used_at is None
+        assert post(client, SETTINGS, CHANGE, **with_pass(token)).status_code == 200
 
 
 class TestTheRecord:
