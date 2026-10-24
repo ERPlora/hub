@@ -972,14 +972,17 @@ Implicados: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F41 Ver la moneda del negocio
 <!-- origen: old-hub:HUB_SHELL-F158 -->
-Estado: parcial — las apps todavía escriben los importes en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
+Estado: parcial — el Inicio ya escribe sus importes en la moneda del negocio, pero las apps (Ventas, Caja, Facturas, Inventario) todavía en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Ajustes · Negocio
+Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
 Pasos:
   1. En «Negocio», «Moneda» («La de su país, para precios y totales») dice la moneda con su código y su nombre
      en el idioma de la persona: «EUR · Euro».
   2. No se elige: es la del país del negocio, como en los terminales de cobro del mercado. Un negocio sin país
      (una demo) va en euros.
+  3. En el Inicio, los importes de los paneles (como «Ventas últimos 7 días») y de «Actividad» van en esa moneda,
+     con su símbolo y sus decimales, como los imprime una caja de ese país: «zł» en un negocio de Polonia, «€» en
+     uno de España. Mientras el negocio no ha contestado, el importe sale sin símbolo, nunca en otra moneda.
 Entra: el país del negocio.
 Sale: nada guardado.
 Si falla: como en BASE-F40.

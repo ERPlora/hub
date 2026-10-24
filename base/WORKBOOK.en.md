@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:12032a8ef99563b689c1322c68bbc126b7c862f93a46b3e2a156da7c028e6cd7 -->
+<!-- generated from WORKBOOK.md sha256:7d8bfd3e86fdd2defe888337819e9ea62c21ee2ce995e1669fe8e5881b5a9737 -->
 
 ## What it is for and who it is for
 
@@ -915,14 +915,17 @@ has no country: "—".
 Involved: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F41 See the business's currency
-Status: partial — the apps still write the amounts in euros even when the business's country pays in another currency: it fits Spain and Portugal, not a country of another currency
+Status: partial — the Home already writes its amounts in the business's currency, but the apps (Sales, Cash register, Invoicing, Inventory) still in euros even when the business's country pays in another currency: it fits Spain and Portugal, not a country of another currency
 Actor: owner, administrator, manager, employee
-Screen: Settings · Business
+Screen: Settings · Business; Home · Summary and Home · Activity
 Steps:
   1. In "Business", "Currency" ("Its country’s, for prices and totals") says the currency with its code and its
      name in the person's language: "EUR · Euro".
   2. It is not chosen: it is the one of the business's country, as in the market's payment terminals. A business
      without a country (a demo) is in euros.
+  3. On the Home, the amounts of the panels (such as "Sales, last 7 days") and of "Activity" are in that currency,
+     with its symbol and its decimals, as a till of that country prints them: "zł" in a business in Poland, "€" in
+     one in Spain. While the business has not answered, the amount shows without a symbol, never in another currency.
 In: the business's country.
 Out: nothing saved.
 If it fails: as in BASE-F40.
