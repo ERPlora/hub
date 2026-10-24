@@ -47,6 +47,8 @@ test.describe.configure({ mode: 'serial' });
 
 /** The capture of a flow, once the screen settled. */
 async function snap(page: Page, key: string, width: number): Promise<void> {
+  // The pointer rests where the last click was: an iOS outline button under it is drawn at 60 % (hover).
+  await page.mouse.move(0, 0);
   await expect(shown(page).locator('[data-testid$="-loading"]:visible')).toHaveCount(0);
   await untilStill(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -118,16 +120,6 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(rows(page).first()).toContainText('From Sales & POS to Invoicing');
       await expect(rows(page).first()).toContainText('Attempts: 8');
       await expect(testid(page, 'failed-events-retry-all')).toBeEnabled();
-      console.log('retry-all look', await testid(page, 'failed-events-retry-all').evaluate((el) => {
-        const style = getComputedStyle(el);
-        const native = el.shadowRoot?.querySelector('.button-native') as HTMLElement | null;
-        const ns = native ? getComputedStyle(native) : null;
-        const discard = document.querySelector('[data-testid="failed-event-discard"]') as HTMLElement;
-        const dn = discard.shadowRoot?.querySelector('.button-native') as HTMLElement | null;
-        return { opacity: style.opacity, disabled: (el as HTMLButtonElement).disabled, cls: el.className, color: style.color,
-          nOpacity: ns?.opacity, nColor: ns?.color, nBorder: ns?.borderColor, nBg: ns?.backgroundColor,
-          dColor: dn ? getComputedStyle(dn).color : null, dCls: discard.className };
-      }));
       await snap(page, 'BASE-G91', width);
 
       // BASE-G92 — resend one: it leaves the list at once, back in the queue.
