@@ -140,6 +140,20 @@ class TestEnteringWithThePin:
         device.refresh_from_db()
         assert (device.last_username, device.last_user_label) == ("saas:1", "Ana López")
 
+    @pytest.mark.parametrize(("own", "business", "cookie"), [("en", "es", "en"), ("", "es", "es")])
+    def test_the_entry_leaves_the_person_s_language_so_a_reload_speaks_it_at_once(self, client, ana, own, business, cookie):
+        # gh:hub#2639: the page Django serves after the entry, and every reload, is in the person's language from the
+        # first paint (their «My profile» choice, else the business's): never a moment in the business's.
+        from django.conf import settings
+
+        from base.models import Hub, Profile
+
+        Hub.objects.filter(slug="a").update(language=business)
+        Profile.objects.create(username=ana.username, first_name="Ana", language=own)
+        a_device(client)
+        response = pin(client, with_pin(ana, "4826").pk, "4826")
+        assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == cookie
+
     def test_a_wrong_pin_says_so_and_opens_nothing(self, client, ana):
         a_device(client)
         cred = with_pin(ana, "4826")
