@@ -88,9 +88,14 @@ for (const viewport of VIEWPORTS) {
       for (const part of ['what', 'first', 'permissions', 'worked', 'limits']) {
         await expect(shown(page).locator(`[data-testid=flow-guide-section-${part}]`)).toBeVisible();
       }
-      // What it already does (starting on its own when something happens, FLOW-F21) is no limit any more.
-      await expect(shown(page).locator('[data-testid=flow-guide-section-limits]')).toContainText('Sending messages or asking the assistant');
-      await expect(shown(page).locator('[data-testid=flow-guide-section-limits]')).not.toContainText('Starting on its own');
+      // flow: FLOW-F08 — the same limits as GuidePage.test.ts (FIX-HUB-E2E-FLOW-GUIDE-LIMITS-TEXT-STALE): asking the
+      // assistant comes later and a customer is messaged by WhatsApp only. What it already does (starting on its own
+      // when something happens, FLOW-F21; sending a WhatsApp, FLOW-F31) is no limit any more.
+      const limits = shown(page).locator('[data-testid=flow-guide-section-limits]');
+      await expect(limits).toContainText('Asking the assistant: it comes in a later version.');
+      await expect(limits).toContainText('Messages to a customer go by WhatsApp only, not by email.');
+      await expect(limits).not.toContainText('Sending messages');
+      await expect(limits).not.toContainText('Starting on its own');
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F08');
       await shown(page).locator('[data-testid=flow-guide-back]').click();
