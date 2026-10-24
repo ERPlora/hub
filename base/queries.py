@@ -339,6 +339,17 @@ def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
 
     The grid reaches only whom the PIN would let in (the old Hub's HUB-F133): anyone else, and an address that tried
     too many wrong PINs (with how long it still waits), hears the same answer with nobody in it."""
+    return _door(ctx)
+
+
+@operation("base.access.faces", kind="query", permission=VIEW_HOME, input=AccessDoorIn, output=AccessDoorOut)
+def access_faces(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
+    """The door's grid for a session: «Switch user» (BASE-G60), live, so a new PIN shows up and a person removed
+    leaves without reloading the till."""
+    return _door(ctx)
+
+
+def _door(ctx: OperationContext) -> dict[str, Any]:
     settings = access_settings()
     device = device_of(ctx.request)
     offered = device is not None and access.pin_offered(device.mode, settings.pin_policy)
@@ -499,3 +510,21 @@ def signed_in(ctx: OperationContext):
 
 def avatar_url(ctx: OperationContext, name: str) -> str:
     return media_url(hub_id(ctx.scope), name)
+
+
+def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
+    """What the shell needs of this session's way in (``hub-home``'s ``access``, ``base.spa``): how it was opened,
+    whether «Switch user» is offered (BASE-G60: a shared device of the hub of a business that asks, with somebody on
+    its grid) and, when the business always asks on such a device, after how many idle minutes it locks (BASE-G59)."""
+    credential = (
+        SessionOwner.objects.filter(session_id=request.session.session_key).values_list("credential", flat=True).first()
+        or SessionOwner.Credential.ACCOUNT
+    )
+    device = device_of(request)
+    settings = access_settings()
+    offered = device is not None and access.pin_offered(device.mode, settings.pin_policy)
+    return {
+        "credential": credential,
+        "switch_user": offered and bool(pin_people(slug)),
+        "idle_minutes": settings.pin_inactivity_minutes if offered and settings.pin_policy == access.ALWAYS else None,
+    }

@@ -10,6 +10,9 @@ from live.meta import module_configs
 from base import live as base_live
 from base.events import HUB_STATE_APPLIED
 
+#: The way in's live queries (APP-BASE-3) have their own test: base/tests/test_access_live.py.
+WAY_IN = ("base.access.", "base.device.", "base.profile.")
+
 
 def declared(hook):
     return sorted({event for config in module_configs() for item in getattr(config, hook) for event in item.refresh_on})
@@ -20,7 +23,11 @@ def test_the_registry_is_valid():
 
 
 def test_the_three_queries_and_their_events():
-    on = {name: events for name, events in live_registry.subscribable.items() if name.startswith("base.")}
+    on = {
+        name: events
+        for name, events in live_registry.subscribable.items()
+        if name.startswith("base.") and not name.startswith(WAY_IN)
+    }
     assert on == {
         "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED}),
         "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED}),
