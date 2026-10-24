@@ -1,14 +1,22 @@
 """A real local HTTPS server for the tests of «Call another system» (FLOW-F27): a certificate made here for
 ``localhost``, ``api.test`` and ``127.0.0.1``, IPv4 and IPv6, recording what it receives. The other system
-of a test is this server, never a patched client."""
+of a test is this server, never a patched client.
+
+A client that hangs up before its answer is done is what clients do (the HTTP client gives up on
+``/slow`` and stops reading ``/big`` at ``MAX_BYTES``): the server counts it in ``hangups``. Any other
+error of a request is kept in ``errors``, never printed — a request thread has no stderr of its own, and
+printing there once left an unhandled thread exception in a test of another app — and stopping the server
+fails on it."""
 
 import datetime as dt
 import ipaddress
 import json
 import socket
 import ssl
+import sys
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from cryptography import x509
@@ -50,9 +58,16 @@ def _certificate(directory):
 
 class Handler(BaseHTTPRequestHandler):
     seen: list[dict] = []
+    timeout = 10  # a client that stalls ends its request, so stopping the server never waits for ever
 
     def log_message(self, *args):  # quiet test server
         pass
+
+    def handle(self):
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError) as cut:
+            self.server.hangups.append(cut)
 
     def _answer(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -102,17 +117,28 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class DualStack(ThreadingHTTPServer):
-    """``localhost`` gives ::1 and 127.0.0.1: the server answers on both."""
+    """``localhost`` gives ::1 and 127.0.0.1: the server answers on both. Its request threads are waited for
+    when it stops: none outlives it."""
 
     address_family = socket.AF_INET6
+    daemon_threads = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.hangups: list[OSError] = []
+        self.errors: list[BaseException] = []
 
     def server_bind(self):
         self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         super().server_bind()
 
+    def handle_error(self, request, client_address):
+        self.errors.append(sys.exception())
+
 
 def start(directory):
-    """Starts the server; yields ``{"port", "ca"}`` until it is stopped."""
+    """Starts the server; yields ``{"port", "ca", "hangups", "errors"}`` until it is stopped, and stopping it
+    fails on the errors its requests kept."""
     cert_file, key_file = _certificate(directory)
     httpd = DualStack(("::", 0), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -120,5 +146,13 @@ def start(directory):
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
-    yield {"port": httpd.server_address[1], "ca": str(cert_file)}
-    httpd.shutdown()
+    try:
+        yield {"port": httpd.server_address[1], "ca": str(cert_file), "hangups": httpd.hangups, "errors": httpd.errors}
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    if httpd.errors:
+        raise AssertionError(
+            "The local HTTPS server failed answering:\n"
+            + "\n".join("".join(traceback.format_exception(error)) for error in httpd.errors)
+        )
