@@ -682,6 +682,118 @@
       "adminOnly": "Solo un administrador puede ver y quitar los dispositivos.",
       "loading": "Cargando los dispositivos…",
       "loadError": "No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo."
+    },
+    "employees": {
+      "title": "Empleados",
+      "tabs": {
+        "label": "Secciones de Empleados",
+        "personal": "Personal",
+        "roles": "Roles",
+        "apikeys": "API keys",
+        "approvals": "Aprobaciones"
+      }
+    },
+    "people": {
+      "columns": {
+        "person": "Usuario",
+        "email": "Email",
+        "role": "Rol",
+        "access": "Acceso",
+        "status": "Estado"
+      },
+      "ways": {
+        "account": "Cuenta",
+        "pin": "PIN",
+        "badge": "Placa"
+      },
+      "roles": {
+        "hub_owner": "Propietario",
+        "hub_admin": "Administrador",
+        "hub_manager": "Encargado",
+        "hub_employee": "Empleado"
+      },
+      "status": {
+        "active": "Activo",
+        "notEntered": "Aún no ha entrado"
+      },
+      "you": "Tú",
+      "search": "Buscar persona…",
+      "empty": "Todavía no hay nadie en este negocio.",
+      "error": "No se pudo cargar el personal de este negocio.",
+      "invite": "Invitar en erplora.com",
+      "managed": "Las personas se invitan, se les cambia el rol y se quitan en erplora.com, en «Miembros» del negocio.",
+      "seats": {
+        "used": "{used} de {limit} plazas ocupadas",
+        "noLimit": "{used} personas · sin límite",
+        "count": "{used} personas"
+      },
+      "full": {
+        "heading": "Tu plan tiene todas las plazas ocupadas",
+        "body": "Quita en erplora.com a alguien que ya no trabaje aquí, o pasa a un plan con más plazas."
+      }
+    },
+    "roles": {
+      "intro": "Estos son los roles de este negocio. Cada persona recibe uno al invitarla en erplora.com, y allí se cambia.",
+      "columns": {
+        "role": "Rol",
+        "origin": "Viene de",
+        "available": "Disponible",
+        "members": "Miembros",
+        "permissions": "Permisos"
+      },
+      "basic": "Básico",
+      "always": "Siempre disponible",
+      "search": "Buscar rol…",
+      "empty": "Este negocio no tiene roles.",
+      "error": "No se pudo cargar el catálogo de roles.",
+      "change": "Cambiar roles en erplora.com"
+    },
+    "person": {
+      "title": "Persona",
+      "loading": "Cargando…",
+      "notFound": "Esta persona no está en este negocio.",
+      "error": "No se pudo abrir a esta persona.",
+      "retry": "Reintentar",
+      "data": {
+        "heading": "Sus datos",
+        "managed": "El nombre, el email y el rol se cambian en erplora.com.",
+        "open": "Abrir en erplora.com",
+        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre."
+      },
+      "pin": {
+        "heading": "PIN",
+        "has": "Tiene PIN desde el {when}.",
+        "none": "Sin PIN: lo elige la propia persona en «Mi perfil» o la primera vez que entra en una caja.",
+        "remove": "Retirar el PIN",
+        "confirm": {
+          "title": "Retirar el PIN",
+          "message": "{name} dejará de entrar en las cajas con su PIN. Con su cuenta de erplora.com sigue entrando.",
+          "confirm": "Retirar el PIN",
+          "cancel": "Cancelar"
+        },
+        "removed": "PIN retirado.",
+        "failed": "No se pudo retirar el PIN."
+      },
+      "badge": {
+        "heading": "Placa",
+        "label": "Placa",
+        "hint": "Pasa la tarjeta y se rellena sola: no hace falta hacer clic aquí antes. También puedes teclear el número, para un llavero o una etiqueta grabada.",
+        "has": "Tiene placa desde el {when}.",
+        "none": "Sin placa.",
+        "save": "Guardar placa",
+        "remove": "Retirar la placa",
+        "saved": "Placa guardada.",
+        "removed": "Placa retirada.",
+        "invalid": "Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».",
+        "taken": "Esa placa ya la lleva otra persona. La placa dice quién está en la caja, así que no la pueden compartir dos personas.",
+        "tooMany": "Demasiadas placas probadas. Espera unos minutos y vuelve a intentarlo.",
+        "failed": "No se pudo guardar la placa.",
+        "removeFailed": "No se pudo retirar la placa."
+      },
+      "refused": {
+        "ownerOnly": "Solo el propietario cambia el acceso del propietario.",
+        "ownBadge": "Nadie da de alta su propia placa: pídeselo a otro administrador."
+      }
     }
   }
 }

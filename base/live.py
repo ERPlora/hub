@@ -66,9 +66,21 @@ live("base.event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
 _DEVICES = [events.DEVICE_MODE_CHANGED, events.DEVICE_RENAMED, events.DEVICE_REMOVED, events.DEVICES_PRUNED]
 live(
     "base.access.faces",
-    on=sorted({events.PIN_SET, HUB_STATE_APPLIED, events.ACCESS_SETTINGS_CHANGED, events.PROFILE_UPDATED, *_DEVICES}),
+    on=sorted(
+        {events.PIN_SET, HUB_STATE_APPLIED, events.ACCESS_SETTINGS_CHANGED, events.PROFILE_UPDATED, *_DEVICES}
+        # APP-BASE-5: a PIN taken away leaves the grid.
+        | {events.PERSON_PIN_REMOVED}
+    ),
 )
 live("base.device.list", on=sorted(_DEVICES))
 live("base.device.current", on=sorted({events.DEVICE_MODE_CHANGED, events.DEVICE_REMOVED, events.DEVICES_PRUNED}))
 live("base.access.settings", on=[events.ACCESS_SETTINGS_CHANGED])
 live("base.profile.get", on=sorted({events.PROFILE_UPDATED, events.PIN_SET, events.ACCESS_SETTINGS_CHANGED}))
+
+# ── People and permissions (APP-BASE-5) ────────────────────────────────────────────────────────────────────────────
+# Employees › Personal and a person's page follow the ways in (a PIN chosen or taken away, a badge), the names of «My
+# profile» and the photo (erplora.com's people and roles, and the plan's places); Roles, the photo.
+_PEOPLE = sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS})
+live("base.person.list", on=_PEOPLE)
+live("base.person.detail", on=_PEOPLE)
+live("base.role.list", on=[HUB_STATE_APPLIED])

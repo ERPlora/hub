@@ -92,6 +92,8 @@ from base.media import AVATARS_FOLDER
 from base.operations import hub_id
 from base.storage import hub_prefix
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base import people as people_rules
+from base.schemas import BadgeSetIn, PersonDetailOut, PersonIn
 from base.schemas import (
     BlueprintImportIn,
     BlueprintSourceIn,
@@ -1854,3 +1856,125 @@ def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
     return {"avatar_url": ""}
+
+
+# ── People and permissions: a person's way in (APP-BASE-5) ─────────────────────────────────────────────────────────
+
+_PERSON_REFUSALS = {people_rules.OWNER_ONLY: people_rules.OWNER_ONLY_MESSAGE, people_rules.OWN_BADGE: people_rules.OWN_BADGE_MESSAGE}
+
+
+def _changeable_person(ctx: OperationContext, person_id: str, *, badge: bool) -> dict:
+    """The person ``person_id`` of this business, if who asks may change their way in (``base.people.refusal``)."""
+    person = queries.person_of(ctx, person_id)
+    why = people_rules.refusal(
+        actor=queries.signed_in_username(ctx),
+        actor_role=queries.signed_in_role(ctx),
+        target=person["id"],
+        target_role=person["role"],
+        badge=badge,
+    )
+    if why is not None:
+        raise PermissionDenied(str(_PERSON_REFUSALS[why]), code=why)
+    return person
+
+
+def _person_answer(ctx: OperationContext, person_id: str) -> dict:
+    return queries.person_detail_out(ctx, queries.person_of(ctx, person_id))
+
+
+@operation(
+    "base.person.pin_remove",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=PersonIn,
+    output=PersonDetailOut,
+    ai={
+        "description": "Takes a person's PIN away (a forgotten or shared one): they stop entering with it at the "
+        "shared tills and keep entering with their erplora.com account. The owner's, only the owner.",
+        "risk": "high",
+    },
+)
+def person_pin_remove(ctx: OperationContext, data: PersonIn) -> dict:
+    """«Remove the PIN» (BASE-G139): the PIN goes at once, the badge and the account stay."""
+    _changeable_person(ctx, data.person, badge=False)
+    credential = Credential.objects.select_for_update().filter(username=data.person).exclude(pin_hash="").first()
+    if credential is None:
+        raise Conflict(gettext("This person has no PIN to remove."), code="base.person_no_pin")
+    credential.pin_hash, credential.pin_set_at = "", None
+    credential.save(update_fields=["pin_hash", "pin_set_at"])
+    record_event(ctx, events.PERSON_PIN_REMOVED, {"person": data.person})
+    return _person_answer(ctx, data.person)
+
+
+@operation(
+    "base.person.badge_set",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=BadgeSetIn,
+    output=PersonDetailOut,
+    ai={
+        "description": "Not an assistant tool (a badge is a card passed through the reader): gives a person the badge "
+        "they will enter with at the shared tills.",
+        "risk": "high",
+    },
+)
+def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
+    """«Badge» (BASE-G140): the card, kept as its digest; never one's own, never one somebody else carries. Every try
+    counts against who gives it (``people.BADGE_CHANGE_LIMIT``, gh:hub#2560): «already taken» tells something."""
+    _changeable_person(ctx, data.person, badge=True)
+    editor = queries.signed_in_username(ctx)
+    wait = people_rules.BADGE_CHANGE_LIMIT.wait(ctx.scope.key, editor)
+    if wait:
+        raise OperationError(
+            too_many_message(wait, gettext("Too many badges tried.")), code="base.too_many_badge_changes", status=429
+        )
+    people_rules.BADGE_CHANGE_LIMIT.failed(ctx.scope.key, editor)
+    card = access.clean_badge(data.badge)
+    if card is None:
+        raise InvalidPayload(
+            gettext("A badge has 4 to 64 characters: letters, digits, «-» and «_»."),
+            code="base.badge_invalid",
+            fields={"badge": "invalid"},
+        )
+    digest = access.badge_digest(card, key=badge_key())
+    if Credential.objects.filter(badge_digest=digest).exclude(username=data.person).exists():
+        raise Conflict(
+            gettext("Somebody else already carries that badge. A badge says who is at the till: two people cannot share it."),
+            code="base.badge_taken",
+        )
+    credential, _ = Credential.objects.select_for_update().get_or_create(username=data.person)
+    credential.badge_digest, credential.badge_set_at = digest, timezone.now()
+    try:
+        with transaction.atomic():
+            credential.save(update_fields=["badge_digest", "badge_set_at"])
+    except IntegrityError:
+        # Given to somebody else at this same moment: the unique digest keeps one.
+        raise Conflict(
+            gettext("Somebody else already carries that badge. A badge says who is at the till: two people cannot share it."),
+            code="base.badge_taken",
+        ) from None
+    record_event(ctx, events.PERSON_BADGE_SET, {"person": data.person})
+    return _person_answer(ctx, data.person)
+
+
+@operation(
+    "base.person.badge_remove",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=PersonIn,
+    output=PersonDetailOut,
+    ai={
+        "description": "Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay.",
+        "risk": "normal",
+    },
+)
+def person_badge_remove(ctx: OperationContext, data: PersonIn) -> dict:
+    """«Remove the badge» (BASE-G140): the card stops opening anything; a lost one never leaves anybody out."""
+    _changeable_person(ctx, data.person, badge=False)
+    credential = Credential.objects.select_for_update().filter(username=data.person).exclude(badge_digest="").first()
+    if credential is None:
+        raise Conflict(gettext("This person has no badge to remove."), code="base.person_no_badge")
+    credential.badge_digest, credential.badge_set_at = "", None
+    credential.save(update_fields=["badge_digest", "badge_set_at"])
+    record_event(ctx, events.PERSON_BADGE_REMOVED, {"person": data.person})
+    return _person_answer(ctx, data.person)

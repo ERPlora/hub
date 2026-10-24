@@ -44,6 +44,14 @@ FAILED_EVENT_RETRIED = "base.failed_event.retried"
 #: Who runs the business discarded a failed event: closed for good, kept for the audit.
 FAILED_EVENT_DISCARDED = "base.failed_event.discarded"
 
+# ── People and permissions (APP-BASE-5) ──────────────────────────────────────────────────────────────────────────
+#: Whoever runs the business took a person's PIN away (``person``: their id in the hub).
+PERSON_PIN_REMOVED = "base.person.pin_removed"
+#: Whoever runs the business gave a person a badge, or took it away.
+PERSON_BADGE_SET = "base.person.badge_set"
+PERSON_BADGE_REMOVED = "base.person.badge_removed"
+PERSON_EVENTS = (PERSON_PIN_REMOVED, PERSON_BADGE_SET, PERSON_BADGE_REMOVED)
+
 ALL = [
     HUB_REGISTERED,
     HUB_STATE_APPLIED,
@@ -64,4 +72,5 @@ ALL = [
     DEVICES_PRUNED,
     ACCESS_SETTINGS_CHANGED,
     PROFILE_UPDATED,
+    *PERSON_EVENTS,
 ]

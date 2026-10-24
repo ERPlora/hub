@@ -66,6 +66,8 @@ def _shell(request: HttpRequest) -> HttpResponse:
             "plan_url": saas_url(f"/store/plans?business={hub.id}") if account else "",
             "account_url": saas_url("/account") if account else "",
             "report_url": saas_url("/report-a-problem") if account else "",
+            # APP-BASE-5: «Members» of the business on erplora.com (HUBS-F24…F29), where people are invited.
+            "members_url": saas_url(f"/businesses/{hub.id}/members") if account else "",
             "access": way_in,
             "preferences": queries.appearance_of(request.user),
         }

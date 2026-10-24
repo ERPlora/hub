@@ -25,6 +25,8 @@ FAILED_EVENTS = (FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCAR
 
 #: The way in's live queries (APP-BASE-3) have their own test: base/tests/test_access_live.py.
 WAY_IN = ("base.access.", "base.device.", "base.profile.")
+#: People and permissions' (APP-BASE-5) too: base/tests/test_people.py.
+PEOPLE = ("base.person.", "base.role.")
 
 
 def declared(hook):
@@ -39,7 +41,7 @@ def test_the_three_queries_and_their_events():
     on = {
         name: events
         for name, events in live_registry.subscribable.items()
-        if name.startswith("base.") and not name.startswith(WAY_IN)
+        if name.startswith("base.") and not name.startswith(WAY_IN + PEOPLE)
     }
     assert on == {
         "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED, *DATA}),

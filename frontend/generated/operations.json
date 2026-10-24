@@ -2702,5 +2702,29 @@
   "base.profile.avatar_remove": {
     "method": "post",
     "path": "/api/me/avatar/remove"
+  },
+  "base.person.list": {
+    "method": "get",
+    "path": "/api/people"
+  },
+  "base.person.detail": {
+    "method": "get",
+    "path": "/api/people/detail"
+  },
+  "base.person.pin_remove": {
+    "method": "post",
+    "path": "/api/people/pin/remove"
+  },
+  "base.person.badge_set": {
+    "method": "post",
+    "path": "/api/people/badge"
+  },
+  "base.person.badge_remove": {
+    "method": "post",
+    "path": "/api/people/badge/remove"
+  },
+  "base.role.list": {
+    "method": "get",
+    "path": "/api/roles"
   }
 }

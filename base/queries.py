@@ -15,7 +15,7 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy, ngettext
 from live.context import OperationContext
 from live.errors import InvalidPayload, NotFound, Unauthorized
-from live.meta import Category
+from live.meta import Category, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import operation
 
@@ -33,7 +33,7 @@ from base.models import (
     TrustedDevice,
 )
 from base.operations import hub_id
-from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base.permissions import ADMINISTER_HUB, FULL_ACCESS_ROLES, VIEW_HOME
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
 from base.storage import media_url
@@ -86,6 +86,8 @@ from base.schemas import (
     WidgetListIn,
     WidgetListOut,
 )
+from base import people as people_rules
+from base.schemas import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
 
 
 @operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut)
@@ -1019,3 +1021,199 @@ def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
         "switch_user": offered and bool(pin_people(slug)),
         "idle_minutes": settings.pin_inactivity_minutes if offered and settings.pin_policy == access.ALWAYS else None,
     }
+
+
+# ── People and permissions: people, roles (APP-BASE-5) ──────────────────────────────────────────────────────────────
+
+
+def people_of(slug: str) -> list[dict[str, Any]]:
+    """The people of the business of ``slug``, owner first: those who entered (their ``Membership``, control's) and
+    those the SaaS's last photo names that have not entered yet (``members``: erplora.com's accepted ones), each once,
+    with what the hub keeps of their way in (``Credential``) and their name in it (``Profile``). Two reads per side,
+    never a join: who is a member is control's and the ways in are the hub's."""
+    found: dict[str, dict[str, Any]] = {}
+    memberships = Membership.objects.filter(host=slug, user__is_active=True).select_related("user")
+    for membership in memberships:
+        user = membership.user
+        found[user.get_username()] = {
+            "user": user,
+            "role": membership.role,
+            "email": user.email,
+            "name": user.get_full_name(),
+            "entered": True,
+        }
+    for member in _photo_members(slug):
+        username = f"{people_rules.SAAS_PREFIX}{member['user_id']}"
+        if username not in found:
+            found[username] = {
+                "user": None,
+                "role": member["role"],
+                "email": member.get("email") or "",
+                "name": member.get("name") or "",
+                "entered": False,
+            }
+    credentials = {row.username: row for row in Credential.objects.filter(username__in=list(found))}
+    profiles = {row.username: row for row in Profile.objects.filter(username__in=list(found))}
+    people = []
+    for username, person in found.items():
+        credential = credentials.get(username)
+        profile = profiles.get(username)
+        own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
+        name = own or person["name"] or person["email"].split("@", 1)[0] or username
+        people.append(
+            {
+                **person,
+                "id": username,
+                "name": name,
+                "initials": access.initials(name),
+                "credential": credential,
+                "ways": people_rules.ways(
+                    pin=bool(credential and credential.pin_hash), badge=bool(credential and credential.badge_digest)
+                ),
+            }
+        )
+    return sorted(people, key=lambda person: (people_rules.role_rank(person["role"]), person["name"].casefold()))
+
+
+#: The roles the photo's ``members`` may carry: erplora.com's four.
+PHOTO_ROLES = frozenset(people_rules.ROLE_ORDER)
+
+
+def _photo_members(slug: str) -> list[dict[str, Any]]:
+    """The ``members`` of the SaaS's last photo of ``slug`` that are well formed; none without a photo."""
+    state = Hub.objects.filter(slug=slug).values_list("state", flat=True).first()
+    members = state.get("members") if isinstance(state, dict) else None
+    if not isinstance(members, list):
+        return []
+    return [
+        member
+        for member in members
+        if isinstance(member, dict) and str(member.get("user_id") or "") and member.get("role") in PHOTO_ROLES
+    ]
+
+
+def seats_of(slug: str, used: int) -> dict[str, Any]:
+    """The places of the plan of the SaaS's last photo (``plan.max_users``; 0 is none) against ``used``."""
+    state = Hub.objects.filter(slug=slug).values_list("state", flat=True).first()
+    plan = state.get("plan") if isinstance(state, dict) and isinstance(state.get("plan"), dict) else None
+    known = plan is not None and _is_count(plan.get("max_users"))
+    limit = plan["max_users"] or None if known else None
+    return {"known": known, "used": used, "limit": limit, "full": limit is not None and used >= limit}
+
+
+def person_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
+    """A person as Employees shows them to who asks: the address only to who runs the business, and their own."""
+    me = signed_in_username(ctx) == person["id"]
+    return {
+        "id": person["id"],
+        "name": person["name"],
+        "initials": person["initials"],
+        "email": person["email"] if (me or ctx.has(ADMINISTER_HUB)) else "",
+        "role": person["role"],
+        "ways": person["ways"],
+        "entered": person["entered"],
+        "me": me,
+    }
+
+
+def signed_in_username(ctx: OperationContext) -> str:
+    return ctx.actor.get_username() if hasattr(ctx.actor, "get_username") else ""
+
+
+def person_of(ctx: OperationContext, person_id: str) -> dict[str, Any]:
+    """The person ``person_id`` of this business; ``NotFound`` for anyone else (another business's, nobody)."""
+    for person in people_of(ctx.scope.key):
+        if person["id"] == person_id:
+            return person
+    raise NotFound(gettext("That person is not in this business."), code="base.person_not_found")
+
+
+def signed_in_role(ctx: OperationContext) -> str:
+    username = signed_in_username(ctx)
+    role = Membership.objects.filter(host=ctx.scope.key, user__username=username).values_list("role", flat=True).first()
+    return role or ""
+
+
+def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
+    """A person's page (BASE-G10): what the hub keeps of their way in and what who asks may change of it."""
+    actor, actor_role = signed_in_username(ctx), signed_in_role(ctx)
+    credential = person["credential"]
+
+    def may(badge: bool) -> bool:
+        return people_rules.refusal(
+            actor=actor, actor_role=actor_role, target=person["id"], target_role=person["role"], badge=badge
+        ) is None
+
+    return {
+        **person_out(ctx, person),
+        "pin_set_at": credential.pin_set_at if credential and credential.pin_hash else None,
+        "badge_set_at": credential.badge_set_at if credential and credential.badge_digest else None,
+        "may": {"remove_pin": may(False), "set_badge": may(True)},
+    }
+
+
+@operation(
+    "base.person.list",
+    kind="query",
+    permission=VIEW_HOME,
+    input=PersonListIn,
+    output=PersonListOut,
+    ai={
+        "description": "Lists the people of this business: name, role (owner, admin, manager, employee), how each one "
+        "gets in (their erplora.com account, and a PIN or a badge at the shared tills) and whether they entered yet; "
+        "and the places of the plan taken. Inviting, changing a role or removing someone is done on erplora.com."
+    },
+)
+def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
+    """Employees › Personal (BASE-G11, G142, G138): every person once, owner first, with the plan's places."""
+    found = people_of(ctx.scope.key)
+    return {"people": [person_out(ctx, person) for person in found], "seats": seats_of(ctx.scope.key, len(found))}
+
+
+@operation(
+    "base.person.detail",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=PersonIn,
+    output=PersonDetailOut,
+    ai={
+        "description": "Reads one person of this business by their id: role, how they get in (PIN, badge), since when, "
+        "and whether who asks may take their PIN away or give them a badge."
+    },
+)
+def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
+    """A person's page (BASE-G10), for who runs the business."""
+    return person_detail_out(ctx, person_of(ctx, data.person))
+
+
+@operation(
+    "base.role.list",
+    kind="query",
+    permission=VIEW_HOME,
+    input=RoleListIn,
+    output=RoleListOut,
+    ai={
+        "description": "Lists the roles of this business (owner, admin, manager, employee): how many people have each "
+        "one and how many permissions of the apps it gives. Roles are given on erplora.com."
+    },
+)
+def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
+    """Employees › Roles (BASE-G143): erplora.com's four, from the top, with their people and permissions."""
+    found = people_of(ctx.scope.key)
+    configs = all_live_app_configs()
+    everything = {permission for config in configs for permission in config.permissions}
+    with translation.override(ctx.language):
+        return {
+            "roles": [
+                {
+                    "key": role.value,
+                    "label": str(role.label),
+                    "origin": "basic",
+                    "members": sum(1 for person in found if person["role"] == role),
+                    "permissions": len(
+                        everything if role in FULL_ACCESS_ROLES else permissions_for_role(configs, role.value)
+                    ),
+                }
+                for role in people_rules.ROLE_ORDER
+            ]
+        }

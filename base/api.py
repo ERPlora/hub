@@ -32,6 +32,8 @@ from base.schemas import (
     ProfileUpdateIn,
 )
 
+from base.schemas import BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
+
 router = Router(tags=["base"])
 
 
@@ -247,3 +249,36 @@ async def avatar_set(request, data: AvatarIn):
 @bind(router, "base.profile.avatar_remove", "/me/avatar/remove")
 async def avatar_remove(request):
     return await run_operation(request, services.avatar_remove)
+
+
+# ── People and permissions: people, roles (APP-BASE-5) ──────────────────────────────────────────────────────────────
+
+
+@bind(router, "base.person.list", "/people")
+async def person_list(request):
+    return await run_operation(request, queries.person_list)
+
+
+@bind(router, "base.person.detail", "/people/detail")
+async def person_detail(request, data: Query[PersonIn]):
+    return await run_operation(request, queries.person_detail, data)
+
+
+@bind(router, "base.person.pin_remove", "/people/pin/remove")
+async def person_pin_remove(request, data: PersonIn):
+    return await run_operation(request, services.person_pin_remove, data)
+
+
+@bind(router, "base.person.badge_set", "/people/badge")
+async def person_badge_set(request, data: BadgeSetIn):
+    return await run_operation(request, services.person_badge_set, data)
+
+
+@bind(router, "base.person.badge_remove", "/people/badge/remove")
+async def person_badge_remove(request, data: PersonIn):
+    return await run_operation(request, services.person_badge_remove, data)
+
+
+@bind(router, "base.role.list", "/roles")
+async def role_list(request):
+    return await run_operation(request, queries.role_list)

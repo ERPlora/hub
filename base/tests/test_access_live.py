@@ -31,6 +31,8 @@ def test_the_way_in_s_live_queries_and_what_re_runs_them():
     devices = sorted({events.DEVICE_MODE_CHANGED, events.DEVICE_RENAMED, events.DEVICE_REMOVED, events.DEVICES_PRUNED})
     assert on["base.access.faces"] == sorted(
         {events.PIN_SET, events.HUB_STATE_APPLIED, events.ACCESS_SETTINGS_CHANGED, *devices, events.PROFILE_UPDATED}
+        # APP-BASE-5: a PIN that whoever runs the business takes away leaves the grid too.
+        | {events.PERSON_PIN_REMOVED}
     )
     assert on["base.device.list"] == devices
     assert on["base.device.current"] == sorted({events.DEVICE_MODE_CHANGED, events.DEVICE_REMOVED, events.DEVICES_PRUNED})

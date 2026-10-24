@@ -682,6 +682,118 @@
       "adminOnly": "Only an administrator can see and remove the devices.",
       "loading": "Loading the devices…",
       "loadError": "Could not load the devices. Check the connection and try again."
+    },
+    "employees": {
+      "title": "Employees",
+      "tabs": {
+        "label": "Employees sections",
+        "personal": "Staff",
+        "roles": "Roles",
+        "apikeys": "API keys",
+        "approvals": "Approvals"
+      }
+    },
+    "people": {
+      "columns": {
+        "person": "User",
+        "email": "Email",
+        "role": "Role",
+        "access": "Access",
+        "status": "Status"
+      },
+      "ways": {
+        "account": "Account",
+        "pin": "PIN",
+        "badge": "Badge"
+      },
+      "roles": {
+        "hub_owner": "Owner",
+        "hub_admin": "Administrator",
+        "hub_manager": "Manager",
+        "hub_employee": "Employee"
+      },
+      "status": {
+        "active": "Active",
+        "notEntered": "Not in yet"
+      },
+      "you": "You",
+      "search": "Search person…",
+      "empty": "Nobody is in this business yet.",
+      "error": "The people of this business could not be loaded.",
+      "invite": "Invite on erplora.com",
+      "managed": "People are invited, given a role and removed on erplora.com, in «Members» of the business.",
+      "seats": {
+        "used": "{used} of {limit} places taken",
+        "noLimit": "{used} people · no limit",
+        "count": "{used} people"
+      },
+      "full": {
+        "heading": "Every place of your plan is taken",
+        "body": "Remove on erplora.com someone who no longer works here, or move to a plan with more places."
+      }
+    },
+    "roles": {
+      "intro": "These are the roles of this business. Each person gets one when invited on erplora.com, and it is changed there.",
+      "columns": {
+        "role": "Role",
+        "origin": "Comes from",
+        "available": "Available",
+        "members": "Members",
+        "permissions": "Permissions"
+      },
+      "basic": "Basic",
+      "always": "Always available",
+      "search": "Search role…",
+      "empty": "This business has no roles.",
+      "error": "The roles could not be loaded.",
+      "change": "Change roles on erplora.com"
+    },
+    "person": {
+      "title": "Person",
+      "loading": "Loading…",
+      "notFound": "This person is not in this business.",
+      "error": "This person could not be opened.",
+      "retry": "Retry",
+      "data": {
+        "heading": "Their details",
+        "managed": "Name, email and role are changed on erplora.com.",
+        "open": "Open on erplora.com",
+        "notEntered": "Not in this hub yet: their PIN and badge are kept for when they come in."
+      },
+      "pin": {
+        "heading": "PIN",
+        "has": "Has a PIN since {when}.",
+        "none": "No PIN: the person chooses it in «My profile» or the first time they enter a till.",
+        "remove": "Remove the PIN",
+        "confirm": {
+          "title": "Remove the PIN",
+          "message": "{name} will stop entering the tills with their PIN. With their erplora.com account they still get in.",
+          "confirm": "Remove the PIN",
+          "cancel": "Cancel"
+        },
+        "removed": "PIN removed.",
+        "failed": "The PIN could not be removed."
+      },
+      "badge": {
+        "heading": "Badge",
+        "label": "Badge",
+        "hint": "Pass the card and it fills itself: no need to click here first. You can also type the number, for a key fob or an engraved tag.",
+        "has": "Has a badge since {when}.",
+        "none": "No badge.",
+        "save": "Save badge",
+        "remove": "Remove the badge",
+        "saved": "Badge saved.",
+        "removed": "Badge removed.",
+        "invalid": "A badge has 4 to 64 characters: letters, digits, «-» and «_».",
+        "taken": "Somebody else already carries that badge. A badge says who is at the till: two people cannot share it.",
+        "tooMany": "Too many badges tried. Wait a few minutes and try again.",
+        "failed": "The badge could not be saved.",
+        "removeFailed": "The badge could not be removed."
+      },
+      "refused": {
+        "ownerOnly": "Only the owner changes the owner's way in.",
+        "ownBadge": "Nobody registers their own badge: ask another administrator."
+      }
     }
   }
 }
