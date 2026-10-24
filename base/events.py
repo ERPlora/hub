@@ -14,6 +14,16 @@ DEMO_CODE_CREATED = "base.demo.code_created"
 DEMO_EXPIRED = "base.demo.expired"
 DEMO_PURGED = "base.demo.purged"
 
+# ── Data: blueprints, imports and reset (APP-BASE-2) ──
+#: A blueprint was loaded (BASE-G105): its load's id and how it went. The Home and the loads read themselves again.
+BLUEPRINT_IMPORTED = "base.blueprint.imported"
+#: A load was undone (BASE-G108): its id.
+IMPORT_UNDONE = "base.import.undone"
+#: Every row of the apps named was removed (BASE-G109).
+HUB_DATA_RESET = "base.hub.data_reset"
+#: What Settings › Data does to the business: the Home's queries follow them (BASE-G131).
+DATA_EVENTS = (BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET)
+
 ALL = [
     HUB_REGISTERED,
     HUB_STATE_APPLIED,
@@ -23,4 +33,5 @@ ALL = [
     DEMO_CODE_CREATED,
     DEMO_EXPIRED,
     DEMO_PURGED,
+    *DATA_EVENTS,
 ]

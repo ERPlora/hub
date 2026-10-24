@@ -1,0 +1,104 @@
+/* Settings › Data and backups (the old hub's DataPanel): one card per block, its title and a muted line under it,
+   facts in a grid, rows with their figure to the right and the actions at the end, wrapping on a phone. */
+.data-card {
+  padding: 16px 18px;
+  border: 1px solid var(--ion-color-step-150, #e4e7ec);
+  border-radius: var(--ep-radius-lg, 16px);
+  background: var(--ion-card-background, var(--ion-background-color, #fff));
+}
+
+.data-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.data-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.data-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ion-text-color);
+}
+
+.data-hint {
+  margin: 4px 0 0;
+  color: var(--ion-color-medium);
+  overflow-wrap: anywhere;
+}
+
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.data-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px 16px;
+  margin: 12px 0 0;
+}
+
+.data-facts dt {
+  font-size: 0.8125rem;
+  color: var(--ion-color-medium);
+}
+
+.data-facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.data-rows {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.data-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ion-color-step-100, #eef0f3);
+}
+
+.data-row:first-child {
+  border-top: 0;
+}
+
+.data-row-main {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.data-row-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.data-row-detail {
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium);
+  overflow-wrap: anywhere;
+}
+
+.data-problems {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 0.875rem;
+  color: var(--ion-color-danger-shade, #b42318);
+}

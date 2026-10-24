@@ -1,0 +1,52 @@
+{
+  "name": "Restaurant",
+  "description": "A sample menu —starters, mains, desserts, drinks and coffees— with its hospitality VAT, and a dining room and a terrace with their tables. Swap the dishes and prices for yours.",
+  "language": "en",
+  "country": "ES",
+  "vertical": "restaurant",
+  "version": "1",
+  "data": {
+    "inventory.category": [
+      {"name": "Starters", "tax_category_key": "restaurant.food", "description": "", "icon": "ion:restaurant-outline", "color": "#e67e22", "order": 1},
+      {"name": "Mains", "tax_category_key": "restaurant.food", "description": "", "icon": "ion:flame-outline", "color": "#c0392b", "order": 2},
+      {"name": "Desserts", "tax_category_key": "restaurant.food", "description": "", "icon": "ion:ice-cream-outline", "color": "#8e44ad", "order": 3},
+      {"name": "Drinks", "tax_category_key": "restaurant.drink", "description": "", "icon": "ion:water-outline", "color": "#2980b9", "order": 4},
+      {"name": "Coffees", "tax_category_key": "restaurant.drink", "description": "", "icon": "ion:cafe-outline", "color": "#795548", "order": 5},
+      {"name": "Wine and beer", "tax_category_key": "restaurant.alcohol", "description": "", "icon": "ion:wine-outline", "color": "#7b1fa2", "order": 6}
+    ],
+    "inventory.product": [
+      {"name": "Home-made croquettes", "sku": "STA-01", "price": 850, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "A plate of eight ham croquettes.", "tax_category_key": "restaurant.food", "categories": ["Starters"], "track_stock": false, "is_active": true},
+      {"name": "Patatas bravas", "sku": "STA-02", "price": 600, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Starters"], "track_stock": false, "is_active": true},
+      {"name": "Mixed salad", "sku": "STA-03", "price": 750, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Starters"], "track_stock": false, "is_active": true},
+      {"name": "Grilled rib-eye steak", "sku": "MAI-01", "price": 2200, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "With potatoes and peppers.", "tax_category_key": "restaurant.food", "categories": ["Mains"], "track_stock": false, "is_active": true},
+      {"name": "Grilled sea bass", "sku": "MAI-02", "price": 1850, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Mains"], "track_stock": false, "is_active": true},
+      {"name": "Seafood paella", "sku": "MAI-03", "price": 1600, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "Price per person; two at least.", "tax_category_key": "restaurant.food", "categories": ["Mains"], "track_stock": false, "is_active": true},
+      {"name": "House burger", "sku": "MAI-04", "price": 1350, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Mains"], "track_stock": false, "is_active": true},
+      {"name": "Cheesecake", "sku": "DES-01", "price": 550, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Desserts"], "track_stock": false, "is_active": true},
+      {"name": "Home-made flan", "sku": "DES-02", "price": 450, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.food", "categories": ["Desserts"], "track_stock": false, "is_active": true},
+      {"name": "Mineral water", "sku": "DRI-01", "price": 200, "cost": 40, "stock": "48", "low_stock_threshold": "12", "unit": "ud", "ean13": "", "description": "A 50 cl bottle.", "tax_category_key": "restaurant.drink", "categories": ["Drinks"], "track_stock": null, "is_active": true},
+      {"name": "Soft drink", "sku": "DRI-02", "price": 250, "cost": 60, "stock": "48", "low_stock_threshold": "12", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.drink", "categories": ["Drinks"], "track_stock": null, "is_active": true},
+      {"name": "Fresh orange juice", "sku": "DRI-03", "price": 350, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.drink", "categories": ["Drinks"], "track_stock": false, "is_active": true},
+      {"name": "Espresso", "sku": "COF-01", "price": 150, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.drink", "categories": ["Coffees"], "track_stock": false, "is_active": true},
+      {"name": "White coffee", "sku": "COF-02", "price": 180, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.drink", "categories": ["Coffees"], "track_stock": false, "is_active": true},
+      {"name": "Draught beer", "sku": "WIN-01", "price": 220, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.alcohol", "categories": ["Wine and beer"], "track_stock": false, "is_active": true},
+      {"name": "Glass of red wine", "sku": "WIN-02", "price": 350, "cost": 0, "stock": "", "low_stock_threshold": "0", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "restaurant.alcohol", "categories": ["Wine and beer"], "track_stock": false, "is_active": true}
+    ],
+    "table.zone": [
+      {"name": "Dining room", "description": "", "color": "primary", "sort_order": 1},
+      {"name": "Terrace", "description": "", "color": "success", "sort_order": 2}
+    ],
+    "table.table": [
+      {"number": "1", "name": "", "capacity": 4, "shape": "square", "zone": "Dining room"},
+      {"number": "2", "name": "", "capacity": 4, "shape": "square", "zone": "Dining room"},
+      {"number": "3", "name": "", "capacity": 2, "shape": "square", "zone": "Dining room"},
+      {"number": "4", "name": "", "capacity": 2, "shape": "square", "zone": "Dining room"},
+      {"number": "5", "name": "", "capacity": 6, "shape": "rectangle", "zone": "Dining room"},
+      {"number": "6", "name": "", "capacity": 8, "shape": "rectangle", "zone": "Dining room"},
+      {"number": "T1", "name": "", "capacity": 4, "shape": "round", "zone": "Terrace"},
+      {"number": "T2", "name": "", "capacity": 4, "shape": "round", "zone": "Terrace"},
+      {"number": "T3", "name": "", "capacity": 2, "shape": "round", "zone": "Terrace"},
+      {"number": "T4", "name": "", "capacity": 2, "shape": "round", "zone": "Terrace"}
+    ]
+  }
+}

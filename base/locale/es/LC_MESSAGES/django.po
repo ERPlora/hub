@@ -623,6 +623,220 @@ msgstr "Tu sesión ha terminado: vuelve a entrar."
 
 # Django 6.1.2 ships these with an empty Spanish translation, so the admin of hubs.erplora.com showed them in English
 # (APP-ACCOUNTS-6). They are Django's messages, not base's: a makemessages of base marks them obsolete, keep them.
+msgid "The file is larger than 5 MB, or holds more than a blueprint can."
+msgstr ""
+"El fichero pesa más de 5 MB, o trae más de lo que cabe en una plantilla."
+
+msgid "This is not a .blueprint.zip file."
+msgstr "No es un fichero .blueprint.zip."
+
+msgid "The file has no manifest: it was not made by ERPlora."
+msgstr "El fichero no tiene manifiesto: no lo ha hecho ERPlora."
+
+msgid "The file is damaged or was changed by hand, so it cannot be read."
+msgstr "El fichero está dañado o se cambió a mano, así que no se puede leer."
+
+msgid ""
+"The file was made by a newer version of ERPlora. Update this one to load it."
+msgstr ""
+"El fichero lo hizo una versión más reciente de ERPlora. Actualiza esta para "
+"cargarlo."
+
+msgid "Something went wrong loading this part; nothing else was affected."
+msgstr "Algo falló al cargar esta parte; lo demás no se ha visto afectado."
+
+msgid "A row has no name."
+msgstr "Una fila no tiene nombre."
+
+msgid ""
+"«%(row)s»: the category «%(category)s» is not there, so it was left without "
+"it."
+msgstr ""
+"«%(row)s»: la categoría «%(category)s» no está, así que se ha quedado sin "
+"ella."
+
+msgid "«%(row)s»: %(reason)s"
+msgstr "«%(row)s»: %(reason)s"
+
+msgid "Choose a template or a file, one of them."
+msgstr "Elige una plantilla o un fichero, uno de los dos."
+
+msgid "This template is no longer in the catalogue."
+msgstr "Esta plantilla ya no está en el catálogo."
+
+msgid ""
+"This load came from a file uploaded by hand, so it cannot be retried by "
+"itself. Upload the file again and choose only what failed."
+msgstr ""
+"Esta importación vino de un archivo subido a mano, así que no se puede "
+"reintentar automáticamente. Vuelve a subir el archivo y elige solo lo que "
+"falló."
+
+msgid ""
+"The version of the template this load used is no longer in the catalogue, so"
+" it was not retried: another version could load different data."
+msgstr ""
+"La versión de la plantilla que usó esta importación ya no está en el "
+"catálogo, así que el reintento no se ejecutó: otra versión podría cargar "
+"datos distintos."
+
+msgid "Everything of this load went in: there is nothing to retry."
+msgstr "Todo lo de esta importación entró: no hay nada que reintentar."
+
+msgid "This load was undone, so there is nothing to retry."
+msgstr "Esta importación se deshizo, así que no hay nada que reintentar."
+
+msgctxt "blueprint dataset"
+msgid "Product categories"
+msgstr "Categorías de productos"
+
+msgctxt "blueprint dataset"
+msgid "Products"
+msgstr "Productos"
+
+msgctxt "blueprint dataset"
+msgid "Service categories"
+msgstr "Categorías de servicios"
+
+msgctxt "blueprint dataset"
+msgid "Services"
+msgstr "Servicios"
+
+msgctxt "blueprint dataset"
+msgid "Zones"
+msgstr "Zonas"
+
+msgctxt "blueprint dataset"
+msgid "Tables"
+msgstr "Mesas"
+
+msgctxt "blueprint dataset"
+msgid "Customers"
+msgstr "Clientes"
+
+msgctxt "blueprint source"
+msgid "Template"
+msgstr "Plantilla"
+
+msgctxt "blueprint source"
+msgid "File"
+msgstr "Fichero"
+
+msgctxt "import status"
+msgid "Complete"
+msgstr "Completa"
+
+msgctxt "import status"
+msgid "Partly loaded"
+msgstr "Cargada en parte"
+
+msgctxt "import status"
+msgid "Failed"
+msgstr "Fallida"
+
+msgctxt "blueprint load"
+msgid "name"
+msgstr "nombre"
+
+msgctxt "blueprint load"
+msgid "source"
+msgstr "origen"
+
+msgctxt "blueprint load"
+msgid "template"
+msgstr "plantilla"
+
+msgctxt "blueprint load"
+msgid "template version"
+msgstr "versión de la plantilla"
+
+msgctxt "blueprint load"
+msgid "purpose"
+msgstr "finalidad"
+
+msgctxt "blueprint load"
+msgid "apps"
+msgstr "apps"
+
+msgctxt "blueprint load"
+msgid "status"
+msgstr "estado"
+
+msgctxt "blueprint load"
+msgid "report"
+msgstr "informe"
+
+msgctxt "blueprint load"
+msgid "rows created"
+msgstr "filas creadas"
+
+msgctxt "blueprint load"
+msgid "loaded by"
+msgstr "cargada por"
+
+msgctxt "blueprint load"
+msgid "loaded at"
+msgstr "cargada el"
+
+msgctxt "blueprint load"
+msgid "undone at"
+msgstr "deshecha el"
+
+msgctxt "blueprint load"
+msgid "retry of"
+msgstr "reintento de"
+
+msgctxt "blueprint load"
+msgid "blueprint load"
+msgstr "importación de plantilla"
+
+msgctxt "blueprint load"
+msgid "blueprint loads"
+msgstr "importaciones de plantillas"
+
+msgid "The app «%(app)s» is not on in this business."
+msgstr "La app «%(app)s» no está activada en este negocio."
+
+msgid "Choose only apps that are on in this business."
+msgstr "Elige solo apps activadas en este negocio."
+
+msgid "The data of an app travels only with the app."
+msgstr "Los datos de una app solo viajan con la app."
+
+msgid "Mark the app too, not only its data."
+msgstr "Marca también la app, no solo sus datos."
+
+msgid "Some of the data chosen belongs to no app whose data travels."
+msgstr "Parte de los datos elegidos no es de ninguna app cuyos datos viajan."
+
+msgid "Choose only data of the app it belongs to."
+msgstr "Elige solo datos de la app a la que pertenecen."
+
+msgid "This load is not there any more."
+msgstr "Esta importación ya no existe."
+
+msgid "This load was undone already."
+msgstr "Esta importación ya se deshizo."
+
+msgid ""
+"Resetting the business is not available yet. Undo a load instead, or remove"
+" what you want from each app."
+msgstr ""
+"Restablecer el negocio todavía no está disponible. Deshaz una importación o "
+"quita lo que quieras desde cada app."
+
+msgid "Choose what to empty."
+msgstr "Elige qué vaciar."
+
+msgid "Choose at least one section of the list, one that has rows."
+msgstr "Elige al menos una sección de la lista, una que tenga filas."
+
+msgid "The name does not match."
+msgstr "El nombre no coincide."
+
+msgid "Type the business's name exactly as it is shown."
+msgstr "Escribe el nombre del negocio exactamente como aparece."
+
 # base/tests/test_admin_django_catalog.py asks for every hole of Django's Spanish catalogues behind the admin.
 
 #: django/contrib/admin/sites.py

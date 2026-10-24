@@ -1,6 +1,7 @@
 // Routes → pages of base, and nothing else: the Home at `/` (PLAN-HUB round 2026-10-21, the old hub's
-// dashboard). Registered before the shell's grid, so it wins `/`; named apart from it (`home`), because a
-// second route with the same name would replace the first. Types only: `main.ts` globs this file eagerly.
+// dashboard), Apps and System (APP-BASE-4) and Settings at `/settings` (its tab in the hash, `#data`; APP-BASE-2). The
+// Home is registered before the shell's grid, so it wins `/`; named apart from it (`home`), because a second route with
+// the same name would replace the first. Types only: `main.ts` globs this file eagerly.
 import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
@@ -25,6 +26,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/SystemPage.vue'),
     meta: { auth: true },
   },
+  // ── Data: blueprints, imports and reset (APP-BASE-2) ──
+  // Settings (its tab in the hash, `#data`), and the old hub's `/import` and `/export` pages landing on Settings › Data.
+  {
+    path: '/settings',
+    name: 'base-settings',
+    component: () => import('./pages/SettingsPage.vue'),
+    meta: { auth: true },
+  },
+  { path: '/import', redirect: { path: '/settings', hash: '#data' } },
+  { path: '/export', redirect: { path: '/settings', query: { data: 'export' }, hash: '#data' } },
 ];
 
 export default routes;

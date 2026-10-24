@@ -92,4 +92,62 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/home/notices", "base.notice.list"),
         ("GET", "/api/apps", "base.app.list"),
         ("GET", "/api/system/plan", "base.plan.usage"),
+        *DATA_ROUTES,
     }
+
+
+# Settings › Data (APP-BASE-2): the blueprints, the loads, the export and the reset. Reading what a file brings goes by
+# POST (a command that writes nothing: its body, the file, does not fit in a query string); the export by GET.
+DATA_ROUTES = {
+    ("GET", "/api/settings/data/blueprints", "base.blueprint.list"),
+    ("POST", "/api/settings/data/blueprints/inspect", "base.blueprint.inspect"),
+    ("POST", "/api/settings/data/blueprints/import", "base.blueprint.import"),
+    ("GET", "/api/settings/data/export", "base.blueprint.export"),
+    ("GET", "/api/settings/data/imports", "base.import.list"),
+    ("POST", "/api/settings/data/imports/undo", "base.import.undo"),
+    ("GET", "/api/settings/data/datasets", "base.dataset.list"),
+    ("POST", "/api/settings/data/reset", "base.hub.reset"),
+}
+
+
+@pytest.mark.parametrize(("method", "path", "operation"), sorted(DATA_ROUTES))
+def test_the_data_routes_are_bound_to_their_operations(method, path, operation):
+    from base.api import router
+
+    [route] = router.path_operations[path.removeprefix("/api")].operations
+    assert (route.methods, route.operation_id) == ([method], operation)
+    assert resolve(path).url_name
+
+
+def test_an_owner_loads_a_file_over_http_bigger_than_any_other_body(client, make_user, settings):
+    import base64
+
+    from base import blueprint
+
+    settings.DATA_UPLOAD_MAX_MEMORY_SIZE = 1024
+    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    zone = {"name": "Patio", "description": "", "color": "warning", "sort_order": 1}
+    bundle = blueprint.Bundle(
+        manifest=blueprint.manifest(
+            name="Patio", language="es", country="ES", purpose="template", created_at="", vertical="", apps=["table"]
+        ),
+        data={"table.zone": [zone]},
+    )
+    # Beyond Django's ceiling for any other view (1 KB here): a field the schema ignores makes the body weigh more.
+    padded = {"file_base64": base64.b64encode(blueprint.write_zip(bundle)).decode(), "apps": ["table"], "note": "x" * 2048}
+
+    response = client.post(
+        "/api/settings/data/blueprints/import", padded, content_type="application/json", HTTP_HOST="a.localhost:8000"
+    )
+
+    assert response.status_code == 200, response.content
+    assert response.json()["status"] == "complete"
+
+
+def test_an_employee_gets_no_data_over_http(client, make_user):
+    client.force_login(make_user("eva", host="a", role="hub_employee"))
+
+    response = client.get("/api/settings/data/blueprints", HTTP_HOST="a.localhost:8000")
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "permission_denied"

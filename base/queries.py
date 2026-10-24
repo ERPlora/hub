@@ -1,19 +1,21 @@
 """Read operations of base: the session's ``me``, the registry's row of a hub (``base.hub.get``), a demo's status
 (``base.demo.get``) and the Home's three live queries (``base.setup.status``, ``base.widget.list``,
-``base.bell.counters``; their rules are ``base.home``'s)."""
+``base.bell.counters``; their rules are ``base.home``'s); and Settings › Data's reads (APP-BASE-2): the catalogue of
+templates, what a blueprint brings, the export, the loads and the apps' data (their rules are ``base.blueprint``'s)."""
 
+import base64
 from typing import Any
 
 from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
-from live.errors import NotFound
+from live.errors import InvalidPayload, NotFound
 from live.meta import Category
 from live.operations import operation
 
-from base import entitlement, home
+from base import blueprint, entitlement, home
 from base.auth import saas_url
-from base.models import EventDelivery, Hub, Membership
+from base.models import EventDelivery, Hub, ImportBatch, Membership
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
 from base.schemas import (
@@ -21,6 +23,14 @@ from base.schemas import (
     AppListOut,
     BellCountersIn,
     BellCountersOut,
+    BlueprintExportIn,
+    BlueprintFileOut,
+    BlueprintListIn,
+    BlueprintListOut,
+    DatasetListIn,
+    DatasetListOut,
+    ImportListIn,
+    ImportListOut,
     DemoSlugIn,
     DemoStatusOut,
     HubGetIn,
@@ -319,3 +329,145 @@ def _is_count(value: Any) -> bool:
 def _limit(plan: dict, field: str) -> int | None:
     """A limit of the plan; 0 is none."""
     return plan[field] or None
+
+
+# ── Data: blueprints, imports and reset (APP-BASE-2) ──
+#: The loads Settings › Data lists: the latest ones.
+IMPORTS_SHOWN = 50
+
+
+@operation(
+    "base.blueprint.list",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=BlueprintListIn,
+    output=BlueprintListOut,
+    ai={
+        "description": "Lists the templates of businesses this hub can load (a restaurant, a hair salon…): what each "
+        "one brings (its apps, its menu or services, its tables) and whether this business is still empty."
+    },
+)
+def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
+    """The seeds by vertical (BASE-G103): the hub's country first, then the person's language, then the hub's vertical."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        country, vertical = (hub.country, hub.vertical) if hub else ("", "")
+        seeds = sorted(
+            blueprint.catalog(),
+            key=lambda seed: (
+                bool(country) and seed.country != country,
+                seed.language != ctx.language,
+                bool(vertical) and seed.vertical != vertical,
+                seed.key,
+            ),
+        )
+        return {"templates": [blueprint.template_out(seed) for seed in seeds], "empty": blueprint.no_rows_yet(ctx)}
+
+
+@operation(
+    "base.blueprint.export",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=BlueprintExportIn,
+    output=BlueprintFileOut,
+    ai={
+        "description": "Writes a .blueprint.zip of this business: the apps chosen and, of those marked, their data. A "
+        "template never takes personal data (customers); a backup takes them. People, PINs and fiscal data never.",
+        "risk": "high",
+    },
+)
+def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
+    """The file of the apps and datasets chosen (BASE-G101, BASE-G102), in base64 for the screen to save."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        on = blueprint.active_apps(ctx.scope)
+        shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
+        registered = list(dict.fromkeys(data.apps))
+        missing = [app for app in registered if app not in shown or app not in on]
+        if missing:
+            raise InvalidPayload(
+                gettext("The app «%(app)s» is not on in this business.") % {"app": missing[0]},
+                fields={"apps": gettext("Choose only apps that are on in this business.")},
+            )
+        if not set(data.data) <= set(registered):
+            raise InvalidPayload(
+                gettext("The data of an app travels only with the app."),
+                fields={"data": gettext("Mark the app too, not only its data.")},
+            )
+        named = set(data.datasets)
+        own = {app: [part.key for part in blueprint.datasets_of(app)] for app in dict.fromkeys(data.data)}
+        if not named <= {key for keys in own.values() for key in keys}:
+            raise InvalidPayload(
+                gettext("Some of the data chosen belongs to no app whose data travels."),
+                fields={"datasets": gettext("Choose only data of the app it belongs to.")},
+            )
+        chosen = {app: [key for key in keys if key in named] or keys for app, keys in own.items()}
+        bundle = blueprint.Bundle(
+            manifest=blueprint.manifest(
+                name=data.name.strip(),
+                language=data.language,
+                country=hub.country if hub else "",
+                purpose=data.purpose,
+                created_at=timezone.now().isoformat(),
+                vertical=hub.vertical if hub else "",
+                apps=registered,
+            ),
+            data=blueprint.export_data(ctx, chosen, purpose=data.purpose),
+        )
+        return {
+            "filename": blueprint.file_name(data.name, data.language),
+            "content_type": "application/zip",
+            "content_base64": base64.b64encode(blueprint.write_zip(bundle)).decode("ascii"),
+        }
+
+
+@operation(
+    "base.import.list",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=ImportListIn,
+    output=ImportListOut,
+    ai={
+        "description": "Lists the templates and files loaded into this business, newest first, each with its report, "
+        "whether it can be undone and whether what did not go in can be loaded again."
+    },
+)
+def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
+    """The loads, newest first; the last one, when it did not go in whole and stands, is shown first (BASE-G107)."""
+    loads = list(ImportBatch.objects.order_by("-created_at", "-id")[:IMPORTS_SHOWN])
+    latest = loads[0] if loads else None
+    unfinished = latest if latest and latest.status != ImportBatch.Status.COMPLETE and latest.undone_at is None else None
+    return {
+        "imports": [blueprint.describe_load(load) for load in loads],
+        "unfinished": blueprint.describe_load(unfinished) if unfinished else None,
+    }
+
+
+@operation(
+    "base.dataset.list",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=DatasetListIn,
+    output=DatasetListOut,
+    ai={"description": "Lists the apps on in this business and, of each, what can travel in an export and how many rows it has."},
+)
+def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
+    """Every app on (BASE-G102), with its datasets and their rows: what an export can take."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        on = blueprint.active_apps(ctx.scope)
+        counts = blueprint.counts(ctx)
+        apps = [
+            {
+                "id": config.label,
+                "label": str(config.verbose_name),
+                "icon": config.icon,
+                "datasets": [
+                    {"key": part.key, "label": str(part.label), "rows": counts.get(part.key, 0), "personal": part.personal}
+                    for part in blueprint.datasets_of(config.label)
+                ],
+            }
+            for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))
+            if config.label in on
+        ]
+        return {"apps": sorted(apps, key=lambda app: app["label"])}

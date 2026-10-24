@@ -17,6 +17,10 @@ The registry's operations (plan 2026-10-17, §1.5) are what the SaaS's signed ``
 has no database to clone: a sign-up is ``ready`` in its own transaction, and the SaaS hears it once it commits
 (:func:`report_ready`); if that call fails, the SaaS asks ``GET /internal/hubs/{id}`` two minutes later.
 
+Settings › Data (APP-BASE-2, PLAN-HUB round 2026-10-21): ``base.blueprint.import`` loads a template or a file and keeps
+it as an ``ImportBatch``, ``base.import.undo`` removes exactly what one load created and ``base.hub.reset`` empties the
+apps chosen (only with the hub's own database); the rules are ``base.blueprint``'s.
+
 The demos (plan 2026-10-17, §1.6 and §1.7) are rows of that registry too: ``base.demo.create`` gives a browser of the
 SaaS its live demo or a new empty ``demo-<8 hex>`` for ``DEMO_TTL_MINUTES``; ``base.demo.code_create`` a one-time
 code into it for that browser only, which the demo's ``/auth/callback`` redeems here (:func:`redeem_demo_code`) and
@@ -30,6 +34,7 @@ import json
 import logging
 import secrets
 import time
+import unicodedata
 from collections.abc import Callable, Iterable
 from contextvars import ContextVar
 from functools import partial
@@ -46,7 +51,7 @@ from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import HttpRequest
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
@@ -57,12 +62,15 @@ from live.operations import operation
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 
-from base import auth, events, registry, signing
+from base import auth, blueprint, events, registry, signing
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST, session_host
-from base.models import DemoCode, EventDelivery, Hub, Membership, SessionOwner, TaskSchedule
+from base.models import DemoCode, EventDelivery, Hub, ImportBatch, Membership, SessionOwner, TaskSchedule
 from base.schemas import (
+    BlueprintImportIn,
+    BlueprintSourceIn,
+    BlueprintSummaryOut,
     DemoCodeIn,
     DemoCodeOut,
     DemoCreateIn,
@@ -77,7 +85,12 @@ from base.schemas import (
     HubSeedLocalIn,
     HubSeedLocalOut,
     HubStateIn,
+    HubResetIn,
+    HubResetOut,
     HubStateOut,
+    ImportOut,
+    ImportUndoIn,
+    ImportUndoOut,
     SessionRevokeIn,
     SessionRevokeOut,
 )
@@ -1001,3 +1014,181 @@ def reap_demo_tombstones(now: dt.datetime | None = None) -> int:
     cutoff = now - dt.timedelta(days=settings.DEMO_TOMBSTONE_DAYS)
     _, deleted = Hub.objects.filter(is_demo=True, status=Hub.Status.PURGED, purged_at__lt=cutoff).delete()
     return deleted.get(Hub._meta.label, 0)
+
+
+# ── Data: blueprints, imports and reset (APP-BASE-2) ──
+#: Who runs the hub: loads, undoes and resets (the old hub's ``hub.administer``).
+ADMINISTER_HUB = "base.administer_hub"
+
+
+def _who(ctx: OperationContext) -> str:
+    actor = ctx.actor
+    if hasattr(actor, "get_username"):
+        return (actor.get_full_name() or actor.get_username())[:150]
+    return str(actor)[:150]
+
+
+@operation(
+    "base.blueprint.inspect",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=BlueprintSourceIn,
+    output=BlueprintSummaryOut,
+    ai={"description": "Says what a template of the catalogue brings, app by app, before loading it; it writes nothing."},
+)
+def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
+    """What a template or an uploaded file brings and what of it would load here (BASE-G104, BASE-G105).
+
+    It writes nothing: a command only because its input is a file, which no query string carries (a query is served
+    by GET), like the rehearsal (``dry_run``) of the apps' imports.
+    """
+    with translation.override(ctx.language):
+        bundle, seed = blueprint.open_source(data.template, data.file_base64)
+        return blueprint.summary(ctx, bundle, seed=seed)
+
+
+@operation(
+    "base.blueprint.import",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=BlueprintImportIn,
+    output=ImportOut,
+    ai={
+        "description": "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: its menu "
+        "or services, its tables and the rest of its apps' data, app by app; what is already there is left as it was. "
+        "Returns the report of what went in. Never brings people, PINs or fiscal data.",
+        "risk": "high",
+    },
+)
+def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
+    """Load a template, a file or what a load left out (BASE-G103–G107) and keep its report and the rows it created."""
+    with translation.override(ctx.language):
+        retried = None
+        if data.retry_of is not None:
+            retried = ImportBatch.objects.select_for_update().filter(pk=data.retry_of).first()
+            if retried is None:
+                raise NotFound(gettext("This load is not there any more."), code="base.import_not_found")
+            blocked = blueprint.retry_state(retried)
+            if blocked:
+                code, message = blueprint.RETRY_BLOCKED[blocked]
+                raise Conflict(str(message), code=code)
+            bundle, seed = blueprint.open_source(retried.template_key, "")
+            apps = list(retried.apps)
+        else:
+            bundle, seed = blueprint.open_source(data.template, data.file_base64)
+            apps = list(dict.fromkeys(data.apps)) if data.apps is not None else []
+        applied = blueprint.apply(ctx, bundle, apps=set(apps) if apps else None)
+        load = ImportBatch.objects.create(
+            name=bundle.manifest["name"],
+            source=ImportBatch.Source.CATALOG if seed else ImportBatch.Source.FILE,
+            template_key=seed.key if seed else "",
+            template_version=seed.version if seed else "",
+            purpose=bundle.manifest["purpose"],
+            apps=apps,
+            status=applied.report["status"],
+            report=applied.report,
+            created_rows=applied.created,
+            created_by=_who(ctx),
+            retry_of=retried,
+        )
+        record_event(ctx, events.BLUEPRINT_IMPORTED, {"id": str(load.pk), "status": load.status})
+        return blueprint.describe_load(load)
+
+
+@operation(
+    "base.import.undo",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ImportUndoIn,
+    output=ImportUndoOut,
+    ai={
+        "description": "Undoes one load of a template or a file: removes exactly the rows it brought; what was made "
+        "afterwards stays.",
+        "risk": "high",
+    },
+)
+def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
+    """Remove exactly the rows one load created (BASE-G108), once."""
+    with translation.override(ctx.language):
+        load = ImportBatch.objects.select_for_update().filter(pk=data.id).first()
+        if load is None:
+            raise NotFound(gettext("This load is not there any more."), code="base.import_not_found")
+        if load.undone_at is not None:
+            raise Conflict(gettext("This load was undone already."), code="base.import_undone")
+        removed = blueprint.undo(ctx, load.created_rows)
+        load.undone_at = timezone.now()
+        load.save(update_fields=["undone_at"])
+        record_event(ctx, events.IMPORT_UNDONE, {"id": str(load.pk)})
+        return {"id": load.pk, "apps": removed["apps"]}
+
+
+def same_name(typed: str, name: str) -> bool:
+    """The name typed is the business's: spaces around and inside collapsed, case ignored, accents kept — what the
+    confirmation dialog of the screen (``ConfirmDialog`` of ``@erplora/ui``) already asked."""
+
+    def tidy(text: str) -> str:
+        return " ".join(unicodedata.normalize("NFC", text).split()).casefold()
+
+    return tidy(typed) == tidy(name)
+
+
+def has_own_database(hub: Hub | None) -> bool:
+    """The hub keeps its business in its own database (phase 2's S5): emptying it touches no other hub.
+
+    In phase 1 every hub with ``db_name=""`` shares one database (plan 2026-10-22-fase-2-tenencia, decision 1), and
+    an app's rows are everyone's: a reset would empty them for all.
+    """
+    return bool(hub is not None and hub.db_name)
+
+
+@operation(
+    "base.hub.reset",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=HubResetIn,
+    output=HubResetOut,
+    ai={
+        "description": "With dry_run, says what each app of this business would lose if emptied and what name must be "
+        "typed to confirm. Without it, empties the apps chosen for good, given the business's name typed exactly.",
+        "risk": "high",
+    },
+)
+def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
+    """The plan of what each app would lose, or empty the apps chosen with the business's name typed (BASE-G109)."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        confirm_with = hub.name.strip() if hub and hub.name.strip() else ctx.scope.key
+        sections = blueprint.reset_plan(ctx)
+        answer = {
+            "dry_run": data.dry_run,
+            "confirm_with": confirm_with,
+            "available": has_own_database(hub),
+            "sections": sections,
+            "apps": [],
+        }
+        if data.dry_run:
+            return answer
+        if not answer["available"]:
+            raise Conflict(
+                gettext(
+                    "Resetting the business is not available yet. Undo a load instead, or remove what you want "
+                    "from each app."
+                ),
+                code="base.reset_shared_database",
+            )
+        chosen = list(dict.fromkeys(data.apps))
+        offered = {section["id"] for section in sections}
+        if not chosen or not set(chosen) <= offered:
+            raise InvalidPayload(
+                gettext("Choose what to empty."),
+                fields={"apps": gettext("Choose at least one section of the list, one that has rows.")},
+            )
+        if not same_name(data.confirm, confirm_with):
+            raise InvalidPayload(
+                gettext("The name does not match."),
+                fields={"confirm": gettext("Type the business's name exactly as it is shown.")},
+            )
+        removed = blueprint.reset(ctx, chosen)
+        record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
+        return {**answer, "sections": blueprint.reset_plan(ctx), "apps": removed["apps"]}
+
