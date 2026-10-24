@@ -214,6 +214,22 @@ describe('FilesPage · see (BASE-G82)', () => {
     expect(m.wrapper.find('[data-testid="files-view-list"]').attributes('aria-pressed')).toBe('true');
   });
 
+  it('a name is cut in what it says, never in its extension; the whole name is its title', async () => {
+    const long = 'supplier price list for the second quarter.csv';
+    const m = await open({}, listing({ files: [file(long, { content_type: 'text/plain', preview: 'table' })] }));
+    await m.wrapper.find('[data-testid="files-view-list"]').trigger('click');
+    const name = m.wrapper.find(`[data-item="${long}"] .files-item-name`);
+    expect(name.attributes('title')).toBe(long);
+    expect(name.find('.files-item-stem').text()).toBe('supplier price list for the second quarter');
+    expect(name.find('.files-item-ext').text()).toBe('.csv');
+    expect(name.text()).toBe(long);
+    // The size and the date go with the name in one block: beside it on a wide screen, under it on a phone.
+    expect(m.wrapper.find(`[data-item="${long}"] .files-item-text .files-item-meta`).exists()).toBe(true);
+    const folder = m.wrapper.find('[data-item="Facturas"] .files-item-name');
+    expect(folder.find('.files-item-ext').exists()).toBe(false);
+    expect(folder.text()).toBe('Facturas');
+  });
+
   it('an empty folder says «No files», and who runs the business is told how to add some', async () => {
     const m = await open({}, listing({ folders: [], files: [] }));
     expect(m.wrapper.find('[data-testid="files-empty"]').text()).toContain('No files');
@@ -283,6 +299,23 @@ describe('FilesPage · upload and new folder (BASE-G83)', () => {
     expect(posted(m)).toEqual([]);
     expect(toastError).toHaveBeenCalledWith(
       'Could not upload “grande.mp4”: That file weighs more than 25 MB, the most Files takes.',
+    );
+  });
+
+  it('a batch with files kept and files refused says both in one notice: a second would close the first', async () => {
+    const m = await open({
+      onApi: (call) =>
+        sent(call).name === 'virus.exe'
+          ? reply(422, { error: { code: 'base.file_type_refused', message: 'x' } })
+          : reply(200, { path: 'b.pdf', name: 'b.pdf', size: 1 }),
+    });
+    choose(m, [new File(['MZ'], 'virus.exe'), new File(['x'], 'b.pdf')]);
+    await flush();
+    await flush();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toastError).mock.calls[0][0]).toBe(
+      'Files uploaded.\nCould not upload “virus.exe”: Programs (.exe) can\'t be kept in Files: they could harm whoever opens them.',
     );
   });
 

@@ -74,6 +74,17 @@ export function nameOf(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1);
 }
 
+/** A name as the list cuts it: what it says (`stem`, cut with an ellipsis when it does not fit) and its extension
+ *  (`.pdf`, always whole), as the server reads one: after the last dot, with something before it, a short word.
+ *  A folder (`folder`) is all stem. */
+export function splitName(name: string, folder = false): { stem: string; extension: string } {
+  const dot = name.lastIndexOf('.');
+  const extension = name.slice(dot + 1);
+  return folder || dot <= 0 || !/^[^\s.]{1,10}$/.test(extension)
+    ? { stem: name, extension: '' }
+    : { stem: name.slice(0, dot), extension: name.slice(dot) };
+}
+
 const inside = (path: string, folder: string) => path === folder || path.startsWith(`${folder}/`);
 
 /** The open folder once `from` became `to` (a rename or a move): it follows when it is `from` or inside it. */

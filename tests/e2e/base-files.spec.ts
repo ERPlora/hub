@@ -85,6 +85,16 @@ const item = (page: Page, path: string) => shown(page).locator(`[data-item="${pa
 const dialog = (page: Page, id: string) => page.locator(`ion-modal[data-testid="${id}"]`);
 const toast = (page: Page, text: string | RegExp) => page.locator('ion-toast').filter({ hasText: text }).last();
 
+/** The messages of the notices painted on screen now: an open toast whose box inside its shadow root has a height. */
+function paintedNotices(page: Page): Promise<string[]> {
+  return page.locator('ion-toast').evaluateAll((toasts) =>
+    toasts
+      .filter((t) => !t.classList.contains('overlay-hidden'))
+      .filter((t) => (t.shadowRoot?.querySelector('.toast-wrapper')?.getBoundingClientRect().height ?? 0) > 0)
+      .map((t) => t.shadowRoot?.querySelector('.toast-message')?.textContent?.trim() ?? ''),
+  );
+}
+
 /** Opens the actions of `path` and picks `action` (`open`, `download`, `rename`, `move`, `delete`). */
 async function act(page: Page, path: string, action: string): Promise<void> {
   await item(page, path).locator('[data-testid="files-item-actions"]').click();
@@ -195,6 +205,34 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, 'files-view-list').click();
       await expect(testid(page, 'files-items')).toHaveClass(/files-list/);
       await expect(item(page, 'notes.txt')).toContainText(`${NOTE.length} B ·`);
+      // Each name on one line, cut in what it says and never in its extension (Drive, Dropbox, iOS Files); the size
+      // and the date under it on a phone, beside it from a tablet up.
+      const rows = await shown(page)
+        .locator('[data-item]')
+        .evaluateAll((items) =>
+          items.map((row) => {
+            const name = row.querySelector<HTMLElement>('.files-item-name')!;
+            const meta = row.querySelector<HTMLElement>('.files-item-meta')!.getBoundingClientRect();
+            const extension = row.querySelector<HTMLElement>('.files-item-ext');
+            const box = name.getBoundingClientRect();
+            return {
+              item: row.getAttribute('data-item'),
+              oneLine: box.height < parseFloat(getComputedStyle(name).fontSize) * 2,
+              extensionWhole:
+                !extension ||
+                (extension.scrollWidth <= extension.clientWidth + 1 &&
+                  extension.getBoundingClientRect().right <= row.getBoundingClientRect().right),
+              metaBelow: meta.top >= box.bottom - 1,
+            };
+          }),
+        );
+      for (const row of rows) {
+        expect(row.oneLine, `${row.item} at ${width}: its name on one line`).toBe(true);
+        expect(row.extensionWhole, `${row.item} at ${width}: its extension whole`).toBe(true);
+        expect(row.metaBelow, `${row.item} at ${width}: size and date ${width <= 600 ? 'under' : 'beside'} the name`).toBe(
+          width <= 600,
+        );
+      }
       await snap(page, 'BASE-G82-list', width);
       await testid(page, 'files-view-grid').click();
 
@@ -224,6 +262,21 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(shown(page).locator('[data-item]')).toHaveCount(2);
       await testid(page, 'files-search').locator('input').fill('nothing like it');
       await expect(testid(page, 'files-no-match')).toHaveText('No file in this folder matches “nothing like it”.');
+
+      // BASE-G83 — two notices in a row never cover each other: the second closes the first, and it reads whole.
+      const refused = toast(page, 'Could not upload “setup.exe”');
+      await upload(page, [{ name: 'setup.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') }]);
+      await expect(refused).toBeVisible();
+      await upload(page, [{ name: 'later.txt', mimeType: 'text/plain', buffer: Buffer.from('later') }]);
+      const kept = toast(page, 'Files uploaded.');
+      await expect(kept).toBeVisible();
+      // What is painted, read inside each toast's shadow root (the host spans the screen either way): one notice, the
+      // last; the one before is closed, never left underneath.
+      await expect.poll(() => paintedNotices(page)).toEqual(['Files uploaded.']);
+      await expect(kept).toBeInViewport({ ratio: 1 });
+      await page.mouse.move(0, 0);
+      await untilStill(page);
+      await page.screenshot({ path: shot(`APP-BASE-8-BASE-G83-notices-${width}`) });
     } finally {
       await wipe(context, A).catch(() => undefined);
       await context.close();

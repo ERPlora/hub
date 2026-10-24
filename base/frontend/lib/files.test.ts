@@ -26,6 +26,7 @@ import {
   rawUrl,
   REFUSAL_KEYS,
   refusalKey,
+  splitName,
   tooLarge,
 } from './files';
 
@@ -159,5 +160,26 @@ describe('refusals (hub#1776)', () => {
       expect(typeof leaf(en, key), key).toBe('string');
       expect(typeof leaf(es, key), key).toBe('string');
     }
+  });
+});
+
+// A long name is cut in the middle of what it says, never in its extension (Drive, Dropbox, iOS Files): the screen
+// shows the stem with an ellipsis and the extension whole.
+describe('splitName', () => {
+  it('splits a file name into what it says and its extension', () => {
+    expect(splitName('supplier price list for the second quarter.csv')).toEqual({
+      stem: 'supplier price list for the second quarter',
+      extension: '.csv',
+    });
+    expect(splitName('notes (1).txt')).toEqual({ stem: 'notes (1)', extension: '.txt' });
+    expect(splitName('archive.tar.gz')).toEqual({ stem: 'archive.tar', extension: '.gz' });
+  });
+
+  it('a name without an extension is all stem: a dot file, a trailing dot, words after a dot, a folder', () => {
+    expect(splitName('.htaccess')).toEqual({ stem: '.htaccess', extension: '' });
+    expect(splitName('Invoices 2026')).toEqual({ stem: 'Invoices 2026', extension: '' });
+    expect(splitName('report.')).toEqual({ stem: 'report.', extension: '' });
+    expect(splitName('v2. final notes')).toEqual({ stem: 'v2. final notes', extension: '' });
+    expect(splitName('logo.png', true)).toEqual({ stem: 'logo.png', extension: '' });
   });
 });

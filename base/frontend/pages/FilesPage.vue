@@ -42,6 +42,7 @@ import {
   parentOf,
   rawUrl,
   refusalKey,
+  splitName,
   tooLarge,
 } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
@@ -156,14 +157,14 @@ async function uploadAll(chosen: File[]): Promise<void> {
     progress.value = { done: progress.value.done + 1, total: chosen.length };
   }
   progress.value = null;
-  if (failures.length) void toastError(failures.join('\n'));
-  if (saved) {
-    void toastSuccess(
-      renamed.length === 1 && saved === 1
-        ? t('base.files.uploadedAs', { name: renamed[0] })
-        : t('base.files.uploaded'),
-    );
-  }
+  const done = !saved
+    ? ''
+    : renamed.length === 1 && saved === 1
+      ? t('base.files.uploadedAs', { name: renamed[0] })
+      : t('base.files.uploaded');
+  // One notice for the batch (a second one would close the first): what was refused, after what was kept.
+  if (failures.length) void toastError([done, ...failures].filter(Boolean).join('\n'));
+  else if (done) void toastSuccess(done);
 }
 
 function picked(event: Event): void {
@@ -656,17 +657,25 @@ async function askDelete(entry: Entry): Promise<void> {
                       decorative
                     />
                   </span>
-                  <span class="files-item-name">{{ entry.name }}</span>
-                  <span
-                    v-if="entry.file"
-                    class="files-item-meta"
-                  >
-                    {{ formatSize(entry.file.size, locale) }}<template v-if="view === 'list' && entry.file.modified"> · {{ when(entry.file.modified) }}</template>
+                  <span class="files-item-text">
+                    <span
+                      class="files-item-name"
+                      :title="entry.name"
+                    ><span class="files-item-stem">{{ splitName(entry.name, entry.folder).stem }}</span><span
+                      v-if="splitName(entry.name, entry.folder).extension"
+                      class="files-item-ext"
+                    >{{ splitName(entry.name, entry.folder).extension }}</span></span>
+                    <span
+                      v-if="entry.file"
+                      class="files-item-meta"
+                    >
+                      {{ formatSize(entry.file.size, locale) }}<template v-if="view === 'list' && entry.file.modified"> · {{ when(entry.file.modified) }}</template>
+                    </span>
+                    <span
+                      v-else
+                      class="files-item-meta"
+                    >{{ t('base.files.folder') }}</span>
                   </span>
-                  <span
-                    v-else
-                    class="files-item-meta"
-                  >{{ t('base.files.folder') }}</span>
                 </button>
                 <ion-button
                   fill="clear"
@@ -1062,14 +1071,41 @@ p.files-space,
   font-size: 1.5rem;
 }
 
+.files-item-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
 .files-item-name {
   min-width: 0;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 
+/* The list: each name on one line, what it says cut with an ellipsis and its extension whole (Drive, Dropbox);
+   the size and the date beside it, or under it on a phone. */
+.files-list .files-item-text {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
 .files-list .files-item-name {
+  display: flex;
   flex: 1;
+  white-space: nowrap;
+}
+
+.files-list .files-item-stem {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.files-list .files-item-ext {
+  flex-shrink: 0;
 }
 
 .files-item-meta {
@@ -1120,6 +1156,14 @@ p.files-space,
   background: var(--ep-primary-tint, #e6f0ff);
   color: var(--ep-primary-text, #0b5ed7);
   font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .files-list .files-item-text {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
 }
 
 @media (max-width: 767px) {
