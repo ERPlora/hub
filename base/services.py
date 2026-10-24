@@ -1476,7 +1476,18 @@ def saas_user_id_of(user) -> str:
     return user.get_username().removeprefix(SAAS_USERNAME_PREFIX)
 
 
-@operation("base.pin.set", kind="command", permission=VIEW_HOME, input=PinSetIn, output=PinSetOut)
+@operation(
+    "base.pin.set",
+    kind="command",
+    permission=VIEW_HOME,
+    input=PinSetIn,
+    output=PinSetOut,
+    ai={
+        "description": "Not an assistant tool (a PIN is typed on the PIN pad, never said aloud or written in a chat): "
+        "the person chooses or changes their own PIN.",
+        "risk": "high",
+    },
+)
 def pin_set(ctx: OperationContext, data: PinSetIn) -> dict:
     """Choose or change one's own PIN (BASE-G54, G126): the business's length, digits only, not guessable, with the
     current one when there is one, and not the PIN of another active person of this hub. Every try counts against
@@ -1578,7 +1589,8 @@ def _actor_label(ctx: OperationContext) -> str:
     output=DeviceCurrentOut,
     ai={
         "description": "Makes the device the person is using shared (a till several people use: PIN, a shift) or "
-        "personal (one person's: no PIN, 30 days). Only on the device itself."
+        "personal (one person's: no PIN, 30 days). Only on the device itself.",
+        "risk": "normal",
     },
 )
 def device_mode_set(ctx: OperationContext, data: DeviceModeIn) -> dict:
@@ -1609,7 +1621,10 @@ def _device(device_id) -> TrustedDevice:
     permission=ADMINISTER_HUB,
     input=DeviceRenameIn,
     output=DeviceByIdIn,
-    ai={"description": "Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»)."},
+    ai={
+        "description": "Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»).",
+        "risk": "normal",
+    },
 )
 def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     """«Name it» (BASE-G64): the one thing of a device the business decides."""
@@ -1635,7 +1650,8 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     output=DeviceRemoveOut,
     ai={
         "description": "Removes a lost device from the hub: its session ends at once and the PIN stops working on "
-        "it until someone signs in with an account on it again. Removing the one in hand signs the person out."
+        "it until someone signs in with an account on it again. Removing the one in hand signs the person out.",
+        "risk": "high",
     },
 )
 def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
@@ -1655,7 +1671,10 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     permission=ADMINISTER_HUB,
     input=DevicePruneIn,
     output=DevicePruneOut,
-    ai={"description": "Removes at once the devices of the hub nobody used in 30 days, never the one in hand."},
+    ai={
+        "description": "Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
+        "risk": "high",
+    },
 )
 def device_prune(ctx: OperationContext, data: DevicePruneIn) -> dict:
     """«Remove the unused» (BASE-G66): those nobody entered on in 30 days, as BASE-G65 removes one."""
@@ -1681,7 +1700,8 @@ def _remove_devices(ids: list) -> None:
     output=AccessSettingsOut,
     ai={
         "description": "Changes how the business asks who is at the till: show the PIN pad or not, ask again after "
-        "1, 5, 10, 15 or 30 minutes without use or once per shift, and PINs of 4 or 6 digits."
+        "1, 5, 10, 15 or 30 minutes without use or once per shift, and PINs of 4 or 6 digits.",
+        "risk": "high",
     },
 )
 def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) -> dict:
@@ -1718,7 +1738,11 @@ def _profile(user) -> Profile:
     permission=VIEW_HOME,
     input=ProfileUpdateIn,
     output=ProfileOut,
-    ai={"description": "Saves the person's own name, last name and contact email in this hub (not their sign-in email)."},
+    ai={
+        "description": "Saves the person's own name, last name and contact email in this hub (not their sign-in "
+        "email).",
+        "risk": "normal",
+    },
 )
 def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     """«Save my data» (BASE-G125): how the person appears in this hub. The contact email gives and takes no access."""
@@ -1745,7 +1769,10 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     permission=VIEW_HOME,
     input=PreferencesIn,
     output=PreferencesOut,
-    ai={"description": "Sets the person's own language (Spanish, English or the business's) and appearance."},
+    ai={
+        "description": "Sets the person's own language (Spanish, English or the business's) and appearance.",
+        "risk": "normal",
+    },
 )
 def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
     """«Preferences» (BASE-G125): saved as chosen and applied at once; empty = the business's. They follow the person
@@ -1764,11 +1791,21 @@ MAX_AVATAR_BYTES = 2 * 1024 * 1024
 _AVATAR_FORMATS = {"image/jpeg": ("JPEG", "jpg"), "image/png": ("PNG", "png"), "image/webp": ("WEBP", "webp")}
 
 
-@operation("base.profile.avatar_set", kind="command", permission=VIEW_HOME, input=AvatarIn, output=AvatarOut)
+@operation(
+    "base.profile.avatar_set",
+    kind="command",
+    permission=VIEW_HOME,
+    input=AvatarIn,
+    output=AvatarOut,
+    ai={
+        "description": "Not an assistant tool (it takes the image file the person picks in «Change photo»): sets the "
+        "photo of their own profile.",
+        "risk": "normal",
+    },
+)
 def avatar_set(ctx: OperationContext, data: AvatarIn) -> dict:
     """«Change photo» (BASE-G125): a JPG, PNG or WebP of 2 MB at most, kept in the hub's files under ``avatars/`` by
-    its content's hash (served to the people of this hub only, ``base.media``). Not an assistant tool: it takes a
-    file."""
+    its content's hash (served to the people of this hub only, ``base.media``)."""
     user = queries.signed_in(ctx)
     refused = gettext("The photo could not be saved. Use a JPG, PNG or WebP of up to 2 MB.")
     try:
@@ -1801,7 +1838,14 @@ def _is_image(raw: bytes, pillow_format: str) -> bool:
     return True
 
 
-@operation("base.profile.avatar_remove", kind="command", permission=VIEW_HOME, input=AvatarRemoveIn, output=AvatarOut)
+@operation(
+    "base.profile.avatar_remove",
+    kind="command",
+    permission=VIEW_HOME,
+    input=AvatarRemoveIn,
+    output=AvatarOut,
+    ai={"description": "Removes the photo of the person's own profile.", "risk": "normal"},
+)
 def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     """«Remove» (BASE-G125): the profile forgets its photo (the file, named by its content, may be someone else's)."""
     user = queries.signed_in(ctx)

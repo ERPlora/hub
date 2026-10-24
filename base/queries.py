@@ -787,7 +787,17 @@ def pin_door_open(request: HttpRequest, slug: str) -> bool:
     return bool(pin_people(slug))
 
 
-@operation("base.access.door", kind="query", permission=None, input=AccessDoorIn, output=AccessDoorOut)
+@operation(
+    "base.access.door",
+    kind="query",
+    permission=None,
+    input=AccessDoorIn,
+    output=AccessDoorOut,
+    ai={
+        "description": "Not an assistant tool (what the browser of a till shows by itself, before anyone is in): the "
+        "people who can enter with a PIN on this shared device, by name and initials, and the PIN's length."
+    },
+)
 def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
     """The way in of the browser that asks (BASE-G55): on a shared device of the hub of a business that asks, the
     people of this hub with a PIN, by name and initials (never their email nor account) and the PIN's length.
@@ -797,7 +807,17 @@ def access_door(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
     return _door(ctx)
 
 
-@operation("base.access.faces", kind="query", permission=VIEW_HOME, input=AccessDoorIn, output=AccessDoorOut)
+@operation(
+    "base.access.faces",
+    kind="query",
+    permission=VIEW_HOME,
+    input=AccessDoorIn,
+    output=AccessDoorOut,
+    ai={
+        "description": "Not an assistant tool (the «Switch user» grid of the till in hand, followed live): the people "
+        "who can enter with a PIN on this device, by name and initials."
+    },
+)
 def access_faces(ctx: OperationContext, data: AccessDoorIn) -> dict[str, Any]:
     """The door's grid for a session: «Switch user» (BASE-G60), live, so a new PIN shows up and a person removed
     leaves without reloading the till."""
