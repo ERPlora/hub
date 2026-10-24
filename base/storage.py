@@ -3,7 +3,8 @@
 In AWS it is the Hub's S3 bucket, the one Terraform names in ``AWS_STORAGE_BUCKET_NAME`` (``erplora-prod-hubs``,
 ``erplora-pre-hubs``; ``aws/stacks/prod/apps.tf``) in ``AWS_REGION``, with the task role's credentials (no keys).
 The bucket stays private: no ACL per object, no signed URLs (the Hub serves what it keeps), and a key that already
-exists is written over, because the modules name their files by a hash of their content. Without a bucket (local
+exists is written over, because the modules name their files by a hash of their content (Files' uploads, named by the
+person, are written only where nobody has written: ``base.files``). Without a bucket (local
 development, the tests) the files go to ``MEDIA_ROOT`` on disk. Every access goes through
 ``django.core.files.storage.storages["hub_files"]``; every key starts with its hub's :func:`hub_prefix`, and the Hub
 serves a file at :func:`media_url` (``base.media``).

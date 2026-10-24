@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d03ea4ab4e35ae2583078c8f691345a7f1cc7d25acb0772c816e99fc5ca1b77e -->
+<!-- generated from WORKBOOK.md sha256:e8077c722e961086aec95e9ab2324a78979cb8538e57be1c684fdb0e7528ceaa -->
 
 ## What it is for and who it is for
 
@@ -15,6 +15,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
   another business's.
 - **The business's details**, in "Settings": its name, its country, its time zone, its currency and its
   language, as erplora.com has them, and where to go to change them.
+- **The business's files**, in "Files": the documents the team keeps in folders (suppliers' invoices,
+  contracts, letters, photos), to open, download and tidy them from any device.
 
 Who uses it:
 
@@ -161,6 +163,18 @@ and, for whoever runs the business, "Devices".
 ### Your business is being prepared
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
+### Files
+From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
+which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
+"Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
+folder" and "Upload file". Below, the open folder's path, with ⋮ beside it to rename, move or delete that folder;
+"Space", with what is used and the plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder
+holds: the folders first and then the files, each with its icon, its name, its size (in the list, also when it
+changed) and its ⋮: "Open", "Download", "Rename", "Move to…" and "Delete". In the list, each name takes one line:
+what does not fit is cut with "…" and the extension always shows whole; on a phone, the size and the date go under
+the name, in grey. Tapping a file opens it in the viewer, with
+its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
+
 ## States of each screen
 
 | State | What the person sees |
@@ -187,6 +201,15 @@ On the Settings · Data and backups screen:
 | Empty | "There are no templates for your business yet.", "No template matches your search.", "This business has no app on to export." and "There is nothing to reset: no section has data.". |
 | Error | "The templates could not be loaded right now. You can still import a file." with "Retry"; "The apps of this business could not be loaded." and "What each section has could not be worked out.", with "Retry". |
 | No permission | "Only an administrator can see and import templates.", "Only an administrator can export the business." and "Only an administrator can undo imports or reset the business."; the Home's templates card does not show. |
+
+On the Files screen:
+
+| State | What the person sees |
+|---|---|
+| Loading | "Loading files…"; in the viewer, "Opening the file…". |
+| Empty | "No files" and, to whoever administers the business, "Upload a file or drag it here."; a search with no results, "No file in this folder matches “{search}”.". |
+| Error | "The files could not be loaded" with the reason and "Retry", never "No files"; in the viewer, "The file could not be opened" with "The file's content did not arrive. Check the connection and try again.". |
+| No permission | Whoever does not administer the business sees, opens and downloads, without "New folder", "Upload file", "Rename", "Move to…" or "Delete". |
 
 ## Flows
 
@@ -263,6 +286,11 @@ On the Settings · Data and backups screen:
 | BASE-F69 | Name a device | done |
 | BASE-F70 | Remove a device that was lost | done |
 | BASE-F71 | Remove at once the devices nobody uses | done |
+| BASE-F72 | See the business's files | done |
+| BASE-F73 | Upload files and make folders | done |
+| BASE-F74 | Preview and download a file | partial |
+| BASE-F75 | Move and rename a file or a folder | done |
+| BASE-F76 | Delete a file or a folder | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -1556,3 +1584,111 @@ In: which devices nobody has used for 30 days.
 Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
 Involved: BASE-F70
+
+### BASE-F72 See the business's files
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Files
+Steps:
+  1. Tap "Files" in the side menu. While it loads: "Loading files…".
+  2. See the tree of folders on the left (on a narrow screen, the "Folders" selector), the open folder's path, what
+     it holds in "Grid" (what shows first) or in "List", and "Space": what the business's files and its apps' take,
+     against the plan's limit ("{used} of {limit}") or, if it has none, "{used} used · No limit".
+  3. Go into a folder by tapping it in the tree, in the grid or in the selector, and come back through the path. The
+     open folder stays in the address, so it can be shared with the team.
+  4. Search by name in "Search files…", only inside the open folder; with no results, "No file in this folder
+     matches “{search}”.".
+  5. An empty folder says "No files" (to whoever administers the business, also "Upload a file or drag it here.").
+  6. The folder brings itself up to date when someone on the team uploads, moves, renames or deletes something, from
+     any device.
+In: the files and folders of this business, never another's. The folders the apps use for their own things (the
+website's images) do not show here.
+Out: nothing saved.
+If it fails: "The files could not be loaded" with the reason ("The file store did not answer. Try again in a
+moment." or "Check the connection and try again.") and "Retry"; a failure never shows as "No files".
+Involved: none
+
+### BASE-F73 Upload files and make folders
+Status: done
+Actor: owner, administrator
+Screen: Files
+Steps:
+  1. In the open folder, tap "Upload file" and choose one or several, or drag them onto the manager ("Drop the files
+     to upload them here"). While they upload: "Uploading {done} of {total}…".
+  2. "Files uploaded." shows and they appear in the folder. If there was already one with the same name, it is not
+     overwritten: the new one is kept as "name (1).ext" and "Uploaded as “{name}”: there was already one with that
+     name." shows.
+  3. For a new folder, tap "New folder", type the "Folder name" (up to 100 characters) and tap "Create folder".
+     "Folder created." shows and the folder appears in the tree and in the open folder.
+In: the files, up to 25 MB each, or the folder's name; the open folder.
+Out: the file or the folder, in the business's files (`base.file.uploaded`, `base.file.folder_created`).
+If it fails: each refused file says why, without stopping the others: "Could not upload “{name}”: {reason}", with
+"That file weighs more than 25 MB, the most Files takes.", "Programs (.{extension}) can't be kept in Files: they
+could harm whoever opens them.", "There is no space left for that file: your plan includes {space}." or "The file did
+not arrive whole. Upload it again.". What was uploaded and what was refused show in a single notice: one notice shows
+at a time and the new one closes the one before, never one on top of another. When making a folder, the dialog stays open with the reason: "That name is not
+valid. Use a name without slashes or lone dots." or "There is already a file or folder with that name here.".
+Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only an
+administrator can change the files.".
+Involved: none
+
+### BASE-F74 Preview and download a file
+Status: partial — Excel sheets (xlsx) and Word documents (docx) say "No preview" and are downloaded, and a data file (.json) is shown tidied but not foldable; the old hub's viewer showed them
+Actor: owner, administrator, manager, employee
+Screen: Files
+Steps:
+  1. Tap a file, or "Open" in its ⋮. A large viewer opens inside the hub, with the name as its title, "Download" and
+     "Close".
+  2. It shows images (whole in the viewer, never larger than the original, with "Zoom in" and "Zoom out"), PDFs (the
+     first 30 pages; if it is longer, "Showing the first {shown} of {total} pages. Download the file to read it
+     all."), text, logs and code, CSV and TSV as a table, data files (.json) tidied, audio and video. Of a very long
+     text, "Showing the beginning of the file. Download it to read it all."; of a table of more than 500 rows,
+     "Showing the first {shown} rows. Download the file to see them all.".
+  3. Any other type: "No preview" with "This type of file can't be shown here. Download it to open it with an app on
+     your device.".
+  4. "Download", in the viewer or in the ⋮, saves the file with its name.
+In: the file, which the hub reads from its store with the person's session; the browser never goes to the store and
+the file is not kept in any cache.
+Out: nothing saved.
+If it fails: "The file could not be opened" with "The file's content did not arrive. Check the connection and try
+again.", never a blank viewer; if it could not be downloaded, "Could not download “{name}”: {reason}".
+Involved: none
+
+### BASE-F75 Move and rename a file or a folder
+Status: done
+Actor: owner, administrator
+Screen: Files
+Steps:
+  1. To rename, choose "Rename" (or "Rename folder") in the ⋮: a dialog with the current name already typed (up to
+     255 characters). Tap "Rename" and "Renamed." shows.
+  2. To move, choose "Move to…": "Move “{name}”" with the business's folders as a tree, starting at "Files"; choose
+     one and tap "Move". The file or the folder can also be dragged onto a folder of the tree or of the grid. "Moved
+     to “{folder}”." shows (to the very top, "Moved to “Files”.").
+  3. A folder is moved or renamed with everything in it. If it is the open folder (its ⋮, beside the path), the
+     screen follows it to its new place. It is never offered as a destination of itself or of its own folders.
+In: the file or the folder and the new name, or the destination folder.
+Out: the change, in the business's files (`base.file.renamed`, `base.file.moved`).
+If it fails: the dialog stays open with the reason: "There is already a file or folder with that name here.", "It is
+already in that folder.", "A folder can't be moved inside itself.", "That name is not valid. Use a name without
+slashes or lone dots." or "That file or folder no longer exists. Refresh the list."; when dragging, "Could not move:
+{reason}". Whoever does not administer the business does not see "Rename" or "Move to…" and, if they try anyway,
+reads "Only an administrator can change the files.".
+Involved: none
+
+### BASE-F76 Delete a file or a folder
+Status: done
+Actor: owner, administrator
+Screen: Files
+Steps:
+  1. Choose "Delete" (or "Delete folder") in the ⋮ of a file, of a folder or of the open folder.
+  2. The screen asks: "Delete file" with "You are about to delete “{name}”. This cannot be undone.", or "Delete
+     folder" with "You are about to delete “{name}” and everything in it. This cannot be undone.".
+  3. Tap "Delete" (or "Cancel"). "File deleted." or "Folder deleted." shows. If the open folder was deleted, the
+     screen goes up to the one above.
+In: the file or the folder.
+Out: the file or the folder, with everything it held, out of the business's files; there is no bin
+(`base.file.deleted`).
+If it fails: "Could not delete: {reason}", with "That file or folder no longer exists. Refresh the list." or "Your
+session has expired. Sign in again and try once more.". Whoever does not administer the business does not see
+"Delete" and, if they try anyway, reads "Only an administrator can change the files.".
+Involved: none

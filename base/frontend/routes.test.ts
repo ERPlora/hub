@@ -31,6 +31,8 @@ describe('base routes', () => {
       ['/switch-user', 'base-switch-user', true],
       ['/profile', 'base-profile', true],
       ['/settings', 'base-settings', true],
+      // Files (APP-BASE-8): routes.files.test.ts.
+      ['/files', 'base-files', true],
     ]);
   });
 

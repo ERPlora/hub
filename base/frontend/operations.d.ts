@@ -358,6 +358,43 @@ export interface FailedEventPage {
   total: number;
 }
 
+// ── Files (APP-BASE-8) ──
+
+/** How the screen shows a file (`base.schemas.FilePreview`); `''`: it does not, it is downloaded. */
+export type FilePreview = 'image' | 'pdf' | 'text' | 'table' | 'json' | 'audio' | 'video' | '';
+
+/** `base.FileFolderOut`: a folder of the business's files and the folders in it. */
+export interface FileFolder {
+  /** «Facturas/2026». */
+  path: string;
+  name: string;
+  children: FileFolder[];
+}
+
+/** `base.FileItemOut`: a file of the open folder. */
+export interface FileItem {
+  path: string;
+  name: string;
+  size: number;
+  /** ISO time it was last written; `null` when the store keeps none. */
+  modified: string | null;
+  /** The type `base.file.read` serves it with. */
+  content_type: string;
+  preview: FilePreview;
+}
+
+/** `base.FileListOut`. */
+export interface FilesListing {
+  folder: string;
+  crumbs: { path: string; name: string }[];
+  folders: FileFolder[];
+  files: FileItem[];
+  /** What the hub's files take, against the plan's space (`limit_bytes: null`: no limit). */
+  space: { used_bytes: number; limit_bytes: number | null };
+  /** Upload, new folder and rename; delete (moving takes both). */
+  can: { upload: boolean; delete: boolean };
+}
+
 // ── The way in (APP-BASE-3) ────────────────────────────────────────────────────────────────────────────────────
 
 /** `base.PinPersonOut`: a face of the PIN pad's grid; `id` is what a PIN entry names, never the account. */
@@ -472,6 +509,20 @@ declare module '@erplora/ui/sdk' {
     'base.failed_event.retry': { input: { id: string }; output: { id: string } };
     'base.failed_event.retry_all': { input: NoInput; output: { count: number } };
     'base.failed_event.discard': { input: { id: string; reason?: string }; output: { id: string } };
+    // ── Files (APP-BASE-8) ──
+    'base.file.list': { input: { folder?: string }; output: FilesListing };
+    'base.file.read': {
+      input: { path: string; inline?: boolean };
+      output: { path: string; name: string; size: number; content_type: string; preview: FilePreview };
+    };
+    'base.file.upload': {
+      input: { folder?: string; name: string; content_base64: string };
+      output: { path: string; name: string; size: number };
+    };
+    'base.file.create_folder': { input: { parent?: string; name: string }; output: { path: string; name: string } };
+    'base.file.rename': { input: { path: string; name: string }; output: { path: string; name: string } };
+    'base.file.move': { input: { path: string; to?: string }; output: { path: string; name: string } };
+    'base.file.delete': { input: { path: string }; output: { path: string; folder: boolean } };
 
     // The way in (APP-BASE-3)
     'base.access.door': { input: NoInput; output: AccessDoor };
