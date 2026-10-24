@@ -417,3 +417,125 @@ for (const viewport of VIEWPORTS) {
     }
   });
 }
+
+// flow: FLOW-F11 · FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH — in Spanish, what a read of an appointment leaves is named in
+// Spanish in «Dato» and in «¿Qué dato?» («Fecha de inicio, en texto»: the day Appointments leaves ready to say), never by
+// its internal name made readable («Start date label»). Nothing is saved.
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F11: what a read of an appointment leaves is named in Spanish at ${viewport.label}`, async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+    const page = await context.newPage();
+    try {
+      await login(page, A, '/');
+      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+      await page.goto(`${A}/flow/automations/new`);
+      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+      const editor = shown(page);
+      await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
+
+      // «Consultar algo» → «Leer una cita»; then «Solo sigue si…», whose «Dato» offers what the read leaves.
+      await editor.locator('[data-testid=flow-editor-add-query]').click();
+      await search(page, 'flow-step-action-s1', 'leer una cita');
+      await page.locator('[data-testid="flow-step-action-s1-option-appointment.appointment.get"]').click();
+      await expect(editor.locator('[data-testid=flow-step-action-s1] input')).toHaveValue('Leer una cita');
+      await editor.locator('[data-testid=flow-editor-add-condition]').click();
+      await editor.locator('[data-testid=flow-step-cond-s2-add]').click();
+      await editor.locator('[data-testid=flow-step-cond-s2-path-0]').click();
+      const data = page.locator('ion-popover.select-popover:not(.overlay-hidden)');
+      await expect(data.locator('ion-radio', { hasText: '1. Leer una cita › Fecha de inicio, en texto' })).toHaveCount(1);
+      await expect(data.locator('ion-radio', { hasText: '1. Leer una cita › Hora de inicio, en texto' })).toHaveCount(1);
+      await expect(data.locator('ion-radio', { hasText: /\blabel\b/i })).toHaveCount(0);
+      // The list shows each name whole, never cut with «…» (two «1. Leer una cita › Nomb…» could not be told apart).
+      const cut = await data.locator('ion-radio').evaluateAll((radios) =>
+        radios
+          .filter((radio) => {
+            const label = radio.shadowRoot?.querySelector<HTMLElement>('[part=label]');
+            return !label || label.scrollWidth > label.clientWidth;
+          })
+          .map((radio) => radio.textContent?.trim() ?? ''),
+      );
+      expect(cut, 'names cut in «Dato»').toEqual([]);
+      await settled(page);
+      await page.screenshot({ path: shot(`FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-data-${viewport.label}`) });
+      await data.locator('ion-radio', { hasText: 'Fecha de inicio, en texto' }).click();
+      await expect(data).toHaveCount(0);
+      await expect(editor.locator('[data-testid=flow-step-cond-s2-path-0]')).toContainText('Fecha de inicio, en texto');
+
+      // «Insertar un dato» opens «¿Qué dato?»: the same words.
+      const picker = page.locator('ion-modal[data-testid=flow-picker]');
+      const presented = picker.evaluate((modal) => new Promise<void>((resolve) => modal.addEventListener('ionModalDidPresent', () => resolve(), { once: true })));
+      await editor.locator('[data-testid=flow-step-cond-s2-insert-0]').click();
+      await presented;
+      await expect(picker.locator('ion-title')).toHaveText('¿Qué dato?');
+      await expect(picker.locator('[data-testid="flow-picker-steps.s1.start_date_label"]')).toContainText('1. Leer una cita › Fecha de inicio, en texto');
+      await expect(picker.locator('[data-testid="flow-picker-steps.s1.start_time_label"]')).toContainText('1. Leer una cita › Hora de inicio, en texto');
+      await expect(picker.locator('.flow-picker__label', { hasText: /\blabel\b/i })).toHaveCount(0);
+      await picker.locator('[data-testid="flow-picker-steps.s1.start_date_label"]').scrollIntoViewIfNeeded();
+      await settled(page);
+      await page.screenshot({ path: shot(`FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-${viewport.label}`) });
+      await picker.locator('[data-testid=flow-picker-close]').click();
+      await expect(picker).toBeHidden();
+      await noHorizontalScroll(page, viewport.label);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+// flow: FLOW-F11 · FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH — the editor's name, at its head next to «En pausa», is read whole or
+// ends in «…», never cut mid-letter («Automatización sin nombr»): empty (its placeholder) and with a long name, in `ios` and
+// `md`, and the pill stays on the screen. Nothing is saved.
+const LONG_NAME = 'Recordar la cita del día siguiente a cada cliente por WhatsApp con su hora, su profesional y cómo cambiarla';
+
+/** Whether the name's box shows what it holds (its value, or the placeholder when empty) cut with no «…». */
+async function nameCut(page: Page): Promise<boolean> {
+  return shown(page)
+    .locator('[data-testid=flow-editor-name] input')
+    .evaluate((input: HTMLInputElement) => {
+      const style = getComputedStyle(input);
+      const context = document.createElement('canvas').getContext('2d');
+      if (!context) return true;
+      context.font = style.font;
+      const room = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const overflow = input.value ? style.textOverflow : getComputedStyle(input, '::placeholder').textOverflow;
+      return context.measureText(input.value || input.placeholder).width > room && overflow !== 'ellipsis';
+    });
+}
+
+for (const viewport of [{ label: '375', width: 375, height: 667 }, ...VIEWPORTS]) {
+  test(`FLOW-F11: the editor's name is never cut mid-letter at ${viewport.label}`, async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+    const page = await context.newPage();
+    try {
+      await login(page, A, '/');
+      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+      for (const mode of ['ios', 'md']) {
+        await page.goto(`${A}/flow/automations/new?ionic:mode=${mode}`);
+        await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+        const editor = shown(page);
+        const name = editor.locator('[data-testid=flow-editor-name] input');
+        await expect(name).toHaveAttribute('placeholder', 'Automatización sin nombre');
+        expect(await nameCut(page), `${mode}: «Automatización sin nombre» cut with no «…»`).toBe(false);
+        if (viewport.label === '375' && mode === 'ios') {
+          // The catalog has come (its «Enviar un mensaje» shows), so the picture is the whole editor.
+          await expect(editor.locator('[data-testid=flow-editor-add-message]')).toBeVisible();
+          await settled(page);
+          await page.screenshot({ path: shot('FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-375-title') });
+        }
+        await name.fill(LONG_NAME);
+        await editor.locator('[data-testid=flow-editor-nosteps]').click();
+        await expect(name).not.toBeFocused();
+        expect(await nameCut(page), `${mode}: a long name cut with no «…»`).toBe(false);
+        const pill = await editor.locator('[data-testid=flow-editor-state]').boundingBox();
+        expect((pill?.x ?? viewport.width) + (pill?.width ?? 0), `${mode}: «En pausa» on the screen`).toBeLessThanOrEqual(viewport.width);
+        await noHorizontalScroll(page, viewport.label);
+        if (viewport.label === '375' && mode === 'ios') {
+          await settled(page);
+          await page.screenshot({ path: shot('FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-375-title-long') });
+        }
+      }
+    } finally {
+      await context.close();
+    }
+  });
+}

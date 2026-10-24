@@ -86,9 +86,13 @@ Reglas que el e2e hace cumplir:
   conserva sus filas, así que se repite tras añadir una migración. Va **antes** de arrancar `runserver`, que no
   arranca sin su BD. `--drop` la borra al terminar, nunca a la fuerza: con el `runserver` vivo, falla y lo dice.
   Solo toca BD e2e.
-- Ese mismo paso deja en el `.env` del checkout la `FISCAL_CERTIFICATE_KEY` con la que el Hub cifra los
-  certificados de prueba (sin ella, «Mi certificado» de `verifactu-config.spec.ts` recibe un 409): la genera para ese
-  checkout si falta o está vacía, y respeta la que ya haya en el `.env` o en el entorno (`certificate-key.ts`).
+- Ese mismo paso deja en el `.env` del checkout las dos claves Fernet con las que cifra el Hub: la
+  `FISCAL_CERTIFICATE_KEY` de los certificados de prueba (sin ella, «Mi certificado» de `verifactu-config.spec.ts`
+  recibe un 409) y la `FLOW_SECRETS_KEY` de los secretos de las automatizaciones (sin ella, la caja «Secretos» de
+  «Llamar a otro sistema» dice que el servidor no puede guardar secretos y `flow-steps.spec.ts` se queda esperando en
+  FLOW-F26). Genera cada una para ese checkout si falta o está vacía, respeta la que ya haya en el `.env` o en el
+  entorno, dice en una línea qué hizo con cada una (nunca su valor) y, si alguna no es una clave, falla sin escribir
+  nada (`fernet-keys.ts`).
 - Si la BD e2e aún no existe, `global-setup.ts` lo dice con la orden que la crea.
 
 Lo que no puede comprobar el e2e, y lo pide la receta:
