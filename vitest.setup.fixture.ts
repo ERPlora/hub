@@ -58,8 +58,10 @@ it('arms nothing while the file holds a timer of its own', () => {
   expect(fileTimer).toBeDefined();
 });
 
+// 0 ms, the worst case: it would run in the first tick after the test, while the setup leaves the page; caught then, a
+// timer of any delay is (on a loaded machine the 20 ms this had ran before it was counted, and into the next test).
 it('leaves a real timeout armed', () => {
-  setTimeout(() => fired.push('timeout'), 20);
+  setTimeout(() => fired.push('timeout'), 0);
 });
 
 it('never runs the timeout the failed test before it left', async () => {
