@@ -102,8 +102,11 @@ const spaceLine = computed(() => {
     ? `${t('base.files.space.label')}: ${t('base.files.space.unlimited', { used })}`
     : `${t('base.files.space.label')}: ${t('base.files.space.of', { used, limit: formatSize(space.limit_bytes, locale.value) })}`;
 });
-const usedGb = computed(() => (listing.value?.space.used_bytes ?? 0) / 1024 ** 3);
-const limitGb = computed(() => (listing.value?.space.limit_bytes ?? 0) / 1024 ** 3);
+/** How full the plan's space is, exact: the meter's bar (its line says the amounts, in the units that fit them). */
+const spacePercent = computed(() => {
+  const space = listing.value?.space;
+  return space?.limit_bytes ? (space.used_bytes * 100) / space.limit_bytes : 0;
+});
 
 const when = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso)) : '';
@@ -573,23 +576,24 @@ async function askDelete(entry: Entry): Promise<void> {
               />
             </ion-button>
           </nav>
-          <div
-            v-if="listing"
-            class="files-space"
-          >
-            <p data-testid="files-space">
-              {{ spaceLine }}
-            </p>
+          <template v-if="listing">
             <UsageMeter
               v-if="listing.space.limit_bytes !== null"
+              class="files-space"
+              data-testid="files-space"
               size="sm"
-              unit="GB"
-              :label="t('base.files.space.label')"
-              :value="Number(usedGb.toFixed(2))"
-              :max="Number(limitGb.toFixed(2))"
+              :label="spaceLine"
+              :percent="spacePercent"
               :locale="locale"
             />
-          </div>
+            <p
+              v-else
+              class="files-space"
+              data-testid="files-space"
+            >
+              {{ spaceLine }}
+            </p>
+          </template>
           <p
             v-if="progress"
             class="files-muted"
@@ -986,13 +990,7 @@ async function askDelete(entry: Entry): Promise<void> {
   font-weight: 600;
 }
 
-.files-space {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.files-space p,
+p.files-space,
 .files-muted {
   margin: 0;
   color: var(--ion-color-medium-shade, #555);

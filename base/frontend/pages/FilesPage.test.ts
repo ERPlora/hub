@@ -141,9 +141,15 @@ describe('FilesPage · see (BASE-G82)', () => {
     expect(m.wrapper.find('[data-testid="files-space"]').text()).toBe('Space: 1.5 MB used · No limit');
   });
 
-  it('with the plan’s space, how much of it is used', async () => {
-    const m = await open({}, listing({ space: { used_bytes: 512 * 1024 ** 2, limit_bytes: 1024 ** 3 } }));
-    expect(m.wrapper.find('[data-testid="files-space"]').text()).toContain('512 MB of 1 GB');
+  it('with the plan’s space, how much of it is used: one line and a bar at the exact share', async () => {
+    // 600 KB of 1 MB: a bar in rounded GB would read «0 GB of 0 GB · 0 %».
+    const m = await open({}, listing({ space: { used_bytes: 600 * 1024, limit_bytes: 1024 ** 2 } }));
+    const space = m.wrapper.find('[data-testid="files-space"]');
+    expect(space.find('.usage-meter__label').text()).toBe('Space: 600 KB of 1 MB');
+    expect(space.find('.usage-meter__value').exists()).toBe(false);
+    expect(space.find('.usage-meter__percent').text()).toBe('59%');
+    expect(space.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('59');
+    expect(m.wrapper.text()).not.toContain('GB');
   });
 
   it('opens a folder from the tree, the list or the path, and the address says which', async () => {

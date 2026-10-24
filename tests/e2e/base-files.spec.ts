@@ -14,7 +14,7 @@ import { crc32, deflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, B, EMPLOYEE, hostPage, shot, shown, untilStill } from './helpers';
+import { A, api, B, EMPLOYEE, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -375,6 +375,38 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'files-empty')).toBeVisible();
       await snap(page, 'BASE-G86-done', width);
     } finally {
+      await wipe(context, A).catch(() => undefined);
+      await context.close();
+    }
+  });
+
+  test(`BASE-G82 BASE-G83 — the plan's space at ${width}`, async ({ browser }) => {
+    // The photo of hub `a` with a plan of 1 MB of space, as erplora.com sends it (`plan.max_storage_bytes`).
+    const before = psql("select state::text from base_hub where slug = 'a'");
+    psql(`update base_hub set state = state || '{\\"plan\\": {\\"max_storage_bytes\\": ${1024 * 1024}}}' where slug = 'a'`);
+    const { context, page } = await hostPage(browser, A, { viewport, next: '/files' });
+    try {
+      await wipe(context, A);
+      await page.reload();
+      const meter = testid(page, 'files-space');
+      await expect(meter.locator('.usage-meter__label')).toHaveText('Space: 0 B of 1 MB');
+      await upload(page, [{ name: 'scan.dat', mimeType: 'application/octet-stream', buffer: Buffer.alloc(600 * 1024, 7) }]);
+      await expect(item(page, 'scan.dat')).toBeVisible();
+      await expect(meter.locator('.usage-meter__label')).toHaveText('Space: 600 KB of 1 MB');
+      // The bar at the exact share, never figures rounded to GB.
+      await expect(meter.locator('[role="progressbar"]')).toHaveAttribute('aria-valuenow', '59');
+      await expect(meter).not.toContainText('GB');
+      await snap(page, 'BASE-G82-space', width);
+
+      // Past the plan's space, refused with its sentence; nothing is kept.
+      await upload(page, [{ name: 'second.dat', mimeType: 'application/octet-stream', buffer: Buffer.alloc(600 * 1024, 7) }]);
+      await expect(
+        toast(page, 'Could not upload “second.dat”: There is no space left for that file: your plan includes 1 MB.'),
+      ).toBeVisible();
+      await expect(item(page, 'second.dat')).toHaveCount(0);
+      await snap(page, 'BASE-G83-no-space', width);
+    } finally {
+      psql(`update base_hub set state = '${before.replaceAll('"', '\\"')}' where slug = 'a'`);
       await wipe(context, A).catch(() => undefined);
       await context.close();
     }
