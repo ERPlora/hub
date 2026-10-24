@@ -26,6 +26,8 @@ describe('base routes', () => {
       ['/apps', 'base-apps', true],
       ['/system', 'base-system', true],
       ['/settings', 'base-settings', true],
+      // Files (APP-BASE-8): routes.files.test.ts.
+      ['/files', 'base-files', true],
     ]);
   });
 

@@ -498,6 +498,122 @@
       "printers": "Printers and ticket",
       "printersHint": "Add your printer and set up the printed and digital ticket",
       "install": "Install the Printing app to add your printer and set up the ticket"
+    },
+    "files": {
+      "title": "Files",
+      "folders": "Folders",
+      "root": "Files",
+      "search": "Search files…",
+      "view": {
+        "label": "View",
+        "grid": "Grid",
+        "list": "List"
+      },
+      "upload": "Upload file",
+      "newFolder": "New folder",
+      "space": {
+        "label": "Space",
+        "unlimited": "{used} used · No limit",
+        "of": "{used} of {limit}"
+      },
+      "loading": "Loading files…",
+      "empty": "No files",
+      "emptyHint": "Upload a file or drag it here.",
+      "noMatch": "No file in this folder matches “{search}”.",
+      "error": {
+        "heading": "The files could not be loaded"
+      },
+      "retry": "Retry",
+      "columns": {
+        "name": "Name",
+        "size": "Size",
+        "modified": "Modified"
+      },
+      "folder": "Folder",
+      "actions": {
+        "label": "Actions for “{name}”",
+        "open": "Open",
+        "download": "Download",
+        "rename": "Rename",
+        "renameFolder": "Rename folder",
+        "move": "Move to…",
+        "delete": "Delete",
+        "deleteFolder": "Delete folder"
+      },
+      "drop": "Drop the files to upload them here",
+      "uploading": "Uploading {done} of {total}…",
+      "uploaded": "Files uploaded.",
+      "uploadedAs": "Uploaded as “{name}”: there was already one with that name.",
+      "uploadFailed": "Could not upload “{name}”: {reason}",
+      "newFolderDialog": {
+        "title": "New folder",
+        "name": "Folder name",
+        "create": "Create folder",
+        "done": "Folder created.",
+        "failed": "Could not create the folder: {reason}"
+      },
+      "renameDialog": {
+        "title": "Rename",
+        "titleFolder": "Rename folder",
+        "name": "New name",
+        "save": "Rename",
+        "done": "Renamed.",
+        "failed": "Could not rename: {reason}"
+      },
+      "moveDialog": {
+        "title": "Move “{name}”",
+        "to": "Folder",
+        "save": "Move",
+        "done": "Moved to “{folder}”.",
+        "failed": "Could not move: {reason}"
+      },
+      "deleteDialog": {
+        "fileTitle": "Delete file",
+        "folderTitle": "Delete folder",
+        "fileMessage": "You are about to delete “{name}”. This cannot be undone.",
+        "folderMessage": "You are about to delete “{name}” and everything in it. This cannot be undone.",
+        "confirm": "Delete",
+        "cancel": "Cancel",
+        "fileDone": "File deleted.",
+        "folderDone": "Folder deleted.",
+        "failed": "Could not delete: {reason}"
+      },
+      "downloadFailed": "Could not download “{name}”: {reason}",
+      "preview": {
+        "close": "Close",
+        "download": "Download",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "loading": "Opening the file…",
+        "none": {
+          "heading": "No preview",
+          "body": "This type of file can't be shown here. Download it to open it with an app on your device."
+        },
+        "error": {
+          "heading": "The file could not be opened",
+          "body": "The file's content did not arrive. Check the connection and try again."
+        },
+        "pdfPages": "Showing the first {shown} of {total} pages. Download the file to read it all.",
+        "textCut": "Showing the beginning of the file. Download it to read it all.",
+        "tableCut": "Showing the first {shown} rows. Download the file to see them all."
+      },
+      "refusal": {
+        "invalidName": "That name is not valid. Use a name without slashes or lone dots.",
+        "folderMissing": "That folder no longer exists. Refresh the list.",
+        "missing": "That file or folder no longer exists. Refresh the list.",
+        "exists": "There is already a file or folder with that name here.",
+        "alreadyThere": "It is already in that folder.",
+        "intoItself": "A folder can't be moved inside itself.",
+        "typeRefused": "Programs (.{extension}) can't be kept in Files: they could harm whoever opens them.",
+        "tooLarge": "That file weighs more than 25 MB, the most Files takes.",
+        "noSpace": "There is no space left for that file: your plan includes {space}.",
+        "notWhole": "The file did not arrive whole. Upload it again.",
+        "storeUnavailable": "The file store did not answer. Try again in a moment.",
+        "onlyAdmin": "Only an administrator can change the files.",
+        "sessionExpired": "Your session has expired. Sign in again and try once more.",
+        "connection": "Check the connection and try again.",
+        "generic": "Something went wrong. Try again."
+      }
     }
   }
 }
