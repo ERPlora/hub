@@ -1709,3 +1709,38 @@ msgstr "No se ha podido transcribir el audio: inténtalo de nuevo."
 #: base/queries.py
 msgid "The assistant's plan could not be read now."
 msgstr "Ahora no se puede leer el plan del asistente."
+
+#: base/models.py
+msgctxt "location"
+msgid "Main"
+msgstr "Principal"
+
+#: base/models.py
+msgctxt "location"
+msgid "name"
+msgstr "nombre"
+
+#: base/models.py
+msgctxt "location"
+msgid "default"
+msgstr "por defecto"
+
+#: base/models.py
+msgctxt "location"
+msgid "active"
+msgstr "activa"
+
+#: base/models.py
+msgctxt "location"
+msgid "created at"
+msgstr "creada el"
+
+#: base/models.py
+msgctxt "location"
+msgid "location"
+msgstr "ubicación"
+
+#: base/models.py
+msgctxt "location"
+msgid "locations"
+msgstr "ubicaciones"

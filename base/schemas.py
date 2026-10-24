@@ -1360,3 +1360,21 @@ class AssistantTranscribeIn(Schema):
 class AssistantTranscribeOut(Schema):
     text: str
     language: str
+
+
+# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+
+
+class LocationListIn(Schema):
+    """No input."""
+
+
+class LocationOut(Schema):
+    id: UUID
+    name: str = Field(description="Its name; the default «Main» in the reader's language while it keeps that name.")
+    is_default: bool = Field(description="The place the business works in unless another one is chosen.")
+    is_active: bool
+
+
+class LocationListOut(Schema):
+    locations: list[LocationOut] = Field(description="The default first, then by name.")
