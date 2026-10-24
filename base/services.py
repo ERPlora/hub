@@ -524,6 +524,9 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
         except IntegrityError:
             raise _slug_taken() from None
     record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": hub.slug, "created": created})
+    # Registered as the platform (/internal): Settings › Business (APP-BASE-6) listens on the business's channel, so a
+    # name, zone or language changed on erplora.com shows without reloading, after the COMMIT as the photo's.
+    transaction.on_commit(partial(notify, Scope("host", hub.slug), [events.HUB_REGISTERED]), robust=True)
     if created or not was_ready:
         transaction.on_commit(partial(report_ready, hub.id), robust=True)
     return {**hub_answer(hub), "created": created}

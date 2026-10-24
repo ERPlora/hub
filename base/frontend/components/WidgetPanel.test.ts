@@ -6,7 +6,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WidgetDef } from '../operations';
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
 import WidgetPanel from './WidgetPanel.vue';
 
 function widget(fields: Partial<WidgetDef> = {}): WidgetDef {
@@ -134,6 +134,32 @@ describe('WidgetPanel', () => {
     expect(m.wrapper.get('[data-testid="widget-sparkline"] polyline').attributes('points')).toBe('0,40 100,0');
   });
 
+  // BASE-G98: a panel's amounts are in the business's currency (`base.business.get`, the same subscription for every
+  // panel of the tab), never a fixed euro; until the business is known, the amount without a symbol.
+  describe("the business's currency", () => {
+    const money = { map: { value: 'total' }, options: { format: 'currency' } } as const;
+
+    it('writes the amount in the currency of a Polish business, and in euros in a Spanish one', async () => {
+      const m = await panel(money, 'es');
+      const call = await m.live();
+      expect(m.client.stream.subscriptions('base.business.get').map((sub) => sub.params)).toEqual([{}]);
+      await m.result(call, 'demo.item.stats', { total: 1250 });
+      expect(value(m.wrapper).text()).toBe('12,50');
+      await m.result(call, 'base.business.get', business(POLISH));
+      expect(value(m.wrapper).text()).toBe('12,50\u00a0zł');
+      await m.result(call, 'base.business.get', business(), 2);
+      expect(value(m.wrapper).text()).toBe('12,50\u00a0€');
+    });
+
+    it('with the decimals of its currency', async () => {
+      const m = await panel(money, 'en');
+      const call = await m.live();
+      await m.result(call, 'base.business.get', business({ country: 'JP', currency: 'JPY', currency_decimals: 0 }));
+      await m.result(call, 'demo.item.stats', { total: 123400 });
+      expect(value(m.wrapper).text()).toBe('¥1,234');
+    });
+  });
+
   // BASE-F06 (the old hub's gh:hub#2392): a chart of business days says each day in the person's language, never
   // `2026-10-23`, and the amount of the chosen bar — the last one (today) until another is tapped or focused.
   describe('a chart of days', () => {
@@ -148,6 +174,7 @@ describe('WidgetPanel', () => {
     it("names each bar by its weekday and says the last bar's day and amount", async () => {
       const m = await panel(chart, 'es');
       const call = await m.live();
+      await m.result(call, 'base.business.get', business());
       await m.result(call, 'demo.item.stats', week);
       const found = m.wrapper.findAll('[data-testid="widget-chart-bar"]');
       expect(found.map((bar) => bar.text())).toEqual(['mié', 'jue', 'vie']);
@@ -160,6 +187,7 @@ describe('WidgetPanel', () => {
     it('a tapped or focused bar says its own day and amount', async () => {
       const m = await panel(chart, 'en');
       const call = await m.live();
+      await m.result(call, 'base.business.get', business());
       await m.result(call, 'demo.item.stats', week);
       const found = m.wrapper.findAll('[data-testid="widget-chart-bar"]');
       await found[0].trigger('click');
@@ -172,6 +200,7 @@ describe('WidgetPanel', () => {
     it('keeps the chosen day when the chart repaints, and goes back to the last one when that day is gone', async () => {
       const m = await panel(chart, 'es');
       const call = await m.live();
+      await m.result(call, 'base.business.get', business());
       await m.result(call, 'demo.item.stats', week);
       await m.wrapper.findAll('[data-testid="widget-chart-bar"]')[0].trigger('click');
       await m.result(call, 'demo.item.stats', { rows: [...week.rows.slice(0, 2), { day: '2026-10-23', total: 750 }] }, 2);

@@ -3,6 +3,7 @@
 // (`sale.sale.list`, live: a sale anywhere in the business brings the new list) only while Sales is on in this
 // hub — base does not require Sales, so without it the table is simply empty. Searched, sorted and paged in the
 // browser (15 a page), filtered by method or status behind the funnel. The status speaks the sales history's words; one this screen does not know is «Other».
+// Each amount is in the business's currency (BASE-G98: `base.business.get`), never a fixed euro.
 import { DataTable, formatDateTime, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -11,6 +12,7 @@ import { computed } from 'vue';
 
 import { formatValue, saleStatus } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
+import { useBusinessMoney } from '../lib/money';
 
 /**
  * The fields «Activity» reads of a row of `sale.sale.list`. base is the platform and requires no module, so it keeps
@@ -33,6 +35,8 @@ const SALE_STATUSES = ['completed', 'voided', 'refunded'] as const;
 
 const { t, locale } = useBaseI18n();
 const session = useSession();
+/** Each sale's amount, in the business's currency (BASE-G98). */
+const money = useBusinessMoney();
 const salesOn = (session.me.value?.apps ?? []).some((app) => app.label === 'sale' && app.state === 'on');
 const sales = salesOn
   ? useLive('sale.sale.list', { limit: LIMIT, offset: 0, sort: 'created_at', dir: 'desc' })
@@ -63,7 +67,7 @@ const columns = computed(() => [
     key: 'total',
     label: t('base.activity.columns.amount'),
     align: 'right' as const,
-    format: (value: unknown) => formatValue(value, 'currency', locale.value),
+    format: (value: unknown) => formatValue(value, 'currency', locale.value, money.value),
   },
   {
     key: 'status',

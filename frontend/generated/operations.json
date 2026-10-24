@@ -6,6 +6,7 @@
   "base.notice.list": { "method": "get", "path": "/api/home/notices" },
   "base.app.list": { "method": "get", "path": "/api/apps" },
   "base.plan.usage": { "method": "get", "path": "/api/system/plan" },
+  "base.business.get": { "method": "get", "path": "/api/business" },
   "base.blueprint.list": { "method": "get", "path": "/api/settings/data/blueprints" },
   "base.blueprint.inspect": { "method": "post", "path": "/api/settings/data/blueprints/inspect" },
   "base.blueprint.import": { "method": "post", "path": "/api/settings/data/blueprints/import" },
