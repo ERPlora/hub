@@ -90,7 +90,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       plantFailed('a', 'Conflict: Set up the issuer first.');
       await page.goto(`${A}/system#logs`);
       await expect(testid(page, 'tab-logs')).toHaveClass(/segment-button-checked/);
-      await expect(shown(page).getByText('Invoicing could not take it: it is in Failed events.').first()).toBeVisible();
+      // What happened is on the screen at every size, never pushed past its right edge (a phone gets cards).
+      await expect(shown(page).getByText('Invoicing could not take it: it is in Failed events.').first()).toBeInViewport();
       await expect(shown(page).locator('[data-testid="system-log-level"]', { hasText: 'Error' }).first()).toBeVisible();
       await snap(page, 'BASE-G90', width);
 

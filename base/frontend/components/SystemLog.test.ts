@@ -63,6 +63,16 @@ describe('SystemLog', () => {
     expect(m.wrapper.text()).toContain('Invoicing could not take it: it is in Failed events.');
   });
 
+  it('on a phone each event is a card headed by its time, so what happened is never past the screen’s edge', async () => {
+    const m = await open();
+    await m.result(m.call, OP, { entries: [entry('e1')] });
+    expect(prop(m, 'views')).toEqual(['table', 'cards']);
+    expect(prop(m, 'cardTitleColumn')).toBe('at');
+    const at = prop<{ format: (value: unknown, row: EventLogEntry) => string }[]>(m, 'columns')[0];
+    expect(prop<(row: EventLogEntry) => string>(m, 'cardTitle')(entry('e1'))).toBe(at.format(undefined, entry('e1')));
+    expect(at.format(undefined, entry('e1'))).toMatch(/^Oct 2[34], 2026, \d{1,2}:50 [AP]M$/);
+  });
+
   it('paints each level as a pill in the person’s language', async () => {
     const m = await open({ locale: 'es' });
     await m.result(m.call, OP, { entries: [entry('e1', { level: 'warning' })] });
