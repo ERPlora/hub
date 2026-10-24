@@ -1,7 +1,8 @@
-// flow: FLOW-F31 WHATSAPP_INBOX-F23
-// «Send a message to a customer» (apps/flow/WORKBOOK.md FLOW-F31) and «The customer gets the notice when the salon
-// confirms» (apps/whatsapp_inbox/WORKBOOK.md WHATSAPP_INBOX-F23), end to end as the owner, against the real apps and
-// the run's REAL erplora.com (only Meta is played: whatsapp-helpers.ts, «The run's real erplora.com»).
+// flow: FLOW-F31 WHATSAPP_INBOX-F23 WHATSAPP_INBOX-F26 RESERVATION-F19
+// «Send a message to a customer» (apps/flow/WORKBOOK.md FLOW-F31), «The customer gets the notice when the salon
+// confirms» (apps/whatsapp_inbox/WORKBOOK.md WHATSAPP_INBOX-F23) and its table companion «… when the restaurant
+// confirms» (WHATSAPP_INBOX-F26, apps/reservation/WORKBOOK.md RESERVATION-F19), end to end as the owner, against the
+// real apps and the run's REAL erplora.com (only Meta is played: whatsapp-helpers.ts, «The run's real erplora.com»).
 // - FLOW-F31, in each of the three sizes: in a new automation «Send a message» opens its own form; to the customer's
 //   exact number, the message, an approved template with a value for each blank; saved, allowed, on and run by
 //   hand, the WhatsApp is in the customer's conversation and went to erplora.com (door 5), whose Meta refuses the
@@ -11,14 +12,21 @@
 //   relay pass hands it over and the notice reaches her conversation through erplora.com, once (a second pass sends
 //   nothing); a booking born confirmed tells its customer too. A customer whose number never wrote gets nothing,
 //   and the automation's history says where it stopped. Citas' setting is put back after.
-// What it creates is «E2E Fsm …», `e2e.`/`+3469900…` (whatsapp-helpers.ts) or the recipe's automation, and goes.
+// - WHATSAPP_INBOX-F26 / RESERVATION-F19, as an owner who works in Spanish: the card «Avisar por WhatsApp al cliente
+//   cuando se confirma su reserva» opened and turned on (one screenshot per size, FIX-HUB-WHATSAPP-INBOX-RESERVATION-
+//   CONFIRMED-RECIPE-<width>); with «Confirmar solas las reservas nuevas» off, «Confirmar» in Reservas on a reservation
+//   whose number has a conversation; the relay pass hands it over and the notice, with its day, time and guests in
+//   Spanish, is in the conversation of the inbox once (a second pass, or cancelling it, sends nothing more; one
+//   screenshot per size, …-chat-<width>). Reservas' settings are put back after.
+// What it creates is «E2E Fsm …», `e2e.`/`+3469900…` (whatsapp-helpers.ts), the recipes' automations, a slot (its
+// maximum is `SLOT_SENTINEL`) and a day open in Schedules («E2E Fsm …»), and goes.
 import { spawnSync } from 'node:child_process';
 
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { choose, confirmDialog, signedIn } from './flow-helpers';
-import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
-import { FLOW_VIEWPORTS, noHorizontalScroll, post, settled } from './service-helpers';
+import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
+import { FLOW_VIEWPORTS, noHorizontalScroll, post, rowAction, settled } from './service-helpers';
 import {
   cleanUp as cleanUpInbox,
   e2ePhone,
@@ -36,11 +44,15 @@ const TASK = 'FIX-FLOW-SEND-MESSAGE-STEP';
 const TAG = 'E2E Fsm';
 const RUN = Date.now().toString(36);
 const REF = 'whatsapp_inbox/appointment_confirmed';
+const TABLE_REF = 'whatsapp_inbox/reservation_confirmed';
+const TABLE_TASK = 'FIX-HUB-WHATSAPP-INBOX-RESERVATION-CONFIRMED-RECIPE';
+/** The maximum of the slot this spec opens (slots have no name): how `cleanUp` knows it. */
+const SLOT_SENTINEL = 76;
 /** An approved Utility template of this run with two blanks. */
 const CONFIRMED = template('e2e_confirmed', { variables: 2, body: 'Confirmada: {{1}} a las {{2}}.' });
 
 function cleanUp(): void {
-  const flows = `select id from flow_flow where name like '${TAG}%' or recipe = '${REF}'`;
+  const flows = `select id from flow_flow where name like '${TAG}%' or recipe in ('${REF}', '${TABLE_REF}')`;
   const customers = `select id from customer_customer where name like '${TAG}%'`;
   const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
   const services = `select id from service_service where name like '${TAG}%'`;
@@ -57,6 +69,10 @@ function cleanUp(): void {
       `delete from staff_member where first_name like '${TAG}%'`,
       `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
       `delete from schedule_specialday where name like '${TAG}%'`,
+      `delete from reservation_reservation where guest_name like '${TAG}%' or customer_id in (${customers})`,
+      `delete from reservation_timeslot where max_reservations = ${SLOT_SENTINEL}`,
+      `delete from schedule_overrideinterval where override_id in (select id from schedule_override where reason like '${TAG}%')`,
+      `delete from schedule_override where reason like '${TAG}%'`,
     ].join('; '),
   );
   cleanUpInbox();
@@ -265,6 +281,130 @@ test('WHATSAPP_INBOX-F23: confirming a booking tells the customer by WhatsApp th
     expect(runs.data.rows.map((row) => row.status).sort()).toEqual(['stopped', 'succeeded', 'succeeded']);
   } finally {
     await post(context, '/appointment/settings', settings, 200);
+    await context.close();
+  }
+});
+
+/** The business's day `days` from today on its wall clock (Madrid in phase 1): `YYYY-MM-DD` and its weekday
+ *  (0 = Monday), inside Reservas' 30 days ahead. */
+function madridDay(days: number): { date: string; weekday: number } {
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    new Date(Date.now() + days * 86_400_000),
+  );
+  return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };
+}
+
+/** The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it), at `next`. */
+async function spanishOwner(browser: Browser, next: string, viewport: { width: number; height: number }) {
+  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+  const page = await context.newPage();
+  await login(page, A, next);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.goto(`${A}${next}`);
+  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+  return { context, page };
+}
+
+// flow: WHATSAPP_INBOX-F26 RESERVATION-F19
+test('WHATSAPP_INBOX-F26 (y RESERVATION-F19): confirming a reservation in Reservas tells the guest by WhatsApp through erplora.com, once', async ({
+  browser,
+}) => {
+  test.setTimeout(240_000);
+  const { context, page } = await spanishOwner(browser, '/flow/automations', FLOW_VIEWPORTS[2]);
+  const day = madridDay(3);
+  const current = await api<Record<string, unknown>>(context, A, 'GET', '/reservation/settings');
+  expect(current.status).toBe(200);
+  try {
+    // The book open on the reservation's day: a slot all day and Schedules open 24 hours, whatever the dev
+    // database's hours; «Confirmar solas las reservas nuevas» off («I review them first»).
+    await post(context, '/reservation/time_slots', { day_of_week: day.weekday, start_time: '00:00', end_time: '23:59', max_reservations: SLOT_SENTINEL });
+    await post(context, '/schedule/overrides', {
+      start_date: day.date,
+      end_date: day.date,
+      reason: `${TAG} open ${RUN}`,
+      is_closed: false,
+      intervals: [{ open_time: '00:00', close_time: '00:00' }],
+    });
+    await post(context, '/reservation/settings', { auto_confirm: false }, 200);
+
+    // FLOW-F33: the inbox's table notice, opened and turned on from its card under the gallery, in Spanish.
+    const card = shown(page).locator(`[data-testid="flow-recipe-${TABLE_REF}"]`);
+    await expect(card).toContainText('Avisar por WhatsApp al cliente cuando se confirma su reserva');
+    await card.locator(`[data-testid="flow-recipe-open-${TABLE_REF}"]`).click();
+    const recipePanel = shown(page).locator(`[data-testid="flow-recipe-panel-${TABLE_REF}"]`);
+    await expect(recipePanel).toContainText('solo al número exacto de la reserva');
+    await expect(recipePanel).toContainText('«reservation_confirmed»');
+    for (const viewport of FLOW_VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await card.scrollIntoViewIfNeeded();
+      await expect(recipePanel).toBeVisible();
+      await settled(page);
+      await noHorizontalScroll(page, `WHATSAPP_INBOX-F26 card ${viewport.label}`);
+      await page.screenshot({ path: shot(`${TABLE_TASK}-${viewport.label}`) });
+    }
+    await page.setViewportSize(FLOW_VIEWPORTS[2]);
+    await shown(page).locator(`[data-testid="flow-recipe-enable-${TABLE_REF}"]`).click();
+    await expect.poll(() => psql(`select enabled from flow_flow where recipe = '${TABLE_REF}' and deleted_at is null`)).toBe('t');
+
+    // The guest wrote from her number; Reservas takes her table for four (her card is made in Customers).
+    const phone = e2ePhone();
+    receive(phone, 'Mesa para 4, por favor', `e2e.Lucía mesa ${RUN}`);
+    relayPass(); // what other specs left in the outbox is delivered first
+    const guest = `${TAG} Lucía mesa ${RUN}`;
+    const reservation = await post<{ id: string; status: string }>(context, '/reservation/reservations', {
+      guest_name: guest,
+      guest_phone: phone,
+      date: day.date,
+      time: '21:00',
+      party_size: 4,
+    });
+    expect(reservation.status).toBe('pending');
+    relayPass();
+    expect(sentTo(phone)).toEqual([]); // a pending reservation tells nobody
+
+    // RESERVATION-F07: «Confirmar» in Reservas, found by searching the whole book for the guest.
+    await page.goto(`${A}/reservation/reservations`);
+    await shown(page).locator('[data-testid=reservation-list-search] input').fill(guest);
+    await rowAction(page, 'reservation-list', reservation.id, 'confirm');
+    await expect.poll(() => psql(`select status from reservation_reservation where id = '${reservation.id}'`)).toBe('confirmed');
+    expect(sentTo(phone)).toEqual([]); // nothing leaves inside the request that confirmed
+
+    relayPass();
+    await expect.poll(() => sentTo(phone).length).toBe(1);
+    const [notice] = sentTo(phone);
+    expect(notice).toMatch(/^text\|[a-z]+\|¡Confirmada! Te esperamos el [a-zé]+, \d{1,2} de [a-z]+ de \d{4} a las 21:00, mesa para 4\.\|/);
+    await expect.poll(() => handedOver(sentTo(phone)[0])).toBe(true);
+    relayPass();
+    expect(sentTo(phone)).toHaveLength(1);
+
+    // Any other change of status tells nobody: cancelling it sends nothing more.
+    await post(context, '/reservation/reservations/cancel', { id: reservation.id }, 200);
+    relayPass();
+    expect(sentTo(phone)).toHaveLength(1);
+    const flowId = psql(`select id from flow_flow where recipe = '${TABLE_REF}' and deleted_at is null`);
+    const runs = await api<{ rows: { status: string }[] }>(context, A, 'GET', `/flow/runs?flow_id=${flowId}`);
+    expect(runs.data.rows.map((row) => row.status)).toEqual(['succeeded']);
+
+    // The notice in her conversation of the inbox, in every size.
+    await page.goto(`${A}/whatsapp_inbox/inbox`);
+    await shown(page).locator('[data-testid=whatsapp-inbox-search] input').fill(phone.slice(3));
+    await shown(page).locator('[data-testid=whatsapp-inbox-row]', { hasText: phone.slice(3) }).click();
+    const bubble = shown(page)
+      .locator('[data-testid=whatsapp-inbox-detail] [data-testid=whatsapp-inbox-message][data-side=outbound]')
+      .filter({ hasText: '¡Confirmada! Te esperamos el' });
+    await expect(bubble).toHaveCount(1);
+    for (const viewport of FLOW_VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(bubble).toBeVisible();
+      await expect(bubble).toContainText('a las 21:00, mesa para 4.');
+      await settled(page);
+      await noHorizontalScroll(page, `WHATSAPP_INBOX-F26 chat ${viewport.label}`);
+      await page.screenshot({ path: shot(`${TABLE_TASK}-chat-${viewport.label}`) });
+    }
+    // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  } finally {
+    await post(context, '/reservation/settings', { auto_confirm: current.data.auto_confirm }, 200);
     await context.close();
   }
 });

@@ -7,8 +7,9 @@ tiene su mitad desde saas#63 (2026-10-21) y los flujos que cruzan con él están
 el erplora.com real con un número de pruebas (solo Meta se simula): recibir, el eco del móvil, los estados,
 la opción tocada, contestar, enviar una plantilla, editarla y borrarla, olvidar un número, conectar el número,
 llegar al tope del mes (F13) y la lista de plantillas que erplora.com trae de Meta (F27, F28). Queda en parcial
-la cabecera con archivo (F29). Las respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F26) están escritas y
-esperan al asistente del Hub y a que Automatizaciones pueda mandar un mensaje a un cliente.
+la cabecera con archivo (F29). Los avisos de la cita y de la mesa confirmadas (F23, F26) ya salen por WhatsApp; las
+respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F22, F24, F25) están escritas y esperan al asistente
+del Hub.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
 > no se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -185,7 +186,7 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | hecho | peluqueria |
 | WHATSAPP_INBOX-F24 | El cliente pide mesa por WhatsApp | parcial — el asistente, que lee el mensaje, busca sitio y redacta la respuesta, todavía no está en el Hub; hoy la reserva se toma a mano en Reservas | restaurante |
 | WHATSAPP_INBOX-F25 | El cliente anula o cambia su mesa por WhatsApp | parcial — el asistente, que entiende qué pide y busca su reserva, todavía no está en el Hub; hoy se cambia o se anula a mano en Reservas | restaurante |
-| WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | parcial — Automatizaciones ya puede mandar el aviso (FLOW-F31), pero Reservas todavía no dice el día de la reserva en palabras, en el idioma del negocio: la automatización no se ofrece y el cliente no recibe el aviso | restaurante |
+| WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | hecho | restaurante |
 | WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | hecho | comun |
 | WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | hecho | comun |
 | WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | parcial — la cabecera con foto, vídeo o documento no se ofrece (el Hub no guarda archivos: se hace en WhatsApp Manager) | comun |
@@ -724,21 +725,36 @@ Implicados: RESERVATION-F09, RESERVATION-F18, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F26 El cliente recibe el aviso cuando el restaurante confirma
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f26 -->
-Estado: parcial — Automatizaciones ya puede mandar el aviso (FLOW-F31), pero Reservas todavía no dice el día de la reserva en palabras, en el idioma del negocio (como ya lo dice Citas para F23): la automatización no se ofrece y el cliente no recibe el aviso
-Actor: responsable, cliente
-Pantalla: WhatsApp: chat del cliente
+Estado: hecho
+Actor: propietario, responsable, cliente
+Pantalla: Automatizaciones; Reservas; WhatsApp: chat del cliente
 Pasos:
-1. Con «Las reviso yo antes», el encargado confirma la reserva en Reservas.
-2. Si el cliente tiene conversación de WhatsApp con el negocio, recibe la confirmación con el día, la hora
-   y los comensales, en el idioma y el reloj del negocio.
-3. Como en F23: solo el número internacional exacto de una conversación de este negocio, y fuera de las 24
-   horas, con una plantilla de Utilidad aprobada.
+1. En Automatizaciones, debajo de la galería, en **Viene con «Bandeja de WhatsApp»**, enciende «Avisar por
+   WhatsApp al cliente cuando se confirma su reserva» (FLOW-F33). Para avisar pasadas las 24 horas, crea en
+   **Ajustes** la plantilla de Utilidad `reservation_confirmed` con tres datos (el día, la hora y los
+   comensales) y espera a que Meta la apruebe (F29).
+2. Con «Confirmar solas las reservas nuevas» apagado, el encargado pulsa «Confirmar» en la reserva Pendiente,
+   en Reservas.
+3. Si el cliente tiene conversación de WhatsApp con el negocio, recibe «¡Confirmada! Te esperamos el {día} a
+   las {hora}, mesa para {comensales}.», con el día y la hora en el idioma y el reloj del negocio.
+4. La conversación se busca con el teléfono de la reserva (el de su conversación, si la reserva llegó por
+   WhatsApp), y solo vale el número internacional exacto de una conversación de este negocio: un teléfono
+   incompleto no avisa a nadie, y el aviso nunca sale a la conversación de otra persona.
+5. Fuera de las 24 horas desde el último mensaje del cliente, el aviso sale con la plantilla de Utilidad
+   aprobada, porque WhatsApp no deja mandar texto libre.
+6. El aviso sale con cualquier confirmación de una reserva con conversación, también la de una reserva que
+   nace ya confirmada porque «Confirmar solas las reservas nuevas» está encendido. Sentarla, completarla,
+   cancelarla o marcar que no se presentó no avisan.
 Entra: la reserva confirmada (Reservas) y la conversación cuyo número es exactamente el de la reserva.
-Sale: hoy, nada. Cuando Reservas diga el día en palabras, la automatización «Avisar por WhatsApp al cliente
-cuando se confirma su reserva» saldrá en **Viene con «Bandeja de WhatsApp»** y mandará un WhatsApp al cliente,
-que se ve en su conversación de la bandeja (`whatsapp_inbox.message.sent`), como en F23.
-Si falla: el motivo queda en el historial de la automatización; nada se ve en Reservas.
-Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F33
+Sale: un WhatsApp al cliente, que se ve en su conversación de la bandeja (`whatsapp_inbox.message.sent`);
+el mismo aviso nunca sale dos veces.
+Si falla: el motivo queda en el historial de la automatización y nada se ve en Reservas. Sin teléfono en la
+reserva o sin conversación con ese número, la automatización se para en su paso, sin error; fuera de las 24
+horas sin la plantilla aprobada, con el número sin conectar o con los mensajes del mes gastados, se para con
+el motivo. Lo que Meta rechace después se ve en la conversación («No entregado»). Un negocio sin Reservas no
+ve esta automatización.
+Implicados: RESERVATION-F07, RESERVATION-F19, FLOW-F31, FLOW-F33, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F29,
+WHATSAPP_INBOX-F33
 
 ### WHATSAPP_INBOX-F27 Ver las plantillas y lo que dice Meta de cada una
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F16 fi:modules/whatsapp_inbox#query-whatsapp_inbox-templates-list old-hub:HUB-F268 old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f27 -->
@@ -1424,21 +1440,24 @@ sus operaciones (`flow.recipe.list`, `flow.recipe.enable`, `flow.recipe.disable`
 esta app no lleva recetas propias en su base de datos. `recipes.py` declara ya «Cita confirmada → WhatsApp»
 (F23, `appointment_confirmed`: lee la ficha, busca la conversación con `conversation.by_phone`, se para sin
 error si no hay teléfono o conversación, lee la cita y avisa con `message.notify`, el envío acotado de
-FLOW-F31, que una automatización sí puede tener). Las demás esperan a dos piezas que no están en `main`
-(2026-10-21):
+FLOW-F31, que una automatización sí puede tener) y su par de mesa «Reserva confirmada → WhatsApp» (F26,
+`reservation_confirmed`: escucha `reservation.reservation.status_changed` solo con `input.status` = `confirmed`
+en el «Solo cuando…» del disparador, lee la reserva con `reservation.reservation.get`, que da `guest_phone`,
+`date_label`, `time_label` y `party_size`, busca la conversación de `guest_phone`, se para igual sin teléfono o
+sin conversación y avisa con `message.notify` y la plantilla `reservation_confirmed` de tres datos). Se usa el
+teléfono de la reserva y no el de la ficha: es el número con el que se reservó (RESERVATION-F17 guarda ahí el de
+la conversación, ya en internacional) y no pide Clientes. La reserva que nace confirmada también avisa:
+`reservation.reservation.create` (y la conversión desde la lista de espera) graban `status_changed` con
+`previous_status` vacío. Las demás esperan a una pieza que no está en `main` (2026-10-24):
 
 1. **El asistente en el Hub**: ni la app `assistant` ni un paso de Automatizaciones que lo ejecute con
    herramientas (las operaciones con `ai=`). Las automatizaciones solo tienen pasos `command`, `query`,
    `condition`, `delay`, `http` y `ask`. Sin él nadie lee el texto libre de la clienta (F14–F22, F24, F25):
    la receta vieja era un paso `ai` con `policy: auto`, el acuse fijo y la disculpa de F20.
-2. **El día de la reserva en palabras** (F26): `reservation.reservation.get` da la fecha (`2026-10-25`) y
-   no la dice en el idioma del negocio, como sí hace `appointment.appointment.get` (`start_date_label`). Con
-   ese dato, el acompañante de mesa es la misma receta sobre `reservation.reservation.status_changed` con el
-   estado confirmado.
 
 Cómo encaja cuando lleguen: `apps/whatsapp_inbox/recipes.py` añade «WhatsApp → cita reservada» junto a su
-acompañante «Cita confirmada → WhatsApp», que ya está, y «WhatsApp → mesa reservada» (y, para F26, su acompañante sobre `reservation.reservation.status_changed` con el estado
-confirmado); la exclusión entre tarjetas (una sola respuesta automática en el número) y el orden al apagar
+acompañante «Cita confirmada → WhatsApp», que ya está, y «WhatsApp → mesa reservada» junto a «Reserva confirmada →
+WhatsApp», que también está; la exclusión entre tarjetas (una sola respuesta automática en el número) y el orden al apagar
 (acompañantes primero) son de la pantalla; el interruptor de F16 escribe `auto_confirm_online` con
 `appointment.settings.update` o `auto_confirm` con `reservation.settings.update`; F19 necesita guardar la
 última lista ofrecida por conversación (24 h) y casar con ella lo escrito; F20 necesita marcar la
@@ -1488,8 +1507,8 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
   erplora.com, que es quien habla con Meta.
 - **No sube la muestra de una cabecera con foto, vídeo o documento**: esas plantillas se hacen en
   WhatsApp Manager y aquí se ven, pero no se envían.
-- **No contesta sola ni reserva todavía** (F14–F26): las respuestas automáticas que reservan cita o mesa
-  necesitan el asistente, que aún no está en el Hub, y sus avisos, que Automatizaciones pueda mandar un
-  mensaje a un cliente («Respuestas automáticas: lo que falta»).
+- **No contesta sola ni reserva todavía** (F14–F22, F24, F25): las respuestas automáticas que reservan cita o
+  mesa necesitan el asistente, que aún no está en el Hub («Respuestas automáticas: lo que falta»). Los avisos de
+  la cita y de la mesa confirmadas (F23, F26) sí salen.
 - **No hace campañas** ni envíos masivos.
 - No sincroniza grupos ni listas de difusión (límite de la coexistencia de Meta).
