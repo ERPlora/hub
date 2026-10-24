@@ -371,3 +371,46 @@ class TestDeleteAnOpenCheck:
         first, second = open_check(client), open_check(client)
         assert post(client, "/sale/orders/void", {"order_id": first["id"]}).json()["status"] == "voided"
         assert post(client, "/sale/orders/void_ordered", {"order_id": second["id"]}).json()["status"] == "voided"
+
+
+# ── What goes with an approved command, and nothing more ─────────────────────────────────────────────────────────────
+
+
+class TestWhatGoesWithIt:
+    """``consequence_context``: what an approved command asks of another app goes with it; a read never does, and
+    without an approval the caller's own permissions decide."""
+
+    @staticmethod
+    def context(approved: bool):
+        from types import SimpleNamespace
+
+        from base.approvals import Approved
+        from apps.sale.tests.conftest import ctx_for
+
+        ctx = ctx_for("hub_employee")
+        mark = Approved(operation="sale.sale.void", permission="sale.void_sale", token="elev_x", fingerprint="f" * 64)
+        return type(ctx)(
+            scope=ctx.scope,
+            actor=ctx.actor,
+            permissions=ctx.permissions,
+            request=SimpleNamespace(approved=mark) if approved else None,
+        )
+
+    def test_a_command_of_another_app_goes_with_the_approved_command(self):
+        from apps.sale.queries import consequence_context
+
+        returned = consequence_context(self.context(approved=True), operation("service.session.return"))
+        assert returned.has("service.return_session")
+
+    def test_a_read_never_does(self):
+        from apps.sale.queries import consequence_context
+
+        ctx = self.context(approved=True)
+        assert consequence_context(ctx, operation("sale.sale.stats")) is ctx
+
+    def test_without_an_approval_the_callers_own_permissions_decide(self):
+        from apps.sale.queries import consequence_context
+
+        ctx = self.context(approved=False)
+        assert consequence_context(ctx, operation("service.session.return")) is ctx
+        assert not ctx.has("service.return_session")
