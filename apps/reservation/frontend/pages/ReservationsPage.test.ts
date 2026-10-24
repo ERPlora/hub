@@ -8,7 +8,7 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { click, EMPLOYEE, flush, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
+import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
 import DayBar from '../components/DayBar.vue';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
@@ -72,10 +72,22 @@ describe('ReservationsPage', () => {
       ['status', 'Status'],
       ['source', 'Booked through'],
     ]);
-    expect(s.cells(0).slice(0, 7)).toEqual(['10/15/2026', '9:00 PM', 'Ana García', '+34600111222', '4', '5 (Terrace)', 'Pending']);
-    expect(s.cells(1).slice(2, 7)).toEqual(['Deleted customer', '+34600111222', '2', '—', 'Seated']);
+    expect(s.cells(0).slice(0, 7)).toEqual(['10/15/2026', '9:00 PM', 'Ana García', '+34 600 111 222', '4', '5 (Terrace)', 'Pending']);
+    expect(s.cells(1).slice(2, 7)).toEqual(['Deleted customer', '+34 600 111 222', '2', '—', 'Seated']);
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Search guest, phone or email…', 'New reservation']);
     expect(s.wrapper.findComponent(DayBar).props()).toMatchObject({ day: '2026-10-15', today: '2026-10-15', now: '12:00' });
+  });
+
+  it('paints the guest’s phone as Customers does, in the list and in the cards (+34 600 111 222)', async () => {
+    const s = await setup();
+    await s.show([PENDING, reservationRow({ id: 'r3', guest_name: 'John Smith', guest_phone: '+447911123456' })]);
+    expect([s.cells(0)[3], s.cells(1)[3]]).toEqual(['+34 600 111 222', '+44 791 112 3456']);
+    await ionValue(s.wrapper.find('[data-testid="reservation-list-view"]').element, 'cards');
+    const phones = s.wrapper
+      .findAll('.data-table__field')
+      .filter((field) => field.find('.data-table__field-label').text() === 'Phone')
+      .map((field) => field.find('.data-table__field-value').text().trim());
+    expect(phones).toEqual(['+34 600 111 222', '+44 791 112 3456']);
   });
 
   it('moves to another day with the bar, and a search looks through the whole book', async () => {
@@ -176,7 +188,7 @@ describe('ReservationsPage', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show([PENDING]);
-    expect(s.cells(0).slice(0, 7)).toEqual(['15/10/2026', '21:00', 'Ana García', '+34600111222', '4', '5 (Terrace)', 'Pendiente']);
+    expect(s.cells(0).slice(0, 7)).toEqual(['15/10/2026', '21:00', 'Ana García', '+34 600 111 222', '4', '5 (Terrace)', 'Pendiente']);
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Buscar cliente, teléfono o correo…', 'Nueva reserva']);
   });
 });

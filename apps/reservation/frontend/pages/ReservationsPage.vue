@@ -21,6 +21,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 
+import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
 import DayBar from '../components/DayBar.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
@@ -122,7 +123,15 @@ const columns = computed<DataTableColumn<ReservationOut>[]>(() => [
     filter: { type: 'text' },
   },
   { key: 'guest_name', label: t('reservation.list.columns.guest'), sortable: true, priority: 'high', cell: 'guest', filter: { type: 'text' } },
-  { key: 'guest_phone', label: t('reservation.list.columns.phone'), sortable: true, priority: 'low', filter: { type: 'text' } },
+  // As Customers paints it (+34 600 111 222): the book keeps it in E.164; the filter is the server's, by digits.
+  {
+    key: 'guest_phone',
+    label: t('reservation.list.columns.phone'),
+    sortable: true,
+    priority: 'low',
+    format: (_, row) => formatPhone(row.guest_phone),
+    filter: { type: 'text' },
+  },
   {
     key: 'party_size',
     label: t('reservation.list.columns.party'),

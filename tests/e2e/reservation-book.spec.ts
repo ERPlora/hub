@@ -10,7 +10,7 @@
 // `afterAll` removes all of it, with the holds, the table's checks and their orders.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, psql, shot, shown, untilStill } from './helpers';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -539,14 +539,29 @@ test('A phone typed without prefix for a chosen card is kept international; one 
     if (SOON.date !== TODAY.date) await view.locator('[data-testid=reservation-day-next]').click();
     const row = view.locator(`[data-testid=reservation-list-row][data-id="${id}"]`);
     await expect(row).toContainText('Pendiente');
-    // Opened at each size, as a phone, a tablet and a desktop open it.
+    // The book paints it as Customers does, grouped. The desk table may fold the Phone column (low priority) away, so
+    // at each size the reservation is read in its card, which shows every field.
+    const grouped = `+34 ${typed.slice(0, 3)} ${typed.slice(3, 6)} ${typed.slice(6)}`;
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(row).toContainText(grouped);
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await view.locator('[data-testid=reservation-list-view-cards]').click();
+      await expect(row).toContainText(grouped);
+      await expect(row).not.toContainText(`+34${typed}`);
+      await row.scrollIntoViewIfNeeded();
+      await untilStill(page);
+      await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-${viewport.label}`), fullPage: true });
+    }
+    // Opened from its card at each size, as a phone, a tablet and a desktop open it (a card never folds its actions
+    // into «⋮», which a resize repaints): the field keeps what is sent (E.164).
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await rowAction(page, 'reservation-list', id, 'edit');
       await expect(form).toBeVisible();
       await expect(phone).toHaveValue(`+34${typed}`);
       await expectWholeWhen(form, viewport.label);
-      await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-${viewport.label}`), fullPage: true });
+      await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-edit-${viewport.label}`), fullPage: true });
       await form.locator('[data-testid=reservation-form-cancel]').click();
       await expect(form).toBeHidden();
     }

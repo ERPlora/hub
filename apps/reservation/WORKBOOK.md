@@ -110,8 +110,9 @@ sin canceladas ni no presentadas), **reservas** y **próxima franja** (la primer
 con cuántas reservas quedan «libres» o «Lleno»; o «No queda servicio hoy», «Sin servicio este día»,
 «Cerrado este día»). «Hoy» es el del reloj del negocio, no el del dispositivo.
 
-Debajo, la tabla del día por hora: Fecha, Hora, Cliente, Teléfono, Pax, Mesa, Estado; buscador
-«Buscar cliente, teléfono o correo…» que busca en **todo** el libro (resultados por día y hora);
+Debajo, la tabla del día por hora: Fecha, Hora, Cliente, Teléfono (como en Clientes: el prefijo del país
+y las cifras en grupos), Pax, Mesa, Estado; buscador «Buscar cliente, teléfono o correo…» que busca en
+**todo** el libro, también por las cifras del teléfono sin prefijo (resultados por día y hora);
 filtros por hora, comensales, mesa y estado; vista tabla o tarjetas. Acción principal **«Nueva
 reserva»** y, por fila, según su estado: «Confirmar», «Sentar», «Completar», «Cancelar», «No
 presentado», «Editar» y «Borrar» (solo el administrador). Tocar una fila la abre para editarla.
@@ -127,12 +128,12 @@ nombre o teléfono, con «+ Nuevo cliente»), Nombre, Teléfono, Correo, Fecha, 
 Origen (Teléfono, En el local), Notas del cliente y Notas internas.
 
 ### Lista de espera
-Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (por día y hora
-preferida): Fecha, Hora pref., Cliente, Teléfono, Pax, Contactado, Estado (En espera, Convertida);
+Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (por día y hora preferida):
+Fecha, Hora pref., Cliente, Teléfono (como en Clientes), Pax, Contactado, Estado (En espera, Convertida);
 buscador y filtros (fecha, contactado, convertida). Acción principal **«Añadir cliente»** (Cliente,
 Nombre, Teléfono, Fecha, Hora, Pax, Notas → «Añadir a la lista de espera»); por fila «Contactado»,
-«Convertir» y «Quitar». Vacía: «La lista de espera está vacía.». Cargando: «Cargando…». Error: el
-mensaje de la tabla con «Reintentar».
+«Convertir» y «Quitar». Vacía: «La lista de espera está vacía.». Cargando: «Cargando…». Error: el mensaje
+de la tabla con «Reintentar».
 
 ### Disponibilidad
 Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
