@@ -185,7 +185,5 @@ function pick(option: ComboOption | null): void {
 .tax-category-select__missing {
   justify-self: start;
   margin: 0;
-  /* A document rule: the shell's Tailwind preflight zeroes Ionic's own chip padding (`:host`). */
-  padding-inline: 12px;
 }
 </style>
