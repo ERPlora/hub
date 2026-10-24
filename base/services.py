@@ -2475,6 +2475,8 @@ def file_delete(ctx: OperationContext, data: FileDeleteIn) -> dict:
 
 # ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
 
+import dataclasses  # noqa: E402 - the assistant's block keeps its imports with it
+
 from django.utils.translation import pgettext  # noqa: E402 - the assistant's block keeps its imports with it
 
 from base.schemas import (  # noqa: E402
@@ -2553,7 +2555,23 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
         return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None
     if not decision.accepted or not assistant.confirmed(card, decision.typed):
         return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED), None
-    return assistant.run_tool(ctx, op, call.arguments), None
+    return assistant.run_tool(_assistant_approved(ctx, op), op, call.arguments), None
+
+
+def _assistant_approved(ctx: OperationContext, op) -> OperationContext:
+    """Who runs a write the person said yes to (BASE-G118): the person. When they may not and a manager may approve it
+    (APP-BASE-5), the turn asks as the screen does — ``requires_elevation`` for this very request — and, repeated with
+    the pass, runs it with that one permission more; the pass is spent in the write's own transaction
+    (``base.approval_spend``), so a write that fails leaves it unspent and one that ran cannot run twice."""
+    request = getattr(ctx, "request", None)
+    if ctx.has(op.permission) or request is None or approval_rules.approvable(op.name) is None:
+        return ctx
+    asked = approval_rules.fingerprint(request, ctx.scope.key)
+    token = request.headers.get(approval_rules.HEADER, "")
+    if not token.startswith(approval_rules.TOKEN_PREFIX):
+        raise approval_rules.refusal(op.name, asked)
+    request.approved = approval_rules.Approved(operation=op.name, permission=op.permission, token=token, fingerprint=asked)
+    return dataclasses.replace(ctx, permissions=frozenset(ctx.permissions) | {op.permission})
 
 
 @operation(

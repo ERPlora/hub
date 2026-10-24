@@ -282,3 +282,57 @@ describe('the setup (BASE-G121)', () => {
     expect(bodies[0].setup).toBe(true);
   });
 });
+
+describe('a write a manager must approve (BASE-G118, with APP-BASE-5’s approvals)', () => {
+  const QUESTION = { operation: 'demo.item.create', label: 'Create an item', fingerprint: 'f'.repeat(64) };
+  const needsApproval = () =>
+    new ApiError(403, 'requires_elevation', 'This needs a manager’s approval.', undefined, { approval: QUESTION });
+
+  async function waitingOnCard(post: ReturnType<typeof hub>['post'], askApproval: (q: typeof QUESTION) => Promise<string | null>) {
+    const assistant = createAssistant({ post, storage: memoryStorage(), openStorage: memoryStorage(), askApproval });
+    assistant.forUser('u1');
+    await assistant.ask('Crea la Mesa 4');
+    expect(assistant.state.confirm?.call).toEqual(CREATE);
+    return assistant;
+  }
+
+  it('its yes asks who approves, as the screen does, and the same turn goes again with the pass', async () => {
+    const { post, bodies } = hub(
+      [{ type: 'confirm', card: CARD, call: CREATE }, done({ append: [asked(CREATE)], pending: [CREATE] })],
+      needsApproval(),
+      [
+        { type: 'executed', call_id: 'c1', name: 'demo.item.create', app: 'demo', kind: 'command', outcome: 'ok', code: '' },
+        { type: 'text', text: 'Hecho.' },
+        done({ append: [{ role: 'tool', tool_call_id: 'c1', content: '{}' }, { role: 'assistant', content: 'Hecho.' }] }),
+      ],
+    );
+    const ask = vi.fn(async () => 'elev_pass');
+    const assistant = await waitingOnCard(post, ask);
+    await assistant.decide(true);
+    expect(ask).toHaveBeenCalledWith(QUESTION);
+    expect(bodies[2]).toEqual(bodies[1]);
+    expect(bodies[1].decision).toEqual({ call_id: 'c1', accepted: true, typed: '', stop: false });
+    const answer = assistant.state.thread.bubbles.at(-1)!;
+    expect(answer.text).toBe('Hecho.');
+    expect(answer.error).toBeUndefined();
+    expect(answer.executed).toEqual([{ name: 'demo.item.create', app: 'demo', outcome: 'ok' }]);
+  });
+
+  it('when nobody approves, the write is not done and the model is told, as with «Cancel»', async () => {
+    const { post, bodies } = hub(
+      [{ type: 'confirm', card: CARD, call: CREATE }, done({ append: [asked(CREATE)], pending: [CREATE] })],
+      needsApproval(),
+      [
+        { type: 'executed', call_id: 'c1', name: 'demo.item.create', app: 'demo', kind: 'command', outcome: 'cancelled', code: 'base.assistant_not_confirmed' },
+        { type: 'text', text: 'No lo he hecho.' },
+        done(),
+      ],
+    );
+    const assistant = await waitingOnCard(post, async () => null);
+    await assistant.decide(true);
+    expect(bodies[2].decision).toEqual({ call_id: 'c1', accepted: false, typed: '', stop: false });
+    const answer = assistant.state.thread.bubbles.at(-1)!;
+    expect(answer.error).toBeUndefined();
+    expect(answer.executed).toEqual([{ name: 'demo.item.create', app: 'demo', outcome: 'cancelled' }]);
+  });
+});

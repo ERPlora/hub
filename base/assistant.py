@@ -36,7 +36,7 @@ from live.errors import AppInactive, OperationError, PermissionDenied, Unauthori
 from live.meta import LiveAppConfig, all_live_app_configs
 from live.operations import Operation, registry
 
-from base import entitlement, signing
+from base import approvals, entitlement, signing
 from base.auth import saas_internal_url
 from base.operations import HostScopeResolver
 
@@ -114,12 +114,13 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
 
 
 def catalog(ctx: OperationContext) -> dict[str, Operation]:
-    """The tools of ``ctx``'s person: by name, in name order."""
+    """The tools of ``ctx``'s person: by name, in name order. A write a manager may approve is theirs too, as its
+    button on the screen is (APP-BASE-5): running it asks for the approval (BASE-G118)."""
     on = active_apps(ctx.scope)
     return {
         name: op
         for name, op in sorted(registry.items())
-        if op.app_label in on and is_tool(op) and ctx.has(op.permission)
+        if op.app_label in on and is_tool(op) and (ctx.has(op.permission) or approvals.label_of(op) is not None)
     }
 
 

@@ -161,3 +161,102 @@ def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
     report = {"message_id": "m1", "reason": "incorrect", "question": "¿?" * 3_000, "answer": answer}
     assert post(client, "/assistant/report", report).status_code == 200
     assert gateway.sent("/internal/assistant/report")[0].body["answer"] == answer
+
+
+# ── A write a manager may approve (BASE-G118, with APP-BASE-5's approvals): the chat asks as the screen does ────────
+
+APPROVED_CREATE = {"demo.item.create": "Create an item"}
+
+
+@pytest.fixture
+def approvable_create(monkeypatch):
+    """``demo`` names its «create» as approvable, as an app would in its ``LiveAppConfig``."""
+    from django.apps import apps
+    from django.core.cache import cache
+
+    monkeypatch.setattr(apps.get_app_config("demo"), "approvals", APPROVED_CREATE, raising=False)
+    cache.clear()
+    yield
+    cache.clear()
+
+
+def _create_turn() -> dict:
+    call = {"call_id": "c1", "name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}
+    asked = {"role": "assistant", "content": "", "tool_calls": [
+        {"id": "c1", "type": "function", "function": {"name": "demo__item__create", "arguments": '{"name": "Mesa 4"}'}}
+    ]}
+    return {"messages": [ASK, asked], "pending": [call], "continuation": "tok", "decision": {"call_id": "c1", "accepted": True}}
+
+
+def _employee_and_manager(client, make_user):
+    from base.tests.test_people import with_pin
+
+    make_user("saas:4", host="a", role="hub_manager", first_name="Mario")
+    with_pin("saas:4", "1357")
+    client.force_login(make_user("saas:3", host="a", role="hub_employee", first_name="Eva"))
+
+
+def _items(name: str = "Mesa 4") -> int:
+    from apps.demo.models import Item
+
+    return Item.objects.filter(name=name).count()
+
+
+def test_its_yes_asks_for_a_managers_approval_as_the_screen_does_and_runs_nothing(client, make_user, gateway, approvable_create):
+    _employee_and_manager(client, make_user)
+    response = post(client, "/assistant/turn", _create_turn())
+    assert response.status_code == 403
+    error = response.json()["error"]
+    assert error["code"] == "requires_elevation"
+    assert (error["approval"]["operation"], error["approval"]["label"]) == ("demo.item.create", "Create an item")
+    assert len(error["approval"]["fingerprint"]) == 64
+    assert _items() == 0
+    assert gateway.requests == []
+
+
+def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent(client, make_user, gateway, approvable_create):
+    from base.models import Approval, Credential
+
+    _employee_and_manager(client, make_user)
+    body = _create_turn()
+    asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
+    manager = str(Credential.objects.get(username="saas:4").pk)
+    approval = {"operation": asked["operation"], "fingerprint": asked["fingerprint"], "person": manager, "pin": "1357"}
+    granted = post(client, "/approvals", approval)
+    assert granted.status_code == 200, granted.content
+    token = granted.json()["token"]
+
+    gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", body, HTTP_X_ELEVATION_TOKEN=token))
+    assert (got[0]["type"], got[0]["name"], got[0]["outcome"]) == ("executed", "demo.item.create", "ok")
+    assert _items() == 1
+    assert Approval.objects.get().used_at is not None
+
+    # The same pass again: spent, so the write does not run twice.
+    gateway.turn({"type": "text_delta", "text": "No."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    again = frames(post(client, "/assistant/turn", body, HTTP_X_ELEVATION_TOKEN=token))
+    assert (again[0]["outcome"], again[0]["code"]) == ("error", "requires_elevation")
+    assert _items() == 1
+
+
+def test_a_pass_for_another_request_does_not_let_this_one_through(client, make_user, gateway, approvable_create):
+    from base.models import Credential
+
+    _employee_and_manager(client, make_user)
+    asked = post(client, "/assistant/turn", _create_turn()).json()["error"]["approval"]
+    manager = str(Credential.objects.get(username="saas:4").pk)
+    token = post(client, "/approvals", {**asked, "person": manager, "pin": "1357"}).json()["token"]
+    other = _create_turn()
+    other["pending"][0]["arguments"] = other["messages"][1]["tool_calls"][0]["function"]["arguments"] = '{"name": "Mesa 9"}'
+    gateway.turn({"type": "text_delta", "text": "No."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", other, HTTP_X_ELEVATION_TOKEN=token))
+    assert (got[0]["outcome"], got[0]["code"]) == ("error", "requires_elevation")
+    assert _items("Mesa 9") == 0
+
+
+def test_a_write_nobody_may_approve_is_still_refused_flat(client, make_user, gateway):
+    _employee_and_manager(client, make_user)
+    gateway.turn({"type": "text_delta", "text": "No puedo."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", _create_turn()))
+    assert (got[0]["outcome"], got[0]["code"]) == ("refused", "not_available")
+    assert _items() == 0

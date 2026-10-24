@@ -11,6 +11,7 @@ import { ApiError } from '@erplora/ui/sdk';
 import { reactive } from 'vue';
 
 import type { AssistantUsage } from '../operations';
+import { type AskApproval, questionOf, withApproval } from './approval';
 import type { AssistantCard } from './assistant-card';
 import { type Executed, groundingNotices } from './assistant-grounding';
 import {
@@ -49,6 +50,8 @@ export interface AssistantState {
 
 export interface AssistantDeps {
   post?: (body: TurnBody, options: TurnOptions) => Promise<void>;
+  /** Who approves a write the person may not make (the dialog «An approval is needed» by default). */
+  askApproval?: AskApproval;
   storage?: Storage;
   openStorage?: Storage;
   id?: () => string;
@@ -213,10 +216,18 @@ export function createAssistant(deps: AssistantDeps = {}) {
       if (decision) body.decision = decision;
       decision = undefined;
       try {
-        await post(body, { onFrame, signal: controller.signal });
+        // A write a manager must approve (BASE-G118): the dialog the screen opens, then the same turn with the pass.
+        const signal = controller.signal;
+        await withApproval(() => post(body, { onFrame, signal }), { ask: deps.askApproval });
       } catch (error) {
         if (turn !== current) return;
         if (isAbort(error)) return finish(undefined, undefined, true);
+        const sent = body.decision;
+        if (questionOf(error) && sent?.accepted) {
+          // Nobody approved it: not done, and the model hears it as a «Cancel».
+          decision = { call_id: sent.call_id, accepted: false, typed: '', stop: false };
+          continue;
+        }
         const code = error instanceof ApiError ? error.code : 'assistant.unreachable';
         return finish(code, error instanceof ApiError ? (error.details ?? {}) : {});
       }

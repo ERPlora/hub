@@ -4,6 +4,7 @@
 import { ApiError } from '@erplora/ui/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
+import { withApproval } from './approval';
 import { postTurn, TURN_PATH, type TurnFrame } from './assistant-stream';
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
@@ -66,5 +67,27 @@ describe('postTurn', () => {
     const frames: TurnFrame[] = [];
     await postTurn({ messages: [] }, { onFrame: (frame) => frames.push(frame), fetcher, doc: page() });
     expect(frames).toEqual([{ type: 'text', text: 'ok' }]);
+  });
+});
+
+describe('a turn repeated after a manager’s approval (BASE-G118)', () => {
+  it('carries the pass in X-Elevation-Token, only while it is repeated', async () => {
+    const question = { operation: 'demo.item.create', label: 'Create an item', fingerprint: 'f'.repeat(64) };
+    const sent: (string | null)[] = [];
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(new Headers(init?.headers).get('X-Elevation-Token'));
+      if (sent.length === 1) return Response.json({ error: { code: 'requires_elevation', message: 'x', approval: question } }, { status: 403 });
+      return new Response('data: {"type":"done","append":[],"pending":[],"continuation":null}\n\n', {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    });
+    const frames: TurnFrame[] = [];
+    await withApproval(() => postTurn({ messages: [] }, { onFrame: (frame) => frames.push(frame), fetcher, doc: page() }), {
+      ask: async () => 'elev_pass',
+    });
+    expect(sent).toEqual([null, 'elev_pass']);
+    expect(frames.map((frame) => frame.type)).toEqual(['done']);
+    await postTurn({ messages: [] }, { onFrame: () => undefined, fetcher, doc: page() });
+    expect(sent[2]).toBeNull();
   });
 });

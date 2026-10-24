@@ -390,7 +390,7 @@ En la pantalla Archivos:
 | BASE-F97 | Confirmar una acción antes de que se ejecute | hecho |
 | BASE-F98 | Acciones peligrosas: escribir para confirmar, o no desde el chat | hecho |
 | BASE-F99 | Comprobar lo que dice el asistente contra lo que de verdad hizo | hecho |
-| BASE-F100 | Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable | parcial |
+| BASE-F100 | Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable | hecho |
 | BASE-F101 | Pedirle varias cosas seguidas | hecho |
 | BASE-F102 | La conversación: qué se guarda, dónde y cuándo se borra | hecho |
 | BASE-F103 | El asistente en la puesta en marcha | hecho |
@@ -2342,21 +2342,28 @@ Implicados: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable
 <!-- origen: old-hub:HUB_SHELL-F193 -->
-Estado: parcial — la aprobación con el PIN de un responsable todavía no existe en el Hub (llega con Personas y permisos): la acción que la pediría se niega
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. El asistente trabaja con la sesión de quien está delante: ve y hace lo que esa persona vería y haría con sus
      botones, en las apps encendidas del negocio, y nada más. Una acción para la que no tiene permiso no se le ofrece
-     al asistente, que así se lo dice.
-  2. Si aun así la intenta, no se hace: el recibo dice «No se hizo, sin permiso: …» y el asistente explica que no
-     puede.
-  3. Lo que el asistente cuenta (listas, cifras) es lo que esa persona puede leer.
-Entra: la sesión de quien pregunta, que firma cada acción.
-Sale: la acción hecha con esa persona como autora.
-Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Lo que
-haría falta que aprobara un responsable no se puede aprobar desde el chat: se queda sin hacer, con el mismo recibo.
-Implicados: BASE-F13, BASE-F97
+     al asistente, que así se lo dice; la que su app deja aprobar a un responsable sí, igual que su botón en la
+     pantalla.
+  2. Esa acción sale con su tarjeta, como cualquier otra. Al pulsar «Ejecutar» se abre «Hace falta una aprobación», la
+     misma de la pantalla: un responsable toca su cara y teclea su PIN, o pasa su placa, y la acción se hace una vez,
+     con quien la pidió como autor. Queda anotada en **Empleados › Aprobaciones**.
+  3. Si nadie la aprueba («Cancelar»), no se hace: el recibo dice «No se hizo, cancelado: …» y el asistente lo sabe.
+  4. Si aun así intenta una acción sin permiso que nadie puede aprobar, no se hace: el recibo dice «No se hizo, sin
+     permiso: …» y el asistente explica que no puede.
+  5. Lo que el asistente cuenta (listas, cifras) es lo que esa persona puede leer.
+Entra: la sesión de quien pregunta, que firma cada acción; para lo que aprueba un responsable, su PIN o su placa.
+Sale: la acción hecha con esa persona como autora. La aprobación vale para esa acción de esa conversación, una sola
+vez y durante dos minutos, y se gasta junto con la acción (BASE-F84).
+Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Una
+aprobación ya usada o caducada no deja pasar la acción: el recibo dice «No se hizo, falló: …» y el asistente lo
+cuenta.
+Implicados: BASE-F13, BASE-F84, BASE-F97
 
 ### BASE-F101 Pedirle varias cosas seguidas
 <!-- origen: old-hub:HUB_SHELL-F194 -->
@@ -2749,9 +2756,9 @@ Implicados: BASE-F93, BASE-F102, BASE-F104
 - **Asistente** (APP-BASE-9, BASE-F92…F106; PLAN §30, ronda 2026-10-22b): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. `base/assistant.py` (sin ORM) tiene el catálogo de herramientas (`catalog`: toda
-  `@operation` de las apps activas cuyo `ai=` tiene descripción y cuyo permiso tiene la persona, salvo las «Not an
-  assistant tool» / «System only», las sin permiso, las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y
-  `base.blueprint.export`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
+  `@operation` de las apps activas cuyo `ai=` tiene descripción y cuyo permiso tiene la persona, o que su app deja
+  aprobar a un responsable (`approvals.label_of`), salvo las «Not an assistant tool» / «System only», las sin permiso,
+  las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
   preguntas; `base.setup.status` y `base.business.get` siempre), la tarjeta (`card`: `ai={"risk": "high"}` pide
   `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `base`, o el número de `ids`; sin `ids`, `blocked`), la
   comparación del servidor (`confirmed`, como `ConfirmDialog`: sin mayúsculas ni espacios de los extremos),
@@ -2760,7 +2767,10 @@ Implicados: BASE-F93, BASE-F102, BASE-F104
   el HMAC de `base.signing`).
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
   (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
-  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`, y arma las instrucciones con las pantallas que puede enlazar
+  `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; el «sí» a una escritura que la persona no puede hacer y un
+  responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
+  con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
+  instrucciones con las pantallas que puede enlazar
   y, con `setup`, la lista de `base.setup.status` releída), `base.assistant.usage` (query), `base.assistant.report` y
   `base.assistant.transcribe` (command). Rutas en `base/api.py` (`/api/assistant/turn`, `usage`, `report`,
   `transcribe`): el turno responde en streaming (`text/event-stream`, `turn_response`) a **una** petición `fetch` +

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:db143d23966e8d46c1e820909ca2dc4b9990200f0dbcd241aea2935216bc2283 -->
+<!-- generated from WORKBOOK.md sha256:b56ec2de54bc6435c21165c202634531d61c77991671d84d46d8450c2dc281a7 -->
 
 ## What it is for and who it is for
 
@@ -385,7 +385,7 @@ On the Employees screens and the API documentation:
 | BASE-F97 | Confirm an action before it runs | done |
 | BASE-F98 | Dangerous actions: type to confirm, or not from the chat | done |
 | BASE-F99 | Check what the assistant says against what it really did | done |
-| BASE-F100 | What the assistant can do depending on who asks: permissions and a manager's PIN | partial |
+| BASE-F100 | What the assistant can do depending on who asks: permissions and a manager's PIN | done |
 | BASE-F101 | Ask it for several things in a row | done |
 | BASE-F102 | The conversation: what is kept, where and when it is deleted | done |
 | BASE-F103 | The assistant in the setup | done |
@@ -2226,22 +2226,29 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
-Status: partial — approval with a manager's PIN does not exist in the Hub yet (it comes with People and permissions): the action that would ask for it is refused
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. The assistant works with the session of whoever is in front of it: it sees and does what that person would see
      and do with their buttons, in the business's apps that are on, and nothing else. An action they have no
-     permission for is not offered to the assistant, which tells them so.
-  2. If it tries it anyway, it is not done: the receipt reads "Not done, not allowed: …" and the assistant explains
-     it cannot.
-  3. What the assistant tells (lists, figures) is what that person may read.
-In: the session of whoever asks, which signs each action.
-Out: the action done with that person as its author.
+     permission for is not offered to the assistant, which tells them so; one its app lets a manager approve is, as
+     its button on the screen is.
+  2. That action comes with its card, like any other. Tapping "Run it" opens "An approval is needed", the same as on
+     the screen: a manager taps their face and types their PIN, or swipes their badge, and the action is done once,
+     with whoever asked for it as its author. It is recorded in **Employees › Approvals**.
+  3. If nobody approves it ("Cancel"), it is not done: the receipt reads "Not done, cancelled: …" and the assistant
+     knows it.
+  4. If it tries anyway an action without permission that nobody can approve, it is not done: the receipt reads "Not
+     done, not allowed: …" and the assistant explains it cannot.
+  5. What the assistant tells (lists, figures) is what that person may read.
+In: the session of whoever asks, which signs each action; for what a manager approves, their PIN or their badge.
+Out: the action done with that person as its author. The approval is good for that action of that conversation, once
+and for two minutes, and it is spent together with the action (BASE-F84).
 If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
-says so. What a manager would have to approve cannot be approved from the chat: it stays undone, with the same
-receipt.
-Involved: BASE-F13, BASE-F97
+says so. An approval already used or expired does not let the action through: the receipt reads "Not done, it
+failed: …" and the assistant tells it.
+Involved: BASE-F13, BASE-F84, BASE-F97
 
 ### BASE-F101 Ask it for several things in a row
 Status: done

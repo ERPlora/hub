@@ -6,6 +6,7 @@
 // `ApiError`; a network that is not there rejects as `fetch` does; aborting (`signal`) stops reading.
 import { ApiError, createHeaderProvider, parseErrorEnvelope, readSpaConfig } from '@erplora/ui/sdk';
 
+import { approvalPass } from './approval';
 import type { AssistantCard } from './assistant-card';
 import type { ChatMessage } from './assistant-history';
 
@@ -68,6 +69,8 @@ function headers(doc: Document): Record<string, string> {
     },
     cookies: () => doc.cookie,
     randomUUID: () => globalThis.crypto.randomUUID(),
+    // A manager's approval (BASE-G118): the pass of the turn being repeated, in `X-Elevation-Token`.
+    getElevationToken: approvalPass,
   });
   return { ...provider.apiHeaders('POST'), Accept: 'text/event-stream', 'Content-Type': 'application/json' };
 }
