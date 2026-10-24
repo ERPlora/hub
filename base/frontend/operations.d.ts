@@ -637,7 +637,7 @@ declare module '@erplora/ui/sdk' {
     'base.api_key.rotate': { input: { id: string }; output: { key: ApiKeyRow; token: string } };
     'base.api_key.revoke': { input: { id: string }; output: { key: ApiKeyRow } };
     'base.approval.list': { input: NoInput; output: { approvals: ApprovalRow[] } };
-    'base.approval.approvers': { input: { operation: string }; output: { people: Approver[] } };
+    'base.approval.approvers': { input: { operation: string }; output: { people: Approver[]; pin_length: number } };
     'base.approval.approve': { input: ApprovalInput; output: ApprovalPass };
   }
 }

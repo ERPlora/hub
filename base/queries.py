@@ -1353,12 +1353,13 @@ def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
     """«Who approves it?» (BASE-G136): the people of the business with a PIN who may do the action themselves, by name;
     nobody for an action no app names."""
     found = approval_rules.approvable(data.operation)
+    pin_length = access.pin_length_or_default(access_settings().pin_length)
     if found is None:
-        return {"people": []}
+        return {"people": [], "pin_length": pin_length}
     op = found[0]
     people = [
         {"id": str(credential.pk), "name": face_name(user), "initials": access.initials(face_name(user))}
         for credential, user in pin_people(ctx.scope.key)
         if holds(user, ctx.scope, op.permission)
     ]
-    return {"people": sorted(people, key=lambda person: person["name"].casefold())}
+    return {"people": sorted(people, key=lambda person: person["name"].casefold()), "pin_length": pin_length}

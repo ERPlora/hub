@@ -1,6 +1,6 @@
 // Routes → pages of base, and nothing else: the Home at `/` (PLAN-HUB round 2026-10-21, the old hub's
 // dashboard), Apps and System (APP-BASE-4), the way in (APP-BASE-3) and Settings at `/settings` (its tab in the hash:
-// General, or `#data`; APP-BASE-3 and APP-BASE-2). The Home is registered before the shell's grid, so it wins `/`;
+// General, or `#data`; APP-BASE-3 and APP-BASE-2) and Employees at `/employees` (APP-BASE-5). The Home is registered before the shell's grid, so it wins `/`;
 // named apart from it (`home`), because a second route with the same name would replace the first. Types only:
 // `main.ts` globs this file eagerly.
 import type { RouteRecordRaw } from 'vue-router';
@@ -63,6 +63,21 @@ const routes: RouteRecordRaw[] = [
     path: '/settings',
     name: 'base-settings',
     component: () => import('./pages/SettingsPage.vue'),
+    meta: { auth: true },
+  },
+  // ── People and permissions (APP-BASE-5) ──
+  // Employees: «Staff», «Roles», «API keys» and «Approvals», the tab in the hash (BASE-G11, G138…G149); a person's
+  // page, for who runs the business (BASE-G10, G139, G140).
+  {
+    path: '/employees',
+    name: 'base-employees',
+    component: () => import('./pages/EmployeesPage.vue'),
+    meta: { auth: true },
+  },
+  {
+    path: '/employees/:person',
+    name: 'base-person',
+    component: () => import('./pages/PersonPage.vue'),
     meta: { auth: true },
   },
   { path: '/import', redirect: { path: '/settings', hash: '#data' } },

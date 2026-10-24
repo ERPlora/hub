@@ -1066,6 +1066,7 @@ class ApproverOut(Schema):
 
 class ApproversOut(Schema):
     people: list[ApproverOut]
+    pin_length: Literal[4, 6] = Field(description="Digits of the business's PIN, for the pad.")
 
 
 class ApprovalListIn(Schema):

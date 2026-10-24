@@ -24,6 +24,7 @@ import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { installErrorReport } from '../base/frontend/lib/error-report';
+import { approvalPass } from '../base/frontend/lib/approval';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
@@ -151,7 +152,8 @@ export async function boot(
   doc: Document = document,
 ): Promise<void> {
   const config = readSpaConfig(doc);
-  const client = createLiveClient(config, { routes: OPERATION_ROUTES });
+  // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
+  const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);
   const { app, router } = await createShell({
     ...session,

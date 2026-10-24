@@ -24,6 +24,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 
 import { createShell, logout } from '@erplora/ui/shell';
 import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
+import { approvalPass } from '../base/frontend/lib/approval';
 
 import { sessionChanged } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE } from '../base/frontend/lib/app-gate';
@@ -152,6 +153,7 @@ describe('main.ts', () => {
     await main.boot({});
     expect(createLiveClient).toHaveBeenCalledWith(expect.objectContaining({ csrfCookieName: 'csrftoken', lang: 'es' }), {
       routes: OPERATION_ROUTES,
+      getElevationToken: approvalPass,
     });
     expect(provideLiveClient).toHaveBeenCalledWith(sdk.client, app);
   });

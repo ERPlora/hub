@@ -877,6 +877,47 @@
         "scopeUnknown": "Esa app no publica lo que la key haría en ella.",
         "denied": "Solo quien lleva el negocio gestiona las API keys."
       }
+    },
+    "approval": {
+      "title": "Hace falta una aprobación",
+      "approving": "Se aprueba: {action}",
+      "unnamed": "una acción que esta app no sabe nombrar",
+      "askPin": "Pide a un encargado que introduzca su PIN para aprobarlo.",
+      "orBadge": "…o que pase su placa: no hace falta pulsar nada antes.",
+      "who": "¿Quién lo aprueba?",
+      "another": "Otra persona",
+      "nobody": "Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.",
+      "loadFailed": "No se pudo cargar quién puede aprobarlo.",
+      "retry": "Reintentar",
+      "cancel": "Cancelar",
+      "approvedBy": "Aprobado por {name}",
+      "errors": {
+        "refused": "Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo.",
+        "cannot": "Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.",
+        "notNeeded": "Esto ya no necesita aprobación: vuelve a hacerlo.",
+        "notOffered": "Esto no se aprueba con un PIN.",
+        "failed": "No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo."
+      }
+    },
+    "approvals": {
+      "intro": "Cada acción que necesitó el PIN de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.",
+      "search": "Buscar por persona o acción…",
+      "empty": "Todavía nadie ha tenido que autorizar nada en este negocio.",
+      "error": "No se pudo cargar el registro de aprobaciones.",
+      "used": "Usada",
+      "unused": "Sin usar",
+      "way": {
+        "pin": "PIN",
+        "badge": "Placa"
+      },
+      "columns": {
+        "at": "Cuándo",
+        "action": "Acción",
+        "approvedBy": "Autorizado por",
+        "requestedBy": "Lo pidió",
+        "way": "Con",
+        "used": "Estado"
+      }
     }
   }
 }

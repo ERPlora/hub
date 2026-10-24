@@ -877,6 +877,47 @@
         "scopeUnknown": "That app does not publish what the key would do on it.",
         "denied": "Only whoever runs the business manages the API keys."
       }
+    },
+    "approval": {
+      "title": "An approval is needed",
+      "approving": "Approving: {action}",
+      "unnamed": "an action this app cannot name",
+      "askPin": "Ask a manager to enter their PIN to approve it.",
+      "orBadge": "…or to swipe their badge: nothing to press first.",
+      "who": "Who approves it?",
+      "another": "Another person",
+      "nobody": "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge.",
+      "loadFailed": "Could not load who can approve it.",
+      "retry": "Retry",
+      "cancel": "Cancel",
+      "approvedBy": "Approved by {name}",
+      "errors": {
+        "refused": "Those details do not approve this. Check the name and the PIN, and try again.",
+        "cannot": "That person cannot approve this: ask somebody who may do it themselves.",
+        "notNeeded": "This no longer needs an approval: do it again.",
+        "notOffered": "This is not approved with a PIN.",
+        "failed": "Could not send the approval. Check the connection and try again."
+      }
+    },
+    "approvals": {
+      "intro": "Each action that needed a manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or delete it.",
+      "search": "Search by person or action…",
+      "empty": "Nobody has had to approve anything in this business yet.",
+      "error": "Could not load the record of approvals.",
+      "used": "Used",
+      "unused": "Not used",
+      "way": {
+        "pin": "PIN",
+        "badge": "Badge"
+      },
+      "columns": {
+        "at": "When",
+        "action": "Action",
+        "approvedBy": "Approved by",
+        "requestedBy": "Asked by",
+        "way": "With",
+        "used": "State"
+      }
     }
   }
 }

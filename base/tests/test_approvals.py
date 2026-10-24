@@ -206,6 +206,7 @@ class TestApproving:
         assert response.status_code == 200, response.content
         assert [person["name"] for person in response.json()["people"]] == ["Adam"]
         assert response.json()["people"][0]["id"] == person_id("saas:2")
+        assert response.json()["pin_length"] == 4
 
 
 class TestThePassIsBound:
