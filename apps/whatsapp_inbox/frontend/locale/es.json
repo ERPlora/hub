@@ -138,7 +138,8 @@
         "cap_reached": "Los mensajes de WhatsApp de tu plan de este mes están gastados: no se puede enviar nada hasta el mes que viene.",
         "unconfigured": "Este Hub no llega a erplora.com, así que desde él no se puede enviar nada."
       },
-      "notIncluded": "Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada."
+      "notIncluded": "Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada.",
+      "reconnectNeeded": "Hay que reconectar el número en Ajustes para enviar."
     },
     "templates": {
       "sendTitle": "Enviar una plantilla",

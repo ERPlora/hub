@@ -235,4 +235,22 @@ describe('MessageComposer: the plan’s messages (WHATSAPP_INBOX-F13)', () => {
     expect(s.find('whatsapp-inbox-composer-blocked').text()).toContain('Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada.');
     expect(s.find('whatsapp-inbox-composer-upgrade').text()).toBe('Mejorar el plan');
   });
+
+  it('while the number needs reconnecting, «Send» says so as «Your number» does, never «not connected» (WHATSAPP_INBOX-F02)', async () => {
+    const reconnect = { ...CHANNEL, status: 'reconnect_needed' as const, monthly_limit: 150, monthly_usage: 3, cap_reached: false };
+    const off = { can_send: false, send_blocked: 'not_connected' as const };
+    for (const [locale, said] of [
+      ['en', 'The number needs reconnecting in Settings to send.'],
+      ['es', 'Hay que reconectar el número en Ajustes para enviar.'],
+    ] as const) {
+      const s = await setup(off, locale, { channel: reconnect });
+      const blocked = s.find('whatsapp-inbox-composer-blocked');
+      expect(blocked.text(), locale).toBe(said);
+      expect(blocked.text(), locale).not.toMatch(/not connected|no está conectado/);
+      expect(s.send().disabled, locale).toBe(true);
+    }
+    // Disconnected for good, it is still «not connected».
+    const gone = await setup(off, 'en', { channel: { ...reconnect, status: 'not_connected' } });
+    expect(gone.find('whatsapp-inbox-composer-blocked').text()).toContain('WhatsApp is not connected');
+  });
 });

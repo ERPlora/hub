@@ -3,9 +3,10 @@
 // put it: «Reply» writes to the customer, «Internal note» writes for the team. A reply is free text only
 // within Meta's 24 hours from the customer's last message (the server is the judge; the box also closes
 // when the window runs out on screen) and «Template» opens the approved ones. With the number not
-// connected, the month spent (or a plan that includes none: WHATSAPP_INBOX-F13, with «Upgrade plan» for whoever
-// configures) or no erplora.com, nothing is offered and the reason is said. A refusal keeps the text with its
-// reason, and sending it again carries the same key: never sent twice.
+// connected (or to reconnect: WHATSAPP_INBOX-F02), the month spent (or a plan that includes none:
+// WHATSAPP_INBOX-F13, with «Upgrade plan» for whoever configures) or no erplora.com, nothing is offered and
+// the reason is said. A refusal keeps the text with its reason, and sending it again carries the same key:
+// never sent twice.
 import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -67,12 +68,13 @@ onBeforeUnmount(() => clearTimeout(timer));
 
 const session = useSession();
 const blocked = computed(() => props.conversation.send_blocked);
-/** Why nothing can be sent, in words: a plan that includes none is not «spent until next month». */
-const blockedText = computed(() =>
-  blocked.value === 'cap_reached' && noAllowance(props.channel)
-    ? t('whatsapp_inbox.composer.notIncluded')
-    : t(`whatsapp_inbox.composer.blocked.${blocked.value}`),
-);
+/** Why nothing can be sent, in words: a plan that includes none is not «spent until next month», and a number
+ *  WhatsApp took the permission of is «to reconnect», as «Your number» says, not «not connected». */
+const blockedText = computed(() => {
+  if (blocked.value === 'cap_reached' && noAllowance(props.channel)) return t('whatsapp_inbox.composer.notIncluded');
+  if (blocked.value === 'not_connected' && props.channel?.status === 'reconnect_needed') return t('whatsapp_inbox.composer.reconnectNeeded');
+  return t(`whatsapp_inbox.composer.blocked.${blocked.value}`);
+});
 /** «Upgrade plan» at the cap, for whoever configures, with erplora.com to send them to. */
 const upgradeUrl = computed(() =>
   blocked.value === 'cap_reached' && session.can('whatsapp_inbox.configure') ? (props.channel?.plans_url ?? '') : '',
