@@ -254,8 +254,9 @@ def with_device(request: HttpRequest, response: HttpResponse) -> HttpResponse:
 
 
 def safe_next(value: str | None) -> str:
-    """``value`` if it is a path of this hub; else ``/``. Never another origin (open redirect)."""
-    if value and value.startswith("/") and url_has_allowed_host_and_scheme(value, allowed_hosts=None):
+    """``value`` if it is a path of this hub; else ``/``. Never another origin (open redirect), nor anything that is
+    not text (the PIN pad's JSON body can carry whatever its sender puts in ``next``)."""
+    if isinstance(value, str) and value.startswith("/") and url_has_allowed_host_and_scheme(value, allowed_hosts=None):
         return value
     return "/"
 

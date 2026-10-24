@@ -238,6 +238,14 @@ class TestEnteringWithThePin:
         response = pin(client, with_pin(ana, "4826").pk, "4826", next_path="https://evil.example/")
         assert response.json() == {"next": "/"}
 
+    @pytest.mark.parametrize("next_path", [5, ["/sale/pos"], {"to": "/sale/pos"}, None], ids=["number", "list", "object", "null"])
+    def test_a_next_that_is_no_text_goes_home_instead_of_breaking_the_entry(self, client, ana, next_path):
+        # The body is JSON from anyone with the device cookie: a «next» that is not a string is no path of this hub.
+        a_device(client)
+        response = pin(client, with_pin(ana, "4826").pk, "4826", next_path=next_path)
+        assert response.status_code == 200
+        assert response.json() == {"next": "/"}
+
 
 class TestSwitchingUser:
     def test_a_right_pin_over_someone_s_session_ends_that_one_and_opens_the_new_one(self, client, ana, bea):
