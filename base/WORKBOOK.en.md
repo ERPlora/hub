@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3f1bfe86c4cebe61f2f063c141023506ffbf97da66bda1d2e87c08eb84fbae32 -->
+<!-- generated from WORKBOOK.md sha256:def5e501a794e3fbf9115fcd4d351b987091e2c01d4ee88bfc151587fb9566a5 -->
 
 ## What it is for and who it is for
 
@@ -288,9 +288,9 @@ On the Employees screens and the API documentation:
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
 | BASE-F02 | See the business at a glance on coming in | partial |
-| BASE-F03 | Go and set up from the "Set up your business" panel | partial |
+| BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
-| BASE-F05 | Open an app from "My apps" | partial |
+| BASE-F05 | Open an app from "My apps" | done |
 | BASE-F06 | See the apps' panels on the Home | done |
 | BASE-F07 | Customize the board of panels | done |
 | BASE-F08 | Keep the panels up to date without reloading | done |
@@ -392,6 +392,7 @@ On the Employees screens and the API documentation:
 | BASE-F104 | See the assistant's plan, the usage limit and extend it | done |
 | BASE-F105 | Report a bad answer | done |
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
+| BASE-F107 | Pass the master QA of the Hub | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -436,19 +437,21 @@ If it fails: a zone that does not load does not bring the others down; each one 
 the zones stack and "My apps" folds.
 Involved: none
 
-### BASE-F03 Go and set up from the "Set up your business" panel
-Status: partial — each step's "Set up" in the list already leads to its screen; the "Set up your business" panel and its destination (Settings › Data and backups) come with the templates
+### BASE-F03 Go and set up from "Finish setting up your business"
+Status: done
 Actor: owner, administrator, manager
 Screen: Home · Summary
 Steps:
   1. In "Finish setting up your business", a pending step the person can do carries "Set up".
   2. They tap "Set up": the screen of the app that completes that step opens.
   3. Back on the Home, the list already counts the step as done if it was completed.
+  4. While the business is empty, whoever runs it starts higher up, in "Start with a business like yours"
+     (BASE-F38): "See all templates" opens "Data and backups", where a template or a backup is loaded.
 In: the screen each step declares.
 Out: nothing from here.
 If it fails: while that screen does not exist in the hub, the step shows without "Set up" (a button that
 leads to "not found" is worse than none).
-Involved: none
+Involved: BASE-F38
 
 ### BASE-F04 See which steps of the list an administrator has to set up
 Status: done
@@ -465,7 +468,7 @@ If it fails: if that step cannot be checked, it does not show.
 Involved: none
 
 ### BASE-F05 Open an app from "My apps"
-Status: partial — "Add apps" shows as soon as the hub has the Apps screen
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
@@ -2380,3 +2383,27 @@ Out: the failure, in the bubble and kept with the conversation (BASE-F102); it d
 had said it.
 If it fails: a failure with nothing written leaves no empty bubble: only the sentence with its way out.
 Involved: BASE-F93, BASE-F102, BASE-F104
+
+### BASE-F107 Pass the master QA of the Hub
+Status: done
+Actor: ERPlora's QA team
+Screen: every screen of the hub's platform
+Steps:
+  1. The team creates on erplora.com, with a new account, a business of its kind (a restaurant): the hub receives it
+     with its sector and in "Data and backups" offers that sector's template first, which leaves the business with
+     its menu and its tables.
+  2. It goes through the platform as its owner, on the phone, the tablet and the computer, in Spanish and in English:
+     the Home with "Summary" and "Activity", "My apps" and the bell; "Add apps" and the three tabs of Apps; the tabs
+     of Settings and the sections of "Data and backups"; Employees, a person's page, the roles, the keys and the
+     approvals; the five tabs of System; Files; "My profile"; an address that does not exist; and the assistant,
+     which opens and answers.
+  3. On each screen it checks that it loads with no error, that nothing runs off a side and that no text is left in
+     the other language or untranslated.
+  4. The day of a restaurant or a hair salon (opening the till, seating or booking, ordering, cooking, charging with
+     the receipt signed for the AEAT, printing and closing the till) is tested by the apps that do it, each with its
+     own flows.
+In: a new business created on erplora.com and its test accounts.
+Out: every screen of the platform seen and checked in both languages and the three sizes.
+If it fails: what fails on a screen is a failure of the app that has it and is fixed there; if erplora.com does not
+have the business types or the test assistant yet, the QA does not start and says which is missing.
+Involved: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48, BASE-F92
