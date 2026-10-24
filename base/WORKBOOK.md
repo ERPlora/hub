@@ -2805,7 +2805,8 @@ Implicados: BASE-F93, BASE-F102, BASE-F104
   llave abriría otros negocios, así que `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no
   entra (test A≠B en `base/tests/test_api_keys.py`).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
-  (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca). `base/approvals.py` pone su puerta
+  (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
+  transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
   (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
   `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
   quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre;

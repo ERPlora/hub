@@ -308,3 +308,32 @@ class TestNotOfTheBusiness:
         assert response.status_code == 403, response.content
         assert code(response) == "permission_denied"
         assert "approval" not in response.json()["error"]
+
+
+class TestACommandThatTouchesNoDatabase:
+    """rv-live-10: a manager's pass is spent in the transaction of the command it lets through (base.approval_spend).
+    A command declared ``database=False`` (live#10) opens none, so naming it approvable is an error of the declaration,
+    said at start, and never a ``LiveMisuse`` at the till."""
+
+    NO_DATABASE = "base.assistant.report"
+
+    def test_it_is_refused_at_start_with_a_clear_error(self, monkeypatch):
+        from django.core import checks
+        from live.operations import get as get_operation
+
+        assert get_operation(self.NO_DATABASE).database is False
+        monkeypatch.setattr(apps.get_app_config("base"), "approvals", {self.NO_DATABASE: "Report an answer"}, raising=False)
+        errors = [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E004"]
+        assert len(errors) == 1
+        assert self.NO_DATABASE in errors[0].msg and "database=False" in errors[0].msg
+
+    def test_the_apps_of_today_name_none(self):
+        from django.core import checks
+
+        assert [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E004"] == []
+
+    def test_it_is_never_approvable_even_without_the_check(self, monkeypatch):
+        from base.approvals import approvable
+
+        monkeypatch.setattr(apps.get_app_config("base"), "approvals", {self.NO_DATABASE: "Report an answer"}, raising=False)
+        assert approvable(self.NO_DATABASE) is None
