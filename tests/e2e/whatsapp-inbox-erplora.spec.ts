@@ -218,6 +218,8 @@ async function inSpanish(browser: Browser, conversation: string): Promise<void> 
     await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
     await page.goto(`${A}${next}`);
     await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
     const reply = bubbles(page, 'outbound').filter({ hasText: 'te esperamos' });
     const why = reply.locator('[data-testid=whatsapp-inbox-message-error]');
     const reconnect = reply.locator('[data-testid=whatsapp-inbox-message-reconnect]');
