@@ -12,7 +12,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, collectProblems, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown } from './helpers';
+import { api, collectProblems, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, untilStill } from './helpers';
 import { readMailCode } from './mail';
 import { STACK } from './stack';
 
@@ -95,15 +95,26 @@ async function joins(owner: Person, person: Person, business: Business): Promise
   expect(accepted.status(), await accepted.text()).toBe(200);
 }
 
-/** `ready` at each size and a capture `APP-BASE-3-<key>-<size>`; back at 1440 after. */
+/**
+ * `ready` at each size and a capture `APP-BASE-3-<key>-<size>` once nothing moves (a page pushed over another slides
+ * in for half a second: mid-way, the screen it leaves shows at its edge); back at 1440 after.
+ */
 async function atEverySize(page: Page, key: string, ready: () => Promise<void>): Promise<void> {
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready();
-    await page.evaluate(() => new Promise<void>((painted) => requestAnimationFrame(() => requestAnimationFrame(() => painted()))));
+    await untilStill(page);
     await page.screenshot({ path: shot(`APP-BASE-3-${key}-${size.name}`), fullPage: true });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+}
+
+/** The screen in hand scrolled back to its top (the capture shows its head, not where the last step left it). */
+async function toTop(page: Page): Promise<void> {
+  await shown(page)
+    .locator('ion-content')
+    .first()
+    .evaluate((content) => (content as unknown as { scrollToTop: (duration: number) => Promise<void> }).scrollToTop(0));
 }
 
 async function press(page: Page, digits: string): Promise<void> {
@@ -177,6 +188,7 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
   expect(psql(`SELECT count(*) FROM base_credential WHERE username = '${usernameOf(owner.credentials.email)}' AND pin_hash <> ''`)).toBe('1');
   await atEverySize(page, 'BASE-G125', async () => {
     await expect(shown(page).getByTestId('profile-summary')).toContainText('Ana López');
+    await toTop(page);
   });
 });
 
@@ -194,6 +206,7 @@ test('BASE-G72 BASE-G151 BASE-G62 BASE-G63 BASE-G64: Settings › General shows 
   await expect(settings.getByTestId('device-row').filter({ hasText: 'The one you are using' })).toContainText('Office');
   await atEverySize(page, 'BASE-G63', async () => {
     await expect(shown(page).getByTestId('devices-card')).toContainText('Office');
+    await toTop(page);
   });
 });
 
@@ -221,6 +234,22 @@ test('BASE-G54 BASE-G57: the employee enters on a till, creates their PIN there,
   const notice = shown(owner.page).getByTestId('access-notice');
   await expect(notice).toContainText('Session opened on another device');
   await expect(notice.getByTestId('access-upgrade')).toHaveAttribute('href', `${SAAS}/store/plans`);
+  // An account without a name shows by the start of its address, however long, on one line like the others; and the
+  // link closes the notice's text without a line taller than the rest.
+  const faces = shown(owner.page).getByTestId('pin-face');
+  const height = (face: Locator) => face.locator('.pin-door__face-name').evaluate((name) => name.getBoundingClientRect().height);
+  expect(await height(faces.filter({ hasText: 'e2e-access-employee' }))).toBe(await height(faces.filter({ hasText: 'Ana López' })));
+  const gaps = await notice.getByTestId('access-upgrade').evaluate((link) => {
+    const range = document.createRange();
+    range.selectNodeContents(link.parentElement ?? link);
+    // One top per line: the boxes of a line start within a few pixels of each other.
+    const tops = [...range.getClientRects()]
+      .map((box) => box.top)
+      .sort((a, b) => a - b)
+      .filter((top, i, all) => i === 0 || top - all[i - 1] > 4);
+    return tops.slice(1).map((top, i) => Math.round(top - tops[i]));
+  });
+  expect(Math.max(...gaps) - Math.min(...gaps), `the notice's lines are ${gaps.join(', ')} px apart`).toBeLessThanOrEqual(2);
   await atEverySize(owner.page, 'BASE-G57', async () => {
     await expect(shown(owner.page).getByTestId('access-notice')).toBeVisible();
   });

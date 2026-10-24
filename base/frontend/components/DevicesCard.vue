@@ -25,6 +25,14 @@ const prune = useCommand('base.device.prune');
 const devices = computed(() => data.value?.devices ?? []);
 const when = (value: string | null): string => formatDateTime(value, locale.value);
 
+/** «Chrome · Android · Asks for a PIN · In use right now»: what it is (only while it has no name), how it asks and
+ *  when it was used; a part the browser did not tell is left out, never a dangling «·». */
+function meta(device: DeviceRow): string {
+  const mode = device.mode === 'shared' ? t('base.devices.modeShared') : t('base.devices.modePersonal');
+  const use = device.in_use ? t('base.devices.inUse') : t('base.devices.lastUsed', { when: when(device.last_entry_at) });
+  return [device.name ? '' : device.agent, mode, use].filter(Boolean).join(' · ');
+}
+
 // One question or field open at a time, under its row.
 const naming = ref<string | null>(null);
 const draft = ref('');
@@ -138,12 +146,11 @@ async function confirmPrune(): Promise<void> {
                 class="devices__current"
               >{{ t('base.devices.current') }}</span>
             </p>
-            <p class="settings-card__note">
-              <template v-if="!device.name">
-                {{ device.agent }} ·
-              </template>
-              {{ device.mode === 'shared' ? t('base.devices.modeShared') : t('base.devices.modePersonal') }} ·
-              {{ device.in_use ? t('base.devices.inUse') : t('base.devices.lastUsed', { when: when(device.last_entry_at) }) }}
+            <p
+              class="settings-card__note"
+              data-testid="device-meta"
+            >
+              {{ meta(device) }}
             </p>
             <p
               v-if="device.session_until"

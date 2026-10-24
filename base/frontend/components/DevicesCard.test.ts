@@ -86,6 +86,13 @@ describe('DevicesCard — the list', () => {
     expect(wrapper.text()).not.toContain(BAR.id);
   });
 
+  it('a device the browser does not tell what it is reads without a dangling separator', async () => {
+    const { row } = await card([{ ...OLD, agent: '' }]);
+    const meta = row(0).get('[data-testid="device-meta"]').text();
+    expect(meta).toMatch(/^Stays open · Last used /);
+    expect(meta).not.toContain('· ·');
+  });
+
   it('an empty list says nobody entered yet', async () => {
     const { wrapper } = await card([]);
     expect(wrapper.get('[data-testid="devices-empty"]').text()).toBe('Nobody has entered from any device yet.');

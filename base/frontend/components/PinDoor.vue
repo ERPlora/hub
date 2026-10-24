@@ -88,6 +88,7 @@ function onComplete(pin: string): void {
             type="button"
             class="pin-door__face"
             data-testid="pin-face"
+            :title="person.name"
             @click="pick(person.id)"
           >
             <UserAvatar
@@ -169,10 +170,14 @@ function onComplete(pin: string): void {
   outline-offset: 2px;
 }
 
+/* One line, cut with «…» (a name-less account shows by its address's start, however long); the button names it whole. */
 .pin-door__face-name {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 0.875rem;
   text-align: center;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pin-door__error {

@@ -292,9 +292,8 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+/* It closes the notice's sentence: inline, so its line is as tall as the others. */
 .access__upgrade {
-  display: inline-block;
-  margin-top: 8px;
   font-weight: 600;
   color: var(--ion-color-primary);
 }
