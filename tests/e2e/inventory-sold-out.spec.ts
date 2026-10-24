@@ -119,6 +119,55 @@ async function searchTill(page: Page): Promise<Locator> {
 const soldOutMark = (page: Page, product: Product): Locator =>
   shown(page).locator(`[data-testid=inventory-products-sold-out-${product.id}]`);
 
+/** What hides part of the switch or the «Sold out» mark beside it in the row's status (none = both whole): a part is
+ *  in sight when it lies inside the cell (or the card's value) and inside every box between them that clips, shadow
+ *  roots crossed — the switch's own track included. In a narrow column the mark goes under the switch, never over it
+ *  (review of FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: at 834 the switch was cut to its first half). */
+async function statusProblems(page: Page, product: Product): Promise<string[]> {
+  return soldOutMark(page, product).evaluate((mark) => {
+    const px = (n: number) => Math.round(n * 10) / 10;
+    const box = mark.closest('[role=cell], .data-table__field-value');
+    if (!box) return ['no cell around the mark'];
+    const parentOf = (node: Element): Element | null => node.parentElement ?? ((node.getRootNode() as ShadowRoot).host || null);
+    const problemOf = (name: string, node: Element | null | undefined): string[] => {
+      if (!node) return [`no ${name}`];
+      const r = node.getBoundingClientRect();
+      const c = box.getBoundingClientRect();
+      let left = c.left;
+      let right = c.right;
+      for (let up = parentOf(node); up && up !== box; up = parentOf(up)) {
+        if (getComputedStyle(up).overflowX === 'visible') continue;
+        const u = up.getBoundingClientRect();
+        left = Math.max(left, u.left);
+        right = Math.min(right, u.right);
+      }
+      const ok = r.width >= 1 && r.left >= left - 0.5 && r.right <= right + 0.5;
+      return ok ? [] : [`the ${name} (${px(r.left)}–${px(r.right)}) is cut by its box (${px(left)}–${px(right)})`];
+    };
+    const toggle = box.querySelector('ion-toggle');
+    const squeezed = mark.scrollWidth > mark.clientWidth ? [`the mark's text is cut (${mark.scrollWidth} > ${mark.clientWidth})`] : [];
+    return [...problemOf('switch', toggle?.shadowRoot?.querySelector('[part~=track]')), ...problemOf('mark', mark), ...squeezed];
+  });
+}
+
+/** `statusProblems` once the layout settles: the table refits its columns after a resize and a step on its way may
+ *  look right, so a measurement counts only when the next one finds it unchanged. */
+async function expectWholeStatus(page: Page, product: Product, message: string): Promise<void> {
+  let last = '';
+  await expect
+    .poll(
+      async () => {
+        const problems = await statusProblems(page, product);
+        const now = JSON.stringify(problems);
+        const settled = now === last;
+        last = now;
+        return settled ? problems : ['settling'];
+      },
+      { message },
+    )
+    .toEqual([]);
+}
+
 test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in the till live; «Put back on sale» brings it back', async ({
   page,
   context,
@@ -150,6 +199,7 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
     await office.setViewportSize({ width: size.width, height: size.height });
     await office.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await expect(soldOutMark(office, croquettes)).toBeVisible();
+    await expectWholeStatus(office, croquettes, `status at ${size.label}`);
     await office.screenshot({ path: shot(`FIX-INVENTORY-SOLD-OUT-86-${size.label}`) });
   }
   await office.setViewportSize({ width: 1440, height: 900 });

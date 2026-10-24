@@ -4,15 +4,17 @@
 //   - the form's refusals under their field: 422 (a price over the limit) and 409 (a SKU taken);
 //   - INVENTORY-F05: a product whose tax category Taxes deactivated is «Not configured», the sale
 //     catalog says it cannot be sold, and saving it with that category is refused; picking another
-//     one in the form fixes it;
+//     one in the form fixes it; its «Not configured» chip keeps its icon in sight and its text whole while the
+//     row has room, or ending in «…» with the whole text as its title, at 390, 834, 1280 and 1440
+//     (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED);
 //   - INVENTORY-F11: the export downloads the filtered catalog with the headers the import reads;
 //   - `/inventory` lands on the dashboard and the tabs walk the five sections; screenshots of every page in three
 //     viewports;
 //   - the list filters behind the table's funnel (price in euros), with its count, at every width; an
 //     amount it cannot read is said under its field and does not filter.
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, login, psql, record, shot, shown } from './helpers';
 import {
   cleanInventory,
   createProduct,
@@ -191,6 +193,157 @@ test('INVENTORY-F05: a product whose tax category Taxes deactivated is «Not con
     await expect(form).toBeHidden();
     await expect(marker).toHaveCount(0);
     await expect.poll(async () => (await productBySku(context, sku)).needs_tax_setup).toBe(false);
+  } finally {
+    psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
+  }
+});
+
+/** The widths of the «Not configured» chip check: a phone (cards), a tablet, the old report's 1280 and a desk
+ *  (`roomy`: the row has room for the whole chip). */
+const CHIP_VIEWPORTS = [
+  { label: '390', width: 390, height: 844, roomy: false },
+  { label: '834', width: 834, height: 1112, roomy: false },
+  { label: '1280', width: 1280, height: 800, roomy: true },
+  { label: '1440', width: 1440, height: 900, roomy: true },
+];
+
+/** How a «Not configured» chip sits in its box (`within`: the table cell, the card's value or the form's field):
+ *  what is wrong with it (none = its icon in sight and its text on one line, whole or ending in «…»; `whole`: it
+ *  has to be whole; `titled`: its `title` is its whole text) and its measurements for the report. A part is in
+ *  sight when it lies inside the box and inside every box between them that clips (`overflow` not `visible`, the
+ *  chip itself included). */
+async function chipFit(
+  chip: Locator,
+  options: { within: string; whole?: boolean; titled?: boolean },
+): Promise<{ problems: string[]; metrics: Record<string, unknown> }> {
+  return chip.evaluate((el, { within: selector, whole: mustFit, titled }) => {
+    const px = (n: number) => Math.round(n * 10) / 10;
+    const box = el.closest(selector);
+    if (!box) return { problems: [`no ${selector} around the chip`], metrics: {} };
+    const sight = (node: Element) => {
+      const r = box.getBoundingClientRect();
+      const span = { left: r.left, right: r.right };
+      for (let up = node.parentElement; up && up !== box; up = up.parentElement) {
+        if (getComputedStyle(up).overflowX === 'visible') continue;
+        const c = up.getBoundingClientRect();
+        span.left = Math.max(span.left, c.left);
+        span.right = Math.min(span.right, c.right);
+      }
+      return span;
+    };
+    const inSight = (node: Element) => {
+      const r = node.getBoundingClientRect();
+      const s = sight(node);
+      return { ok: r.width >= 1 && r.left >= s.left - 0.5 && r.right <= s.right + 0.5, at: `${px(r.left)}–${px(r.right)}`, sight: `${px(s.left)}–${px(s.right)}` };
+    };
+    const problems: string[] = [];
+    const chipAt = inSight(el);
+    if (!chipAt.ok) problems.push(`the chip (${chipAt.at}) sticks out of its box (${chipAt.sight})`);
+    const icon = el.querySelector('ion-icon');
+    const iconAt = icon ? inSight(icon) : null;
+    if (!icon || !iconAt || getComputedStyle(icon).visibility === 'hidden') problems.push('the chip has no icon');
+    else if (!iconAt.ok) problems.push(`its icon (${iconAt.at}) is out of sight (${iconAt.sight})`);
+    // The box that paints the text: the nearest ancestor of its text that is not inline.
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let text: Node | null = walker.nextNode();
+    while (text && !text.textContent?.trim()) text = walker.nextNode();
+    let painter: Element | null = text?.parentElement ?? null;
+    while (painter && painter !== el && getComputedStyle(painter).display === 'inline') painter = painter.parentElement;
+    const whole = (el.querySelector('ion-label')?.textContent ?? '').trim();
+    if (!text || !painter || !whole) return { problems: [...problems, 'the chip has no text'], metrics: {} };
+    const style = getComputedStyle(painter);
+    const fits = painter.scrollWidth <= painter.clientWidth;
+    const ellipsis = style.textOverflow === 'ellipsis' && style.overflowX === 'hidden' && style.whiteSpace === 'nowrap';
+    if (mustFit && !fits) problems.push(`its text is not whole though the row has room (${painter.scrollWidth} > ${painter.clientWidth})`);
+    else if (!fits && !ellipsis) {
+      problems.push(
+        `its text is cut with no «…» (${painter.scrollWidth} > ${painter.clientWidth}; text-overflow ${style.textOverflow}, overflow ${style.overflowX}, white-space ${style.whiteSpace})`,
+      );
+    }
+    // One line: a chip that wraps its text is not whole on its row.
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+    if (lines > 1) problems.push(`its text wraps to ${lines} lines`);
+    const textAt = inSight(painter);
+    if (!textAt.ok) problems.push(`its text (${textAt.at}) is cut by a box around it (${textAt.sight})`);
+    const title = el.getAttribute('title');
+    if (titled && title !== whole) problems.push(`its title «${title}» is not its whole text «${whole}»`);
+    return {
+      problems,
+      metrics: {
+        box: sight(el),
+        chip: chipAt.at,
+        icon: iconAt?.at,
+        text: { at: textAt.at, scrollWidth: painter.scrollWidth, clientWidth: painter.clientWidth, fits, ellipsis, lines },
+        title,
+        whole,
+      },
+    };
+  }, options);
+}
+
+/** The chip's problems once the layout settles (`[]` = it fits): the table refits to its box after a resize (columns,
+ *  cards) and a step on its way may look right, so a measurement counts only when the next one finds it unchanged. */
+async function settledChipFit(
+  chip: Locator,
+  options: Parameters<typeof chipFit>[1],
+  message: string,
+): Promise<Awaited<ReturnType<typeof chipFit>>> {
+  let last = '';
+  let fit: Awaited<ReturnType<typeof chipFit>> = { problems: [], metrics: {} };
+  await expect
+    .configure({ soft: true })
+    .poll(
+      async () => {
+        fit = await chipFit(chip, options);
+        const now = JSON.stringify(fit);
+        const settled = now === last;
+        last = now;
+        return settled ? fit.problems : ['settling'];
+      },
+      { message },
+    )
+    .toEqual([]);
+  return fit;
+}
+
+// flow: INVENTORY-F05 (chip «Sin configurar» de Productos)
+test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and its text whole or ending in «…», at every width', async ({
+  page,
+  context,
+}) => {
+  await login(page, A, '/inventory/dashboard');
+  const key = `e2e.chip_${stamp().toLowerCase()}`;
+  const created = await api(context, A, 'POST', '/tax/categories', { key, name: 'E2E chip tax' });
+  expect(created.status).toBe(201);
+  const product = await createProduct(context, { name: 'E2E Chip wine', sku: `E2E-CHIP-${stamp()}`, tax_category_key: key });
+  psql(`update tax_taxcategory set is_active = false where key = '${key}'`);
+  try {
+    await page.goto(`${A}/inventory/products?status=unconfigured`);
+    await productsReady(page);
+    // The session, for ui-clip-sweep.sh over this same page.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+    const marker = shown(page).locator(`[data-testid=inventory-products-unconfigured-${product.id}]`);
+    // Soft checks: one run says what is wrong at every width.
+    for (const vp of CHIP_VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(marker).toBeVisible();
+      const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, titled: true };
+      const fit = await settledChipFit(marker, options, `list at ${vp.label}`);
+      record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`, { ...fit.metrics, problems: fit.problems });
+      await page.screenshot({ path: shot(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`) });
+    }
+
+    // Tapping it still opens the form, whose own chip fits its field the same way.
+    await marker.click();
+    const form = dialog(page, 'inventory-product-form');
+    const formChip = form.locator('[data-testid=inventory-product-tax-unconfigured]');
+    await expect(formChip).toBeVisible();
+    for (const vp of CHIP_VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await settledChipFit(formChip, { within: '.tax-category-select' }, `form at ${vp.label}`);
+    }
   } finally {
     psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
   }
