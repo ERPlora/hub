@@ -101,6 +101,25 @@ describe('flow catalogues (en source + es)', () => {
     expect(ES.get('flow.actions.cart_checkout__checkout__initiate')).toBe('Iniciar el pedido desde un carrito');
   });
 
+  it('call Payments’ methods and its cancelled payment by its own words, not Sales’ «forma de pago»', () => {
+    // apps/payment/frontend/locale: the «Métodos» tab, the «Método» field, «Nuevo método», the «Cancelado»
+    // status and «Cancelar pago». «Forma de pago» is how Sales names its own (`sale__payment_method__*`),
+    // so the same word on both would hide which app a trigger or a step belongs to.
+    const spanish = [...ES].filter(([key]) => /^flow\.(events|actions)\.payment__/.test(key));
+    const methods = spanish.filter(([key]) => /\.payment__method__/.test(key));
+    expect(methods.length).toBe(10);
+    for (const [key, message] of spanish) expect(message, key).not.toMatch(/formas? de pago|anula/i);
+    for (const [key, message] of methods) expect(message, key).toMatch(/\b(un método|métodos) de pago$/);
+    expect(ES.get('flow.events.payment__payment__cancelled')).toBe('se cancela un pago');
+    expect(ES.get('flow.events.payment__method__created')).toBe('se crea un método de pago');
+    expect(ES.get('flow.actions.payment__method__list')).toBe('Buscar métodos de pago');
+    expect(ES.get('flow.events.sale__payment_method__created')).toBe('se añade una forma de pago a las ventas');
+    const english = [...EN].filter(([key]) => /^flow\.(events|actions)\.payment__method__/.test(key));
+    expect(english.length).toBe(10);
+    for (const [key, message] of english) expect(message, key).toMatch(/\bpayment methods?\b/);
+    expect(EN.get('flow.events.payment__payment__cancelled')).toBe('a payment is cancelled');
+  });
+
   it('keep the old screens’ words: list, editor, tabs, steps, permissions, gallery', () => {
     const words: Array<[string, string, string]> = [
       ['flow.title', 'Automations', 'Automatizaciones'],
