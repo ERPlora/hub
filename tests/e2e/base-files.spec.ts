@@ -167,8 +167,24 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       ).toBeVisible();
       await expect(item(page, 'setup.exe')).toHaveCount(0);
 
+      // BASE-G82 — a long name wraps inside its card, and every card of the row keeps its icon at the top.
+      const long = 'supplier price list for the second quarter of the year.csv';
+      await upload(page, [{ name: long, mimeType: 'text/csv', buffer: Buffer.from('item;price\nflour;12\n') }]);
+      await expect(item(page, long)).toBeVisible();
+      const icons = await shown(page)
+        .locator('[data-item]')
+        .evaluateAll((cards) =>
+          cards.map((card) => ({
+            row: Math.round(card.getBoundingClientRect().top),
+            icon: Math.round(card.querySelector('.files-item-icon')!.getBoundingClientRect().top),
+          })),
+        );
+      for (const { row, icon } of icons) {
+        expect(icon, `the icon of a card at ${row}`).toBe(icons.find((other) => other.row === row)!.icon);
+      }
+
       // BASE-G82 — folders first, then the files; «Space» counts what is kept.
-      await expect(shown(page).locator('[data-item]')).toHaveCount(4);
+      await expect(shown(page).locator('[data-item]')).toHaveCount(5);
       await expect(shown(page).locator('[data-item]').first()).toHaveAttribute('data-kind', 'folder');
       await expect(testid(page, 'files-space')).toHaveText(/^Space: \d+ B used · No limit$/);
       // The open folder stands out in the tree and stays readable.
@@ -370,6 +386,8 @@ test('BASE-G82 BASE-G84 — the employee opens and downloads, and changes nothin
   const employee = await hostPage(browser, A, { viewport: VIEWPORTS[834], next: '/', credentials: EMPLOYEE });
   try {
     await wipe(owner.context, A);
+    // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await owner.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
     await upload(owner.page, [{ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from(NOTE) }]);
     await expect(item(owner.page, 'notes.txt')).toBeVisible();
 

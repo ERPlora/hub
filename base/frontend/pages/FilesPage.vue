@@ -1025,6 +1025,8 @@ async function askDelete(entry: Entry): Promise<void> {
 }
 
 .files-grid .files-item {
+  /* Every card of a row as tall as the tallest (a long name wraps), its content from the top. */
+  align-items: stretch;
   border: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
 }
 
