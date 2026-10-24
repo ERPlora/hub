@@ -4,9 +4,10 @@
 // second question after approving is a refusal, never a second dialog; the same command repeated while the dialog is
 // open (a double tap) joins it and gets its very result, without running again; a different one is refused, not stacked.
 import { ApiError } from '@erplora/ui/sdk';
+import { modalController } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { approvalPass, approvalQuestion, withApproval } from './approval';
+import { APPROVAL_DIALOG_CLASS, APPROVED, approvalPass, approvalQuestion, withApproval } from './approval';
 
 const QUESTION = { operation: 'sale.sale.void', label: 'Void a sale', fingerprint: 'f'.repeat(64) };
 
@@ -85,5 +86,21 @@ describe('withApproval', () => {
     expect(first).toHaveBeenCalledTimes(2);
     expect(ask).toHaveBeenCalledTimes(1);
     expect(approvalQuestion.value).toBeNull();
+  });
+
+  it('without its own way to ask, opens «An approval is needed» fitted to its whole PIN pad, never Ionic’s fixed card', async () => {
+    // FIX-HUB-BASE-APPROVAL-KEYPAD-CUT-ON-TABLET-DESKTOP: Ionic's 600×600 card cut the pad's last row (the 0 and erase)
+    // on a tablet and a desk; the class is what fits the dialog to its pad (ApprovalDialog.vue).
+    const present = vi.fn(() => Promise.resolve());
+    const onDidDismiss = vi.fn(() => Promise.resolve({ data: 'elev_pass', role: APPROVED }));
+    const create = vi.spyOn(modalController, 'create').mockResolvedValue({ present, onDidDismiss } as never);
+    const run = vi.fn(async () => {
+      if (run.mock.calls.length === 1) throw asksApproval();
+      return 'voided';
+    });
+    await expect(withApproval(run)).resolves.toBe('voided');
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0]).toMatchObject({ cssClass: APPROVAL_DIALOG_CLASS, componentProps: { question: QUESTION } });
+    expect(present).toHaveBeenCalledTimes(1);
   });
 });

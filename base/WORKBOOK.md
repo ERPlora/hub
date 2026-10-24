@@ -222,8 +222,8 @@ Desde una fila de **Empleados › Personal**, para quien administra, con el bot�
 en erplora.com»), «PIN» y «Placa».
 
 ### Hace falta una aprobación
-Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién lo aprueba?» con las caras y el teclado, y
-«Cancelar».
+Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién lo aprueba?» con las caras y el teclado
+(entero y sin desplazar en el móvil, la tableta y el escritorio), y «Cancelar».
 
 ### Documentación de la API
 Con el botón de volver: cómo se llama a la API, «Descargar el fichero OpenAPI» y una sección por app con sus llamadas.
@@ -374,7 +374,7 @@ En la pantalla Archivos:
 | BASE-F81 | Entender cómo entra cada persona | hecho |
 | BASE-F82 | Ver los roles y encender los que trae una app | parcial |
 | BASE-F83 | Asignar un rol a una persona | hecho |
-| BASE-F84 | Aprobar con el PIN de un responsable | parcial |
+| BASE-F84 | Aprobar con el PIN de un responsable | hecho |
 | BASE-F85 | Consultar quién aprobó qué | hecho |
 | BASE-F86 | Crear una llave de API y copiar su token | parcial |
 | BASE-F87 | Rotar una llave de API | parcial |
@@ -2000,7 +2000,7 @@ Implicados: BASE-F82, BASE-F13
 
 ### BASE-F84 Aprobar con el PIN de un responsable
 <!-- origen: old-hub:HUB_SHELL-F51 -->
-Estado: parcial — la aprobación funciona para las acciones que una app nombre, pero ninguna app la pide todavía (anular una venta, un descuento por encima del tope)
+Estado: hecho
 Actor: empleado, encargado
 Pantalla: Hace falta una aprobación
 Pasos:
@@ -2008,8 +2008,9 @@ Pasos:
      sale «Hace falta una aprobación» con «Se aprueba: {action}», en palabras de la app.
   2. Lee «Pide a un encargado que introduzca su PIN para aprobarlo.» y «…o que pase su placa: no hace falta pulsar
      nada antes.».
-  3. En «¿Quién lo aprueba?», las caras de quienes pueden hacerlo ellos mismos y tienen PIN. El responsable toca la
-     suya y teclea su PIN («Otra persona» vuelve a las caras), o pasa su placa en cualquier momento.
+  3. En «¿Quién lo aprueba?», las caras de quienes pueden hacerlo ellos mismos y tienen PIN (con una sola, su teclado
+     sale ya). El responsable toca la suya y teclea su PIN en el teclado, entero a la vista sin desplazar, también el
+     0 y «Borrar» («Otra persona» vuelve a las caras), o pasa su placa en cualquier momento.
   4. La acción se hace una vez y sale «Aprobado por {name}». La sesión de quien lo pidió no se cierra.
 Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en

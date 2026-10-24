@@ -4,11 +4,12 @@
 // «Who approves it?» with the people of the business who may do it themselves and have a PIN (live
 // `base.approval.approvers`), on the till's faces and PIN pad (APP-BASE-3's PinDoor), or their badge swiped at any
 // moment (APP-BASE-3's reader). An approval closes the dialog with the pass and says «Approved by <name>»; a refusal
-// stays here, told from its code; «Cancel» closes it with none, and the app tells the original refusal.
+// stays here, told from its code; «Cancel» closes it with none, and the app tells the original refusal. From a tablet up
+// the dialog is as tall as its whole pad (the styles at the end), never Ionic's fixed card, which cut its last row.
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
-import { IonButton, IonButtons, IonContent, IonHeader, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { IonButton, IonButtons, IonHeader, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { createBadgeReader } from '../lib/access';
@@ -89,7 +90,7 @@ onBeforeUnmount(() => stopReader());
       </IonButtons>
     </IonToolbar>
   </IonHeader>
-  <IonContent class="ion-padding">
+  <div class="approval-dialog__body ion-padding">
     <div class="approval-dialog">
       <p
         class="approval-dialog__action"
@@ -152,10 +153,17 @@ onBeforeUnmount(() => stopReader());
         </p>
       </template>
     </div>
-  </IonContent>
+  </div>
 </template>
 
 <style scoped>
+/* What scrolls when the screen is too short for the whole pad (a phone on its side): the content, under the title. */
+.approval-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .approval-dialog {
   display: flex;
   flex-direction: column;
@@ -183,5 +191,22 @@ onBeforeUnmount(() => stopReader());
   margin: 0;
   color: var(--ion-color-danger);
   font-size: 0.875rem;
+}
+</style>
+
+<style>
+/* Not scoped: Ionic moves the dialog to ion-app, and every rule hangs from its own class (APPROVAL_DIALOG_CLASS of
+   lib/approval.ts). From a tablet up it is as tall as its content, the whole PIN pad with the 0 and erase in view, as
+   Square's and Toast's manager override, never Ionic's fixed 600×600 card, which cut that row; a screen too short for
+   it scrolls the content under the title. A phone keeps the full-screen dialog. */
+@media only screen and (min-width: 768px) and (min-height: 600px) {
+  ion-modal.approval-dialog-modal {
+    --height: auto;
+  }
+
+  ion-modal.approval-dialog-modal .ion-page {
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+  }
 }
 </style>
