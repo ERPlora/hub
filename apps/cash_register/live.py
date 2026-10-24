@@ -28,7 +28,7 @@ live(
 )
 # The close's summary: its cash figures; what it reads of Sales, Kitchen and Printing is read when it runs.
 live(
-    "cash_register.session.close_preview",
+    "cash_register.session.closing_summary",
     on=[*SHIFT, E.SETTINGS_UPDATED, E.REGISTER_UPDATED],
 )
 # A session's lines, and the unassigned ones (which an opening or a closing moves).

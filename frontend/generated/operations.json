@@ -1107,9 +1107,9 @@
     "method": "get",
     "path": "/api/cash_register/sessions/detail"
   },
-  "cash_register.session.close_preview": {
+  "cash_register.session.closing_summary": {
     "method": "get",
-    "path": "/api/cash_register/sessions/close_preview"
+    "path": "/api/cash_register/sessions/closing_summary"
   },
   "cash_register.session.open": {
     "method": "post",

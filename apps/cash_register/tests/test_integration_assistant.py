@@ -1,7 +1,7 @@
 """Closing the drawer by asking the assistant (CASH_REGISTER-F09; PLAN §30, «Cinco acciones de IA pulidas», the
 first: the cash count, with its summary before and its confirmation), against the Hub's real assistant turn
 (``base.assistant.turn``): «cierra la caja con 250 € contados» offers the summary and the close; the summary
-(``cash_register.session.close_preview``) is a read, so it runs by itself and goes back to the model, with the
+(``cash_register.session.closing_summary``) is a read, so it runs by itself and goes back to the model, with the
 expected cash only for whoever may see it; the close is a dangerous write: it waits on its card, names the session
 and the count, and closes only after the person types the word. Cancelling leaves the session open."""
 
@@ -43,26 +43,26 @@ def turn(*calls, role="hub_admin", decision=None, messages=None):
 
 def test_close_the_drawer_offers_the_summary_and_the_close():
     names = [tool["name"] for tool in turn()["tools"]]
-    assert "cash_register__session__close_preview" in names
+    assert "cash_register__session__closing_summary" in names
     assert "cash_register__session__close" in names
 
 
 def test_the_close_tells_the_assistant_to_read_its_summary_first_and_to_name_the_session():
     description = assistant.description(get("cash_register.session.close"))
-    assert "cash_register.session.close_preview" in description
+    assert "cash_register.session.closing_summary" in description
     assert assistant.risk(get("cash_register.session.close")) == "high"
     # The summary is a read the assistant may run by itself: never a card, never a change.
-    summary = get("cash_register.session.close_preview")
+    summary = get("cash_register.session.closing_summary")
     assert (summary.kind, assistant.is_tool(summary)) == ("query", True)
 
 
 def test_the_summary_runs_by_itself_and_tells_the_model_the_session_the_count_the_expected_and_the_difference(coffee):
     session = open_session(10000)
     charge()
-    plan = turn(call("cash_register.session.close_preview", {"closing_balance": 25000}))
+    plan = turn(call("cash_register.session.closing_summary", {"closing_balance": 25000}))
     assert plan["confirm"] is None
     assert [(row["name"], row["kind"], row["outcome"]) for row in plan["executed"]] == [
-        ("cash_register.session.close_preview", "query", "ok")
+        ("cash_register.session.closing_summary", "query", "ok")
     ]
     told = json.loads(plan["append"][0]["content"])
     assert (told["number"], told["counted"], told["expected_balance"], told["difference"]) == (
@@ -79,7 +79,7 @@ def test_a_blind_count_keeps_the_expected_from_the_model_when_a_cashier_asks(cof
     run("cash_register.settings.update", {"require_blind_count": True})
     open_session(10000)
     charge()
-    plan = turn(call("cash_register.session.close_preview", {"closing_balance": 25000}), role="hub_employee")
+    plan = turn(call("cash_register.session.closing_summary", {"closing_balance": 25000}), role="hub_employee")
     content = plan["append"][0]["content"]
     told = json.loads(content)
     assert (told["expected_balance"], told["difference"], told["expected_hidden"]) == (None, None, True)
@@ -88,7 +88,7 @@ def test_a_blind_count_keeps_the_expected_from_the_model_when_a_cashier_asks(cof
 
 def test_with_the_count_required_the_summary_without_a_count_says_so_and_no_card_comes():
     open_session(10000)
-    plan = turn(call("cash_register.session.close_preview", {}))
+    plan = turn(call("cash_register.session.closing_summary", {}))
     assert plan["confirm"] is None
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [
         ("error", "cash_register.closing_balance_required")

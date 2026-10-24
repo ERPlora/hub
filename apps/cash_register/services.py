@@ -415,7 +415,7 @@ def _open_for_writing(session_id, number) -> Session:
         "description": "Close a cash session (the open one unless its number is said) with the cash counted in the drawer, "
         "in cents, and closing notes: the expected cash, the counted one and their difference (negative = short) are "
         "frozen for good. The count is required unless the settings say otherwise. A closed session is never reopened. "
-        "Read cash_register.session.close_preview first with the same count, tell the person its summary, then close "
+        "Read cash_register.session.closing_summary first with the same count, tell the person its summary, then close "
         "naming the session by the number it gave.",
         "risk": "high",
     },

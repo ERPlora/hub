@@ -166,7 +166,7 @@ export interface SessionCloseIn extends SessionRefIn {
   closing_notes?: string;
 }
 
-export interface ClosePreviewIn extends SessionRefIn {
+export interface ClosingSummaryIn extends SessionRefIn {
   closing_balance?: number;
 }
 
@@ -183,7 +183,7 @@ export interface ShiftReviewOut {
 
 /** The close's summary before it runs (CASH_REGISTER-F09): the expected and the difference are null for whoever a
  *  blind count hides them from. */
-export interface ClosePreviewOut {
+export interface ClosingSummaryOut {
   session_id: string;
   number: string;
   register_name: string;
@@ -290,7 +290,7 @@ declare module '@erplora/ui/sdk' {
     'cash_register.session.get': { input: SessionGetIn; output: SessionOut };
     'cash_register.session.print': { input: SessionGetIn; output: SessionPrintOut };
     'cash_register.session.open': { input: SessionOpenIn; output: SessionRow };
-    'cash_register.session.close_preview': { input: ClosePreviewIn; output: ClosePreviewOut };
+    'cash_register.session.closing_summary': { input: ClosingSummaryIn; output: ClosingSummaryOut };
     'cash_register.session.close': { input: SessionCloseIn; output: SessionRow };
     'cash_register.session.auto_close': { input: EmptyIn; output: AutoCloseOut };
     'cash_register.movement.list': { input: MovementListIn; output: Page<MovementRow> };

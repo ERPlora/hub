@@ -21,7 +21,7 @@ ROUTES = {
     ("GET", "/cash_register/sessions", "cash_register.session.list"),
     ("GET", "/cash_register/sessions/current", "cash_register.session.current"),
     ("GET", "/cash_register/sessions/detail", "cash_register.session.get"),
-    ("GET", "/cash_register/sessions/close_preview", "cash_register.session.close_preview"),
+    ("GET", "/cash_register/sessions/closing_summary", "cash_register.session.closing_summary"),
     ("POST", "/cash_register/sessions/open", "cash_register.session.open"),
     ("POST", "/cash_register/sessions/close", "cash_register.session.close"),
     ("POST", "/cash_register/sessions/auto_close", "cash_register.session.auto_close"),
@@ -142,10 +142,10 @@ def test_an_employee_opens_records_counts_and_closes_over_http(employee_client):
 @pytest.mark.django_db
 def test_the_close_summary_is_read_over_http_before_closing(employee_client):
     session = post(employee_client, "/cash_register/sessions/open", {"opening_balance": 10000}).json()
-    seen = get(employee_client, "/cash_register/sessions/close_preview", closing_balance=9500)
+    seen = get(employee_client, "/cash_register/sessions/closing_summary", closing_balance=9500)
     assert seen.status_code == 200
     assert (seen.json()["number"], seen.json()["counted"], seen.json()["difference"]) == (session["number"], 9500, -500)
-    asked = get(employee_client, "/cash_register/sessions/close_preview")
+    asked = get(employee_client, "/cash_register/sessions/closing_summary")
     assert asked.status_code == 409
     assert asked.json()["error"]["code"] == "cash_register.closing_balance_required"
     assert get(employee_client, "/cash_register/sessions/current").json()["session"]["status"] == "open"

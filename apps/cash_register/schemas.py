@@ -361,7 +361,7 @@ class SessionCloseIn(SessionRefIn):
     closing_notes: Notes = Field("", title="Closing notes", description="Notes of the closing.")
 
 
-class ClosePreviewIn(SessionRefIn):
+class ClosingSummaryIn(SessionRefIn):
     closing_balance: Cents | None = Field(
         None,
         description="The counted cash, in cents, as it will be sent to close (required when the settings ask for "
@@ -385,7 +385,7 @@ class ShiftReviewOut(Schema):
     )
 
 
-class ClosePreviewOut(Schema):
+class ClosingSummaryOut(Schema):
     session_id: UUID = Field(description="The session that would close.")
     number: str = Field(description="Its number, S-AAMMDD-NNNN: name it to close exactly this one.")
     register_name: str = Field(description="Its drawer's name; empty = no drawer.")
