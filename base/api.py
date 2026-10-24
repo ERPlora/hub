@@ -1,9 +1,10 @@
 """Ninja routes of base: each route calls exactly one operation and holds no logic."""
 
 from live.ninja import bind, run_operation
-from ninja import Router
+from ninja import Query, Router
 
-from base import queries
+from base import queries, services
+from base.schemas import FailedEventDiscardIn, FailedEventIn, FailedEventListIn
 
 router = Router(tags=["base"])
 
@@ -45,3 +46,36 @@ async def app_list(request):
 @bind(router, "base.plan.usage", "/system/plan")
 async def plan_usage(request):
     return await run_operation(request, queries.plan_usage)
+
+
+# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
+
+
+@bind(router, "base.system.status", "/system/status")
+async def system_status(request):
+    return await run_operation(request, queries.system_status)
+
+
+@bind(router, "base.event.list", "/system/events")
+async def event_list(request):
+    return await run_operation(request, queries.event_list)
+
+
+@bind(router, "base.failed_event.list", "/system/failed-events")
+async def failed_event_list(request, params: Query[FailedEventListIn]):
+    return await run_operation(request, queries.failed_event_list, params)
+
+
+@bind(router, "base.failed_event.retry", "/system/failed-events/retry")
+async def failed_event_retry(request, data: FailedEventIn):
+    return await run_operation(request, services.failed_event_retry, data)
+
+
+@bind(router, "base.failed_event.retry_all", "/system/failed-events/retry_all")
+async def failed_event_retry_all(request):
+    return await run_operation(request, services.failed_event_retry_all)
+
+
+@bind(router, "base.failed_event.discard", "/system/failed-events/discard")
+async def failed_event_discard(request, data: FailedEventDiscardIn):
+    return await run_operation(request, services.failed_event_discard, data)

@@ -8,7 +8,9 @@ from live.live_registry import live_registry
 from live.meta import module_configs
 
 from base import live as base_live
-from base.events import HUB_STATE_APPLIED
+from base.events import FAILED_EVENT_CREATED, FAILED_EVENT_DISCARDED, FAILED_EVENT_RETRIED, HUB_STATE_APPLIED
+
+FAILED_EVENTS = (FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED)
 
 
 def declared(hook):
@@ -24,11 +26,14 @@ def test_the_three_queries_and_their_events():
     assert on == {
         "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED}),
         "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED}),
-        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED}),
+        # The failed events the relay gives up on, resent or discarded change the bell's row (APP-BASE-7).
+        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *FAILED_EVENTS}),
         "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED}),
         # Apps (APP-BASE-4): the photo gives or takes the right to a paid module.
         "base.app.list": [HUB_STATE_APPLIED],
         "base.plan.usage": [HUB_STATE_APPLIED],
+        # System (APP-BASE-7): the failed events, and the photo (it turns the app they were for on or off).
+        "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
     }
 
 

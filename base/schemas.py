@@ -368,3 +368,102 @@ class PlanUsageOut(Schema):
     known: bool
     people: LimitOut
     devices: LimitOut
+
+
+# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
+
+
+class SystemStatusIn(Schema):
+    """No input: the status of the hub of the request."""
+
+
+class SystemStatusOut(Schema):
+    """``base.system.status``: what runs and where the business's data lives. No usage figures: one service runs every
+    business, so CPU, memory and connections have no figure per business (PLAN-HUB §1a)."""
+
+    #: The release running: its commit, short (``APP_VERSION``); ``dev`` without one (local development).
+    version: str
+    #: When that release was published (``APP_RELEASED_AT``); ``None`` when it is not known, never made up.
+    released_at: dt.datetime | None
+    #: Phase 1: every business on the one shared database; ``False`` once the hub has its own.
+    shared_database: bool
+
+
+class EventListIn(Schema):
+    """No input: the last events between apps of the hub of the request."""
+
+
+class EventLogEntryOut(Schema):
+    """An event between apps as System › Logs shows it: when, how it went and where it went; never its content."""
+
+    id: UUID
+    at: dt.datetime
+    level: Literal["info", "warning", "error"]
+    #: The event's own name (``sale.sale.completed``).
+    name: str
+    #: The app that recorded it, and its name as the business knows it.
+    app: str
+    app_name: str
+    #: What happened to it, in the person's language («Delivered to Invoicing.»).
+    detail: str
+
+
+class EventListOut(Schema):
+    entries: list[EventLogEntryOut]
+
+
+class FailedEventListIn(Schema):
+    """A page of the failed events of the hub of the request, newest first."""
+
+    limit: int = Field(default=50, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
+class FailedEventOut(Schema):
+    """A delivery the relay gave up on: which event, from which app to which, how many attempts and the last error."""
+
+    #: The delivery's id: what is resent or discarded.
+    id: UUID
+    event_id: UUID
+    name: str
+    source_app: str
+    source_app_name: str
+    target_app: str
+    target_app_name: str
+    attempts: int
+    occurred_at: dt.datetime
+    #: The start of the last error, as the app said it (it may carry a customer's data: who runs the business only).
+    last_error: str
+    #: ``False`` when the app it was for is no longer on in this business: resending it would fail again.
+    retryable: bool
+
+
+class FailedEventListOut(Schema):
+    items: list[FailedEventOut]
+    #: How many failed events the hub has, beyond this page.
+    total: int
+
+
+class FailedEventIn(Schema):
+    """A failed event of the hub of the request, by its id."""
+
+    id: UUID
+
+
+class FailedEventDiscardIn(Schema):
+    id: UUID
+    #: Why it is discarded (optional): kept with who and when.
+    reason: str = Field(default="", max_length=500)
+
+
+class FailedEventOutId(Schema):
+    id: UUID
+
+
+class FailedEventRetryAllIn(Schema):
+    """No input: every failed event of the hub of the request that can be resent."""
+
+
+class FailedEventCountOut(Schema):
+    #: How many failed events went back to the queue.
+    count: int

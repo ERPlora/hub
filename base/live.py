@@ -8,7 +8,10 @@ follows the union of them per query, fixed from the start like every declaration
 from live.live_registry import live
 from live.meta import module_configs
 
-from base.events import HUB_STATE_APPLIED
+from base.events import FAILED_EVENT_CREATED, FAILED_EVENT_DISCARDED, FAILED_EVENT_RETRIED, HUB_STATE_APPLIED
+
+#: What changes the failed events: the relay gives one up, who runs the business resends or discards one (APP-BASE-7).
+FAILED_EVENTS = [FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED]
 
 
 def events_of(hook: str) -> list[str]:
@@ -19,7 +22,8 @@ def events_of(hook: str) -> list[str]:
 
 live("base.setup.status", on=events_of("setup"))
 live("base.widget.list", on=events_of("widgets"))
-live("base.bell.counters", on=events_of("bell"))
+# The failed events of System (APP-BASE-7) change the bell's row of them too.
+live("base.bell.counters", on=sorted(events_of("bell") + FAILED_EVENTS))
 live("base.notice.list", on=events_of("notices"))
 
 # ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
@@ -27,3 +31,7 @@ live("base.notice.list", on=events_of("notices"))
 live("base.app.list", on=[HUB_STATE_APPLIED])
 # The plan and the members come in the photo too: «Plan and limits» follows it.
 live("base.plan.usage", on=[HUB_STATE_APPLIED])
+
+# ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
+# The failed events follow the relay, who resends or discards them, and the photo (it turns their app on or off).
+live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
