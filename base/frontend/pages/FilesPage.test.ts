@@ -186,6 +186,17 @@ describe('FilesPage · see (BASE-G82)', () => {
     ]);
   });
 
+  it('the selector shows the open folder by its name, never with the indentation of the tree', async () => {
+    const m = await open(
+      { path: '/files?folder=Facturas%2F2026' },
+      listing({ folder: 'Facturas/2026', crumbs: [{ path: 'Facturas', name: 'Facturas' }, { path: 'Facturas/2026', name: '2026' }] }),
+    );
+    const select = m.wrapper.find('[data-testid="files-folder-select"] ion-select').element as HTMLElement & {
+      selectedText?: string;
+    };
+    expect(select.selectedText ?? select.getAttribute('selected-text')).toBe('2026');
+  });
+
   it('searches only the open folder, and says when nothing matches', async () => {
     const m = await open();
     await input('files-search', 'MARZ');

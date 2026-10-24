@@ -250,6 +250,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         .poll(() => preview.locator('[data-testid="file-preview-image"]').evaluate((img: HTMLImageElement) => img.naturalWidth))
         .toBe(1);
       const image = preview.locator('[data-testid="file-preview-image"]');
+      await expect(image).toBeVisible();
       await expect.poll(() => image.evaluate((img) => img.getBoundingClientRect().width)).toBe(1);
       await preview.locator('[data-testid="file-preview-close"]').click();
       await expect(preview).toBeHidden();
@@ -258,16 +259,21 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await item(page, 'tall.png').locator('[data-testid="files-item-main"]').click();
       await expect(preview.locator('[data-testid="file-preview-title"]')).toHaveText('tall.png');
       await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalHeight)).toBe(3000);
+      await expect(image).toBeVisible();
       const body = preview.locator('.file-preview-body');
+      // Until the viewer is presented whole, a box may not be there yet: asked again, never taken as a fit.
       await expect
-        .poll(async () => (await image.boundingBox())!.height <= (await body.boundingBox())!.height)
+        .poll(async () => {
+          const [picture, viewer] = [await image.boundingBox(), await body.boundingBox()];
+          return Boolean(picture && viewer && picture.height > 0 && picture.height <= viewer.height);
+        })
         .toBe(true);
       expect(await body.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(0);
       const fitted = (await image.boundingBox())!.width;
       await untilStill(page);
       await page.screenshot({ path: shot(`APP-BASE-8-BASE-G84-image-${width}`) });
       await preview.locator('[data-testid="file-preview-zoom-in"]').click();
-      await expect.poll(async () => (await image.boundingBox())!.width).toBeCloseTo(fitted * 1.25, 0);
+      await expect.poll(async () => (await image.boundingBox())?.width ?? 0).toBeCloseTo(fitted * 1.25, 0);
       await preview.locator('[data-testid="file-preview-close"]').click();
       await expect(preview).toBeHidden();
 

@@ -432,6 +432,7 @@ async function askDelete(entry: Entry): Promise<void> {
         >
           <ion-select
             :value="folder"
+            :selected-text="folderLabel(folder)"
             interface="popover"
             :label="t('base.files.folders')"
             label-placement="stacked"
