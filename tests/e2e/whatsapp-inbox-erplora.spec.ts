@@ -19,7 +19,18 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp as cleanUpCards, inputOf } from './customer-helpers';
 import { A, HUB_DIR, login, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { BUSINESS_PHONE, cleanUp, e2ePhone, metaGraph, metaHandsOver, metaNow, notice, PREFIX, seedErplora } from './whatsapp-helpers';
+import {
+  BUSINESS_PHONE,
+  cleanUp,
+  e2ePhone,
+  metaGraph,
+  metaHandsOver,
+  metaNow,
+  notice,
+  PREFIX,
+  restorePhoto,
+  seedErplora,
+} from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -33,6 +44,7 @@ test.beforeAll(async () => {
 test.afterAll(() => {
   cleanUp();
   cleanUpCards();
+  restorePhoto();
 });
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12';

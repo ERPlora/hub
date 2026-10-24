@@ -17,7 +17,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, e2ePhone, metaGraph, metaHandsOver, metaNow, notice, PREFIX, receive, seedErplora } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, metaGraph, metaHandsOver, metaNow, notice, PREFIX, receive, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -29,7 +29,10 @@ test.beforeAll(async () => {
   cleanUp();
 });
 
-test.afterAll(() => cleanUp());
+test.afterAll(() => {
+  cleanUp();
+  restorePhoto();
+});
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-MEDIA-E2E-NEEDS-SAAS-MEDIA-URL';
 const panel = (page: Page) => shown(page).locator('[data-testid=whatsapp-inbox-detail]');

@@ -1,8 +1,8 @@
 # Workbook — Reservas (app)
 Prefijo: RESERVATION
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas). De la reserva por WhatsApp (F17–F19) está la parte de
-Reservas; la conversación es de la segunda parte de la Bandeja de WhatsApp. La liberación de pendientes
+Estado de la app: hecha (servidor y páginas). De la reserva por WhatsApp, el aviso al confirmar (F19) ya sale; de
+F17 y F18 está la parte de Reservas y la conversación es de la segunda parte de la Bandeja de WhatsApp. La liberación de pendientes
 (F13) avisa al momento solo en un negocio hasta la fase 2: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `reservation`. Se escribe **antes** que el código: no
@@ -188,7 +188,7 @@ Mientras se recupera la conexión en vivo, «Reconectando…» encima, sin borra
 | RESERVATION-F16 | Convertir una entrada de la lista de espera en reserva | hecho |
 | RESERVATION-F17 | Reserva que llega por WhatsApp | parcial |
 | RESERVATION-F18 | Cambiar o anular la reserva por WhatsApp | parcial |
-| RESERVATION-F19 | Avisar por WhatsApp cuando el restaurante confirma | parcial |
+| RESERVATION-F19 | Avisar por WhatsApp cuando el restaurante confirma | hecho |
 | RESERVATION-F20 | Borrar una reserva | hecho |
 | RESERVATION-F21 | Unir las reservas de dos fichas de cliente | hecho |
 | RESERVATION-F22 | Borrar los datos personales de un cliente (RGPD) | hecho |
@@ -507,20 +507,24 @@ Implicados: RESERVATION-F08, RESERVATION-F09, WHATSAPP_INBOX-F25
 
 ### RESERVATION-F19 Avisar por WhatsApp cuando el restaurante confirma
 <!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f19 wf:whatsapp-mesa#rec_wa_mesa-f07 -->
-Estado: parcial — Reservas ya avisa al confirmar, su reserva dice que llegó por WhatsApp y desde qué
-número, y da su día y su hora listos para el mensaje; solo falta la parte de WhatsApp: que escuche ese
-aviso y mande el mensaje (segunda parte de la Bandeja de WhatsApp; en el producto actual tampoco estaba)
+Estado: hecho
 Actor: responsable, cliente
 Pantalla: Reservas
 Pasos:
-1. El personal confirma una reserva que nació por WhatsApp (RESERVATION-F07).
+1. Con la automatización «Avisar por WhatsApp al cliente cuando se confirma su reserva» encendida en
+   Automatizaciones (WHATSAPP_INBOX-F26), el personal pulsa «Confirmar» en una reserva Pendiente, o la reserva
+   nace ya confirmada porque «Confirmar solas las reservas nuevas» está encendido.
 2. La reserva da su día y su hora listos para decírselos al cliente («martes, 5 de marzo de 2030»,
-   «21:30»), en su idioma y en el reloj del negocio.
-3. El cliente recibe por el mismo WhatsApp que su mesa está confirmada.
-Entra: la confirmación de la reserva y el teléfono del cliente.
-Sale: el aviso de la confirmación (`reservation.reservation.status_changed`) y el mensaje al cliente.
-Si falla: sin conversación de WhatsApp con ese número, no se manda nada y la reserva sigue confirmada.
-Implicados: RESERVATION-F07, WHATSAPP_INBOX-F26
+   «21:30»), en su idioma y en el reloj del negocio, y sus comensales.
+3. Si el teléfono de la reserva (el de su conversación, si llegó por WhatsApp; RESERVATION-F17) tiene
+   conversación de WhatsApp con el negocio, el cliente recibe por ese mismo WhatsApp que su mesa está
+   confirmada, con el día, la hora y los comensales.
+Entra: la confirmación de la reserva y su teléfono.
+Sale: el aviso de la confirmación (`reservation.reservation.status_changed`) y el mensaje al cliente, que se ve
+en su conversación de la Bandeja de WhatsApp.
+Si falla: sin teléfono o sin conversación de WhatsApp con ese número, no se manda nada y la reserva sigue
+confirmada; el motivo queda en el historial de la automatización.
+Implicados: RESERVATION-F07, RESERVATION-F17, WHATSAPP_INBOX-F26
 
 ### RESERVATION-F20 Borrar una reserva
 <!-- origen: fi:modules/reservations#command-reservations-reservations-delete-sql-transaccional old:reservations/workflow/reservas.md#reservations-f20 -->
@@ -836,11 +840,13 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
 
 ### Lo que queda fuera
 
-- **La conversación de WhatsApp** (F17–F19): pedir los comensales y ofrecer horas libres, cambiar o
-  anular desde el mensaje y avisar al confirmar son de la segunda parte de la Bandeja de WhatsApp
-  (`whatsapp_inbox` F14–F26). Reservas ya tiene su parte: la reserva del cliente con sus reglas, la puerta
-  «en nombre del cliente», el aviso al confirmar y el día y la hora listos para el mensaje
-  (`date_label`, `time_label`; `tests/test_queries.py`, `tests/test_services.py`).
+- **La conversación de WhatsApp** (F17, F18): pedir los comensales y ofrecer horas libres, y cambiar o
+  anular desde el mensaje son de la segunda parte de la Bandeja de WhatsApp (`whatsapp_inbox` F24, F25, que
+  esperan al asistente del Hub). Reservas ya tiene su parte: la reserva del cliente con sus reglas y la puerta
+  «en nombre del cliente». El aviso al confirmar (F19) ya sale: lo manda la receta `reservation_confirmed` de
+  `whatsapp_inbox` (WHATSAPP_INBOX-F26) con el `status_changed` confirmado y el día y la hora listos para el
+  mensaje (`date_label`, `time_label`; `tests/test_queries.py`, `tests/test_services.py`;
+  `apps/whatsapp_inbox/tests/test_relay_notify.py`).
 - **Asignación automática de mesa y juntar mesas para un grupo grande**: una reserva tiene una mesa
   (la retención de Mesas es una por reserva); juntar mesas espera a que Mesas tenga mesas unidas
   (su duda 3).

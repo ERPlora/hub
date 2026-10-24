@@ -31,6 +31,7 @@ import {
   notice,
   PREFIX,
   pushChannel,
+  restorePhoto,
   seedErplora,
 } from './whatsapp-helpers';
 
@@ -100,6 +101,8 @@ test.describe('a plan without WhatsApp messages', () => {
   test.afterAll(() => {
     if (before !== undefined) expect(setPlan(before).delivered).toBe(true);
     cleanUp();
+    // After erplora.com's plan goes back (its push): `a`'s photo as before the seed.
+    restorePhoto();
   });
 
   test('WHATSAPP_INBOX-F13: with a plan without WhatsApp messages the inbox says so, a message still arrives and «Send» explains it', async ({
@@ -171,6 +174,8 @@ test.describe('the month spent', () => {
     cleanUp();
     // The month back to 0, the photo pushed again: the next spec sends as always.
     expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+    // After that push: `a`'s photo as before the seed.
+    restorePhoto();
   });
 
   /** The conversation open at `phone`'s, once her message has arrived through erplora.com; its id. */
