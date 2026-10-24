@@ -44,6 +44,7 @@ test('login on a: shell, topbar with Demo among the apps, empty state, CSP heade
   await expect(page.locator('ion-menu.dash-menu')).toBeVisible();
   await expect(page.locator('ion-menu.dash-menu ion-item.nav-item')).toHaveText([
     /^\s*Home\s*$/,
+    /^\s*Files\s*$/,
     /^\s*Apps\s*$/,
     /^\s*System\s*$/,
     /^\s*Settings\s*$/,

@@ -21,7 +21,8 @@ type Box = { x: number; y: number; width: number; height: number };
 const menu = (page: Page): Locator => page.locator('ion-menu.dash-menu');
 const entries = (page: Page): Locator => menu(page).locator('ion-item.nav-item');
 /** The platform's entries of the menu, in its order: the ones whose screen exists. */
-const PLATFORM_ENTRIES = ['nav-home', 'nav-apps', 'nav-system', 'nav-settings'];
+// «Files» came with APP-BASE-8 (BASE-F72), after Home, as in the old hub's menu.
+const PLATFORM_ENTRIES = ['nav-home', 'nav-files', 'nav-apps', 'nav-system', 'nav-settings'];
 
 /** The topbar of the screen on view and its pieces. */
 function topbar(page: Page) {
