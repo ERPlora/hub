@@ -13,6 +13,7 @@ from base.events import (
     FAILED_EVENT_CREATED,
     FAILED_EVENT_DISCARDED,
     FAILED_EVENT_RETRIED,
+    FILE_EVENTS,
     HUB_DATA_RESET,
     HUB_REGISTERED,
     HUB_STATE_APPLIED,
@@ -62,6 +63,8 @@ def test_the_three_queries_and_their_events():
         # also when a failed event appears, is resent or discarded (its level changes).
         "base.system.status": [HUB_STATE_APPLIED],
         "base.event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
+        # Files (APP-BASE-8): every write of the business's files, and the photo (the plan's space).
+        "base.file.list": sorted({HUB_STATE_APPLIED, *FILE_EVENTS}),
     }
 
 

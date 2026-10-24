@@ -89,6 +89,14 @@ const routes: RouteRecordRaw[] = [
   },
   { path: '/import', redirect: { path: '/settings', hash: '#data' } },
   { path: '/export', redirect: { path: '/settings', query: { data: 'export' }, hash: '#data' } },
+  // ── Files (APP-BASE-8) ──
+  // The business's files (BASE-G82…G86), the old hub's `/files` and the side menu's «Files»; the folder in `?folder=`.
+  {
+    path: '/files',
+    name: 'base-files',
+    component: () => import('./pages/FilesPage.vue'),
+    meta: { auth: true },
+  },
 ];
 
 export default routes;

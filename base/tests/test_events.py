@@ -23,6 +23,12 @@ def test_every_event_is_named_as_the_convention_says():
         "base.failed_event.created",
         "base.failed_event.retried",
         "base.failed_event.discarded",
+        # Files (APP-BASE-8): what changes the business's files.
+        "base.file.uploaded",
+        "base.file.folder_created",
+        "base.file.renamed",
+        "base.file.moved",
+        "base.file.deleted",
         # The way in (APP-BASE-3).
         "base.pin.set",
         "base.device.mode_changed",

@@ -87,6 +87,34 @@
     "method": "post",
     "path": "/api/system/failed-events/discard"
   },
+  "base.file.list": {
+    "method": "get",
+    "path": "/api/files"
+  },
+  "base.file.read": {
+    "method": "get",
+    "path": "/api/files/raw"
+  },
+  "base.file.upload": {
+    "method": "post",
+    "path": "/api/files/upload"
+  },
+  "base.file.create_folder": {
+    "method": "post",
+    "path": "/api/files/folder"
+  },
+  "base.file.rename": {
+    "method": "post",
+    "path": "/api/files/rename"
+  },
+  "base.file.move": {
+    "method": "post",
+    "path": "/api/files/move"
+  },
+  "base.file.delete": {
+    "method": "post",
+    "path": "/api/files/delete"
+  },
   "demo.item.list": {
     "method": "get",
     "path": "/api/demo/items"

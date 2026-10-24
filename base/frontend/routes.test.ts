@@ -38,6 +38,8 @@ describe('base routes', () => {
       ['/employees', 'base-employees', true],
       ['/employees/:person', 'base-person', true],
       ['/api-docs', 'base-api-docs', true],
+      // Files (APP-BASE-8): routes.files.test.ts.
+      ['/files', 'base-files', true],
     ]);
   });
 

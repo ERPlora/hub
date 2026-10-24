@@ -63,6 +63,20 @@ APPROVAL_EVENTS = (APPROVAL_GRANTED, APPROVAL_USED)
 #: Whoever runs the business showed or hid the documentation of its API.
 API_DOC_SETTINGS_CHANGED = "base.api_doc.settings_changed"
 
+# ── Files (APP-BASE-8) ──
+#: A file went up to the business's files (BASE-G83): its path.
+FILE_UPLOADED = "base.file.uploaded"
+#: A new, empty folder (BASE-G83): its path.
+FILE_FOLDER_CREATED = "base.file.folder_created"
+#: A file or folder got another name (BASE-G85): its new path and the old one.
+FILE_RENAMED = "base.file.renamed"
+#: A file or folder went to another folder (BASE-G85): its new path and the old one.
+FILE_MOVED = "base.file.moved"
+#: A file, or a folder and everything in it, was deleted (BASE-G86): its path and whether it was a folder.
+FILE_DELETED = "base.file.deleted"
+#: What changes the business's files: Files' listing follows them.
+FILE_EVENTS = (FILE_UPLOADED, FILE_FOLDER_CREATED, FILE_RENAMED, FILE_MOVED, FILE_DELETED)
+
 ALL = [
     HUB_REGISTERED,
     HUB_STATE_APPLIED,
@@ -76,6 +90,7 @@ ALL = [
     FAILED_EVENT_CREATED,
     FAILED_EVENT_RETRIED,
     FAILED_EVENT_DISCARDED,
+    *FILE_EVENTS,
     PIN_SET,
     DEVICE_MODE_CHANGED,
     DEVICE_RENAMED,

@@ -19,7 +19,8 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
-const TOKEN = 'erpk_live_AbCdEfGh0123456789abcdefghijklmnopqrstuvwxy';
+// Shaped like a real token (`erpk_live_` + URL-safe base64) without looking like a leaked one to the secrets hook.
+const TOKEN = 'erpk_live_test-token-shown-once_0123456789-abcdefghij';
 
 function key(fields: Partial<ApiKeyRow> = {}): ApiKeyRow {
   return {
