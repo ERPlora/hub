@@ -6,16 +6,17 @@
 //   DB_NAME=hub_e2e_8030 node tests/e2e/database.ts --drop   drops it once its runserver is stopped
 //
 // Run it before starting the stack's runserver (which cannot start without its database) and again after
-// adding a migration; it keeps the rows of a database that exists, and leaves the checkout's .env the key that seals
-// the test certificates (`FISCAL_CERTIFICATE_KEY`, certificate-key.ts), made for it when it has none. Only e2e
-// databases (`isE2eDatabase`): `hub`, `saas`, the templates and every other one are refused untouched. A drop is
-// never forced: with a connection open (its runserver) it fails and says so. Postgres is compose.yaml's
-// (`COMPOSE_FILE` points at it from a checkout elsewhere), reached as its superuser `hub`, like the specs' `psql()`.
+// adding a migration; it keeps the rows of a database that exists, and leaves the checkout's .env the keys that seal
+// the test certificates and the automations' secrets (`FISCAL_CERTIFICATE_KEY`, `FLOW_SECRETS_KEY`: fernet-keys.ts),
+// made for it when it has none. Only e2e databases (`isE2eDatabase`): `hub`, `saas`, the templates and every other
+// one are refused untouched. A drop is never forced: with a connection open (its runserver) it fails and says so.
+// Postgres is compose.yaml's (`COMPOSE_FILE` points at it from a checkout elsewhere), reached as its superuser `hub`,
+// like the specs' `psql()`.
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { ENV_FILE, ensureCertificateKey, type KeySource } from './certificate-key.ts';
+import { ENV_FILE, ensureFernetKeys, type FernetKeyName, type KeySource } from './fernet-keys.ts';
 import { type CommandResult, type ManagePy, managePy, type Spawn } from './global-setup.ts';
 import { isE2eDatabase, STACK } from './stack.ts';
 
@@ -91,14 +92,17 @@ export function dropDatabase(name: string, { sql }: { sql: AdminSql }): void {
   throw new Error(`Could not drop the e2e database ${name}: psql ${said(drop)}`);
 }
 
-/** What `runCli` says of the run's certificate key: where it came from, never the key itself. */
-function keySaid(source: KeySource, envFile: string): string {
-  if (source === 'environment') return 'FISCAL_CERTIFICATE_KEY taken from the environment (export it to runserver too).';
-  if (source === 'env-file') return `FISCAL_CERTIFICATE_KEY kept from ${envFile}.`;
-  return `FISCAL_CERTIFICATE_KEY generated in ${envFile} (restart a runserver already running: it reads the .env at start).`;
+/** The keys runserver seals with: the test certificates' (verifactu) and the automations' secrets' (flow). */
+const STACK_KEYS: readonly FernetKeyName[] = ['FISCAL_CERTIFICATE_KEY', 'FLOW_SECRETS_KEY'];
+
+/** What `runCli` says of one of the run's keys: where it came from, never the key itself. */
+function keySaid(name: FernetKeyName, source: KeySource, envFile: string): string {
+  if (source === 'environment') return `${name} taken from the environment (export it to runserver too).`;
+  if (source === 'env-file') return `${name} kept from ${envFile}.`;
+  return `${name} generated in ${envFile} (restart a runserver already running: it reads the .env at start).`;
 }
 
-/** The command line: prepares `database` and leaves the certificate key in `envFile`, or drops it with `--drop`.
+/** The command line: prepares `database` and leaves the stack's keys in `envFile`, or drops it with `--drop`.
  * Returns the exit status. */
 export function runCli(
   args: string[],
@@ -106,7 +110,7 @@ export function runCli(
     database: string;
     sql: AdminSql;
     manage: ManagePy;
-    /** The checkout's .env and the environment runserver starts with: where its certificate key comes from. */
+    /** The checkout's .env and the environment runserver starts with: where its keys come from. */
     envFile: string;
     env: NodeJS.ProcessEnv;
     print: (line: string) => void;
@@ -125,7 +129,9 @@ export function runCli(
     } else {
       const { created } = prepareDatabase(deps.database, deps);
       deps.print(`database.ts: ${deps.database} ${created ? 'created, migrated' : 'migrated'} and seeded (a, b).`);
-      deps.print(`database.ts: ${keySaid(ensureCertificateKey(deps.envFile, deps.env), deps.envFile)}`);
+      for (const { name, source } of ensureFernetKeys(STACK_KEYS, deps.envFile, deps.env)) {
+        deps.print(`database.ts: ${keySaid(name, source, deps.envFile)}`);
+      }
     }
     return 0;
   } catch (error) {
