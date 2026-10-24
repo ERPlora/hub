@@ -190,6 +190,12 @@ class TestApproving:
         response = approve(client, asked, "saas:2")
         assert response.status_code == 409 and code(response) == "base.approval_not_needed"
 
+    def test_a_query_is_never_approved_by_pin_even_named(self, client, adam, eva, monkeypatch):
+        monkeypatch.setattr(apps.get_app_config("base"), "approvals", {"base.device.list": "See the devices"}, raising=False)
+        response = approve(client, {"operation": "base.device.list", "fingerprint": "0" * 64}, "saas:2")
+        assert response.status_code == 409 and code(response) == "base.approval_not_offered"
+        assert Approval.objects.count() == 0
+
     def test_a_command_nobody_names_is_not_approved_by_pin(self, client, adam, eva):
         response = approve(client, {"operation": "base.device.prune", "fingerprint": "0" * 64}, "saas:2")
         assert response.status_code == 409 and code(response) == "base.approval_not_offered"

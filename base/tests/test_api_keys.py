@@ -96,6 +96,15 @@ class TestNotYetAvailable:
         response = get(client, "a.localhost:8000", CARTS, **bearer("erpk_live_" + "x" * 43))
         assert response.status_code == 401
 
+    @pytest.mark.django_db
+    def test_not_even_one_that_is_in_the_shared_tables(self, client):
+        """A key row in phase 1's shared tables (left by hand, or by a business before it moved) would be anybody's."""
+        token = api_keys.new_token()
+        with context.use_shared_database():
+            ApiKey.objects.create(name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full")
+        for slug in ("a", "b"):
+            assert get(client, f"{slug}.localhost:8000", CARTS, **bearer(token)).status_code == 401
+
 
 @HUB_DB
 class TestCreate:
