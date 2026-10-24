@@ -7,9 +7,10 @@ Estado de la app: en construcción (2026-10-22)
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
 > (el del hub viejo: saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
 > la actividad), con lo que acompaña a cualquier pantalla: la campana, «Actualizar plan» y la franja que
-> avisa cuando todavía no se puede facturar. Las plantillas y Ajustes › Datos llegan en la parte siguiente.
-> El acceso (entrar con la cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los dispositivos) está
-> en sus propias pantallas, más abajo.
+> avisa cuando todavía no se puede facturar. También «Apps», «Plan y límites» de Sistema y las plantillas: la
+> tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer). El acceso (entrar con la
+> cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los dispositivos) está en sus propias pantallas,
+> más abajo.
 
 ## Para qué sirve y para quién
 
@@ -21,6 +22,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
 - **Los paneles de las apps**: cifras, listas y gráficos que se mueven solos cuando algo cambia en el
   negocio, sin recargar.
 - **La actividad**: las últimas ventas.
+- **Empezar con una plantilla** de un negocio como el suyo y, en «Ajustes», guardar una copia de sus datos o
+  cargar la de otro negocio.
 
 Quién lo usa:
 
@@ -55,6 +58,9 @@ backoffice.
 Arriba, el nombre del negocio y «Hoy» con la fecha larga; mientras el negocio no tiene nombre, un saludo
 según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo, en este orden:
 
+- **«Empieza con un negocio como el tuyo»**, solo para quien administra el negocio y mientras el negocio no
+  tiene nada de lo que trae una plantilla: hasta cuatro plantillas con «Usar esta», «Ver todas las
+  plantillas» y «Ahora no».
 - **«Mis apps»**: una baldosa por app, con su icono y su nombre; las que más se abren en este navegador,
   primero. En el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
 - **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan,
@@ -105,6 +111,19 @@ navegador).
 Desde «Sistema» en el menú lateral, la pestaña «Plan y límites»: «Los límites de tu plan» con «Dentro del
 límite» o «Cerca del límite», las tarjetas «Personas» y «Dispositivos» y dónde se gestionan los planes.
 
+### Ajustes · Datos y copias
+Desde «Ajustes» en el menú lateral, la pestaña «Datos y copias» de abajo, tras «General» (las demás pestañas de
+Ajustes del hub viejo llegan con sus flujos). Arriba, un selector con «Importar» (lo que se abre), «Exportar» y
+«Restablecer»; lo elegido queda en el enlace, así que se puede compartir y Atrás sale de Ajustes.
+
+- **Importar**: «Elige qué cargar», con «Subir desde archivo» y las plantillas en tarjetas o en lista, con
+  «Buscar plantillas»; cada una con su idioma, su país, su versión, lo que trae y «Usar plantilla». Después,
+  «Revisa lo que trae» y el «Informe de la importación».
+- **Exportar**: el nombre y el idioma del archivo, «¿Para qué es este archivo?», las apps con sus casillas
+  «App» y «Datos», y «Exportar».
+- **Restablecer**: «Deshacer una importación», con una fila por importación que se puede deshacer, y
+  «Restablecer el negocio», con lo que tiene cada sección.
+
 ### Acceso
 La entrada de una caja compartida, o de un dispositivo al que otra entrada le cerró la sesión, sin menú ni barra:
 el logo, «Entra en tu negocio», el aviso de lo que pasó si lo hay y una tarjeta con dos pestañas, «PIN» (las
@@ -123,8 +142,8 @@ Desde «Perfil» del menú de usuario. Arriba, la persona (cara, nombre y rol); 
 foto), «Preferencias» (idioma y apariencia) y «PIN».
 
 ### Ajustes · General
-Desde «Ajustes» en el menú lateral. Hoy, una sola sección (las pestañas de abajo salen cuando haya dos): «Este
-dispositivo», «Pinpad» y, para quien administra, «Dispositivos».
+Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»,
+«Pinpad» y, para quien administra, «Dispositivos».
 
 ### Estamos preparando tu negocio
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
@@ -137,6 +156,15 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; la campana, «Todo al día. Sin notificaciones.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
 | Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en la campana, «No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión.». En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
 | Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». |
+
+En la pantalla Ajustes · Datos y copias:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando plantillas…»; en «Exportar» y «Restablecer», las filas en gris. |
+| Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
+| Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
+| Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. |
 
 ## Flujos
 
@@ -170,26 +198,36 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 | BASE-F26 | Entender por qué una app no se abre | hecho |
 | BASE-F27 | Ver una app de pago bloqueada | hecho |
 | BASE-F28 | Ver cuánto de los límites del plan se está usando | parcial |
-| BASE-F29 | Entrar con la cuenta de erplora.com | hecho |
-| BASE-F30 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
-| BASE-F31 | Elegir el PIN la primera vez que se entra en una caja | hecho |
-| BASE-F32 | Entrar con PIN | hecho |
-| BASE-F33 | Entrar pasando la placa | hecho |
-| BASE-F34 | Perder la sesión porque se abrió en otro dispositivo | hecho |
-| BASE-F35 | La sesión termina mientras se trabaja | hecho |
-| BASE-F36 | Cerrar la sesión de una caja que nadie toca | hecho |
-| BASE-F37 | Cambiar de usuario sin perder la venta | hecho |
-| BASE-F38 | Cerrar sesión | hecho |
-| BASE-F39 | Decidir si este dispositivo es compartido o personal | hecho |
-| BASE-F40 | Abrir un hub que todavía no está dado de alta | hecho |
-| BASE-F41 | Cambiar mis datos, foto, idioma y apariencia | hecho |
-| BASE-F42 | Cambiar mi PIN desde Mi perfil | hecho |
-| BASE-F43 | Elegir cuántos dígitos tiene el PIN del negocio | hecho |
-| BASE-F44 | Decidir si se pide PIN en la caja y cuándo se vuelve a pedir | hecho |
-| BASE-F45 | Ver los dispositivos en los que se ha entrado | hecho |
-| BASE-F46 | Ponerle nombre a un dispositivo | hecho |
-| BASE-F47 | Quitar un dispositivo que se ha perdido | hecho |
-| BASE-F48 | Quitar de golpe los dispositivos que nadie usa | hecho |
+| BASE-F29 | Elegir una plantilla del catálogo para importar | hecho |
+| BASE-F30 | Subir un fichero para importar | hecho |
+| BASE-F31 | Revisar y cargar lo que trae el fichero | hecho |
+| BASE-F32 | Leer el informe de la importación | hecho |
+| BASE-F33 | Volver al informe de una importación que no entró entera y reintentar | hecho |
+| BASE-F34 | Deshacer una importación | hecho |
+| BASE-F35 | Exportar una copia de seguridad o una plantilla | hecho |
+| BASE-F36 | Elegir qué apps, datos y tablas viajan en la exportación | hecho |
+| BASE-F37 | Restablecer el negocio por secciones | parcial |
+| BASE-F38 | Ver Inicio al día después de importar una plantilla | hecho |
+| BASE-F39 | Entrar con la cuenta de erplora.com | hecho |
+| BASE-F40 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
+| BASE-F41 | Elegir el PIN la primera vez que se entra en una caja | hecho |
+| BASE-F42 | Entrar con PIN | hecho |
+| BASE-F43 | Entrar pasando la placa | hecho |
+| BASE-F44 | Perder la sesión porque se abrió en otro dispositivo | hecho |
+| BASE-F45 | La sesión termina mientras se trabaja | hecho |
+| BASE-F46 | Cerrar la sesión de una caja que nadie toca | hecho |
+| BASE-F47 | Cambiar de usuario sin perder la venta | hecho |
+| BASE-F48 | Cerrar sesión | hecho |
+| BASE-F49 | Decidir si este dispositivo es compartido o personal | hecho |
+| BASE-F50 | Abrir un hub que todavía no está dado de alta | hecho |
+| BASE-F51 | Cambiar mis datos, foto, idioma y apariencia | hecho |
+| BASE-F52 | Cambiar mi PIN desde Mi perfil | hecho |
+| BASE-F53 | Elegir cuántos dígitos tiene el PIN del negocio | hecho |
+| BASE-F54 | Decidir si se pide PIN en la caja y cuándo se vuelve a pedir | hecho |
+| BASE-F55 | Ver los dispositivos en los que se ha entrado | hecho |
+| BASE-F56 | Ponerle nombre a un dispositivo | hecho |
+| BASE-F57 | Quitar un dispositivo que se ha perdido | hecho |
+| BASE-F58 | Quitar de golpe los dispositivos que nadie usa | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -216,14 +254,16 @@ Implicados: INVENTORY-F28
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
 <!-- origen: old-hub:HUB_SHELL-F25 -->
-Estado: parcial — sin la fila de salud del hub (la impresora y WhatsApp con «Ver sistema») ni la propuesta de plantilla, que llega con las plantillas
+Estado: parcial — sin la fila de salud del hub (la impresora y WhatsApp con «Ver sistema»)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
   1. Tras entrar se abre el Inicio (también desde «Inicio» en el menú lateral).
   2. Arriba, el nombre del negocio (el de erplora.com) y «Hoy» con la fecha larga en el idioma de la
      aplicación; mientras el negocio no tiene nombre, «Buenos días», «Buenas tardes» o «Buenas noches».
-  3. Debajo, en este orden: «Mis apps», «Termina de configurar tu negocio» y el tablero de paneles.
+  3. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
+     para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
+     paneles.
   4. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
 Entra: el nombre del negocio y la fecha del dispositivo.
 Sale: nada guardado.
@@ -689,7 +729,234 @@ Quien no administra el negocio ve «Solo quien administra el negocio ve el plan 
 cuanto erplora.com lo envíe.».
 Implicados: ninguno
 
-### BASE-F29 Entrar con la cuenta de erplora.com
+### BASE-F29 Elegir una plantilla del catálogo para importar
+<!-- origen: old-hub:HUB_SHELL-F175 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Abre «Ajustes» en el menú lateral; en «Datos y copias», «Importar» es lo que se abre. Dice «Carga una
+     plantilla: llena tus apps con sus datos —una carta, servicios, mesas— listos para usar.» y, debajo,
+     «Elige qué cargar».
+  2. Mientras llegan, «Cargando plantillas…». Después, una tarjeta por plantilla (o una fila, con la vista de
+     lista): su nombre, su descripción, su «Idioma» y su «País» por su nombre, su «Versión» y lo que «Trae»
+     (cuántas categorías, productos, servicios, zonas o mesas). Primero las del país del negocio y, dentro,
+     las del idioma de la persona.
+  3. «Buscar plantillas» busca por el nombre, la descripción o las apps que trae.
+  4. Pulsa «Usar plantilla» en la que le sirva: el botón gira mientras se lee y se abre «Revisa lo que
+     trae» (BASE-F31).
+Entra: las plantillas del Hub, una por sector e idioma (hoy restaurante y peluquería, en español y en
+inglés).
+Sale: nada guardado hasta cargarla.
+Si falla: «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con
+«Reintentar»; sin plantillas, «Todavía no hay plantillas para tu negocio.»; una búsqueda sin resultado,
+«Ninguna plantilla coincide con tu búsqueda.»; si la plantilla no se puede leer, «No se pudo leer el
+fichero: {reason}» y se queda en la elección. Quien no administra el negocio lee «Solo un administrador
+puede ver e importar plantillas.».
+Implicados: INVENTORY-F12
+
+### BASE-F30 Subir un fichero para importar
+<!-- origen: old-hub:HUB_SHELL-F176 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. En «Importar», pulsa «Subir desde archivo» y elige un .blueprint.zip: una copia de seguridad de este
+     negocio o una plantilla que exportó otro.
+  2. Mientras se lee, el botón gira. Después se abre «Revisa lo que trae» (BASE-F31).
+  3. Tras un error se puede elegir el mismo fichero otra vez.
+Entra: el fichero, de 5 MB como mucho.
+Sale: nada guardado hasta cargarlo.
+Si falla: «No se pudo leer el fichero: {reason}» con el motivo (no es un .blueprint.zip, está dañado, lo
+hizo una versión más nueva de ERPlora o pasa de 5 MB) y se queda en la elección.
+Implicados: ninguno
+
+### BASE-F31 Revisar y cargar lo que trae el fichero
+<!-- origen: old-hub:HUB_SHELL-F177 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Tras elegir una plantilla o un fichero sale «Revisa lo que trae»: «Nombre», «Tipo» («Plantilla» o
+     «Copia de seguridad»), «Idioma» y «País» por su nombre, cuántas «Apps» y, si es un fichero, cuándo se
+     hizo («Creado»).
+  2. Debajo, una casilla por app con lo que trae (cada parte y sus filas). Vienen marcadas las que están encendidas
+     en el negocio; una app apagada dice «Esta app está apagada en tu negocio: no se cargará nada suyo.» y una
+     que este negocio no tiene, «Este negocio no tiene esta app: no se cargará nada suyo.». Los clientes de
+     una plantilla se quedan fuera: «Datos personales: solo se cargan desde una copia de seguridad.». Lo que
+     el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí».
+  3. Desmarca las apps que no quiera y pulsa «Importar» («Importando…»), o «Elegir otro» para volver.
+  4. Al terminar sale el informe (BASE-F32). Lo que ya había en el negocio se queda como estaba: no se
+     duplica ni se sobrescribe.
+Entra: la plantilla o el fichero y las apps marcadas.
+Sale: en cada app marcada, lo que trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus
+categorías, productos, servicios, zonas, mesas y, desde una copia de seguridad, clientes), y el informe
+guardado (`base.blueprint.imported`).
+Si falla: «La importación falló: {reason}» y se queda en la revisión; sin ninguna app marcada, «Elige al
+menos una app.» y no se puede importar; si ninguna de sus apps está encendida, «Nada de este fichero puede
+cargarse en tu negocio: ninguna de sus apps está encendida.».
+Implicados: INVENTORY-F12
+
+### BASE-F32 Leer el informe de la importación
+<!-- origen: old-hub:HUB_SHELL-F178 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Al terminar, «Informe de la importación» con cómo fue: «Todo ha entrado.», «No todo entró.» o «No ha
+     entrado nada.».
+  2. Una fila por app con su etiqueta: «Aplicado», «Ya lo tenías», «Aplicado en parte», «Falló», «Nada que
+     copiar», «Descartado», «App apagada», «No está en este negocio» o «No elegida». Debajo, por cada parte,
+     «{created} creadas · {already} ya estaban · {failed} fallaron» y, de lo que falló, su nombre y el
+     motivo.
+  3. Lo dejado fuera a propósito sale en «Se ha dejado fuera a propósito».
+  4. «Ver las plantillas» vuelve al catálogo; «Ir al inicio» lleva al Inicio.
+Entra: el informe de la importación.
+Sale: nada; el informe queda guardado en el negocio.
+Si falla: una etiqueta que la pantalla no conoce sale como «Falló» con su texto tal cual, nunca como un
+éxito.
+Implicados: ninguno
+
+### BASE-F33 Volver al informe de una importación que no entró entera y reintentar
+<!-- origen: old-hub:HUB_SHELL-F179 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Al abrir «Importar», si la última importación no entró entera y no se deshizo, sale primero su informe,
+     con «Este es el informe de tu última importación de {name} ({date}). No todo entró.».
+  2. Si vino de una plantilla, pulsa «Reintentar lo que falta» («Reintentando…»): se vuelve a cargar la misma
+     versión de la plantilla y solo entra lo que faltaba; lo que ya entró no se toca ni se duplica. Sale el
+     informe nuevo.
+  3. Si vino de un fichero subido a mano, el botón sale apagado con «Esta importación vino de un archivo
+     subido a mano, así que no se puede reintentar sola. Vuelve a subir el archivo y elige solo lo que
+     falló.»; si esa versión de la plantilla ya no está, con «La versión de la plantilla que usó esta
+     importación ya no está en el catálogo, así que no se ha reintentado: otra versión podría cargar datos
+     distintos.».
+  4. «Ver las plantillas» deja ese informe y abre el catálogo.
+Entra: la última importación y su informe.
+Sale: lo que faltaba, si ahora entra, y el informe nuevo (`base.blueprint.imported`).
+Si falla: «El reintento falló: {reason}» y el informe sigue a la vista.
+Implicados: ninguno
+
+### BASE-F34 Deshacer una importación
+<!-- origen: old-hub:HUB_SHELL-F180 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Restablecer
+Pasos:
+  1. En «Restablecer», «Deshacer una importación» («Quita solo lo que trajo esa importación. Lo que hayas
+     creado después se conserva.»): una fila por importación que trajo algo y no se deshizo, con su nombre,
+     cuándo, quién y cuántas filas trajo, y «Deshacer».
+  2. Pulsa «Deshacer»: «Deshacer «{name}»», con «Se borrarán las {n} filas que trajo esta importación. Lo que
+     creaste después se conserva.». No pide escribir nada: se puede volver a importar.
+  3. Confirma con «Deshacer» (o «Cancelar»).
+  4. Sale «Importación deshecha:» con una línea por app («{app} — {n} filas borradas»); lo que no se pudo
+     borrar (algo que otra app todavía usa) sale aparte con su motivo. Lo que tiene cada sección se pone al
+     día.
+Entra: la importación elegida.
+Sale: borradas exactamente las filas que trajo; lo creado después se queda (`base.import.undone`).
+Si falla: el motivo sale en la propia ventana, que no se cierra (en el hub viejo no se decía nada); una
+importación ya deshecha, «Esta importación ya se deshizo.».
+Implicados: ninguno
+
+### BASE-F35 Exportar una copia de seguridad o una plantilla
+<!-- origen: old-hub:HUB_SHELL-F173 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Exportar
+Pasos:
+  1. Abre «Exportar»: «Empaqueta las apps de este negocio —y, si quieres, sus datos— en un archivo que
+     puedes cargar en otro negocio o guardar como copia.».
+  2. Escribe el «Nombre» (viene el del negocio; sin él, el de su dirección) y elige el «Idioma»; debajo, el
+     nombre final del archivo («Archivo: {file}»).
+  3. Responde «¿Para qué es este archivo?»: «Copia de seguridad de este negocio» (la que viene marcada; lleva
+     también los clientes) o «Plantilla para compartir» (nunca lleva clientes).
+  4. Elige las apps y sus datos (BASE-F36) y pulsa «Exportar» («Exportando…»).
+  5. El archivo baja con el navegador y sale «{file} descargado.».
+Entra: el nombre, el idioma, para qué es y lo marcado.
+Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas; nunca personas, PIN
+ni datos fiscales. En el negocio no se guarda nada.
+Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre para el archivo.» y no se puede
+exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.».
+Implicados: ninguno
+
+### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
+<!-- origen: old-hub:HUB_SHELL-F174 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Exportar
+Pasos:
+  1. En «Exportar», bajo «Apps» («Elige qué apps registra el archivo y si sus datos viajan con él.»), una fila
+     por app encendida con dos casillas, «App» y «Datos». Vienen todas con la app marcada y sin datos; una app
+     sin nada propio dice «Nada propio que copiar».
+  2. Desmarcar la app desmarca sus datos. «Seleccionar todo» marca todas las apps y sus datos;
+     «Deseleccionar todo» las desmarca todas.
+  3. Al marcar «Datos» de una app sale debajo «Datos de {app}», con una casilla por cada parte y sus filas;
+     desmarcar una la deja fuera. En una plantilla los clientes no se pueden marcar:
+     «Solo en una copia de seguridad».
+  4. Mientras no se desmarque ninguna parte de una app, viaja todo lo suyo, también lo que esa app traiga
+     más adelante.
+Entra: las apps encendidas y cuántas filas tiene cada parte.
+Sale: nada guardado; lo marcado viaja al exportar.
+Si falla: «No se han podido cargar las apps de este negocio.» con «Reintentar»; sin ninguna app marcada no
+se puede exportar.
+Implicados: ninguno
+
+### BASE-F37 Restablecer el negocio por secciones
+<!-- origen: old-hub:HUB_SHELL-F181 -->
+Estado: parcial — mientras el negocio comparte su base de datos con otros negocios no se puede vaciar: la pantalla lo explica y no ofrece el botón; se podrá cuando cada negocio tenga la suya
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Restablecer
+Pasos:
+  1. En «Restablecer», «Restablecer el negocio»: «Borra definitivamente los datos que marques. No se puede
+     deshacer: si dudas, exporta antes una copia.», con «Exportar una copia antes», que abre «Exportar».
+  2. Dice qué no se borra nunca: «Solo se borra lo que cada sección enumera aquí. Las ventas, las facturas,
+     los registros fiscales, las personas y sus accesos, los archivos y los ajustes del negocio se quedan
+     siempre.».
+  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total.
+  4. Con su propia base de datos, marca las secciones y pulsa «Restablecer el negocio»: «Esto no se puede
+     deshacer», con «Se borrarán definitivamente {n} filas:» y el desglose. Escribe el nombre del negocio
+     («Escribe «{name}» para confirmar») y pulsa «Borrar definitivamente» (o «Cancelar»).
+  5. Sale «Negocio restablecido:» con una línea por sección («{app} — {n} filas borradas») y la lista se
+     recalcula.
+  6. Hoy, con la base de datos compartida, sale «Restablecer el negocio todavía no está disponible. Deshaz una
+     importación o quita lo que quieras desde cada app.», sin casillas ni botón.
+Entra: lo que tiene cada sección y lo marcado.
+Sale: borrado definitivo de lo marcado (`base.hub.data_reset`).
+Si falla: el motivo sale en la ventana, que no se cierra: un nombre que no es el del negocio, «El nombre no
+coincide.». Quien no administra el negocio lee «Solo un administrador puede deshacer importaciones o
+restablecer el negocio.».
+Implicados: ninguno
+
+### BASE-F38 Ver Inicio al día después de importar una plantilla
+<!-- origen: old-hub:HUB_SHELL-F39 old-hub:HUB_SHELL-F26 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Inicio · Resumen
+Pasos:
+  1. Mientras el negocio no tiene nada de lo que trae una plantilla, quien lo administra ve arriba «Empieza
+     con un negocio como el tuyo» («Elige el que más se parezca al tuyo y te dejamos tus apps listas con su
+     catálogo de una vez. Después tendrás que poner tus propios datos.»): hasta cuatro plantillas, una por
+     tipo de negocio y en su idioma si la hay (primero las de su país), con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
+     copias» y «Ahora no» cierra la tarjeta en este dispositivo.
+  2. Pulsa «Usar esta»: «Preparando «{name}»…» mientras se carga, sin pantallas intermedias.
+  3. En la misma tarjeta, «Ya tienes tus apps y tu catálogo» («Lo que queda es lo que solo puedes contestar
+     tú: los datos de tu negocio. Los tienes en la lista de abajo.») con «Continuar», que la cierra.
+  4. Sin recargar, el Inicio se pone al día: «Termina de configurar tu negocio» cuenta como hechos los pasos
+     que resolvió la plantilla y los paneles se refrescan. Igual tras cargar una plantilla o un fichero desde
+     «Datos y copias».
+Entra: las plantillas y si el negocio todavía está vacío.
+Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`).
+Si falla: si no entró todo, «No todo ha entrado» con «Estas no han entrado: {apps}.» (o «Hay algo más que
+no ha entrado.») y «Ver el informe»; si no se pudo abrir, «No se ha podido abrir esa plantilla» con «No ha
+cambiado nada en tu negocio: {reason}» e «Intentar otra vez»; si se cortó a medias, «La configuración no ha
+terminado» con «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a
+intentarlo.» y «Ver el informe», sin reintento. Si las plantillas no se pueden leer, «No se han podido
+cargar las plantillas para empezar.» con «Reintentar» y «Ahora no».
+Implicados: BASE-F01, INVENTORY-F12
+
+### BASE-F39 Entrar con la cuenta de erplora.com
 <!-- origen: old-hub:HUB_SHELL-F01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -700,7 +967,7 @@ Pasos:
      tu cuenta».
   2. En erplora.com entra como siempre: email y contraseña, Google o su código de verificación.
   3. Vuelve al negocio ya dentro, en la pantalla que había pedido o en **Inicio**. Si este dispositivo pide PIN,
-     el negocio ya entra en sus cajas con PIN y la persona aún no tiene uno, antes le pide elegirlo (BASE-F31).
+     el negocio ya entra en sus cajas con PIN y la persona aún no tiene uno, antes le pide elegirlo (BASE-F41).
 Entra: la cuenta que comprueba erplora.com; este navegador.
 Sale: la sesión de la persona en este negocio y este navegador convertido en un dispositivo de confianza del
 negocio (sale en «Dispositivos», compartido mientras nadie diga lo contrario). La sesión dura un turno de 12 horas
@@ -709,7 +976,7 @@ Si falla: erplora.com dice por qué no entra (credenciales, verificación, «No 
 negocio no guarda nada hasta que vuelve con la persona identificada.
 Implicados: BASE-F13
 
-### BASE-F30 Entrar desde el panel de erplora.com sin volver a teclear la contraseña
+### BASE-F40 Entrar desde el panel de erplora.com sin volver a teclear la contraseña
 <!-- origen: old-hub:HUB_SHELL-F02 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -718,23 +985,23 @@ Pasos:
   1. En erplora.com, con la sesión abierta, pulsa entrar en su negocio.
   2. El negocio se abre con la persona ya dentro, en **Inicio**, sin pasar por ninguna pantalla de entrada.
 Entra: el pase de un solo uso que da erplora.com.
-Sale: lo mismo que BASE-F29: la sesión y este navegador como dispositivo de confianza del negocio, así que
+Sale: lo mismo que BASE-F39: la sesión y este navegador como dispositivo de confianza del negocio, así que
 después ofrece el pinpad, sale en «Dispositivos» y su modo se puede cambiar.
 Si falla: un pase caducado o ya usado no abre nada: el negocio vuelve a pedir la entrada de erplora.com.
-Implicados: BASE-F29
+Implicados: BASE-F39
 
-### BASE-F31 Elegir el PIN la primera vez que se entra en una caja
+### BASE-F41 Elegir el PIN la primera vez que se entra en una caja
 <!-- origen: old-hub:HUB_SHELL-F03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Crea tu PIN de acceso
 Pasos:
-  1. Tras entrar con la cuenta (BASE-F29) en un dispositivo compartido de un negocio que pide PIN, donde otra
+  1. Tras entrar con la cuenta (BASE-F39) en un dispositivo compartido de un negocio que pide PIN, donde otra
      persona ya entra con el suyo, y si la persona aún no tiene PIN, sale «Crea tu PIN de acceso» — «Con él
      entrarás en esta caja sin tu contraseña.».
   2. Teclea el PIN en el teclado de círculos: «Elige un PIN de {n} dígitos» (4 o 6, lo que diga el negocio).
   3. Repite: «Confirma tu PIN». Al acertar se guarda y entra donde iba.
-  4. «Ahora no» lo deja para más tarde: entra igual y puede elegirlo en **Mi perfil** (BASE-F42).
+  4. «Ahora no» lo deja para más tarde: entra igual y puede elegirlo en **Mi perfil** (BASE-F52).
 Entra: la sesión recién abierta; los dígitos del PIN del negocio.
 Sale: el PIN de la persona, guardado cifrado; su cara aparece en «Cambiar de usuario» al momento y en el pinpad
 de **Acceso** en menos de un minuto.
@@ -743,9 +1010,9 @@ repetidos o seguidos: «Ese PIN es demasiado fácil de adivinar: evita dígitos 
 (1234).». Ya lo usa otra persona: «Ese PIN ya lo tiene otra persona activa: elige otro.». Sin conexión: «No se
 pudo guardar el PIN. Vuelve a intentarlo.». Un negocio en el que nadie tiene PIN no lo pide al entrar: el primero
 se elige en **Mi perfil**.
-Implicados: BASE-F29, BASE-F42
+Implicados: BASE-F39, BASE-F52
 
-### BASE-F32 Entrar con PIN
+### BASE-F42 Entrar con PIN
 <!-- origen: old-hub:HUB_SHELL-F04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -769,9 +1036,9 @@ Un dispositivo en el que nunca se entró con una cuenta, o que un administrador 
 todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Sin
 conexión, «No se pudo entrar. Comprueba la conexión e inténtalo de nuevo.»; si no se puede leer quién trabaja
 aquí, «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.».
-Implicados: BASE-F31, BASE-F44
+Implicados: BASE-F41, BASE-F54
 
-### BASE-F33 Entrar pasando la placa
+### BASE-F43 Entrar pasando la placa
 <!-- origen: old-hub:HUB_SHELL-F05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -783,12 +1050,12 @@ Pasos:
   3. Entras como el dueño de la tarjeta.
 Entra: el número que lee el lector. Solo se atiende en la pestaña «PIN» de un dispositivo que ofrece el pinpad y
 en **Cambiar de usuario**; en «Cuenta» o mientras se elige el PIN, no.
-Sale: lo mismo que BASE-F32.
+Sale: lo mismo que BASE-F42.
 Si falla: una tarjeta que no es de nadie o cuyo dueño ya no está: «Esa placa no abre nada aquí. Entra con tu PIN
 o pídeselo a un administrador.»; cuenta como un intento fallido. El pinpad sigue disponible.
-Implicados: BASE-F32
+Implicados: BASE-F42
 
-### BASE-F34 Perder la sesión porque se abrió en otro dispositivo
+### BASE-F44 Perder la sesión porque se abrió en otro dispositivo
 <!-- origen: old-hub:HUB_SHELL-F06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -806,7 +1073,7 @@ Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardad
 Si falla: sin tope en el plan no se cierra nada.
 Implicados: BASE-F11
 
-### BASE-F35 La sesión termina mientras se trabaja
+### BASE-F45 La sesión termina mientras se trabaja
 <!-- origen: old-hub:HUB_SHELL-F07 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -822,9 +1089,9 @@ Pasos:
 Entra: la sesión que ya no existe.
 Sale: nada guardado; la venta a medias la conserva su app.
 Si falla: sin red, la pantalla no da la sesión por terminada.
-Implicados: BASE-F13, BASE-F47
+Implicados: BASE-F13, BASE-F57
 
-### BASE-F36 Cerrar la sesión de una caja que nadie toca
+### BASE-F46 Cerrar la sesión de una caja que nadie toca
 <!-- origen: old-hub:HUB_SHELL-F08 -->
 Estado: hecho
 Actor: sistema
@@ -838,9 +1105,9 @@ Entra: los minutos del negocio, que llegan con la propia página (no hay una lec
 Sale: la sesión cerrada en el negocio. La cuenta abierta la conserva su app.
 Si falla: con «Hasta cerrar sesión», en un dispositivo personal o donde no se pide PIN no se cierra nada; aunque
 la pantalla se quede colgada, una sesión abierta mientras el negocio pide siempre el PIN no dura más de 1 hora.
-Implicados: BASE-F44
+Implicados: BASE-F54
 
-### BASE-F37 Cambiar de usuario sin perder la venta
+### BASE-F47 Cambiar de usuario sin perder la venta
 <!-- origen: old-hub:HUB_SHELL-F09 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -862,9 +1129,9 @@ Si falla: PIN erróneo: «PIN incorrecto.» y quien estaba dentro sigue dentro. 
 intentos fallidos.» y los minutos que tiene que esperar. Nadie con PIN: «Aquí nadie tiene PIN todavía: se
 pone en Mi perfil o en Empleados.». Sin poder leer quién trabaja aquí: «No se pudo cargar quién trabaja aquí.
 Comprueba la conexión e inténtalo de nuevo.».
-Implicados: BASE-F32, BASE-F33
+Implicados: BASE-F42, BASE-F43
 
-### BASE-F38 Cerrar sesión
+### BASE-F48 Cerrar sesión
 <!-- origen: old-hub:HUB_SHELL-F10 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -879,7 +1146,7 @@ Sale: la sesión cerrada en el negocio.
 Si falla: si el negocio no contesta, la sesión caduca sola.
 Implicados: ninguno
 
-### BASE-F39 Decidir si este dispositivo es compartido o personal
+### BASE-F49 Decidir si este dispositivo es compartido o personal
 <!-- origen: old-hub:HUB_SHELL-F11 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -898,9 +1165,9 @@ Si falla: quien no administra ve las opciones apagadas y «Solo un administrador
 en este dispositivo.». Un navegador en el que nunca se entró con la cuenta: «Este navegador todavía no es un
 dispositivo del negocio: entra una vez aquí con tu cuenta y podrás elegir.». Sin conexión: «No se pudo cambiar
 este dispositivo. Comprueba la conexión e inténtalo de nuevo.».
-Implicados: BASE-F32
+Implicados: BASE-F42
 
-### BASE-F40 Abrir un hub que todavía no está dado de alta
+### BASE-F50 Abrir un hub que todavía no está dado de alta
 <!-- origen: old-hub:HUB_SHELL-F12 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -915,7 +1182,7 @@ Si falla: una dirección que no es de ningún negocio no existe; un negocio dado
 disponible.».
 Implicados: ninguno
 
-### BASE-F41 Cambiar mis datos, foto, idioma y apariencia
+### BASE-F51 Cambiar mis datos, foto, idioma y apariencia
 <!-- origen: old-hub:HUB_SHELL-F21 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -940,7 +1207,7 @@ conexión y vuelve a intentarlo.» con «Reintentar». Al guardar: «No se pudo 
 preferencias. Comprueba la conexión e inténtalo de nuevo.».
 Implicados: ninguno
 
-### BASE-F42 Cambiar mi PIN desde Mi perfil
+### BASE-F52 Cambiar mi PIN desde Mi perfil
 <!-- origen: old-hub:HUB_SHELL-F22 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -958,15 +1225,15 @@ coinciden.»; fácil de adivinar: «Ese PIN es demasiado fácil de adivinar: evi
 secuencias (1234).»; ya lo usa otra persona: «Ese PIN ya lo tiene otra persona activa: elige otro.»; el actual no
 es: «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; treinta intentos en una hora:
 «Demasiados intentos de cambiar el PIN.» y los minutos que tiene que esperar.
-Implicados: BASE-F31
+Implicados: BASE-F41
 
-### BASE-F43 Elegir cuántos dígitos tiene el PIN del negocio
+### BASE-F53 Elegir cuántos dígitos tiene el PIN del negocio
 <!-- origen: old-hub:HUB_SHELL-F100 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
 Pasos:
-  1. Con el pinpad encendido (BASE-F44), bajo «Dígitos del PIN» elige «4 dígitos» o «6 dígitos».
+  1. Con el pinpad encendido (BASE-F54), bajo «Dígitos del PIN» elige «4 dígitos» o «6 dígitos».
   2. Se guarda al momento. Debajo: «Todo el mundo teclea el mismo número de dígitos, que es lo que permite que el
      teclado entre al último en vez de pedirte confirmar. Los PIN que ya se usan siguen funcionando hasta que su
      dueño los cambie.».
@@ -974,9 +1241,9 @@ Pasos:
 Entra: la elección.
 Sale: la longitud del PIN del negocio. No toca los PIN que ya hay.
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.».
-Implicados: BASE-F44
+Implicados: BASE-F54
 
-### BASE-F44 Decidir si se pide PIN en la caja y cuándo se vuelve a pedir
+### BASE-F54 Decidir si se pide PIN en la caja y cuándo se vuelve a pedir
 <!-- origen: old-hub:HUB_SHELL-F99 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -999,9 +1266,9 @@ vuelve a pedirlo por turno.
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.». Si no se puede leer: «No se pudo
 cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.». Quien no administra ve los
 controles apagados y «Solo un administrador puede cambiar si se pregunta.».
-Implicados: BASE-F32, BASE-F36
+Implicados: BASE-F42, BASE-F46
 
-### BASE-F45 Ver los dispositivos en los que se ha entrado
+### BASE-F55 Ver los dispositivos en los que se ha entrado
 <!-- origen: old-hub:HUB_SHELL-F101 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1019,9 +1286,9 @@ Sale: nada guardado.
 Si falla: quien no administra ve «Solo un administrador puede ver y quitar los dispositivos.», sin lista. Si no
 llega: «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.», nunca «Todavía no ha
 entrado nadie desde ningún dispositivo.», que es solo para una lista de verdad vacía.
-Implicados: BASE-F46, BASE-F47, BASE-F48
+Implicados: BASE-F56, BASE-F57, BASE-F58
 
-### BASE-F46 Ponerle nombre a un dispositivo
+### BASE-F56 Ponerle nombre a un dispositivo
 <!-- origen: old-hub:HUB_SHELL-F102 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1035,9 +1302,9 @@ Entra: el nombre.
 Sale: el nombre del dispositivo, el único dato de la fila que decide el negocio.
 Si falla: «No se pudo cambiar el nombre. Comprueba la conexión e inténtalo de nuevo.» o «Ese nombre es demasiado
 largo. Ponle uno más corto y vuelve a guardar.».
-Implicados: BASE-F45
+Implicados: BASE-F55
 
-### BASE-F47 Quitar un dispositivo que se ha perdido
+### BASE-F57 Quitar un dispositivo que se ha perdido
 <!-- origen: old-hub:HUB_SHELL-F103 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1054,9 +1321,9 @@ Sale: el dispositivo olvidado y sus sesiones cerradas: se corta el dispositivo, 
 entrar en él con su cuenta.
 Si falla: «No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.» o «Ese dispositivo ya
 no está registrado aquí. Actualiza la lista.»; nunca queda como hecho lo que se rechazó.
-Implicados: BASE-F35, BASE-F45
+Implicados: BASE-F45, BASE-F55
 
-### BASE-F48 Quitar de golpe los dispositivos que nadie usa
+### BASE-F58 Quitar de golpe los dispositivos que nadie usa
 <!-- origen: old-hub:HUB_SHELL-F104 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1069,9 +1336,9 @@ Pasos:
      él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.».
   3. Confirma con «Quitar».
 Entra: qué dispositivos lleva 30 días sin usar nadie.
-Sale: esos dispositivos olvidados, como BASE-F47.
+Sale: esos dispositivos olvidados, como BASE-F57.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
-Implicados: BASE-F47
+Implicados: BASE-F57
 
 ## Para quien lo mantiene
 
@@ -1146,6 +1413,28 @@ Implicados: BASE-F47
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
   `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
+- Plantillas y Ajustes › Datos (BASE-F29–F38, APP-BASE-2): `base/blueprint.py` (sin ORM) tiene el formato
+  `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
+  `data/<app>.<parte>.json`; 5 MB, 50 MB al descomprimir y 200 entradas como mucho; `BlueprintInvalid.reason`),
+  el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.template_apps(vertical)`) y las siete
+  partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
+  `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones
+  de su app (nunca su ORM; las filas se enlazan por nombre, gh:hub#2626). Lo que ya existe se salta.
+- Operaciones (permiso `base.administer_hub`, ruta en `base/api.py` bajo `/api/settings/data/`): consultas
+  `base.blueprint.list` (con `empty`, viva), `base.blueprint.export` (GET, el fichero en base64),
+  `base.import.list` (con `unfinished`, viva) y `base.dataset.list`; órdenes `base.blueprint.inspect` (no escribe;
+  orden porque su entrada es un fichero), `base.blueprint.import` (plantilla, fichero o `retry_of`),
+  `base.import.undo` y `base.hub.reset` (`dry_run` = el plan). Eventos `base.blueprint.imported`,
+  `base.import.undone` y `base.hub.data_reset`, tras los que se re-ejecutan las consultas vivas del Inicio.
+- `base.ImportBatch` (modelo de hub, migración `0009`) guarda cada importación: informe, filas creadas por parte
+  (lo que deshace), origen y versión de la plantilla (lo que reintenta).
+- Fase 1: los negocios comparten base de datos, así que `base.hub.reset` sin `dry_run` responde 409
+  `base.reset_shared_database` (`available: false` en el plan) y «vacío» mira las filas de todos.
+- Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
+  del viejo llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
+  no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
+  `test_services_data.py`, `test_queries_data.py`; Vitest en `base/frontend/**`; e2e `tests/e2e/base-data.spec.ts`
+  (vacía lo que trae una plantilla por las operaciones de cada app antes de empezar).
 
 - **Apps (APP-BASE-4: BASE-F14…F28).** `base/entitlement.py` aplica el derecho de uso (PLAN §20.4–§20.5): un
   módulo con `premium = False` siempre lo tiene; uno con `premium = True` necesita su id en `modules[]` de la última
@@ -1174,7 +1463,7 @@ Implicados: BASE-F47
 - Fase 1: no hay activación por negocio (`AppActivation`, `base.app.*`, 202 «Activando…», 409 `base.app_required`,
   el veto de VeriFactu): BASE-F18, F19 (su aviso), F21–F25 quedan `parcial` hasta la fase 2 (FIX-BASE-APP-TURN-OFF-VETO).
 
-- **Acceso (APP-BASE-3: BASE-F29…F48).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
+- **Acceso (APP-BASE-3: BASE-F39…F58).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),
   `Credential` (por `username`: `pin_hash` argon2id y `badge_digest` = HMAC-SHA256 del número con
@@ -1182,10 +1471,10 @@ Implicados: BASE-F47
   `pin_inactivity_minutes`, `pin_length` 4/6; un valor que esta versión no entiende se lee como el de fábrica,
   `base/access.py`) y `Profile` (nombre, correo de contacto, foto, idioma, apariencia). En control, `SessionOwner`
   anota además `device_id` y `credential` (`account`, `pin`, `badge`).
-- Entrar con la cuenta (BASE-F29, F30) es el canje de siempre (`/auth/callback`) más `services.trust_device` (la
+- Entrar con la cuenta (BASE-F39, F40) es el canje de siempre (`/auth/callback`) más `services.trust_device` (la
   cookie `hub_device`), la duración de la sesión por dispositivo y negocio (`access.session_lifetime`: 12 h
   compartido, 30 días personal, tope de 1 h con `always`) y `_end_other_devices`, que aplica `plan.max_devices` de
-  la foto (BASE-F34). El PIN y la placa son vistas de Django tras el CSRF, porque abren sesión (ninguna operación
+  la foto (BASE-F44). El PIN y la placa son vistas de Django tras el CSRF, porque abren sesión (ninguna operación
   lo hace): `POST /auth/pin {person, pin, next}` y `POST /auth/badge {badge, next}` (`base/auth_views.py`), en este
   orden: freno por dirección (`PIN_ADDRESS_LIMIT`, 20 en 15 min), dispositivo compartido de un negocio que pregunta
   (403 `base.device_not_trusted`, `base.pin_not_offered`), freno por persona (`PIN_PERSON_LIMIT`, 5 en 5 min; la
@@ -1230,6 +1519,8 @@ Implicados: BASE-F47
 - No inventa cifras: un panel o un paso que no se puede comprobar no sale o dice «No disponible».
 - No guarda el tablero en el servidor: es de cada dispositivo, como en el hub viejo.
 - No enseña nunca a un cliente los ejemplos de la app Demo.
+- Importar no trae personas, PIN, datos fiscales ni los ajustes del negocio; exportar no los lleva nunca, ni
+  archivos ni imágenes.
 - No tiene formulario de soporte propio: «Reportar un problema» abre el de erplora.com, que manda el aviso
   con la cuenta y el negocio; el hub no guarda nada.
 - No vende ni enseña importes: el precio y la compra de una app de pago son de la Tienda de erplora.com, y en la

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ae9cce6bcb0ff71bc71dc1c0283551a50b1bebe61851b1e0e671972f01c5d87b -->
+<!-- generated from WORKBOOK.md sha256:2cd9806d0371dd0aa3758eff21707ecd3a6bcb66c5ee17f7343ef39d9efccc85 -->
 
 ## What it is for and who it is for
 
@@ -11,6 +11,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
 - **The apps' panels**: figures, lists and charts that move by themselves when something changes in the
   business, without reloading.
 - **The activity**: the latest sales.
+- **Start with a template** of a business like theirs and, in "Settings", keep a copy of its data or load
+  another business's.
 
 Who uses it:
 
@@ -45,6 +47,8 @@ each person picks and orders of Lightspeed and Toast, and the bell with counters
 On top, the business's name and "Today" with the long date; while the business has no name, a greeting
 by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this order:
 
+- **"Start with a business like yours"**, only for who administers the business and while the business has
+  nothing a template brings: up to four templates with "Use this one", "See all templates" and "Not now".
 - **"My apps"**: one tile per app, with its icon and its name; the ones opened most in this browser,
   first. On a phone, with six apps or more, the first four and "View all apps".
 - **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
@@ -93,6 +97,19 @@ browser).
 From "System" in the side menu, the "Plan and limits" tab: "Your plan's limits" with "Within the limit" or
 "Close to the limit", the "People" and "Devices" cards and where plans are managed.
 
+### Settings · Data and backups
+From "Settings" in the side menu, the "Data and backups" tab at the bottom, after "General" (the old hub's
+other Settings tabs come with their flows). On top, a selector with "Import" (what opens), "Export" and "Reset";
+the one chosen stays in the link, so it can be shared and Back leaves Settings.
+
+- **Import**: "Choose what to load", with "Upload from file" and the templates as cards or as a list, with
+  "Search templates"; each with its language, its country, its version, what it brings and "Use template".
+  Then "Review what it brings" and the "Import report".
+- **Export**: the file's name and language, "What is this file for?", the apps with their "App" and "Data"
+  boxes, and "Export".
+- **Reset**: "Undo an import", with one row per import that can be undone, and "Reset the business", with
+  what each section has.
+
 ### Access
 The way in of a shared till, or of a device whose session another entry closed, with no menu or bar: the logo,
 "Enter your business", the notice of what happened if there is one and a card with two tabs, "PIN" (the faces,
@@ -111,8 +128,8 @@ From "Profile" in the user menu. At the top, the person (face, name and role); b
 photo), "Preferences" (language and appearance) and "PIN".
 
 ### Settings · General
-From "Settings" in the side menu. Today, a single section (the tabs at the bottom show once there are two): "This
-device", "PIN pad" and, for whoever runs the business, "Devices".
+What "Settings" in the side menu opens: the first tab at the bottom, "General", with "This device", "PIN pad"
+and, for whoever runs the business, "Devices".
 
 ### Your business is being prepared
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
@@ -125,6 +142,15 @@ The page that shows at the address of a business erplora.com is still preparing;
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell, "All caught up. No notifications."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
 | Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell, "Could not check the notifications. They will show up when the connection is back.". In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
 | No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". |
+
+On the Settings · Data and backups screen:
+
+| State | What the person sees |
+|---|---|
+| Loading | "Loading templates…"; in "Export" and "Reset", the rows in grey. |
+| Empty | "There are no templates for your business yet.", "No template matches your search.", "This business has no app on to export." and "There is nothing to reset: no section has data.". |
+| Error | "The templates could not be loaded right now. You can still import a file." with "Retry"; "The apps of this business could not be loaded." and "What each section has could not be worked out.", with "Retry". |
+| No permission | "Only an administrator can see and import templates.", "Only an administrator can export the business." and "Only an administrator can undo imports or reset the business."; the Home's templates card does not show. |
 
 ## Flows
 
@@ -158,26 +184,36 @@ The page that shows at the address of a business erplora.com is still preparing;
 | BASE-F26 | Understand why an app does not open | done |
 | BASE-F27 | See a paid app blocked | done |
 | BASE-F28 | See how much of the plan's limits is in use | partial |
-| BASE-F29 | Enter with the erplora.com account | done |
-| BASE-F30 | Enter from the erplora.com panel without typing the password again | done |
-| BASE-F31 | Choose the PIN the first time one enters a till | done |
-| BASE-F32 | Enter with a PIN | done |
-| BASE-F33 | Enter by passing the badge | done |
-| BASE-F34 | Lose the session because it was opened on another device | done |
-| BASE-F35 | The session ends while working | done |
-| BASE-F36 | Close the session of a till nobody touches | done |
-| BASE-F37 | Switch user without losing the sale | done |
-| BASE-F38 | Sign out | done |
-| BASE-F39 | Decide whether this device is shared or personal | done |
-| BASE-F40 | Open a hub that is not set up yet | done |
-| BASE-F41 | Change my details, photo, language and appearance | done |
-| BASE-F42 | Change my PIN from My profile | done |
-| BASE-F43 | Choose how many digits the business's PIN has | done |
-| BASE-F44 | Decide whether the till asks for a PIN and when it asks again | done |
-| BASE-F45 | See the devices someone has entered on | done |
-| BASE-F46 | Name a device | done |
-| BASE-F47 | Remove a device that was lost | done |
-| BASE-F48 | Remove at once the devices nobody uses | done |
+| BASE-F29 | Choose a template of the catalogue to import | done |
+| BASE-F30 | Upload a file to import | done |
+| BASE-F31 | Review and load what the file brings | done |
+| BASE-F32 | Read the import report | done |
+| BASE-F33 | Come back to the report of an import that did not go in whole and retry | done |
+| BASE-F34 | Undo an import | done |
+| BASE-F35 | Export a backup or a template | done |
+| BASE-F36 | Choose which apps, data and tables travel in the export | done |
+| BASE-F37 | Reset the business by sections | partial |
+| BASE-F38 | See the Home up to date after importing a template | done |
+| BASE-F39 | Enter with the erplora.com account | done |
+| BASE-F40 | Enter from the erplora.com panel without typing the password again | done |
+| BASE-F41 | Choose the PIN the first time one enters a till | done |
+| BASE-F42 | Enter with a PIN | done |
+| BASE-F43 | Enter by passing the badge | done |
+| BASE-F44 | Lose the session because it was opened on another device | done |
+| BASE-F45 | The session ends while working | done |
+| BASE-F46 | Close the session of a till nobody touches | done |
+| BASE-F47 | Switch user without losing the sale | done |
+| BASE-F48 | Sign out | done |
+| BASE-F49 | Decide whether this device is shared or personal | done |
+| BASE-F50 | Open a hub that is not set up yet | done |
+| BASE-F51 | Change my details, photo, language and appearance | done |
+| BASE-F52 | Change my PIN from My profile | done |
+| BASE-F53 | Choose how many digits the business's PIN has | done |
+| BASE-F54 | Decide whether the till asks for a PIN and when it asks again | done |
+| BASE-F55 | See the devices someone has entered on | done |
+| BASE-F56 | Name a device | done |
+| BASE-F57 | Remove a device that was lost | done |
+| BASE-F58 | Remove at once the devices nobody uses | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -205,14 +241,16 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28
 
 ### BASE-F02 See the business at a glance on coming in
-Status: partial — without the hub's health row (the printer and WhatsApp with "View system") nor the template proposal, which comes with the templates
+Status: partial — without the hub's health row (the printer and WhatsApp with "View system")
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
   1. After coming in, the Home opens (also from "Home" in the side menu).
   2. On top, the business's name (the one on erplora.com) and "Today" with the long date in the app's
      language; while the business has no name, "Good morning", "Good afternoon" or "Good evening".
-  3. Below, in this order: "My apps", "Finish setting up your business" and the board of panels.
+  3. Below, in this order: "Start with a business like yours" (only while the business is empty and for
+     who administers it, BASE-F38), "My apps", "Finish setting up your business" and the board of
+     panels.
   4. At the bottom, two tabs: "Summary" (the above) and "Activity".
 In: the business's name and the device's date.
 Out: nothing saved.
@@ -651,7 +689,217 @@ the hub does not know the plan: "We do not know this business's plan yet: it sho
 sends it.".
 Involved: none
 
-### BASE-F29 Enter with the erplora.com account
+### BASE-F29 Choose a template of the catalogue to import
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Import
+Steps:
+  1. Open "Settings" in the side menu; in "Data and backups", "Import" is what opens. It says "Load a
+     template: it fills your apps with its data — a menu, services, tables — ready to use." and, below,
+     "Choose what to load".
+  2. While they arrive, "Loading templates…". Then one card per template (or one row, in the list view):
+     its name, its description, its "Language" and its "Country" by name, its "Version" and what "It brings"
+     (how many categories, products, services, areas or tables). First those of the business's country and,
+     among them, those in the person's language.
+  3. "Search templates" searches by the name, the description or the apps it brings.
+  4. Tap "Use template" on the one that fits: the button spins while it is read and "Review what it brings"
+     opens (BASE-F31).
+In: the Hub's templates, one per sector and language (today restaurant and hair salon, in Spanish and in
+English).
+Out: nothing saved until it is loaded.
+If it fails: "The templates could not be loaded right now. You can still import a file." with "Retry";
+with no templates, "There are no templates for your business yet."; a search with no result, "No template
+matches your search."; if the template cannot be read, "The file could not be read: {reason}" and it stays
+on the choice. Who does not administer the business reads "Only an administrator can see and import
+templates.".
+Involved: INVENTORY-F12
+
+### BASE-F30 Upload a file to import
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Import
+Steps:
+  1. In "Import", tap "Upload from file" and choose a .blueprint.zip: a backup of this business or a
+     template another one exported.
+  2. While it is read, the button spins. Then "Review what it brings" opens (BASE-F31).
+  3. After an error the same file can be chosen again.
+In: the file, of 5 MB at most.
+Out: nothing saved until it is loaded.
+If it fails: "The file could not be read: {reason}" with the reason (it is not a .blueprint.zip, it is
+damaged, a newer version of ERPlora made it or it is larger than 5 MB) and it stays on the choice.
+Involved: none
+
+### BASE-F31 Review and load what the file brings
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Import
+Steps:
+  1. After choosing a template or a file, "Review what it brings" shows: "Name", "Type" ("Template" or
+     "Backup"), "Language" and "Country" by name, how many "Apps" and, for a file, when it was made
+     ("Created").
+  2. Below, one box per app with what it brings (each part and its rows). The ones on in the business come ticked;
+     an app that is off says "This app is off in your business: nothing of it will load." and one this
+     business does not have, "This business does not have this app: nothing of it will load.". A template's
+     customers stay out: "Personal data: it loads only from a backup.". What the Hub never loads (people,
+     PINs, fiscal data) shows in "Never loaded here".
+  3. Untick the apps not wanted and tap "Import" ("Importing…"), or "Choose another" to go back.
+  4. When it ends, the report shows (BASE-F32). What the business already had stays as it was: nothing is
+     duplicated nor overwritten.
+In: the template or the file and the apps ticked.
+Out: in each app ticked, what it brings and was missing, added as if it were added by hand in that app (its
+categories, products, services, areas, tables and, from a backup, customers), and the report kept
+(`base.blueprint.imported`).
+If it fails: "The import failed: {reason}" and it stays on the review; with no app ticked, "Choose at least
+one app." and it cannot be imported; if none of its apps is on, "Nothing of this file can load in your
+business: none of its apps is on.".
+Involved: INVENTORY-F12
+
+### BASE-F32 Read the import report
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Import
+Steps:
+  1. When it ends, "Import report" with how it went: "Everything went in.", "Not everything went in." or
+     "Nothing went in.".
+  2. One row per app with its label: "Applied", "You had it already", "Applied in part", "Failed", "Nothing
+     to copy", "Left out", "App off", "Not in this business" or "Not chosen". Below, for each part, "{created}
+     created · {already} already there · {failed} failed" and, of what failed, its name and the reason.
+  3. What was left out on purpose shows in "Left out on purpose".
+  4. "See the templates" goes back to the catalogue; "Go to Home" leads to the Home.
+In: the import's report.
+Out: nothing; the report stays kept in the business.
+If it fails: a label the screen does not know shows as "Failed" with its own text, never as a success.
+Involved: none
+
+### BASE-F33 Come back to the report of an import that did not go in whole and retry
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Import
+Steps:
+  1. On opening "Import", if the last import did not go in whole and was not undone, its report shows first,
+     with "This is the report of your last import of {name} ({date}). Not everything went in.".
+  2. If it came from a template, tap "Retry what is missing" ("Retrying…"): the same version of the template
+     is loaded again and only what was missing goes in; what already went in is neither touched nor
+     duplicated. The new report shows.
+  3. If it came from a file uploaded by hand, the button shows off with "This import came from a file
+     uploaded by hand, so it cannot be retried by itself. Upload the file again and choose only what
+     failed."; if that version of the template is gone, with "The version of the template this import used
+     is no longer in the catalogue, so it was not retried: another version could load different data.".
+  4. "See the templates" leaves that report and opens the catalogue.
+In: the last import and its report.
+Out: what was missing, if it goes in now, and the new report (`base.blueprint.imported`).
+If it fails: "The retry failed: {reason}" and the report stays in sight.
+Involved: none
+
+### BASE-F34 Undo an import
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Reset
+Steps:
+  1. In "Reset", "Undo an import" ("Removes only what that import brought. What you created afterwards
+     stays."): one row per import that brought something and was not undone, with its name, when, who and
+     how many rows it brought, and "Undo".
+  2. Tap "Undo": "Undo «{name}»", with "The {n} rows this import brought will be removed. What you created
+     afterwards stays.". It asks to type nothing: it can be imported again.
+  3. Confirm with "Undo" (or "Cancel").
+  4. "Import undone:" shows with one line per app ("{app} — {n} rows removed"); what could not be removed
+     (something another app still uses) shows apart with its reason. What each section has gets up to date.
+In: the import chosen.
+Out: exactly the rows it brought removed; what was created afterwards stays (`base.import.undone`).
+If it fails: the reason shows in the dialog itself, which does not close (the old hub said nothing); an
+import already undone, "This load was undone already.".
+Involved: none
+
+### BASE-F35 Export a backup or a template
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Export
+Steps:
+  1. Open "Export": "Packs this business's apps — and, if you want, their data — into a file you can load in
+     another business or keep as a backup.".
+  2. Write the "Name" (the business's comes in; without one, its address's) and choose the "Language"; below,
+     the file's final name ("File: {file}").
+  3. Answer "What is this file for?": "Backup of this business" (the one ticked; it takes the customers too)
+     or "Template to share" (it never takes customers).
+  4. Choose the apps and their data (BASE-F36) and tap "Export" ("Exporting…").
+  5. The file downloads with the browser and "{file} downloaded." shows.
+In: the name, the language, what it is for and what is ticked.
+Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows; never people,
+PINs nor fiscal data. Nothing is kept in the business.
+If it fails: "The export failed: {reason}"; without a name, "Write a name for the file." and it cannot be
+exported. Who does not administer the business reads "Only an administrator can export the business.".
+Involved: none
+
+### BASE-F36 Choose which apps, data and tables travel in the export
+Status: done
+Actor: owner, administrator
+Screen: Settings · Data and backups › Export
+Steps:
+  1. In "Export", under "Apps" ("Choose which apps the file registers and whether their data travels with
+     it."), one row per app on with two boxes, "App" and "Data". They all come with the app ticked and no
+     data; an app with nothing of its own says "Nothing of its own to copy".
+  2. Unticking the app unticks its data. "Select all" ticks every app and its data; "Deselect all" unticks
+     them all.
+  3. Ticking an app's "Data" shows "Data of {app}" below, with one box per part and its rows;
+     unticking one leaves it out. In a template the customers cannot be ticked: "Only in a backup".
+  4. While no part of an app is unticked, all of it travels, also what that app brings later on.
+In: the apps on and how many rows each part has.
+Out: nothing saved; what is ticked travels on export.
+If it fails: "The apps of this business could not be loaded." with "Retry"; with no app ticked it cannot
+be exported.
+Involved: none
+
+### BASE-F37 Reset the business by sections
+Status: partial — while the business shares its database with other businesses it cannot be emptied: the screen says so and offers no button; it will be possible once each business has its own
+Actor: owner, administrator
+Screen: Settings · Data and backups › Reset
+Steps:
+  1. In "Reset", "Reset the business": "Removes for good the data you mark. It cannot be undone: if in
+     doubt, export a copy first.", with "Export a copy first", which opens "Export".
+  2. It says what is never removed: "Only what each section lists here is removed. Sales, invoices, fiscal
+     records, people and their access, files and the business's settings always stay.".
+  3. One row per section (an app) that has something, with what it has (each part and its rows) and its total.
+  4. With its own database, tick the sections and tap "Reset the business": "This cannot be undone", with
+     "{n} rows will be removed for good:" and the breakdown. Type the business's name ("Type «{name}» to
+     confirm") and tap "Remove for good" (or "Cancel").
+  5. "Business reset:" shows with one line per section ("{app} — {n} rows removed") and the list is worked
+     out again.
+  6. Today, with the shared database, "Resetting the business is not available yet. Undo an import instead, or
+     remove what you want from each app." shows, with no boxes nor button.
+In: what each section has and what is ticked.
+Out: what is ticked, removed for good (`base.hub.data_reset`).
+If it fails: the reason shows in the dialog, which does not close: a name that is not the business's, "The
+name does not match.". Who does not administer the business reads "Only an administrator can undo imports
+or reset the business.".
+Involved: none
+
+### BASE-F38 See the Home up to date after importing a template
+Status: done
+Actor: owner, administrator
+Screen: Home · Summary
+Steps:
+  1. While the business has nothing a template brings, who administers it sees on top "Start with a business
+     like yours" ("Choose the one most like yours and we leave your apps ready with its catalogue in one go.
+     Then put in your own details."): up to four templates, one per kind of business and in their language when
+     there is one (those of its country first), with their description and "Use this one"; "See all templates" opens "Data and backups" and "Not now"
+     closes the card on this device.
+  2. Tap "Use this one": "Preparing «{name}»…" while it loads, with no screens in between.
+  3. In the same card, "Your apps and your catalogue are ready" ("What is left only you can answer: your
+     business's details. They are in the list below.") with "Continue", which closes it.
+  4. Without reloading, the Home gets up to date: "Finish setting up your business" counts as done the steps
+     the template solved and the panels refresh. The same after loading a template or a file from "Data and
+     backups".
+In: the templates and whether the business is still empty.
+Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`).
+If it fails: if not everything went in, "Not everything went in" with "These did not go in: {apps}." (or
+"Something else did not go in.") and "See the report"; if it could not be opened, "That template could not
+be opened" with "Nothing has changed in your business: {reason}" and "Try again"; if it was cut halfway,
+"The setup did not finish" with "Part of it may be in already. Check it in Settings › Data before trying
+again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with
+could not be loaded." with "Retry" and "Not now".
+Involved: BASE-F01, INVENTORY-F12
+
+### BASE-F39 Enter with the erplora.com account
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -662,7 +910,7 @@ Steps:
   2. At erplora.com they sign in as always: email and password, Google or their verification code.
   3. They come back to the business already in, on the screen they had asked for or on **Home**. If this
      device asks for a PIN, the business already enters its tills with a PIN and the person has none yet, it
-     first asks them to choose it (BASE-F31).
+     first asks them to choose it (BASE-F41).
 In: the account erplora.com checks; this browser.
 Out: the person's session in this business and this browser turned into a trusted device of the business (it
 shows in "Devices", shared until someone says otherwise). The session lasts a 12-hour shift on a shared device,
@@ -671,7 +919,7 @@ If it fails: erplora.com says why they do not get in (credentials, verification,
 hub"); the business keeps nothing until it comes back with the person identified.
 Involved: BASE-F13
 
-### BASE-F30 Enter from the erplora.com panel without typing the password again
+### BASE-F40 Enter from the erplora.com panel without typing the password again
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -679,22 +927,22 @@ Steps:
   1. At erplora.com, with the session open, they tap enter their business.
   2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
 In: the one-time pass erplora.com gives.
-Out: the same as BASE-F29: the session and this browser as a trusted device of the business, so it then offers
+Out: the same as BASE-F39: the session and this browser as a trusted device of the business, so it then offers
 the PIN pad, shows in "Devices" and its mode can be changed.
 If it fails: an expired or already used pass opens nothing: the business asks for erplora.com's sign-in again.
-Involved: BASE-F29
+Involved: BASE-F39
 
-### BASE-F31 Choose the PIN the first time one enters a till
+### BASE-F41 Choose the PIN the first time one enters a till
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Create your PIN
 Steps:
-  1. After entering with the account (BASE-F29) on a shared device of a business that asks for a PIN, where
+  1. After entering with the account (BASE-F39) on a shared device of a business that asks for a PIN, where
      someone else already enters with theirs, and if the person has no PIN yet, "Create your PIN" shows — "With
      it you will enter this till without your password.".
   2. They type the PIN on the keypad of circles: "Choose a {n}-digit PIN" (4 or 6, whatever the business says).
   3. They repeat it: "Confirm your PIN". Once it matches it is saved and they go where they were going.
-  4. "Not now" leaves it for later: they enter all the same and can choose it in **My profile** (BASE-F42).
+  4. "Not now" leaves it for later: they enter all the same and can choose it in **My profile** (BASE-F52).
 In: the session just opened; the business's PIN digits.
 Out: the person's PIN, stored encrypted; their face shows in "Switch user" at once and on the PIN pad of
 **Access** within a minute.
@@ -703,9 +951,9 @@ Repeated or consecutive digits: "That PIN is too easy to guess: avoid repeated d
 Someone else already uses it: "Another active person already has that PIN: choose a different one.". Without a
 connection: "Could not save the PIN. Try again.". A business in which nobody has a PIN does not ask for it on
 entering: the first one is chosen in **My profile**.
-Involved: BASE-F29, BASE-F42
+Involved: BASE-F39, BASE-F52
 
-### BASE-F32 Enter with a PIN
+### BASE-F42 Enter with a PIN
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -728,9 +976,9 @@ which nobody ever entered with an account, or that an administrator removed: "Th
 PIN yet. Sign in once here with your account and from then on it will.". Without a connection, "Could not enter.
 Check the connection and try again."; if who works here cannot be read, "Could not load the PIN pad. You can
 still enter with your account.".
-Involved: BASE-F31, BASE-F44
+Involved: BASE-F41, BASE-F54
 
-### BASE-F33 Enter by passing the badge
+### BASE-F43 Enter by passing the badge
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -741,12 +989,12 @@ Steps:
   3. They come in as the card's owner.
 In: the number the reader reads. It is only listened to on the "PIN" tab of a device that offers the PIN pad and
 in **Switch user**; on "Account" or while the PIN is being chosen, it is not.
-Out: the same as BASE-F32.
+Out: the same as BASE-F42.
 If it fails: a card that is nobody's or whose owner is gone: "That badge opens nothing here. Enter with your PIN
 or ask an administrator."; it counts as a failed attempt. The PIN pad stays available.
-Involved: BASE-F32
+Involved: BASE-F42
 
-### BASE-F34 Lose the session because it was opened on another device
+### BASE-F44 Lose the session because it was opened on another device
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -763,7 +1011,7 @@ Out: the sessions of the devices left over, ended, and the reason kept on each o
 If it fails: with no limit in the plan nothing ends.
 Involved: BASE-F11
 
-### BASE-F35 The session ends while working
+### BASE-F45 The session ends while working
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -778,9 +1026,9 @@ Steps:
 In: the session that no longer exists.
 Out: nothing saved; the half-made sale is kept by its app.
 If it fails: without a network, the screen does not take the session as ended.
-Involved: BASE-F13, BASE-F47
+Involved: BASE-F13, BASE-F57
 
-### BASE-F36 Close the session of a till nobody touches
+### BASE-F46 Close the session of a till nobody touches
 Status: done
 Actor: system
 Screen: Access
@@ -793,9 +1041,9 @@ In: the business's minutes, which come with the page itself (there is no separat
 Out: the session closed in the business. The open check is kept by its app.
 If it fails: with "Until signing out", on a personal device or where no PIN is asked nothing closes; even if the
 screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour.
-Involved: BASE-F44
+Involved: BASE-F54
 
-### BASE-F37 Switch user without losing the sale
+### BASE-F47 Switch user without losing the sale
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Switch user
@@ -816,9 +1064,9 @@ If it fails: wrong PIN: "Wrong PIN." and whoever was in stays in. Too many attem
 and the minutes they have to wait. Nobody with a PIN: "Nobody here has a PIN yet: give one in My profile or in
 Employees.". Without being able to read who works here: "Could not load who works here. Check the connection and
 try again.".
-Involved: BASE-F32, BASE-F33
+Involved: BASE-F42, BASE-F43
 
-### BASE-F38 Sign out
+### BASE-F48 Sign out
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
@@ -832,7 +1080,7 @@ Out: the session closed in the business.
 If it fails: if the business does not answer, the session expires by itself.
 Involved: none
 
-### BASE-F39 Decide whether this device is shared or personal
+### BASE-F49 Decide whether this device is shared or personal
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -850,9 +1098,9 @@ If it fails: whoever does not run the business sees the options off and "Only an
 people enter on this device.". A browser in which nobody ever entered with the account: "This browser is not a
 device of the business yet: enter once here with your account and you will be able to choose.". Without a
 connection: "Could not change this device. Check the connection and try again.".
-Involved: BASE-F32
+Involved: BASE-F42
 
-### BASE-F40 Open a hub that is not set up yet
+### BASE-F50 Open a hub that is not set up yet
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
@@ -866,7 +1114,7 @@ If it fails: an address that belongs to no business does not exist; a business t
 is no longer available.".
 Involved: none
 
-### BASE-F41 Change my details, photo, language and appearance
+### BASE-F51 Change my details, photo, language and appearance
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -890,7 +1138,7 @@ save the photo. Use a JPG, PNG or WebP of up to 2 MB."; preferences: "Could not 
 connection and try again.".
 Involved: none
 
-### BASE-F42 Change my PIN from My profile
+### BASE-F52 Change my PIN from My profile
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -906,14 +1154,14 @@ match."; easy to guess: "That PIN is too easy to guess: avoid repeated digits (1
 else already uses it: "Another active person already has that PIN: choose a different one."; the current one is
 not it: "That is not your current PIN. Type it right to set a new one."; thirty tries in an hour: "Too many tries
 to change the PIN." and the minutes they have to wait.
-Involved: BASE-F31
+Involved: BASE-F41
 
-### BASE-F43 Choose how many digits the business's PIN has
+### BASE-F53 Choose how many digits the business's PIN has
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
 Steps:
-  1. With the PIN pad on (BASE-F44), under "PIN digits" they choose "4 digits" or "6 digits".
+  1. With the PIN pad on (BASE-F54), under "PIN digits" they choose "4 digits" or "6 digits".
   2. It is saved at once. Below: "Everyone types the same number of digits, which is what lets the keypad enter
      at the last one instead of asking you to confirm. The PINs in use keep working until their owner changes
      them.".
@@ -921,9 +1169,9 @@ Steps:
 In: the choice.
 Out: the length of the business's PIN. It does not touch the PINs there are.
 If it fails: "Could not change it. Check the connection and try again.".
-Involved: BASE-F44
+Involved: BASE-F54
 
-### BASE-F44 Decide whether the till asks for a PIN and when it asks again
+### BASE-F54 Decide whether the till asks for a PIN and when it asks again
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -944,9 +1192,9 @@ back to asking per shift.
 If it fails: "Could not change it. Check the connection and try again.". If it cannot be read: "Could not load
 how the business asks for the PIN. Check the connection and try again.". Whoever does not run the business sees
 the controls off and "Only an administrator can change whether it asks.".
-Involved: BASE-F32, BASE-F36
+Involved: BASE-F42, BASE-F46
 
-### BASE-F45 See the devices someone has entered on
+### BASE-F55 See the devices someone has entered on
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -963,9 +1211,9 @@ Out: nothing saved.
 If it fails: whoever does not run the business sees "Only an administrator can see and remove the devices.",
 with no list. If it does not arrive: "Could not load the devices. Check the connection and try again.", never
 "Nobody has entered from any device yet.", which is only for a truly empty list.
-Involved: BASE-F46, BASE-F47, BASE-F48
+Involved: BASE-F56, BASE-F57, BASE-F58
 
-### BASE-F46 Name a device
+### BASE-F56 Name a device
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -977,9 +1225,9 @@ In: the name.
 Out: the device's name, the only detail of the row the business decides.
 If it fails: "Could not change the name. Check the connection and try again." or "That name is too long. Give it
 a shorter one and save again.".
-Involved: BASE-F45
+Involved: BASE-F55
 
-### BASE-F47 Remove a device that was lost
+### BASE-F57 Remove a device that was lost
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -995,9 +1243,9 @@ Out: the device forgotten and its sessions ended: the device is cut off, not the
 again with their account.
 If it fails: "Could not remove this device. Check the connection and try again." or "That device is no longer
 registered here. Refresh the list."; what was refused never stays as done.
-Involved: BASE-F35, BASE-F45
+Involved: BASE-F45, BASE-F55
 
-### BASE-F48 Remove at once the devices nobody uses
+### BASE-F58 Remove at once the devices nobody uses
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1009,6 +1257,6 @@ Steps:
      account. Those used in the last 30 days and the one you are using stay.".
   3. They confirm with "Remove".
 In: which devices nobody has used for 30 days.
-Out: those devices forgotten, as in BASE-F47.
+Out: those devices forgotten, as in BASE-F57.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
-Involved: BASE-F47
+Involved: BASE-F57

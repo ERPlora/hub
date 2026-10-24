@@ -1,7 +1,8 @@
 // Routes → pages of base, and nothing else: the Home at `/` (PLAN-HUB round 2026-10-21, the old hub's
-// dashboard), registered before the shell's grid, so it wins `/`; named apart from it (`home`), because a
-// second route with the same name would replace the first. Then each part's block. Types only: `main.ts` globs this
-// file eagerly.
+// dashboard), Apps and System (APP-BASE-4), the way in (APP-BASE-3) and Settings at `/settings` (its tab in the hash:
+// General, or `#data`; APP-BASE-3 and APP-BASE-2). The Home is registered before the shell's grid, so it wins `/`;
+// named apart from it (`home`), because a second route with the same name would replace the first. Types only:
+// `main.ts` globs this file eagerly.
 import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
@@ -55,14 +56,17 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/ProfilePage.vue'),
     meta: { auth: true },
   },
-  // Settings › General: this device, the PIN pad and the devices (BASE-G62…G66, G72, G151); the other tabs come with
-  // their parts.
+  // ── Settings: General (APP-BASE-3) and Data (APP-BASE-2) ──
+  // Its tab in the hash: General (this device, the PIN pad and the devices: BASE-G62…G66, G72, G151) or `#data`;
+  // the old hub's `/import` and `/export` pages land on Settings › Data.
   {
     path: '/settings',
     name: 'base-settings',
     component: () => import('./pages/SettingsPage.vue'),
     meta: { auth: true },
   },
+  { path: '/import', redirect: { path: '/settings', hash: '#data' } },
+  { path: '/export', redirect: { path: '/settings', query: { data: 'export' }, hash: '#data' } },
 ];
 
 export default routes;
