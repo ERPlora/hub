@@ -2498,6 +2498,8 @@ def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
     with translation.override(ctx.language):
         screens = {
             "/": pgettext("base", "Home"),
+            # In everybody's menu since APP-BASE-5.
+            "/employees": pgettext("base", "Employees"),
             "/apps": pgettext("base", "Apps"),
             "/settings": pgettext("base", "Settings"),
             "/profile": pgettext("base", "My profile"),

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ef1f799dd07e6df159f98e635794885822703dd197877c85187cd57802a87333 -->
+<!-- generated from WORKBOOK.md sha256:db143d23966e8d46c1e820909ca2dc4b9990200f0dbcd241aea2935216bc2283 -->
 
 ## What it is for and who it is for
 
@@ -2144,8 +2144,8 @@ Screen: Assistant
 Steps:
   1. If the answer names a screen of this business, "Go to …" with its name shows under the bubble (up to four,
      without repeating) and the mention itself can be tapped.
-  2. It can lead to Home, Apps, Settings, My profile, Files (for whoever sees them), System (for whoever runs the
-     business) and the screens in the menu of each app that is on.
+  2. It can lead to Home, Employees, Apps, Settings, My profile, Files (for whoever sees them), System (for whoever
+     runs the business) and the screens in the menu of each app that is on.
   3. The button uses the name the person sees in the menu ("Go to Settings", "Go to Home" and, for an app, its name
      and the screen's), never the address.
   4. Tapping it opens that screen and the panel closes so it can be seen.

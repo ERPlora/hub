@@ -1682,6 +1682,11 @@ msgstr "Archivos"
 
 #: base/services.py
 msgctxt "base"
+msgid "Employees"
+msgstr "Empleados"
+
+#: base/services.py
+msgctxt "base"
 msgid "System"
 msgstr "Sistema"
 

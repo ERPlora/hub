@@ -2259,8 +2259,8 @@ Pantalla: Asistente
 Pasos:
   1. Si la respuesta nombra una pantalla de este negocio, bajo la burbuja sale «Ir a …» con su nombre (hasta cuatro,
      sin repetir) y la propia mención se puede pulsar.
-  2. Puede llevar al Inicio, a Apps, a Ajustes, a Mi perfil, a Archivos (a quien los ve), a Sistema (a quien
-     administra) y a las pantallas del menú de cada app encendida.
+  2. Puede llevar al Inicio, a Empleados, a Apps, a Ajustes, a Mi perfil, a Archivos (a quien los ve), a Sistema (a
+     quien administra) y a las pantallas del menú de cada app encendida.
   3. El botón usa el nombre que la persona ve en el menú («Ir a Ajustes», «Ir a Inicio» y, para una app, su nombre y
      el de la pantalla), nunca la dirección.
   4. Al pulsarlo se abre esa pantalla y el panel se cierra para que se vea.

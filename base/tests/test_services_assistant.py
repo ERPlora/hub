@@ -302,6 +302,11 @@ def test_the_files_screen_is_linked_to_who_sees_the_files():
     assert "/files" not in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]
 
 
+
+def test_the_employees_screen_is_linked_as_the_menu_shows_it():
+    """APP-BASE-5 (BASE-F77…F91): «Employees» is in everybody's menu, so the assistant may link it to everybody."""
+    assert "[Empleados](/employees)" in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]
+
 # ── What waits on erplora.com holds no transaction meanwhile (BASE-G122, G123, G112; rv-hub-247) ──────────────────
 
 GATEWAY_CALLS = [
