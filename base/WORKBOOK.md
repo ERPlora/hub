@@ -79,8 +79,9 @@ La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método»,
 Se abre también con el enlace del Inicio terminado en `#actividad`.
 
 ### La campana
-Arriba a la derecha, después de «Mis apps». Su número suma los avisos pendientes; al tocarla, una fila
-por aviso («Eventos caídos (2)») que lleva a su pantalla. Sin nada: «Todo al día. Sin notificaciones.».
+Arriba a la derecha, después de «Mis apps» y de los destellos del asistente; en un móvil, las dos van dentro de
+«Más opciones», que lleva su número. Su número suma los avisos pendientes; al tocarla, una fila por aviso («Eventos
+caídos (2)») que lleva a su pantalla. Sin nada: «Todo al día. Sin notificaciones.».
 
 ### «Actualizar plan»
 Al pie del menú lateral, entre el código QR y la marca. Abre la página del plan de este negocio en
@@ -178,13 +179,13 @@ Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
 
 ### Asistente
-El panel que se abre con los destellos «Asistente» de la barra de arriba, a la derecha. En una tableta o un ordenador
-se queda al lado de la pantalla y la empuja, así que se sigue trabajando con él abierto; en un móvil la tapa, sobre un
-velo oscuro. Arriba, «Asistente», «Nueva conversación» cuando ya hay una y la × «Cerrar». En medio, la conversación:
-vacía, los destellos, la frase de bienvenida y los atajos de la puesta en marcha; luego, los mensajes, cada respuesta
-con sus botones «Ir a …», sus avisos y los recibos de lo que se hizo. Abajo, los avisos del pie (sin conexión, los
-mensajes que quedan este mes, un plan sin asistente) y el cuadro «Escribe un mensaje…» con «Adjuntar archivo», «Dictar
-por voz» y «Enviar».
+El panel que se abre con los destellos «Asistente» de la barra de arriba (en un móvil, dentro de «Más opciones»), a la
+derecha. En una tableta o un ordenador se queda al lado de la pantalla y la empuja, así que se sigue trabajando con él
+abierto; en un móvil la tapa, sobre un velo oscuro. Arriba, «Asistente», «Nueva conversación» cuando ya hay una y la ×
+«Cerrar». En medio, la conversación: vacía, los destellos, la frase de bienvenida y los atajos de la puesta en marcha;
+luego, los mensajes, cada respuesta con sus botones «Ir a …», sus avisos y los recibos de lo que se hizo. Abajo, los
+avisos del pie (sin conexión, los mensajes que quedan este mes, un plan sin asistente) y el cuadro «Escribe un
+mensaje…» con «Adjuntar archivo», «Dictar por voz» y «Enviar».
 
 ### Tarjeta de confirmación del asistente
 Sale encima de todo, también con el panel cerrado, cuando el asistente quiere cambiar algo: «¿Ejecutar esta acción?»,
@@ -1693,7 +1694,8 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
-     pulsarlos lo cierra.
+     pulsarlos lo cierra. En un móvil, los destellos y la campana van juntos en «Más opciones» (con el número de la
+     campana), para que el título siga centrado: ahí, «Asistente» abre el panel y «Notificaciones», la campana.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima

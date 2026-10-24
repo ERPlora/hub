@@ -7,7 +7,7 @@
 // flow: BASE-F02 BASE-F01 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, clearItems, hostPage, shot, shown, uniqueName, untilStill } from './helpers';
+import { A, api, bellBadge, clearItems, hostPage, openBell, shot, shown, uniqueName, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -125,9 +125,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
     // BASE-F10 — the bell (base.bell.counters): the demo's «Open demo items» counter once there is one open.
     await api(context, A, 'POST', '/demo/items', { name: uniqueName('Bell') });
-    const bell = testid(page, 'hub-bell');
-    await expect(bell.locator('[data-testid="hub-bell-badge"]')).toHaveText('1');
-    await bell.click();
+    await expect(bellBadge(page)).toHaveText('1');
+    await openBell(page);
     const rows = page.locator('ion-popover [data-testid="hub-bell-row"]');
     await expect(rows).toHaveCount(1);
     await snap(page, 'BASE-F10', width);

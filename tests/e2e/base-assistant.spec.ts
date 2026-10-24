@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider } from './assistant-provider';
-import { A, api, EMPLOYEE, login, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, compactBar, EMPLOYEE, login, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = [
@@ -78,14 +78,19 @@ async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
   await expect(card(page)).toBeHidden();
 }
 
+/** The topbar's way to the assistant: the sparkles, or on a phone «More options» (the sparkles folded with the bell). */
+const opener = (page: Page): Locator =>
+  shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
+
 async function home(page: Page): Promise<void> {
   await page.goto(`${A}/`);
-  await expect(shown(page).locator('[data-testid="assistant-button"]')).toBeVisible();
+  await expect(opener(page)).toBeVisible();
 }
 
 async function openPanel(page: Page): Promise<void> {
   if ((await panel(page).getAttribute('data-open')) !== 'true') {
-    await shown(page).locator('[data-testid="assistant-button"]').click();
+    await opener(page).click();
+    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
   }
   await expect(panel(page)).toHaveAttribute('data-open', 'true');
   await expect(box(page)).toBeVisible();
@@ -125,11 +130,23 @@ test.use({
   permissions: ['microphone'],
 });
 
-test('BASE-G110 — the sparkles open the panel on the right: docked from 768 px, over the screen on a phone; Escape, × and the veil close it; it stays open across screens and reloads', async ({ page }) => {
+test('BASE-G110 — the sparkles open the panel on the right (on a phone, from «More options»): docked from 768 px, over the screen on a phone; Escape, × and the veil close it; it stays open across screens and reloads', async ({ page }) => {
   await login(page, A, '/');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await home(page);
+    if (vp.width < 768) {
+      // As in the old hub: the sparkles and the bell folded into one «More options», so the title stays centred.
+      await expect(shown(page).locator('[data-testid="assistant-button"]')).toHaveCount(0);
+      await expect(shown(page).locator('[data-testid="hub-bell"]')).toHaveCount(0);
+      await opener(page).click();
+      await expect(page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]')).toHaveText('Assistant');
+      await expect(page.locator('ion-popover [data-testid="topbar-chrome-more-bell"] ion-label')).toHaveText('Notifications');
+      await untilStill(page);
+      await page.screenshot({ path: shot(`APP-BASE-9-BASE-G110-more-${vp.label}`) });
+      await page.keyboard.press('Escape');
+      await expect(page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]')).toHaveCount(0);
+    }
     await openPanel(page);
     await expect(panel(page)).toContainText('Ask me about your sales, your stock or anything about your business.');
     await expect(panel(page).locator('[data-testid="assistant-shortcut"]').first()).toHaveText('What is left to set up?');

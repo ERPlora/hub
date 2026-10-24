@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4d71a9db60f232972742287245a3985f7326ebf8659071add6d233e872f47ddc -->
+<!-- generated from WORKBOOK.md sha256:c2680fd777b9b43b5fc40c12714a0a817b63ac69fb5246eac15c4aca86dcc0da -->
 
 ## What it is for and who it is for
 
@@ -67,8 +67,9 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 also opens with the Home's link ending in `#actividad`.
 
 ### The bell
-At the top right, after "My apps". Its number adds up the pending notices; tapped, one row per notice
-("Failed events (2)") that leads to its screen. With nothing: "All caught up. No notifications.".
+At the top right, after "My apps" and the assistant's sparkles; on a phone, both go inside "More options", which
+carries its number. Its number adds up the pending notices; tapped, one row per notice ("Failed events (2)") that
+leads to its screen. With nothing: "All caught up. No notifications.".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and the brand. It opens this business's plan page on
@@ -164,13 +165,13 @@ and, for whoever runs the business, "Devices".
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
 ### Assistant
-The panel the "Assistant" sparkles of the top bar open, on the right. On a tablet or a computer it stays beside the
-screen and pushes it, so they keep working with it open; on a phone it covers it, over a dark veil. At the top,
-"Assistant", "New conversation" once there is one and the "Close" ×. In the middle, the conversation: empty, the
-sparkles, the welcome sentence and the setup's shortcuts; then, the messages, each answer with its "Go to …"
-buttons, its notices and the receipts of what was done. At the bottom, the foot's notices (no connection, the
-messages left this month, a plan without the assistant) and the "Write a message…" box with "Attach a file",
-"Dictate by voice" and "Send".
+The panel the "Assistant" sparkles of the top bar open (on a phone, inside "More options"), on the right. On a tablet
+or a computer it stays beside the screen and pushes it, so they keep working with it open; on a phone it covers it,
+over a dark veil. At the top, "Assistant", "New conversation" once there is one and the "Close" ×. In the middle, the
+conversation: empty, the sparkles, the welcome sentence and the setup's shortcuts; then, the messages, each answer
+with its "Go to …" buttons, its notices and the receipts of what was done. At the bottom, the foot's notices (no
+connection, the messages left this month, a plan without the assistant) and the "Write a message…" box with "Attach a
+file", "Dictate by voice" and "Send".
 
 ### Assistant confirmation card
 It shows over everything, also with the panel closed, when the assistant wants to change something: "Run this
@@ -1603,7 +1604,8 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it.
+     closes it. On a phone, the sparkles and the bell go together in "More options" (with the bell's number), so the
+     title stays centred: there, "Assistant" opens the panel and "Notifications", the bell.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the

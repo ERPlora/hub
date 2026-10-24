@@ -2,7 +2,8 @@
 // The bell at the end of the topbar (BASE-G137; the old hub's, hub#1678): `base.bell.counters`, live — a write
 // anywhere in the business re-runs it on the server, so it no longer asks every 30 s. The badge sums the counters
 // above zero; opened, one row per counter («Failed events (2)») that leads to its screen when this hub has it.
-// A failed read keeps the last counters (`useLive` keeps its data); one that never came says so.
+// A failed read keeps the last counters (`useLive` keeps its data); one that never came says so. `folded` (a phone's
+// «More options», TopbarChrome.vue): no button of its own; the list opens from that menu's row (`show`, `total`).
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonBadge, IonButton, IonItem, IonLabel, IonList, IonPopover } from '@ionic/vue';
@@ -11,6 +12,8 @@ import { useRouter } from 'vue-router';
 
 import type { BellCounter } from '../operations';
 import { useBaseI18n } from '../lib/i18n';
+
+defineProps<{ folded?: boolean }>();
 
 const { t } = useBaseI18n();
 const router = useRouter();
@@ -35,10 +38,13 @@ function go(counter: BellCounter): void {
   open.value = false;
   void router.push(counter.route);
 }
+
+defineExpose({ show, total });
 </script>
 
 <template>
   <ion-button
+    v-if="!folded"
     class="hub-bell"
     data-testid="hub-bell"
     :aria-label="t('base.bell.title')"

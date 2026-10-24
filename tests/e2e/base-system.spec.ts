@@ -12,7 +12,7 @@
 // flow: BASE-G87 BASE-G88 BASE-G89 BASE-G90 BASE-G91 BASE-G92 BASE-G93 BASE-G94 BASE-G95
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, EMPLOYEE, hostPage, openBell, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -132,7 +132,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const { context, page } = await signedIn(browser, viewport, '/');
     try {
       // BASE-G91 — the bell says how many and leads to them (BASE-F10).
-      await testid(page, 'hub-bell').click();
+      await openBell(page);
       const row = page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Failed events (2)' });
       await expect(row).toBeVisible();
       await row.click();
