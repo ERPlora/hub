@@ -7,7 +7,9 @@ PlatformHostMiddleware: the platform host (``hubs.localhost``, ``hubs.erplora.co
 admin for the staff (round 13, PLAN §18.1); on any other host, ``/admin/`` is not found (PLAN §18.1.3).
 """
 
-from urllib.parse import parse_qs, urlsplit
+import json
+import re
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 from django.urls import clear_script_prefix, set_script_prefix
@@ -43,6 +45,20 @@ def state_of(response) -> str:
     return state
 
 
+def jump_target(response) -> str:
+    """Where the hub's jump page sends (``base/jump.html``): ``/auth/login?next=<path>``, before its script adds the
+    fragment the browser never sends to the server."""
+    assert response.status_code == 200, f"{response.status_code} is no jump page"
+    match = re.search(r'<script id="hub-jump" type="application/json">(.*?)</script>', response.content.decode(), re.S)
+    assert match is not None, "no jump page"
+    return json.loads(match.group(1))
+
+
+def through_the_jump(client, response, host="a.localhost:8000"):
+    """The jump page followed as a browser does without a fragment: ``/auth/login``'s answer."""
+    return client.get(jump_target(response), HTTP_HOST=host, HTTP_ACCEPT=HTML)
+
+
 @pytest.mark.parametrize(
     ("path", "host", "location"),
     [
@@ -52,13 +68,38 @@ def state_of(response) -> str:
     ],
 )
 def test_an_anonymous_browser_goes_to_the_saas_login_of_its_hub(client, path, host, location):
-    response = browse(client, path, host)
+    page = browse(client, path, host)
+    assert jump_target(page) == f"/auth/login?{urlencode({'next': path})}"
+    response = through_the_jump(client, page, host)
     assert (response.status_code, response["Location"]) == (302, f"{location}&state={state_of(response)}")
+
+
+def test_the_jump_page_carries_the_fragment_the_browser_never_sends(client):
+    # «/settings#data» reaches the server as «/settings»: only the page's script knows the «#data» it adds to
+    # ``next``, so the person lands on the tab the link named after erplora.com (BASE-G52).
+    page = browse(client, "/settings")
+    html = page.content.decode()
+    nonce = re.search(r"'nonce-([^']+)'", page["Content-Security-Policy"]).group(1)
+    assert f'<script nonce="{nonce}">' in html
+    assert "encodeURIComponent(location.hash)" in html
+    assert '<meta http-equiv="refresh" content="0;url=/auth/login?next=%2Fsettings">' in html
+    assert "no-store" in page["Cache-Control"]
+
+
+def test_the_jump_page_speaks_the_language_of_the_browser_without_scripts(client):
+    page = client.get("/settings", HTTP_HOST="a.localhost:8000", HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")
+    assert '<html lang="es">' in page.content.decode()
+    assert '<a href="/auth/login?next=%2Fsettings">Continuar para entrar</a>' in page.content.decode()
+
+
+def test_the_jump_page_leaves_the_state_to_the_login_it_sends_to(client):
+    # The page is not the jump to erplora.com: /auth/login is, with its own fresh state (no page replays one).
+    assert not browse(client, "/demo/items").cookies
 
 
 def test_the_jump_binds_its_state_to_this_browser_with_a_cookie(client):
     # Only the callback reads it (PLAN-SAAS §3.1): /auth/callback refuses a code without this state.
-    response = browse(client, "/demo/items")
+    response = through_the_jump(client, browse(client, "/demo/items"))
     cookie = response.cookies["hub_login_state"]
     assert (cookie["httponly"], cookie["samesite"], cookie["secure"], cookie["max-age"], cookie["path"]) == (
         True,
@@ -67,11 +108,12 @@ def test_the_jump_binds_its_state_to_this_browser_with_a_cookie(client):
         600,
         "/auth/callback",
     )
-    assert state_of(response) != state_of(browse(client, "/demo/items"))
+    assert state_of(response) != state_of(through_the_jump(client, browse(client, "/demo/items")))
 
 
 def test_head_is_a_navigation_too(client):
-    assert browse(client, "/demo/items", method="head").status_code == 302
+    response = browse(client, "/demo/items", method="head")
+    assert (response.status_code, response.has_header("Location")) == (200, False)
 
 
 def test_a_signed_in_person_gets_the_shell(client, make_user):
@@ -161,7 +203,8 @@ def test_with_a_base_domain_the_pages_of_another_domain_are_not_found(client, su
     from base.models import Hub
 
     Hub.objects.create(slug="acme", status="ready")  # the registry's, as the SaaS's sign-up leaves it
-    assert browse(client, "/demo/items", "acme.erplora.com")["Location"].startswith(SAAS_LOGIN)
+    page = browse(client, "/demo/items", "acme.erplora.com")
+    assert through_the_jump(client, page, "acme.erplora.com")["Location"].startswith(SAAS_LOGIN)
     for host in ("acme.pre.erplora.com", "pre.erplora.com", "erplora.com"):
         assert browse(client, "/demo/items", host).status_code == 404
         api = client.get("/api/me", HTTP_HOST=host)
@@ -310,7 +353,7 @@ class TestPlatformHost:
         assert (outside.status_code, outside["Location"]) == (302, "/x/admin/")
 
     def test_a_hub_host_keeps_the_saas_login_of_its_hub(self, client):
-        response = browse(client, "/demo/items")
+        response = through_the_jump(client, browse(client, "/demo/items"))
         assert response["Location"] == f"{SAAS_LOGIN}?hub=a&next=/demo/items&state={state_of(response)}"
 
 
@@ -337,7 +380,7 @@ class TestTheRegistryGate:
         from base.middleware import HubHostRequiredMiddleware
 
         acme = hub("acme")
-        assert browse(client, "/demo/items", "acme.localhost:8000").status_code == 302  # to the SaaS's login
+        assert jump_target(browse(client, "/demo/items", "acme.localhost:8000"))  # on to the SaaS's login
         request = rf.get("/demo/items", HTTP_HOST="acme.localhost:8000")
         assert HubHostRequiredMiddleware(lambda r: None).process_request(request) is None
         assert request.hub == acme
@@ -395,7 +438,7 @@ class TestTheRegistryGate:
         from django.utils import timezone
 
         hub("demo-0000beef", is_demo=True, expires_at=timezone.now() + dt.timedelta(minutes=5))
-        assert browse(client, "/", "demo-0000beef.localhost:8000").status_code == 302
+        assert jump_target(browse(client, "/", "demo-0000beef.localhost:8000"))  # on to its door
 
     def test_the_gone_page_is_translated(self, client, hub):
         hub("acme", status="cancelled")
@@ -471,7 +514,7 @@ class TestTheRegistryGate:
     @pytest.mark.parametrize("status", ["active", "past_due"])
     def test_a_business_in_its_grace_or_paid_up_is_served(self, client, hub, status):
         hub("acme", state={"status": status})
-        assert browse(client, "/demo/items", "acme.localhost:8000").status_code == 302  # to the SaaS's login
+        assert jump_target(browse(client, "/demo/items", "acme.localhost:8000"))  # on to the SaaS's login
 
     def test_the_suspended_page_is_translated(self, client, hub):
         hub("acme", state={"status": "suspended"})

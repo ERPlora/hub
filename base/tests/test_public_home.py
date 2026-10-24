@@ -17,6 +17,7 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 
 from base import public_home
+from base.tests.test_middleware import through_the_jump
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("spa_manifest")]
 
@@ -65,7 +66,9 @@ def browse(client, path="/", host="a.localhost:8000", method="get", accept=HTML)
     return getattr(client, method)(path, HTTP_HOST=host, HTTP_ACCEPT=accept)
 
 
-def jumps_to(response, path: str) -> bool:
+def jumps_to(client, response, path: str, host="a.localhost:8000") -> bool:
+    """Whether ``response`` is the hub's jump page whose ``/auth/login`` jumps on to the SaaS's ``path``."""
+    response = through_the_jump(client, response, host)
     location = urlsplit(response["Location"]) if response.status_code == 302 else None
     return location is not None and f"{location.scheme}://{location.netloc}{location.path}" == f"{SAAS}{path}"
 
@@ -77,7 +80,7 @@ def test_without_the_module_the_home_page_jumps_to_the_saas_login(client, monkey
         raise AssertionError("Without apps.website installed, its provider is never imported.")
 
     monkeypatch.setattr(public_home, "_provider", no_provider)
-    assert jumps_to(browse(client), "/hub-login/")
+    assert jumps_to(client, browse(client), "/hub-login/")
 
 
 @pytest.mark.parametrize("method", ["get", "head"])
@@ -105,7 +108,7 @@ def test_a_call_that_does_not_ask_for_a_page_gets_the_published_site_too(client,
 
 def test_an_unpublished_site_leaves_the_home_page_jumping_to_the_login(client, website):
     website.published = False
-    assert jumps_to(browse(client), "/hub-login/")
+    assert jumps_to(client, browse(client), "/hub-login/")
     assert (website.asked, website.served) == (["a"], [])
 
 
@@ -119,7 +122,7 @@ def test_a_signed_in_person_gets_the_shell_even_with_a_published_site(client, we
 
 @pytest.mark.parametrize("path", ["/demo/items", "/website"])
 def test_other_paths_still_jump_to_the_login(client, website, path):
-    assert jumps_to(browse(client, path), "/hub-login/")
+    assert jumps_to(client, browse(client, path), "/hub-login/")
     assert website.served == []
 
 
@@ -154,7 +157,8 @@ def test_a_demo_with_a_published_site_shows_it_and_one_without_jumps_to_its_door
     response = browse(client, host="demo-0000beef.localhost:8000")
     assert (response.status_code, website.served) == (200, ["demo-0000beef"])
     website.published = False
-    assert jumps_to(browse(client, host="demo-0000beef.localhost:8000"), "/demo/enter/")
+    demo = "demo-0000beef.localhost:8000"
+    assert jumps_to(client, browse(client, host=demo), "/demo/enter/", demo)
 
 
 def test_each_hub_asks_about_its_own_site(client, website):

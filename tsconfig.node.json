@@ -1,6 +1,7 @@
 {
-  // The root config and its tests (Vite, ESLint, these tsconfigs): they run in Node, with Node's types.
+  // The root config and its tests (Vite, ESLint, these tsconfigs): they run in Node, with Node's types. The shell's
+  // shims because vitest.setup.ts registers the shell's icons, as the app does (their `~icons/*` imports).
   "extends": "./packages/ui/tsconfig.base.json",
   "compilerOptions": { "allowJs": true, "types": ["node"] },
-  "include": ["*.ts", "*.js"]
+  "include": ["*.ts", "*.js", "packages/ui/src/shell/shims.d.ts"]
 }

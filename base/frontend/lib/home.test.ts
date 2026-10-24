@@ -1,5 +1,6 @@
 // The rules of the Home that are not the server's (the old hub's `dashboard-heading.ts`, `setup-status.ts`,
 // `dashboard-widgets.ts` and the «My apps» card): pure, so each one is pinned here once.
+import * as components from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
@@ -281,6 +282,9 @@ describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
 
   it('a business day is the same day in every time zone: a civil day, never an instant', async () => {
     const zone = process.env.TZ;
+    // Only this module is the page's: the UI library already loaded is handed to each fresh copy, not evaluated again
+    // (every component and Ionic, three times over, outlasted the test on a busy run).
+    vi.doMock('@erplora/ui/components', () => components);
     try {
       for (const tz of ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati']) {
         // A page opened in that zone: a fresh module, so no formatter of another zone is reused.
@@ -295,6 +299,7 @@ describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
     } finally {
       if (zone === undefined) delete process.env.TZ;
       else process.env.TZ = zone;
+      vi.doUnmock('@erplora/ui/components');
       vi.resetModules();
     }
   });

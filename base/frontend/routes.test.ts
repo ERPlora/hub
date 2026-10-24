@@ -1,6 +1,6 @@
-// base's `routes.ts`: the Home at `/` (APP-BASE-1), Apps at `/apps` and System at `/system` (APP-BASE-4), and Settings
-// at `/settings` (APP-BASE-2, the old hub's address, with its old `/import` and `/export` pages landing on Data);
-// main.ts reads the default export.
+// base's `routes.ts`: the Home at `/` (APP-BASE-1), Apps at `/apps` and System at `/system` (APP-BASE-4), the way in
+// (APP-BASE-3), and Settings at `/settings` (APP-BASE-2, the old hub's address, with its old `/import` and `/export`
+// pages landing on Data); main.ts reads the default export.
 import type { RouteComponent } from 'vue-router';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -25,6 +25,11 @@ describe('base routes', () => {
       ['/', 'base-home', true],
       ['/apps', 'base-apps', true],
       ['/system', 'base-system', true],
+      // The way in (APP-BASE-3; routes.access.test.ts).
+      ['/login', 'base-login', false],
+      ['/pin/setup', 'base-pin-setup', true],
+      ['/switch-user', 'base-switch-user', true],
+      ['/profile', 'base-profile', true],
       ['/settings', 'base-settings', true],
     ]);
   });

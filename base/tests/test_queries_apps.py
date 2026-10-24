@@ -193,8 +193,8 @@ def test_the_people_against_the_plans_limit_and_the_devices_limit(make_user):
     assert plan_usage("base.administer_hub") == {
         "known": True,
         "people": {"used": 2, "limit": 3},
-        # The Hub keeps no count of its devices yet (trusted devices come later): the limit, never a made-up use.
-        "devices": {"used": None, "limit": 2},
+        # The devices in use are those with a session open here (base/tests/test_access_devices.py): none yet.
+        "devices": {"used": 0, "limit": 2},
     }
 
 

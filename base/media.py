@@ -26,10 +26,15 @@ from base.storage import hub_prefix
 MAX_NAME_LENGTH = 200
 #: The folders under a hub's prefix whose files anyone may see: a module that publishes files adds its own.
 PUBLIC_FOLDERS = ("website/img/",)
+#: The people's photos («My profile», APP-BASE-3): served only to a session of this hub, never cached by others.
+AVATARS_FOLDER = "avatars/"
+MEMBERS_FOLDERS = (AVATARS_FOLDER,)
 #: What opening a name that is no file raises on disk: missing, a folder, under a file, or unreadable.
 NO_FILE = (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError)
 #: A content-hashed name never changes: a year, and no revalidation.
 CACHE_CONTROL = "public, max-age=31536000, immutable"
+#: A person's photo: only this browser keeps it.
+MEMBERS_CACHE_CONTROL = "private, max-age=31536000, immutable"
 #: The CSP of a file opened on its own: nothing runs, nothing loads, no form posts.
 FILE_CSP = {"default-src": [CSP.NONE], "sandbox": True}
 
@@ -37,7 +42,10 @@ FILE_CSP = {"default-src": [CSP.NONE], "sandbox": True}
 @require_safe
 def media(request: HttpRequest, hub: str, name: str) -> FileResponse:
     own = getattr(request, "hub", None)
-    if own is None or hub != own.id.hex or not _is_safe_name(name) or not name.startswith(PUBLIC_FOLDERS):
+    members_only = name.startswith(MEMBERS_FOLDERS)
+    if own is None or hub != own.id.hex or not _is_safe_name(name) or not name.startswith(PUBLIC_FOLDERS + MEMBERS_FOLDERS):
+        raise Http404("No such file.")
+    if members_only and not request.user.is_authenticated:
         raise Http404("No such file.")
     try:
         file = storages["hub_files"].open(f"{hub_prefix(own.id)}/{name}", "rb")
@@ -45,7 +53,7 @@ def media(request: HttpRequest, hub: str, name: str) -> FileResponse:
         raise Http404("No such file.") from None
     content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
     response = FileResponse(file, content_type=content_type)
-    response["Cache-Control"] = CACHE_CONTROL
+    response["Cache-Control"] = MEMBERS_CACHE_CONTROL if members_only else CACHE_CONTROL
     response._csp_config = FILE_CSP
     return response
 

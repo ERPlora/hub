@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { BellCounter } from '../operations';
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { accessibleName, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import HubBell from './HubBell.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -38,7 +38,7 @@ describe('HubBell', () => {
   it('follows base.bell.counters live and names itself', async () => {
     const s = await setup({ locale: 'es' });
     expect(s.client.stream.subscriptions('base.bell.counters').map((sub) => sub.params)).toEqual([{}]);
-    expect(s.wrapper.get('[data-testid="hub-bell"]').attributes('aria-label')).toBe('Notificaciones');
+    expect(accessibleName(s.wrapper.get('[data-testid="hub-bell"]').element)).toBe('Notificaciones');
   });
 
   it('with nothing to tell: no badge, and «All caught up» when opened', async () => {

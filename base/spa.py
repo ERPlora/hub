@@ -5,7 +5,9 @@ paints the menu and decides on the login without a first round trip. ``spa-confi
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
 jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
 Home, BASE-G127), where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
-plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1). It goes only
+plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1), those three only
+to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
+``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). It goes only
 to a person with a session: the auth gate sends anyone else to the login, so their HTML names neither the business
 nor the hub's id.
 
@@ -27,6 +29,7 @@ from live.spa import render_spa, spa_path_pattern
 
 from base import public_home, queries
 from base.auth import saas_url
+from base.models import SessionOwner
 
 SESSION_ME_ID = "session-me"
 HUB_HOME_ID = "hub-home"
@@ -54,11 +57,17 @@ def _shell(request: HttpRequest) -> HttpResponse:
     extra_json = {SESSION_ME_ID: me.model_dump(mode="json")}
     hub = getattr(request, "hub", None)
     if hub is not None and request.user.is_authenticated:
+        way_in = queries.shell_access(request, hub.slug)
+        # erplora.com's pages only for a session opened with the account: on a shared till, the browser's erplora.com
+        # session is whoever made it a device of the hub, never the person who entered with a PIN (gh:hub#2506).
+        account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
         extra_json[HUB_HOME_ID] = {
             "name": hub.name,
-            "plan_url": saas_url(f"/store/plans?business={hub.id}"),
-            "account_url": saas_url("/account"),
-            "report_url": saas_url("/report-a-problem"),
+            "plan_url": saas_url(f"/store/plans?business={hub.id}") if account else "",
+            "account_url": saas_url("/account") if account else "",
+            "report_url": saas_url("/report-a-problem") if account else "",
+            "access": way_in,
+            "preferences": queries.appearance_of(request.user),
         }
     return render_spa(
         request,

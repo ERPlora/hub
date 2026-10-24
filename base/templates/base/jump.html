@@ -1,0 +1,29 @@
+{% load i18n static %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+The jump page of a page load without a session that goes on to erplora.com (base.auth_views.jump_page): the browser
+never sends a link's fragment («#data» of «/settings#data») to the server, so its one script, with the response's CSP
+nonce, adds it to the «next» of /auth/login, which jumps on with a fresh state. Without scripts, /auth/login without
+the fragment. Never cached; no inline styles: its look is base/gate.css.
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>ERPlora</title>
+  <noscript><meta http-equiv="refresh" content="0;url={{ target }}"></noscript>
+  <link rel="stylesheet" href="{% static 'base/gate.css' %}">
+  {{ target|json_script:"hub-jump" }}
+  <script nonce="{{ csp_nonce }}">location.replace(JSON.parse(document.getElementById("hub-jump").textContent) + encodeURIComponent(location.hash));</script>
+</head>
+<body>
+  <noscript>
+    <main>
+      <div class="ep-gate__brand">
+        <img class="ep-gate__logo" src="{% static 'base/img/logo.png' %}" alt="" width="28" height="28"><span>ERPlora</span>
+      </div>
+      <p><a href="{{ target }}">{% translate "Continue to sign in" %}</a></p>
+    </main>
+  </noscript>
+</body>
+</html>

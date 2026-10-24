@@ -5,10 +5,10 @@
 // see it, has no Logs tab, and their session never asks the Hub what it would refuse. The old `#backups` lands on
 // Settings › Data.
 //
-// «Plan and limits» (BASE-G81, APP-BASE-4): the live `base.plan.usage`, which the SaaS's photo re-runs — the people of
-// the business against the plan's limit (a bar) and the devices' limit (the Hub keeps no count of them yet: «n/a»,
-// never a made-up figure) —, «Close to the limit» with why when every place is taken, and where plans are managed
-// (erplora.com; no button: the stores refuse an app that sells, and «Upgrade plan» is in the menu on the web). Memory,
+// «Plan and limits» (BASE-G81, APP-BASE-4): the live `base.plan.usage`, which the SaaS's photo re-runs — the people
+// of the business against the plan's limit (a bar) and the devices in use, with a session open now, against its
+// limit (BASE-G57's rule, APP-BASE-3) —, «Close to the limit» with why when every place is taken, and where plans are
+// managed (erplora.com; no button: the stores refuse an app that sells, and «Upgrade plan» is in the menu on the web). Memory,
 // CPU and database size went with the old process per hub (PLAN-HUB §1a). Only whoever runs the business reads it:
 // anyone else is told so, with no useless «Retry».
 import { InlineFeedback, StatusPill, UsageMeter } from '@erplora/ui/components';
@@ -213,21 +213,24 @@ const number = (n: number) => new Intl.NumberFormat(locale.value).format(n);
             class="system-plan-card"
             data-testid="system-plan-devices"
           >
+            <!-- In use: those with a session open here, the ones the plan's cap keeps (APP-BASE-3, BASE-G57); its
+                 limit in the pill, as the old hub did. -->
             <h3>
               {{ t('base.systemPlan.devices') }}
               <StatusPill
+                v-if="usage.known"
                 tone="neutral"
-                :label="t('base.systemPlan.notCounted')"
+                :label="devicesLimit === null ? t('base.systemPlan.noLimit') : t('base.systemPlan.upTo', { n: number(devicesLimit) })"
               />
             </h3>
             <p
-              v-if="usage.known"
               class="system-plan-figure"
+              data-testid="system-plan-devices-used"
             >
-              {{ devicesLimit === null ? t('base.systemPlan.noLimit') : t('base.systemPlan.upTo', { n: number(devicesLimit) }) }}
+              {{ number(usage.devices.used ?? 0) }}
             </p>
             <p class="system-plan-hint">
-              {{ t('base.systemPlan.devicesNotCounted') }}
+              {{ t('base.systemPlan.devicesInUse') }}
             </p>
           </article>
         </div>
