@@ -3,7 +3,8 @@
 // `base.setup.status` — the platform's steps and the modules', already ordered and filtered by country,
 // vertical and permission on the server — painted as it comes. «Set up» only where the step's screen exists
 // and the person can do it; a ⛔ only an administrator can do says who can. Folded: ⛔ and 🔴 in sight, at
-// most 5 rows (2 on a phone); «Your apps» is the «My apps» card's, so the fold does not repeat it.
+// most 5 rows (2 on a phone); «Your apps» is the «My apps» card's, so the fold does not repeat it. While something is
+// left, «Ask the assistant» opens its panel on the setup (BASE-G121).
 import { InlineFeedback, StatusPill, type StatusPillTone } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -13,6 +14,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import type { SetupItem } from '../operations';
+import { useAssistant } from '../lib/assistant';
 import { checklistView, MAX_VISIBLE_ROWS, PHONE_MAX_VISIBLE_ROWS } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { usePhone } from '../lib/phone';
@@ -25,6 +27,7 @@ const { t } = useBaseI18n();
 const router = useRouter();
 const phone = usePhone();
 const expanded = ref(false);
+const assistant = useAssistant();
 const { data, status, refresh } = useLive('base.setup.status', {});
 
 const view = computed(() =>
@@ -172,20 +175,52 @@ function note(item: SetupItem): string {
       </li>
     </ul>
 
-    <ion-button
-      v-if="view.hidden > 0 || expanded"
-      size="small"
-      fill="clear"
-      class="setup-toggle"
-      data-testid="setup-toggle"
-      @click="expanded = !expanded"
+    <footer
+      v-if="view.hidden > 0 || expanded || !view.complete"
+      class="setup-foot"
     >
-      {{ expanded ? $t('base.setup.viewLess') : $t('base.setup.viewAll') }}
-    </ion-button>
+      <ion-button
+        v-if="view.hidden > 0 || expanded"
+        size="small"
+        fill="clear"
+        class="setup-toggle"
+        data-testid="setup-toggle"
+        @click="expanded = !expanded"
+      >
+        {{ expanded ? $t('base.setup.viewLess') : $t('base.setup.viewAll') }}
+      </ion-button>
+      <!-- BASE-G121 (gh:hub#373): the setup with the assistant; each step keeps its own «Set up» if it is down. -->
+      <ion-button
+        v-if="!view.complete"
+        size="small"
+        class="setup-review"
+        data-testid="setup-review"
+        @click="assistant.openForSetup()"
+      >
+        <HubIcon
+          slot="start"
+          name="ion:sparkles-outline"
+        />
+        {{ $t('base.assistant.setup.ask') }}
+      </ion-button>
+    </footer>
   </section>
 </template>
 
 <style scoped>
+.setup-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.setup-review {
+  margin-inline-start: auto;
+}
+
 .setup-head {
   display: flex;
   flex-wrap: wrap;
