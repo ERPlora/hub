@@ -427,9 +427,17 @@ async function exportFile(): Promise<void> {
             v-else
             :data-testid="`inventory-products-active-text-${row.id}`"
           >{{ row.is_active ? $t('inventory.common.yes') : $t('inventory.common.no') }}</span>
+          <!-- Beside the switch, or under it when the column is narrow: never squeezing it. -->
+          <ion-badge
+            v-if="row.is_sold_out"
+            color="danger"
+            :data-testid="`inventory-products-sold-out-${row.id}`"
+          >
+            {{ $t('inventory.products.soldOut') }}
+          </ion-badge>
         </span>
         <ion-badge
-          v-if="row.is_sold_out"
+          v-if="row.needs_tax_setup && row.is_sold_out"
           color="danger"
           class="inventory-products__sold-out"
           :data-testid="`inventory-products-sold-out-${row.id}`"
@@ -495,7 +503,10 @@ async function exportFile(): Promise<void> {
 <style scoped>
 .inventory-products__status {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
+  gap: 8px;
   vertical-align: middle;
 }
 
@@ -522,7 +533,7 @@ async function exportFile(): Promise<void> {
   vertical-align: middle;
 }
 
-/* Beside the switch or the chip: in the row's cell (a flex box) and on a card's line alike. */
+/* Beside the chip: in the row's cell (a flex box) and on a card's line alike. */
 .inventory-products__sold-out {
   flex-shrink: 0;
   margin-inline-start: 8px;
