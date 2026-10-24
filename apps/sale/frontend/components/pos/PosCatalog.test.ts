@@ -28,7 +28,7 @@ const CATEGORIES = 'inventory.category.list';
 const GRID = { is_active: true, include_sold_out: true, sort: 'name' };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(PosCatalog, { props: { showProducts: true, canOpenPrice: true, ...props }, locale });
+  const m = await mountSale(PosCatalog, { props: { showProducts: true, ...props }, locale });
   await m.live();
   const grid = () => m.wrapper.findComponent(ProductGrid);
   const gridParams = () => m.params(PRODUCTS).filter((p) => p.sort === 'name');

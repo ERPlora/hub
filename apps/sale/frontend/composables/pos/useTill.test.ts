@@ -1,24 +1,34 @@
 // `useTill()`: the check on screen and every write to it (SALE-F01, F09, F13–F18; spec «Cart → order
 // mapping»). The first line opens the check (and the device remembers it); the next ones go to it; a
 // second tap on the same product raises its line. One write in flight at a time per check. What the
-// screen shows is what the operations answer (no money of its own); a refusal says the server's words.
+// screen shows is what the operations answer (no money of its own); a refusal says the server's words. What the
+// cashier's role does not allow, a manager approves with their PIN on this very device (BASE-F84).
 import { toastError } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import { approvalDialog, asksApproval, CANCELLED } from '../../__tests__/approval-dialog';
 import { EMPLOYEE, flush, MANAGER, mountSale } from '../../__tests__/mount-sale';
 import { deferred, line, memoryStorage, order, product, refused, settings } from '../../components/pos/__tests__/fixtures';
 import type { OrderOut, SettingsOut } from '../../operations';
 import { CURRENT_CHECK_KEY } from './useCurrentCheck';
 import { type Till, useTill } from './useTill';
 
+vi.mock('@ionic/vue', async (importOriginal) => {
+  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
+});
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
   toastError: vi.fn(() => Promise.resolve()),
   toast: vi.fn(() => Promise.resolve()),
 }));
 
-beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
+beforeEach(() => {
+  vi.stubGlobal('localStorage', memoryStorage());
+  approvalDialog.reset();
+});
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(toastError).mockClear();
@@ -41,6 +51,14 @@ async function setup(options: { settings?: Partial<SettingsOut>; session?: typeo
 }
 
 const CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: 'p1' })] });
+
+/** The hub asks for a manager's approval of `operation` (403 `requires_elevation`). */
+const asks = (operation: string, label: string) => Response.json(asksApproval(operation, label), { status: 403 });
+/** The server's answers in order; after them, the check (the repeat a manager approved). */
+const answers = (...first: Response[]) => {
+  let count = 0;
+  return () => first[count++] ?? Response.json(CHECK);
+};
 
 describe('useTill: adding products', () => {
   it('the first product opens the check with it; the device remembers the check', async () => {
@@ -259,6 +277,31 @@ describe('useTill: open price', () => {
     ]);
   });
 
+  it('an employee’s open price on the check is added once a manager approves it with their PIN', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    s.reply(CHECK);
+    await s.till().addProduct(product({ id: 'p1' }), null);
+    s.net.onApi(answers(asks('sale.order.add_open_line', 'Sell at an open price')));
+    expect(await s.till().addOpenLine({ unit_price: 500, tax_category_key: 'food', name: 'Food' }, null)).toEqual({ ok: true });
+    const body = { order_id: 'o1', unit_price: 500, tax_category_key: 'food', name: 'Food' };
+    expect(s.calls().slice(1)).toEqual([
+      ['/add_open_line', body],
+      ['/add_open_line', body],
+    ]);
+  });
+
+  it('with no check yet, an employee opens it empty and the open price waits for the manager’s approval', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    s.net.onApi(answers(Response.json(order({ id: 'o1', version: 1, lines: [] })), asks('sale.order.add_open_line', 'Sell at an open price')));
+    expect(await s.till().addOpenLine({ unit_price: 300, department_id: 'd1', name: 'Fruit' }, 's1')).toEqual({ ok: true });
+    expect(s.calls()).toEqual([
+      ['', {}],
+      ['/add_open_line', { order_id: 'o1', unit_price: 300, department_id: 'd1', name: 'Fruit', staff_id: 's1' }],
+      ['/add_open_line', { order_id: 'o1', unit_price: 300, department_id: 'd1', name: 'Fruit', staff_id: 's1' }],
+    ]);
+    expect(s.opened).toEqual(['o1']);
+  });
+
   it('hands a refusal back to the sheet, in the server’s words', async () => {
     const s = await setup();
     s.net.onApi(() => refused('permission_denied', 'You do not have permission.', 403));
@@ -325,6 +368,18 @@ describe('useTill: the lines', () => {
     expect(await s.till().voidLine(line({ id: 'l1' }), 'Sold out')).toEqual({ ok: true });
     expect(s.calls().at(-1)).toEqual(['/void_line', { order_id: 'o1', line_id: 'l1', reason: 'Sold out' }]);
   });
+
+  it('an employee voids a line sent to the kitchen once a manager approves it with their PIN', async () => {
+    const s = await withCheck({ session: EMPLOYEE });
+    s.net.onApi(answers(asks('sale.order.void_line', 'Void an item already sent to the kitchen')));
+    expect(await s.till().voidLine(line({ id: 'l1' }), 'Sold out')).toEqual({ ok: true });
+    const body = { order_id: 'o1', line_id: 'l1', reason: 'Sold out' };
+    expect(s.calls().slice(-2)).toEqual([
+      ['/void_line', body],
+      ['/void_line', body],
+    ]);
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Void an item already sent to the kitchen']);
+  });
 });
 
 describe('useTill: discounts and the manager’s door', () => {
@@ -347,14 +402,32 @@ describe('useTill: discounts and the manager’s door', () => {
     expect(s.calls().at(-1)).toEqual(['/set_line_discount_over_limit', { order_id: 'o1', line_id: 'l1', discount_percent: '30' }]);
   });
 
-  it('above the cap an employee gets the server’s refusal', async () => {
+  it('above the cap an employee asks a manager, who approves it with their PIN on this device', async () => {
     const s = await withCheck({ session: EMPLOYEE });
-    s.net.onApi(() => refused('sale.discount_over_limit', 'That discount is over what this business allows without the manager.'));
-    expect(await s.till().setLineDiscount(line({ id: 'l1' }), '30')).toEqual({
-      ok: false,
-      message: 'That discount is over what this business allows without the manager.',
-    });
-    expect(s.calls().at(-1)?.[0]).toBe('/set_line_discount');
+    s.net.onApi(answers(refused('sale.discount_over_limit', 'Over the cap.'), asks('sale.order.set_line_discount_over_limit', 'Discount a line above the maximum')));
+    expect(await s.till().setLineDiscount(line({ id: 'l1' }), '30')).toEqual({ ok: true });
+    const body = { order_id: 'o1', line_id: 'l1', discount_percent: '30' };
+    expect(s.calls().slice(1)).toEqual([
+      ['/set_line_discount', body],
+      ['/set_line_discount_over_limit', body],
+      ['/set_line_discount_over_limit', body],
+    ]);
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Discount a line above the maximum']);
+  });
+
+  it('«Cancel» on the approval hands the sheet its refusal, and the check stays as it was', async () => {
+    const s = await withCheck({ session: EMPLOYEE });
+    approvalDialog.answer = CANCELLED;
+    s.net.onApi(answers(refused('sale.discount_over_limit', 'Over the cap.'), asks('sale.order.set_discount_over_limit', 'Discount the check above the maximum')));
+    expect(await s.till().setTicketDiscount({ percent: '50', amount: 0 })).toEqual({ ok: false, message: 'This needs a manager’s approval.' });
+    expect(s.till().order.value).toEqual(CHECK);
+  });
+
+  it('a refusal of another kind asks no manager', async () => {
+    const s = await withCheck({ session: EMPLOYEE });
+    s.net.onApi(() => refused('sale.discounts_not_allowed', 'This business does not allow discounts.'));
+    expect(await s.till().setLineDiscount(line({ id: 'l1' }), '30')).toEqual({ ok: false, message: 'This business does not allow discounts.' });
+    expect(approvalDialog.questions).toEqual([]);
   });
 
   it('a fixed ticket amount over the cap (the server says so) is retried through the manager’s door', async () => {
@@ -407,6 +480,26 @@ describe('useTill: the check', () => {
     await s.till().addProduct(product({ id: 'p1' }), null);
     expect(await s.till().voidCheck()).toEqual({ ok: true });
     expect(s.calls().at(-1)).toEqual(['/void', { order_id: 'o1' }]);
+    expect(s.till().orderId.value).toBeNull();
+  });
+
+  it('an employee deletes a check with something on it once a manager approves it with their PIN', async () => {
+    const s = await setup({ session: EMPLOYEE });
+    s.reply(CHECK);
+    await s.till().addProduct(product({ id: 'p1' }), null);
+    s.net.onApi(
+      answers(
+        refused('permission_denied', 'Permission “sale.void_sale” is required.', 403),
+        asks('sale.order.void_ordered', 'Delete an open check with something on it'),
+        Response.json({ ...CHECK, status: 'voided' }),
+      ),
+    );
+    expect(await s.till().voidCheck()).toEqual({ ok: true });
+    expect(s.calls().slice(1)).toEqual([
+      ['/void', { order_id: 'o1' }],
+      ['/void_ordered', { order_id: 'o1' }],
+      ['/void_ordered', { order_id: 'o1' }],
+    ]);
     expect(s.till().orderId.value).toBeNull();
   });
 

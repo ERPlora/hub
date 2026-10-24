@@ -44,7 +44,6 @@
       "loadMore": "Load more",
       "openPrice": "Open price",
       "openPriceTag": "+ €",
-      "managerOnly": "A manager has to do it",
       "notSellableBadge": "{tax} missing",
       "notSellableNoTaxCategory": "Cannot be sold: no tax category. {tax} needs to be set up.",
       "soldOutBadge": "Sold out",

@@ -11,7 +11,7 @@ const PRODUCTS = [product({ id: 'p1', name: 'Coffee' }), product({ id: 'p2', nam
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   return mountSale(ProductGrid, {
-    props: { products: PRODUCTS, loading: false, hasMore: false, canOpenPrice: true, ...props },
+    props: { products: PRODUCTS, loading: false, hasMore: false, ...props },
     locale,
   });
 }
@@ -34,11 +34,11 @@ describe('ProductGrid', () => {
     expect(m.wrapper.emitted('openPrice')).toHaveLength(1);
   });
 
-  it('without the open-price permission the tile says a manager has to do it', async () => {
-    const m = await setup({ canOpenPrice: false }, 'es');
+  it('the open-price tile is the same for everyone: a manager approves it when it is added (SALE-F09)', async () => {
+    const m = await setup({}, 'es');
     const open = m.find('pos-open-price-tile');
     expect(open.find('.pos-tile__name').text()).toBe('Precio libre');
-    expect(open.find('.pos-tile__price').text()).toBe('Lo tiene que hacer un responsable');
+    expect(open.find('.pos-tile__price').text()).toBe('+ €');
     await click(open.element);
     expect(m.wrapper.emitted('openPrice')).toHaveLength(1);
   });
