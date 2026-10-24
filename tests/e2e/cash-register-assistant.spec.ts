@@ -271,15 +271,17 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
     25000 - expected,
   ]);
 
-  // «Cash register» shows it closed, with its expected, counted and difference.
-  await panel(page).locator('[data-testid="assistant-close"]').click();
+  // «Cash register» shows it closed, with its expected, counted and difference (the panel stays docked beside it).
   await page.goto(`${A}/cash_register/sessions`);
+  await expect(panel(page)).toHaveAttribute('data-open', 'true');
   const row = shown(page).locator(`[data-testid=cash-register-sessions-row][data-id="${shift.id}"]`);
   await expect(row).toContainText('Closed');
   await expect(row).toContainText(/112\.10/);
   await expect(row).toContainText(/250\.00/);
   await expect(row).toContainText(/137\.90/);
   await expect(shown(page).locator('[data-testid=cash-register-new-session]')).not.toHaveAttribute('aria-disabled', 'true');
+  // The owner's session, with the assistant docked, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
 
 test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close gets the summary without the expected nor the difference, and the model never gets them', async ({ browser }) => {
