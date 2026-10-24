@@ -39,12 +39,14 @@ test('login on a: shell, topbar with Demo among the apps, empty state, CSP heade
 
   await expect(page.locator('ion-app')).toHaveCount(1);
   // The old hub's side menu (PLAN-MIGRATIONS §16), pinned at this width: the platform's entries whose
-  // screen exists (Home, Apps and System today: APP-BASE-4), never an app; the apps are the topbar's sheet.
+  // screen exists (Home, Apps and System today: APP-BASE-4; Settings: APP-BASE-3), never an app; the apps are the
+  // topbar's sheet.
   await expect(page.locator('ion-menu.dash-menu')).toBeVisible();
   await expect(page.locator('ion-menu.dash-menu ion-item.nav-item')).toHaveText([
     /^\s*Home\s*$/,
     /^\s*Apps\s*$/,
     /^\s*System\s*$/,
+    /^\s*Settings\s*$/,
   ]);
   await listReady(page);
   const apps = await openApps(page);

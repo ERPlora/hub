@@ -4,18 +4,24 @@
 // before anything loads `@ionic/vue` (the SDK does). Vite hoists eager globs above everything, so an
 // app's `routes.ts` only imports types; its pages load with `() => import(…)`. Guards: main.test.ts.
 import {
+  applyUserThemePreferences,
   createShell,
   type CreateShellOptions,
   logout,
+  resetUserThemePreferences,
   type SessionMe,
   type SessionStatus,
   type ShellSidebar,
   type ShellUserMenu,
+  type ShellUserMenuItem,
+  type ThemePalette,
+  toastSuccess,
 } from '@erplora/ui/shell';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
 import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
+import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { installErrorReport } from '../base/frontend/lib/error-report';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
@@ -86,23 +92,32 @@ export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShe
 }
 
 /**
- * The user menu (PLAN-SAAS §1.1): the person's account and «Report a problem» are erplora.com's pages, opened from
- * the addresses `base/spa.py` embeds in `hub-home` (a new tab; the system browser in the installed app); then the
- * Hub's sign out, a form POST to `/auth/logout` and the SaaS's logout page. Without them, only the sign out.
+ * The user menu: «Profile» (the person's page in this hub, BASE-G125) and, on a shared till of a business that asks,
+ * «Switch user» (BASE-G60), both from `hub-home`'s `access` (APP-BASE-3); then the person's account and «Report a
+ * problem», erplora.com's pages (PLAN-SAAS §1.1), opened from the addresses `base/spa.py` embeds only in a session
+ * opened with the account (a new tab; the system browser in the installed app; gh:hub#2506); then the Hub's sign out,
+ * a form POST to `/auth/logout`. Without `hub-home` (no hub), only the sign out.
  */
 export function userMenu(doc: Document): ShellUserMenu {
   const home = readJsonBlock<HubHome>('hub-home', doc);
-  if (!home?.account_url || !home.report_url) return { logout };
-  return {
-    items: [
+  if (!home) return { logout };
+  const items: ShellUserMenuItem[] = [
+    { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
+  ];
+  if (readAccess(doc).switch_user) {
+    items.push({ id: 'switch-user', labelKey: 'base.userMenu.switchUser', icon: 'ion:people-outline', to: '/switch-user' });
+  }
+  if (home.account_url && home.report_url) {
+    items.push(
       { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
       { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
-    ],
-    logout,
-  };
+    );
+  }
+  return { items, logout };
 }
 
-/** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. */
+/** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. `reload` reads it again
+ *  when base says the person changed (their name in «My profile», BASE-G125); a failed reload keeps the session it had. */
 function loadSession(client: LiveClient, doc: Document) {
   const text = doc.getElementById('session-me')?.textContent;
   const me = ref<SessionMe | undefined>(text ? (JSON.parse(text) as SessionMe) : undefined);
@@ -119,7 +134,14 @@ function loadSession(client: LiveClient, doc: Document) {
       },
     );
   }
-  return { session: me, status };
+  const reload = () =>
+    client.api.call('base.session.me', {}).then(
+      (answer) => {
+        me.value = answer;
+      },
+      (error: unknown) => console.error('hub: base.session.me failed', error),
+    );
+  return { session: me, status, reload };
 }
 
 /** Boots the shell and mounts it on `#app`; no mount when the gate sent the page to the login. */
@@ -130,7 +152,7 @@ export async function boot(
 ): Promise<void> {
   const config = readSpaConfig(doc);
   const client = createLiveClient(config, { routes: OPERATION_ROUTES });
-  const session = loadSession(client, doc);
+  const { reload, ...session } = loadSession(client, doc);
   const { app, router } = await createShell({
     ...session,
     routes: appRoutes(routeFiles),
@@ -164,7 +186,19 @@ export async function boot(
   const blocked = appGate(router.currentRoute.value);
   if (blocked !== true) await router.replace(blocked);
   app.mount('#app');
+  // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
+  startWayIn(doc, {
+    translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
+    logout: () => logout(doc),
+    toast: (message) => void toastSuccess(message),
+    paint: (mode, palette) => applyUserThemePreferences(mode, palette as ThemePalette | null),
+    reset: resetUserThemePreferences,
+    label: () => session.session.value?.user?.label,
+  });
+  onSessionChanged(() => void reload());
 }
+
+type Translate = (key: string, values?: Record<string, unknown>) => string;
 
 void boot(
   import.meta.glob<AppRoutes>(['../base/frontend/routes.ts', '../apps/*/frontend/routes.ts'], { eager: true }),

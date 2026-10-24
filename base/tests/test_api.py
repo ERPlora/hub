@@ -82,6 +82,8 @@ def test_the_spas_route_map_names_every_base_route(settings):
     # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
     import json
 
+    from base.tests.test_access_routes import ROUTES as WAY_IN
+
     spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
     mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("base.")}
     assert mine == {
@@ -110,7 +112,7 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/files/rename", "base.file.rename"),
         ("POST", "/api/files/move", "base.file.move"),
         ("POST", "/api/files/delete", "base.file.delete"),
-    }
+    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN}
 
 
 # Settings › Data (APP-BASE-2): the blueprints, the loads, the export and the reset. Reading what a file brings goes by

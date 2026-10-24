@@ -30,6 +30,7 @@ from base.models import DemoCode, Hub, Membership
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoCodeIn, DemoCreateIn
 from base.services import demo_code_create, demo_create
+from base.tests.test_middleware import through_the_jump
 
 pytestmark = pytest.mark.django_db
 
@@ -106,6 +107,20 @@ class TestCallback:
         response = callback(client, {"code": "c1", "next": "/"})
         sent = response.cookies.get(settings.LANGUAGE_COOKIE_NAME)
         assert (sent.value if sent else None) == cookie
+
+    @pytest.mark.parametrize(("own", "cookie"), [("es", "es"), ("", "en")])
+    def test_the_language_of_my_profile_wins_over_the_account_s_and_without_one_the_account_s(
+        self, client, fake_saas, settings, own, cookie
+    ):
+        # BASE-G125: the language chosen in «My profile» is the one every entry speaks, the account's too; without one,
+        # the account's language on erplora.com, never the browser's (a PIN entry, without the account, takes the
+        # business's: test_access_pin).
+        from base.models import Profile
+
+        Profile.objects.create(username="saas:42", first_name="Ana", language=own)
+        fake_saas(body={"user_id": "42", "email": "ana@example.com", "name": "Ana", "locale": "en", "role": "hub_admin"})
+        response = callback(client, {"code": "c1", "next": "/"})
+        assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == cookie
 
     @pytest.mark.parametrize(
         ("saas_answer", "error"),
@@ -570,7 +585,8 @@ class TestDemoLoginStart:
         assert (cookie["path"], cookie["max-age"], cookie["httponly"]) == ("/auth/callback", 600, True)
 
     def test_a_page_of_the_demo_without_a_session_jumps_there_too(self, client, demo):
-        response = client.get("/demo/items", HTTP_HOST=host_of(demo), HTTP_ACCEPT="text/html")
+        page = client.get("/demo/items", HTTP_HOST=host_of(demo), HTTP_ACCEPT="text/html")
+        response = through_the_jump(client, page, host_of(demo))
         assert response.status_code == 302
         assert response["Location"].startswith(f"{SAAS_DEMO_ENTER}?hub={demo}&next=/demo/items&state=")
         assert STATE_COOKIE in response.cookies

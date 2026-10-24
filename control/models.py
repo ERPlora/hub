@@ -52,7 +52,7 @@ class Cluster(UUIDModel):
     pooler_host = models.CharField(_("PgBouncer host"), max_length=255)
     pooler_port = models.PositiveIntegerField(_("PgBouncer port"), default=6432)
     is_open = models.BooleanField(_("open to new hubs"), default=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    created_at = models.DateTimeField(pgettext_lazy("hub registry", "created at"), auto_now_add=True)
 
     class Meta:
         verbose_name = _("cluster")
@@ -92,7 +92,9 @@ class Hub(models.Model):
         BEHIND = "behind", pgettext_lazy("hub schema", "Behind")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid7, editable=False)
-    slug = models.CharField(_("slug"), max_length=63, unique=True, validators=[registry_slug_validator])
+    slug = models.CharField(
+        pgettext_lazy("hub registry", "slug"), max_length=63, unique=True, validators=[registry_slug_validator]
+    )
     name = models.CharField(_("name"), max_length=120, blank=True)
     country = models.CharField(_("country"), max_length=2, blank=True)
     timezone = models.CharField(_("time zone"), max_length=64, blank=True)
@@ -102,7 +104,7 @@ class Hub(models.Model):
     is_demo = models.BooleanField(_("demo"), default=False)
     expires_at = models.DateTimeField(_("expires at"), null=True, blank=True)
     demo_session_key = models.CharField(_("demo session"), max_length=64, blank=True)
-    state = models.JSONField(_("state"), default=dict, blank=True)
+    state = models.JSONField(pgettext_lazy("hub registry", "state"), default=dict, blank=True)
     state_version = models.PositiveBigIntegerField(_("state version"), default=0)
     db_name = models.CharField(
         _("database"), max_length=63, blank=True, default="", db_default="", validators=[db_name_validator]
@@ -119,10 +121,10 @@ class Hub(models.Model):
         Cluster, on_delete=models.PROTECT, null=True, blank=True, related_name="hubs", verbose_name=_("cluster")
     )
     is_platform = models.BooleanField(_("platform hub"), default=False, db_default=False)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    ready_at = models.DateTimeField(_("ready at"), null=True, blank=True)
-    cancelled_at = models.DateTimeField(_("cancelled at"), null=True, blank=True)
+    created_at = models.DateTimeField(pgettext_lazy("hub registry", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("hub registry", "updated at"), auto_now=True)
+    ready_at = models.DateTimeField(pgettext_lazy("hub registry", "ready at"), null=True, blank=True)
+    cancelled_at = models.DateTimeField(pgettext_lazy("hub registry", "cancelled at"), null=True, blank=True)
     purged_at = models.DateTimeField(_("purged at"), null=True, blank=True)
 
     class Meta:

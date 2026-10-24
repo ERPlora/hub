@@ -8,6 +8,7 @@ its real path, the same with the header or without it, on the platform host and 
 """
 
 import asyncio
+import json
 import re
 from urllib.parse import urlsplit
 
@@ -111,12 +112,14 @@ def test_a_client_root_path_changes_nothing(host, path):
 
 
 def test_a_client_root_path_does_not_reach_the_api_of_a_hub():
-    status, headers, _ = get(HUB_HOST, "/x/api/me", root_path="/x")
+    status, headers, body = get(HUB_HOST, "/x/api/me", root_path="/x")
 
-    # /x/api/me is a SPA route: a browser without a session goes to the SaaS's login, not to /api/me.
-    assert status == 302
-    assert not headers["content-type"].startswith("application/json")
-    assert not urlsplit(headers["location"]).path.startswith("/x/")
+    # /x/api/me is a SPA route: a browser without a session goes on to the SaaS's login (through the hub's jump page,
+    # base.auth_views.jump_page), not to /api/me; the made-up prefix never steers where it goes.
+    assert status == 200
+    assert headers["content-type"].startswith("text/html")
+    target = json.loads(re.search(rb'<script id="hub-jump" type="application/json">(.*?)</script>', body).group(1))
+    assert urlsplit(target).path == "/auth/login"
 
 
 # WebSockets: /ws/print is the only one (PLAN-HUB §5); it was a 500, Django serves HTTP only.

@@ -101,7 +101,9 @@
     },
     "userMenu": {
       "account": "My account",
-      "reportProblem": "Report a problem"
+      "reportProblem": "Report a problem",
+      "profile": "Profile",
+      "switchUser": "Switch user"
     },
     "appsPage": {
       "title": "Apps",
@@ -192,8 +194,6 @@
       "limitHint": "Plan limit",
       "noLimit": "No limit",
       "upTo": "Up to {n}",
-      "notCounted": "n/a",
-      "devicesNotCounted": "The hub does not count its devices yet.",
       "full": {
         "heading": "You are running out of room in your plan",
         "body": "Your plan has every place taken, so you cannot add anyone else."
@@ -206,7 +206,8 @@
         "heading": "We could not read your plan",
         "body": "Check the connection and try again."
       },
-      "retry": "Retry"
+      "retry": "Retry",
+      "devicesInUse": "With a session open now."
     },
     "settings": {
       "title": "Settings",
@@ -214,7 +215,8 @@
         "label": "Settings sections",
         "data": "Data and backups",
         "business": "Business",
-        "tickets": "Printing"
+        "tickets": "Printing",
+        "general": "General"
       }
     },
     "data": {
@@ -498,6 +500,188 @@
       "printers": "Printers and ticket",
       "printersHint": "Add your printer and set up the printed and digital ticket",
       "install": "Install the Printing app to add your printer and set up the ticket"
+    },
+    "pinpad": {
+      "erase": "Erase"
+    },
+    "access": {
+      "title": "Access",
+      "heading": "Enter your business",
+      "theme": "Switch between light and dark",
+      "tabs": {
+        "label": "How to enter",
+        "pin": "PIN",
+        "account": "Account"
+      },
+      "pinIntro": "Enter your PIN",
+      "badgeHint": "…or pass your badge: no need to choose your name first.",
+      "chooseUser": "Choose your user",
+      "changeUser": "Change user",
+      "pinOf": "PIN of {name}",
+      "accountIntro": "Sign in with your erplora.com account: your email and password, Google or your verification code.",
+      "accountButton": "Enter with your account",
+      "footerTrusted": "ERPlora · trusted device",
+      "footer": "ERPlora · secure connection",
+      "entering": "Entering…",
+      "loading": "Loading…",
+      "failed": "Could not enter. Check the connection and try again.",
+      "doorError": "Could not load the PIN pad. You can still enter with your account.",
+      "wait": "Too many wrong attempts. Wait {minutes} min and try again.",
+      "notice": {
+        "endedTitle": "Your session has ended",
+        "ended": "It expired or it was closed. Enter again.",
+        "deviceLimitTitle": "Session opened on another device",
+        "deviceLimit": "Your plan covers one device at a time, so entering on another one closed the session on this one. Enter again to use it here, or add devices to your plan.",
+        "upgrade": "Upgrade plan"
+      }
+    },
+    "pinSetup": {
+      "title": "Create your PIN",
+      "why": "With it you will enter this till without your password.",
+      "choose": "Choose a {n}-digit PIN",
+      "confirm": "Confirm your PIN",
+      "mismatch": "The PINs do not match, try again",
+      "later": "Not now",
+      "failed": "Could not save the PIN. Try again.",
+      "loadError": "Could not read your profile. You can choose your PIN later in My profile."
+    },
+    "switchUser": {
+      "title": "Switch user",
+      "intro": "The sale stays open. From now on it is in the name of whoever enters here.",
+      "who": "Who is taking over?",
+      "other": "Someone else",
+      "cancel": "Cancel",
+      "nowServing": "Now serving {name}",
+      "empty": "Nobody here has a PIN yet: give one in My profile or in Employees.",
+      "loadError": "Could not load who works here. Check the connection and try again."
+    },
+    "profile": {
+      "title": "My profile",
+      "subtitle": "Your identity and your personal preferences in this business.",
+      "summary": "Account summary",
+      "loading": "Loading your profile…",
+      "loadErrorTitle": "Could not load the profile",
+      "loadError": "Your details stay the same. Check the connection and try again.",
+      "retry": "Retry",
+      "photo": {
+        "label": "Photo",
+        "saved": "Photo updated",
+        "removed": "Photo removed",
+        "failed": "Could not save the photo. Use a JPG, PNG or WebP of up to 2 MB."
+      },
+      "data": {
+        "title": "Account details",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "email": "Email",
+        "emailHelp": "Only to contact you: it is not the email you sign in with.",
+        "role": "Role in this business: {role}",
+        "save": "Save my details",
+        "saved": "Profile saved",
+        "failed": "Could not save the profile"
+      },
+      "prefs": {
+        "title": "Preferences",
+        "language": "Language",
+        "languageHelp": "Saved for you. If you choose none, the business’s language is used.",
+        "businessLanguage": "Use the business’s language",
+        "appearance": "Appearance",
+        "appearanceHelp": "Choose the mode and the palette you prefer.",
+        "palette": "Theme palette",
+        "mode": "Theme",
+        "modes": {
+          "system": "System (auto)",
+          "light": "Light",
+          "dark": "Dark"
+        },
+        "business": "Use the business’s appearance",
+        "failed": "Could not save your preferences. Check the connection and try again."
+      },
+      "pin": {
+        "title": "PIN",
+        "intro": "The PIN you enter the till with. Change it whenever you want — nobody else has to.",
+        "introNone": "You do not have a PIN yet. Set one to also enter from the till.",
+        "current": "Current PIN",
+        "new": "New PIN",
+        "repeat": "Repeat the new PIN",
+        "change": "Change PIN",
+        "set": "Set PIN",
+        "saved": "PIN updated",
+        "length": "The PIN must have {n} digits.",
+        "mismatch": "The two PINs do not match."
+      },
+      "roles": {
+        "hub_owner": "Owner",
+        "hub_admin": "Administrator",
+        "hub_manager": "Manager",
+        "hub_employee": "Employee"
+      }
+    },
+    "device": {
+      "title": "This device",
+      "intro": "How this device asks who is using it. Each device of the business is decided on its own.",
+      "shared": "Shared — a till or tablet several people use",
+      "sharedHelp": "It asks for a PIN to enter and forgets it at the end of the shift, so every sale is in the name of whoever made it.",
+      "personal": "Personal — a device only you use",
+      "personalHelp": "The session stays open and it never asks for a PIN.",
+      "adminOnly": "Only an administrator can change how people enter on this device.",
+      "unknown": "This browser is not a device of the business yet: enter once here with your account and you will be able to choose.",
+      "failed": "Could not change this device. Check the connection and try again.",
+      "loadError": "Could not load this device. Check the connection and try again."
+    },
+    "pinPolicy": {
+      "title": "PIN pad",
+      "show": "Show PIN pad",
+      "showHelp": "Whether the PIN pad is shown and who is at the till is asked. It holds for the whole business: besides, each device decides on its own, above.",
+      "on": "Staff choose their name and type their PIN, so every sale carries the name of whoever made it.",
+      "off": "Nobody types a PIN. Whoever opened the till in the morning is the name of every sale until the shift ends, whoever made them: you will not know who sold what or who gave a discount. Staff who only have a PIN and no account will not be able to enter.",
+      "again": "Ask again after inactivity",
+      "untilSignOut": "Until signing out",
+      "minutes": "{n} min",
+      "againMinutes": "A till nobody touches for {n} minutes closes the session and shows the PIN pad: the next sale carries the name of the next person.",
+      "againShift": "The PIN pad asks again when the session ends: at the end of the shift or when someone signs out.",
+      "digits": "PIN digits",
+      "four": "4 digits",
+      "six": "6 digits",
+      "digitsHelp": "Everyone types the same number of digits, which is what lets the keypad enter at the last one instead of asking you to confirm. The PINs in use keep working until their owner changes them.",
+      "adminOnly": "Only an administrator can change whether it asks.",
+      "failed": "Could not change it. Check the connection and try again.",
+      "loadError": "Could not load how the business asks for the PIN. Check the connection and try again."
+    },
+    "devices": {
+      "title": "Devices",
+      "intro": "The devices someone has entered on. If you lose one, remove it here: its session closes at once and it can no longer enter with a PIN.",
+      "unnamed": "Unnamed device",
+      "current": "The one you are using",
+      "modeShared": "Asks for a PIN",
+      "modePersonal": "Stays open",
+      "inUse": "In use right now",
+      "lastUsed": "Last used {when}",
+      "added": "Added {when}, unused since then",
+      "sessionUntil": "Its session stays open until {when}",
+      "lastUser": "Last entered: {who}",
+      "rename": "Name it",
+      "renameLabel": "Name",
+      "renamePlaceholder": "Name the place: Bar, Kitchen, Office laptop",
+      "save": "Save",
+      "keep": "Leave it",
+      "renameFailed": "Could not change the name. Check the connection and try again.",
+      "remove": "Remove this device",
+      "removeAsk": "Remove this device?",
+      "removeBody": "Its session closes at once. To use it again, someone has to enter on it with their account.",
+      "removeYours": "It is the device you are using: removing it will close your session and you will have to enter again.",
+      "removeFailed": "Could not remove this device. Check the connection and try again.",
+      "pruneOne": "Remove the device unused for 30 days",
+      "pruneMany": "Remove the {n} devices unused for 30 days",
+      "pruneAsk": "Remove {n} devices nobody has used for 30 days?",
+      "pruneAskOne": "Remove the device nobody has used for 30 days?",
+      "pruneBody": "They stop showing here and, to use one again, someone will have to enter on it with their account. Those used in the last 30 days and the one you are using stay.",
+      "pruneConfirm": "Remove",
+      "pruneFailed": "Could not remove the unused devices. Check the connection and try again.",
+      "empty": "Nobody has entered from any device yet.",
+      "adminOnly": "Only an administrator can see and remove the devices.",
+      "loading": "Loading the devices…",
+      "loadError": "Could not load the devices. Check the connection and try again."
     },
     "files": {
       "title": "Files",
