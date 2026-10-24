@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import type { ApprovalRow } from '../operations';
+import ApprovalsExportButton from './ApprovalsExportButton.vue';
 import ApprovalsList from './ApprovalsList.vue';
 
 function approval(fields: Partial<ApprovalRow> = {}): ApprovalRow {
@@ -109,6 +110,24 @@ describe('ApprovalsList', () => {
         },
       ],
     ]);
+  });
+
+  // The old hub's record had its download (HUB_SHELL-F93): «Export CSV» in the table's bar asks for the file with what
+  // the person has on screen, the search and the active filters, and nothing else.
+  it('carries «Export CSV» in its bar, with the search and the filters on screen', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.approval.list', { approvals: [approval()] });
+    const table = m.wrapper.getComponent(DataTable);
+    const exported = () => m.wrapper.getComponent(ApprovalsExportButton).props('query');
+    expect(table.find('[data-testid="approvals-export"]').exists()).toBe(true);
+    expect(exported()).toEqual({});
+    table.vm.$emit('update:search', ' eva ');
+    table.vm.$emit('update:filters', { at_from: '2026-10-01', way: 'pin', used: 'false' });
+    await flush();
+    expect(exported()).toEqual({ search: 'eva', at_from: '2026-10-01', way: 'pin', used: 'false' });
+    // DataTable is generic: its props are read as a plain record.
+    const props = table.props() as Record<string, unknown>;
+    expect([props.search, props.filters]).toEqual([' eva ', { at_from: '2026-10-01', way: 'pin', used: 'false' }]);
   });
 
   it('none yet says nobody had to approve anything', async () => {

@@ -2795,6 +2795,10 @@
     "method": "get",
     "path": "/api/approvals/approvers"
   },
+  "base.approval.export": {
+    "method": "get",
+    "path": "/api/approvals/export"
+  },
   "base.approval.approve": {
     "method": "post",
     "path": "/api/approvals"

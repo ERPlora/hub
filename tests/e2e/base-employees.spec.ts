@@ -9,7 +9,9 @@
 // «An approval is needed» (BASE-G136) has no screen of its own: it opens over an app's when the app asks for it, and no
 // app does yet; its dialog is ApprovalDialog.test.ts's and the server's base/tests/test_approvals.py's.
 // flow: BASE-G138 BASE-G139 BASE-G140 BASE-G142 BASE-G143 BASE-G144 BASE-G145 BASE-G146 BASE-G149 BASE-G150 BASE-G100
-// BASE-G10 BASE-G11 BASE-G02 BASE-G04 BASE-G05
+// BASE-G10 BASE-G11 BASE-G02 BASE-G04 BASE-G05 BASE-F85
+import { readFileSync } from 'node:fs';
+
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, collectProblems, EMPLOYEE, hostPage, psql, shot, shown, untilStill } from './helpers';
@@ -123,6 +125,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(shown(page).getByText('Nobody has had to approve anything in this business yet.')).toBeVisible();
     // BASE-F85: the record filters by day, action, how and whether it was used, behind its funnel (as the old hub's).
     await expect(shown(page).locator('[data-testid=approvals-filters-toggle]')).toBeVisible();
+    // BASE-F85: «Export CSV» downloads what the search and the filters keep, in the person's language: here, nobody has
+    // approved anything yet, its header alone.
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      shown(page).locator('[data-testid=approvals-export]').click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('approvals.csv');
+    expect(readFileSync(await download.path(), 'utf8')).toBe('\ufeffWhen,Action,Approved by,Asked by,With,State\r\n');
     await snap(page, 'BASE-G145', width);
     await noProblems(problems);
     await context.close();

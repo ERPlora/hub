@@ -1089,6 +1089,24 @@ class ApprovalListOut(Schema):
     approvals: list[ApprovalOut]
 
 
+class ApprovalExportIn(Schema):
+    """What Employees › Approvals keeps on screen: its search and its filters (BASE-F85); none, the whole record."""
+
+    search: str = Field("", max_length=200, description="Words of the action, or of who approved or who asked.")
+    at_from: dt.date | None = Field(None, description="From this day, in the business's time zone.")
+    at_to: dt.date | None = Field(None, description="Up to this day, included.")
+    operation: str = Field("", max_length=120, description="Only the approvals of this action.")
+    way: Literal["pin", "badge"] | None = Field(None, description="Only those approved with a PIN or with a badge.")
+    used: bool | None = Field(None, description="Only the used ones (true) or the unused ones (false).")
+
+
+class ApprovalExportOut(Schema):
+    filename: str
+    content_type: str
+    rows: int
+    csv: str
+
+
 # ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
 
 

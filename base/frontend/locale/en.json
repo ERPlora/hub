@@ -916,6 +916,11 @@
       "error": "Could not load the record of approvals.",
       "used": "Used",
       "unused": "Not used",
+      "export": {
+        "button": "Export CSV",
+        "pending": "Exporting…",
+        "failed": "The approvals could not be exported: {reason}"
+      },
       "way": {
         "pin": "PIN",
         "badge": "Badge"

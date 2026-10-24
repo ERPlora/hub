@@ -2042,10 +2042,13 @@ Pasos:
      «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
   3. Busca con «Buscar por persona o acción…» y, en «Filtros» (el embudo), filtra por «Cuándo» (un día o unos días
      seguidos), «Acción» (las que hay en el registro), «Con» y «Estado».
+  4. «Exportar CSV» descarga un archivo con las aprobaciones que dejan la búsqueda y los filtros, también las más
+     antiguas que la lista ya no enseña, con las mismas columnas en su idioma; mientras tanto dice «Exportando…».
 Entra: el registro de aprobaciones.
-Sale: nada; es solo lectura. Se pone al día sola con cada aprobación.
+Sale: nada; es solo lectura (el archivo exportado no cambia nada). Se pone al día sola con cada aprobación.
 Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido
-que autorizar nada en este negocio.».
+que autorizar nada en este negocio.» (y el archivo exportado trae solo la cabecera). Si no se puede exportar, un aviso
+lo dice con su motivo y no se descarga nada.
 Implicados: BASE-F84
 
 ### BASE-F86 Crear una llave de API y copiar su token

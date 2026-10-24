@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:49fab0b056b23473af4165808ca8bde4c0c16e45dfb2e03f22859a2a2d054acd -->
+<!-- generated from WORKBOOK.md sha256:65c4fdb90ebc4f700de197caac7be10d4d3d5d48e0154381113dd31be32277be -->
 
 ## What it is for and who it is for
 
@@ -1948,10 +1948,13 @@ Steps:
      or "Badge") and "State" ("Used" or "Not used").
   3. They search with "Search by person or action…" and, in "Filters" (the funnel), filter by "When" (a day or a few
      days in a row), "Action" (the ones on the record), "With" and "State".
+  4. "Export CSV" downloads a file with the approvals the search and the filters keep, also the older ones the list
+     no longer shows, with the same columns in their language; meanwhile it says "Exporting…".
 In: the record of approvals.
-Out: nothing; it is read only. It updates by itself with each approval.
+Out: nothing; it is read only (the exported file changes nothing). It updates by itself with each approval.
 If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve
-anything in this business yet.".
+anything in this business yet." (and the exported file brings its header alone). If it cannot export, a notice says
+so with its reason and nothing is downloaded.
 Involved: BASE-F84
 
 ### BASE-F86 Create an API key and copy its token
