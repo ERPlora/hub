@@ -15,13 +15,20 @@ from django.utils import timezone
 
 #: The currency of a business without a country (a demo): ERPlora's market.
 DEFAULT_CURRENCY = "EUR"
+#: Changes of currency newer than the CLDR that Babel ships: country → (currency, since). Bulgaria adopted the euro on
+#: 1 January 2026; Babel 2.18 still gives the lev with no end.
+ADOPTED_SINCE: dict[str, tuple[str, dt.date]] = {"BG": ("EUR", dt.date(2026, 1, 1))}
 
 
 def currency_of(country: str, *, today: dt.date | None = None) -> str:
     """The currency ``country`` (ISO 3166-1 alpha-2) pays in today; the euro without one CLDR knows."""
     if len(country) != 2:
         return DEFAULT_CURRENCY
-    found = get_territory_currencies(country.upper(), start_date=today or timezone.localdate(), tender=True)
+    today = today or timezone.localdate()
+    adopted = ADOPTED_SINCE.get(country.upper())
+    if adopted and today >= adopted[1]:
+        return adopted[0]
+    found = get_territory_currencies(country.upper(), start_date=today, tender=True)
     return found[0] if found else DEFAULT_CURRENCY
 
 

@@ -22,6 +22,12 @@ def test_the_currency_is_the_one_the_country_pays_in(country, currency):
     assert business.currency_of(country, today=TODAY) == currency
 
 
+def test_bulgaria_pays_in_euros_since_2026_though_the_cldr_of_babel_still_says_lev():
+    # Bulgaria adopted the euro on 1 January 2026 (Council decision of 8 July 2025); Babel 2.18's CLDR has no end to BGN.
+    assert business.currency_of("BG", today=TODAY) == "EUR"
+    assert business.currency_of("BG", today=dt.date(2025, 12, 31)) == "BGN"
+
+
 @pytest.mark.parametrize("country", ["", "ZZ", "X"])
 def test_without_a_country_it_knows_the_currency_is_the_euro(country):
     assert business.currency_of(country, today=TODAY) == "EUR"
