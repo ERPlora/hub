@@ -112,7 +112,7 @@ zonas:
 
 - **Catálogo**: la tira de categorías de Inventario con su número de artículos, los que enseña la
   rejilla, agotados incluidos («Todos» primero y, con Servicios, «Servicios» detrás), la lupa que abre el buscador («Buscar producto…», por nombre o
-  SKU, en el servidor; con Servicios busca también sus servicios) y la rejilla: artículos con sus
+  SKU, en el servidor; con Servicios busca también sus servicios), la tecla «Hablar» y la rejilla: artículos con sus
   iniciales, su unidad y su precio (lo agotado, en gris con «Agotado»), y al final la baldosa «Precio
   libre». En «Servicios», cada servicio
   con sus iniciales, su duración y su precio («Desde», «Por hora», «Variable» o «Gratis» si no es de
@@ -125,6 +125,16 @@ zonas:
   cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N» y el botón ⊗ «Anular
   este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie: la fila «Descuento del ticket» si lo hay, «Total» (el que calcula el
   servidor), el botón de descuento, la impresora («Imprimir cuenta») y «Cobrar · <importe>».
+
+**Hablar** (la tecla del micrófono de la tira; solo a quien puede usar el asistente y en un dispositivo
+que puede grabar): púlsala y habla. Mientras graba se pone roja, se llama «Parar» y debajo sale
+«Escuchando…»; vuelve a pulsarla para terminar (a los dos minutos para sola). Tras «Transcribiendo…»,
+lo entendido cae en el cuadro del asistente, detrás de lo que hubiera escrito, y su panel se abre: la
+persona lee lo que se ha entendido, lo corrige si hace falta y lo envía ella. **Nada se envía solo**, y
+lo que pida pasa por la tarjeta de confirmación como cualquier otra petición del asistente (BASE-F94,
+BASE-F97). Sin conexión la tecla sale apagada y, al pulsarla, dice «Sin conexión: para hablar con el
+asistente hace falta internet.». Con el asistente abierto al lado en una tableta, el catálogo se queda
+solo y la cuenta pasa a ser el cajón del botón flotante, como en el móvil.
 
 Hojas que se abren encima: precio libre, importe de un servicio sin precio fijo, nota, descuento,
 «Anular «<artículo>»», «Aparcar cuenta»,
@@ -205,6 +215,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | Error | El aviso con «Reintentar»; un rechazo de una acción sale dentro de su hoja o ventana, junto a su campo. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
+| Hablando (Vender) | La tecla «Hablar», roja, dice «Parar» y debajo sale «Escuchando…»; al parar, «Transcribiendo…». Un aviso dice lo que falla: sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.»; con el micrófono denegado, «El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.»; demasiado larga, «La grabación es demasiado larga: di algo más corto.»; si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.»; sin conexión, «Sin conexión: para hablar con el asistente hace falta internet.». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». Lo que un responsable puede aprobar con su PIN (anular y devolver una venta, anular una línea enviada, eliminar una cuenta con algo pedido, el precio libre y los descuentos por encima del máximo) sí aparece y, al pulsarlo, pide «Hace falta una aprobación». |
 
 ## Flujos
@@ -1618,6 +1629,15 @@ administrador y responsable, los mismos que anulan y devuelven).
   (`tests/test_admin.py`). Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en cobrar,
   anular, devolver y descuentos) y cada campo de `schemas.py` su `description`.
+- **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`, FIX-SALE-POS-NO-SPEAK-KEY; PLAN §30 punto 4,
+  PLAN-HUB §8 ronda 2026-10-22b): sin operación propia; reutiliza el dictado del asistente de la plataforma
+  (`recordVoice`, `canDictate`, `base64Of` e iconos de `base/frontend/lib/`, la operación
+  `base.assistant.transcribe` y `useAssistant()`: el texto va a `state.draft` y `setOpen(true)` abre el
+  panel). Se ve con `base.view_home` (el permiso de `base.assistant.transcribe` y del botón del asistente) y
+  un navegador que graba; sin conexión, `aria-disabled` con su motivo. El TPV pasa a la disposición del
+  móvil también cuando su propia caja mide menos de 700 px (`NARROW_TILL` de `PosPage.vue`): el panel
+  acoplado desde 768 px dejaba la columna del catálogo en unos 90 px en una tableta de 834. Tests:
+  `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y la e2e `tests/e2e/sale-speak.spec.ts`.
 
 ### Decisiones de plataforma
 
@@ -1734,6 +1754,14 @@ administrador y responsable, los mismos que anulan y devuelven).
     en los avisos del servidor (el tope del efectivo y del tique, el margen de precio de un servicio, lo que
     queda por devolver con un medio), que antes decían «1000.00 €». Lo que se teclea (cobro, cantidades,
     devolución) nunca se agrupa.
+38. **Tecla «Hablar» nueva** (el TPV viejo no tenía voz): sin permiso o sin micrófono no sale, como el
+    micrófono del asistente; sin conexión sale apagada y explica por qué al pulsarla, para que la tira no
+    salte cuando la red parpadea. Mercado (2026-10-24): Shopify POS apaga sin conexión las extensiones que
+    la necesitan (hilo de community.shopify.dev sobre las funciones sin conexión de las extensiones del TPV); el dictado
+    de Microsoft 365 sale gris sin internet y no existe sin suscripción; el dictado de Google Docs y los
+    micrófonos de Odoo (módulos `pits_voice_to_text_chatter`, `kg_voice_chatter`) solo salen en
+    navegadores que pueden; Gboard y el teclado de Apple quitan el micrófono sin permiso de voz; Square y
+    Toast IQ (texto) y Lightspeed AI (conversacional) no tienen tecla de voz en el TPV.
 
 ### Lo que NO hace, a propósito
 
