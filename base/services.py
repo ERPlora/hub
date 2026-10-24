@@ -534,8 +534,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     ``whatsapp_inbox.channel.sync`` with the photo's version when the app is on in that business (off, the photo
     applies and the block waits for the next one); both in this same transaction, so their notices go out after its
     COMMIT (a block out of contract keeps nothing). Its ``members`` apply on the business's memberships
-    (:func:`_apply_members`), in this transaction too. The rest of the rights it carries (plan, modules) are only
-    kept until phase 2 applies them.
+    (:func:`_apply_members`), in this transaction too. Its modules and plan are read where they are kept: the right
+    to a paid app (``base.entitlement``) and «Plan and limits» (``base.plan.usage``) follow this photo.
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
@@ -551,6 +551,9 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     if data.members is not None:
         _apply_members(hub, data.members)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
+    # Applied as the platform (/internal): its own notice goes to the platform's channel. The live queries that
+    # follow the photo (base/live.py) listen on the business's, which hears it after the COMMIT too.
+    transaction.on_commit(partial(notify, Scope("host", hub.slug), [events.HUB_STATE_APPLIED]), robust=True)
     if was_open and registry.is_suspended(hub):
         transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
     return {"applied": True, "version": data.version}

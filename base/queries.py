@@ -263,7 +263,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                 {
                     "id": config.label,
                     "name": str(config.verbose_name),
-                    "icon": config.icon,
+                    "icon": _shell_icon(config),
                     "category": config.category,
                     "category_label": str(Category(config.category).label),
                     "summary": str(config.summary),
@@ -278,6 +278,13 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
             ],
             "store_url": saas_url(f"/store/modules?business={hub.id}") if hub is not None else "",
         }
+
+
+def _shell_icon(config: Any) -> str:
+    """The icon the shell paints for a module: its first menu entry's, as the launcher and «My apps»; without a menu,
+    the shell's own for an app. The module's ``icon`` is the store's, baked apart (``base.catalog``): HubIcon refuses
+    a name the shell has not registered."""
+    return config.navigation[0].icon if config.navigation else "ion:apps-outline"
 
 
 def _first_screen(ctx: OperationContext, config: Any) -> str | None:

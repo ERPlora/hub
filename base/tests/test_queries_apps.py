@@ -59,13 +59,25 @@ def test_every_module_of_the_deployment_from_its_own_config():
     config = apps.get_app_config("demo")
     assert {key: demo[key] for key in ("name", "icon", "category", "summary", "premium", "right", "state")} == {
         "name": str(config.verbose_name),
-        "icon": config.icon,
+        "icon": config.navigation[0].icon,
         "category": config.category,
         "summary": str(config.summary),
         "premium": False,
         "right": "free",
         "state": "on",
     }
+
+
+def test_each_app_shows_the_icon_the_shell_paints_for_it():
+    """The icon of an app is its first menu entry's, as the launcher and «My apps» paint it (registered in the shell:
+    frontend/icons.test.ts); without a menu, the shell's own for an app. The module's ``icon`` is the store's, baked
+    apart for erplora.com (base/catalog.py), and HubIcon refuses a name the shell does not know: the whole screen went
+    blank on Staff's ``ion:id-card-outline``."""
+    document = by_id(app_list())
+    for config in module_configs():
+        expected = config.navigation[0].icon if config.navigation else "ion:apps-outline"
+        assert document[config.label]["icon"] == expected, config.label
+    assert document["staff"]["icon"] != apps.get_app_config("staff").icon
 
 
 def test_names_and_categories_in_the_language_of_who_asks():
