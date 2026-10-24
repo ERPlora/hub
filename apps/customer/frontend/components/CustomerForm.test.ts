@@ -164,6 +164,17 @@ describe('CustomerForm: «Add» (F01)', () => {
     expect(s.countryField().classes()).toEqual(expect.arrayContaining(['ion-invalid', 'ion-touched']));
   });
 
+  it('a birthday the browser cannot read behind a closed «More details» opens it, so the message is seen', async () => {
+    const s = await setup({ locale: 'es' });
+    const more = s.wrapper.get('[data-testid="customer-form-more"]');
+    expect((more.element as HTMLDetailsElement).open).toBe(false);
+    unreadable('birthday');
+    expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(false);
+    await flush();
+    expect((more.element as HTMLDetailsElement).open).toBe(true);
+    expect(errorText('birthday')).toBe('Introduce una fecha válida.');
+  });
+
   it('source, stage and channel are selects with their names; a card from an import keeps «Import»', async () => {
     const s = await setup({ form: { source: 'import' } });
     const texts = (id: string) => s.select(id)!.findAll('ion-select-option').map((o) => o.text());
