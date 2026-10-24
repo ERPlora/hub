@@ -15,7 +15,7 @@ from live.context import OperationContext
 from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
-from base.models import Hub, Membership, TaskSchedule
+from base.models import Hub, Location, Membership, TaskSchedule
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoSlugIn
 from base.services import demo_expire
@@ -112,6 +112,28 @@ class TaskScheduleAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
+
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    """The business's locations (round 2026-10-24b): no screen of the Hub shows them yet. Which one is the default is
+    read only (every hub's database is born with «Main» as its default, ``base/migrations/0015``), the default stays
+    active and is never deleted, so a hub always has one; another place is added, renamed, turned off or deleted."""
+
+    list_display = ("name", "is_default", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    ordering = ("-is_default", "name")
+
+    def get_readonly_fields(self, request: HttpRequest, obj=None):
+        if obj is not None and obj.is_default:
+            return ("is_default", "is_active", "created_at")
+        return ("is_default", "created_at")
+
+    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
+        if obj is not None and obj.is_default:
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 def open_hub(request: HttpRequest, slug: str) -> HttpResponseRedirect:

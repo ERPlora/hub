@@ -95,3 +95,9 @@ live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
 # The API's documentation: shown or hidden. The document itself is asked once (far bigger than a live result may be).
 live("base.api_doc.settings", on=[events.API_DOC_SETTINGS_CHANGED])
 live("base.approval.approvers", on=sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS}))
+
+# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+# No operation writes a location yet (only the platform's Django admin, which records no event): the stream sends the
+# list when it opens and again on every reconnection, and the SaaS's photo, which carries the business's plan, re-runs
+# it.
+live("base.location.list", on=[HUB_STATE_APPLIED])

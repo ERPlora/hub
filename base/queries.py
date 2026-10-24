@@ -1509,3 +1509,32 @@ def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
         "resets_at": usage.get("resets_at"),
         "demo": bool(usage.get("demo")),
     }
+
+
+# ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
+
+from base.models import Location  # noqa: E402
+from base.schemas import LocationListIn, LocationListOut  # noqa: E402
+
+
+@operation(
+    "base.location.list",
+    kind="query",
+    permission=VIEW_HOME,
+    input=LocationListIn,
+    output=LocationListOut,
+    ai={
+        "description": "Lists the places this business works in (its shops, bars or salons), the default one first, "
+        "and whether each is still in use. A business with one place has only its default one."
+    },
+)
+def location_list(ctx: OperationContext, data: LocationListIn) -> dict:
+    """The business's locations, for everyone of the hub: the default first, then by name, those no longer in use
+    too."""
+    rows = Location.objects.order_by("-is_default", "name", "id")
+    return {
+        "locations": [
+            {"id": row.id, "name": row.display_name, "is_default": row.is_default, "is_active": row.is_active}
+            for row in rows
+        ]
+    }
