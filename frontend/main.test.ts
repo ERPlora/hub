@@ -25,6 +25,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 import { createShell, logout } from '@erplora/ui/shell';
 import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
 
+import { sessionChanged } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE } from '../base/frontend/lib/app-gate';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
@@ -289,6 +290,30 @@ describe('main.ts', () => {
     await vi.waitFor(() => expect(status.value).toBe('error'));
     expect(session.value).toBeUndefined();
     expect(logged).toHaveBeenCalledWith('hub: base.session.me failed', expect.any(ApiError));
+    logged.mockRestore();
+  });
+
+  // APP-BASE-3 (BASE-G125): saving one's name in «My profile» renames the side menu at once, without a reload.
+  it('reads base.session.me again when base says the person changed, and the shell paints its answer', async () => {
+    fakeShell();
+    await main.boot({});
+    const { session, status } = shellOptions();
+    vi.mocked(sdk.client.api.call).mockResolvedValue({ ...ME, user: { id: 'u1', label: 'Ana María' } });
+    sessionChanged();
+    expect(sdk.client.api.call).toHaveBeenCalledWith('base.session.me', {});
+    await vi.waitFor(() => expect(session.value?.user?.label).toBe('Ana María'));
+    expect(status.value).toBe('live');
+  });
+
+  it('keeps the session it had when reading it again fails: a name not refreshed never signs anyone out', async () => {
+    fakeShell();
+    await main.boot({});
+    const { session, status } = shellOptions();
+    vi.mocked(sdk.client.api.call).mockRejectedValue(new ApiError(0, 'network_error', 'Network error'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    sessionChanged();
+    await vi.waitFor(() => expect(logged).toHaveBeenCalledWith('hub: base.session.me failed', expect.any(ApiError)));
+    expect([session.value, status.value]).toEqual([ME, 'live']);
     logged.mockRestore();
   });
 

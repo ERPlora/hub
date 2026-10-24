@@ -21,7 +21,7 @@ import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } f
 import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
-import { readAccess, startWayIn } from '../base/frontend/lib/access';
+import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { OPERATION_ROUTES } from './generated/operation-routes';
@@ -115,7 +115,8 @@ export function userMenu(doc: Document): ShellUserMenu {
   return { items, logout };
 }
 
-/** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. */
+/** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. `reload` reads it again
+ *  when base says the person changed (their name in «My profile», BASE-G125); a failed reload keeps the session it had. */
 function loadSession(client: LiveClient, doc: Document) {
   const text = doc.getElementById('session-me')?.textContent;
   const me = ref<SessionMe | undefined>(text ? (JSON.parse(text) as SessionMe) : undefined);
@@ -132,7 +133,14 @@ function loadSession(client: LiveClient, doc: Document) {
       },
     );
   }
-  return { session: me, status };
+  const reload = () =>
+    client.api.call('base.session.me', {}).then(
+      (answer) => {
+        me.value = answer;
+      },
+      (error: unknown) => console.error('hub: base.session.me failed', error),
+    );
+  return { session: me, status, reload };
 }
 
 /** Boots the shell and mounts it on `#app`; no mount when the gate sent the page to the login. */
@@ -143,7 +151,7 @@ export async function boot(
 ): Promise<void> {
   const config = readSpaConfig(doc);
   const client = createLiveClient(config, { routes: OPERATION_ROUTES });
-  const session = loadSession(client, doc);
+  const { reload, ...session } = loadSession(client, doc);
   const { app, router } = await createShell({
     ...session,
     routes: appRoutes(routeFiles),
@@ -184,6 +192,7 @@ export async function boot(
     reset: resetUserThemePreferences,
     label: () => session.session.value?.user?.label,
   });
+  onSessionChanged(() => void reload());
 }
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;

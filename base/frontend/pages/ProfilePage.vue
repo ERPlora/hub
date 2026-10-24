@@ -18,6 +18,7 @@ import {
 import { IonButton, IonInput, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed, getCurrentInstance, ref, watch } from 'vue';
 
+import { sessionChanged } from '../lib/access';
 import { useBaseI18n } from '../lib/i18n';
 import type { Preferences, Profile, ProfileLanguage, ProfileThemeMode } from '../operations';
 
@@ -66,6 +67,7 @@ async function saveData(): Promise<void> {
     form.value = fromProfile(answer);
     dirty.value = false;
     saved.value = true;
+    sessionChanged(); // the side menu says the new name without a reload
   } catch {
     saved.value = false; // The card paints the error; what was typed stays.
   }
@@ -396,6 +398,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             {{ t('base.profile.prefs.mode') }}
           </h4>
           <ion-segment
+            class="profile__mode"
             data-testid="profile-mode"
             :value="prefs.theme_mode || 'system'"
             :aria-label="t('base.profile.prefs.mode')"
@@ -599,6 +602,13 @@ const text = (value: unknown): string => (value === null || value === undefined 
   margin: 8px 0 0;
   font-size: 1rem;
   font-weight: 600;
+}
+
+/* Each button as wide as its words, as in the old hub: Ionic's segment is a grid of equal columns (`1fr`), which cut
+   «System (auto)» into «System (au…» on a narrow card. The three fit side by side down to 375 px. */
+.profile__mode {
+  grid-auto-columns: auto;
+  justify-content: start;
 }
 
 .profile__eyebrow {

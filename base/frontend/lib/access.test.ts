@@ -11,8 +11,10 @@ import {
   createBadgeReader,
   createIdleLock,
   enterWith,
+  onSessionChanged,
   readAccess,
   safeNext,
+  sessionChanged,
   startWayIn,
   takeSwitchAnnouncement,
 } from './access';
@@ -295,5 +297,27 @@ describe('startWayIn — what the shell does with the session’s way in, once m
     const d = deps();
     startWayIn(page({ access: ACCOUNT, preferences: NONE }), d)();
     expect([d.toast.mock.calls.length, d.paint.mock.calls.length, d.reset.mock.calls.length]).toEqual([0, 0, 0]);
+  });
+});
+
+describe('sessionChanged — what the session says of the person, read again (My profile)', () => {
+  it('tells whoever listens, every time, until they stop listening', () => {
+    const target = new EventTarget();
+    const listener = vi.fn();
+    const stop = onSessionChanged(listener, target);
+    sessionChanged(target);
+    sessionChanged(target);
+    expect(listener).toHaveBeenCalledTimes(2);
+    stop();
+    sessionChanged(target);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('tells the window by default, where the entry point listens', () => {
+    const listener = vi.fn();
+    const stop = onSessionChanged(listener);
+    sessionChanged();
+    stop();
+    expect(listener).toHaveBeenCalledOnce();
   });
 });

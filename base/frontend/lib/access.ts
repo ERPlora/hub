@@ -199,6 +199,22 @@ export function replaceWith(url: string): void {
   window.location.replace(url);
 }
 
+// ── What the session says of the person, read again ──────────────────────────────────────────────────────────────
+
+/** Dispatched on the window when what the session says of the person changed (their name, saved in «My profile»):
+ *  the entry point owns the session the shell paints, so it reads `base.session.me` again (BASE-G125). */
+export const SESSION_CHANGED = 'erplora:base-session-changed';
+
+export function sessionChanged(target: EventTarget = window): void {
+  target.dispatchEvent(new Event(SESSION_CHANGED));
+}
+
+/** Listens for `sessionChanged`; returns the function that stops listening. */
+export function onSessionChanged(listener: () => void, target: EventTarget = window): () => void {
+  target.addEventListener(SESSION_CHANGED, listener);
+  return () => target.removeEventListener(SESSION_CHANGED, listener);
+}
+
 // ── Once the shell is mounted ────────────────────────────────────────────────────────────────────────────────────
 
 export interface WayInDeps {

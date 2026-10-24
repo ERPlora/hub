@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { onSessionChanged } from '../lib/access';
 import type { Profile } from '../operations';
 import ProfilePage from './ProfilePage.vue';
 
@@ -82,21 +83,39 @@ describe('ProfilePage — who I am', () => {
     expect(wrapper.get('[data-testid="profile-saved"]').text()).toBe('Profile saved');
   });
 
+  it('a saved name tells the shell its session changed, so the side menu takes it without a reload', async () => {
+    const changed = vi.fn();
+    const stop = onSessionChanged(changed);
+    try {
+      const { wrapper, type } = await profile();
+      await type('profile-first-name', 'Ana María');
+      await wrapper.get('[data-testid="profile-save"]').trigger('click');
+      await flush();
+      expect(changed).toHaveBeenCalledOnce();
+    } finally {
+      stop();
+    }
+  });
+
   it('a refused save says so, with the Hub’s reason, and keeps what was typed', async () => {
     const refuse: Answer = (url, body) =>
       url.startsWith('/api/me/profile/update')
         ? Response.json({ error: { code: 'invalid_payload', message: 'Enter a valid email address.' } }, { status: 422 })
         : ok(url, body);
+    const changed = vi.fn();
+    const stop = onSessionChanged(changed);
     const { wrapper, type } = await profile(PROFILE, refuse);
     await type('profile-email', 'not-an-email');
     await wrapper.get('[data-testid="profile-save"]').trigger('click');
     await flush();
     const error = wrapper.get('[data-testid="profile-save-error"]');
+    expect(changed).not.toHaveBeenCalled();
     expect(error.text()).toContain('Could not save the profile');
     expect(error.text()).toContain('Enter a valid email address.');
     expect((wrapper.get('[data-testid="profile-email"]').element as HTMLInputElement & { value: string }).value).toBe(
       'not-an-email',
     );
+    stop();
   });
 
   it('a profile that cannot be read offers only «Retry», nothing to save', async () => {
