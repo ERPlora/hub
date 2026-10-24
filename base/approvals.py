@@ -8,10 +8,12 @@ nothing. For a person who may not, it answers ``requires_elevation`` (:class:`Ap
 approved and the fingerprint of that very request (:func:`fingerprint`: this business, the method, the path and the
 body); somebody of the business who holds the permission approves it (``base.approval.approve``, their PIN or badge,
 the PIN pad's hash and brakes) and the hub hands back a pass (``X-Elevation-Token``) of one use, for two minutes
-(:data:`PASS_SECONDS`). The command repeated with it goes through once, with that one permission more: the door spends
-the pass (``base.approval.spend``) and marks the request (:class:`Approved`), and ``base.operations`` adds the
-permission to that call's context. A pass that is spent, late, forged, another person's, another command's or another
-request's is the same question again, never a way in.
+(:data:`PASS_SECONDS`). The command repeated with it goes through once, with that one permission more: the door marks
+the request with the pass (:class:`Approved`), ``base.operations`` adds the permission to that call's context, and the
+pass is spent (``base.approval.spend``, its row locked) in the command's own transaction (``base.approval_spend``,
+from ``LIVE["operation_database"]``): a command that fails leaves it unspent, one that went through cannot be repeated,
+and of two at once only one runs. A pass that is spent, late, forged, another person's, another command's or another
+request's is the same question again, never a way in. Whoever is not of the business gets the refusal of always.
 """
 
 import hashlib
@@ -97,11 +99,20 @@ class ApprovalRequired(OperationError):
 
 @dataclass(frozen=True)
 class Approved:
-    """The mark of a request a manager approved: its one permission more, and who approved it."""
+    """The mark of a request that came with a manager's pass: the command it is for, its one permission more, and the
+    pass with the request's fingerprint, spent in the command's transaction (``base.approval_spend``)."""
 
-    approval_id: str
+    operation: str
     permission: str
-    approver: str
+    token: str
+    fingerprint: str
+
+
+def refusal(operation: str, fingerprint_: str) -> ApprovalRequired:
+    """The approval's question for ``operation`` on the request of ``fingerprint_``."""
+    found = approvable(operation)
+    label = found[1] if found is not None else operation
+    return ApprovalRequired(gettext("This needs a manager's approval."), operation=operation, label=label, fingerprint=fingerprint_)
 
 
 class ApprovalDoor:
@@ -120,18 +131,17 @@ class ApprovalDoor:
         op, label = found
         from base.operations import HubContextBuilder
 
+        from base.permissions import VIEW_HOME
+
         ctx = HubContextBuilder().from_request(request)
-        if ctx.has(op.permission):
+        if ctx.has(op.permission) or not ctx.has(VIEW_HOME):
+            # Somebody who may, or somebody who is not of the business: the command's own refusal of always.
             return user
         asked = fingerprint(request, ctx.scope.key)
         token = request.headers.get(HEADER, "")
         if token.startswith(TOKEN_PREFIX):
-            from base.schemas import ApprovalSpendIn
-
-            spent = get("base.approval.spend")(ctx, ApprovalSpendIn(token=token, operation=op.name, fingerprint=asked))
-            if spent.spent:
-                request.approved = Approved(approval_id=spent.id, permission=op.permission, approver=spent.approver)
-                return user
+            request.approved = Approved(operation=op.name, permission=op.permission, token=token, fingerprint=asked)
+            return user
         raise ApprovalRequired(
             gettext("This needs a manager's approval."), operation=op.name, label=label, fingerprint=asked
         )

@@ -1972,7 +1972,10 @@ Pasos:
   4. La acción se hace una vez y sale «Aprobado por {name}». La sesión de quien lo pidió no se cierra.
 Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
-**Empleados › Aprobaciones**. Eventos `base.approval.granted` y `base.approval.used`.
+**Empleados › Aprobaciones**. Eventos `base.approval.granted` y `base.approval.used`. Se gasta junto con la acción:
+si la acción falla por un motivo del negocio, la aprobación sigue sin usar y la misma acción, repetida en esos dos
+minutos, pasa con ella; si salió bien, no se repite; dos a la vez con la misma, solo pasa una. Quien no es del negocio
+recibe el rechazo de siempre, sin la pregunta de la aprobación.
 Si falla: el diálogo se queda abierto con «Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a
 intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.», «Esto ya no necesita
 aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.», la espera tras demasiados intentos o «No se pudo
@@ -2377,23 +2380,30 @@ En las pantallas de Empleados y en la Documentación de la API:
   entra (test A≠B en `base/tests/test_api_keys.py`).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca). `base/approvals.py` pone su puerta
-  (`ApprovalDoor`) delante de la sesión en toda orden: a quien le falta el permiso le responde 403
-  `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo);
+  (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
+  `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
+  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre;
   `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.pin_owner`,
   `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
-  pase de un uso (120 s, `X-Elevation-Token`); la puerta lo gasta (`base.approval.spend`, sin ruta) y
-  `base.operations` añade ese permiso a esa llamada. En el cliente, `withApproval(() => command.run(input))` de
+  pase de un uso (120 s, `X-Elevation-Token`); la puerta marca la petición con él (`Approved`), `base.operations`
+  añade ese permiso a esa llamada y el pase se gasta en la transacción de la propia orden: `LIVE["operation_database"]`
+  (`base/entitlement.py`) abre esa transacción en `base/approval_spend.py` y gasta el pase dentro
+  (`base.approval.spend`, sin ruta, con la fila bloqueada), así que una orden que falla lo deja sin gastar, una que
+  salió bien no se repite y de dos a la vez solo corre una (`base/tests/test_approval_spend.py`; excepción razonada
+  en `tests/test_guardrails.py`, `APPROVAL_SPEND_REASON`). En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
   `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
   en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo); el ajuste es
   `base.models.ApiSettings` (`base.api_doc.settings`, `base.api_doc.settings_update`). Sin Swagger UI: producción
-  aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral del hub viejo
-  necesita que el menú admita una entrada condicionada (cambio de `packages/ui`): hoy se llega desde Ajustes y desde
-  Empleados › API keys.
-- Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py` y `test_api_docs.py`; Vitest de
-  `base/frontend/lib/{people,approval,api-docs}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
+  aplica Trusted Types; la página propia la lee y la descarga. La entrada «API» del menú lateral sale con el ajuste
+  (`useApiDocsShown` de `base/frontend/lib/sidebar.ts`, que se suscribe a `base.api_doc.settings` solo con sesión).
+- Menú lateral: `SIDEBAR` de `frontend/main.ts`; cada entrada lleva el `visible` del shell (`ShellSidebarItem`,
+  `packages/ui`) con el permiso de la operación de su pantalla (`allowedTo` de `base/frontend/lib/sidebar.ts`): un
+  empleado no ve «Sistema» (`base.administer_hub`).
+- Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py`, `test_approval_spend.py` y `test_api_docs.py`; Vitest de
+  `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
   `tests/e2e/base-employees.spec.ts`.
 

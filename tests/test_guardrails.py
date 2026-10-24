@@ -63,6 +63,13 @@ SHARED_CATALOG_REASON = (
     "(base/tests/test_shared_lint.py), and the hub_shared role (SELECT, INSERT, UPDATE on those two "
     "tables) is the boundary."
 )
+#: APP-BASE-5 (rv-hub-244): a manager's pass is spent in the transaction of the command it lets through.
+APPROVAL_SPEND_REASON = (
+    "LIVE['operation_database'] wraps @operation's transaction: for the command a request's pass is for, "
+    "base.approval_spend opens that transaction on the alias the tenancy gave the command (never one of its own) and "
+    "spends the pass through the base.approval.spend operation inside it, so a command that fails rolls the spend back "
+    "and two at once lock the same row; it reads and writes nothing itself."
+)
 #: Phase 2 (plan 2026-10-22, S1): the tenancy itself chooses and checks the hubs' aliases.
 TENANCY_ALIASES_REASON = (
     "use_hub registers a hub's alias the first time a process uses it, swapping in a copy of "
@@ -83,6 +90,7 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
         "(plan 2026-10-17, §1.2)."
     ),
+    "base/approval_spend.py": APPROVAL_SPEND_REASON,
     "base/tenancy/migrator.py": (
         "Phase 2: the only function that changes a hub's schema, through its direct __ddl "
         "connection and the schema lock (CLAUDE.md «Tenencia del Hub»)."
@@ -144,6 +152,7 @@ ALIAS_EXCEPTIONS: dict[str, str] = {
         "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations "
         "(plan 2026-10-17, §1.2)."
     ),
+    "base/approval_spend.py": APPROVAL_SPEND_REASON,
     "base/tenancy/migrator.py": (
         "Phase 2: the schema migrator opens hub_<hex>__ddl itself and takes the session "
         "pg_advisory_lock of the schema (CLAUDE.md «Tenencia del Hub», PLAN-DB §14.5)."

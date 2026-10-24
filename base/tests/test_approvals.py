@@ -288,3 +288,23 @@ APPROVAL_ROUTES = {
     ("POST", "/approvals", "base.approval.approve"),
 }
 
+
+
+class TestNotOfTheBusiness:
+    """rv-hub-244: whoever is not of the business gets the refusal of always, never the approval's question with what
+    it would approve."""
+
+    def test_a_session_of_another_business_is_refused_flat(self, client, adam, make_user):
+        stranger = make_user("saas:9", host="b", role=Membership.Role.EMPLOYEE, first_name="Zoe")
+        client.force_login(stranger)
+        response = post(client, SETTINGS, CHANGE)
+        assert response.status_code == 403, response.content
+        assert code(response) == "permission_denied"
+        assert "approval" not in response.json()["error"]
+
+    def test_a_session_of_nobody_s_business_is_refused_flat(self, client, adam, make_user):
+        client.force_login(make_user("saas:10", first_name="Nobody"))
+        response = post(client, SETTINGS, CHANGE)
+        assert response.status_code == 403, response.content
+        assert code(response) == "permission_denied"
+        assert "approval" not in response.json()["error"]

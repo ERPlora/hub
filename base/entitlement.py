@@ -89,11 +89,14 @@ def blocked_apps(scope: Scope) -> frozenset[str]:
 @contextmanager
 def operation_database(op, ctx) -> Iterator[str]:
     """``LIVE["operation_database"]``: an operation of an app blocked on its business answers 402 before it opens a
-    transaction; any other goes on to the database of the tenancy (``base.tenancy.context.operation_database``)."""
+    transaction; any other goes on to the database of the tenancy (``base.tenancy.context.operation_database``), where
+    a manager's pass for it is spent in its transaction (``base.approval_spend``, APP-BASE-5)."""
     if op.app_label in blocked_apps(ctx.scope):
         raise EntitlementBlocked(_refusal(op.app_label, ctx.language))
-    with tenancy.operation_database(op, ctx) as alias:
-        yield alias
+    from base.approval_spend import spending
+
+    with tenancy.operation_database(op, ctx) as alias, spending(op, ctx, alias) as spent_on:
+        yield spent_on
 
 
 def requires_of(label: str, configs: Iterable[Any] | None = None) -> frozenset[str]:

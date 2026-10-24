@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5fc1e7bfaca09b6c4a22e623b0199c28ee3dc5300b123afe417cddb296618fd5 -->
+<!-- generated from WORKBOOK.md sha256:d895ee8ef732add2bf1ef0692b7a9bb1785d5149f3b7a18223ab039df3e286f0 -->
 
 ## What it is for and who it is for
 
@@ -1879,7 +1879,10 @@ Steps:
   4. The action is done once and "Approved by {name}" shows. The session of whoever asked is not closed.
 In: the name and the PIN, or the badge, of whoever approves.
 Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in
-**Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`.
+**Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`. It is spent together with the
+action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
+within those two minutes, goes through with it; if it went through, it is not repeated; two at once with the same one,
+only one goes through. Whoever is not of the business gets the refusal of always, without the approval's question.
 If it fails: the dialog stays open with "Those details do not approve this. Check the name and the PIN, and try
 again.", "That person cannot approve this: ask somebody who may do it themselves.", "This no longer needs an
 approval: do it again.", "This is not approved with a PIN.", the wait after too many attempts or "Could not send
