@@ -1019,3 +1019,36 @@ def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
         "switch_user": offered and bool(pin_people(slug)),
         "idle_minutes": settings.pin_inactivity_minutes if offered and settings.pin_policy == access.ALWAYS else None,
     }
+
+
+# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+
+from live.errors import OperationError  # noqa: E402 - the assistant's block keeps its imports with it
+
+from base import assistant  # noqa: E402
+from base.schemas import AssistantUsageIn, AssistantUsageOut  # noqa: E402
+
+
+@operation(
+    "base.assistant.usage",
+    kind="query",
+    permission=VIEW_HOME,
+    input=AssistantUsageIn,
+    output=AssistantUsageOut,
+    ai={"description": "Not an assistant tool (the panel's own footer: the messages of the month left)."},
+)
+def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
+    """This month's messages of the assistant as erplora.com counts them (BASE-G122): used, of how many, and when
+    they come back. What cannot be read is an error, never a number made up."""
+    try:
+        usage = assistant.usage(ctx.scope)
+    except assistant.GatewayError:
+        raise OperationError(
+            gettext("The assistant's plan could not be read now."), code="base.assistant_unavailable", status=503
+        ) from None
+    return {
+        "used": int(usage.get("used") or 0),
+        "limit": int(usage.get("limit") or 0),
+        "resets_at": usage.get("resets_at"),
+        "demo": bool(usage.get("demo")),
+    }

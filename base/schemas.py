@@ -884,3 +884,118 @@ class AvatarOut(Schema):
 
 class AvatarRemoveIn(Schema):
     """No input: one's own photo."""
+
+
+# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+
+
+class AssistantCallIn(Schema):
+    """A tool the model asked for, as the gateway gave it: its id, its name (``demo__item__create``) and its
+    arguments as the model wrote them (JSON text)."""
+
+    call_id: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200)
+    arguments: str = Field(default="{}", max_length=1_000_000)
+
+
+class AssistantDecisionIn(Schema):
+    """The person's answer to the card of the first pending write: ``accepted``, what it typed when the card asks to
+    type (a word, or how many) and ``stop`` («Cancel all»: this write and the rest of the turn)."""
+
+    call_id: str = Field(min_length=1, max_length=200)
+    accepted: bool
+    typed: str = Field(default="", max_length=200)
+    stop: bool = False
+
+
+class AssistantTurnIn(Schema):
+    """A turn of the assistant: the whole conversation (the person's browser keeps it), the tools the model asked for
+    that still wait (``pending``) with their ``continuation``, the person's answer to the first one's card and whether
+    the person is setting up the business (``setup``: the checklist goes to the model, read again)."""
+
+    messages: list[dict[str, Any]] = Field(min_length=1, max_length=1000)
+    continuation: str | None = Field(default=None, max_length=4096)
+    pending: list[AssistantCallIn] = Field(default_factory=list, max_length=64)
+    decision: AssistantDecisionIn | None = None
+    setup: bool = False
+
+
+class AssistantExecutedOut(Schema):
+    call_id: str
+    name: str = Field(description="The operation («demo.item.create»), or the tool's name when there was none.")
+    app: str
+    kind: Literal["query", "command", ""]
+    outcome: Literal["ok", "error", "refused", "cancelled"]
+    code: str
+
+
+class AssistantFieldOut(Schema):
+    name: str
+    label: str
+    kind: Literal["text", "money", "bool", "list", "object", "empty"]
+    value: Any = None
+
+
+class AssistantCardOut(Schema):
+    operation: str
+    app: str
+    app_name: str
+    action: str
+    risk: Literal["normal", "high"]
+    fields: list[AssistantFieldOut]
+    count: int | None = None
+    confirm_word: str = Field(description="What to type to confirm a dangerous write; empty for a normal one.")
+    blocked: bool = Field(description="A dangerous write that names no record: not done from the chat.")
+
+
+class AssistantTurnOut(Schema):
+    """The turn made ready (the route streams it, ``text/event-stream``): the tools' results to keep (``append``),
+    what ran (``executed``), the card of the write that waits (``confirm``) with what still waits (``pending``), and
+    what goes to the gateway (``messages``, ``tools``, ``instructions``, ``continuation``); ``stop``, why it goes no
+    further (``assistant.too_many_steps``)."""
+
+    messages: list[dict[str, Any]]
+    append: list[dict[str, Any]]
+    executed: list[AssistantExecutedOut]
+    confirm: AssistantCardOut | None = None
+    pending: list[AssistantCallIn]
+    tools: list[dict[str, Any]]
+    instructions: str
+    continuation: str | None = None
+    stop: str = ""
+
+
+class AssistantUsageIn(Schema):
+    """No input: this business's allowance of the month."""
+
+
+class AssistantUsageOut(Schema):
+    used: int
+    limit: int = Field(description="Messages of the month in the plan; 0: the plan has no assistant.")
+    resets_at: str | None = Field(None, description="When the allowance comes back (UTC); none for a demo.")
+    demo: bool
+
+
+class AssistantReportIn(Schema):
+    message_id: str = Field(min_length=1, max_length=200)
+    reason: Literal["incorrect", "harmful", "instructions", "other"]
+    comment: str = Field(default="", max_length=2000)
+    question: str = Field(default="", max_length=4000)
+    answer: str = Field(min_length=1, max_length=4000)
+
+
+class AssistantReportOut(Schema):
+    sent: bool
+    duplicate: bool
+
+
+class AssistantTranscribeIn(Schema):
+    # 2 MB of audio is 2 796 204 characters of base64 (the gateway's own limit).
+    audio: str = Field(min_length=1, max_length=2_800_000, description="The recording, in base64.")
+    mime_type: str = Field(min_length=1, max_length=100)
+    language: str = Field(default="", max_length=16)
+
+
+class AssistantTranscribeOut(Schema):
+    text: str
+    language: str

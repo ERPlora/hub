@@ -72,6 +72,7 @@ from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
 from base import access, auth, blueprint, events, queries, registry, signing, system
+from base import assistant
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST, session_host
@@ -1854,3 +1855,198 @@ def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
     return {"avatar_url": ""}
+
+
+# ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
+
+from django.utils.translation import pgettext  # noqa: E402 - the assistant's block keeps its imports with it
+
+from base.schemas import (  # noqa: E402
+    AssistantReportIn,
+    AssistantReportOut,
+    AssistantTranscribeIn,
+    AssistantTranscribeOut,
+    AssistantTurnIn,
+    AssistantTurnOut,
+)
+
+#: What the model hears of a tool that did not run (in English, as its instructions).
+NOT_CONFIRMED = "Not confirmed by the person: nothing was done."
+STOPPED = "The person stopped this request: nothing more was done."
+NOT_AVAILABLE = "This tool is not available to this person here: nothing was done."
+NOT_FROM_THE_CHAT = "This cannot be done from the chat (it names no record): nothing was done. Say where it is done."
+
+
+def _assistant_screens(ctx: OperationContext) -> dict[str, str]:
+    """The screens the assistant may link (BASE-G114): the platform's and the menus of the apps on, by name."""
+    with translation.override(ctx.language):
+        screens = {
+            "/": pgettext("base", "Home"),
+            "/apps": pgettext("base", "Apps"),
+            "/settings": pgettext("base", "Settings"),
+            "/profile": pgettext("base", "My profile"),
+        }
+        if ctx.has(ADMINISTER_HUB):
+            screens["/system"] = pgettext("base", "System")
+        for config in assistant.active_apps(ctx.scope).values():
+            for nav in getattr(config, "navigation", []) or []:
+                screens.setdefault(nav.path, f"{config.verbose_name} › {nav.label}")
+    return screens
+
+
+def _assistant_read(ctx: OperationContext, name: str) -> dict | None:
+    """``name``'s answer for the person (a read of base), or ``None`` when it fails: never made up."""
+    op = get_operation(name)
+    try:
+        return op(ctx, op.input()).model_dump(mode="json")
+    except OperationError:
+        return None
+
+
+def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.ToolOutcome":
+    """A tool that did not run, told to the model in the same envelope as an operation's error."""
+    return assistant.ToolOutcome(outcome, code, assistant.error_content(code, message))
+
+
+def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
+    """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card)``: the card when the
+    write still waits for its answer."""
+    op = assistant.operation_of(call.name, tools)
+    if op is None:
+        return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None
+    if stopped:
+        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None
+    if op.kind == "query":
+        return assistant.run_tool(ctx, op, call.arguments), None
+    try:
+        arguments = json.loads(call.arguments or "{}")
+    except ValueError:
+        arguments = None
+    if not isinstance(arguments, dict):
+        return assistant.run_tool(ctx, op, call.arguments), None
+    card = assistant.card(op, arguments, ctx.language)
+    if decision is None or decision.call_id != call.call_id:
+        return None, card
+    if card["blocked"]:
+        return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT), None
+    if decision.stop:
+        return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None
+    if not decision.accepted or not assistant.confirmed(card, decision.typed):
+        return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED), None
+    return assistant.run_tool(ctx, op, call.arguments), None
+
+
+@operation(
+    "base.assistant.turn",
+    kind="command",
+    permission=VIEW_HOME,
+    input=AssistantTurnIn,
+    output=AssistantTurnOut,
+    ai={"description": "Not an assistant tool (the assistant's own turn: the person writes it in its panel)."},
+)
+def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
+    """A turn of the Hub's assistant made ready (BASE-G111, G115…G119, G121): the reads the model asked for run as the
+    person; a write shows its card and runs only with the person's yes (``decision``; «Cancel all» = ``stop``); a tool
+    this person was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
+    and the instructions (with the checklist, read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools
+    it goes no further (``stop``)."""
+    if ctx.actor is None:
+        raise Unauthorized(gettext("Sign in to talk to the assistant."))
+    tools = assistant.catalog(ctx)
+    pending = list(data.pending)
+    decision = data.decision
+    stopped = False
+    append: list[dict] = []
+    executed: list[dict] = []
+    card = None
+    while pending:
+        call = pending[0]
+        outcome, card = _assistant_answer(ctx, tools, call, decision, stopped=stopped)
+        if outcome is None:
+            break
+        if decision is not None and decision.call_id == call.call_id:
+            stopped = decision.stop
+            decision = None
+        op = assistant.operation_of(call.name, tools)
+        append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
+        executed.append(
+            {
+                "call_id": call.call_id,
+                "name": op.name if op else call.name,
+                "app": op.app_label if op else "",
+                "kind": op.kind if op else "",
+                "outcome": outcome.outcome,
+                "code": outcome.code,
+            }
+        )
+        pending.pop(0)
+    messages = [*data.messages, *append]
+    asked = [str(m.get("content")) for m in data.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
+    business = _assistant_read(ctx, "base.business.get") or {}
+    text = assistant.instructions(
+        language=ctx.language,
+        currency=business.get("currency") or "EUR",
+        business=business.get("name") or "",
+        screens=_assistant_screens(ctx),
+    )
+    if data.setup:
+        text += "\n\n" + assistant.setup_block(_assistant_read(ctx, "base.setup.status"))
+    stop = ""
+    if card is None and not stopped and assistant.rounds(messages) >= assistant.MAX_ROUNDS:
+        stop = "assistant.too_many_steps"
+    return {
+        "messages": messages,
+        "append": append,
+        "executed": executed,
+        "confirm": card,
+        "pending": [p.model_dump() for p in pending],
+        "tools": [assistant.tool_spec(op) for op in assistant.relevant(tools, asked[-2:], ctx.language)],
+        "instructions": text,
+        "continuation": data.continuation,
+        "stop": stop,
+    }
+
+
+def _gateway_failure(code: str, message: str) -> OperationError:
+    """erplora.com did not do it (unreachable, down, refused): a 503 the panel says in its own words."""
+    return OperationError(message, code=code, status=503)
+
+
+@operation(
+    "base.assistant.report",
+    kind="command",
+    permission=VIEW_HOME,
+    input=AssistantReportIn,
+    output=AssistantReportOut,
+    ai={"description": "Not an assistant tool (the person reports an answer of the assistant from its panel)."},
+)
+def assistant_report(ctx: OperationContext, data: AssistantReportIn) -> dict:
+    """Send erplora.com's team an answer the person reports (BASE-G123), with the question that led to it."""
+    try:
+        return assistant.report(ctx.scope, **data.model_dump())
+    except assistant.GatewayError:
+        raise _gateway_failure(
+            "base.assistant_report_not_sent", gettext("The report could not be sent: try again in a moment.")
+        ) from None
+
+
+@operation(
+    "base.assistant.transcribe",
+    kind="command",
+    permission=VIEW_HOME,
+    input=AssistantTranscribeIn,
+    output=AssistantTranscribeOut,
+    ai={"description": "Not an assistant tool (the person's dictation in the panel, turned into text it reviews)."},
+)
+def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> dict:
+    """The text of the person's dictation (BASE-G112), by erplora.com: it goes to the box, never sent by itself."""
+    try:
+        return assistant.transcribe(ctx.scope, audio=data.audio, mime_type=data.mime_type, language=data.language or ctx.language)
+    except assistant.GatewayError as exc:
+        if exc.status == 413 or exc.code == "payload_too_large":
+            raise OperationError(
+                gettext("The recording is too long: dictate a shorter message."), code="base.assistant_audio_too_long", status=413
+            ) from None
+        raise _gateway_failure(
+            "base.assistant_transcribe_failed", gettext("The audio could not be transcribed: try again.")
+        ) from None
