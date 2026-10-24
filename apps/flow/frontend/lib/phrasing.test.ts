@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { CatalogOut, LogEntry, Step } from '../operations';
+import { dataChoices } from './document';
 import {
   actionLabel,
   describeClause,
@@ -84,9 +85,28 @@ describe('events and actions in words', () => {
     expect(fieldLabel('party_size', p)).toBe('Personas');
     expect(fieldLabel('assigned_to_id', p)).toBe('Asignada a');
     expect(fieldLabel('appointment_id', phrasing())).toBe('Appointment');
+    // The day and the hour an appointment or a reservation leaves ready to say: its words, never «Start date label».
+    expect(fieldLabel('start_date_label', p)).toBe('Fecha de inicio, en texto');
+    expect(fieldLabel('date_label', p)).toBe('Fecha, en texto');
+    expect(fieldLabel('start_date_label', phrasing())).toBe('Start date, as text');
     // Every word of the dictionary has its Spanish, and the Spanish is never the English left as is.
     const words = (es as { flow: { fields: Record<string, string> } }).flow.fields;
     expect(Object.keys(words).length).toBeGreaterThan(1100);
+  });
+
+  it('names every datum the editor’s own steps leave, in both languages (FLOW-F11)', () => {
+    // A call, a question, a step skipped by «Only if…» and one that failed and carried on (`dataChoices`).
+    // What the modules' actions, reads and events bring is checked by tests/test_field_words.py.
+    const runIf = { 'input.total': { gt: 1 } };
+    const call: Step = { id: 's1', kind: 'http', method: 'GET', url: 'https://api.example.com', headers: {}, body: '', timeout: 10, run_if: runIf, on_error: 'continue' };
+    const question: Step = { id: 's2', kind: 'ask', title: 'Refund?', details: '', role: '', hours: 24, on_no: 'stop', on_timeout: 'no', run_if: runIf };
+    const names = dataChoices([call, question], 2, null, CATALOG).map((choice) => choice.path.split('.').at(-1) ?? '');
+    expect(names).toEqual(expect.arrayContaining(['status', 'body', 'approved', 'expired', 'note', 'answered_by', 'skipped', 'failed', 'error_code']));
+    // Each catalogue on its own: `te` falls back to English, so it would not see a word missing in Spanish.
+    for (const [locale, catalogue] of [['en', en], ['es', es]] as const) {
+      const words = (catalogue as { flow: { fields: Record<string, string> } }).flow.fields;
+      for (const name of names) expect(words[name]?.trim(), `${locale}: ${name}`).toBeTruthy();
+    }
   });
 
   it('a path says where it comes from', () => {

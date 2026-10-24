@@ -536,6 +536,12 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
   font-size: 1.05rem;
   font-weight: 600;
 }
+/* A name (or «Untitled automation») longer than its box ends in «…» while it is not being typed, never cut
+   mid-letter; the pill and the buttons keep their place. */
+.flow-editor__name :deep(input),
+.flow-editor__name :deep(input::placeholder) {
+  text-overflow: ellipsis;
+}
 .flow-editor__icon {
   display: inline-flex;
   align-items: center;
