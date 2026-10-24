@@ -67,8 +67,16 @@ describe('AssistantConfirm', () => {
     expect(dialog.props('consequences')).toEqual(['Registros: 3 elementos']);
     expect(body()).toContain('Borrar en Citas. Revisa cada dato antes de seguir.');
     expect(body()).toContain('Afecta a 3 registros.');
+    dialog.vm.$emit('update:typed', '3');
     dialog.vm.$emit('confirm');
     expect(wrapper.emitted('decide')).toEqual([[true, '3', false]]);
+  });
+
+  it('a dangerous one sends what the person typed, as typed, for the server to check it again (rv-hub-247)', async () => {
+    const { wrapper, dialog } = await card(HIGH);
+    dialog.vm.$emit('update:typed', ' 3 ');
+    dialog.vm.$emit('confirm');
+    expect(wrapper.emitted('decide')).toEqual([[true, ' 3 ', false]]);
   });
 
   it('the amounts in the currency the card brings (gh:hub#1045)', async () => {

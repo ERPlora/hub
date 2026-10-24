@@ -315,9 +315,17 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   await expect(submit).toBeDisabled();
   await shots(page, 'BASE-G116', () => expect(card(page)).toBeVisible());
   await page.setViewportSize({ width: 1440, height: 900 });
-  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
+  const typing = card(page).locator('[data-testid="assistant-confirm-input"] input');
+  // Typed wrong: «Run it» stays off and nothing is deleted.
+  await typing.fill('confirmed');
+  await expect(submit).toBeDisabled();
+  expect((await api(context, A, 'GET', `/demo/items/detail?id=${item.data.id}`)).status).toBe(200);
+  // Typed right, in its own way: what goes to the Hub is what was typed, which the server checks again (rv-hub-247).
+  await typing.fill('  Confirm ');
   await expect(submit).toBeEnabled();
+  const sent = page.waitForRequest((request) => request.url().endsWith('/api/assistant/turn') && Boolean(request.postDataJSON()?.decision));
   await decide(page, 'submit');
+  expect((await sent).postDataJSON().decision).toMatchObject({ accepted: true, typed: '  Confirm ' });
   await expect(lastAnswer(page)).toContainText('Hecho.');
   const gone = await api(context, A, 'GET', `/demo/items/detail?id=${item.data.id}`);
   expect(gone.status).toBe(404);

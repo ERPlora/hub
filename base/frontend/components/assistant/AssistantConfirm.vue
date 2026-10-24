@@ -2,8 +2,9 @@
 // The card of a write the assistant wants to run (BASE-G115, G116, G119), over everything: the platform's
 // ConfirmDialog. A normal write says its action, its app and its first data in one line, and runs with one click; a
 // dangerous one (`risk="high"`) lists every datum by its name and, before it runs, asks to type the word in the
-// person's language — or, over records named one by one, how many (the dialog compares it as the server does). «Cancel
-// all» stops this action and the rest of the turn when more wait behind it. Nothing runs on Cancel or Escape.
+// person's language — or, over records named one by one, how many (the dialog compares it, and the server again with
+// what was typed). «Cancel all» stops this action and the rest of the turn when more wait behind it. Nothing runs on
+// Cancel or Escape.
 // Mounted with the panel: it opens when a card arrives (after mounting: Ionic presents a modal only once it is in the
 // page) and closes when the card goes; the last card stays painted while the dialog closes.
 import { ConfirmDialog } from '@erplora/ui/components';
@@ -20,6 +21,8 @@ const emit = defineEmits<{ decide: [accepted: boolean, typed: string, stop: bool
 const { t, locale } = useBaseI18n();
 const open = ref(false);
 const shown = shallowRef<AssistantCard | null>(null);
+/** What the person typed on a dangerous card, as typed: the server checks it again (BASE-G116). */
+const typed = ref('');
 
 function follow(card: AssistantCard | null): void {
   if (card) shown.value = card;
@@ -50,13 +53,14 @@ function decide(accepted: boolean, stop = false): void {
   const card = shown.value;
   if (!card || !open.value) return;
   open.value = false;
-  emit('decide', accepted, accepted ? card.confirm_word : '', stop);
+  emit('decide', accepted, accepted && high.value ? typed.value : '', stop);
 }
 </script>
 
 <template>
   <ConfirmDialog
     v-model:open="open"
+    v-model:typed="typed"
     :title="t('base.assistant.card.title')"
     :tone="high ? 'danger' : 'primary'"
     :confirm-label="t('base.assistant.card.run')"
