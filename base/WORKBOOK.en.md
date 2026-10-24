@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5028cd6bdaf50cc6d6ee43954c40f52241e87c19002306efccae9ea8f212f3d4 -->
+<!-- generated from WORKBOOK.md sha256:49fab0b056b23473af4165808ca8bde4c0c16e45dfb2e03f22859a2a2d054acd -->
 
 ## What it is for and who it is for
 
@@ -1946,7 +1946,8 @@ Steps:
      delete it.".
   2. A row per approval, the latest first: "When", "Action" (in words), "Approved by", "Asked by", "With" ("PIN"
      or "Badge") and "State" ("Used" or "Not used").
-  3. They search with "Search by person or action…".
+  3. They search with "Search by person or action…" and, in "Filters" (the funnel), filter by "When" (a day or a few
+     days in a row), "Action" (the ones on the record), "With" and "State".
 In: the record of approvals.
 Out: nothing; it is read only. It updates by itself with each approval.
 If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve

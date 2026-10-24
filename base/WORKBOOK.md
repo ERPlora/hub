@@ -2040,7 +2040,8 @@ Pasos:
      ni borrarlo.».
   2. Una fila por aprobación, la última primero: «Cuándo», «Acción» (en palabras), «Autorizado por», «Lo pidió»,
      «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
-  3. Busca con «Buscar por persona o acción…».
+  3. Busca con «Buscar por persona o acción…» y, en «Filtros» (el embudo), filtra por «Cuándo» (un día o unos días
+     seguidos), «Acción» (las que hay en el registro), «Con» y «Estado».
 Entra: el registro de aprobaciones.
 Sale: nada; es solo lectura. Se pone al día sola con cada aprobación.
 Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido

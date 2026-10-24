@@ -121,6 +121,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(page).toHaveURL(/\/employees#approvals$/);
     await expect(shown(page).getByText('Each action that needed a manager')).toBeVisible();
     await expect(shown(page).getByText('Nobody has had to approve anything in this business yet.')).toBeVisible();
+    // BASE-F85: the record filters by day, action, how and whether it was used, behind its funnel (as the old hub's).
+    await expect(shown(page).locator('[data-testid=approvals-filters-toggle]')).toBeVisible();
     await snap(page, 'BASE-G145', width);
     await noProblems(problems);
     await context.close();
