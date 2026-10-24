@@ -64,6 +64,22 @@ def test_saving_my_data_names_me_so_in_this_hub(client, ana):
     assert OutboxEvent.objects.filter(name="base.profile.updated").count() == 1
 
 
+def test_a_wrong_contact_email_says_so_in_its_own_words_never_taking_django_s_message_from_other_apps(client, ana):
+    # «Enter a valid email address.» is Django's, which other apps' catalogues translate their own way (Personal's
+    # member form): base's catalogue comes first, so translating it here changed theirs (apps/staff test_schemas).
+    response = client.post(
+        "/api/me/profile/update",
+        json.dumps({"first_name": "Ana", "last_name": "", "contact_email": "nope"}),
+        content_type="application/json",
+        HTTP_HOST=HOST,
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+    assert response.json()["error"]["code"] == "base.email_invalid"
+    assert response.json()["error"]["message"] == "Escribe un correo de contacto válido."
+    catalogue = settings.BASE_DIR / "base" / "locale" / "es" / "LC_MESSAGES" / "django.po"
+    assert 'msgid "Enter a valid email address."' not in catalogue.read_text()
+
+
 def test_the_contact_email_must_be_an_email_and_gives_no_access(client, ana):
     assert post(client, "/me/profile/update", {"first_name": "Ana", "last_name": "", "contact_email": "nope"}).status_code == 422
     post(client, "/me/profile/update", {"first_name": "Ana", "last_name": "", "contact_email": "boss@bar.example"})

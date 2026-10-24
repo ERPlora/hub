@@ -1725,7 +1725,10 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
         try:
             validate_email(email)
         except ValidationError:
-            raise InvalidPayload(gettext("Enter a valid email address."), code="base.email_invalid", fields={"contact_email": "invalid"}) from None
+            # Its own words: «Enter a valid email address.» is Django's, and other apps' catalogues translate it.
+            raise InvalidPayload(
+                gettext("Enter a valid contact email."), code="base.email_invalid", fields={"contact_email": "invalid"}
+            ) from None
     profile = _profile(user)
     profile.first_name, profile.last_name, profile.contact_email = data.first_name.strip(), data.last_name.strip(), email
     profile.save()

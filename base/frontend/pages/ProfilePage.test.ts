@@ -100,7 +100,7 @@ describe('ProfilePage — who I am', () => {
   it('a refused save says so, with the Hub’s reason, and keeps what was typed', async () => {
     const refuse: Answer = (url, body) =>
       url.startsWith('/api/me/profile/update')
-        ? Response.json({ error: { code: 'invalid_payload', message: 'Enter a valid email address.' } }, { status: 422 })
+        ? Response.json({ error: { code: 'invalid_payload', message: 'Enter a valid contact email.' } }, { status: 422 })
         : ok(url, body);
     const changed = vi.fn();
     const stop = onSessionChanged(changed);
@@ -111,7 +111,7 @@ describe('ProfilePage — who I am', () => {
     const error = wrapper.get('[data-testid="profile-save-error"]');
     expect(changed).not.toHaveBeenCalled();
     expect(error.text()).toContain('Could not save the profile');
-    expect(error.text()).toContain('Enter a valid email address.');
+    expect(error.text()).toContain('Enter a valid contact email.');
     expect((wrapper.get('[data-testid="profile-email"]').element as HTMLInputElement & { value: string }).value).toBe(
       'not-an-email',
     );

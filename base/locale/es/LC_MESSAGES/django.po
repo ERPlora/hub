@@ -1301,9 +1301,8 @@ msgid "Nothing to change."
 msgstr "No hay nada que cambiar."
 
 #: services.py:1402
-#| msgid "Another hub has this address."
-msgid "Enter a valid email address."
-msgstr "Escribe un correo electrónico válido."
+msgid "Enter a valid contact email."
+msgstr "Escribe un correo de contacto válido."
 
 #: services.py:1441
 msgid "The photo could not be saved. Use a JPG, PNG or WebP of up to 2 MB."
