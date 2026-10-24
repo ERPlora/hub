@@ -1009,7 +1009,8 @@ def void_line(ctx: OperationContext, data: OrderVoidLineIn) -> dict:
     _release_vouchers(ctx, [line])
     line.removed_at = timezone.now()
     line.void_reason = data.reason
-    line.voided_by = actor(ctx)
+    # Who authorised it: the manager who approved it with their PIN on the cashier's device, or who voided it.
+    line.voided_by = authoriser(ctx)
     line.save(update_fields=["removed_at", "void_reason", "voided_by", "updated_at"])
     reference = {"order_id": str(order.id), "line_id": str(line.id)}
     record_event(ctx, events.ORDER_LINE_REMOVED, reference)

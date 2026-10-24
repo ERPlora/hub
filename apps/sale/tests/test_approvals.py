@@ -270,7 +270,8 @@ class TestVoidLine:
         assert voided.status_code == 200, voided.content
         assert voided.json()["lines"] == []
         line = OrderLine.objects.get(pk=line_id)
-        assert (line.removed_at is not None, line.void_reason) == (True, "Agotado")
+        # The line keeps who authorised it: the manager who approved it with their PIN.
+        assert (line.removed_at is not None, line.void_reason, line.voided_by) == (True, "Agotado", "mario")
         assert [event["reason"] for event in events("sale.order.line_voided")] == ["Agotado"]
 
 
