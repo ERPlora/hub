@@ -23,5 +23,11 @@ def test_every_event_is_named_as_the_convention_says():
         "base.failed_event.created",
         "base.failed_event.retried",
         "base.failed_event.discarded",
+        # Files (APP-BASE-8): what changes the business's files.
+        "base.file.uploaded",
+        "base.file.folder_created",
+        "base.file.renamed",
+        "base.file.moved",
+        "base.file.deleted",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)

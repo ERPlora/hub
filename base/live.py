@@ -14,6 +14,7 @@ from base.events import (
     FAILED_EVENT_CREATED,
     FAILED_EVENT_DISCARDED,
     FAILED_EVENT_RETRIED,
+    FILE_EVENTS,
     HUB_REGISTERED,
     HUB_STATE_APPLIED,
 )
@@ -58,3 +59,7 @@ live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
 live("base.system.status", on=[HUB_STATE_APPLIED])
 # The log: what a new event brings shows when the tab opens again; a failed event changes the level of its row at once.
 live("base.event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
+
+# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────
+# Files' listing follows every write of the business's files (from any device) and the photo (the plan's space).
+live("base.file.list", on=sorted([HUB_STATE_APPLIED, *FILE_EVENTS]))
