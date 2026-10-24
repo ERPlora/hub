@@ -9,6 +9,7 @@ Estado de la app: en construcción (2026-10-22)
 > la actividad), con lo que acompaña a cualquier pantalla: la campana, «Actualizar plan» y la franja que
 > avisa cuando todavía no se puede facturar. También «Apps», «Plan y límites» de Sistema y las plantillas: la
 > tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer).
+> Y «Archivos»: los documentos del negocio, en carpetas.
 
 ## Para qué sirve y para quién
 
@@ -24,6 +25,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
   cargar la de otro negocio.
 - **Los datos del negocio**, en «Ajustes»: su nombre, su país, su zona horaria, su moneda y su idioma, tal como
   los tiene erplora.com, y adónde ir para cambiarlos.
+- **Los archivos del negocio**, en «Archivos»: los documentos que el equipo guarda en carpetas (facturas de
+  proveedores, contratos, cartas, fotos), para abrirlos, descargarlos y ordenarlos desde cualquier dispositivo.
 
 Quién lo usa:
 
@@ -146,6 +149,17 @@ Una tarjeta por aviso entre apps que agotó sus reintentos, con «Reenviar» y �
 «Registro de eventos»: la tabla «Hora», «Nivel» y «Evento» (en el móvil, una tarjeta por suceso), con «Buscar
 evento…» y el filtro de nivel.
 
+### Archivos
+Desde «Archivos» en el menú lateral; la ve todo el equipo. A la izquierda, «Carpetas»: el árbol de carpetas del
+negocio, que empieza en «Archivos» (lo de arriba del todo), con la carpeta abierta resaltada; en una pantalla
+estrecha, el árbol se pliega en el selector «Carpetas». A la derecha, «Buscar archivos…», «Lista» y «Cuadrícula» y,
+para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, la ruta de la carpeta abierta, con ⋮ al
+lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y el límite del plan («{used} de {limit}»)
+o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las carpetas y luego los archivos, cada uno con su
+icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮: «Abrir», «Descargar», «Renombrar», «Mover a…»
+y «Eliminar». Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en
+imágenes y PDF).
+
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
@@ -172,6 +186,15 @@ En la pantalla Ajustes · Datos y copias:
 | Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
 | Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
 | Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. |
+
+En la pantalla Archivos:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando archivos…»; en el visor, «Abriendo el archivo…». |
+| Vacío | «Sin archivos» y, a quien administra el negocio, «Sube un archivo o arrástralo aquí.»; una búsqueda sin resultados, «Ningún archivo de esta carpeta coincide con «{search}».». |
+| Error | «No se pudieron cargar los archivos» con el motivo y «Reintentar», nunca «Sin archivos»; en el visor, «No se pudo abrir el archivo» con «No llegó el contenido del archivo. Revisa la conexión e inténtalo de nuevo.». |
+| Sin permiso | Quien no administra el negocio ve, abre y descarga, sin «Nueva carpeta», «Subir archivo», «Renombrar», «Mover a…» ni «Eliminar». |
 
 ## Flujos
 
@@ -228,6 +251,11 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F49 | Ver el país del negocio | hecho |
 | BASE-F50 | Ver la moneda del negocio | parcial |
 | BASE-F51 | Cambiar el idioma del negocio en erplora.com | parcial |
+| BASE-F52 | Ver los archivos del negocio | hecho |
+| BASE-F53 | Subir archivos y crear carpetas | hecho |
+| BASE-F54 | Previsualizar y descargar un archivo | parcial |
+| BASE-F55 | Mover y renombrar un archivo o una carpeta | hecho |
+| BASE-F56 | Borrar un archivo o una carpeta | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -1207,6 +1235,120 @@ propietario o un administrador los cambian, en erplora.com.». En una demo, «Es
 erplora.com: sus datos no se cambian.».
 Implicados: HUBS-F15, HUBS-F08
 
+### BASE-F52 Ver los archivos del negocio
+<!-- origen: old-hub:HUB_SHELL-F130 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Archivos
+Pasos:
+  1. Pulsa «Archivos» en el menú lateral. Mientras carga: «Cargando archivos…».
+  2. Ve el árbol de carpetas a la izquierda (en una pantalla estrecha, el selector «Carpetas»), la ruta de la
+     carpeta abierta, lo que hay en ella en «Cuadrícula» (lo primero que sale) o en «Lista», y «Espacio»: lo que
+     ocupan los archivos del negocio y los de sus apps, contra el límite del plan («{used} de {limit}») o, si no tiene,
+     «{used} usados · Sin límite».
+  3. Entra en una carpeta pulsándola en el árbol, en la cuadrícula o en el selector, y vuelve por la ruta. La carpeta
+     abierta queda en el enlace, así que se puede compartir con el equipo.
+  4. Busca por el nombre en «Buscar archivos…», solo dentro de la carpeta abierta; sin resultados, «Ningún archivo
+     de esta carpeta coincide con «{search}».».
+  5. Una carpeta vacía dice «Sin archivos» (a quien administra el negocio, también «Sube un archivo o arrástralo
+     aquí.»).
+  6. La carpeta se pone al día sola cuando alguien del equipo sube, mueve, renombra o elimina algo, desde cualquier
+     dispositivo.
+Entra: los archivos y las carpetas de este negocio, nunca los de otro. Las carpetas que usan las apps para lo suyo
+(las imágenes de la web) no salen aquí.
+Sale: nada guardado.
+Si falla: «No se pudieron cargar los archivos» con el motivo («El almacén de archivos no ha respondido. Inténtalo de
+nuevo en un momento.» o «Comprueba la conexión y vuelve a intentarlo.») y «Reintentar»; un fallo nunca sale como «Sin
+archivos».
+Implicados: ninguno
+
+### BASE-F53 Subir archivos y crear carpetas
+<!-- origen: old-hub:HUB_SHELL-F131 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Archivos
+Pasos:
+  1. En la carpeta abierta pulsa «Subir archivo» y elige uno o varios, o los arrastra al gestor («Suelta los
+     archivos para subirlos aquí»). Mientras suben: «Subiendo {done} de {total}…».
+  2. Sale «Archivos subidos.» y aparecen en la carpeta. Si ya había uno con el mismo nombre, no se pisa: el nuevo se
+     guarda como «nombre (1).ext» y sale «Se ha subido como «{name}»: ya había uno con ese nombre.».
+  3. Para una carpeta nueva pulsa «Nueva carpeta», escribe el «Nombre de la carpeta» (hasta 100 caracteres) y pulsa
+     «Crear carpeta». Sale «Carpeta creada.» y la carpeta aparece en el árbol y en la carpeta abierta.
+Entra: los archivos, de hasta 25 MB cada uno, o el nombre de la carpeta; la carpeta abierta.
+Sale: el archivo o la carpeta, en los archivos del negocio (`base.file.uploaded`, `base.file.folder_created`).
+Si falla: cada archivo rechazado dice por qué, sin parar los demás: «No se pudo subir «{name}»: {reason}», con «Ese
+archivo pesa más de 25 MB, lo máximo que admite Archivos.», «Los programas (.{extension}) no se pueden guardar
+en Archivos: podrían dañar a quien los abra.», «No queda espacio para ese archivo: tu plan incluye {space}.» o «El
+archivo no llegó entero. Vuelve a subirlo.». Al crear una carpeta, el diálogo sigue abierto con el motivo: «Ese nombre
+no es válido. Usa un nombre sin barras ni puntos sueltos.» o «Ya hay un archivo o una carpeta con ese nombre aquí.».
+Quien no administra el negocio no ve los botones y, si lo intenta igual, lee «Solo un administrador puede modificar
+los archivos.».
+Implicados: ninguno
+
+### BASE-F54 Previsualizar y descargar un archivo
+<!-- origen: old-hub:HUB_SHELL-F132 -->
+Estado: parcial — las hojas de Excel (xlsx) y los documentos de Word (docx) dicen «Sin vista previa» y se descargan, y un archivo de datos (.json) se ve ordenado pero sin plegar; el visor del hub viejo los enseñaba
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Archivos
+Pasos:
+  1. Pulsa un archivo, o «Abrir» en su ⋮. Se abre un visor grande dentro del hub, con el nombre como título,
+     «Descargar» y «Cerrar».
+  2. Enseña imágenes (enteras en el visor, nunca más grandes que el original, con «Ampliar» y «Reducir»), PDF (las
+     primeras 30 páginas; si es más largo, «Mostrando las primeras {shown} de {total} páginas. Descarga el archivo
+     para leerlo entero.»), texto, registros y código, CSV y TSV como tabla, archivos de datos (.json) ordenados, audio y vídeo. De un texto
+     muy largo, «Mostrando el principio del archivo. Descárgalo para leerlo entero.»; de una tabla de más de 500
+     filas, «Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.».
+  3. Cualquier otro tipo: «Sin vista previa» con «Este tipo de archivo no se puede mostrar aquí. Descárgalo para
+     abrirlo con una aplicación de tu dispositivo.».
+  4. «Descargar», en el visor o en el ⋮, guarda el archivo con su nombre.
+Entra: el archivo, que el hub lee de su almacén con la sesión de la persona; el navegador nunca va al almacén y el
+archivo no queda guardado en ninguna caché.
+Sale: nada guardado.
+Si falla: «No se pudo abrir el archivo» con «No llegó el contenido del archivo. Revisa la conexión e inténtalo de
+nuevo.», nunca un visor en blanco; si no se pudo descargar, «No se pudo descargar «{name}»: {reason}».
+Implicados: ninguno
+
+### BASE-F55 Mover y renombrar un archivo o una carpeta
+<!-- origen: old-hub:HUB_SHELL-F133 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Archivos
+Pasos:
+  1. Para renombrar, elige «Renombrar» (o «Renombrar carpeta») en el ⋮: un diálogo con el nombre actual ya escrito
+     (hasta 255 caracteres). Pulsa «Renombrar» y sale «Renombrado.».
+  2. Para mover, elige «Mover a…»: «Mover «{name}»» con las carpetas del negocio en árbol, empezando por
+     «Archivos»; elige una y pulsa «Mover». También puede arrastrar el archivo o la carpeta a una carpeta del árbol o
+     de la cuadrícula. Sale «Movido a «{folder}».» (a lo de arriba del todo, «Movido a «Archivos».»).
+  3. Una carpeta se mueve o se renombra con todo lo que tiene. Si es la carpeta abierta (su ⋮, junto a la ruta), la
+     pantalla la sigue a su sitio nuevo. Nunca se ofrece como destino de sí misma ni de las suyas.
+Entra: el archivo o la carpeta y el nombre nuevo, o la carpeta de destino.
+Sale: el cambio, en los archivos del negocio (`base.file.renamed`, `base.file.moved`).
+Si falla: el diálogo sigue abierto con el motivo: «Ya hay un archivo o una carpeta con ese nombre aquí.», «Ya está en
+esa carpeta.», «Una carpeta no se puede mover dentro de sí misma.», «Ese nombre no es válido. Usa un nombre sin barras
+ni puntos sueltos.» o «Ese archivo o carpeta ya no existe. Actualiza la lista.»; al arrastrar, «No se pudo mover:
+{reason}». Quien no administra el negocio no ve «Renombrar» ni «Mover a…» y, si lo intenta igual, lee «Solo un
+administrador puede modificar los archivos.».
+Implicados: ninguno
+
+### BASE-F56 Borrar un archivo o una carpeta
+<!-- origen: old-hub:HUB_SHELL-F134 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Archivos
+Pasos:
+  1. Elige «Eliminar» (o «Eliminar carpeta») en el ⋮ de un archivo, de una carpeta o de la carpeta abierta.
+  2. La pantalla pregunta: «Eliminar archivo» con «Vas a eliminar «{name}». Esta acción no se puede deshacer.», o
+     «Eliminar carpeta» con «Vas a eliminar «{name}» y todo su contenido. Esto no se puede deshacer.».
+  3. Pulsa «Eliminar» (o «Cancelar»). Sale «Archivo eliminado.» o «Carpeta eliminada.». Si eliminó la carpeta
+     abierta, la pantalla sube a la de arriba.
+Entra: el archivo o la carpeta.
+Sale: el archivo o la carpeta, con todo lo que tenía, fuera de los archivos del negocio; no hay papelera
+(`base.file.deleted`).
+Si falla: «No se pudo eliminar: {reason}», con «Ese archivo o carpeta ya no existe. Actualiza la lista.» o «Tu sesión
+ha caducado. Vuelve a entrar e inténtalo otra vez.». Quien no administra el negocio no ve «Eliminar» y, si lo intenta
+igual, lee «Solo un administrador puede modificar los archivos.».
+Implicados: ninguno
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -1375,6 +1517,22 @@ Implicados: HUBS-F15, HUBS-F08
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
+- Archivos (BASE-F52…F56) no tiene modelo ni tabla: lista el almacén `STORAGES["hub_files"]` (`base/storage.py`: S3
+  con bucket, si no disco bajo `MEDIA_ROOT`) bajo `hub-<hex>/files/<ruta>` con `base/files.py` (sin ORM: nombres y
+  rutas, el `.keep` de una carpeta vacía, listar, subir, carpeta, renombrar, mover, borrar y `file_response`). Las
+  operaciones, todas con `ai=`: `base.file.list` y `base.file.read` (`queries.py`, `base.view_files`), y en
+  `services.py` `base.file.upload`, `create_folder` y `rename` (`base.upload_files`), `move` (`base.delete_files` y
+  además `base.upload_files`) y `delete` (`base.delete_files`). Rutas `/api/files`, `/api/files/raw` (los bytes con
+  `Cache-Control: private, no-store`, adjunto salvo `inline` en un tipo que se puede enseñar, CSP `sandbox`; su
+  descripción en JSON con `Accept: application/json`) y `/api/files/{upload,folder,rename,move,delete}`; eventos
+  `base.file.*` y consulta viva `base.file.list`. Nunca por `/p/media/` (público y con caché de un año: solo las
+  `PUBLIC_FOLDERS`). Topes: 25 MB por archivo (cuerpo de 35,1 MB en base64), nombre de 255 bytes, carpeta de 100
+  caracteres y ruta de 980 bytes; los programas (`BLOCKED_EXTENSIONS`, la lista de Gmail) se rechazan. El espacio es el
+  de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
+  guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
+  enseña. Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
+  hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
+  `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A).
 
 ## Lo que NO hace, a propósito
 
@@ -1392,3 +1550,7 @@ Implicados: HUBS-F15, HUBS-F08
 - No edita un aviso caído ni enseña lo que llevaba: se reenvía tal cual o se descarta, y el descartado se guarda.
 - No cambia el nombre, el país, la zona horaria ni el idioma del negocio: los guarda erplora.com y el hub los
   recibe. Tampoco deja elegir la moneda: es la del país del negocio.
+- Archivos no enseña las carpetas que usan las apps para lo suyo (las imágenes de la web): las gestiona cada app; los
+  registros del sistema están en «Sistema» › «Registros».
+- Archivos no tiene papelera, no copia, no comparte por enlace ni busca en todas las carpetas a la vez; tampoco guarda
+  programas ni archivos de más de 25 MB.

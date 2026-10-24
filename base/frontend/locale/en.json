@@ -524,11 +524,6 @@
         "heading": "The files could not be loaded"
       },
       "retry": "Retry",
-      "columns": {
-        "name": "Name",
-        "size": "Size",
-        "modified": "Modified"
-      },
       "folder": "Folder",
       "actions": {
         "label": "Actions for “{name}”",
@@ -549,16 +544,14 @@
         "title": "New folder",
         "name": "Folder name",
         "create": "Create folder",
-        "done": "Folder created.",
-        "failed": "Could not create the folder: {reason}"
+        "done": "Folder created."
       },
       "renameDialog": {
         "title": "Rename",
         "titleFolder": "Rename folder",
         "name": "New name",
         "save": "Rename",
-        "done": "Renamed.",
-        "failed": "Could not rename: {reason}"
+        "done": "Renamed."
       },
       "moveDialog": {
         "title": "Move “{name}”",

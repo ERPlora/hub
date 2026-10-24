@@ -524,11 +524,6 @@
         "heading": "No se pudieron cargar los archivos"
       },
       "retry": "Reintentar",
-      "columns": {
-        "name": "Nombre",
-        "size": "Tamaño",
-        "modified": "Modificado"
-      },
       "folder": "Carpeta",
       "actions": {
         "label": "Acciones de «{name}»",
@@ -549,16 +544,14 @@
         "title": "Nueva carpeta",
         "name": "Nombre de la carpeta",
         "create": "Crear carpeta",
-        "done": "Carpeta creada.",
-        "failed": "No se pudo crear la carpeta: {reason}"
+        "done": "Carpeta creada."
       },
       "renameDialog": {
         "title": "Renombrar",
         "titleFolder": "Renombrar carpeta",
         "name": "Nombre nuevo",
         "save": "Renombrar",
-        "done": "Renombrado.",
-        "failed": "No se pudo renombrar: {reason}"
+        "done": "Renombrado."
       },
       "moveDialog": {
         "title": "Mover «{name}»",
