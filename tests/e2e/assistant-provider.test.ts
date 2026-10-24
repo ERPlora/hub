@@ -43,6 +43,16 @@ describe('answerTo', () => {
     expect(textOf(answerTo([user('x'), { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed"}}' }]).frames)).toBe('No lo he hecho.');
   });
 
+  it('a chain: first a read, then a write, then the outcome (BASE-G119)', () => {
+    const question = user('E2E-CHAIN Mesa 7');
+    const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
+    expect(toolOf(answerTo([question]).frames)).toEqual({ name: 'demo__item__list', arguments: '{}' });
+    const read = [question, asked('demo__item__list'), { role: 'tool', content: '{"rows": []}' }];
+    expect(toolOf(answerTo(read).frames)).toEqual({ name: 'demo__item__create', arguments: '{"name":"Mesa 7"}' });
+    const written = [...read, asked('demo__item__create'), { role: 'tool', content: '{"id": "1"}' }];
+    expect(textOf(answerTo(written).frames)).toBe('Hecho.');
+  });
+
   it('reads the question from a message with attachments', () => {
     const parts = [{ type: 'text', text: 'E2E-FORMAT' }, { type: 'text', text: '[Attachment: a.md]' }];
     expect(textOf(answerTo([{ role: 'user', content: parts }]).frames)).toBe(FORMAT_ANSWER);

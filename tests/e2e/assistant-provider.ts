@@ -5,6 +5,7 @@
 // - `E2E-FORMAT`: an answer with a heading, bold, a list, a table and a screen of the hub;
 // - `E2E-CREATE <name>`: asks for the write `demo.item.create` with that name, then says it is done;
 // - `E2E-DELETE <id>`: asks for the dangerous write `demo.item.delete` of that item, then says it is done;
+// - `E2E-CHAIN <name>`: reads the items (`demo.item.list`), then asks to create one with that name, then says so;
 // - `E2E-CLAIM`: says it created something without running anything;
 // - `E2E-DOWN`: the provider fails (500);
 // - `E2E-SLOW`: a long answer, piece by piece, to stop it half-way;
@@ -68,6 +69,12 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
       usage,
     ],
   });
+  const chain = /E2E-CHAIN (.+)$/m.exec(question);
+  if (chain) {
+    const results = messages.filter((message) => message.role === 'tool').length;
+    if (results === 0) return call('demo__item__list', {});
+    if (results === 1) return call('demo__item__create', { name: chain[1].trim() });
+  }
   if (last?.role === 'tool') {
     const result = textOf(last.content);
     return text(/error|refused|cancel|not_confirmed|denied/i.test(result) ? 'No lo he hecho.' : 'Hecho.');

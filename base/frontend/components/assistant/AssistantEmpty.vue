@@ -79,7 +79,7 @@ const shortcuts = computed(() =>
   padding: 9px 14px;
   border: 1px solid var(--ion-border-color, #e3e5e8);
   border-radius: 10px;
-  background: var(--ion-background-color, #fff);
+  background: var(--ion-card-background, var(--ion-background-color, #fff));
   color: var(--ion-text-color, #1a1c20);
   font: inherit;
   font-size: 0.9rem;

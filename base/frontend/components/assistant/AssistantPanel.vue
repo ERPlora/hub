@@ -98,6 +98,7 @@ const onConnection = () => {
 onMounted(() => {
   window.addEventListener('online', onConnection);
   window.addEventListener('offline', onConnection);
+  document.addEventListener('keydown', onKeydown);
 });
 
 // ── The month's messages (read once per opening) ──
@@ -151,8 +152,13 @@ watch(
   { immediate: true },
 );
 
+/** The overlays whose Escape is their own (the card, the report, a menu): never the panel's. */
+const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-picker-legacy';
+
+/** Escape closes the panel wherever the focus is (the old panel had no handler), never from a dialog over it. */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Escape' || event.defaultPrevented) return;
+  if (event.key !== 'Escape' || event.defaultPrevented || !state.open) return;
+  if (event.target instanceof Element && event.target.closest(OVERLAYS)) return;
   event.preventDefault();
   close();
 }
@@ -214,6 +220,7 @@ onBeforeUnmount(() => {
   wideQuery?.removeEventListener?.('change', onWide);
   window.removeEventListener('online', onConnection);
   window.removeEventListener('offline', onConnection);
+  document.removeEventListener('keydown', onKeydown);
   document.documentElement.classList.remove(DOCKED_CLASS);
   if (speaking.value) voice?.cancel();
 });
@@ -235,7 +242,6 @@ onBeforeUnmount(() => {
     :aria-modal="state.open && !wide ? 'true' : undefined"
     :aria-hidden="state.open ? 'false' : 'true'"
     :data-open="state.open ? 'true' : 'false'"
-    @keydown="onKeydown"
   >
     <template v-if="state.open">
       <header class="assistant-head">
@@ -379,7 +385,7 @@ onBeforeUnmount(() => {
   width: min(420px, 100vw);
   padding-top: var(--ion-safe-area-top, 0px);
   border-left: 1px solid var(--ion-border-color, #e3e5e8);
-  background: var(--ion-background-color, #fff);
+  background: var(--ion-card-background, var(--ion-background-color, #fff));
   color: var(--ion-text-color, #1a1c20);
   transform: translateX(100%);
   visibility: hidden;

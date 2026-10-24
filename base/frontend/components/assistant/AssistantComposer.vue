@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 8px 10px calc(8px + var(--ion-safe-area-bottom, 0px));
   border-top: 1px solid var(--ion-border-color, #e5e7eb);
-  background: var(--ion-background-color, #fff);
+  background: var(--ion-card-background, var(--ion-background-color, #fff));
 }
 .assistant-composer-problem {
   margin: 0;

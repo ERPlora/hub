@@ -118,7 +118,7 @@ describe('AssistantPanel', () => {
     expect(aside(m).text()).toContain('Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.');
   });
 
-  it('× and Escape close it', async () => {
+  it('× and Escape close it, wherever the focus is; an Escape inside a dialog over it is the dialog’s', async () => {
     const m = await panel();
     await m.wrapper.get('[data-testid="assistant-close"]').trigger('click');
     expect(assistant.state.open).toBe(false);
@@ -126,6 +126,21 @@ describe('AssistantPanel', () => {
     await flush();
     await aside(m).trigger('keydown', { key: 'Escape' });
     expect(assistant.state.open).toBe(false);
+    assistant.setOpen(true);
+    await flush();
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(assistant.state.open).toBe(false);
+    assistant.setOpen(true);
+    await flush();
+    const dialog = document.createElement('ion-modal');
+    const field = document.createElement('input');
+    dialog.append(field);
+    document.body.append(dialog);
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(assistant.state.open).toBe(true);
+    m.wrapper.unmount();
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(assistant.state.open).toBe(true);
   });
 
   it('docked beside the screen from 768 px, pushing it, without a veil', async () => {
