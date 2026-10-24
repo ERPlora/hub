@@ -6,6 +6,8 @@
   (its sessions end at once and the PIN stops working on it) and remove at once those nobody used in 30 days.
 - G57: a plan that covers N devices (``plan.max_devices`` of the SaaS's photo) ends, at each entry, the sessions of
   the other devices past the N - 1 most recent; each of them says why at its next way in.
+- G81 (BASE-F28): «Plan and limits» counts the devices in use the way that cap does: those with a session open on
+  this hub.
 """
 
 import datetime as dt
@@ -15,7 +17,9 @@ import pytest
 from django.contrib.sessions.models import Session
 from django.test import Client
 from django.utils import timezone
+from live.context import OperationContext, Scope
 from live.models import OutboxEvent
+from live.operations import get as get_operation
 
 from base import access
 from base.models import Hub, Membership, SessionOwner, TrustedDevice
@@ -233,3 +237,50 @@ class TestThePlanCoversOneDevice:
         first = Client()
         enter(first)
         assert SessionOwner.objects.get().device_id == TrustedDevice.objects.get().pk
+
+
+class TestThePlanSaysTheDevicesInUse:
+    """BASE-G81: the devices «Plan and limits» counts are those the cap of BASE-G57 keeps: a session open on this hub."""
+
+    @pytest.fixture(autouse=True)
+    def plan(self, db):
+        Hub.objects.filter(slug="a").update(state={"plan": {"max_users": 5, "max_devices": 3}})
+
+    def devices(self, slug="a"):
+        from base.schemas import PlanUsageIn
+
+        ctx = OperationContext(
+            scope=Scope("host", slug), actor="ana", permissions=frozenset({"base.administer_hub"}), language="en"
+        )
+        return get_operation("base.plan.usage")(ctx, PlanUsageIn()).model_dump(mode="json")["devices"]
+
+    def test_none_in_use_until_someone_enters(self):
+        assert self.devices() == {"used": 0, "limit": 3}
+
+    def test_each_device_with_a_session_open_here_counts_once(self, fake_saas):
+        fake_saas()
+        till, tablet = Client(), Client()
+        enter(till)
+        enter(tablet)
+        device = SessionOwner.objects.get(session_id=tablet.session.session_key).device_id
+        # A second open session on the same device (another tab, another person) is still one device.
+        session = Session.objects.create(
+            session_key="second-on-the-tablet", session_data="", expire_date=timezone.now() + dt.timedelta(hours=1)
+        )
+        SessionOwner.objects.create(session=session, saas_user_id="7", host="a", device_id=device)
+        assert self.devices() == {"used": 2, "limit": 3}
+
+    def test_an_ended_session_a_session_without_a_device_or_another_hub_s_does_not_count(self, fake_saas):
+        # No cap here: four entries would otherwise end the oldest session before it could expire.
+        Hub.objects.filter(slug="a").update(state={"plan": {"max_users": 5, "max_devices": 0}})
+        fake_saas()
+        ended, deviceless, elsewhere, here = Client(), Client(), Client(), Client()
+        for client in (ended, deviceless, elsewhere, here):
+            enter(client)
+        Session.objects.filter(session_key=ended.session.session_key).update(
+            expire_date=timezone.now() - dt.timedelta(minutes=1)
+        )
+        SessionOwner.objects.filter(session_id=deviceless.session.session_key).update(device_id=None)
+        SessionOwner.objects.filter(session_id=elsewhere.session.session_key).update(host="b")
+        assert self.devices()["used"] == 1
+        assert self.devices("b")["used"] == 1

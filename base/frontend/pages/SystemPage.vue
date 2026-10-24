@@ -125,21 +125,24 @@ const number = (n: number) => new Intl.NumberFormat(locale.value).format(n);
             class="system-plan-card"
             data-testid="system-plan-devices"
           >
+            <!-- In use: those with a session open here, the ones the plan's cap keeps (APP-BASE-3, BASE-G57); its
+                 limit in the pill, as the old hub did. -->
             <h3>
               {{ t('base.systemPlan.devices') }}
               <StatusPill
+                v-if="usage.known"
                 tone="neutral"
-                :label="t('base.systemPlan.notCounted')"
+                :label="devicesLimit === null ? t('base.systemPlan.noLimit') : t('base.systemPlan.upTo', { n: number(devicesLimit) })"
               />
             </h3>
             <p
-              v-if="usage.known"
               class="system-plan-figure"
+              data-testid="system-plan-devices-used"
             >
-              {{ devicesLimit === null ? t('base.systemPlan.noLimit') : t('base.systemPlan.upTo', { n: number(devicesLimit) }) }}
+              {{ number(usage.devices.used ?? 0) }}
             </p>
             <p class="system-plan-hint">
-              {{ t('base.systemPlan.devicesNotCounted') }}
+              {{ t('base.systemPlan.devicesInUse') }}
             </p>
           </article>
         </div>

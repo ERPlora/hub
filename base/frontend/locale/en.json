@@ -194,8 +194,7 @@
       "limitHint": "Plan limit",
       "noLimit": "No limit",
       "upTo": "Up to {n}",
-      "notCounted": "n/a",
-      "devicesNotCounted": "The hub does not count its devices yet.",
+      "devicesInUse": "With a session open now.",
       "full": {
         "heading": "You are running out of room in your plan",
         "body": "Your plan has every place taken, so you cannot add anyone else."

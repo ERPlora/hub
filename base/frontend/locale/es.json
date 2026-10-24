@@ -194,8 +194,7 @@
       "limitHint": "Límite del plan",
       "noLimit": "Sin límite",
       "upTo": "Hasta {n}",
-      "notCounted": "n/d",
-      "devicesNotCounted": "El hub aún no lleva la cuenta de sus dispositivos.",
+      "devicesInUse": "Con una sesión abierta ahora.",
       "full": {
         "heading": "Te estás quedando sin margen en tu plan",
         "body": "Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más."

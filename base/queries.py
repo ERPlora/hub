@@ -333,17 +333,25 @@ def _first_screen(ctx: OperationContext, config: Any) -> str | None:
 def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     """«Plan and limits» of System (BASE-G81): the limits of the plan the SaaS's last photo carries (``plan``:
     ``max_users``, ``max_devices``; 0 = no limit) against the people of the business (its active members, the ones
-    the SaaS counts). Devices: the limit only, the Hub keeps no count of them yet. Memory, CPU and database size are
-    gone with the old process per hub (PLAN-HUB §1a): erplora.com measures the use. For who runs the business."""
+    the SaaS counts) and the devices in use (those with a session open on this hub: the ones the cap of BASE-G57
+    keeps, APP-BASE-3). Memory, CPU and database size are gone with the old process per hub (PLAN-HUB §1a):
+    erplora.com measures the use. For who runs the business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state = hub.state if hub is not None and isinstance(hub.state, dict) else {}
     plan = state.get("plan") if isinstance(state.get("plan"), dict) else None
     known = plan is not None and all(_is_count(plan.get(field)) for field in ("max_users", "max_devices"))
     people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).count()
+    devices = (
+        SessionOwner.objects.filter(host=ctx.scope.key, session__expire_date__gt=timezone.now())
+        .exclude(device_id=None)
+        .values("device_id")
+        .distinct()
+        .count()
+    )
     return {
         "known": known,
         "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
-        "devices": {"used": None, "limit": _limit(plan, "max_devices") if known else None},
+        "devices": {"used": devices, "limit": _limit(plan, "max_devices") if known else None},
     }
 
 
