@@ -600,7 +600,7 @@ Steps:
 In: the plan's limits erplora.com passes to the hub and the business's active people.
 Out: nothing saved.
 If it fails: "We could not read your plan" — "Check the connection and try again." with "Retry". Whoever does
-not run the business sees "Only who runs the business sees the plan and its limits.", without "Retry". While
+not run the business sees "Only whoever runs the business can see the plan and its limits.", without "Retry". While
 the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com
 sends it.".
 Involved: none

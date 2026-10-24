@@ -201,7 +201,7 @@
       "unknown": "We do not know this business's plan yet: it shows up as soon as erplora.com sends it.",
       "managed": "Plans are managed from your ERPlora account, on erplora.com.",
       "loading": "Loading your plan…",
-      "denied": "Only who runs the business sees the plan and its limits.",
+      "denied": "Only whoever runs the business can see the plan and its limits.",
       "error": {
         "heading": "We could not read your plan",
         "body": "Check the connection and try again."

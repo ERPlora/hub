@@ -67,4 +67,8 @@ describe('«Open»', () => {
   it('only for an app that is on and has a screen for this person', () => {
     expect([canOpen(TAX), canOpen(STOCK), canOpen(app('reports', { path: null }))]).toEqual([true, false, false]);
   });
+
+  it('never for an app that stopped being on, even with a screen the list still names', () => {
+    expect(canOpen(app('stock', { state: 'blocked', path: '/stock' }))).toBe(false);
+  });
 });

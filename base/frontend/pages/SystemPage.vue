@@ -4,7 +4,7 @@
 // and the devices' limit (the Hub keeps no count of them yet: «n/a», never a made-up figure) —, «Close to the limit»
 // with why when every place is taken, and where plans are managed (erplora.com; no button: the stores refuse an app
 // that sells, and «Upgrade plan» is in the menu on the web). Memory, CPU and database size went with the old process
-// per hub (PLAN-HUB §1a). Only who runs the business reads it: anyone else is told so, with no useless «Retry». The
+// per hub (PLAN-HUB §1a). Only whoever runs the business reads it: anyone else is told so, with no useless «Retry». The
 // other sections of System come with its own part; each will be a tab here, in the address hash.
 import { InlineFeedback, StatusPill, UsageMeter } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';

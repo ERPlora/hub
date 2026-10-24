@@ -69,7 +69,7 @@ describe('SystemPage › Plan and limits', () => {
     const m = await open({ session: EMPLOYEE });
     m.call.push(errorFrame(subId(m.client, 'base.plan.usage'), 'permission_denied'));
     await flush();
-    expect(m.wrapper.find('[data-testid="system-plan-denied"]').text()).toContain('Only who runs the business');
+    expect(m.wrapper.find('[data-testid="system-plan-denied"]').text()).toContain('Only whoever runs the business can see');
     expect(m.wrapper.find('[data-testid="system-plan-retry"]').exists()).toBe(false);
   });
 
