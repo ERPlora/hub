@@ -9,6 +9,7 @@ from ninja import Query, Router
 
 from apps.cash_register import queries, services
 from apps.cash_register.schemas import (
+    ClosePreviewIn,
     CountAddIn,
     CountListIn,
     MovementAddIn,
@@ -73,6 +74,11 @@ async def session_current(request):
 @bind(router, "cash_register.session.get", "/cash_register/sessions/detail")
 async def session_get(request, params: Query[SessionGetIn]):
     return await run_operation(request, queries.get_session, params)
+
+
+@bind(router, "cash_register.session.close_preview", "/cash_register/sessions/close_preview")
+async def session_close_preview(request, params: Query[ClosePreviewIn]):
+    return await run_operation(request, queries.close_preview, params)
 
 
 @bind(router, "cash_register.session.open", "/cash_register/sessions/open", status=201)

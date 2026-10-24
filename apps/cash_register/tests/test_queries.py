@@ -412,3 +412,206 @@ def test_the_session_list_takes_every_filter_its_screen_sends():
     }
     for name, value in sent.items():
         assert run("cash_register.session.list", {name: value}).total == 0, name
+
+
+# ── CASH_REGISTER-F09 The close's summary before it runs (what the assistant reads before its card) ──────
+
+
+def preview(ctx=None, **data):
+    return run("cash_register.session.close_preview", data, ctx)
+
+
+NOTHING_PENDING = {
+    "open_checks": 0,
+    "open_check_labels": [],
+    "unserved": 0,
+    "unserved_labels": [],
+    "prints": 0,
+    "print_usages": [],
+    "incomplete": False,
+}
+
+
+def test_the_close_summary_has_the_session_the_count_said_the_expected_and_the_difference(coffee):
+    from live.outbox import OutboxEvent
+
+    from apps.cash_register.tests.conftest import charge
+
+    session = open_session(10000, opening_notes="Morning")
+    charge()
+    run("cash_register.movement.add", {"type": "in", "amount": 2000})
+    before = OutboxEvent.objects.count()
+    seen = preview(closing_balance=25000)
+    assert seen.model_dump(exclude={"opened_at"}) == {
+        "session_id": session.id,
+        "number": session.number,
+        "register_name": "",
+        "opened_by": "tester",
+        "opening_balance": 10000,
+        "counted": 25000,
+        "expected_balance": 12150,
+        "difference": 12850,
+        "expected_hidden": False,
+        "count_required": True,
+        "review": NOTHING_PENDING,
+    }
+    assert seen.opened_at == session.opened_at
+    # It only reads: the session stays open and nothing is said.
+    assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
+    assert OutboxEvent.objects.count() == before
+
+
+def test_the_close_summary_counts_a_shortfall_as_a_negative_difference():
+    open_session(10000)
+    seen = preview(closing_balance=9500)
+    assert (seen.counted, seen.expected_balance, seen.difference) == (9500, 10000, -500)
+
+
+def test_the_close_summary_names_its_drawer_and_the_session_said_by_its_number():
+    run("cash_register.register.create", {"name": "Bar"})
+    session = open_session(5000)
+    seen = preview(session=session.number, closing_balance=5000)
+    assert (seen.session_id, seen.register_name, seen.difference) == (session.id, "Bar", 0)
+
+
+def test_a_blind_count_keeps_the_expected_and_the_difference_out_of_the_cashiers_close_summary():
+    # gh:cash_register#24, #84: who may not see the expected never reads it, nor the difference that gives it away.
+    run("cash_register.settings.update", {"require_blind_count": True})
+    open_session(10000)
+    cashier = preview(ctx_for("hub_employee"), closing_balance=25000)
+    assert (cashier.counted, cashier.expected_balance, cashier.difference, cashier.expected_hidden) == (
+        25000,
+        None,
+        None,
+        True,
+    )
+    # gh:cash_register#83: whoever may see it reads how much there should be.
+    manager = preview(ctx_for("hub_manager"), closing_balance=25000)
+    assert (manager.expected_balance, manager.difference, manager.expected_hidden) == (10000, 15000, False)
+
+
+def test_without_a_blind_count_the_cashier_reads_the_expected_in_the_close_summary():
+    open_session(10000)
+    seen = preview(ctx_for("hub_employee"), closing_balance=10000)
+    assert (seen.expected_balance, seen.difference, seen.expected_hidden) == (10000, 0, False)
+
+
+def test_with_the_count_required_a_close_summary_without_a_count_asks_for_it_as_the_close_does():
+    from live.errors import Conflict
+
+    open_session(10000)
+    with pytest.raises(Conflict) as refused:
+        preview()
+    assert refused.value.code == "cash_register.closing_balance_required"
+    assert set(refused.value.fields) == {"closing_balance"}
+    # With the count not required, the summary goes without a count nor a difference.
+    run("cash_register.settings.update", {"require_closing_balance": False})
+    seen = preview()
+    assert (seen.counted, seen.expected_balance, seen.difference, seen.count_required) == (None, 10000, None, False)
+
+
+def test_the_close_summary_of_a_session_that_cannot_be_closed_is_refused_as_the_close_is():
+    from live.errors import Conflict
+
+    with pytest.raises(Conflict) as refused:
+        preview(closing_balance=100)
+    assert refused.value.code == "cash_register.no_open_session"
+    session = open_session(10000)
+    run("cash_register.session.close", {"closing_balance": 10000})
+    with pytest.raises(Conflict) as refused:
+        preview(session=session.number, closing_balance=100)
+    assert refused.value.code == "cash_register.session_not_open"
+    with pytest.raises(NotFound) as refused:
+        preview(session="S-990101-0001", closing_balance=100)
+    assert refused.value.code == "cash_register.session_not_found"
+
+
+def test_the_close_summary_of_a_session_past_its_cut_off_is_refused_as_the_close_is():
+    from live.errors import Conflict
+
+    session = open_session(10000)
+    Session.objects.filter(pk=session.id).update(opened_at=timezone.now() - dt.timedelta(days=2))
+    run("cash_register.settings.update", {"auto_close_enabled": True})
+    with pytest.raises(Conflict) as refused:
+        preview(closing_balance=10000)
+    assert refused.value.code == "cash_register.session_auto_close_due"
+
+
+def test_the_close_summary_needs_the_permission_to_close():
+    from live.context import OperationContext
+
+    from apps.cash_register.tests.conftest import A
+
+    open_session(10000)
+    reader = OperationContext(scope=A, actor="x", permissions=frozenset({"cash_register.view_session"}))
+    with pytest.raises(PermissionDenied):
+        preview(reader, closing_balance=10000)
+
+
+# ── CASH_REGISTER-F08 The shift review inside the close's summary (gh:cash_register#68) ─────────────────
+
+
+def test_the_close_summary_carries_what_is_still_pending_in_sales_the_kitchen_and_printing():
+    open_session(10000)
+    run("sale.order.open", {"label": "Table 4"})
+    run("sale.order.open", {"label": "Table 7"})
+    run("kitchen.ticket.create", {"label": "Terrace 2", "items": [{"name": "Burger"}]})
+    run(
+        "printing.job.create",
+        {
+            "document_type": "receipt",
+            "document": {"receipt_id": "T-1", "items": [], "total": 0.0, "payment_method": "Cash"},
+        },
+    )
+    review = preview(closing_balance=10000).review
+    assert (review.open_checks, sorted(review.open_check_labels)) == (2, ["Table 4", "Table 7"])
+    assert (review.unserved, review.unserved_labels) == (1, ["Terrace 2"])
+    # The receipt waiting, and the kitchen ticket's own paper (the kitchen queues it, with no printer to take it).
+    assert (review.prints, review.print_usages) == (2, ["receipt", "kitchen"])
+    assert review.incomplete is False
+
+
+def test_an_app_not_on_in_the_business_has_nothing_pending_in_the_close_summary(monkeypatch):
+    from live.operations import registry
+
+    open_session(10000)
+    for name in ("kitchen.ticket.board", "printing.job.summary"):
+        monkeypatch.delitem(registry, name)
+    assert preview(closing_balance=10000).review.model_dump() == NOTHING_PENDING
+
+
+def test_an_app_off_in_the_business_has_nothing_pending_in_the_close_summary(monkeypatch):
+    from live.errors import AppInactive
+    from live.operations import registry
+
+    open_session(10000)
+
+    def off(ctx, data):
+        raise AppInactive("Kitchen is not on in this business.")
+
+    monkeypatch.setitem(registry, "kitchen.ticket.board", _replaced(registry["kitchen.ticket.board"], off))
+    assert preview(closing_balance=10000).review.model_dump() == NOTHING_PENDING
+
+
+def test_a_reading_refused_makes_the_review_of_the_close_summary_incomplete():
+    from live.context import OperationContext
+
+    from apps.cash_register.tests.conftest import A
+
+    open_session(10000)
+    run("sale.order.open", {"label": "Table 4"})
+    # May close the drawer but not read the open checks, the kitchen or the print queue.
+    closer = OperationContext(
+        scope=A,
+        actor="x",
+        permissions=frozenset({"cash_register.view_session", "cash_register.close_session", "kitchen.view_ticket"}),
+    )
+    review = preview(closer, closing_balance=10000).review
+    assert (review.open_checks, review.prints, review.incomplete) == (0, 0, True)
+
+
+def _replaced(op, function):
+    """``op`` as registered, doing ``function`` instead (its name, permission, input and output kept)."""
+    import dataclasses
+
+    return dataclasses.replace(op, fn=function)

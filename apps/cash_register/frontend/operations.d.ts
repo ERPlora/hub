@@ -166,6 +166,38 @@ export interface SessionCloseIn extends SessionRefIn {
   closing_notes?: string;
 }
 
+export interface ClosePreviewIn extends SessionRefIn {
+  closing_balance?: number;
+}
+
+/** What is still open when the drawer closes (CASH_REGISTER-F08). */
+export interface ShiftReviewOut {
+  open_checks: number;
+  open_check_labels: string[];
+  unserved: number;
+  unserved_labels: string[];
+  prints: number;
+  print_usages: string[];
+  incomplete: boolean;
+}
+
+/** The close's summary before it runs (CASH_REGISTER-F09): the expected and the difference are null for whoever a
+ *  blind count hides them from. */
+export interface ClosePreviewOut {
+  session_id: string;
+  number: string;
+  register_name: string;
+  opened_at: string;
+  opened_by: string;
+  opening_balance: number;
+  counted: number | null;
+  expected_balance: number | null;
+  difference: number | null;
+  expected_hidden: boolean;
+  count_required: boolean;
+  review: ShiftReviewOut;
+}
+
 export interface AutoCloseOut {
   closed: SessionRow[];
 }
@@ -258,6 +290,7 @@ declare module '@erplora/ui/sdk' {
     'cash_register.session.get': { input: SessionGetIn; output: SessionOut };
     'cash_register.session.print': { input: SessionGetIn; output: SessionPrintOut };
     'cash_register.session.open': { input: SessionOpenIn; output: SessionRow };
+    'cash_register.session.close_preview': { input: ClosePreviewIn; output: ClosePreviewOut };
     'cash_register.session.close': { input: SessionCloseIn; output: SessionRow };
     'cash_register.session.auto_close': { input: EmptyIn; output: AutoCloseOut };
     'cash_register.movement.list': { input: MovementListIn; output: Page<MovementRow> };

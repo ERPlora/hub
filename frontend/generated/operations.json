@@ -1107,6 +1107,10 @@
     "method": "get",
     "path": "/api/cash_register/sessions/detail"
   },
+  "cash_register.session.close_preview": {
+    "method": "get",
+    "path": "/api/cash_register/sessions/close_preview"
+  },
   "cash_register.session.open": {
     "method": "post",
     "path": "/api/cash_register/sessions/open"
