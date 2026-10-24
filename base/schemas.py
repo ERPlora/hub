@@ -332,6 +332,7 @@ class AccessDoorOut(Schema):
     pin_length: int = Field(description="How many digits a PIN of this business has (4 or 6).")
     people: list[PinPersonOut] = Field(description="The faces of the grid; none where the PIN is not offered.")
     wait: int = Field(description="Seconds this address still waits after too many wrong PINs; 0 when it may try.")
+    plan_url: str = Field(description="erplora.com's plans, for «Upgrade plan» when another device's entry ended this one.")
 
 
 class PinSetIn(Schema):

@@ -94,6 +94,13 @@ class TestTheDoor:
         answer = door(client)
         assert (answer["pin"], answer["people"]) == (False, [])
 
+    def test_the_door_carries_erplora_com_s_plans_without_naming_the_business(self, client, ana, settings):
+        # BASE-G57: «Upgrade plan» after another device's entry ended this one; nobody is signed in, so the link is
+        # the Store's plans of erplora.com (which asks who it is), never this hub's id.
+        settings.SAAS_URL = "https://erplora.example"
+        answer = door(client)
+        assert answer["plan_url"] == "https://erplora.example/store/plans"
+
     def test_a_business_of_six_digit_pins_says_so(self, client, ana):
         a_device(client)
         with_pin(ana, "482613")

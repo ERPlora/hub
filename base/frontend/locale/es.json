@@ -101,7 +101,191 @@
     },
     "userMenu": {
       "account": "Mi cuenta",
-      "reportProblem": "Reportar un problema"
+      "reportProblem": "Reportar un problema",
+      "profile": "Perfil",
+      "switchUser": "Cambiar de usuario"
+    },
+    "pinpad": {
+      "erase": "Borrar"
+    },
+    "access": {
+      "title": "Acceso",
+      "heading": "Entra en tu negocio",
+      "theme": "Cambiar entre claro y oscuro",
+      "tabs": {
+        "label": "Cómo entrar",
+        "pin": "PIN",
+        "account": "Cuenta"
+      },
+      "pinIntro": "Introduce tu PIN",
+      "badgeHint": "…o pasa tu placa: no hace falta elegir tu nombre antes.",
+      "chooseUser": "Elige tu usuario",
+      "changeUser": "Cambiar usuario",
+      "pinOf": "PIN de {name}",
+      "accountIntro": "Entra con tu cuenta de erplora.com: tu email y contraseña, Google o tu código de verificación.",
+      "accountButton": "Entrar con tu cuenta",
+      "footerTrusted": "ERPlora · dispositivo de confianza",
+      "footer": "ERPlora · conexión segura",
+      "entering": "Entrando…",
+      "loading": "Cargando…",
+      "failed": "No se pudo entrar. Comprueba la conexión e inténtalo de nuevo.",
+      "doorError": "No se pudo cargar el pinpad. Puedes entrar con tu cuenta.",
+      "wait": "Demasiados intentos fallidos. Espera {minutes} min y vuelve a intentarlo.",
+      "notice": {
+        "endedTitle": "Tu sesión ha terminado",
+        "ended": "Caducó o se cerró. Vuelve a entrar.",
+        "deviceLimitTitle": "Sesión abierta en otro dispositivo",
+        "deviceLimit": "Tu plan cubre un dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí, o amplía los dispositivos de tu plan.",
+        "upgrade": "Actualizar plan"
+      }
+    },
+    "pinSetup": {
+      "title": "Crea tu PIN de acceso",
+      "why": "Con él entrarás en esta caja sin tu contraseña.",
+      "choose": "Elige un PIN de {n} dígitos",
+      "confirm": "Confirma tu PIN",
+      "mismatch": "Los PIN no coinciden, inténtalo de nuevo",
+      "later": "Ahora no",
+      "failed": "No se pudo guardar el PIN. Vuelve a intentarlo.",
+      "loadError": "No se pudo leer tu perfil. Puedes elegir tu PIN más tarde en Mi perfil."
+    },
+    "switchUser": {
+      "title": "Cambiar de usuario",
+      "intro": "La venta sigue abierta. A partir de ahora queda a nombre de quien entre aquí.",
+      "who": "¿Quién se pone?",
+      "other": "Otra persona",
+      "cancel": "Cancelar",
+      "nowServing": "Ahora atiende {name}",
+      "empty": "Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.",
+      "loadError": "No se pudo cargar quién trabaja aquí. Comprueba la conexión e inténtalo de nuevo."
+    },
+    "profile": {
+      "title": "Mi perfil",
+      "subtitle": "Tu identidad y tus preferencias personales en este negocio.",
+      "summary": "Resumen de la cuenta",
+      "loading": "Cargando tu perfil…",
+      "loadErrorTitle": "No se pudo cargar el perfil",
+      "loadError": "Tus datos siguen igual. Comprueba la conexión y vuelve a intentarlo.",
+      "retry": "Reintentar",
+      "photo": {
+        "label": "Foto",
+        "saved": "Foto actualizada",
+        "removed": "Foto quitada",
+        "failed": "No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB."
+      },
+      "data": {
+        "title": "Datos de la cuenta",
+        "firstName": "Nombre",
+        "lastName": "Apellidos",
+        "email": "Correo electrónico",
+        "emailHelp": "Solo para contactarte: no es el correo con el que entras.",
+        "role": "Rol en este negocio: {role}",
+        "save": "Guardar mis datos",
+        "saved": "Perfil guardado",
+        "failed": "No se pudo guardar el perfil"
+      },
+      "prefs": {
+        "title": "Preferencias",
+        "language": "Idioma",
+        "languageHelp": "Se guarda para ti. Si no eliges uno, se usa el idioma del negocio.",
+        "businessLanguage": "Usar el idioma del negocio",
+        "appearance": "Apariencia",
+        "appearanceHelp": "Elige el modo y la paleta que prefieras.",
+        "palette": "Paleta de tema",
+        "mode": "Tema",
+        "modes": {
+          "system": "Sistema (auto)",
+          "light": "Claro",
+          "dark": "Oscuro"
+        },
+        "business": "Usar la apariencia del negocio",
+        "failed": "No se pudieron guardar tus preferencias. Comprueba la conexión e inténtalo de nuevo."
+      },
+      "pin": {
+        "title": "PIN",
+        "intro": "El PIN con el que entras en la caja. Cámbialo cuando quieras — no hace falta que lo haga nadie más.",
+        "introNone": "Todavía no tienes un PIN. Establece uno para poder entrar también desde la caja.",
+        "current": "PIN actual",
+        "new": "PIN nuevo",
+        "repeat": "Repite el PIN nuevo",
+        "change": "Cambiar PIN",
+        "set": "Establecer PIN",
+        "saved": "PIN actualizado",
+        "length": "El PIN debe tener {n} dígitos.",
+        "mismatch": "Los dos PIN no coinciden."
+      }
+    },
+    "settings": {
+      "title": "Ajustes",
+      "tabs": {
+        "label": "Secciones de Ajustes",
+        "general": "General"
+      }
+    },
+    "device": {
+      "title": "Este dispositivo",
+      "intro": "Cómo pregunta este dispositivo quién lo está usando. Cada dispositivo del negocio se decide por separado.",
+      "shared": "Compartido — una caja o tablet que usan varias personas",
+      "sharedHelp": "Pide PIN al entrar y lo olvida al acabar el turno, así que cada venta queda atribuida a quien la hizo.",
+      "personal": "Personal — un dispositivo que solo usas tú",
+      "personalHelp": "La sesión se queda abierta y nunca pide PIN.",
+      "adminOnly": "Solo un administrador puede cambiar cómo entra la gente en este dispositivo.",
+      "unknown": "Este navegador todavía no es un dispositivo del negocio: entra una vez aquí con tu cuenta y podrás elegir.",
+      "failed": "No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
+      "loadError": "No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo."
+    },
+    "pinPolicy": {
+      "title": "Pinpad",
+      "show": "Mostrar pinpad",
+      "showHelp": "Si se muestra el pinpad y se pregunta quién está en la caja. Vale para todo el negocio: además, cada dispositivo decide por su cuenta, arriba.",
+      "on": "El personal elige su nombre y teclea su PIN, así que cada venta lleva el nombre de quien la hizo.",
+      "off": "Nadie teclea un PIN. Quien abriera la caja por la mañana es el nombre de todas las ventas hasta que acabe el turno, las hiciera quien las hiciera: no podrás saber quién vendió qué ni quién hizo un descuento. El personal que solo tiene PIN y no tiene cuenta no podrá entrar.",
+      "again": "Volver a preguntar tras inactividad",
+      "untilSignOut": "Hasta cerrar sesión",
+      "minutes": "{n} min",
+      "againMinutes": "Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.",
+      "againShift": "El pinpad vuelve a preguntar cuando acaba la sesión: al terminar el turno o cuando alguien cierra sesión.",
+      "digits": "Dígitos del PIN",
+      "four": "4 dígitos",
+      "six": "6 dígitos",
+      "digitsHelp": "Todo el mundo teclea el mismo número de dígitos, que es lo que permite que el teclado entre al último en vez de pedirte confirmar. Los PIN que ya se usan siguen funcionando hasta que su dueño los cambie.",
+      "adminOnly": "Solo un administrador puede cambiar si se pregunta.",
+      "failed": "No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.",
+      "loadError": "No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo."
+    },
+    "devices": {
+      "title": "Dispositivos",
+      "intro": "Los dispositivos en los que alguien ha entrado. Si pierdes uno, quítalo aquí: su sesión se cierra al momento y deja de poder entrar con PIN.",
+      "unnamed": "Dispositivo sin nombre",
+      "current": "El que estás usando",
+      "modeShared": "Pide PIN",
+      "modePersonal": "Se queda abierto",
+      "inUse": "En uso ahora mismo",
+      "lastUsed": "Se usó por última vez {when}",
+      "added": "Añadido {when}, sin usar desde entonces",
+      "sessionUntil": "Su sesión sigue abierta hasta {when}",
+      "lastUser": "La última vez entró {who}",
+      "rename": "Ponerle nombre",
+      "renameLabel": "Nombre",
+      "renamePlaceholder": "Ponle el nombre del sitio: Barra, Cocina, Portátil del despacho",
+      "save": "Guardar",
+      "keep": "Dejarlo",
+      "renameFailed": "No se pudo cambiar el nombre. Comprueba la conexión e inténtalo de nuevo.",
+      "remove": "Quitar este dispositivo",
+      "removeAsk": "¿Quitar este dispositivo?",
+      "removeBody": "Su sesión se cierra al momento. Para volver a usarlo, alguien tiene que entrar en él con su cuenta.",
+      "removeYours": "Es el dispositivo que estás usando: al quitarlo se cerrará tu sesión y tendrás que volver a entrar.",
+      "removeFailed": "No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
+      "pruneOne": "Quitar el dispositivo sin usar desde hace 30 días",
+      "pruneMany": "Quitar los {n} dispositivos sin usar desde hace 30 días",
+      "pruneAsk": "¿Quitar {n} dispositivos que nadie usa desde hace 30 días?",
+      "pruneBody": "Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.",
+      "pruneConfirm": "Quitar",
+      "pruneFailed": "No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.",
+      "empty": "Todavía no ha entrado nadie desde ningún dispositivo.",
+      "adminOnly": "Solo un administrador puede ver y quitar los dispositivos.",
+      "loading": "Cargando los dispositivos…",
+      "loadError": "No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo."
     }
   }
 }

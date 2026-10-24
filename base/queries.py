@@ -15,6 +15,7 @@ from live.errors import NotFound, Unauthorized
 from live.operations import operation
 
 from base import access, home
+from base.auth import saas_url
 from base.models import (
     AccessSettings,
     Credential,
@@ -360,7 +361,14 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
          for credential, user in people),
         key=lambda face: face["name"].casefold(),
     )
-    return {"pin": offered and (bool(faces) or wait > 0), "pin_length": settings.pin_length, "people": faces, "wait": wait}
+    return {
+        "pin": offered and (bool(faces) or wait > 0),
+        "pin_length": settings.pin_length,
+        "people": faces,
+        "wait": wait,
+        # BASE-G57's «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
+        "plan_url": saas_url("/store/plans"),
+    }
 
 
 def language_of(user, slug: str) -> str:
