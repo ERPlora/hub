@@ -1019,3 +1019,70 @@ class ApiKeyTokenOut(Schema):
 
 class ApiKeyRevokeOut(Schema):
     key: ApiKeyOut
+
+
+# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+
+
+class ApprovalIn(Schema):
+    """A manager approves one refused command: their person and PIN, or their badge."""
+
+    operation: str = Field(max_length=120)
+    fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$", description="The refused request's, from requires_elevation.")
+    person: str | None = Field(None, max_length=64, description="The id of who approves, from base.approval.approvers.")
+    pin: str | None = Field(None, max_length=16)
+    badge: str | None = Field(None, max_length=128)
+
+
+class ApprovalPassOut(Schema):
+    """The pass of one use (header X-Elevation-Token), shown once, and who approved."""
+
+    token: str
+    approver: str
+    expires_in: int = Field(description="Seconds the pass lasts.")
+
+
+class ApprovalSpendIn(Schema):
+    token: str = Field(max_length=128)
+    operation: str = Field(max_length=120)
+    fingerprint: str = Field(max_length=64)
+
+
+class ApprovalSpentOut(Schema):
+    spent: bool
+    id: str
+    approver: str
+
+
+class ApproversIn(Schema):
+    operation: str = Field(max_length=120)
+
+
+class ApproverOut(Schema):
+    id: str = Field(description="The person's id in the hub, to approve with their PIN.")
+    name: str
+    initials: str
+
+
+class ApproversOut(Schema):
+    people: list[ApproverOut]
+
+
+class ApprovalListIn(Schema):
+    """No input."""
+
+
+class ApprovalOut(Schema):
+    id: UUID
+    at: dt.datetime
+    action: str = Field(description="What was approved, in words.")
+    operation: str
+    requested_by: str
+    approved_by: str
+    way: Literal["pin", "badge"]
+    used: bool
+    used_at: dt.datetime | None
+
+
+class ApprovalListOut(Schema):
+    approvals: list[ApprovalOut]

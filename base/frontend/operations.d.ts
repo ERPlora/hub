@@ -531,6 +531,42 @@ export interface ApiKeyInput {
   scopes: Record<string, ApiKind[]>;
 }
 
+/** `base.ApprovalOut`: one approval of the record (Employees › Approvals). */
+export interface ApprovalRow {
+  id: string;
+  at: string;
+  action: string;
+  operation: string;
+  requested_by: string;
+  approved_by: string;
+  way: 'pin' | 'badge';
+  used: boolean;
+  used_at: string | null;
+}
+
+/** `base.ApproverOut`: somebody who can approve the action, by name. */
+export interface Approver {
+  id: string;
+  name: string;
+  initials: string;
+}
+
+/** `base.ApprovalIn`: their person and PIN, or their badge. */
+export interface ApprovalInput {
+  operation: string;
+  fingerprint: string;
+  person?: string;
+  pin?: string;
+  badge?: string;
+}
+
+/** `base.ApprovalPassOut`: the pass of one use, and who approved. */
+export interface ApprovalPass {
+  token: string;
+  approver: string;
+  expires_in: number;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
@@ -600,5 +636,8 @@ declare module '@erplora/ui/sdk' {
     'base.api_key.create': { input: ApiKeyInput; output: { key: ApiKeyRow; token: string } };
     'base.api_key.rotate': { input: { id: string }; output: { key: ApiKeyRow; token: string } };
     'base.api_key.revoke': { input: { id: string }; output: { key: ApiKeyRow } };
+    'base.approval.list': { input: NoInput; output: { approvals: ApprovalRow[] } };
+    'base.approval.approvers': { input: { operation: string }; output: { people: Approver[] } };
+    'base.approval.approve': { input: ApprovalInput; output: ApprovalPass };
   }
 }

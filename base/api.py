@@ -32,7 +32,7 @@ from base.schemas import (
     ProfileUpdateIn,
 )
 
-from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
+from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
 
 router = Router(tags=["base"])
 
@@ -305,3 +305,21 @@ async def api_key_rotate(request, data: ApiKeyIdIn):
 @bind(router, "base.api_key.revoke", "/keys/revoke")
 async def api_key_revoke(request, data: ApiKeyIdIn):
     return await run_operation(request, services.api_key_revoke, data)
+
+
+# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+
+
+@bind(router, "base.approval.list", "/approvals")
+async def approval_list(request):
+    return await run_operation(request, queries.approval_list)
+
+
+@bind(router, "base.approval.approvers", "/approvals/approvers")
+async def approval_approvers(request, data: Query[ApproversIn]):
+    return await run_operation(request, queries.approval_approvers, data)
+
+
+@bind(router, "base.approval.approve", "/approvals")
+async def approval_approve(request, data: ApprovalIn):
+    return await run_operation(request, services.approval_approve, data)

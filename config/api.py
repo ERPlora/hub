@@ -4,11 +4,12 @@ Every route calls one operation (``ensure_api_parity`` keeps it so) and every fa
 the single envelope ``{"error": {...}}``. Authentication is Django's session, which ninja checks
 together with the CSRF token on every unsafe method (the SDK sends ``X-CSRFToken``); a route open
 to anonymous visitors says ``auth=None``. The business's API keys (``erpk_live``, ``base.api_keys``) open the
-routes of the published operations, before the session.
+routes of the published operations, before the session; a manager's approval (``base.approvals``) lets one refused
+command through.
 """
 
 from django.conf import settings
-from base import api_keys
+from base import api_keys, approvals
 from live.ninja import install_error_handlers, mount_app_routers
 from ninja import NinjaAPI
 from ninja.openapi.docs import Swagger
@@ -46,3 +47,5 @@ api = build_api()
 mount_app_routers(api)
 # The business's API keys (``erpk_live``, APP-BASE-5) open the routes of the operations the apps publish (``expose_api``).
 api_keys.install(api)
+# A manager's PIN lets one refused command through (``base.approvals``, APP-BASE-5): its door, before the session's.
+approvals.install(api)

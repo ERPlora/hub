@@ -86,3 +86,6 @@ live("base.person.detail", on=_PEOPLE)
 live("base.role.list", on=[HUB_STATE_APPLIED])
 # The keys follow their own making, rotating and revoking; the apps a key may reach, the photo (a paid app comes or goes).
 live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS}))
+# Approvals follow each approval given and each pass spent; who may approve, the ways in and the photo (the roles).
+live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
+live("base.approval.approvers", on=sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS}))

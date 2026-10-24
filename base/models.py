@@ -443,6 +443,45 @@ class ApiKey(UUIDModel):
         return f"{self.name} ({self.prefix}…)"
 
 
+# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+
+
+class Approval(UUIDModel):
+    """A manager's approval of one refused command, given with their PIN or badge (BASE-G136), and its record (G145).
+
+    The pass handed back is kept as its SHA-256 only, and works once, until ``expires_at``, for the person who asked
+    (``requested_by``), that command (``operation``) and that very request of this business (``fingerprint``,
+    ``base.approvals.fingerprint``). The names are kept as they were then: the record still reads when a person left.
+    Nobody edits or deletes a row.
+    """
+
+    class Way(models.TextChoices):
+        PIN = "pin", pgettext_lazy("way in", "PIN")
+        BADGE = "badge", pgettext_lazy("way in", "Badge")
+
+    operation = models.CharField(pgettext_lazy("approval", "action"), max_length=120)
+    permission = models.CharField(pgettext_lazy("approval", "permission"), max_length=120)
+    fingerprint = models.CharField(pgettext_lazy("approval", "request fingerprint"), max_length=64)
+    token_digest = models.CharField(pgettext_lazy("approval", "pass digest"), max_length=64, unique=True)
+    requested_by = models.CharField(pgettext_lazy("approval", "asked by"), max_length=ACTOR_MAX_LENGTH)
+    requested_by_name = models.CharField(pgettext_lazy("approval", "asked by (name)"), max_length=ACTOR_MAX_LENGTH)
+    approved_by = models.CharField(pgettext_lazy("approval", "approved by"), max_length=ACTOR_MAX_LENGTH)
+    approved_by_name = models.CharField(pgettext_lazy("approval", "approved by (name)"), max_length=ACTOR_MAX_LENGTH)
+    way = models.CharField(pgettext_lazy("approval", "approved with"), max_length=8, choices=Way.choices)
+    created_at = models.DateTimeField(pgettext_lazy("approval", "approved at"), auto_now_add=True)
+    expires_at = models.DateTimeField(pgettext_lazy("approval", "valid until"))
+    used_at = models.DateTimeField(pgettext_lazy("approval", "used at"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = pgettext_lazy("approval", "approval")
+        verbose_name_plural = pgettext_lazy("approval", "approvals")
+        ordering = ["-created_at", "-id"]
+        constraints = [models.CheckConstraint(condition=Q(way__in=["pin", "badge"]), name="base_approval_way")]
+
+    def __str__(self) -> str:
+        return f"{self.operation} · {self.approved_by_name}"
+
+
 # The registry moved to control in S1 (plan 2026-10-22): base/migrations/0004 and 0005 name the validator here, and
 # phase 1's code imports the models from here.
 from control.models import DemoCode, Hub, registry_slug_validator  # noqa: E402, F401

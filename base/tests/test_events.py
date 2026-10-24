@@ -39,5 +39,8 @@ def test_every_event_is_named_as_the_convention_says():
         "base.api_key.created",
         "base.api_key.rotated",
         "base.api_key.revoked",
+        # A manager's approval given, and spent (APP-BASE-5).
+        "base.approval.granted",
+        "base.approval.used",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)

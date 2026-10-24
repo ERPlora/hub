@@ -2742,5 +2742,17 @@
   "base.api_key.revoke": {
     "method": "post",
     "path": "/api/keys/revoke"
+  },
+  "base.approval.list": {
+    "method": "get",
+    "path": "/api/approvals"
+  },
+  "base.approval.approvers": {
+    "method": "get",
+    "path": "/api/approvals/approvers"
+  },
+  "base.approval.approve": {
+    "method": "post",
+    "path": "/api/approvals"
   }
 }

@@ -1278,3 +1278,87 @@ def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
     available = bool(hub is not None and hub.db_name)
     keys = [api_key_out(key) for key in ApiKey.objects.all()] if available else []
     return {"available": available, "keys": keys, "apps": api_apps(ctx)}
+
+
+# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+from base import approvals as approval_rules  # noqa: E402
+from base.models import Approval  # noqa: E402
+from base.schemas import ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut  # noqa: E402
+from base.permissions import permissions_for  # noqa: E402
+
+#: Employees › Approvals shows the newest 500.
+APPROVALS_SHOWN = 500
+
+
+def holds(user, scope, permission: str) -> bool:
+    """Whether ``user`` holds ``permission`` on ``scope``, as ``@operation`` asks it (wildcards included)."""
+    return OperationContext(scope=scope, actor=user, permissions=permissions_for(user, scope)).has(permission)
+
+
+def approval_action(operation: str) -> str:
+    """What an approval approved, in words: the app's own, else «An action of <app>», else that nobody names it now."""
+    found = approval_rules.approvable(operation)
+    if found is not None:
+        return found[1]
+    config = next((c for c in all_live_app_configs() if c.label == operation.split(".", 1)[0]), None)
+    if config is not None:
+        return gettext("An action of %(app)s") % {"app": config.verbose_name}
+    return gettext("An action no app names now")
+
+
+@operation(
+    "base.approval.list",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=ApprovalListIn,
+    output=ApprovalListOut,
+    ai={
+        "description": "Lists the actions a manager approved with their PIN or badge, the newest first: when, what "
+        "in words, who asked, who approved, how, and whether the approval was used."
+    },
+)
+def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
+    """Employees › Approvals (BASE-G145): the record of approvals, read only."""
+    rows = Approval.objects.order_by("-created_at", "-id")[:APPROVALS_SHOWN]
+    return {
+        "approvals": [
+            {
+                "id": row.id,
+                "at": row.created_at,
+                "action": approval_action(row.operation),
+                "operation": row.operation,
+                "requested_by": row.requested_by_name,
+                "approved_by": row.approved_by_name,
+                "way": row.way,
+                "used": row.used_at is not None,
+                "used_at": row.used_at,
+            }
+            for row in rows
+        ]
+    }
+
+
+@operation(
+    "base.approval.approvers",
+    kind="query",
+    permission=VIEW_HOME,
+    input=ApproversIn,
+    output=ApproversOut,
+    ai={
+        "description": "Not an assistant tool: names who of the business can approve one refused action with their "
+        "PIN (they hold its permission and have a PIN), for the approval dialog."
+    },
+)
+def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
+    """«Who approves it?» (BASE-G136): the people of the business with a PIN who may do the action themselves, by name;
+    nobody for an action no app names."""
+    found = approval_rules.approvable(data.operation)
+    if found is None:
+        return {"people": []}
+    op = found[0]
+    people = [
+        {"id": str(credential.pk), "name": face_name(user), "initials": access.initials(face_name(user))}
+        for credential, user in pin_people(ctx.scope.key)
+        if holds(user, ctx.scope, op.permission)
+    ]
+    return {"people": sorted(people, key=lambda person: person["name"].casefold())}
