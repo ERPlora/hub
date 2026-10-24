@@ -481,3 +481,61 @@ for (const viewport of VIEWPORTS) {
     }
   });
 }
+
+// flow: FLOW-F11 · FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH — the editor's name, at its head next to «En pausa», is read whole or
+// ends in «…», never cut mid-letter («Automatización sin nombr»): empty (its placeholder) and with a long name, in `ios` and
+// `md`, and the pill stays on the screen. Nothing is saved.
+const LONG_NAME = 'Recordar la cita del día siguiente a cada cliente por WhatsApp con su hora, su profesional y cómo cambiarla';
+
+/** Whether the name's box shows what it holds (its value, or the placeholder when empty) cut with no «…». */
+async function nameCut(page: Page): Promise<boolean> {
+  return shown(page)
+    .locator('[data-testid=flow-editor-name] input')
+    .evaluate((input: HTMLInputElement) => {
+      const style = getComputedStyle(input);
+      const context = document.createElement('canvas').getContext('2d');
+      if (!context) return true;
+      context.font = style.font;
+      const room = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const overflow = input.value ? style.textOverflow : getComputedStyle(input, '::placeholder').textOverflow;
+      return context.measureText(input.value || input.placeholder).width > room && overflow !== 'ellipsis';
+    });
+}
+
+for (const viewport of [{ label: '375', width: 375, height: 667 }, ...VIEWPORTS]) {
+  test(`FLOW-F11: the editor's name is never cut mid-letter at ${viewport.label}`, async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+    const page = await context.newPage();
+    try {
+      await login(page, A, '/');
+      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+      for (const mode of ['ios', 'md']) {
+        await page.goto(`${A}/flow/automations/new?ionic:mode=${mode}`);
+        await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+        const editor = shown(page);
+        const name = editor.locator('[data-testid=flow-editor-name] input');
+        await expect(name).toHaveAttribute('placeholder', 'Automatización sin nombre');
+        expect(await nameCut(page), `${mode}: «Automatización sin nombre» cut with no «…»`).toBe(false);
+        if (viewport.label === '375' && mode === 'ios') {
+          // The catalog has come (its «Enviar un mensaje» shows), so the picture is the whole editor.
+          await expect(editor.locator('[data-testid=flow-editor-add-message]')).toBeVisible();
+          await settled(page);
+          await page.screenshot({ path: shot('FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-375-title') });
+        }
+        await name.fill(LONG_NAME);
+        await editor.locator('[data-testid=flow-editor-nosteps]').click();
+        await expect(name).not.toBeFocused();
+        expect(await nameCut(page), `${mode}: a long name cut with no «…»`).toBe(false);
+        const pill = await editor.locator('[data-testid=flow-editor-state]').boundingBox();
+        expect((pill?.x ?? viewport.width) + (pill?.width ?? 0), `${mode}: «En pausa» on the screen`).toBeLessThanOrEqual(viewport.width);
+        await noHorizontalScroll(page, viewport.label);
+        if (viewport.label === '375' && mode === 'ios') {
+          await settled(page);
+          await page.screenshot({ path: shot('FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-375-title-long') });
+        }
+      }
+    } finally {
+      await context.close();
+    }
+  });
+}
