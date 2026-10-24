@@ -30,6 +30,8 @@ from live.errors import NotFound, Unauthorized
 from live.slugs import validate_hub_slug
 
 from base import registry
+from base.api_keys import KeyCaller
+from base.approvals import Approved
 from base.permissions import permissions_for, reload_user
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import HUB_SCOPE_KIND, use_hub
@@ -130,12 +132,28 @@ class HubContextBuilder:
 
     def from_request(self, request: HttpRequest) -> OperationContext:
         scope = self.resolver.resolve(request)
+        caller = getattr(request, "auth", None)
+        if isinstance(caller, KeyCaller):
+            # APP-BASE-5: a business's API key opened this published operation (``base.api_keys``): the key acts,
+            # with that operation's permission and nothing more.
+            return OperationContext(
+                scope=scope,
+                actor=caller,
+                permissions=caller.permissions,
+                language=getattr(request, "LANGUAGE_CODE", None) or settings.LANGUAGE_CODE,
+                request=request,
+            )
         user: Any = getattr(request, "user", None)
         actor = user if user is not None and user.is_authenticated else None
+        permissions = permissions_for(actor, scope)
+        approved = getattr(request, "approved", None)
+        if isinstance(approved, Approved):
+            # APP-BASE-5: a manager approved this very request (``base.approvals``): its one permission more.
+            permissions = frozenset(permissions) | {approved.permission}
         return OperationContext(
             scope=scope,
             actor=actor,
-            permissions=permissions_for(actor, scope),
+            permissions=permissions,
             language=getattr(request, "LANGUAGE_CODE", None) or settings.LANGUAGE_CODE,
             request=request,
         )

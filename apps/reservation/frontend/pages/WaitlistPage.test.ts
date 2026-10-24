@@ -6,7 +6,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { flush, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
+import { flush, ionValue, type MountOptions, mountReservation, page } from '../__tests__/mount-reservation';
 import { entryRow, reservationRow } from '../__tests__/rows';
 import WaitlistFormModal from '../components/WaitlistFormModal.vue';
 import WaitlistPage from './WaitlistPage.vue';
@@ -61,10 +61,22 @@ describe('WaitlistPage', () => {
       ['is_contacted', 'Contacted'],
       ['is_converted', 'Status'],
     ]);
-    expect(s.cells(0).slice(0, 7)).toEqual(['10/15/2026', '9:00 PM', 'Luis Pérez', '+34600333444', '2', 'No', 'Waiting']);
-    expect(s.cells(1).slice(2, 7)).toEqual(['Deleted customer', '+34600333444', '2', 'Yes', 'Waiting']);
+    expect(s.cells(0).slice(0, 7)).toEqual(['10/15/2026', '9:00 PM', 'Luis Pérez', '+34 600 333 444', '2', 'No', 'Waiting']);
+    expect(s.cells(1).slice(2, 7)).toEqual(['Deleted customer', '+34 600 333 444', '2', 'Yes', 'Waiting']);
     expect(s.cells(2)[6]).toBe('Converted');
     expect([s.prop('searchPlaceholder'), s.prop<{ add: string }>('labels').add]).toEqual(['Search guest, phone or email…', 'Add guest']);
+  });
+
+  it('paints the guest’s phone as Customers does, in the list and in the cards (+34 600 333 444)', async () => {
+    const s = await setup();
+    await s.result(OP, page([WAITING, entryRow({ id: 'w4', guest_name: 'John Smith', guest_phone: '+447911123456' })]));
+    expect([s.cells(0)[3], s.cells(1)[3]]).toEqual(['+34 600 333 444', '+44 791 112 3456']);
+    await ionValue(s.wrapper.find('[data-testid="reservation-waitlist-view"]').element, 'cards');
+    const phones = s.wrapper
+      .findAll('.data-table__field')
+      .filter((field) => field.find('.data-table__field-label').text() === 'Phone')
+      .map((field) => field.find('.data-table__field-value').text().trim());
+    expect(phones).toEqual(['+34 600 333 444', '+44 791 112 3456']);
   });
 
   it('searches and filters on the server', async () => {
@@ -146,7 +158,7 @@ describe('WaitlistPage', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.result(OP, page([WAITING]));
-    expect(s.cells(0).slice(0, 7)).toEqual(['15/10/2026', '21:00', 'Luis Pérez', '+34600333444', '2', 'No', 'En espera']);
+    expect(s.cells(0).slice(0, 7)).toEqual(['15/10/2026', '21:00', 'Luis Pérez', '+34 600 333 444', '2', 'No', 'En espera']);
     expect(s.prop<{ add: string }>('labels').add).toBe('Añadir cliente');
   });
 });

@@ -683,6 +683,268 @@
       "loading": "Cargando los dispositivos…",
       "loadError": "No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo."
     },
+    "employees": {
+      "title": "Empleados",
+      "tabs": {
+        "label": "Secciones de Empleados",
+        "personal": "Personal",
+        "roles": "Roles",
+        "apikeys": "API keys",
+        "approvals": "Aprobaciones"
+      }
+    },
+    "people": {
+      "columns": {
+        "person": "Usuario",
+        "email": "Email",
+        "role": "Rol",
+        "access": "Acceso",
+        "status": "Estado"
+      },
+      "ways": {
+        "account": "Cuenta",
+        "pin": "PIN",
+        "badge": "Placa"
+      },
+      "roles": {
+        "hub_owner": "Propietario",
+        "hub_admin": "Administrador",
+        "hub_manager": "Encargado",
+        "hub_employee": "Empleado"
+      },
+      "status": {
+        "active": "Activo",
+        "notEntered": "Aún no ha entrado"
+      },
+      "you": "Tú",
+      "search": "Buscar persona…",
+      "empty": "Todavía no hay nadie en este negocio.",
+      "error": "No se pudo cargar el personal de este negocio.",
+      "invite": "Invitar en erplora.com",
+      "managed": "Las personas se invitan, se les cambia el rol y se quitan en erplora.com, en «Miembros» del negocio.",
+      "seats": {
+        "used": "{used} de {limit} plaza ocupada | {used} de {limit} plazas ocupadas",
+        "noLimit": "{used} persona · sin límite | {used} personas · sin límite",
+        "count": "{used} persona | {used} personas"
+      },
+      "full": {
+        "heading": "Tu plan tiene todas las plazas ocupadas",
+        "body": "Quita en erplora.com a alguien que ya no trabaje aquí, o pasa a un plan con más plazas."
+      }
+    },
+    "roles": {
+      "intro": "Estos son los roles de este negocio. Cada persona recibe uno al invitarla en erplora.com, y allí se cambia.",
+      "columns": {
+        "role": "Rol",
+        "origin": "Viene de",
+        "available": "Disponible",
+        "members": "Miembros",
+        "permissions": "Permisos"
+      },
+      "basic": "Básico",
+      "always": "Siempre disponible",
+      "search": "Buscar rol…",
+      "empty": "Este negocio no tiene roles.",
+      "error": "No se pudo cargar el catálogo de roles.",
+      "change": "Cambiar roles en erplora.com"
+    },
+    "person": {
+      "title": "Persona",
+      "loading": "Cargando…",
+      "notFound": "Esta persona no está en este negocio.",
+      "error": "No se pudo abrir a esta persona.",
+      "retry": "Reintentar",
+      "data": {
+        "heading": "Sus datos",
+        "managed": "El nombre, el email y el rol se cambian en erplora.com.",
+        "open": "Abrir en erplora.com",
+        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre."
+      },
+      "pin": {
+        "heading": "PIN",
+        "has": "Tiene PIN desde el {when}.",
+        "none": "Sin PIN: lo elige la propia persona en «Mi perfil» o la primera vez que entra en una caja.",
+        "remove": "Retirar el PIN",
+        "confirm": {
+          "title": "Retirar el PIN",
+          "message": "{name} dejará de entrar en las cajas con su PIN. Con su cuenta de erplora.com sigue entrando.",
+          "confirm": "Retirar el PIN",
+          "cancel": "Cancelar"
+        },
+        "removed": "PIN retirado.",
+        "failed": "No se pudo retirar el PIN."
+      },
+      "badge": {
+        "heading": "Placa",
+        "label": "Placa",
+        "hint": "Pasa la tarjeta y se rellena sola: no hace falta hacer clic aquí antes. También puedes teclear el número, para un llavero o una etiqueta grabada.",
+        "has": "Tiene placa desde el {when}.",
+        "none": "Sin placa.",
+        "save": "Guardar placa",
+        "remove": "Retirar la placa",
+        "saved": "Placa guardada.",
+        "removed": "Placa retirada.",
+        "invalid": "Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».",
+        "taken": "Esa placa ya la lleva otra persona. La placa dice quién está en la caja, así que no la pueden compartir dos personas.",
+        "tooMany": "Demasiadas placas probadas. Espera unos minutos y vuelve a intentarlo.",
+        "failed": "No se pudo guardar la placa.",
+        "removeFailed": "No se pudo retirar la placa."
+      },
+      "refused": {
+        "ownerOnly": "Solo el propietario cambia el acceso del propietario.",
+        "ownBadge": "Nadie da de alta su propia placa: pídeselo a otro administrador."
+      }
+    },
+    "apiKeys": {
+      "intro": "Una llave deja que otro sistema (el de tu gestoría, tu tienda online) lea o escriba datos de este negocio por su API.",
+      "new": "Nueva API key",
+      "search": "Buscar API key…",
+      "empty": "Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.",
+      "loadError": "No se pudieron cargar tus API keys.",
+      "unavailableHeading": "Todavía no disponible",
+      "unavailable": "Las API keys todavía no están disponibles en este negocio.",
+      "never": "Nunca",
+      "columns": {
+        "name": "Nombre",
+        "token": "Token",
+        "permissions": "Permisos",
+        "state": "Estado",
+        "created": "Creada",
+        "lastUsed": "Último uso",
+        "limit": "Límite"
+      },
+      "modes": {
+        "full": "Acceso total",
+        "read": "Solo lectura",
+        "write": "Solo escritura",
+        "per_app": "Por app"
+      },
+      "kinds": {
+        "read": "Lectura",
+        "write": "Escritura"
+      },
+      "short": {
+        "read": "L",
+        "write": "E"
+      },
+      "states": {
+        "active": "Activa",
+        "revoked": "Revocada"
+      },
+      "rotate": "Rotar",
+      "revoke": "Revocar",
+      "revoked": "«{name}» revocada.",
+      "form": {
+        "title": "Nueva API key",
+        "submit": "Crear key",
+        "cancel": "Cancelar",
+        "name": "Nombre",
+        "namePlaceholder": "Gestoría — facturas",
+        "rate": "Peticiones por minuto",
+        "rateHint": "De 1 a 10.000.",
+        "mode": "Qué puede hacer esta key",
+        "generalHint": "Los modos generales cubren todas las apps de tu negocio, también las que añadas después.",
+        "perAppHint": "Marca qué puede hacer la key en cada app.",
+        "app": "App",
+        "noApps": "Ninguna app publica todavía su API."
+      },
+      "token": {
+        "title": "API key creada",
+        "heading": "Copia el token ahora",
+        "once": "Este es el único momento en que se muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "copyFailed": "No se pudo copiar al portapapeles.",
+        "done": "Hecho"
+      },
+      "rotateConfirm": {
+        "title": "Rotar la API key",
+        "message": "«{name}» recibe un token nuevo. El actual deja de funcionar de inmediato.",
+        "confirm": "Rotar"
+      },
+      "revokeConfirm": {
+        "title": "Revocar API key",
+        "message": "Vas a revocar «{name}». Cualquier sistema que use este token dejará de tener acceso de inmediato. Esta acción no se puede deshacer.",
+        "confirm": "Revocar"
+      },
+      "errors": {
+        "create": "No se pudo crear la API key.",
+        "rotate": "No se pudo rotar la API key.",
+        "revoke": "No se pudo revocar la API key.",
+        "revoked": "Esa key está revocada: no vuelve a funcionar.",
+        "gone": "Esa key ya no existe. Actualiza la lista y vuelve a intentarlo.",
+        "scopesRequired": "Elige al menos una app y qué puede hacer la key en ella.",
+        "scopeUnknown": "Esa app no publica lo que la key haría en ella.",
+        "denied": "Solo quien lleva el negocio gestiona las API keys."
+      },
+      "docs": "Documentación de la API"
+    },
+    "approval": {
+      "title": "Hace falta una aprobación",
+      "approving": "Se aprueba: {action}",
+      "unnamed": "una acción que esta app no sabe nombrar",
+      "askPin": "Pide a un encargado que introduzca su PIN para aprobarlo.",
+      "orBadge": "…o que pase su placa: no hace falta pulsar nada antes.",
+      "who": "¿Quién lo aprueba?",
+      "another": "Otra persona",
+      "nobody": "Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.",
+      "loadFailed": "No se pudo cargar quién puede aprobarlo.",
+      "retry": "Reintentar",
+      "cancel": "Cancelar",
+      "approvedBy": "Aprobado por {name}",
+      "errors": {
+        "refused": "Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo.",
+        "cannot": "Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.",
+        "notNeeded": "Esto ya no necesita aprobación: vuelve a hacerlo.",
+        "notOffered": "Esto no se aprueba con un PIN.",
+        "failed": "No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo."
+      }
+    },
+    "approvals": {
+      "intro": "Cada acción que necesitó el PIN de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.",
+      "search": "Buscar por persona o acción…",
+      "empty": "Todavía nadie ha tenido que autorizar nada en este negocio.",
+      "error": "No se pudo cargar el registro de aprobaciones.",
+      "used": "Usada",
+      "unused": "Sin usar",
+      "way": {
+        "pin": "PIN",
+        "badge": "Placa"
+      },
+      "columns": {
+        "at": "Cuándo",
+        "action": "Acción",
+        "approvedBy": "Autorizado por",
+        "requestedBy": "Lo pidió",
+        "way": "Con",
+        "used": "Estado"
+      }
+    },
+    "apiDocs": {
+      "title": "Documentación de la API",
+      "intro": "La API de este negocio: lo que publican sus apps para otros sistemas. Para llamarla, crea una llave en Empleados › API keys y envíala como «Authorization: Bearer <llave>».",
+      "keysSoon": "Las API keys todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede llamarla.",
+      "download": "Descargar el fichero OpenAPI",
+      "empty": "Ninguna app de este negocio publica todavía su API.",
+      "error": "No se pudo cargar la documentación.",
+      "retry": "Reintentar",
+      "loading": "Cargando la documentación…",
+      "hidden": "La documentación de la API está oculta en este negocio.",
+      "showIt": "Muéstrala en Ajustes › General",
+      "parameters": "Parámetros",
+      "body": "Cuerpo",
+      "required": "obligatorio",
+      "card": {
+        "title": "Documentación de la API",
+        "toggle": "Mostrar documentación de la API",
+        "note": "Añade una página con la documentación de la API, para quien conecte otro sistema.",
+        "open": "Abrir la documentación de la API",
+        "adminOnly": "Solo quien administra el negocio puede cambiarlo.",
+        "saveFailed": "No se pudo guardar el cambio.",
+        "loadFailed": "No se pudo cargar el ajuste.",
+        "retry": "Reintentar"
+      }
+    },
     "files": {
       "title": "Archivos",
       "folders": "Carpetas",

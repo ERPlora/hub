@@ -44,6 +44,25 @@ FAILED_EVENT_RETRIED = "base.failed_event.retried"
 #: Who runs the business discarded a failed event: closed for good, kept for the audit.
 FAILED_EVENT_DISCARDED = "base.failed_event.discarded"
 
+# ── People and permissions (APP-BASE-5) ──────────────────────────────────────────────────────────────────────────
+#: Whoever runs the business took a person's PIN away (``person``: their id in the hub).
+PERSON_PIN_REMOVED = "base.person.pin_removed"
+#: Whoever runs the business gave a person a badge, or took it away.
+PERSON_BADGE_SET = "base.person.badge_set"
+PERSON_BADGE_REMOVED = "base.person.badge_removed"
+PERSON_EVENTS = (PERSON_PIN_REMOVED, PERSON_BADGE_SET, PERSON_BADGE_REMOVED)
+#: An API key made, rotated (a new token) or revoked; its token never travels in an event.
+API_KEY_CREATED = "base.api_key.created"
+API_KEY_ROTATED = "base.api_key.rotated"
+API_KEY_REVOKED = "base.api_key.revoked"
+API_KEY_EVENTS = (API_KEY_CREATED, API_KEY_ROTATED, API_KEY_REVOKED)
+#: A manager approved one refused command with their PIN or badge, and the pass was spent on it (``base.approvals``).
+APPROVAL_GRANTED = "base.approval.granted"
+APPROVAL_USED = "base.approval.used"
+APPROVAL_EVENTS = (APPROVAL_GRANTED, APPROVAL_USED)
+#: Whoever runs the business showed or hid the documentation of its API.
+API_DOC_SETTINGS_CHANGED = "base.api_doc.settings_changed"
+
 # ── Files (APP-BASE-8) ──
 #: A file went up to the business's files (BASE-G83): its path.
 FILE_UPLOADED = "base.file.uploaded"
@@ -79,4 +98,8 @@ ALL = [
     DEVICES_PRUNED,
     ACCESS_SETTINGS_CHANGED,
     PROFILE_UPDATED,
+    *PERSON_EVENTS,
+    *API_KEY_EVENTS,
+    *APPROVAL_EVENTS,
+    API_DOC_SETTINGS_CHANGED,
 ]

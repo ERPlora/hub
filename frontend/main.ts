@@ -25,26 +25,31 @@ import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/a
 import { forgetAssistant } from '../base/frontend/lib/assistant';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { installErrorReport } from '../base/frontend/lib/error-report';
+import { approvalPass } from '../base/frontend/lib/approval';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
+import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 /**
  * The old hub's side menu (PLAN-MIGRATIONS §16): the platform's entries in its two groups — Home (the
- * shell's, first), Employees, Files · My plan, Apps, System, Settings — and never a module (they open
+ * shell's, first), Employees, Files · My plan, Apps, System, API, Settings — and never a module (they open
  * from «My apps» and Home). The shell paints an entry only once its screen exists in the router, so
- * each appears by itself when `base` brings it.
+ * each appears by itself when `base` brings it; and only for whoever may open it (`visible`: the permission
+ * its screen's operation asks, APP-BASE-5), «API» only while the business shows its API's documentation.
+ * My plan has no screen in the Hub yet: it asks nothing until it has one.
  */
 export const SIDEBAR: ShellSidebar = {
   groups: [
     [
-      { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees' },
-      { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files' },
+      { id: 'employees', labelKey: 'sidebar.employees', icon: 'ion:people-outline', to: '/employees', visible: allowedTo('base.view_home') },
+      { id: 'files', labelKey: 'sidebar.files', icon: 'ion:folder-outline', to: '/files', visible: allowedTo('base.view_files') },
     ],
     [
       { id: 'billing', labelKey: 'sidebar.billing', icon: 'ion:card-outline', to: '/billing' },
-      { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps' },
-      { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system' },
-      { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings' },
+      { id: 'apps', labelKey: 'sidebar.apps', icon: 'ion:storefront-outline', to: '/apps', visible: allowedTo('base.view_home') },
+      { id: 'system', labelKey: 'sidebar.system', icon: 'ion:hardware-chip-outline', to: '/system', visible: allowedTo('base.administer_hub') },
+      { id: 'api', labelKey: 'sidebar.api', icon: 'ion:code-slash-outline', to: '/api-docs', visible: useApiDocsShown },
+      { id: 'settings', labelKey: 'sidebar.settings', icon: 'ion:settings-outline', to: '/settings', visible: allowedTo('base.view_home') },
     ],
   ],
 };
@@ -158,7 +163,8 @@ export async function boot(
   doc: Document = document,
 ): Promise<void> {
   const config = readSpaConfig(doc);
-  const client = createLiveClient(config, { routes: OPERATION_ROUTES });
+  // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
+  const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);
   const { app, router } = await createShell({
     ...session,

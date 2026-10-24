@@ -9,8 +9,11 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from live.errors import InvalidPayload
 
 from apps.customer import models, queries, schemas, services
+
+from .conftest import run
 
 LOCALE = Path(apps.get_app_config("customer").path) / "locale" / "es" / "LC_MESSAGES"
 _STRING = re.compile(r'^"(.*)"$')
@@ -154,3 +157,62 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
     assert response.json()["error"]["fields"]["phone"].startswith(
         "No es un teléfono válido de su país"
     )
+
+
+def compiled(path: Path) -> dict[str, str]:
+    """The singular entries of a compiled catalogue, as Django reads them (the header left out)."""
+    with path.open("rb") as catalogue:
+        entries = gettext.GNUTranslations(catalogue)._catalog
+    return {key: text for key, text in entries.items() if isinstance(key, str) and key}
+
+
+def test_what_an_earlier_app_also_translates_says_the_same_here():
+    """Django joins every catalogue of a language in one, and the first app in ``INSTALLED_APPS`` wins a message
+    two translate without context: ``live`` goes first, so the app's own wording never reached the user (a custom
+    number field refused with live's «Introduce un número.», never with the app's); ``auth``'s «Correo
+    electrónico» named the channel «Email» in the admin. What an app before this one says, this one says too."""
+    configs = list(apps.get_app_configs())
+    earlier = configs[: configs.index(apps.get_app_config("customer"))]
+    ours = compiled(LOCALE / "django.mo")
+    assert sorted(
+        f"{message!r}: {config.label} «{text}», customer «{ours[message]}»"
+        for config in earlier
+        if (path := Path(config.path) / "locale" / "es" / "LC_MESSAGES" / "django.mo").exists()
+        for message, text in compiled(path).items()
+        if "\x04" not in message and message in ours and ours[message] != text
+    ) == []
+
+
+@pytest.mark.django_db
+def test_a_custom_value_of_the_wrong_type_is_refused_in_spanish_under_its_field():
+    """CUSTOMER-F04 «Si falla»: what the person reads in Spanish under each field."""
+    visits = models.CustomField.objects.create(name="Visits", field_type="number")
+    since = models.CustomField.objects.create(name="Since", field_type="date")
+    ana = models.Customer.objects.create(name="Ana")
+    sent = [
+        {"field_id": visits.id, "value": "three"},
+        {"field_id": since.id, "value": "2026-02-31"},
+    ]
+    with translation.override("es"):
+        with pytest.raises(InvalidPayload) as refused:
+            run("customer.customer.update", schemas.CustomerPatchIn(id=ana.id, field_values=sent))
+        fields = {key: str(text) for key, text in refused.value.fields.items()}
+    assert fields == {
+        f"field_values.{visits.id}": "Introduce un número.",
+        f"field_values.{since.id}": "Introduce una fecha válida.",
+    }
+    assert not models.CustomFieldValue.objects.filter(customer=ana).exists()
+
+
+@pytest.mark.parametrize(
+    ("key", "message"),
+    [("invalidNumber", services.FIELD_INVALID_NUMBER), ("invalidDate", services.FIELD_INVALID_DATE)],
+)
+def test_what_the_card_cannot_read_is_worded_as_the_server_refuses_it(key, message):
+    """A number or a date the browser cannot read is told by the form itself (it never reaches the server): in
+    each language it says what the server says for the same value."""
+    frontend = Path(apps.get_app_config("customer").path) / "frontend" / "locale"
+    for language in ("en", "es"):
+        texts = json.loads((frontend / f"{language}.json").read_text(encoding="utf-8"))
+        with translation.override(language):
+            assert texts["customer"]["form"][key] == str(message), language

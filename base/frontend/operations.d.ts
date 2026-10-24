@@ -476,6 +476,134 @@ export interface Preferences {
   palette: string;
 }
 
+// ── People and permissions (APP-BASE-5) ──
+
+/** `base.PersonWaysOut`: the account always; at the shared tills, a PIN and a badge. */
+export interface PersonWays {
+  account: boolean;
+  pin: boolean;
+  badge: boolean;
+}
+
+export type HubRole = 'hub_owner' | 'hub_admin' | 'hub_manager' | 'hub_employee';
+
+/** `base.PersonOut`: a person of the business (Employees › Personal). */
+export interface Person {
+  /** Their account's local name in the hub (`saas:<id>`). */
+  id: string;
+  name: string;
+  initials: string;
+  /** Empty for whom does not run the business (their own, always). */
+  email: string;
+  role: HubRole;
+  ways: PersonWays;
+  /** False: erplora.com names them and they have not entered yet. */
+  entered: boolean;
+  me: boolean;
+}
+
+/** `base.SeatsOut`: the plan's places. */
+export interface Seats {
+  known: boolean;
+  used: number;
+  limit: number | null;
+  full: boolean;
+}
+
+/** `base.PersonDetailOut`: a person's page (who runs the business). */
+export interface PersonDetail extends Person {
+  pin_set_at: string | null;
+  badge_set_at: string | null;
+  may: { remove_pin: boolean; set_badge: boolean };
+}
+
+/** `base.RoleOut`: one of erplora.com's four roles. */
+export interface HubRoleRow {
+  key: HubRole;
+  label: string;
+  origin: 'basic';
+  members: number;
+  permissions: number;
+}
+
+/** `base.ApiKeyOut`: a key of the business (never its whole token). */
+export type ApiKeyMode = 'full' | 'read' | 'write' | 'per_app';
+export type ApiKind = 'read' | 'write';
+
+export interface ApiKeyRow {
+  id: string;
+  name: string;
+  /** The token's first characters, to tell it apart. */
+  prefix: string;
+  mode: ApiKeyMode;
+  scopes: Record<string, ApiKind[]>;
+  rate_per_minute: number;
+  created_by: string;
+  created_at: string;
+  rotated_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+/** `base.ApiAppOut`: an app this business has that publishes its API. */
+export interface ApiApp {
+  id: string;
+  name: string;
+  read: boolean;
+  write: boolean;
+}
+
+/** `base.ApiKeyListOut`. */
+export interface ApiKeyList {
+  /** False while the business shares its database with others: no key yet. */
+  available: boolean;
+  keys: ApiKeyRow[];
+  apps: ApiApp[];
+}
+
+export interface ApiKeyInput {
+  name: string;
+  rate_per_minute: number;
+  mode: ApiKeyMode;
+  scopes: Record<string, ApiKind[]>;
+}
+
+/** `base.ApprovalOut`: one approval of the record (Employees › Approvals). */
+export interface ApprovalRow {
+  id: string;
+  at: string;
+  action: string;
+  operation: string;
+  requested_by: string;
+  approved_by: string;
+  way: 'pin' | 'badge';
+  used: boolean;
+  used_at: string | null;
+}
+
+/** `base.ApproverOut`: somebody who can approve the action, by name. */
+export interface Approver {
+  id: string;
+  name: string;
+  initials: string;
+}
+
+/** `base.ApprovalIn`: their person and PIN, or their badge. */
+export interface ApprovalInput {
+  operation: string;
+  fingerprint: string;
+  person?: string;
+  pin?: string;
+  badge?: string;
+}
+
+/** `base.ApprovalPassOut`: the pass of one use, and who approved. */
+export interface ApprovalPass {
+  token: string;
+  approver: string;
+  expires_in: number;
+}
+
 // ── Assistant (APP-BASE-9) ──
 
 /** `base.AssistantUsageOut`: this month's messages of the assistant, as erplora.com counts them. */
@@ -567,6 +695,24 @@ declare module '@erplora/ui/sdk' {
       output: { avatar_url: string };
     };
     'base.profile.avatar_remove': { input: NoInput; output: { avatar_url: string } };
+
+    // People and permissions (APP-BASE-5)
+    'base.person.list': { input: NoInput; output: { people: Person[]; seats: Seats } };
+    'base.person.detail': { input: { person: string }; output: PersonDetail };
+    'base.person.pin_remove': { input: { person: string }; output: PersonDetail };
+    'base.person.badge_set': { input: { person: string; badge: string }; output: PersonDetail };
+    'base.person.badge_remove': { input: { person: string }; output: PersonDetail };
+    'base.role.list': { input: NoInput; output: { roles: HubRoleRow[] } };
+    'base.api_key.list': { input: NoInput; output: ApiKeyList };
+    'base.api_key.create': { input: ApiKeyInput; output: { key: ApiKeyRow; token: string } };
+    'base.api_key.rotate': { input: { id: string }; output: { key: ApiKeyRow; token: string } };
+    'base.api_key.revoke': { input: { id: string }; output: { key: ApiKeyRow } };
+    'base.approval.list': { input: NoInput; output: { approvals: ApprovalRow[] } };
+    'base.approval.approvers': { input: { operation: string }; output: { people: Approver[]; pin_length: number } };
+    'base.approval.approve': { input: ApprovalInput; output: ApprovalPass };
+    'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[]; keys_available: boolean } };
+    'base.api_doc.settings': { input: NoInput; output: { docs_enabled: boolean; can_change: boolean } };
+    'base.api_doc.settings_update': { input: { docs_enabled: boolean }; output: { docs_enabled: boolean; can_change: boolean } };
     // Assistant (APP-BASE-9); its turn is a stream the panel reads itself (lib/assistant-stream.ts).
     'base.assistant.usage': { input: NoInput; output: AssistantUsage };
     'base.assistant.report': { input: AssistantReportInput; output: { sent: boolean; duplicate: boolean } };

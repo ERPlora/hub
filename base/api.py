@@ -41,6 +41,8 @@ from base.schemas import (
     ProfileUpdateIn,
 )
 
+from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
+
 router = Router(tags=["base"])
 
 
@@ -315,6 +317,99 @@ async def avatar_set(request, data: AvatarIn):
 @bind(router, "base.profile.avatar_remove", "/me/avatar/remove")
 async def avatar_remove(request):
     return await run_operation(request, services.avatar_remove)
+
+
+# ── People and permissions: people, roles (APP-BASE-5) ──────────────────────────────────────────────────────────────
+
+
+@bind(router, "base.person.list", "/people")
+async def person_list(request):
+    return await run_operation(request, queries.person_list)
+
+
+@bind(router, "base.person.detail", "/people/detail")
+async def person_detail(request, data: Query[PersonIn]):
+    return await run_operation(request, queries.person_detail, data)
+
+
+@bind(router, "base.person.pin_remove", "/people/pin/remove")
+async def person_pin_remove(request, data: PersonIn):
+    return await run_operation(request, services.person_pin_remove, data)
+
+
+@bind(router, "base.person.badge_set", "/people/badge")
+async def person_badge_set(request, data: BadgeSetIn):
+    return await run_operation(request, services.person_badge_set, data)
+
+
+@bind(router, "base.person.badge_remove", "/people/badge/remove")
+async def person_badge_remove(request, data: PersonIn):
+    return await run_operation(request, services.person_badge_remove, data)
+
+
+@bind(router, "base.role.list", "/roles")
+async def role_list(request):
+    return await run_operation(request, queries.role_list)
+
+
+# ── People and permissions: the business's API keys (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+@bind(router, "base.api_key.list", "/keys")
+async def api_key_list(request):
+    return await run_operation(request, queries.api_key_list)
+
+
+@bind(router, "base.api_key.create", "/keys")
+async def api_key_create(request, data: ApiKeyCreateIn):
+    return await run_operation(request, services.api_key_create, data)
+
+
+@bind(router, "base.api_key.rotate", "/keys/rotate")
+async def api_key_rotate(request, data: ApiKeyIdIn):
+    return await run_operation(request, services.api_key_rotate, data)
+
+
+@bind(router, "base.api_key.revoke", "/keys/revoke")
+async def api_key_revoke(request, data: ApiKeyIdIn):
+    return await run_operation(request, services.api_key_revoke, data)
+
+
+# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+
+
+@bind(router, "base.approval.list", "/approvals")
+async def approval_list(request):
+    return await run_operation(request, queries.approval_list)
+
+
+@bind(router, "base.approval.approvers", "/approvals/approvers")
+async def approval_approvers(request, data: Query[ApproversIn]):
+    return await run_operation(request, queries.approval_approvers, data)
+
+
+@bind(router, "base.approval.approve", "/approvals")
+async def approval_approve(request, data: ApprovalIn):
+    return await run_operation(request, services.approval_approve, data)
+
+
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+from base.schemas import ApiDocSettingsUpdateIn  # noqa: E402
+
+
+@bind(router, "base.api_doc.get", "/api-docs")
+async def api_doc_get(request):
+    return await run_operation(request, queries.api_doc_get)
+
+
+@bind(router, "base.api_doc.settings", "/api-docs/settings")
+async def api_doc_settings(request):
+    return await run_operation(request, queries.api_doc_settings)
+
+
+@bind(router, "base.api_doc.settings_update", "/api-docs/settings/update")
+async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
+    return await run_operation(request, services.api_doc_settings_update, data)
 
 
 # ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────

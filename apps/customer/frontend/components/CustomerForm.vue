@@ -4,12 +4,14 @@
 // native <details>, closed, as in the product) when adding; in «Edit» everything at once, then the
 // business's custom fields, each with its own control, and «Active». The parent owns the model
 // (`v-model`, `v-model:field-values`) and the submit; the server validates and its 422 comes back in
-// `errors`, painted under its field («More details» opens when the field is in there). The country
-// is the shared Combo (the product's `ok-combo`, customers#72): typing its name, or its code, filters
+// `errors`, painted under its field («More details» opens when the field is in there). A number or a
+// date the browser cannot read (31/02, «tres») reaches the page as "", so saving would empty the field:
+// `readable()` tells it under its field, worded as the server's refusal, and the parent does not save.
+// The country is the shared Combo (the product's `ok-combo`, customers#72): typing its name, or its code, filters
 // the ~250 countries; the card keeps the ISO code, and clearing the field leaves it without one.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import { countryName, countryOptions } from '../lib/countries';
 import {
@@ -104,10 +106,15 @@ const sections = computed(() =>
     : [{ id: 'all', more: false, fields: [...ESSENTIAL_FIELDS, ...MORE_FIELDS] as TextField[] }],
 );
 
+/** What the browser could not read at the last «Save», by the key the server would refuse it under. */
+const unread = ref<Record<string, string>>({});
+/** What is painted under each field: the server's last refusal and what the browser could not read. */
+const shown = computed<Record<string, string>>(() => ({ ...props.errors, ...unread.value }));
+
 const moreOpen = ref(false);
 // A refusal of a field behind «More details» must be seen: the section opens.
 watch(
-  () => props.errors,
+  shown,
   (errors) => {
     if (MORE_FIELDS.some((field) => errors[field])) moreOpen.value = true;
   },
@@ -141,7 +148,7 @@ function set(field: CustomerField, value: unknown): void {
   form.value = { ...form.value, [field]: field === 'is_active' ? value === true : String(value ?? '') };
 }
 
-const invalid = (key: string) => ({ 'ion-invalid': !!props.errors[key], 'ion-touched': !!props.errors[key] });
+const invalid = (key: string) => ({ 'ion-invalid': !!shown.value[key], 'ion-touched': !!shown.value[key] });
 
 function setFieldValue(fieldId: string, value: unknown): void {
   fieldValues.value = { ...fieldValues.value, [fieldId]: String(value ?? '') };
@@ -149,13 +156,40 @@ function setFieldValue(fieldId: string, value: unknown): void {
 
 const fieldLabel = (field: CustomFieldValueOut): string =>
   field.is_required ? t('customer.form.required', { name: field.name }) : field.name;
-const fieldError = (field: CustomFieldValueOut): string | undefined => props.errors[`field_values.${field.field_id}`];
+const fieldError = (field: CustomFieldValueOut): string | undefined => shown.value[`field_values.${field.field_id}`];
 const fieldInputType = (field: CustomFieldValueOut): InputType =>
   field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text';
+
+const root = useTemplateRef<HTMLElement>('root');
+const UNREADABLE = { number: 'customer.form.invalidNumber', date: 'customer.form.invalidDate' } as const;
+
+/** Whether the browser read every number and date typed; if not, each one is told under its field. */
+function readable(): boolean {
+  const typed = [
+    ...sections.value
+      .flatMap((section) => section.fields)
+      .filter((field) => INPUT_TYPES[field] === 'date')
+      .map((field) => ({ key: field, testid: `customer-form-${field}`, type: 'date' as const })),
+    ...(props.mode === 'edit' ? props.customFields : []).flatMap((field) =>
+      field.field_type === 'number' || field.field_type === 'date'
+        ? [{ key: `field_values.${field.field_id}`, testid: `customer-form-field-${field.field_id}`, type: field.field_type }]
+        : [],
+    ),
+  ];
+  unread.value = Object.fromEntries(
+    typed
+      .filter(({ testid }) => root.value?.querySelector<HTMLInputElement>(`[data-testid="${testid}"] input`)?.validity.badInput)
+      .map(({ key, type }) => [key, t(UNREADABLE[type])]),
+  );
+  return Object.keys(unread.value).length === 0;
+}
+
+defineExpose({ readable });
 </script>
 
 <template>
   <div
+    ref="root"
     class="customer-form"
     :class="`customer-form--${mode}`"
   >
@@ -183,7 +217,7 @@ const fieldInputType = (field: CustomFieldValueOut): InputType =>
             :model-value="country"
             :options="countries"
             :label="t(LABELS.country)"
-            :error-text="errors.country"
+            :error-text="shown.country"
             @update:model-value="set('country', $event?.id ?? '')"
           />
           <ion-select
@@ -196,7 +230,7 @@ const fieldInputType = (field: CustomFieldValueOut): InputType =>
             interface="popover"
             fill="outline"
             mode="md"
-            :error-text="errors[field]"
+            :error-text="shown[field]"
             :class="invalid(field)"
             @update:model-value="set(field, $event)"
           >
@@ -220,7 +254,7 @@ const fieldInputType = (field: CustomFieldValueOut): InputType =>
             mode="md"
             :auto-grow="true"
             :maxlength="MAX_LENGTH.notes"
-            :error-text="errors.notes"
+            :error-text="shown.notes"
             :class="invalid('notes')"
             @update:model-value="set('notes', $event)"
           />
@@ -238,7 +272,7 @@ const fieldInputType = (field: CustomFieldValueOut): InputType =>
             mode="md"
             :maxlength="MAX_LENGTH[field]"
             :helper-text="field === 'phone' ? t('customer.form.phoneHint') : undefined"
-            :error-text="errors[field]"
+            :error-text="shown[field]"
             :class="invalid(field)"
             :data-autofocus="field === 'name' ? '' : undefined"
             @update:model-value="set(field, $event)"

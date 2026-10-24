@@ -21,8 +21,7 @@ type Box = { x: number; y: number; width: number; height: number };
 const menu = (page: Page): Locator => page.locator('ion-menu.dash-menu');
 const entries = (page: Page): Locator => menu(page).locator('ion-item.nav-item');
 /** The platform's entries of the menu, in its order: the ones whose screen exists. */
-// «Files» came with APP-BASE-8 (BASE-F72), after Home, as in the old hub's menu.
-const PLATFORM_ENTRIES = ['nav-home', 'nav-files', 'nav-apps', 'nav-system', 'nav-settings'];
+const PLATFORM_ENTRIES = ['nav-home', 'nav-employees', 'nav-files', 'nav-apps', 'nav-system', 'nav-settings'];
 
 /** The topbar of the screen on view and its pieces. */
 function topbar(page: Page) {
@@ -68,8 +67,9 @@ test('1440: the menu pinned next to the content, the person on top and the QR be
   expect(pinned.width).toBeLessThanOrEqual(248);
   expect(content.x, 'the content starts where the menu ends, not under it').toBeGreaterThanOrEqual(pinned.x + pinned.width - 1);
 
-  // The person at the top; the platform entries with a screen today (Home, Apps and System: APP-BASE-4; Settings:
-  // APP-BASE-3); no module.
+  // The person at the top; the platform entries with a screen today that the owner may open (Home, Apps and System:
+  // APP-BASE-4; Settings: APP-BASE-3; Employees: APP-BASE-5; Files: APP-BASE-8; «API» only with its docs shown); no
+  // module.
   await expect(menu(page).locator('[data-testid=user-menu-trigger] .sidebar-user-name')).toBeVisible();
   await expect(entries(page)).toHaveCount(PLATFORM_ENTRIES.length);
   expect(await entries(page).evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(PLATFORM_ENTRIES);

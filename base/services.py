@@ -93,6 +93,19 @@ from base.media import AVATARS_FOLDER
 from base.operations import hub_id
 from base.storage import hub_prefix
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base import people as people_rules
+from base.schemas import (
+    ApiKeyCreateIn,
+    ApiKeyIdIn,
+    ApiKeyRevokeOut,
+    ApiKeyTokenOut,
+    BadgeSetIn,
+    PersonDetailOut,
+    PersonIn,
+)
+from base import api_keys
+from base.models import ApiKey
+from base.throttle import client_key
 from base.schemas import (
     BlueprintImportIn,
     BlueprintSourceIn,
@@ -1863,6 +1876,465 @@ def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
     return {"avatar_url": ""}
+
+
+# ── People and permissions: a person's way in (APP-BASE-5) ─────────────────────────────────────────────────────────
+
+_PERSON_REFUSALS = {people_rules.OWNER_ONLY: people_rules.OWNER_ONLY_MESSAGE, people_rules.OWN_BADGE: people_rules.OWN_BADGE_MESSAGE}
+
+
+def _changeable_person(ctx: OperationContext, person_id: str, *, badge: bool) -> dict:
+    """The person ``person_id`` of this business, if who asks may change their way in (``base.people.refusal``)."""
+    person = queries.person_of(ctx, person_id)
+    why = people_rules.refusal(
+        actor=queries.signed_in_username(ctx),
+        actor_role=queries.signed_in_role(ctx),
+        target=person["id"],
+        target_role=person["role"],
+        badge=badge,
+    )
+    if why is not None:
+        raise PermissionDenied(str(_PERSON_REFUSALS[why]), code=why)
+    return person
+
+
+def _person_answer(ctx: OperationContext, person_id: str) -> dict:
+    return queries.person_detail_out(ctx, queries.person_of(ctx, person_id))
+
+
+@operation(
+    "base.person.pin_remove",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=PersonIn,
+    output=PersonDetailOut,
+    ai={
+        "description": "Takes a person's PIN away (a forgotten or shared one): they stop entering with it at the "
+        "shared tills and keep entering with their erplora.com account. The owner's, only the owner.",
+        "risk": "high",
+    },
+)
+def person_pin_remove(ctx: OperationContext, data: PersonIn) -> dict:
+    """«Remove the PIN» (BASE-G139): the PIN goes at once, the badge and the account stay."""
+    _changeable_person(ctx, data.person, badge=False)
+    credential = Credential.objects.select_for_update().filter(username=data.person).exclude(pin_hash="").first()
+    if credential is None:
+        raise Conflict(gettext("This person has no PIN to remove."), code="base.person_no_pin")
+    credential.pin_hash, credential.pin_set_at = "", None
+    credential.save(update_fields=["pin_hash", "pin_set_at"])
+    record_event(ctx, events.PERSON_PIN_REMOVED, {"person": data.person})
+    return _person_answer(ctx, data.person)
+
+
+@operation(
+    "base.person.badge_set",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=BadgeSetIn,
+    output=PersonDetailOut,
+    ai={
+        "description": "Not an assistant tool (a badge is a card passed through the reader): gives a person the badge "
+        "they will enter with at the shared tills.",
+        "risk": "high",
+    },
+)
+def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
+    """«Badge» (BASE-G140): the card, kept as its digest; never one's own, never one somebody else carries. Every try
+    counts against who gives it (``people.BADGE_CHANGE_LIMIT``, gh:hub#2560): «already taken» tells something."""
+    _changeable_person(ctx, data.person, badge=True)
+    editor = queries.signed_in_username(ctx)
+    wait = people_rules.BADGE_CHANGE_LIMIT.wait(ctx.scope.key, editor)
+    if wait:
+        raise OperationError(
+            too_many_message(wait, gettext("Too many badges tried.")), code="base.too_many_badge_changes", status=429
+        )
+    people_rules.BADGE_CHANGE_LIMIT.failed(ctx.scope.key, editor)
+    card = access.clean_badge(data.badge)
+    if card is None:
+        raise InvalidPayload(
+            gettext("A badge has 4 to 64 characters: letters, digits, «-» and «_»."),
+            code="base.badge_invalid",
+            fields={"badge": "invalid"},
+        )
+    digest = access.badge_digest(card, key=badge_key())
+    if Credential.objects.filter(badge_digest=digest).exclude(username=data.person).exists():
+        raise Conflict(
+            gettext("Somebody else already carries that badge. A badge says who is at the till: two people cannot share it."),
+            code="base.badge_taken",
+        )
+    credential, _ = Credential.objects.select_for_update().get_or_create(username=data.person)
+    credential.badge_digest, credential.badge_set_at = digest, timezone.now()
+    try:
+        with transaction.atomic():
+            credential.save(update_fields=["badge_digest", "badge_set_at"])
+    except IntegrityError:
+        # Given to somebody else at this same moment: the unique digest keeps one.
+        raise Conflict(
+            gettext("Somebody else already carries that badge. A badge says who is at the till: two people cannot share it."),
+            code="base.badge_taken",
+        ) from None
+    record_event(ctx, events.PERSON_BADGE_SET, {"person": data.person})
+    return _person_answer(ctx, data.person)
+
+
+@operation(
+    "base.person.badge_remove",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=PersonIn,
+    output=PersonDetailOut,
+    ai={
+        "description": "Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay.",
+        "risk": "normal",
+    },
+)
+def person_badge_remove(ctx: OperationContext, data: PersonIn) -> dict:
+    """«Remove the badge» (BASE-G140): the card stops opening anything; a lost one never leaves anybody out."""
+    _changeable_person(ctx, data.person, badge=False)
+    credential = Credential.objects.select_for_update().filter(username=data.person).exclude(badge_digest="").first()
+    if credential is None:
+        raise Conflict(gettext("This person has no badge to remove."), code="base.person_no_badge")
+    credential.badge_digest, credential.badge_set_at = "", None
+    credential.save(update_fields=["badge_digest", "badge_set_at"])
+    record_event(ctx, events.PERSON_BADGE_REMOVED, {"person": data.person})
+    return _person_answer(ctx, data.person)
+
+
+# ── People and permissions: the business's API keys (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+def _api_keys_available(ctx: OperationContext) -> None:
+    """A key lives in its hub's own database; while the business shares phase 1's with others, a key of it would open
+    theirs too: none is made yet («not available yet», never the infrastructure's words)."""
+    if not has_own_database(Hub.objects.filter(slug=ctx.scope.key).first()):
+        raise Conflict(
+            gettext("API keys are not available yet for this business."), code="base.api_keys_unavailable"
+        )
+
+
+def _checked_scopes(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
+    """What a key per app may do on each app, of those this business has that publish it; nothing for the others."""
+    if data.mode != ApiKey.Mode.PER_APP:
+        return {}
+    offered = {app["id"]: app for app in queries.api_apps(ctx)}
+    scopes = {app: sorted(set(kinds)) for app, kinds in data.scopes.items() if kinds}
+    if not scopes:
+        raise InvalidPayload(
+            gettext("Choose at least one app and what the key may do on it."),
+            code="base.api_key_scopes_required",
+            fields={"scopes": "required"},
+        )
+    for app, kinds in scopes.items():
+        found = offered.get(app)
+        if found is None or any(not found[kind] for kind in kinds):
+            raise InvalidPayload(
+                gettext("That app does not publish what the key would do on it."),
+                code="base.api_key_scope_unknown",
+                fields={"scopes": app},
+            )
+    return scopes
+
+
+def _new_token_for(key: ApiKey) -> str:
+    token = api_keys.new_token()
+    key.token_digest, key.prefix = api_keys.digest(token), token[: api_keys.PREFIX_LENGTH]
+    return token
+
+
+@operation(
+    "base.api_key.create",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyCreateIn,
+    output=ApiKeyTokenOut,
+    ai={
+        "description": "Not an assistant tool (its token is a secret shown once, never in a chat): makes an API key "
+        "for another system, with a name, its requests a minute and what it may do.",
+        "risk": "high",
+    },
+)
+def api_key_create(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
+    """«New API key» (BASE-G146): its token once; the hub keeps its digest and its first characters."""
+    _api_keys_available(ctx)
+    name = " ".join(data.name.split())
+    if not name:
+        raise InvalidPayload(gettext("Give the key a name."), code="base.api_key_name_required", fields={"name": "required"})
+    key = ApiKey(
+        name=name,
+        mode=data.mode,
+        scopes=_checked_scopes(ctx, data),
+        rate_per_minute=data.rate_per_minute,
+        created_by=_actor_label(ctx),
+    )
+    token = _new_token_for(key)
+    key.save()
+    record_event(ctx, events.API_KEY_CREATED, {"id": str(key.id), "mode": key.mode})
+    return {"key": queries.api_key_out(key), "token": token}
+
+
+def _live_key(key_id: UUID) -> ApiKey:
+    key = ApiKey.objects.select_for_update().filter(pk=key_id).first()
+    if key is None:
+        raise NotFound(gettext("That key no longer exists. Refresh the list and try again."), code="base.api_key_not_found")
+    if key.revoked_at is not None:
+        raise Conflict(gettext("That key was revoked: it never works again."), code="base.api_key_revoked")
+    return key
+
+
+@operation(
+    "base.api_key.rotate",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyIdIn,
+    output=ApiKeyTokenOut,
+    ai={
+        "description": "Not an assistant tool (its new token is a secret shown once): gives an API key a new token; "
+        "the old one stops working at once.",
+        "risk": "high",
+    },
+)
+def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
+    """«Rotate» (BASE-G147): a new token, shown once; the old one stops at once (its digest is gone)."""
+    _api_keys_available(ctx)
+    key = _live_key(data.id)
+    token = _new_token_for(key)
+    key.rotated_at = timezone.now()
+    key.save(update_fields=["token_digest", "prefix", "rotated_at"])
+    record_event(ctx, events.API_KEY_ROTATED, {"id": str(key.id)})
+    return {"key": queries.api_key_out(key), "token": token}
+
+
+@operation(
+    "base.api_key.revoke",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyIdIn,
+    output=ApiKeyRevokeOut,
+    ai={
+        "description": "Revokes an API key: any system using it loses access at once, for good. The key stays listed "
+        "as revoked.",
+        "risk": "high",
+    },
+)
+def api_key_revoke(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
+    """«Revoke» (BASE-G148): at once and for good; the key is kept, for the record."""
+    _api_keys_available(ctx)
+    key = _live_key(data.id)
+    key.revoked_at, key.revoked_by = timezone.now(), _actor_label(ctx)
+    key.save(update_fields=["revoked_at", "revoked_by"])
+    record_event(ctx, events.API_KEY_REVOKED, {"id": str(key.id)})
+    return {"key": queries.api_key_out(key)}
+
+
+#: A key's last use is written at most once a minute: a busy integration does not write on every call.
+API_KEY_LAST_USE_EVERY = dt.timedelta(minutes=1)
+
+
+def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyCaller | None":
+    """The caller of ``token`` on the published operation ``op``, in the request's hub (``base.api_keys.KeyDoor``).
+
+    ``None`` (the session's door goes on) on a business that shares phase 1's database, or for a token nobody issued
+    here (counted against the address); 429 once the address tried too many, or the key passed its pace; 403 when the
+    key may not do this on this app."""
+    hub = getattr(request, "hub", None)
+    if not has_own_database(hub):
+        return None
+    address = client_key(request)
+    wait = api_keys.KEY_ADDRESS_LIMIT.wait(hub.slug, address)
+    if wait:
+        raise OperationError(
+            too_many_message(wait, gettext("Too many keys tried from here.")),
+            code="base.too_many_api_key_tries",
+            status=429,
+        )
+    key = ApiKey.objects.filter(token_digest=api_keys.digest(token), revoked_at=None).first()
+    if key is None:
+        api_keys.KEY_ADDRESS_LIMIT.failed(hub.slug, address)
+        return None
+    if not api_keys.allows(key.mode, key.scopes, op.app_label, api_keys.kind_of(op)):
+        raise PermissionDenied(
+            gettext("This API key may not do that on this app."), code="base.api_key_scope"
+        )
+    if api_keys.over_pace(key.pk, key.rate_per_minute):
+        raise OperationError(
+            gettext("This API key went past its requests a minute: wait a moment."),
+            code="base.api_key_rate_limited",
+            status=429,
+        )
+    now = timezone.now()
+    if key.last_used_at is None or now - key.last_used_at >= API_KEY_LAST_USE_EVERY:
+        ApiKey.objects.filter(pk=key.pk).update(last_used_at=now)
+    granted = frozenset({op.permission}) if op.permission else frozenset()
+    return api_keys.KeyCaller(key_id=str(key.pk), name=key.name, prefix=key.prefix, permissions=granted)
+
+
+# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+from base import approvals as approval_rules  # noqa: E402
+from base.models import Approval  # noqa: E402
+from base.schemas import ApprovalIn, ApprovalPassOut, ApprovalSpendIn, ApprovalSpentOut  # noqa: E402
+
+
+def _approval_refused() -> Unauthorized:
+    return Unauthorized(
+        gettext("Those details do not approve this. Check the name and the PIN, and try again."),
+        code="base.approval_refused",
+    )
+
+
+def _approval_too_many(wait: int) -> OperationError:
+    return OperationError(
+        too_many_message(wait, gettext("Too many wrong attempts.")), code="base.too_many_attempts", status=429
+    )
+
+
+def _approver(ctx: OperationContext, data: ApprovalIn):
+    """Who approves, by their PIN (counted against that person) or their badge (against the card), with the PIN
+    pad's brakes (APP-BASE-3): a wrong one also counts against the address; a right one starts the count again."""
+    slug, address = ctx.scope.key, client_key(ctx.request)
+    wait = access.PIN_ADDRESS_LIMIT.wait(slug, address)
+    if wait:
+        raise _approval_too_many(wait)
+    if data.badge:
+        user, card = badge_owner(slug, data.badge)
+        brake = ("badge", card)
+        way = Approval.Way.BADGE
+    else:
+        person = (data.person or "")[:64]
+        brake = (person,)
+        wait = access.PIN_PERSON_LIMIT.wait(slug, *brake)
+        if wait:
+            raise _approval_too_many(wait)
+        user = queries.pin_owner(slug, person, (data.pin or "")[:16]) if data.pin else None
+        way = Approval.Way.PIN
+    if data.badge and (wait := access.PIN_PERSON_LIMIT.wait(slug, *brake)):
+        raise _approval_too_many(wait)
+    if user is None:
+        access.PIN_PERSON_LIMIT.failed(slug, *brake)
+        access.PIN_ADDRESS_LIMIT.failed(slug, address)
+        raise _approval_refused()
+    access.PIN_PERSON_LIMIT.clear(slug, *brake)
+    return user, way
+
+
+@operation(
+    "base.approval.approve",
+    kind="command",
+    permission=VIEW_HOME,
+    input=ApprovalIn,
+    output=ApprovalPassOut,
+    ai={
+        "description": "Not an assistant tool (it takes a manager's PIN, never typed in a chat): a manager approves "
+        "one action the person at the screen may not do, and the hub hands back a pass of one use.",
+        "risk": "high",
+    },
+)
+def approval_approve(ctx: OperationContext, data: ApprovalIn) -> dict:
+    """«An approval is needed» (BASE-G136): somebody of the business who may do the action approves it with their PIN
+    or badge; a pass of one use for two minutes, bound to who asked, that action and that very request."""
+    found = approval_rules.approvable(data.operation)
+    if found is None:
+        raise Conflict(gettext("This is not approved with a PIN."), code="base.approval_not_offered")
+    op, _label = found
+    if ctx.has(op.permission):
+        raise Conflict(gettext("This no longer needs an approval: do it again."), code="base.approval_not_needed")
+    if not data.badge and not (data.person and data.pin):
+        raise InvalidPayload(
+            gettext("Choose who approves it and type their PIN."), code="base.approval_incomplete", fields={"pin": "required"}
+        )
+    approver, way = _approver(ctx, data)
+    if not queries.holds(approver, ctx.scope, op.permission):
+        raise PermissionDenied(
+            gettext("That person cannot approve this: ask somebody who may do it themselves."),
+            code="base.approver_cannot",
+        )
+    token = approval_rules.new_token()
+    approver_name = queries.face_name(approver)
+    approval = Approval.objects.create(
+        operation=op.name,
+        permission=op.permission,
+        fingerprint=data.fingerprint,
+        token_digest=approval_rules.digest(token),
+        requested_by=ctx.actor.get_username(),
+        requested_by_name=queries.face_name(ctx.actor)[:150],
+        approved_by=approver.get_username(),
+        approved_by_name=approver_name[:150],
+        way=way,
+        expires_at=timezone.now() + dt.timedelta(seconds=approval_rules.PASS_SECONDS),
+    )
+    record_event(ctx, events.APPROVAL_GRANTED, {"id": str(approval.pk), "operation": op.name})
+    return {"token": token, "approver": approver_name, "expires_in": approval_rules.PASS_SECONDS}
+
+
+@operation(
+    "base.approval.spend",
+    kind="command",
+    permission=VIEW_HOME,
+    input=ApprovalSpendIn,
+    output=ApprovalSpentOut,
+    ai={
+        "description": "Not an assistant tool, and no route: the approval's door spends a pass on the request it was "
+        "given for (base.approvals).",
+        "risk": "high",
+    },
+)
+def approval_spend(ctx: OperationContext, data: ApprovalSpendIn) -> dict:
+    """Spend a pass on the request it was given for: once, in time, by who asked, on that action and that request of
+    this business. Anything else spends nothing."""
+    if not hasattr(ctx.actor, "get_username"):
+        return {"spent": False, "id": "", "approver": ""}
+    now = timezone.now()
+    approval = (
+        Approval.objects.select_for_update()
+        .filter(
+            token_digest=approval_rules.digest(data.token),
+            operation=data.operation,
+            fingerprint=data.fingerprint,
+            requested_by=ctx.actor.get_username(),
+            used_at=None,
+            expires_at__gt=now,
+        )
+        .first()
+    )
+    if approval is None:
+        return {"spent": False, "id": "", "approver": ""}
+    approval.used_at = now
+    approval.save(update_fields=["used_at"])
+    record_event(ctx, events.APPROVAL_USED, {"id": str(approval.pk), "operation": approval.operation})
+    return {"spent": True, "id": str(approval.pk), "approver": approval.approved_by_name}
+
+
+
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+from base.models import ApiSettings  # noqa: E402
+from base.schemas import ApiDocSettingsIn, ApiDocSettingsOut, ApiDocSettingsUpdateIn  # noqa: E402
+
+
+@operation(
+    "base.api_doc.settings_update",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiDocSettingsUpdateIn,
+    output=ApiDocSettingsOut,
+    ai={
+        "description": "Shows or hides the documentation of this business's API (for whoever connects another "
+        "system); it comes hidden.",
+        "risk": "low",
+    },
+)
+def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn) -> dict:
+    """«Show the API documentation» (BASE-G100): saved at once."""
+    row = ApiSettings.objects.select_for_update().first()
+    if row is None:
+        try:
+            with transaction.atomic():
+                row = ApiSettings.objects.create()
+        except IntegrityError:
+            row = ApiSettings.objects.select_for_update().get()
+    row.docs_enabled = data.docs_enabled
+    row.updated_by = _actor_label(ctx)
+    row.save()
+    record_event(ctx, events.API_DOC_SETTINGS_CHANGED, {"docs_enabled": data.docs_enabled})
+    return queries.api_doc_settings(ctx, ApiDocSettingsIn())
 
 
 # ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────────

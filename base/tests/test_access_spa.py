@@ -56,7 +56,7 @@ def test_an_account_s_session_keeps_erplora_com_s_pages_and_no_switch_off_a_till
     ana, _ = people
     client.force_login(ana)
     home = hub_home(client)
-    assert home["account_url"] and home["report_url"] and home["plan_url"]
+    assert home["account_url"] and home["report_url"] and home["plan_url"] and home["members_url"]
     assert home["access"] == {"credential": "account", "switch_user": False, "idle_minutes": None}
 
 
@@ -66,7 +66,7 @@ def test_a_pin_session_on_a_till_switches_user_and_never_names_erplora_com(clien
     with_pin(ana, "4826")
     enter_with_pin(client, with_pin(bea, "9071"), "9071")
     home = hub_home(client)
-    assert (home["account_url"], home["report_url"], home["plan_url"]) == ("", "", "")
+    assert (home["account_url"], home["report_url"], home["plan_url"], home["members_url"]) == ("", "", "", "")
     assert home["access"] == {"credential": "pin", "switch_user": True, "idle_minutes": None}
 
 

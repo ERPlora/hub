@@ -7,7 +7,7 @@
 import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { blankCustomer, createInput, ESSENTIAL_FIELDS, MORE_FIELDS } from '../lib/customerForm';
@@ -24,6 +24,7 @@ const { run: create, pending, error } = useCommand('customer.customer.create');
 const form = ref(blankCustomer());
 const SHOWN = [...ESSENTIAL_FIELDS, ...MORE_FIELDS];
 const errors = computed(() => refusalFields(error.value));
+const cardForm = useTemplateRef<InstanceType<typeof CustomerForm>>('cardForm');
 const failure = computed(() => {
   const message = refusalOutsideFields(error.value, SHOWN);
   return message ? { message } : null;
@@ -37,6 +38,8 @@ watch(open, (isOpen) => {
 });
 
 async function save(): Promise<void> {
+  // A date the browser could not read would go as "" (no date): told under its field, not sent.
+  if (cardForm.value && !cardForm.value.readable()) return;
   let customer: CustomerDetailOut;
   try {
     customer = await create(createInput(form.value));
@@ -60,6 +63,7 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <CustomerForm
+      ref="cardForm"
       v-model="form"
       mode="create"
       :errors="errors"

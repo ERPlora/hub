@@ -101,8 +101,17 @@ def test_every_entry_has_a_spanish_translation():
     assert [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy] == []
 
 
+#: Texts Reservas shows but Customers owns (its reason for a phone that is not a number of its country, RESERVATION-F06):
+#: they are translated once, in Customers' catalog.
+BORROWED = (services.PHONE_INVALID,)
+CUSTOMER_LOCALE = Path(apps.get_app_config("customer").path) / "locale" / "es" / "LC_MESSAGES"
+
+
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - msgids(po_entries(LOCALE / "django.po")) == set()
+    with translation.override("en"):
+        borrowed = {str(text) for text in BORROWED}
+    assert visible_texts() - borrowed - msgids(po_entries(LOCALE / "django.po")) == set()
+    assert borrowed - msgids(po_entries(CUSTOMER_LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():

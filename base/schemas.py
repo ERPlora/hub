@@ -886,6 +886,235 @@ class AvatarRemoveIn(Schema):
     """No input: one's own photo."""
 
 
+# ── People and permissions: people, roles (APP-BASE-5) ──────────────────────────────────────────────────────────────
+
+
+class PersonListIn(Schema):
+    """No input: the people of the business of the request."""
+
+
+class PersonWaysOut(Schema):
+    """How a person gets in: the account always; at the shared tills, a PIN and a badge when the hub keeps them."""
+
+    account: bool
+    pin: bool
+    badge: bool
+
+
+class PersonOut(Schema):
+    id: str = Field(description="The person in this hub: their account's local name (``saas:<id>``).")
+    name: str
+    initials: str
+    email: str = Field(description="Their erplora.com address; empty for whom does not run the business.")
+    role: Literal["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+    ways: PersonWaysOut
+    entered: bool = Field(description="False: erplora.com names them, and they have not entered this hub yet.")
+    me: bool
+
+
+class SeatsOut(Schema):
+    """The places of the plan the SaaS's last photo carries (``plan.max_users``; 0 is none)."""
+
+    known: bool = Field(description="False: no photo with the plan's places yet.")
+    used: int
+    limit: int | None
+    full: bool
+
+
+class PersonListOut(Schema):
+    people: list[PersonOut]
+    seats: SeatsOut
+
+
+class PersonIn(Schema):
+    person: str = Field(min_length=1, max_length=150, description="The ``id`` of a person of ``base.person.list``.")
+
+
+class PersonMayOut(Schema):
+    """What who asks may change of this person's way in."""
+
+    remove_pin: bool
+    set_badge: bool
+
+
+class PersonDetailOut(PersonOut):
+    pin_set_at: dt.datetime | None
+    badge_set_at: dt.datetime | None
+    may: PersonMayOut
+
+
+class BadgeSetIn(PersonIn):
+    badge: str = Field(max_length=200, description="The card's number, as the reader types it (4 to 64 characters).")
+
+
+class RoleListIn(Schema):
+    """No input: the roles of the business of the request."""
+
+
+class RoleOut(Schema):
+    key: Literal["hub_owner", "hub_admin", "hub_manager", "hub_employee"]
+    label: str
+    origin: Literal["basic"] = Field(description="Where the role comes from: erplora.com's own four.")
+    members: int
+    permissions: int = Field(description="How many permissions of the apps of this deployment it gives.")
+
+
+class RoleListOut(Schema):
+    roles: list[RoleOut]
+
+
+# ── People and permissions: the business's API keys and its API's documentation (APP-BASE-5) ──────────────────────
+
+
+class ApiKeyListIn(Schema):
+    """No input: the keys of the business of the request."""
+
+
+class ApiKeyOut(Schema):
+    id: UUID
+    name: str
+    prefix: str = Field(description="The token's first characters, to tell it apart; never the whole token.")
+    mode: Literal["full", "read", "write", "per_app"]
+    scopes: dict[str, list[Literal["read", "write"]]] = Field(description="Per app: what it may do on each app.")
+    rate_per_minute: int
+    created_by: str
+    created_at: dt.datetime
+    rotated_at: dt.datetime | None
+    last_used_at: dt.datetime | None
+    revoked_at: dt.datetime | None
+
+
+class ApiAppOut(Schema):
+    """An app this business has that publishes operations: what a key per app may be given on it."""
+
+    id: str
+    name: str
+    read: bool = Field(description="It publishes queries.")
+    write: bool = Field(description="It publishes commands.")
+
+
+class ApiKeyListOut(Schema):
+    available: bool = Field(description="False while the business shares its database with others: no key yet.")
+    keys: list[ApiKeyOut]
+    apps: list[ApiAppOut]
+
+
+class ApiKeyCreateIn(Schema):
+    name: str = Field(max_length=80)
+    rate_per_minute: int = Field(60, ge=1, le=10_000)
+    mode: Literal["full", "read", "write", "per_app"]
+    scopes: dict[str, list[Literal["read", "write"]]] = Field(default_factory=dict)
+
+
+class ApiKeyIdIn(Schema):
+    id: UUID
+
+
+class ApiKeyTokenOut(Schema):
+    """A key just made or rotated, with its whole token: the only time it is shown."""
+
+    key: ApiKeyOut
+    token: str
+
+
+class ApiKeyRevokeOut(Schema):
+    key: ApiKeyOut
+
+
+# ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
+
+
+class ApprovalIn(Schema):
+    """A manager approves one refused command: their person and PIN, or their badge."""
+
+    operation: str = Field(max_length=120)
+    fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$", description="The refused request's, from requires_elevation.")
+    person: str | None = Field(None, max_length=64, description="The id of who approves, from base.approval.approvers.")
+    pin: str | None = Field(None, max_length=16)
+    badge: str | None = Field(None, max_length=128)
+
+
+class ApprovalPassOut(Schema):
+    """The pass of one use (header X-Elevation-Token), shown once, and who approved."""
+
+    token: str
+    approver: str
+    expires_in: int = Field(description="Seconds the pass lasts.")
+
+
+class ApprovalSpendIn(Schema):
+    token: str = Field(max_length=128)
+    operation: str = Field(max_length=120)
+    fingerprint: str = Field(max_length=64)
+
+
+class ApprovalSpentOut(Schema):
+    spent: bool
+    id: str
+    approver: str
+
+
+class ApproversIn(Schema):
+    operation: str = Field(max_length=120)
+
+
+class ApproverOut(Schema):
+    id: str = Field(description="The person's id in the hub, to approve with their PIN.")
+    name: str
+    initials: str
+
+
+class ApproversOut(Schema):
+    people: list[ApproverOut]
+    pin_length: Literal[4, 6] = Field(description="Digits of the business's PIN, for the pad.")
+
+
+class ApprovalListIn(Schema):
+    """No input."""
+
+
+class ApprovalOut(Schema):
+    id: UUID
+    at: dt.datetime
+    action: str = Field(description="What was approved, in words.")
+    operation: str
+    requested_by: str
+    approved_by: str
+    way: Literal["pin", "badge"]
+    used: bool
+    used_at: dt.datetime | None
+
+
+class ApprovalListOut(Schema):
+    approvals: list[ApprovalOut]
+
+
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+class ApiDocIn(Schema):
+    """No input."""
+
+
+class ApiDocOut(Schema):
+    document: dict = Field(description="The OpenAPI document of what this business's apps publish.")
+    apps: list[ApiAppOut] = Field(description="The apps in it (its tags), by name.")
+    keys_available: bool = Field(description="Whether this business can make API keys yet.")
+
+
+class ApiDocSettingsIn(Schema):
+    """No input."""
+
+
+class ApiDocSettingsOut(Schema):
+    docs_enabled: bool
+    can_change: bool = Field(description="Whether who asks may change it (who runs the business).")
+
+
+class ApiDocSettingsUpdateIn(Schema):
+    docs_enabled: bool
+
+
 # ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────
 
 #: How the Files screen shows a file: «image», «pdf», «text», «table» (CSV, TSV), «json», «audio», «video», or «»

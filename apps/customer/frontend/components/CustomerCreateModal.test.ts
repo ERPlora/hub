@@ -96,6 +96,20 @@ describe('CustomerCreateModal', () => {
     expect(s.created).toEqual([]);
   });
 
+  it('a birthday the browser cannot read is told under it, in Spanish, and nothing is sent', async () => {
+    const s = await setup('es');
+    await s.type('customer-form-name', 'Ana');
+    // What a browser does with 31/02 typed in a date input: the page reads "" and the input says it could not.
+    const birthday = s.el('customer-form-birthday')! as HTMLElement & { errorText?: string };
+    const native = birthday.querySelector('input') ?? birthday.appendChild(document.createElement('input'));
+    Object.defineProperty(native, 'validity', { value: { badInput: true } });
+    await s.save();
+    expect(s.net.api).toHaveLength(0);
+    expect(birthday.errorText).toBe('Introduce una fecha válida.');
+    expect(s.open.value).toBe(true);
+    expect(s.created).toEqual([]);
+  });
+
   it('a refusal that names no field shown is told on top of the form', async () => {
     const s = await setup();
     s.net.onApi(() => refusal(403, 'permission_denied', 'You do not have permission to do that.'));
