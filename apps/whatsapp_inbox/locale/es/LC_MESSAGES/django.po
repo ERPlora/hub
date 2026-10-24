@@ -692,3 +692,21 @@ msgstr "Lee la cita, para decir su día, su hora, el servicio y el profesional."
 
 msgid "Sends the customer the WhatsApp, only in their own conversation and within your plan's messages."
 msgstr "Manda el WhatsApp a la clienta, solo en su propia conversación y dentro de los mensajes de tu plan."
+
+msgid "Tell the customer by WhatsApp when their reservation is confirmed"
+msgstr "Avisar por WhatsApp al cliente cuando se confirma su reserva"
+
+msgid "When a reservation is confirmed, the customer gets a WhatsApp with its day, time and guests."
+msgstr "Cuando se confirma una reserva, el cliente recibe un WhatsApp con el día, la hora y los comensales."
+
+msgid "Only to a customer who already has a WhatsApp conversation with your business, and only to exactly the number of the reservation. Within 24 hours of their last message it goes as text; after them WhatsApp only lets an approved template through: create the Utility template «reservation_confirmed» in WhatsApp settings with three values (the day, the time and the guests). Whenever it cannot go, the reason is in this automation's history."
+msgstr "Solo a un cliente que ya tiene conversación de WhatsApp con tu negocio, y solo al número exacto de la reserva. Dentro de las 24 horas desde su último mensaje sale como texto; después, WhatsApp solo deja pasar una plantilla aprobada: crea en los ajustes de WhatsApp la plantilla de Utilidad «reservation_confirmed» con tres datos (el día, la hora y los comensales). Siempre que no pueda salir, el motivo queda en el historial de esta automatización."
+
+msgid "Confirmed! We are expecting you on {{steps.s1.date_label}} at {{steps.s1.time_label}}, table for {{steps.s1.party_size}}."
+msgstr "¡Confirmada! Te esperamos el {{steps.s1.date_label}} a las {{steps.s1.time_label}}, mesa para {{steps.s1.party_size}}."
+
+msgid "Reads the reservation, for its number, day, time and guests."
+msgstr "Lee la reserva, para saber su número, su día, su hora y los comensales."
+
+msgid "Sends the guest the WhatsApp, only in their own conversation and within your plan's messages."
+msgstr "Manda el WhatsApp al cliente, solo en su propia conversación y dentro de los mensajes de tu plan."
