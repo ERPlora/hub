@@ -286,11 +286,21 @@ def test_resetting_removes_the_sections_chosen(owner, own_database):
     assert events("base.hub.data_reset") == [{"apps": ["table"]}]
 
 
+def test_the_name_is_compared_as_the_confirmation_dialog_does(owner, own_database):
+    """Spaces around and inside collapsed and case ignored, accents kept (ConfirmDialog of @erplora/ui)."""
+    Hub.objects.filter(slug="a").update(name="Bar  Pepé")
+    call(owner, "base.blueprint.import", template="restaurant.es")
+
+    call(owner, "base.hub.reset", apps=["table"], confirm="  bar pepé ")
+
+    assert total(owner, "table.table.list") == 0
+
+
 @pytest.mark.parametrize(
     ("data", "field"),
     [
         ({"apps": ["table"], "confirm": "b"}, "confirm"),
-        ({"apps": ["table"], "confirm": "A "}, "confirm"),
+        ({"apps": ["table"], "confirm": "á"}, "confirm"),  # accents count, as in the confirmation dialog
         ({"apps": [], "confirm": "a"}, "apps"),
         ({"apps": ["bakery_oven"], "confirm": "a"}, "apps"),
     ],

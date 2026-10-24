@@ -34,6 +34,7 @@ import json
 import logging
 import secrets
 import time
+import unicodedata
 from collections.abc import Callable, Iterable
 from contextvars import ContextVar
 from functools import partial
@@ -1118,6 +1119,16 @@ def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
         return {"id": load.pk, "apps": removed["apps"]}
 
 
+def same_name(typed: str, name: str) -> bool:
+    """The name typed is the business's: spaces around and inside collapsed, case ignored, accents kept — what the
+    confirmation dialog of the screen (``ConfirmDialog`` of ``@erplora/ui``) already asked."""
+
+    def tidy(text: str) -> str:
+        return " ".join(unicodedata.normalize("NFC", text).split()).casefold()
+
+    return tidy(typed) == tidy(name)
+
+
 def has_own_database(hub: Hub | None) -> bool:
     """The hub keeps its business in its own database (phase 2's S5): emptying it touches no other hub.
 
@@ -1169,7 +1180,7 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
                 gettext("Choose what to empty."),
                 fields={"apps": gettext("Choose at least one section of the list, one that has rows.")},
             )
-        if data.confirm != confirm_with:
+        if not same_name(data.confirm, confirm_with):
             raise InvalidPayload(
                 gettext("The name does not match."),
                 fields={"confirm": gettext("Type the business's name exactly as it is shown.")},
