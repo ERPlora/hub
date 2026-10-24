@@ -129,6 +129,25 @@ describe('ConversationPanel: what it shows', () => {
     expect(s.find('whatsapp-inbox-composer-blocked').text()).toContain('Your plan does not include WhatsApp messages');
   });
 
+  it('tells the thread whether the number still needs reconnecting, so a refused bubble offers «Reconnect» only then (WHATSAPP_INBOX-F34, F02)', async () => {
+    const channel: ChannelOut = {
+      status: 'reconnect_needed',
+      phone_number: '+34910000000',
+      display_name: 'Peluquería Ana',
+      monthly_limit: 150,
+      monthly_usage: 3,
+      cap_reached: false,
+      synced_at: '2026-10-15T09:00:00Z',
+      manage_url: 'http://localhost:8001',
+      plans_url: 'http://localhost:8001/store/plans',
+    };
+    const s = await setup({ can_send: false, send_blocked: 'not_connected' }, { props: { conversationId: 'c1', channel } });
+    expect(s.wrapper.findComponent(ThreadView).props('reconnectNeeded')).toBe(true);
+    await s.wrapper.setProps({ channel: { ...channel, status: 'connected' } });
+    expect(s.wrapper.findComponent(ThreadView).props('reconnectNeeded')).toBe(false);
+    expect((await setup()).wrapper.findComponent(ThreadView).props('reconnectNeeded')).toBe(false);
+  });
+
   it('«View earlier» follows one more page of 50', async () => {
     const s = await setup();
     await s.result(MESSAGES, page([message('m1', '2026-10-15T09:50:00Z')], 120));

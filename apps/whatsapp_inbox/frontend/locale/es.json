@@ -92,6 +92,7 @@
       "audioError": "No se ha podido cargar la nota de voz.",
       "template": "Plantilla: {name}",
       "failedReason": "Motivo de Meta: {reason}",
+      "permissionExpired": "El permiso de WhatsApp para tu número había caducado.",
       "kinds": {
         "image": "Foto",
         "sticker": "Sticker",

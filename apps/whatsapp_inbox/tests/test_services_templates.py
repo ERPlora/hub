@@ -260,6 +260,11 @@ def test_only_who_configures_makes_changes_or_deletes_templates(role):
         ("whatsapp.template_invalid", "whatsapp_inbox.template_refused", "Template name already exists"),
         ("whatsapp.meta_unreachable", "whatsapp_inbox.meta_unreachable", "Meta did not answer"),
         ("whatsapp.meta_rate_limited", "whatsapp_inbox.meta_rate_limited", "Meta asks to wait"),
+        (
+            "whatsapp.reconnect_needed",
+            "whatsapp_inbox.reconnect_needed",
+            "WhatsApp's permission for your number expired: connect it again.",
+        ),
     ],
 )
 @respx.mock

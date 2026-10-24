@@ -92,6 +92,7 @@
       "audioError": "The voice note could not be loaded.",
       "template": "Template: {name}",
       "failedReason": "Meta's reason: {reason}",
+      "permissionExpired": "WhatsApp's permission for your number had expired.",
       "kinds": {
         "image": "Photo",
         "sticker": "Sticker",

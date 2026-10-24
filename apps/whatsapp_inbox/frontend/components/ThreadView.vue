@@ -2,7 +2,9 @@
 // The thread of a conversation (WHATSAPP_INBOX-F05, F06, F08, F34, F36), as the product's panel painted
 // it: oldest first, the customer's messages on the left, the business's on the right with their
 // delivery status (Sending…, Sent, Delivered, Read, Not delivered and Meta's reason, or the plan's cap of F13; «Not sent» with
-// «Retry» when erplora.com gave no final answer), the owner's replies from the phone marked «From the
+// «Retry» when erplora.com gave no final answer; refused for WhatsApp's expired permission, «Needs reconnecting» with
+// «Reconnect» to Settings for whoever configures while the number still needs it, and only what happened once it is
+// back), the owner's replies from the phone marked «From the
 // phone», a message without text nor attachment named by its type in the reader's language, reactions on
 // the message they answer, and the team's internal notes in their own colour. An attachment is kept by
 // erplora.com, over https only (WORKBOOK F06): a photo or a sticker is painted in its bubble (opening full size
@@ -10,8 +12,10 @@
 // origin —; one that does not load says so and, like a video or a document, offers «Open the attachment» there.
 // «View earlier» asks the page for the previous page; the page owns the data.
 import { InlineFeedback } from '@erplora/ui/components';
+import { useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatMessageTime, mediaKind, safeMediaUrl } from '../lib/format';
@@ -27,14 +31,20 @@ const props = withDefaults(
     hasMore?: boolean;
     /** «Now» for «today» and «yesterday»; the device's clock unless a test pins it. */
     now?: Date;
+    /** The business's number still needs reconnecting (its live state, not the message's). */
+    reconnectNeeded?: boolean;
   }>(),
-  { loading: false, error: undefined, hasMore: false, now: undefined },
+  { loading: false, error: undefined, hasMore: false, now: undefined, reconnectNeeded: false },
 );
 
 const emit = defineEmits<{ earlier: []; deleteNote: [note: NoteOut]; retry: [message: MessageOut] }>();
 
+const SETTINGS = '/whatsapp_inbox/settings';
+
 const t = useT();
 const locale = useLocale();
+const router = useRouter();
+const session = useSession();
 const items = computed(() => timeline(props.messages, props.notes));
 const reactions = computed(() => reactionsByMessage(props.messages));
 const log = ref<HTMLElement | null>(null);
@@ -69,11 +79,22 @@ function notSent(message: MessageOut): boolean {
   return message.status === 'sending' && !!message.error_code;
 }
 
+const EXPIRED = 'whatsapp_inbox.reconnect_needed';
+
 /** Why a message was not delivered: erplora.com's refusal for the plan's cap in the Hub's words (it is not Meta's,
- *  and erplora.com says it in English), any other with Meta's reason. */
+ *  and erplora.com says it in English); WhatsApp's expired permission as «Your number» says it while the number
+ *  still needs reconnecting, and as what happened once it is back; any other with Meta's reason. */
 function failedText(message: MessageOut): string {
   if (message.error_code === 'whatsapp_inbox.cap_reached') return t('whatsapp_inbox.composer.blocked.cap_reached');
+  if (message.error_code === EXPIRED) {
+    return t(props.reconnectNeeded ? 'whatsapp_inbox.settings.reconnectNeeded' : 'whatsapp_inbox.thread.permissionExpired');
+  }
   return t('whatsapp_inbox.thread.failedReason', { reason: message.error_message });
+}
+
+/** «Reconnect» on a message refused for the expired permission: only while it still is, for whoever configures. */
+function offersReconnect(message: MessageOut): boolean {
+  return message.error_code === EXPIRED && props.reconnectNeeded && session.can('whatsapp_inbox.configure');
 }
 
 function statusLabel(message: MessageOut): string {
@@ -234,7 +255,19 @@ watch(
           class="wa-bubble__error"
           data-testid="whatsapp-inbox-message-error"
           :data-code="item.message.error_code"
-        >{{ failedText(item.message) }}</span>
+        >
+          {{ failedText(item.message) }}
+          <ion-button
+            v-if="offersReconnect(item.message)"
+            size="small"
+            fill="clear"
+            class="wa-bubble__retry"
+            data-testid="whatsapp-inbox-message-reconnect"
+            @click="router.push(SETTINGS)"
+          >
+            {{ $t('whatsapp_inbox.settings.connection.reconnect') }}
+          </ion-button>
+        </span>
         <span
           v-if="notSent(item.message)"
           class="wa-bubble__error"
