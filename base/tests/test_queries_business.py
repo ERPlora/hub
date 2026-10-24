@@ -9,6 +9,7 @@ again (``base.hub.registered``), so a change made on erplora.com shows without r
 
 import pytest
 from django.urls import resolve
+from django.utils import translation
 from live.context import OperationContext, Scope
 from live.errors import NotFound, PermissionDenied
 from live.live_registry import live_registry
@@ -116,9 +117,10 @@ def test_a_demo_has_no_business_on_erplora_com_to_change_it(settings):
     assert (demo["country"], demo["currency"], demo["timezone"], demo["language"]) == ("", "EUR", "Europe/Madrid", "en")
 
 
-def test_a_scope_without_a_business_is_not_found():
-    with pytest.raises(NotFound):
+def test_a_scope_without_a_business_is_not_found_and_says_so_in_the_person_s_language():
+    with translation.override("es"), pytest.raises(NotFound) as refused:
         business(Scope("host", "nobody"))
+    assert refused.value.message == "No hay ningún negocio aquí."
 
 
 def test_without_the_home_s_permission_it_is_refused(hubs):

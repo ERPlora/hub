@@ -912,3 +912,7 @@ msgstr "“%(value)s” no es un valor binario válido."
 #, python-format
 msgid "No %s matches the given query."
 msgstr "Ningún %s coincide con la consulta."
+
+#: base/queries.py
+msgid "There is no business here."
+msgstr "No hay ningún negocio aquí."
