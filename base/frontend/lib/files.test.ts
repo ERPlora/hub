@@ -18,6 +18,7 @@ import {
   flatFolders,
   formatSize,
   iconFor,
+  joinSentences,
   matches,
   MAX_UPLOAD_BYTES,
   nameOf,
@@ -181,5 +182,21 @@ describe('splitName', () => {
     expect(splitName('report.')).toEqual({ stem: 'report.', extension: '' });
     expect(splitName('v2. final notes')).toEqual({ stem: 'v2. final notes', extension: '' });
     expect(splitName('logo.png', true)).toEqual({ stem: 'logo.png', extension: '' });
+  });
+});
+
+// A notice is one line of text (Material's snackbar: a short message): a batch that says two things says them as
+// sentences one after the other, each ending with its stop, never with a line break the notice paints as a space.
+describe('joinSentences', () => {
+  it('puts each part after the other as a sentence, on one line', () => {
+    const said = joinSentences(['Files uploaded.', 'Could not upload “a.exe”: Programs (.exe) can’t be kept in Files: x']);
+    expect(said).toBe('Files uploaded. Could not upload “a.exe”: Programs (.exe) can’t be kept in Files: x.');
+    expect(said).not.toMatch(/\n/);
+  });
+
+  it('leaves out what is empty and keeps a stop the part already has', () => {
+    expect(joinSentences(['', '  Archivos subidos.  ', '¿Seguro?', 'Espera…', ''])).toBe('Archivos subidos. ¿Seguro? Espera…');
+    expect(joinSentences(['Line one\nline two'])).toBe('Line one line two.');
+    expect(joinSentences([])).toBe('');
   });
 });

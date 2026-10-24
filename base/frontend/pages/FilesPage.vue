@@ -35,6 +35,7 @@ import {
   flatFolders,
   formatSize,
   iconFor,
+  joinSentences,
   matches,
   MAX_FOLDER_NAME,
   MAX_NAME,
@@ -162,8 +163,9 @@ async function uploadAll(chosen: File[]): Promise<void> {
     : renamed.length === 1 && saved === 1
       ? t('base.files.uploadedAs', { name: renamed[0] })
       : t('base.files.uploaded');
-  // One notice for the batch (a second one would close the first): what was refused, after what was kept.
-  if (failures.length) void toastError([done, ...failures].filter(Boolean).join('\n'));
+  // One notice for the batch (a second one would close the first): what was kept, then each refusal with its reason,
+  // as sentences on one line.
+  if (failures.length) void toastError(joinSentences([done, ...failures]));
   else if (done) void toastSuccess(done);
 }
 

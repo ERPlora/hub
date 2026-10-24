@@ -326,8 +326,9 @@ describe('FilesPage · upload and new folder (BASE-G83)', () => {
     await flush();
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledTimes(1);
+    // One line of sentences (a notice paints a line break as a space), what was kept first.
     expect(vi.mocked(toastError).mock.calls[0][0]).toBe(
-      'Files uploaded.\nCould not upload “virus.exe”: Programs (.exe) can\'t be kept in Files: they could harm whoever opens them.',
+      'Files uploaded. Could not upload “virus.exe”: Programs (.exe) can\'t be kept in Files: they could harm whoever opens them.',
     );
   });
 
@@ -347,6 +348,9 @@ describe('FilesPage · upload and new folder (BASE-G83)', () => {
     const said = String(vi.mocked(toastError).mock.calls[0][0]);
     expect(said).toContain('Could not upload “virus.exe”: Programs (.exe) can\'t be kept in Files');
     expect(said).toContain('Could not upload “b.pdf”: There is no space left for that file: your plan includes 1 GB.');
+    // Each refusal its own sentence, one after the other on one line.
+    expect(said).not.toMatch(/\n/);
+    expect(said).toMatch(/opens them\. Could not upload “b\.pdf”/);
   });
 
   it('dropping files on the manager uploads them', async () => {

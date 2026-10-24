@@ -195,6 +195,16 @@ export function refusalKey(code: string | undefined): string {
   return (code && REFUSAL_KEYS[code]) || 'base.files.refusal.generic';
 }
 
+/** One notice from several sentences: one after the other on one line, each ending with its stop. A notice is one
+ *  line of text (Material's snackbar): a line break would paint as a bare space between two sentences. */
+export function joinSentences(parts: readonly string[]): string {
+  return parts
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .map((part) => (/[.!?…]$/.test(part) ? part : `${part}.`))
+    .join(' ');
+}
+
 /** The extension of a name, for «Programs (.exe) can't be kept…»; `''` without one. */
 export function extensionOf(name: string): string {
   const dot = name.lastIndexOf('.');
