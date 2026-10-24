@@ -244,7 +244,8 @@ Sale: las conversaciones guardadas no se tocan; aviso `whatsapp_inbox.channel.di
 Si falla: si erplora.com no contesta o no confirma, el diálogo lo dice y el número sigue como estaba (en un
 momento **Tu número** dice cómo quedó); si erplora.com no tenía ningún número conectado para este negocio,
 lo dice y **Tu número** queda «Sin conectar». Mientras siga «Hay que reconectar», **Enviar** dice por qué no
-sale; lo guardado se sigue leyendo.
+sale («Hay que reconectar el número en Ajustes para enviar.») y un mensaje que no se entregó por eso dice
+«Hay que reconectar» con **Volver a conectar**; lo guardado se sigue leyendo.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
@@ -917,7 +918,11 @@ Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
 1. Cada mensaje enviado lleva su estado: **Enviando…**, **Enviado**, **Entregado**, **Leído**, **No
-   entregado** (con el motivo de Meta o de erplora.com) o **No enviado** (con **Reintentar**).
+   entregado** (con el motivo de Meta o de erplora.com) o **No enviado** (con **Reintentar**). Si no se
+   entregó porque WhatsApp retiró el permiso del número, dice «Hay que reconectar» con **Volver a conectar**,
+   que lleva a **Tu número** en **Ajustes** (solo quien puede configurar; sin **Reintentar**, que volvería a
+   fallar); con el número de vuelta, el mensaje queda con «El permiso de WhatsApp para tu número había
+   caducado.».
 2. Cambia solo, sin recargar, cuando erplora.com lo cuenta.
 Entra: cada estado que erplora.com recibe de Meta para un mensaje del Hub.
 Sale: el estado solo avanza (un «Entregado» que llega tarde no deshace un «Leído»); un estado que llega
@@ -1155,7 +1160,10 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   quien lo pide desde la bandeja compartida; sin negocio guardado (anterior a `0007`), con el de quien lo pide.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
-  `whatsapp_inbox.cap_reached`, cualquier otro como `whatsapp_inbox.send_refused`); conexión fallida o un
+  `whatsapp_inbox.cap_reached`; `whatsapp.reconnect_needed`, el 190 de Meta, como
+  `whatsapp_inbox.reconnect_needed` con el texto del Hub (`RECONNECT_NEEDED`), nunca el de Meta, y la burbuja
+  lo dice como **Tu número** mientras el canal siga `reconnect_needed`; cualquier otro como
+  `whatsapp_inbox.send_refused`, con el motivo de Meta); conexión fallida o un
   4xx que no es 409 (también un 429: ir más despacio no es el tope) → no ha salido (`sending`,
   `whatsapp_inbox.saas_unreachable`); 5xx, tiempo de lectura agotado o 200 sin id → no se sabe
   (`sending`, `whatsapp_inbox.send_unknown`). Los dos últimos se reintentan **con la misma clave** («No
@@ -1165,8 +1173,9 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - **Una plantilla nunca se registra dos veces.** Cada guardado lleva su `submit_key` (la pantalla genera
   una por guardado; el asistente, una por intención); el mismo guardado repetido es la misma fila y la
   misma entrega. 200 `{meta_id, status}` → la plantilla (o su `draft`) pasa a lo que Meta dice; 409 →
-  `failed` con el motivo de Meta (`whatsapp.meta_unreachable`, `whatsapp.meta_rate_limited` y
-  `whatsapp.not_connected` se dicen con palabras del Hub, sin culpar a ERPlora); sin respuesta →
+  `failed` con el motivo de Meta (`whatsapp.meta_unreachable`, `whatsapp.meta_rate_limited`,
+  `whatsapp.not_connected` y `whatsapp.reconnect_needed` se dicen con palabras del Hub, sin culpar a ERPlora);
+  sin respuesta →
   `sending`, y `template.retry` la entrega con la misma clave; un `failed` reintentado va con clave nueva
   (la misma daría el mismo rechazo).
 - **La lista de Meta nunca pisa al Hub**: una plantilla `DRAFT` que va de camino conserva lo escrito, un
@@ -1314,8 +1323,11 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
    ```
 
    Respuestas: 200 `{"wa_message_id": "wamid…"}` (aceptado por Meta); 409
-   `{"error": {"code": "whatsapp.cap_reached" | "whatsapp.not_connected" | "whatsapp.window_closed" |
-   "whatsapp.template_not_approved" | "whatsapp.recipient_blocked", "message": "…"}}` = no ha salido;
+   `{"error": {"code": "whatsapp.cap_reached" | "whatsapp.not_connected" | "whatsapp.reconnect_needed" |
+   "whatsapp.window_closed" | "whatsapp.template_not_approved" | "whatsapp.recipient_blocked" |
+   "whatsapp.meta_rejected", "message": "…"}}` = no ha salido (`reconnect_needed`: el permiso caducó o se
+   retiró, el 190 de Meta, y erplora.com marca el número «Hay que reconectar» con foto nueva; `meta_rejected`:
+   otro rechazo de Meta, con su motivo);
    un 4xx que no es 409 (también 429) = no ha salido; 5xx o sin respuesta = no se sabe. erplora.com
    **nunca envía dos veces la misma clave** (devuelve el `wa_message_id` que ya tenía) y **reserva el
    cupo del mes de forma atómica al aceptar**: dos envíos simultáneos no pueden pasar ambos el tope.
