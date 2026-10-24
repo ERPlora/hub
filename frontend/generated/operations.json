@@ -4,6 +4,8 @@
   "base.widget.list": { "method": "get", "path": "/api/home/widgets" },
   "base.bell.counters": { "method": "get", "path": "/api/home/bell" },
   "base.notice.list": { "method": "get", "path": "/api/home/notices" },
+  "base.app.list": { "method": "get", "path": "/api/apps" },
+  "base.plan.usage": { "method": "get", "path": "/api/system/plan" },
   "base.access.door": { "method": "get", "path": "/api/access/door" },
   "base.pin.set": { "method": "post", "path": "/api/me/pin" },
   "base.device.current": { "method": "get", "path": "/api/device" },

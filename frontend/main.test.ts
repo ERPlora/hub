@@ -25,6 +25,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 import { createShell, logout } from '@erplora/ui/shell';
 import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
 
+import { APP_BLOCKED_ROUTE } from '../base/frontend/lib/app-gate';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 type Main = typeof import('./main');
@@ -34,9 +35,15 @@ const ME = { user: { id: 'u1', label: 'Ana' }, permissions: ['demo.view'], menu:
 const page = { template: '<div />' };
 const LOGIN_URL = '/auth/login';
 
-function fakeShell(isReady: () => Promise<void> = () => Promise.resolve()) {
+function fakeShell(isReady: () => Promise<void> = () => Promise.resolve(), current: object = { path: '/', meta: {} }) {
   const app = { mount: vi.fn() };
-  const router = { isReady: vi.fn(isReady) };
+  const router = {
+    isReady: vi.fn(isReady),
+    addRoute: vi.fn(),
+    beforeEach: vi.fn(),
+    replace: vi.fn(() => Promise.resolve()),
+    currentRoute: { value: { fullPath: '/', query: {}, hash: '', ...current } },
+  };
   vi.mocked(createShell).mockResolvedValue({ app, router } as never);
   return { app, router };
 }
@@ -305,6 +312,43 @@ describe('main.ts', () => {
     const { app } = fakeShell(() => Promise.reject(cancelled));
     await expect(main.boot({})).resolves.toBeUndefined();
     expect(app.mount).not.toHaveBeenCalled();
+  });
+
+  // ── The app gate (APP-BASE-4: BASE-G132, G134) ──
+
+  it("marks each app's routes with its app (meta.app), for the app gate; base's have none", async () => {
+    fakeShell();
+    await main.boot({
+      '../base/frontend/routes.ts': { default: [{ path: '/apps', component: page }] },
+      '../apps/cash_register/frontend/routes.ts': { default: [{ path: '/cash_register', component: page }] },
+    });
+    const routes = shellOptions().routes as RouteRecordRaw[];
+    expect(routes.map((r) => [r.path, r.meta?.app])).toEqual([
+      ['/cash_register', 'cash_register'],
+      ['/apps', undefined],
+    ]);
+  });
+
+  it("adds base's «why it does not open» after the shell's routes and guards every navigation with the app gate", async () => {
+    const { router } = fakeShell();
+    await main.boot({});
+    expect(router.addRoute).toHaveBeenCalledExactlyOnceWith(APP_BLOCKED_ROUTE);
+    expect(router.beforeEach).toHaveBeenCalledOnce();
+  });
+
+  it('checks the first address too, before mounting: a screen of an app that is off opens base’s page there', async () => {
+    renderShellHtml({ ...ME, apps: [{ label: 'stock', state: 'off' }] });
+    const { app, router } = fakeShell(undefined, { path: '/stock/items', fullPath: '/stock/items', meta: { app: 'stock' } });
+    await main.boot({});
+    expect(router.replace).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: APP_BLOCKED_ROUTE.name }));
+    expect(router.replace.mock.invocationCallOrder[0]).toBeLessThan(app.mount.mock.invocationCallOrder[0]);
+  });
+
+  it('leaves the first address alone when its app is on', async () => {
+    renderShellHtml({ ...ME, apps: [{ label: 'stock', state: 'on' }] });
+    const { router } = fakeShell(undefined, { path: '/stock/items', meta: { app: 'stock' } });
+    await main.boot({});
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it('lets any other boot failure surface', async () => {

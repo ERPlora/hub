@@ -166,10 +166,4 @@ function remove(id: string): void {
   flex-wrap: wrap;
   gap: 4px;
 }
-
-/* A document rule: the shell's Tailwind preflight zeroes Ionic's own chip padding (`:host`). */
-.product-categories__chips ion-chip {
-  margin: 0;
-  padding-inline: 12px 0;
-}
 </style>

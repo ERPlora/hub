@@ -24,6 +24,12 @@ live("base.widget.list", on=events_of("widgets"))
 live("base.bell.counters", on=events_of("bell"))
 live("base.notice.list", on=events_of("notices"))
 
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+# The SaaS's photo gives or takes the right to a paid module (base.entitlement): the Apps screen follows it.
+live("base.app.list", on=[HUB_STATE_APPLIED])
+# The plan and the members come in the photo too: «Plan and limits» follows it.
+live("base.plan.usage", on=[HUB_STATE_APPLIED])
+
 
 # The way in (APP-BASE-3): the grid of «Switch user» follows the PINs, the people (the photo), the dial and the devices.
 _DEVICES = [events.DEVICE_MODE_CHANGED, events.DEVICE_RENAMED, events.DEVICE_REMOVED, events.DEVICES_PRUNED]

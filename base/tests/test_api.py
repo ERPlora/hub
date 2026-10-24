@@ -90,4 +90,6 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/home/widgets", "base.widget.list"),
         ("GET", "/api/home/bell", "base.bell.counters"),
         ("GET", "/api/home/notices", "base.notice.list"),
+        ("GET", "/api/apps", "base.app.list"),
+        ("GET", "/api/system/plan", "base.plan.usage"),
     }

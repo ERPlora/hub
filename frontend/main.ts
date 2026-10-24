@@ -22,6 +22,7 @@ import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { readAccess, startWayIn } from '../base/frontend/lib/access';
+import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
@@ -61,12 +62,19 @@ export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
 /** An app's `frontend/routes.ts` default-exports its routes → pages, and nothing else. */
 export type AppRoutes = { default: RouteRecordRaw[] };
 
-/** Every app's routes, in path order; a page needs a session unless its route says `auth: false`. */
+/**
+ * Every app's routes, in path order; a page needs a session unless its route says `auth: false`. Each app's carry
+ * `meta.app`, its folder, which base's app gate checks (base's own carry none).
+ */
 export function appRoutes(routeFiles: Record<string, AppRoutes>): RouteRecordRaw[] {
   return Object.keys(routeFiles)
     .sort()
-    .flatMap((file) => routeFiles[file].default)
-    .map((route) => ({ ...route, meta: { auth: true, ...route.meta } }) as RouteRecordRaw);
+    .flatMap((file) => {
+      const app = appOfRouteFile(file);
+      return routeFiles[file].default.map(
+        (route) => ({ ...route, meta: { auth: true, ...(app ? { app } : {}), ...route.meta } }) as RouteRecordRaw,
+      );
+    });
 }
 
 /** An app's `frontend/locale/<lang>.json`, all under the app id (guard: main.test.ts). */
@@ -152,12 +160,20 @@ export async function boot(
     chrome: CHROME,
   });
   provideLiveClient(client, app);
+  // base's app gate (BASE-G132, G134): a screen of an app the session gives `off` mounts «why it does not open» in
+  // its address. The page's own after the shell's 404, so only reached by name; the first address is checked once
+  // the router is ready, before mounting (the first navigation may have started before the guard was added).
+  const appGate = createAppGate(session.session);
+  router.addRoute(APP_BLOCKED_ROUTE);
+  router.beforeEach(appGate);
   try {
     await router.isReady();
   } catch (failure) {
     if (isNavigationFailure(failure)) return;
     throw failure;
   }
+  const blocked = appGate(router.currentRoute.value);
+  if (blocked !== true) await router.replace(blocked);
   app.mount('#app');
   // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
   startWayIn(doc, {

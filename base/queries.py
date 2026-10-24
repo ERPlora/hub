@@ -12,9 +12,10 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
 from live.errors import NotFound, Unauthorized
+from live.meta import Category
 from live.operations import operation
 
-from base import access, home
+from base import access, entitlement, home
 from base.auth import saas_url
 from base.models import (
     AccessSettings,
@@ -37,6 +38,8 @@ from base.schemas import (
     AccessDoorOut,
     AccessSettingsIn,
     AccessSettingsOut,
+    AppListIn,
+    AppListOut,
     DeviceCurrentIn,
     DeviceCurrentOut,
     DeviceListIn,
@@ -53,6 +56,8 @@ from base.schemas import (
     HubsBySlugOut,
     NoticeListIn,
     NoticeListOut,
+    PlanUsageIn,
+    PlanUsageOut,
     SessionMeIn,
     SessionMeOut,
     SetupStatusIn,
@@ -67,13 +72,15 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     """The user, its permissions, and the menu and apps it may see on this scope, already translated.
 
     Menu and apps list modules only (``home.shown_modules``: the reference app only in development, the tests
-    or a demo's hub): a platform app such as ``base`` is always on and never shows. ``demo`` says when the demo
+    or a demo's hub): a platform app such as ``base`` is always on and never shows. A module its business has no
+    right to (``base.entitlement``) is ``off`` and has no menu: the shell's gate tells why its screens do not open. ``demo`` says when the demo
     ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing else, which
     tells the SPA to send it to the login.
     """
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
     demo = _demo_hub(ctx)
+    blocked = entitlement.blocked_apps(ctx.scope)
     with translation.override(ctx.language):
         visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
@@ -89,9 +96,9 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
                     ],
                 }
                 for config in visible
-                if config.navigation
+                if config.navigation and config.label not in blocked
             ],
-            "apps": [{"label": config.label, "state": "on"} for config in visible],
+            "apps": [{"label": config.label, "state": "off" if config.label in blocked else "on"} for config in visible],
             "language": ctx.language,
             "demo": None if demo is None else {"expires_at": demo.expires_at},
         }
@@ -259,6 +266,83 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         return {"notices": home.device_notices(ctx, modules), "sources": home.notice_sources(ctx, modules)}
 
+
+# ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
+
+
+@operation("base.app.list", kind="query", permission=VIEW_HOME, input=AppListIn, output=AppListOut)
+def app_list(ctx: OperationContext, data: AppListIn) -> dict:
+    """The Apps screen: every module the scope shows, from its own config in this process (PLAN §20.4.1; never the
+    SaaS's catalog), with where its right comes from and its state (``base.entitlement``), the first screen this
+    person may open, what it needs (it comes along with it) and what needs it, and erplora.com's Store of this
+    business, where a paid one is bought. Phase 1 has every module the business has a right to on."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    configs = home.shown_modules(demo_hub=bool(hub and hub.is_demo))
+    blocked = entitlement.blocked_apps(ctx.scope)
+    rights = entitlement.entitlements(None if hub is None or hub.is_demo else hub.state, now=timezone.now())
+    needs = {config.label: entitlement.requires_of(config.label) for config in configs}
+    with translation.override(ctx.language):
+        return {
+            "apps": [
+                {
+                    "id": config.label,
+                    "name": str(config.verbose_name),
+                    "icon": _shell_icon(config),
+                    "category": config.category,
+                    "category_label": str(Category(config.category).label),
+                    "summary": str(config.summary),
+                    "premium": bool(config.premium),
+                    "right": entitlement.FREE if hub is not None and hub.is_demo else rights[config.label],
+                    "state": "blocked" if config.label in blocked else "on",
+                    "path": None if config.label in blocked else _first_screen(ctx, config),
+                    "requires": sorted(needs[config.label]),
+                    "required_by": sorted(label for label, required in needs.items() if config.label in required),
+                }
+                for config in configs
+            ],
+            "store_url": saas_url(f"/store/modules?business={hub.id}") if hub is not None else "",
+        }
+
+
+def _shell_icon(config: Any) -> str:
+    """The icon the shell paints for a module: its first menu entry's, as the launcher and «My apps»; without a menu,
+    the shell's own for an app. The module's ``icon`` is the store's, baked apart (``base.catalog``): HubIcon refuses
+    a name the shell has not registered."""
+    return config.navigation[0].icon if config.navigation else "ion:apps-outline"
+
+
+def _first_screen(ctx: OperationContext, config: Any) -> str | None:
+    """The first entry of the module's menu, for a person who may see the module; else none."""
+    if not config.navigation or not _can_see(ctx, config):
+        return None
+    return config.navigation[0].path
+
+
+@operation("base.plan.usage", kind="query", permission=ADMINISTER_HUB, input=PlanUsageIn, output=PlanUsageOut)
+def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
+    """«Plan and limits» of System (BASE-G81): the limits of the plan the SaaS's last photo carries (``plan``:
+    ``max_users``, ``max_devices``; 0 = no limit) against the people of the business (its active members, the ones
+    the SaaS counts). Devices: the limit only, the Hub keeps no count of them yet. Memory, CPU and database size are
+    gone with the old process per hub (PLAN-HUB §1a): erplora.com measures the use. For who runs the business."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    state = hub.state if hub is not None and isinstance(hub.state, dict) else {}
+    plan = state.get("plan") if isinstance(state.get("plan"), dict) else None
+    known = plan is not None and all(_is_count(plan.get(field)) for field in ("max_users", "max_devices"))
+    people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).count()
+    return {
+        "known": known,
+        "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
+        "devices": {"used": None, "limit": _limit(plan, "max_devices") if known else None},
+    }
+
+
+def _is_count(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _limit(plan: dict, field: str) -> int | None:
+    """A limit of the plan; 0 is none."""
+    return plan[field] or None
 
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile (APP-BASE-3) ───────────────────
 
