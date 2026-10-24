@@ -19,6 +19,7 @@ operations (``base.queries``, ``base.services``) give them the hub of the reques
 
 import datetime as dt
 import logging
+import os
 import posixpath
 import unicodedata
 import uuid
@@ -30,11 +31,12 @@ from urllib.parse import quote
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.core.files.base import ContentFile, File
-from django.core.files.storage import Storage
+from django.core.files.storage import FileSystemStorage, Storage
 from django.http import FileResponse
 from django.utils.translation import gettext
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 from storages.backends.s3 import S3Storage
+from storages.utils import clean_name as s3_clean_name
 
 from base.media import FILE_CSP
 from base.storage import hub_prefix
@@ -51,6 +53,8 @@ MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_NAME_BYTES = 255
 #: The longest name of a new folder, in characters (the old hub's dialog).
 MAX_FOLDER_NAME = 100
+#: How many times an upload takes the next free name because another upload of that name wrote it first.
+MAX_NAME_RACES = 10
 #: The longest path under the root, in UTF-8 bytes: with ``hub-<hex>/files/`` (43), an S3 key's 1024 at most.
 MAX_PATH_BYTES = 980
 #: Programs a file manager does not keep: they run on whoever opens them (the extensions Gmail blocks).
@@ -360,11 +364,54 @@ def upload(
             % {"space": human_space(limit_bytes)},
             code="base.file_no_space",
         )
-    final = _free_name(store, hub, folder, name)
-    path = _join(folder, final)
+    # The free name is worked out, then written only if nobody wrote it meanwhile (another upload of the same name at
+    # the same moment): if somebody did, the next free name, never over the other's file.
+    for _attempt in range(MAX_NAME_RACES):
+        final = _free_name(store, hub, folder, name)
+        path = _join(folder, final)
+        if _create(store, _key(hub, path), content):
+            return {"path": path, "name": final, "size": len(content)}
+    raise Conflict(gettext("There is already a file or folder with that name here."), code="base.file_exists")
+
+
+def _create(store: Storage, key: str, content: bytes) -> bool:
+    """Write ``content`` as ``key`` only if no key of that name is there; ``False`` if one is (never written over).
+
+    On S3 the write itself is conditional (``If-None-Match: *``: 412 when the key exists, 409 when another conditional
+    write of it is under way); on disk the file is opened to be created (``O_EXCL``). Any other store (memory, in the
+    tests) checks and writes."""
     with _store():
-        store.save(_key(hub, path), ContentFile(content))
-    return {"path": path, "name": final, "size": len(content)}
+        if isinstance(store, S3Storage):
+            content_type, _preview = served(posixpath.basename(key))
+            try:
+                store.connection.meta.client.put_object(
+                    Bucket=store.bucket_name,
+                    Key=store._normalize_name(s3_clean_name(key)),
+                    Body=content,
+                    ContentType=content_type,
+                    IfNoneMatch="*",
+                )
+            except ClientError as exc:
+                if exc.response.get("Error", {}).get("Code") in ("PreconditionFailed", "ConditionalRequestConflict"):
+                    return False
+                raise
+            return True
+        if isinstance(store, FileSystemStorage):
+            path = store.path(key)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            try:
+                handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o666)
+            except FileExistsError:
+                return False
+            with os.fdopen(handle, "wb") as written:
+                written.write(content)
+            if store.file_permissions_mode is not None:
+                os.chmod(path, store.file_permissions_mode)
+            return True
+        if store.exists(key):
+            return False
+        store.save(key, ContentFile(content))
+        return True
 
 
 def _free_name(store: Storage, hub: uuid.UUID, folder: str, name: str) -> str:

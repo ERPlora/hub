@@ -2030,7 +2030,9 @@ Implicados: ninguno
   descripción en JSON con `Accept: application/json`) y `/api/files/{upload,folder,rename,move,delete}`; eventos
   `base.file.*` y consulta viva `base.file.list`. Nunca por `/p/media/` (público y con caché de un año: solo las
   `PUBLIC_FOLDERS`). Topes: 25 MB por archivo (cuerpo de 35,1 MB en base64), nombre de 255 bytes, carpeta de 100
-  caracteres y ruta de 980 bytes; los programas (`BLOCKED_EXTENSIONS`, la lista de Gmail) se rechazan. El espacio es el
+  caracteres y ruta de 980 bytes; los programas (`BLOCKED_EXTENSIONS`, la lista de Gmail) se rechazan. Subir nunca pisa:
+  la escritura es condicional (`If-None-Match: *` en S3, `O_EXCL` en disco) y, si otra subida del mismo nombre llegó
+  antes, toma el siguiente nombre libre. El espacio es el
   de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
   enseña. Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
