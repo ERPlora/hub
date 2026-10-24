@@ -2,7 +2,7 @@
 // when missing and migrates it, `--drop` deletes it. On 2026-10-16 two stacks (8030 and 8040) shared the
 // default `hub` and the cash sale of one fell into the other's open shift; each stack now runs on its own
 // e2e database, and these commands never touch any other (`hub`, `saas`, the templates…). Preparing it also leaves
-// the checkout's .env the key that seals the test certificates (certificate-key.ts).
+// the checkout's .env the keys that seal the test certificates and the automations' secrets (fernet-keys.ts).
 // flow: ninguno — FIX de la infraestructura e2e del Hub (aislar los datos de cada ejecución)
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newFernetKey } from './certificate-key';
+import { newFernetKey } from './fernet-keys';
 import { adminSql, dropDatabase, prepareDatabase, runCli, type AdminSql } from './database';
 import type { CommandResult, ManagePy, Spawn } from './global-setup';
 
@@ -151,7 +151,7 @@ describe('runCli', () => {
     for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
   });
 
-  /** A checkout's .env holding `content`, and an environment without the certificate key. */
+  /** A checkout's .env holding `content`, and an environment without the Fernet keys. */
   function checkout(content: string): { envFile: string; env: NodeJS.ProcessEnv } {
     const folder = mkdtempSync(join(tmpdir(), 'e2e-database-'));
     folders.push(folder);
@@ -160,8 +160,16 @@ describe('runCli', () => {
     return { envFile, env: {} };
   }
 
-  /** A checkout whose .env already has its certificate key. */
-  const keyed = () => checkout(`DEBUG=True\nFISCAL_CERTIFICATE_KEY=${newFernetKey()}\n`);
+  /** A checkout whose .env already has both its keys. */
+  const keyed = () => checkout(`DEBUG=True\nFISCAL_CERTIFICATE_KEY=${newFernetKey()}\nFLOW_SECRETS_KEY=${newFernetKey()}\n`);
+
+  /** The value the .env `content` gives `name`, if a line sets it. */
+  function keyIn(content: string, name: string): string | undefined {
+    return content
+      .split('\n')
+      .find((l) => l.startsWith(`${name}=`))
+      ?.slice(`${name}=`.length);
+  }
 
   it('prepares the database of DB_NAME without arguments and drops it with --drop', () => {
     const postgres = fakePostgres([]);
@@ -179,25 +187,40 @@ describe('runCli', () => {
     expect(postgres.statements.at(-1)).toBe('drop database if exists "hub_e2e_8030"');
   });
 
-  it("leaves the checkout's .env a certificate key once the database is ready, and never prints it", () => {
+  it("leaves the checkout's .env the certificates' key and the secrets' key once the database is ready, and never prints them", () => {
     const stack = checkout('DEBUG=True\n');
     const prepared = io();
 
     expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...stack, ...prepared })).toBe(0);
 
     const given = readFileSync(stack.envFile, 'utf8');
-    const [line] = given.split('\n').filter((l) => l.startsWith('FISCAL_CERTIFICATE_KEY='));
-    const key = line.slice('FISCAL_CERTIFICATE_KEY='.length);
-    expect(key).toMatch(/^[A-Za-z0-9_-]{43}=$/);
-    expect(prepared.out).toHaveLength(2);
+    const keys = ['FISCAL_CERTIFICATE_KEY', 'FLOW_SECRETS_KEY'].map((name) => keyIn(given, name) ?? '');
+    expect(keys).toEqual([expect.stringMatching(/^[A-Za-z0-9_-]{43}=$/), expect.stringMatching(/^[A-Za-z0-9_-]{43}=$/)]);
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(prepared.out).toHaveLength(3);
     expect(prepared.out[1]).toMatch(/^database\.ts: FISCAL_CERTIFICATE_KEY generated in /);
-    expect(prepared.out.join('\n')).not.toContain(key);
+    expect(prepared.out[2]).toMatch(/^database\.ts: FLOW_SECRETS_KEY generated in /);
+    for (const key of keys) expect(prepared.out.join('\n')).not.toContain(key);
 
-    // Again on the same checkout: the key it gave is the one the run keeps.
+    // Again on the same checkout: the keys it gave are the ones the run keeps.
     const kept = io();
     expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres(['hub_e2e_8030']).sql, manage: fakeManage().manage, ...stack, ...kept })).toBe(0);
-    expect(kept.out[1]).toMatch(/^database\.ts: FISCAL_CERTIFICATE_KEY kept from /);
+    expect(kept.out.slice(1)).toEqual([
+      expect.stringMatching(/^database\.ts: FISCAL_CERTIFICATE_KEY kept from /),
+      expect.stringMatching(/^database\.ts: FLOW_SECRETS_KEY kept from /),
+    ]);
     expect(readFileSync(stack.envFile, 'utf8')).toBe(given);
+
+    // From the environment: said as such, and nothing written.
+    const exported = checkout('DEBUG=True\n');
+    const fromEnvironment = io();
+    const env = { FISCAL_CERTIFICATE_KEY: newFernetKey(), FLOW_SECRETS_KEY: newFernetKey() };
+    expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...exported, env, ...fromEnvironment })).toBe(0);
+    expect(fromEnvironment.out.slice(1)).toEqual([
+      expect.stringMatching(/^database\.ts: FISCAL_CERTIFICATE_KEY taken from the environment/),
+      expect.stringMatching(/^database\.ts: FLOW_SECRETS_KEY taken from the environment/),
+    ]);
+    expect(readFileSync(exported.envFile, 'utf8')).toBe('DEBUG=True\n');
   });
 
   it('exits 1 with the reason on stderr, and 2 on an argument it does not know', () => {
@@ -209,6 +232,13 @@ describe('runCli', () => {
     const unusable = io();
     expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...broken, ...unusable })).toBe(1);
     expect(unusable.err.join('\n')).toMatch(/^database\.ts: FISCAL_CERTIFICATE_KEY in /);
+
+    // The secrets' key no key: refused, and the certificates' key, missing, is not written either.
+    const brokenSecrets = checkout('DEBUG=True\nFLOW_SECRETS_KEY=not-a-key\n');
+    const unusableSecrets = io();
+    expect(runCli([], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...brokenSecrets, ...unusableSecrets })).toBe(1);
+    expect(unusableSecrets.err.join('\n')).toMatch(/^database\.ts: FLOW_SECRETS_KEY in /);
+    expect(readFileSync(brokenSecrets.envFile, 'utf8')).toBe('DEBUG=True\nFLOW_SECRETS_KEY=not-a-key\n');
 
     const unknown = io();
     expect(runCli(['--force'], { database: 'hub_e2e_8030', sql: fakePostgres([]).sql, manage: fakeManage().manage, ...keyed(), ...unknown })).toBe(2);
