@@ -662,6 +662,23 @@ def test_erplora_s_cap_refusal_is_the_hub_s_own_cap_reached(delivered):
     assert (message.status, message.error_code) == ("failed", "whatsapp_inbox.cap_reached")
 
 
+@respx.mock
+def test_an_expired_permission_is_the_hub_s_reconnect_needed_in_its_own_words(delivered):
+    """Meta's 190 (the business's permission expired or withdrawn) reaches the Hub as erplora.com's
+    ``whatsapp.reconnect_needed``: the message says the number must be connected again, never Meta's raw words."""
+    c = ready()
+    raw = "Invalid OAuth access token - Cannot parse access token"
+    answering(409, {"error": {"code": "whatsapp.reconnect_needed", "message": raw}})
+    message = stored(delivered(lambda: send({"id": str(c.id), "text": "Hola"})))
+    assert (message.status, message.error_code, message.error_message, message.wa_message_id) == (
+        "failed",
+        "whatsapp_inbox.reconnect_needed",
+        "WhatsApp's permission for your number expired: connect it again.",
+        None,
+    )
+    assert raw not in message.error_message and "ERPlora" not in message.error_message
+
+
 @pytest.mark.parametrize(
     ("answer", "code"),
     [
