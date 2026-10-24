@@ -8,7 +8,7 @@
 // three viewports, one capture per flow (`APP-RESERVATION-<flow>-<width>`). What a run creates is named «E2E Rsv
 // <stamp>…» (a zone, its table, guests, slots, a blocked date and a temporary change of Schedules open all day);
 // `afterAll` removes all of it, with the holds, the table's checks and their orders.
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
@@ -461,6 +461,21 @@ test('Seating a party leaves the next reservation of its table held: Reserved ag
   }
 });
 
+/** The «when» row of the reservation form shows each label and value whole: none cut by its box or its icon. */
+async function expectWholeWhen(form: Locator, size: string): Promise<void> {
+  for (const field of ['date', 'time', 'party_size', 'duration_minutes']) {
+    const cut = await form.locator(`[data-testid=reservation-form-${field}]`).evaluate((box) => {
+      const label = box.querySelector('.label-text');
+      const input = box.querySelector('input');
+      return {
+        label: label === null || label.scrollWidth > label.clientWidth,
+        value: input === null || input.scrollWidth > input.clientWidth,
+      };
+    });
+    expect(cut, `${field} at ${size}`).toEqual({ label: false, value: false });
+  }
+}
+
 /** A Spanish mobile no other run has (nine digits from 6): the local digits the staff type. */
 function localPhone(): string {
   return `6${String(Date.now() + Math.floor(Math.random() * 1000)).slice(-8)}`;
@@ -505,7 +520,9 @@ test('A phone typed without prefix for a chosen card is kept international; one 
     expect(psql(`select count(*) from reservation_reservation where customer_id = '${card.id}'`)).toBe('0');
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(form).toBeVisible();
       await expect(form.locator('[data-testid=reservation-form-guest_phone]')).toContainText(refusal);
+      await expectWholeWhen(form, viewport.label);
       await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-form-${viewport.label}`), fullPage: true });
     }
     await page.setViewportSize({ width: 1280, height: 860 });
@@ -522,14 +539,19 @@ test('A phone typed without prefix for a chosen card is kept international; one 
     if (SOON.date !== TODAY.date) await view.locator('[data-testid=reservation-day-next]').click();
     const row = view.locator(`[data-testid=reservation-list-row][data-id="${id}"]`);
     await expect(row).toContainText('Pendiente');
-    await rowAction(page, 'reservation-list', id, 'edit');
-    await expect(phone).toHaveValue(`+34${typed}`);
+    // Opened at each size, as a phone, a tablet and a desktop open it.
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await rowAction(page, 'reservation-list', id, 'edit');
+      await expect(form).toBeVisible();
       await expect(phone).toHaveValue(`+34${typed}`);
+      await expectWholeWhen(form, viewport.label);
       await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-${viewport.label}`), fullPage: true });
+      await form.locator('[data-testid=reservation-form-cancel]').click();
+      await expect(form).toBeHidden();
     }
     await page.setViewportSize({ width: 1280, height: 860 });
+    await rowAction(page, 'reservation-list', id, 'edit');
     await phone.fill('600111');
     await form.locator('[data-testid=reservation-form-submit]').click();
     await expect(form.locator('[data-testid=reservation-form-guest_phone]')).toContainText(refusal);

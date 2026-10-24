@@ -408,14 +408,10 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
   display: grid;
   gap: 14px;
 }
-.reservation-form__pair {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
-}
+.reservation-form__pair,
 .reservation-form__when {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 .reservation-form__customer,
@@ -426,11 +422,5 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 .reservation-form__label {
   font-size: 0.85rem;
   color: var(--ion-color-medium, #8b897f);
-}
-@media (max-width: 575px) {
-  .reservation-form__pair,
-  .reservation-form__when {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
 }
 </style>
