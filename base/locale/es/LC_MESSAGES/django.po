@@ -1303,3 +1303,290 @@ msgstr "actualizado el"
 msgctxt "event delivery"
 msgid "event"
 msgstr "evento"
+
+# ── People and permissions: people, API keys, a manager's approval and the API's documentation (APP-BASE-5) ──
+
+#: approvals.py:136
+msgid "This needs a manager's approval."
+msgstr "Esto necesita la aprobación de un encargado."
+
+#: models.py:411
+msgctxt "api key"
+msgid "Full access"
+msgstr "Acceso total"
+
+#: models.py:412
+msgctxt "api key"
+msgid "Read only"
+msgstr "Solo lectura"
+
+#: models.py:413
+msgctxt "api key"
+msgid "Write only"
+msgstr "Solo escritura"
+
+#: models.py:414
+msgctxt "api key"
+msgid "Per app"
+msgstr "Por app"
+
+#: models.py:416
+msgctxt "api key"
+msgid "name"
+msgstr "nombre"
+
+#: models.py:417
+msgctxt "api key"
+msgid "token start"
+msgstr "inicio del token"
+
+#: models.py:418
+msgctxt "api key"
+msgid "token digest"
+msgstr "huella del token"
+
+#: models.py:419
+msgctxt "api key"
+msgid "what it may do"
+msgstr "qué puede hacer"
+
+#: models.py:420
+msgctxt "api key"
+msgid "apps"
+msgstr "apps"
+
+#: models.py:421
+msgctxt "api key"
+msgid "requests a minute"
+msgstr "peticiones por minuto"
+
+#: models.py:422
+msgctxt "api key"
+msgid "created by"
+msgstr "creada por"
+
+#: models.py:423
+msgctxt "api key"
+msgid "created at"
+msgstr "creada el"
+
+#: models.py:424
+msgctxt "api key"
+msgid "rotated at"
+msgstr "rotada el"
+
+#: models.py:425
+msgctxt "api key"
+msgid "last used"
+msgstr "último uso"
+
+#: models.py:426
+msgctxt "api key"
+msgid "revoked at"
+msgstr "revocada el"
+
+#: models.py:427
+msgctxt "api key"
+msgid "revoked by"
+msgstr "revocada por"
+
+#: models.py:430
+msgctxt "api key"
+msgid "API key"
+msgstr "API key"
+
+#: models.py:431
+msgctxt "api key"
+msgid "API keys"
+msgstr "API keys"
+
+#: models.py:453
+msgctxt "api settings"
+msgid "show the API documentation"
+msgstr "mostrar la documentación de la API"
+
+#: models.py:454
+msgctxt "api settings"
+msgid "updated at"
+msgstr "actualizado el"
+
+#: models.py:455
+msgctxt "api settings"
+msgid "updated by"
+msgstr "actualizado por"
+
+#: models.py:458 models.py:459
+msgctxt "api settings"
+msgid "API settings"
+msgstr "ajustes de la API"
+
+#: models.py:485
+msgctxt "approval"
+msgid "action"
+msgstr "acción"
+
+#: models.py:486
+msgctxt "approval"
+msgid "permission"
+msgstr "permiso"
+
+#: models.py:487
+msgctxt "approval"
+msgid "request fingerprint"
+msgstr "huella de la petición"
+
+#: models.py:488
+msgctxt "approval"
+msgid "pass digest"
+msgstr "huella del pase"
+
+#: models.py:489
+msgctxt "approval"
+msgid "asked by"
+msgstr "lo pidió"
+
+#: models.py:490
+msgctxt "approval"
+msgid "asked by (name)"
+msgstr "lo pidió (nombre)"
+
+#: models.py:491
+msgctxt "approval"
+msgid "approved by"
+msgstr "autorizado por"
+
+#: models.py:492
+msgctxt "approval"
+msgid "approved by (name)"
+msgstr "autorizado por (nombre)"
+
+#: models.py:493
+msgctxt "approval"
+msgid "approved with"
+msgstr "autorizado con"
+
+#: models.py:494
+msgctxt "approval"
+msgid "approved at"
+msgstr "autorizado el"
+
+#: models.py:495
+msgctxt "approval"
+msgid "valid until"
+msgstr "válido hasta"
+
+#: models.py:496
+msgctxt "approval"
+msgid "used at"
+msgstr "usado el"
+
+#: models.py:499
+msgctxt "approval"
+msgid "approval"
+msgstr "aprobación"
+
+#: models.py:500
+msgctxt "approval"
+msgid "approvals"
+msgstr "aprobaciones"
+
+#: people.py:35
+msgid "Only the owner changes the owner's way in."
+msgstr "Solo el propietario cambia cómo entra el propietario."
+
+#: people.py:36
+msgid "Nobody registers their own badge: ask another administrator."
+msgstr "Nadie registra su propia placa: pídeselo a otro administrador."
+
+#: queries.py:1131
+msgid "That person is not in this business."
+msgstr "Esa persona no está en este negocio."
+
+#: queries.py:1305
+#, python-format
+msgid "An action of %(app)s"
+msgstr "Una acción de %(app)s"
+
+#: queries.py:1306
+msgid "An action no app names now"
+msgstr "Una acción que ya no nombra ninguna app"
+
+#: queries.py:1408
+msgid "The API documentation is hidden in this business."
+msgstr "La documentación de la API está oculta en este negocio."
+
+#: services.py:1913
+msgid "This person has no PIN to remove."
+msgstr "Esta persona no tiene PIN que quitar."
+
+#: services.py:1940
+msgid "Too many badges tried."
+msgstr "Demasiadas placas probadas."
+
+#: services.py:1946
+msgid "A badge has 4 to 64 characters: letters, digits, «-» and «_»."
+msgstr "Una placa tiene de 4 a 64 caracteres: letras, cifras, «-» y «_»."
+
+#: services.py:1953 services.py:1964
+msgid "Somebody else already carries that badge. A badge says who is at the till: two people cannot share it."
+msgstr "Esa placa ya la lleva otra persona. Una placa dice quién está en la caja: dos personas no pueden compartirla."
+
+#: services.py:1987
+msgid "This person has no badge to remove."
+msgstr "Esta persona no tiene placa que quitar."
+
+#: services.py:2002
+msgid "API keys are not available yet for this business."
+msgstr "Las API keys todavía no están disponibles para este negocio."
+
+#: services.py:2014
+msgid "Choose at least one app and what the key may do on it."
+msgstr "Elige al menos una app y qué puede hacer la llave en ella."
+
+#: services.py:2022
+msgid "That app does not publish what the key would do on it."
+msgstr "Esa app no publica lo que la llave haría en ella."
+
+#: services.py:2052
+msgid "Give the key a name."
+msgstr "Ponle un nombre a la llave."
+
+#: services.py:2069
+msgid "That key no longer exists. Refresh the list and try again."
+msgstr "Esa llave ya no existe. Actualiza la lista y vuelve a intentarlo."
+
+#: services.py:2071
+msgid "That key was revoked: it never works again."
+msgstr "Esa llave se revocó: no vuelve a funcionar."
+
+#: services.py:2137
+msgid "Too many keys tried from here."
+msgstr "Demasiadas llaves probadas desde aquí."
+
+#: services.py:2147
+msgid "This API key may not do that on this app."
+msgstr "Esta API key no puede hacer eso en esta app."
+
+#: services.py:2151
+msgid "This API key went past its requests a minute: wait a moment."
+msgstr "Esta API key pasó de sus peticiones por minuto: espera un momento."
+
+#: services.py:2170
+msgid "Those details do not approve this. Check the name and the PIN, and try again."
+msgstr "Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a intentarlo."
+
+#: services.py:2227
+msgid "This is not approved with a PIN."
+msgstr "Esto no se aprueba con un PIN."
+
+#: services.py:2230
+msgid "This no longer needs an approval: do it again."
+msgstr "Esto ya no necesita aprobación: vuelve a hacerlo."
+
+#: services.py:2233
+msgid "Choose who approves it and type their PIN."
+msgstr "Elige quién lo aprueba y escribe su PIN."
+
+#: services.py:2238
+msgid "That person cannot approve this: ask somebody who may do it themselves."
+msgstr "Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo."
