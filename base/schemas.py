@@ -977,11 +977,13 @@ class AssistantUsageOut(Schema):
 
 
 class AssistantReportIn(Schema):
-    message_id: str = Field(min_length=1, max_length=200)
+    """What erplora.com's ``report`` door takes, with its limits: a long answer is reported whole."""
+
+    message_id: str = Field(min_length=1, max_length=128)
     reason: Literal["incorrect", "harmful", "instructions", "other"]
-    comment: str = Field(default="", max_length=2000)
-    question: str = Field(default="", max_length=4000)
-    answer: str = Field(min_length=1, max_length=4000)
+    comment: str = Field(default="", max_length=20_000)
+    question: str = Field(default="", max_length=200_000)
+    answer: str = Field(min_length=1, max_length=200_000)
 
 
 class AssistantReportOut(Schema):

@@ -145,3 +145,13 @@ def test_a_dictation_over_two_megabytes_is_refused_by_the_hub(client, make_user)
     client.force_login(make_user("ana", host="a", role="hub_employee"))
     dictation = {"audio": "A" * 2_800_001, "mime_type": "audio/webm"}
     assert post(client, "/assistant/transcribe", dictation).status_code == 422
+
+
+def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
+    """An answer with a long table runs past 4,000 characters: the Hub takes what erplora.com's door takes (BASE-G123)."""
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    answer = "| a | b |\n" * 2_000
+    report = {"message_id": "m1", "reason": "incorrect", "question": "¿?" * 3_000, "answer": answer}
+    assert post(client, "/assistant/report", report).status_code == 200
+    assert gateway.sent("/internal/assistant/report")[0].body["answer"] == answer
