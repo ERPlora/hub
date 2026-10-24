@@ -82,7 +82,7 @@ function cancel(): void {
 <template>
   <FormModal
     v-model:open="open"
-    testid="assistant-report"
+    testid="assistant-report-dialog"
     size="sm"
     :title="t('base.assistant.report.title')"
     :submit-label="t('base.assistant.report.send')"

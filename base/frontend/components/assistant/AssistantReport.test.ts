@@ -56,7 +56,7 @@ function write(comment: string): void {
 }
 
 async function send(): Promise<void> {
-  field('assistant-report-submit')!.click();
+  field('assistant-report-dialog-submit')!.click();
   for (let i = 0; i < 3; i += 1) await flush();
 }
 
@@ -71,7 +71,7 @@ afterEach(() => {
 describe('AssistantReport', () => {
   it('asks what is wrong, in the person’s language, with the four reasons', async () => {
     await report(() => Response.json({ sent: true, duplicate: false }));
-    const text = field('assistant-report')!.textContent ?? '';
+    const text = field('assistant-report-dialog')!.textContent ?? '';
     expect(text).toContain('Denunciar esta respuesta');
     expect(text).toContain('¿Qué le pasa?');
     for (const reason of ['Es incorrecta', 'Es dañina u ofensiva', 'No hace lo que pedí', 'Otra cosa']) {
@@ -112,13 +112,13 @@ describe('AssistantReport', () => {
     const m = await report(() => Response.json({ code: 'assistant.unavailable', message: 'down' }, { status: 503 }));
     choose('other');
     await send();
-    expect(field('assistant-report-error')?.textContent).toContain('No se pudo enviar la denuncia. Inténtalo de nuevo.');
+    expect(field('assistant-report-dialog-error')?.textContent).toContain('No se pudo enviar la denuncia. Inténtalo de nuevo.');
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(m.wrapper.emitted('close')).toBeUndefined();
   });
 
   it('closed when there is nothing to report', async () => {
     await report(() => Response.json({}), null);
-    expect(field('assistant-report-submit')).toBeNull();
+    expect(field('assistant-report-dialog-submit')).toBeNull();
   });
 });
