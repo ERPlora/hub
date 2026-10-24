@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a25fa5619870ddab6a0653f328e83773e4e2b8a0fd4f30ade66d59ebf0e80812 -->
+<!-- generated from WORKBOOK.md sha256:ae9cce6bcb0ff71bc71dc1c0283551a50b1bebe61851b1e0e671972f01c5d87b -->
 
 ## What it is for and who it is for
 
@@ -31,7 +31,8 @@ each person picks and orders of Lightspeed and Toast, and the bell with counters
 
 ## Before you start
 
-- You come in with your ERPlora account; the Hub has no sign-in of its own.
+- You come in with your ERPlora account; the Hub has no sign-in of its own. On a shared till, after that, each
+  person enters with their PIN or their badge.
 - What each person sees depends on their role in the business and on the apps the business has on.
 - The apps declare their steps, their panels and their counters; the Home only puts them together. While
   an app does not declare its own, nothing of it shows in the list or on the board.
@@ -66,10 +67,11 @@ At the foot of the side menu, between the QR code and the brand. It opens this b
 erplora.com, in a new tab. Only in the browser: the installed app does not have it.
 
 ### The user menu
-It opens by tapping the person, at the top of the side menu. First "My account" and "Report a problem",
-which open those pages on erplora.com (in a new tab; in the installed app, in the device's browser); then
-"Theme" (light, dark or the system's) and "Sign out". The first two also show in the installed app:
-neither sells anything.
+It opens by tapping the person, at the top of the side menu. First "Profile" and, on a shared till of a business
+that asks for a PIN, "Switch user"; then, only if they entered with the account (never in a PIN session), "My
+account" and "Report a problem", which open those pages on erplora.com (in a new tab; in the installed app, in
+the device's browser); last "Theme" (light, dark or the system's) and "Sign out". The erplora.com ones also show
+in the installed app: neither sells anything.
 
 ### The "You cannot issue invoices yet" strip
 Over any screen while a step that stops invoicing is missing: "No ticket or invoice can be issued until
@@ -91,14 +93,38 @@ browser).
 From "System" in the side menu, the "Plan and limits" tab: "Your plan's limits" with "Within the limit" or
 "Close to the limit", the "People" and "Devices" cards and where plans are managed.
 
+### Access
+The way in of a shared till, or of a device whose session another entry closed, with no menu or bar: the logo,
+"Enter your business", the notice of what happened if there is one and a card with two tabs, "PIN" (the faces,
+the keypad and the badge) and "Account" ("Enter with your account", which leads to erplora.com). In the footer,
+"ERPlora · trusted device"; at the top right, the switch between light and dark.
+
+### Create your PIN
+After entering with the account on a till: the keypad of circles to choose the PIN and repeat it, and "Not now".
+
+### Switch user
+Over the screen in use, with no menu: "The sale stays open. From now on it is in the name of whoever enters
+here.", "Who is taking over?" with the faces, the keypad and "Cancel".
+
+### My profile
+From "Profile" in the user menu. At the top, the person (face, name and role); below, "Account details" (with the
+photo), "Preferences" (language and appearance) and "PIN".
+
+### Settings · General
+From "Settings" in the side menu. Today, a single section (the tabs at the bottom show once there are two): "This
+device", "PIN pad" and, for whoever runs the business, "Devices".
+
+### Your business is being prepared
+The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
+
 ## States of each screen
 
 | State | What the person sees |
 |---|---|
-| Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity". |
-| Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell, "All caught up. No notifications.". |
-| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell, "Could not check the notifications. They will show up when the connection is back.". |
-| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. |
+| Loading | Grey tiles in "My apps" ("Loading your apps…" for the screen reader), the list in grey, "Loading widgets…" on the board, each panel's figure in grey and "Loading…" in "Activity"; "Loading…" on the PIN pad, "Loading your profile…" and "Loading the devices…". |
+| Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell, "All caught up. No notifications."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
+| Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell, "Could not check the notifications. They will show up when the connection is back.". In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
+| No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". |
 
 ## Flows
 
@@ -132,6 +158,26 @@ From "System" in the side menu, the "Plan and limits" tab: "Your plan's limits" 
 | BASE-F26 | Understand why an app does not open | done |
 | BASE-F27 | See a paid app blocked | done |
 | BASE-F28 | See how much of the plan's limits is in use | partial |
+| BASE-F29 | Enter with the erplora.com account | done |
+| BASE-F30 | Enter from the erplora.com panel without typing the password again | done |
+| BASE-F31 | Choose the PIN the first time one enters a till | done |
+| BASE-F32 | Enter with a PIN | done |
+| BASE-F33 | Enter by passing the badge | done |
+| BASE-F34 | Lose the session because it was opened on another device | done |
+| BASE-F35 | The session ends while working | done |
+| BASE-F36 | Close the session of a till nobody touches | done |
+| BASE-F37 | Switch user without losing the sale | done |
+| BASE-F38 | Sign out | done |
+| BASE-F39 | Decide whether this device is shared or personal | done |
+| BASE-F40 | Open a hub that is not set up yet | done |
+| BASE-F41 | Change my details, photo, language and appearance | done |
+| BASE-F42 | Change my PIN from My profile | done |
+| BASE-F43 | Choose how many digits the business's PIN has | done |
+| BASE-F44 | Decide whether the till asks for a PIN and when it asks again | done |
+| BASE-F45 | See the devices someone has entered on | done |
+| BASE-F46 | Name a device | done |
+| BASE-F47 | Remove a device that was lost | done |
+| BASE-F48 | Remove at once the devices nobody uses | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -604,3 +650,365 @@ not run the business sees "Only whoever runs the business can see the plan and i
 the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com
 sends it.".
 Involved: none
+
+### BASE-F29 Enter with the erplora.com account
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Access
+Steps:
+  1. Opens the business without a session. On a device that does not offer a PIN it goes straight to
+     erplora.com's sign-in for this business; on a till that does offer it, **Access** shows and they tap the
+     "Account" tab and then "Enter with your account".
+  2. At erplora.com they sign in as always: email and password, Google or their verification code.
+  3. They come back to the business already in, on the screen they had asked for or on **Home**. If this
+     device asks for a PIN, the business already enters its tills with a PIN and the person has none yet, it
+     first asks them to choose it (BASE-F31).
+In: the account erplora.com checks; this browser.
+Out: the person's session in this business and this browser turned into a trusted device of the business (it
+shows in "Devices", shared until someone says otherwise). The session lasts a 12-hour shift on a shared device,
+30 days on a personal one and 1 hour at most if the business always asks for the PIN.
+If it fails: erplora.com says why they do not get in (credentials, verification, "You don't have access to this
+hub"); the business keeps nothing until it comes back with the person identified.
+Involved: BASE-F13
+
+### BASE-F30 Enter from the erplora.com panel without typing the password again
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Access
+Steps:
+  1. At erplora.com, with the session open, they tap enter their business.
+  2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
+In: the one-time pass erplora.com gives.
+Out: the same as BASE-F29: the session and this browser as a trusted device of the business, so it then offers
+the PIN pad, shows in "Devices" and its mode can be changed.
+If it fails: an expired or already used pass opens nothing: the business asks for erplora.com's sign-in again.
+Involved: BASE-F29
+
+### BASE-F31 Choose the PIN the first time one enters a till
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Create your PIN
+Steps:
+  1. After entering with the account (BASE-F29) on a shared device of a business that asks for a PIN, where
+     someone else already enters with theirs, and if the person has no PIN yet, "Create your PIN" shows — "With
+     it you will enter this till without your password.".
+  2. They type the PIN on the keypad of circles: "Choose a {n}-digit PIN" (4 or 6, whatever the business says).
+  3. They repeat it: "Confirm your PIN". Once it matches it is saved and they go where they were going.
+  4. "Not now" leaves it for later: they enter all the same and can choose it in **My profile** (BASE-F42).
+In: the session just opened; the business's PIN digits.
+Out: the person's PIN, stored encrypted; their face shows in "Switch user" at once and on the PIN pad of
+**Access** within a minute.
+If it fails: the repetition does not match: "The PINs do not match, try again" and back to the first step.
+Repeated or consecutive digits: "That PIN is too easy to guess: avoid repeated digits (1111) and runs (1234).".
+Someone else already uses it: "Another active person already has that PIN: choose a different one.". Without a
+connection: "Could not save the PIN. Try again.". A business in which nobody has a PIN does not ask for it on
+entering: the first one is chosen in **My profile**.
+Involved: BASE-F29, BASE-F42
+
+### BASE-F32 Enter with a PIN
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Access
+Steps:
+  1. On a shared device of a business that asks for a PIN, **Access** opens on the "PIN" tab: "Enter your PIN",
+     "…or pass your badge: no need to choose your name first." and "Choose your user" with a face per person
+     (initials and name; never their email). With a single person, they are already chosen.
+  2. They tap their name: "PIN of {name}" and the keypad show, with as many circles as the business's PIN has
+     digits. The arrow ("Change user") goes back to the faces.
+  3. They type the PIN: it enters by itself at the last digit, with no button.
+  4. They come in on the screen they had asked for or on **Home**. The footer says "ERPlora · trusted device".
+In: the business's people with a PIN, read again every minute and on coming back to the screen: whoever gets a
+PIN shows up and whoever leaves disappears without reloading. Only a shared device of the business that would
+let them in sees them.
+Out: that person's session on this device, for a shift (1 hour at most if the business always asks for the PIN),
+in their language from the first moment. It works even if erplora.com does not answer.
+If it fails: wrong PIN: the circles empty and "Wrong PIN." shows below. Five wrong PINs in a row for one person,
+or too many from the same connection: "Too many wrong attempts." and the minutes they have to wait. A device on
+which nobody ever entered with an account, or that an administrator removed: "This device does not work with a
+PIN yet. Sign in once here with your account and from then on it will.". Without a connection, "Could not enter.
+Check the connection and try again."; if who works here cannot be read, "Could not load the PIN pad. You can
+still enter with your account.".
+Involved: BASE-F31, BASE-F44
+
+### BASE-F33 Enter by passing the badge
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Access
+Steps:
+  1. On the "PIN" tab of **Access** (with a person chosen or without one), they pass the card through the
+     reader. No field needs touching.
+  2. The screen recognises the reader's burst by its speed (a person typing is never a badge).
+  3. They come in as the card's owner.
+In: the number the reader reads. It is only listened to on the "PIN" tab of a device that offers the PIN pad and
+in **Switch user**; on "Account" or while the PIN is being chosen, it is not.
+Out: the same as BASE-F32.
+If it fails: a card that is nobody's or whose owner is gone: "That badge opens nothing here. Enter with your PIN
+or ask an administrator."; it counts as a failed attempt. The PIN pad stays available.
+Involved: BASE-F32
+
+### BASE-F34 Lose the session because it was opened on another device
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Access
+Steps:
+  1. The business's plan covers a number of devices at a time (the Free one, one) and someone enters on another.
+  2. The session of the device that has gone longest without an entry ends at that moment: what it has open stops
+     updating.
+  3. Its next screen is **Access**, which says at the top "Session opened on another device" — "Your plan covers
+     one device at a time, so entering on another one closed the session on this one. Enter again to use it here,
+     or add devices to your plan." with "Upgrade plan".
+  4. They can enter again (and it closes the other one's) or go to erplora.com to extend the plan.
+In: the devices the plan covers, which erplora.com passes to the business.
+Out: the sessions of the devices left over, ended, and the reason kept on each one to tell it.
+If it fails: with no limit in the plan nothing ends.
+Involved: BASE-F11
+
+### BASE-F35 The session ends while working
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Access
+Steps:
+  1. The session ends: the shift is over (12 hours on a shared device, 30 days on a personal one, 1 hour if the
+     business always asks for the PIN), an administrator removes the device or the person leaves the business.
+  2. The next thing they open takes them to the way in; if the session ended because the device was removed or
+     the person left the business, what they have open finds out at once.
+  3. On a till with the PIN pad, **Access** says at the top "Your session has ended" — "It expired or it was
+     closed. Enter again." and the next person enters with their PIN. On a device without the PIN pad it goes to
+     erplora.com's sign-in, which brings them back in if their session there is still open.
+In: the session that no longer exists.
+Out: nothing saved; the half-made sale is kept by its app.
+If it fails: without a network, the screen does not take the session as ended.
+Involved: BASE-F13, BASE-F47
+
+### BASE-F36 Close the session of a till nobody touches
+Status: done
+Actor: system
+Screen: Access
+Steps:
+  1. The business chose in **Settings › General**, under "Ask again after inactivity", some minutes (1, 5, 10,
+     15 or 30) and this device is shared.
+  2. Nobody touches the screen (no finger, key or wheel) for those minutes.
+  3. The session closes and the till goes back to **Access**, to the PIN pad.
+In: the business's minutes, which come with the page itself (there is no separate read that could fail).
+Out: the session closed in the business. The open check is kept by its app.
+If it fails: with "Until signing out", on a personal device or where no PIN is asked nothing closes; even if the
+screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour.
+Involved: BASE-F44
+
+### BASE-F37 Switch user without losing the sale
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Switch user
+Steps:
+  1. On a shared till of a business that asks for a PIN, they open the user card of the menu and tap "Switch
+     user" (it does not show in any other case).
+  2. **Switch user** opens over the screen in use: "The sale stays open. From now on it is in the name of
+     whoever enters here." and "Who is taking over?" with a face per person.
+  3. They tap theirs and type the PIN, or pass their badge. The arrow ("Someone else") goes back to the faces;
+     "Cancel" goes back without changing anything.
+  4. "Now serving {name}" shows and the screen stays where it was, loaded again for whoever entered: what shows
+     is what their role allows, and going back no longer leads to the screens of whoever left. The till's open check
+     stays on screen, with its lines, and what comes next is in the name of whoever entered.
+In: the name and the PIN (or the badge) of whoever enters; the session of whoever leaves.
+Out: the session of whoever enters; that of whoever leaves ends only once the new one is open. The appearance of
+whoever left is forgotten, and erplora.com is in nobody's name in a PIN session.
+If it fails: wrong PIN: "Wrong PIN." and whoever was in stays in. Too many attempts: "Too many wrong attempts."
+and the minutes they have to wait. Nobody with a PIN: "Nobody here has a PIN yet: give one in My profile or in
+Employees.". Without being able to read who works here: "Could not load who works here. Check the connection and
+try again.".
+Involved: BASE-F32, BASE-F33
+
+### BASE-F38 Sign out
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: The user menu
+Steps:
+  1. They open the user card at the top of the side menu (on a phone, first the menu with the bar's button).
+  2. They tap "Sign out".
+  3. On a till with the PIN pad it goes back to **Access**, ready for the next person. On another device,
+     erplora.com's session ends too (erplora.com asks to confirm it).
+In: the session.
+Out: the session closed in the business.
+If it fails: if the business does not answer, the session expires by itself.
+Involved: none
+
+### BASE-F39 Decide whether this device is shared or personal
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. From the device itself, they open **Settings**; under "This device": "How this device asks who is using it.
+     Each device of the business is decided on its own.".
+  2. They choose "Shared — a till or tablet several people use" ("It asks for a PIN to enter and forgets it at
+     the end of the shift, so every sale is in the name of whoever made it.") or "Personal — a device only you
+     use" ("The session stays open and it never asks for a PIN.").
+  3. It is saved at once; the mark moves when the business confirms it.
+  4. This device's way in changes accordingly: the PIN pad when shared, only the account when personal.
+In: the device the request comes from (never another one).
+Out: the device's mode, with who chose it and when.
+If it fails: whoever does not run the business sees the options off and "Only an administrator can change how
+people enter on this device.". A browser in which nobody ever entered with the account: "This browser is not a
+device of the business yet: enter once here with your account and you will be able to choose.". Without a
+connection: "Could not change this device. Check the connection and try again.".
+Involved: BASE-F32
+
+### BASE-F40 Open a hub that is not set up yet
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Your business is being prepared
+Steps:
+  1. They open the address of a business erplora.com is still preparing (just created).
+  2. "Your business is being prepared" shows — "It takes a few seconds. This page refreshes by itself.".
+  3. When it is ready, the page refreshes and they come in as always.
+In: the business's state erplora.com passes on.
+Out: nothing saved.
+If it fails: an address that belongs to no business does not exist; a business that was closed says "This hub
+is no longer available.".
+Involved: none
+
+### BASE-F41 Change my details, photo, language and appearance
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: My profile
+Steps:
+  1. They open the user card of the menu and tap "Profile". At the top, their face, their name, "Your identity
+     and your personal preferences in this business." and their role.
+  2. In "Account details" they change "First name", "Last name" or "Email" ("Only to contact you: it is not the
+     email you sign in with.") and tap "Save my details": "Profile saved".
+  3. "Choose image" uploads a JPG, PNG or WebP photo of up to 2 MB ("Photo updated"); "Remove" deletes it
+     ("Photo removed").
+  4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
+     palette" and "Theme": "System (auto)", "Light", "Dark") are saved on choosing and applied at once; "Use the
+     business’s appearance" undoes their own.
+In: the profile of whoever has the session.
+Out: their name in this business (the one on the faces and in "Devices"), their photo, their language and their
+appearance, which follow them on any device they enter. The email is only for contact: it does not change the
+erplora.com account.
+If it fails: if the profile could not be read, "Could not load the profile" — "Your details stay the same. Check
+the connection and try again." with "Retry". On saving: "Could not save the profile"; a refused photo: "Could not
+save the photo. Use a JPG, PNG or WebP of up to 2 MB."; preferences: "Could not save your preferences. Check the
+connection and try again.".
+Involved: none
+
+### BASE-F42 Change my PIN from My profile
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: My profile
+Steps:
+  1. In **My profile**, the "PIN" card: "The PIN you enter the till with. Change it whenever you want — nobody
+     else has to." (without a PIN: "You do not have a PIN yet. Set one to also enter from the till.").
+  2. If they already have a PIN, they type "Current PIN".
+  3. They type "New PIN" and "Repeat the new PIN" and tap "Change PIN" (or "Set PIN"): "PIN updated".
+In: the session; the business's PIN digits.
+Out: the new PIN, stored encrypted; the tills accept it at once.
+If it fails: a different length: "The PIN must have {n} digits."; the two do not match: "The two PINs do not
+match."; easy to guess: "That PIN is too easy to guess: avoid repeated digits (1111) and runs (1234)."; someone
+else already uses it: "Another active person already has that PIN: choose a different one."; the current one is
+not it: "That is not your current PIN. Type it right to set a new one."; thirty tries in an hour: "Too many tries
+to change the PIN." and the minutes they have to wait.
+Involved: BASE-F31
+
+### BASE-F43 Choose how many digits the business's PIN has
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. With the PIN pad on (BASE-F44), under "PIN digits" they choose "4 digits" or "6 digits".
+  2. It is saved at once. Below: "Everyone types the same number of digits, which is what lets the keypad enter
+     at the last one instead of asking you to confirm. The PINs in use keep working until their owner changes
+     them.".
+  3. From then on, the PIN pad, "Create your PIN" and **My profile** ask for that length.
+In: the choice.
+Out: the length of the business's PIN. It does not touch the PINs there are.
+If it fails: "Could not change it. Check the connection and try again.".
+Involved: BASE-F44
+
+### BASE-F44 Decide whether the till asks for a PIN and when it asks again
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. In **Settings**, under "PIN pad", they see "Show PIN pad": "Whether the PIN pad is shown and who is at the
+     till is asked. It holds for the whole business: besides, each device decides on its own, above.".
+  2. They turn it on or off. Below, the consequence. On: "Staff choose their name and type their PIN, so every
+     sale carries the name of whoever made it.". Off: "Nobody types a PIN. Whoever opened the till in the morning
+     is the name of every sale until the shift ends, whoever made them: you will not know who sold what or who
+     gave a discount. Staff who only have a PIN and no account will not be able to enter.".
+  3. With the PIN pad on, "Ask again after inactivity": 1, 5, 10, 15 or 30 min, or "Until signing out", and
+     below what happens ("A till nobody touches for {n} minutes closes the session and shows the PIN pad: the
+     next sale carries the name of the next person.").
+  4. Each change is saved at once, with no button, and the card shows what the business confirms.
+In: how the business asks for the PIN.
+Out: whether it asks and when it asks again, for every till of the business. Turning it off and on again goes
+back to asking per shift.
+If it fails: "Could not change it. Check the connection and try again.". If it cannot be read: "Could not load
+how the business asks for the PIN. Check the connection and try again.". Whoever does not run the business sees
+the controls off and "Only an administrator can change whether it asks.".
+Involved: BASE-F32, BASE-F36
+
+### BASE-F45 See the devices someone has entered on
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. In **Settings**, under "Devices": "The devices someone has entered on. If you lose one, remove it here: its
+     session closes at once and it can no longer enter with a PIN.".
+  2. A row per device, the last used first: the name the business gave it (or "Unnamed device" and what it is,
+     for example Chrome · Android), "The one you are using" on the current one, the mode ("Asks for a PIN" or
+     "Stays open"), "In use right now" or "Last used {when}", "Its session stays open until {when}" and "Last
+     entered: {who}". Never its identifier.
+  3. It updates by itself when someone changes, names or removes a device.
+In: the business's devices.
+Out: nothing saved.
+If it fails: whoever does not run the business sees "Only an administrator can see and remove the devices.",
+with no list. If it does not arrive: "Could not load the devices. Check the connection and try again.", never
+"Nobody has entered from any device yet.", which is only for a truly empty list.
+Involved: BASE-F46, BASE-F47, BASE-F48
+
+### BASE-F46 Name a device
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. On the device's row, they tap "Name it".
+  2. A field shows below: "Name the place: Bar, Kitchen, Office laptop" (up to 60 characters).
+  3. They type and tap "Save" (or "Leave it" to close). The row takes that name as its title.
+In: the name.
+Out: the device's name, the only detail of the row the business decides.
+If it fails: "Could not change the name. Check the connection and try again." or "That name is too long. Give it
+a shorter one and save again.".
+Involved: BASE-F45
+
+### BASE-F47 Remove a device that was lost
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. On the device's row, they tap the "Remove this device" icon.
+  2. Below shows "Remove this device?" with the consequence: "Its session closes at once. To use it again,
+     someone has to enter on it with their account.". If it is the one they are using: "It is the device you are
+     using: removing it will close your session and you will have to enter again.".
+  3. They confirm with "Remove this device" (or "Leave it"). The row disappears and its session closes at once.
+     If it was theirs, they leave the business.
+In: the device.
+Out: the device forgotten and its sessions ended: the device is cut off, not the person, who can enter on it
+again with their account.
+If it fails: "Could not remove this device. Check the connection and try again." or "That device is no longer
+registered here. Refresh the list."; what was refused never stays as done.
+Involved: BASE-F35, BASE-F45
+
+### BASE-F48 Remove at once the devices nobody uses
+Status: done
+Actor: owner, administrator
+Screen: Settings · General
+Steps:
+  1. If there are devices nobody has used in 30 days (never the one in hand), "Remove the device unused for 30
+     days" or "Remove the {n} devices unused for 30 days" shows.
+  2. On tapping it, "Remove {n} devices nobody has used for 30 days?" (or "Remove the device nobody has used for
+     30 days?") with "They stop showing here and, to use one again, someone will have to enter on it with their
+     account. Those used in the last 30 days and the one you are using stay.".
+  3. They confirm with "Remove".
+In: which devices nobody has used for 30 days.
+Out: those devices forgotten, as in BASE-F47.
+If it fails: "Could not remove the unused devices. Check the connection and try again.".
+Involved: BASE-F47
