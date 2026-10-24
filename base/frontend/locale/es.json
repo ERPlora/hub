@@ -213,6 +213,12 @@
         "saved": "PIN actualizado",
         "length": "El PIN debe tener {n} dígitos.",
         "mismatch": "Los dos PIN no coinciden."
+      },
+      "roles": {
+        "hub_owner": "Propietario",
+        "hub_admin": "Administrador",
+        "hub_manager": "Encargado",
+        "hub_employee": "Empleado"
       }
     },
     "settings": {
@@ -279,6 +285,7 @@
       "pruneOne": "Quitar el dispositivo sin usar desde hace 30 días",
       "pruneMany": "Quitar los {n} dispositivos sin usar desde hace 30 días",
       "pruneAsk": "¿Quitar {n} dispositivos que nadie usa desde hace 30 días?",
+      "pruneAskOne": "¿Quitar el dispositivo que nadie usa desde hace 30 días?",
       "pruneBody": "Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.",
       "pruneConfirm": "Quitar",
       "pruneFailed": "No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.",

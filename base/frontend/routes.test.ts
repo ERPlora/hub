@@ -10,7 +10,7 @@ vi.mock('./pages/HomePage.vue', () => ({ default: { name: 'HomePage' } }));
 
 describe('base routes', () => {
   it("puts the Home at `/`, under a name of its own: the shell's grid keeps `home`", () => {
-    expect(routes.map((r) => [r.path, r.name, r.meta?.auth])).toEqual([['/', 'base-home', true]]);
+    expect(routes.filter((r) => r.path === '/').map((r) => [r.path, r.name, r.meta?.auth])).toEqual([['/', 'base-home', true]]);
   });
 
   it('loads the Home page on demand', async () => {

@@ -15,7 +15,7 @@ from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 
 from base import access
-from base.models import AccessSettings, Credential, Membership, TrustedDevice
+from base.models import AccessSettings, Credential, Membership, Profile, TrustedDevice
 
 pytestmark = pytest.mark.django_db
 
@@ -85,3 +85,14 @@ def test_a_personal_device_never_locks_nor_switches(client, people):
     with_pin(ana, "4826")
     client.force_login(ana)
     assert hub_home(client)["access"] == {"credential": "account", "switch_user": False, "idle_minutes": None}
+
+
+def test_the_person_s_own_appearance_comes_with_the_html_on_any_device(client, people):
+    # BASE-G125: the mode and palette chosen in «My profile» follow the person to every device they enter; empty, the
+    # business's (and the browser's own toggle).
+    ana, bea = people
+    Profile.objects.create(username=ana.username, theme_mode="dark", palette="forest")
+    client.force_login(ana)
+    assert hub_home(client)["preferences"] == {"theme_mode": "dark", "palette": "forest"}
+    client.force_login(bea)
+    assert hub_home(client)["preferences"] == {"theme_mode": "", "palette": ""}

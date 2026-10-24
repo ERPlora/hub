@@ -100,7 +100,7 @@ describe('SwitchUserPage', () => {
     call.push(errorFrame(subId(client, 'base.access.faces'), 'unexpected'));
     await flush();
     expect(wrapper.get('[data-testid="switch-user-error"]').text()).toContain('Could not load who works here');
-    expect(wrapper.get('[data-testid="switch-user-cancel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="switch-user-cancel"]').exists()).toBe(true);
   });
 
   it('speaks Spanish', async () => {

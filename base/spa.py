@@ -7,7 +7,7 @@ jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries thi
 Home, BASE-G127), where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
 plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1), those three only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
-``base.queries.shell_access``). It goes only
+``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). It goes only
 to a person with a session: the auth gate sends anyone else to the login, so their HTML names neither the business
 nor the hub's id.
 
@@ -67,6 +67,7 @@ def _shell(request: HttpRequest) -> HttpResponse:
             "account_url": saas_url("/account") if account else "",
             "report_url": saas_url("/report-a-problem") if account else "",
             "access": way_in,
+            "preferences": queries.appearance_of(request.user),
         }
     return render_spa(
         request,

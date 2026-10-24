@@ -1,6 +1,7 @@
 // Routes → pages of base, and nothing else: the Home at `/` (PLAN-HUB round 2026-10-21, the old hub's
-// dashboard). Registered before the shell's grid, so it wins `/`; named apart from it (`home`), because a
-// second route with the same name would replace the first. Types only: `main.ts` globs this file eagerly.
+// dashboard), registered before the shell's grid, so it wins `/`; named apart from it (`home`), because a
+// second route with the same name would replace the first. Then each part's block. Types only: `main.ts` globs this
+// file eagerly.
 import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
@@ -8,6 +9,43 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'base-home',
     component: () => import('./pages/HomePage.vue'),
+    meta: { auth: true },
+  },
+  // ── The way in (APP-BASE-3) ──
+  // «Access» (BASE-G55…G58): where Django's `way_in` sends a browser without a session; it paints its own frame.
+  {
+    path: '/login',
+    name: 'base-login',
+    component: () => import('./pages/LoginPage.vue'),
+    meta: { auth: false, chrome: false },
+  },
+  // «Create your PIN» after entering with the account on a till (BASE-G54).
+  {
+    path: '/pin/setup',
+    name: 'base-pin-setup',
+    component: () => import('./pages/PinSetupPage.vue'),
+    meta: { auth: true, chrome: false },
+  },
+  // «Switch user» over the session it replaces (BASE-G60).
+  {
+    path: '/switch-user',
+    name: 'base-switch-user',
+    component: () => import('./pages/SwitchUserPage.vue'),
+    meta: { auth: true, chrome: false },
+  },
+  // «My profile» (BASE-G125, G126).
+  {
+    path: '/profile',
+    name: 'base-profile',
+    component: () => import('./pages/ProfilePage.vue'),
+    meta: { auth: true },
+  },
+  // Settings › General: this device, the PIN pad and the devices (BASE-G62…G66, G72, G151); the other tabs come with
+  // their parts.
+  {
+    path: '/settings',
+    name: 'base-settings',
+    component: () => import('./pages/SettingsPage.vue'),
     meta: { auth: true },
   },
 ];

@@ -213,6 +213,12 @@
         "saved": "PIN updated",
         "length": "The PIN must have {n} digits.",
         "mismatch": "The two PINs do not match."
+      },
+      "roles": {
+        "hub_owner": "Owner",
+        "hub_admin": "Administrator",
+        "hub_manager": "Manager",
+        "hub_employee": "Employee"
       }
     },
     "settings": {
@@ -279,6 +285,7 @@
       "pruneOne": "Remove the device unused for 30 days",
       "pruneMany": "Remove the {n} devices unused for 30 days",
       "pruneAsk": "Remove {n} devices nobody has used for 30 days?",
+      "pruneAskOne": "Remove the device nobody has used for 30 days?",
       "pruneBody": "They stop showing here and, to use one again, someone will have to enter on it with their account. Those used in the last 30 days and the one you are using stay.",
       "pruneConfirm": "Remove",
       "pruneFailed": "Could not remove the unused devices. Check the connection and try again.",

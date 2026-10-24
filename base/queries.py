@@ -520,6 +520,13 @@ def avatar_url(ctx: OperationContext, name: str) -> str:
     return media_url(hub_id(ctx.scope), name)
 
 
+def appearance_of(user) -> dict[str, str]:
+    """The mode and palette a person chose in «My profile» (BASE-G125), for the shell to paint on any device they enter;
+    empty, the business's."""
+    chosen = Profile.objects.filter(username=user.get_username()).values("theme_mode", "palette").first()
+    return {"theme_mode": chosen["theme_mode"], "palette": chosen["palette"]} if chosen else {"theme_mode": "", "palette": ""}
+
+
 def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
     """What the shell needs of this session's way in (``hub-home``'s ``access``, ``base.spa``): how it was opened,
     whether «Switch user» is offered (BASE-G60: a shared device of the hub of a business that asks, with somebody on

@@ -13,6 +13,7 @@ import {
   enterWith,
   readAccess,
   safeNext,
+  startWayIn,
   takeSwitchAnnouncement,
 } from './access';
 
@@ -224,5 +225,75 @@ describe('the «Now serving» note across the reload', () => {
     const broken = { ...memoryStorage(), setItem: () => { throw new Error('QuotaExceededError'); } } as Storage;
     expect(() => announceSwitch('Bea', broken)).not.toThrow();
     expect(takeSwitchAnnouncement(broken)).toBeNull();
+  });
+});
+
+describe('startWayIn — what the shell does with the session’s way in, once mounted', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  function page(home: unknown): Document {
+    const doc = document.implementation.createHTMLDocument('hub');
+    const block = doc.createElement('script');
+    block.id = 'hub-home';
+    block.type = 'application/json';
+    block.textContent = JSON.stringify(home);
+    doc.body.append(block);
+    return doc;
+  }
+
+  function deps(storage = memoryStorage()) {
+    return {
+      translate: vi.fn((key: string, values?: Record<string, unknown>) => `${key} ${JSON.stringify(values ?? {})}`),
+      logout: vi.fn(),
+      toast: vi.fn(),
+      paint: vi.fn(),
+      reset: vi.fn(),
+      label: () => 'Bea',
+      storage,
+      target: window,
+    };
+  }
+
+  const ACCOUNT = { credential: 'account', switch_user: false, idle_minutes: null };
+  const NONE = { theme_mode: '', palette: '' };
+
+  it('a till that always asks signs out after its idle minutes (BASE-G59)', () => {
+    const d = deps();
+    const stop = startWayIn(page({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('anywhere else nothing is armed', () => {
+    const d = deps();
+    const stop = startWayIn(page({ access: ACCOUNT, preferences: NONE }), d);
+    vi.advanceTimersByTime(60 * 60_000);
+    expect(d.logout).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('paints the person’s own appearance (BASE-G125)', () => {
+    const d = deps();
+    startWayIn(page({ access: ACCOUNT, preferences: { theme_mode: 'dark', palette: 'forest' } }), d)();
+    expect(d.paint).toHaveBeenCalledWith('dark', 'forest');
+    expect(d.reset).not.toHaveBeenCalled();
+  });
+
+  it('after «Switch user», tells who serves now and forgets the appearance of whoever left (gh:hub#2506)', () => {
+    const storage = memoryStorage();
+    announceSwitch('Bea', storage);
+    const d = deps(storage);
+    startWayIn(page({ access: { ...ACCOUNT, credential: 'pin' }, preferences: NONE }), d)();
+    expect(d.reset).toHaveBeenCalledOnce();
+    expect(d.toast).toHaveBeenCalledWith('base.switchUser.nowServing {"name":"Bea"}');
+    expect(takeSwitchAnnouncement(storage)).toBeNull();
+  });
+
+  it('without a switch, no toast and the browser’s own appearance stays', () => {
+    const d = deps();
+    startWayIn(page({ access: ACCOUNT, preferences: NONE }), d)();
+    expect([d.toast.mock.calls.length, d.paint.mock.calls.length, d.reset.mock.calls.length]).toEqual([0, 0, 0]);
   });
 });

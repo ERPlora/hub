@@ -49,7 +49,7 @@ describe('LoginPage — the PIN pad of a shared till', () => {
   it('opens on «PIN» with the faces and the badge hint, and «Account» beside it', async () => {
     const { wrapper } = await login([PIN_DOOR]);
     expect(wrapper.get('[data-testid="access-heading"]').text()).toBe('Enter your business');
-    expect(wrapper.get('[data-testid="access-tabs"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="access-tabs"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('Enter your PIN');
     expect(wrapper.text()).toContain('…or pass your badge: no need to choose your name first.');
     expect(wrapper.findAll('[data-testid="pin-face"]')).toHaveLength(2);
@@ -96,7 +96,7 @@ describe('LoginPage — the PIN pad of a shared till', () => {
     const { wrapper } = await login([{ ...PIN_DOOR, people: [], wait: 170 }]);
     expect(wrapper.get('[data-testid="access-wait"]').text()).toBe('Too many wrong attempts. Wait 3 min and try again.');
     expect(wrapper.find('[data-testid="pin-face"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid="access-tabs"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="access-tabs"]').exists()).toBe(true);
   });
 
   it('reads the faces again every minute and when the till comes back to the screen', async () => {
@@ -134,7 +134,7 @@ describe('LoginPage — the account', () => {
     const broken = new Response('{"error":{"code":"x","message":"x"}}', { status: 503 });
     const { wrapper } = await login([broken]);
     expect(wrapper.get('[data-testid="access-door-error"]').text()).toContain('Could not load the PIN pad');
-    expect(wrapper.get('[data-testid="access-account"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="access-account"]').exists()).toBe(true);
   });
 
   it('a `next` of another origin never leaves the hub', async () => {

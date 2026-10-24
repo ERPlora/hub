@@ -103,8 +103,8 @@ describe('PinSetupPage', () => {
     const { wrapper } = await setup(() => {
       throw new ApiError(503, 'x', 'x');
     });
-    expect(wrapper.get('[data-testid="pin-setup-error"]').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="pin-setup-later"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="pin-setup-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="pin-setup-later"]').exists()).toBe(true);
   });
 
   it('speaks Spanish', async () => {

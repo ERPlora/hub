@@ -9,7 +9,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 const sdk = vi.hoisted(() => ({ client: { api: { call: (() => undefined) as (...args: unknown[]) => unknown } } }));
 
-vi.mock('@erplora/ui/shell', () => ({ createShell: vi.fn(), logout: vi.fn() }));
+vi.mock('@erplora/ui/shell', () => ({
+  createShell: vi.fn(),
+  logout: vi.fn(),
+  toastSuccess: vi.fn(),
+  applyUserThemePreferences: vi.fn(),
+  resetUserThemePreferences: vi.fn(),
+}));
 vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   createLiveClient: vi.fn(() => sdk.client),
@@ -206,11 +212,50 @@ describe('main.ts', () => {
     await main.boot({});
     expect(shellOptions().userMenu).toEqual({
       items: [
+        // APP-BASE-3 (BASE-G125): «Profile», the person's own page in this hub, first.
+        { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
         { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
         { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
       ],
       logout,
     });
+  });
+
+  // APP-BASE-3 (BASE-G60, gh:hub#2506): a PIN session on a shared till has «Switch user» and never erplora.com's pages.
+  it('on a till, the user menu has «Profile» and «Switch user», and nothing of erplora.com', async () => {
+    const home = {
+      name: 'Bar A',
+      plan_url: '',
+      account_url: '',
+      report_url: '',
+      access: { credential: 'pin', switch_user: true, idle_minutes: null },
+    };
+    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
+    fakeShell();
+    await main.boot({});
+    expect(shellOptions().userMenu).toEqual({
+      items: [
+        { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
+        { id: 'switch-user', labelKey: 'base.userMenu.switchUser', icon: 'ion:people-outline', to: '/switch-user' },
+      ],
+      logout,
+    });
+  });
+
+  // APP-BASE-3 (BASE-G59): once mounted, a till of a business that always asks signs out after its idle minutes.
+  it('arms the idle lock of the session once mounted', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const home = { name: 'Bar A', access: { credential: 'pin', switch_user: true, idle_minutes: 1 } };
+      document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
+      fakeShell();
+      await main.boot({});
+      expect(logout).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(60_000);
+      expect(logout).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('without an embedded session, asks GET /api/me (base.session.me) and goes live with its answer', async () => {

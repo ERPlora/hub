@@ -17,6 +17,9 @@ export async function enterWith(
   path: EntryPath,
   body: Record<string, string>,
   doc: Document = document,
+  // `/auth/pin` and `/auth/badge` open a session, which no operation does (Django's `login` needs the request, as the
+  // callback's): the SDK has no route to them. Same origin and the SDK's CSRF header, as its own calls.
+  // eslint-disable-next-line no-restricted-globals -- see above
   fetcher: typeof fetch = (...args) => fetch(...args),
 ): Promise<string> {
   const config = readSpaConfig(doc);
@@ -194,4 +197,43 @@ export function leaveTo(url: string): void {
 /** Reloads on `url` in place of this page: after «Switch user», Back never returns to what whoever left had open. */
 export function replaceWith(url: string): void {
   window.location.replace(url);
+}
+
+// ── Once the shell is mounted ────────────────────────────────────────────────────────────────────────────────────
+
+export interface WayInDeps {
+  translate: (key: string, values?: Record<string, unknown>) => string;
+  /** The Hub's sign out (the shell's `logout`): a form POST, then the way in. */
+  logout: () => void;
+  toast: (message: string) => void;
+  /** The shell's `applyUserThemePreferences`; `null`: the business's. */
+  paint: (mode: 'system' | 'light' | 'dark' | null, palette: string | null) => void;
+  /** The shell's `resetUserThemePreferences`. */
+  reset: () => void;
+  /** The name of the person of the session. */
+  label: () => string | undefined;
+  storage?: Storage;
+  target?: EventTarget;
+}
+
+interface Appearance {
+  theme_mode: '' | 'system' | 'light' | 'dark';
+  palette: string;
+}
+
+/** What the session's way in asks of the mounted shell: the idle lock of a till that always asks (BASE-G59), the
+ *  person's own appearance (BASE-G125) and, after «Switch user», «Now serving {name}» with the appearance of whoever
+ *  left forgotten (gh:hub#2506). Returns the function that disarms the lock. */
+export function startWayIn(doc: Document, deps: WayInDeps): () => void {
+  const access = readAccess(doc);
+  const stop = access.idle_minutes ? createIdleLock(access.idle_minutes, deps.logout, deps.target) : () => undefined;
+  const appearance = readJsonBlock<{ preferences?: Appearance }>('hub-home', doc)?.preferences;
+  const switched = takeSwitchAnnouncement(deps.storage);
+  if (appearance && (appearance.theme_mode || appearance.palette)) {
+    deps.paint(appearance.theme_mode || null, appearance.palette || null);
+  } else if (switched !== null) {
+    deps.reset();
+  }
+  if (switched !== null) deps.toast(deps.translate('base.switchUser.nowServing', { name: deps.label() || switched }));
+  return stop;
 }
