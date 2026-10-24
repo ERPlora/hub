@@ -90,7 +90,10 @@ def test_the_right_on_an_app_gives_the_right_on_what_it_requires():
 def test_a_right_that_ended_is_no_right():
     ended = {"id": "stock", "source": "purchase", "valid_until": "2026-10-24T11:59:59+00:00"}
     running = {"id": "stock", "source": "purchase", "valid_until": "2026-10-24T12:00:01+00:00"}
+    # Its end is the first instant without it, as a subscription's period end.
+    at_its_end = {"id": "stock", "source": "purchase", "valid_until": "2026-10-24T12:00:00+00:00"}
     assert entitlement.blocked(photo(ended), now=NOW, configs=CONFIGS) == frozenset({"stock", "invoice"})
+    assert entitlement.blocked(photo(at_its_end), now=NOW, configs=CONFIGS) == frozenset({"stock", "invoice"})
     assert entitlement.blocked(photo(running), now=NOW, configs=CONFIGS) == frozenset({"invoice"})
 
 

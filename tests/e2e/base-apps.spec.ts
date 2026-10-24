@@ -97,6 +97,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
   test(`BASE-G67 BASE-G68 BASE-G69 BASE-G70 — Apps at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/apps');
+    // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
     // BASE-G67 — «My apps»: the apps on, the demo among them, each with its state.
     await expect(page).toHaveURL(`${A}/apps`);
