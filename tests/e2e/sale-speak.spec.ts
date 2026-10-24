@@ -5,7 +5,6 @@
 // the assistant's box with its panel open and nothing is asked until the person sends: `DICTATION` asks for a write,
 // which stops on its card. Offline, the key stays greyed and a tap says why. The SaaS must be seeded with this
 // provider and run with `ASSISTANT_SERVICE_PROVIDER=e2e-local` (README «El asistente»).
-// flow: Vender (pantalla del TPV; sin flujo propio)
 // flow: SALE-F01
 // flow: BASE-F94
 import { execSync } from 'node:child_process';
@@ -89,7 +88,7 @@ async function reset(page: Page): Promise<void> {
   await expect(panel(page)).toHaveAttribute('data-open', 'false');
 }
 
-test('Vender (pantalla del TPV; sin flujo propio) — «Speak» dictates into the assistant: the words wait in its box with the panel open, and only «Send» asks, as the cashier', async ({ page }) => {
+test('SALE-F01 / BASE-F94 — «Speak» dictates into the assistant: the words wait in its box with the panel open, and only «Send» asks, as the cashier', async ({ page }) => {
   await login(page, A, '/sale/pos', EMPLOYEE);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -116,7 +115,7 @@ test('Vender (pantalla del TPV; sin flujo propio) — «Speak» dictates into th
   await expect(card(page)).toBeHidden();
 });
 
-test('Vender (pantalla del TPV; sin flujo propio) — a write dictated by whoever may make it stops on its card; «Cancel» leaves it undone', async ({ page }) => {
+test('SALE-F01 / BASE-F94 — a write dictated by whoever may make it stops on its card; «Cancel» leaves it undone', async ({ page }) => {
   await login(page, A, '/sale/pos');
   await page.setViewportSize({ width: 1440, height: 900 });
   await till(page);
@@ -129,7 +128,7 @@ test('Vender (pantalla del TPV; sin flujo propio) — a write dictated by whoeve
   await expect(answers(page)).toHaveCount(1, { timeout: 30_000 });
 });
 
-test('Vender (pantalla del TPV; sin flujo propio) — offline, «Speak» stays greyed and a tap says why instead of recording; back online it records', async ({ page }) => {
+test('SALE-F01 / BASE-F94 — offline, «Speak» stays greyed and a tap says why instead of recording; back online it records', async ({ page }) => {
   await login(page, A, '/sale/pos', EMPLOYEE);
   await till(page);
   // The cashier's session, with the panel closed, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
