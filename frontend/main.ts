@@ -22,6 +22,7 @@ import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
+import { forgetAssistant } from '../base/frontend/lib/assistant';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { installErrorReport } from '../base/frontend/lib/error-report';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
@@ -49,16 +50,22 @@ export const SIDEBAR: ShellSidebar = {
 };
 
 /**
- * base's pieces of the chrome (APP-BASE-1, the old hub's): the bell at the end of the topbar, «Upgrade plan»
- * in the menu's footer, the blocking strip over every screen and, beside the pane, the device's notices
- * (APPOINTMENT-F28). Loaded on demand: none is needed to paint.
+ * base's pieces of the chrome (APP-BASE-1, the old hub's): the assistant's sparkles and the bell at the end of the
+ * topbar, «Upgrade plan» in the menu's footer, the blocking strip over every screen and, beside the pane, the device's
+ * notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Loaded on demand: none is needed to paint.
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
-  topbar: defineAsyncComponent(() => import('../base/frontend/components/HubBell.vue')),
+  topbar: defineAsyncComponent(() => import('../base/frontend/components/TopbarChrome.vue')),
   sidebarFooter: defineAsyncComponent(() => import('../base/frontend/components/UpgradePlanLink.vue')),
   notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
-  background: defineAsyncComponent(() => import('../base/frontend/components/DeviceNotices.vue')),
+  background: defineAsyncComponent(() => import('../base/frontend/components/BackgroundChrome.vue')),
 };
+
+/** The Hub's sign out: the assistant's conversation of the tab is forgotten first (BASE-G120), then the shell's. */
+export function signOut(doc: Document = document): void {
+  forgetAssistant();
+  logout(doc);
+}
 
 /** An app's `frontend/routes.ts` default-exports its routes → pages, and nothing else. */
 export type AppRoutes = { default: RouteRecordRaw[] };
@@ -96,11 +103,11 @@ export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShe
  * «Switch user» (BASE-G60), both from `hub-home`'s `access` (APP-BASE-3); then the person's account and «Report a
  * problem», erplora.com's pages (PLAN-SAAS §1.1), opened from the addresses `base/spa.py` embeds only in a session
  * opened with the account (a new tab; the system browser in the installed app; gh:hub#2506); then the Hub's sign out,
- * a form POST to `/auth/logout`. Without `hub-home` (no hub), only the sign out.
+ * a form POST to `/auth/logout` once the assistant's conversation is forgotten (`signOut`). Without `hub-home` (no hub), only the sign out.
  */
 export function userMenu(doc: Document): ShellUserMenu {
   const home = readJsonBlock<HubHome>('hub-home', doc);
-  if (!home) return { logout };
+  if (!home) return { logout: signOut };
   const items: ShellUserMenuItem[] = [
     { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
   ];
@@ -113,7 +120,7 @@ export function userMenu(doc: Document): ShellUserMenu {
       { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
     );
   }
-  return { items, logout };
+  return { items, logout: signOut };
 }
 
 /** A failed `/api/me` ends in `error`, so the auth gate stops waiting and sends to the login. `reload` reads it again
@@ -189,7 +196,7 @@ export async function boot(
   // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
   startWayIn(doc, {
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
-    logout: () => logout(doc),
+    logout: () => signOut(doc),
     toast: (message) => void toastSuccess(message),
     paint: (mode, palette) => applyUserThemePreferences(mode, palette as ThemePalette | null),
     reset: resetUserThemePreferences,

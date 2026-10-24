@@ -95,10 +95,22 @@ describe('main.ts', () => {
     expect(importBoot.home).toBe(true);
   });
 
-  it("plugs base's pieces into the chrome: the bell in the topbar, «Upgrade plan» in the menu, the blocking strip and the device's notices", () => {
+  it("plugs base's pieces into the chrome: the assistant and the bell in the topbar, «Upgrade plan» in the menu, the blocking strip, and the device's notices and the assistant's panel beside the pane", async () => {
     const chrome = importBoot.chrome as Record<string, unknown>;
     expect(Object.keys(chrome).sort()).toEqual(['background', 'notice', 'sidebarFooter', 'topbar']);
     for (const piece of Object.values(chrome)) expect(piece).toBeTruthy();
+    // APP-BASE-9: loaded on demand; what each one loads.
+    const loaded = async (piece: unknown) =>
+      ((await (piece as { __asyncLoader: () => Promise<{ __name?: string }> }).__asyncLoader()) ?? {}).__name;
+    expect([await loaded(chrome.topbar), await loaded(chrome.background)]).toEqual(['TopbarChrome', 'BackgroundChrome']);
+  });
+
+  // BASE-G120: signing out forgets the assistant's conversation of the tab, from the menu and from the idle lock.
+  it('signing out forgets the conversation with the assistant, then leaves', () => {
+    sessionStorage.setItem('erplora.assistant.history', JSON.stringify({ user: 'u1', bubbles: [], conversation: [] }));
+    main.signOut();
+    expect(sessionStorage.getItem('erplora.assistant.history')).toBeNull();
+    expect(logout).toHaveBeenCalledOnce();
   });
 
   it("on import, globs base's catalogue next to the apps' (the Home would show raw keys otherwise)", () => {
@@ -203,7 +215,7 @@ describe('main.ts', () => {
   it("without this hub's addresses on erplora.com (no hub-home), the user menu has only the Hub's sign out", async () => {
     fakeShell();
     await main.boot({});
-    expect(shellOptions().userMenu).toEqual({ logout });
+    expect(shellOptions().userMenu).toEqual({ logout: main.signOut });
   });
 
   // PLAN-SAAS §1.1: «Report a problem» is the SaaS's form (saas `/report-a-problem`), and the account lives there
@@ -225,7 +237,7 @@ describe('main.ts', () => {
         { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
         { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
       ],
-      logout,
+      logout: main.signOut,
     });
   });
 
@@ -246,7 +258,7 @@ describe('main.ts', () => {
         { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
         { id: 'switch-user', labelKey: 'base.userMenu.switchUser', icon: 'ion:people-outline', to: '/switch-user' },
       ],
-      logout,
+      logout: main.signOut,
     });
   });
 
