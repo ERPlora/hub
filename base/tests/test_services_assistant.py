@@ -269,3 +269,26 @@ def test_a_dictation_too_long_is_said(gateway):
     with pytest.raises(OperationError) as caught:
         run("base.assistant.transcribe", EMPLOYEE, audio="UklGRg==", mime_type="audio/webm")
     assert (caught.value.status, caught.value.code) == (413, "base.assistant_audio_too_long")
+
+
+# ── A dangerous write that names no record never runs, whatever the browser answers (BASE-G116) ──────────────────
+
+
+def test_a_blocked_write_does_not_run_even_with_a_yes_and_the_word_typed():
+    """The card said «not from the chat»; a yes with the word typed (a browser that ignores ``blocked``) runs nothing."""
+    permissions = frozenset({"base.view_home", "appointment.*"})
+    delete_all = call("appointment.appointment.bulk_delete", {"ids": []})
+    card = turn(delete_all, permissions=permissions)["confirm"]
+    assert card["blocked"] is True
+    plan = turn(delete_all, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"}, permissions=permissions)
+    assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("cancelled", "base.assistant_not_from_chat")
+    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "base.assistant_not_from_chat"
+    assert plan["confirm"] is None
+
+
+# ── The screens the assistant may link are the person's (BASE-G114, G118) ────────────────────────────────────────
+
+
+def test_the_system_screen_is_linked_only_to_who_administers():
+    assert "](/system)" in run("base.assistant.turn", {"base.view_home", "base.administer_hub"}, messages=[ASK])["instructions"]
+    assert "/system" not in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]

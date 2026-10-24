@@ -51,7 +51,10 @@ describe('files', () => {
     expect(fileProblem(file('menu.pdf', 'application/pdf', 2 * MB), 0)).toBeNull();
     expect(fileProblem(file('foto.heic', 'image/heic'), 0)).toEqual({ key: 'base.assistant.files.unsupported', values: { name: 'foto.heic' } });
     expect(fileProblem(file('viejo.doc', 'application/msword'), 0)).toEqual({ key: 'base.assistant.files.unsupported', values: { name: 'viejo.doc' } });
-    expect(fileProblem(file('big.pdf', 'application/pdf', MAX_FILE_BYTES + 1), 0)).toEqual({
+    // The limit the sentence promises («8 MB at most per file»), pinned in bytes: not the constant against itself.
+    expect(MAX_FILE_BYTES).toBe(8 * MB);
+    expect(fileProblem(file('full.pdf', 'application/pdf', 8 * MB), 0)).toBeNull();
+    expect(fileProblem(file('big.pdf', 'application/pdf', 8 * MB + 1), 0)).toEqual({
       key: 'base.assistant.files.tooLarge',
       values: { name: 'big.pdf' },
     });
