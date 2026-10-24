@@ -825,12 +825,14 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
     }
 
 
+def chosen_language(user) -> str:
+    """The language a person chose in «My profile»; empty while it is the business's."""
+    return Profile.objects.filter(username=user.get_username()).values_list("language", flat=True).first() or ""
+
+
 def language_of(user, slug: str) -> str:
     """The language a person works in on ``slug``: their «My profile» choice, else the business's."""
-    chosen = Profile.objects.filter(username=user.get_username()).values_list("language", flat=True).first()
-    if chosen:
-        return chosen
-    return Hub.objects.filter(slug=slug).values_list("language", flat=True).first() or ""
+    return chosen_language(user) or Hub.objects.filter(slug=slug).values_list("language", flat=True).first() or ""
 
 
 def device_of_entry(request: HttpRequest) -> TrustedDevice | None:

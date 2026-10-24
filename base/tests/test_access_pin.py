@@ -154,6 +154,20 @@ class TestEnteringWithThePin:
         response = pin(client, with_pin(ana, "4826").pk, "4826")
         assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == cookie
 
+    @pytest.mark.usefixtures("spa_manifest")
+    def test_who_has_not_chosen_a_language_sees_the_business_s_not_the_browser_s(self, client, ana):
+        # BASE-F51 (APP-BASE-6): «The business's language — the one of whoever has not chosen theirs». The browser asks
+        # for English; the business is in Spanish and the person chose nothing in «My profile»: the page is Spanish.
+        from base.models import Hub, Profile
+
+        Hub.objects.filter(slug="a").update(language="es")
+        Profile.objects.create(username=ana.username, first_name="Ana", language="")
+        a_device(client)
+        assert pin(client, with_pin(ana, "4826").pk, "4826").status_code == 200
+        page = client.get("/sale/pos", HTTP_HOST=HOST, HTTP_ACCEPT="text/html", HTTP_ACCEPT_LANGUAGE="en")
+        assert page.status_code == 200
+        assert '<html lang="es"' in page.content.decode()
+
     def test_a_wrong_pin_says_so_and_opens_nothing(self, client, ana):
         a_device(client)
         cred = with_pin(ana, "4826")

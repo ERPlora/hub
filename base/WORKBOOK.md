@@ -256,7 +256,7 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F48 | Abrir Ajustes y moverse por sus pestañas | hecho |
 | BASE-F49 | Ver el país del negocio | hecho |
 | BASE-F50 | Ver la moneda del negocio | parcial |
-| BASE-F51 | Cambiar el idioma del negocio en erplora.com | parcial |
+| BASE-F51 | Cambiar el idioma del negocio en erplora.com | hecho |
 | BASE-F52 | Entrar con la cuenta de erplora.com | hecho |
 | BASE-F53 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
 | BASE-F54 | Elegir el PIN la primera vez que se entra en una caja | hecho |
@@ -1240,7 +1240,7 @@ Implicados: BASE-F49
 
 ### BASE-F51 Cambiar el idioma del negocio en erplora.com
 <!-- origen: old-hub:HUB_SHELL-F159 -->
-Estado: parcial — quien no ha elegido un idioma propio sigue viendo la pantalla en el de su navegador, no en el del negocio, hasta que el hub use el idioma de cada persona
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Negocio
 Pasos:
@@ -1251,12 +1251,14 @@ Pasos:
   3. Sin recargar, «Negocio» enseña el idioma nuevo en cuanto el negocio lo recibe; igual con el nombre y la zona
      horaria.
 Entra: el idioma que guardó erplora.com.
-Sale: nada guardado en el negocio: lo recibe de erplora.com (`base.hub.registered`).
+Sale: nada guardado en el negocio: lo recibe de erplora.com (`base.hub.registered`). Quien no ha elegido un idioma
+propio en «Mi perfil» y entra con su PIN ve el hub en el del negocio, no en el de su navegador; con su cuenta, en el
+de su cuenta de erplora.com (BASE-F64).
 Si falla: si el negocio no responde, erplora.com se queda con el cambio y se lo vuelve a mandar (HUBS-F08);
 mientras tanto, «Negocio» sigue con el anterior. Quien no administra el negocio no ve el botón: «Solo el
 propietario o un administrador los cambian, en erplora.com.». En una demo, «Esta demo no tiene un negocio en
 erplora.com: sus datos no se cambian.».
-Implicados: HUBS-F15, HUBS-F08
+Implicados: HUBS-F15, HUBS-F08, BASE-F64
 
 ### BASE-F52 Entrar con la cuenta de erplora.com
 <!-- origen: old-hub:HUB_SHELL-F01 -->
@@ -1502,13 +1504,14 @@ Pasos:
      apariencia del negocio» deshace lo propio.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
-y su apariencia, que le siguen en cualquier dispositivo en el que entre. El correo es solo de contacto: no cambia
-la cuenta de erplora.com.
+y su apariencia, que le siguen en cualquier dispositivo en el que entre, con su PIN o con su cuenta. Con «Usar el
+idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su cuenta de erplora.com (BASE-F51). El
+correo es solo de contacto: no cambia la cuenta de erplora.com.
 Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» — «Tus datos siguen igual. Comprueba la
 conexión y vuelve a intentarlo.» con «Reintentar». Al guardar: «No se pudo guardar el perfil»; foto rechazada:
 «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.»; preferencias: «No se pudieron guardar tus
 preferencias. Comprueba la conexión e inténtalo de nuevo.».
-Implicados: ninguno
+Implicados: BASE-F51
 
 ### BASE-F65 Cambiar mi PIN desde Mi perfil
 <!-- origen: old-hub:HUB_SHELL-F22 -->

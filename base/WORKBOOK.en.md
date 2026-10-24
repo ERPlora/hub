@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3ca58e4739cbc601c1235d5e5d868d7b4c05f0d9637587c6374885b4f93b6dd8 -->
+<!-- generated from WORKBOOK.md sha256:d03ea4ab4e35ae2583078c8f691345a7f1cc7d25acb0772c816e99fc5ca1b77e -->
 
 ## What it is for and who it is for
 
@@ -242,7 +242,7 @@ On the Settings · Data and backups screen:
 | BASE-F48 | Open Settings and move through its tabs | done |
 | BASE-F49 | See the business's country | done |
 | BASE-F50 | See the business's currency | partial |
-| BASE-F51 | Change the business's language on erplora.com | partial |
+| BASE-F51 | Change the business's language on erplora.com | done |
 | BASE-F52 | Enter with the erplora.com account | done |
 | BASE-F53 | Enter from the erplora.com panel without typing the password again | done |
 | BASE-F54 | Choose the PIN the first time one enters a till | done |
@@ -1173,7 +1173,7 @@ If it fails: as in BASE-F49.
 Involved: BASE-F49
 
 ### BASE-F51 Change the business's language on erplora.com
-Status: partial — whoever has not chosen a language of their own still sees the screen in their browser's, not in the business's, until the hub uses each person's language
+Status: done
 Actor: owner, administrator
 Screen: Settings · Business
 Steps:
@@ -1184,12 +1184,14 @@ Steps:
   3. Without reloading, "Business" shows the new language as soon as the business receives it; the same with the
      name and the time zone.
 In: the language erplora.com saved.
-Out: nothing saved in the business: it receives it from erplora.com (`base.hub.registered`).
+Out: nothing saved in the business: it receives it from erplora.com (`base.hub.registered`). Whoever has not chosen
+a language of their own in "My profile" and enters with their PIN sees the hub in the business's, not in their
+browser's; with their account, in their erplora.com account's (BASE-F64).
 If it fails: if the business does not answer, erplora.com keeps the change and sends it again (HUBS-F08);
 meanwhile, "Business" stays with the previous one. Whoever does not administer the business does not see the
 button: "Only the owner or an administrator changes them, on erplora.com.". In a demo, "This demo has no business
 on erplora.com: its data does not change.".
-Involved: HUBS-F15, HUBS-F08
+Involved: HUBS-F15, HUBS-F08, BASE-F64
 
 ### BASE-F52 Enter with the erplora.com account
 Status: done
@@ -1423,13 +1425,14 @@ Steps:
      business’s appearance" undoes their own.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
-appearance, which follow them on any device they enter. The email is only for contact: it does not change the
-erplora.com account.
+appearance, which follow them on any device they enter, with their PIN or with their account. With "Use the
+business’s language", they enter with a PIN in the business's and with their account in their erplora.com
+account's (BASE-F51). The email is only for contact: it does not change the erplora.com account.
 If it fails: if the profile could not be read, "Could not load the profile" — "Your details stay the same. Check
 the connection and try again." with "Retry". On saving: "Could not save the profile"; a refused photo: "Could not
 save the photo. Use a JPG, PNG or WebP of up to 2 MB."; preferences: "Could not save your preferences. Check the
 connection and try again.".
-Involved: none
+Involved: BASE-F51
 
 ### BASE-F65 Change my PIN from My profile
 Status: done

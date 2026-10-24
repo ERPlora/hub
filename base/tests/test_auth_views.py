@@ -108,6 +108,20 @@ class TestCallback:
         sent = response.cookies.get(settings.LANGUAGE_COOKIE_NAME)
         assert (sent.value if sent else None) == cookie
 
+    @pytest.mark.parametrize(("own", "cookie"), [("es", "es"), ("", "en")])
+    def test_the_language_of_my_profile_wins_over_the_account_s_and_without_one_the_account_s(
+        self, client, fake_saas, settings, own, cookie
+    ):
+        # BASE-G125: the language chosen in «My profile» is the one every entry speaks, the account's too; without one,
+        # the account's language on erplora.com, never the browser's (a PIN entry, without the account, takes the
+        # business's: test_access_pin).
+        from base.models import Profile
+
+        Profile.objects.create(username="saas:42", first_name="Ana", language=own)
+        fake_saas(body={"user_id": "42", "email": "ana@example.com", "name": "Ana", "locale": "en", "role": "hub_admin"})
+        response = callback(client, {"code": "c1", "next": "/"})
+        assert response.cookies[settings.LANGUAGE_COOKIE_NAME].value == cookie
+
     @pytest.mark.parametrize(
         ("saas_answer", "error"),
         [

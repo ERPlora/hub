@@ -129,7 +129,9 @@ def auth_callback(request: HttpRequest) -> HttpResponse:
         logger.warning("Login on hub %r refused: the hub's user %r is deactivated.", slug, result.user.user_id)
         return auth.login_redirect(slug, next_path, error=USER_INACTIVE)
     landing = _choose_a_pin_first(request, next_path, slug)
-    return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(landing), result.user.locale)))
+    # The language chosen in «My profile», else the account's on erplora.com (BASE-G125).
+    language = queries.chosen_language(request.user) or result.user.locale
+    return with_device(request, auth.forget_state(_with_language(HttpResponseRedirect(landing), language)))
 
 
 def _demo_callback(request: HttpRequest, hub, next_path: str) -> HttpResponseRedirect:
