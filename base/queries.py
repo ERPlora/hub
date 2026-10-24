@@ -1097,6 +1097,8 @@ from base.schemas import AssistantUsageIn, AssistantUsageOut  # noqa: E402
     input=AssistantUsageIn,
     output=AssistantUsageOut,
     ai={"description": "Not an assistant tool (the panel's own footer: the messages of the month left)."},
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    database=False,
 )
 def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
     """This month's messages of the assistant as erplora.com counts them (BASE-G122): used, of how many, and when

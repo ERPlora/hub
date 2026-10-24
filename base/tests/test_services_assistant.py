@@ -6,6 +6,7 @@ asked for, shows a write's card and runs it only with the person's yes, as the p
 import json
 
 import pytest
+from django.db import connections
 from live.context import OperationContext, Scope
 from live.errors import OperationError, Unauthorized
 from live.operations import get
@@ -299,3 +300,40 @@ def test_the_files_screen_is_linked_to_who_sees_the_files():
     text = run("base.assistant.turn", {"base.view_home", "base.view_files"}, messages=[ASK])["instructions"]
     assert "[Archivos](/files)" in text
     assert "/files" not in run("base.assistant.turn", EMPLOYEE, messages=[ASK])["instructions"]
+
+
+# ── What waits on erplora.com holds no transaction meanwhile (BASE-G122, G123, G112; rv-hub-247) ──────────────────
+
+GATEWAY_CALLS = [
+    ("base.assistant.usage", "/internal/assistant/usage", {"used": 1, "limit": 30, "resets_at": None, "demo": False}, {}),
+    (
+        "base.assistant.report",
+        "/internal/assistant/report",
+        {"sent": True, "duplicate": False},
+        {"message_id": "m1", "reason": "incorrect", "answer": "a"},
+    ),
+    (
+        "base.assistant.transcribe",
+        "/internal/speech/transcribe",
+        {"text": "hola", "language": "es"},
+        {"audio": "UklGRg==", "mime_type": "audio/webm"},
+    ),
+]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(("operation_name", "path", "answer", "data"), GATEWAY_CALLS)
+def test_waiting_for_erplora_com_holds_no_transaction(gateway, monkeypatch, operation_name, path, answer, data):
+    """Up to 15 s of waiting inside a transaction would hold the hub's connection (and, on the Free plan, its one
+    transaction at a time: PLAN §14.2), so the till would wait too: while the gateway answers, none is open."""
+    gateway.reply(path, json=answer)
+    seen = []
+    post = assistant._post
+
+    def probe(*args, **kwargs):
+        seen.append(any(connection.in_atomic_block for connection in connections.all()))
+        return post(*args, **kwargs)
+
+    monkeypatch.setattr(assistant, "_post", probe)
+    run(operation_name, EMPLOYEE, **data)
+    assert seen == [False]

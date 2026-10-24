@@ -2170,6 +2170,8 @@ def _gateway_failure(code: str, message: str) -> OperationError:
     input=AssistantReportIn,
     output=AssistantReportOut,
     ai={"description": "Not an assistant tool (the person reports an answer of the assistant from its panel)."},
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    database=False,
 )
 def assistant_report(ctx: OperationContext, data: AssistantReportIn) -> dict:
     """Send erplora.com's team an answer the person reports (BASE-G123), with the question that led to it."""
@@ -2188,6 +2190,8 @@ def assistant_report(ctx: OperationContext, data: AssistantReportIn) -> dict:
     input=AssistantTranscribeIn,
     output=AssistantTranscribeOut,
     ai={"description": "Not an assistant tool (the person's dictation in the panel, turned into text it reviews)."},
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    database=False,
 )
 def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> dict:
     """The text of the person's dictation (BASE-G112), by erplora.com: it goes to the box, never sent by itself."""
