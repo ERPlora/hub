@@ -4,6 +4,7 @@ Every read sees the live conversations only (not erased). A conversation may be 
 its number (any format) or the name of its customer card or WhatsApp profile (``find_conversation``).
 """
 
+import datetime as dt
 import re
 from uuid import UUID
 
@@ -22,6 +23,8 @@ from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Tem
 from apps.whatsapp_inbox.schemas import (
     AgentListIn,
     AgentPage,
+    AwaitingCountIn,
+    AwaitingCountOut,
     ByPhoneIn,
     ByPhoneOut,
     ChannelGetIn,
@@ -34,6 +37,8 @@ from apps.whatsapp_inbox.schemas import (
     MessagePage,
     NoteListIn,
     NotePage,
+    NoticesIn,
+    NoticesOut,
     PageIn,
     SummaryIn,
     SummaryOut,
@@ -105,6 +110,14 @@ def preview(body: str, filename: str = "", caption: str = "") -> str:
 
 def live_conversations() -> QuerySet:
     return Conversation.objects.filter(erased_at__isnull=True)
+
+
+#: A customer waiting for an answer (WHATSAPP_INBOX-F09): an open conversation whose last message is the customer's.
+#: The summary, the bell's count and the device's notices read this one definition.
+AWAITING_REPLY = Q(
+    status=Conversation.Status.OPEN,
+    last_message_direction=Message.Direction.INBOUND,
+)
 
 
 def _matching_ids(reference: str) -> list[UUID]:
@@ -188,6 +201,12 @@ def send_blocked(row: Channel | None) -> str | None:
     return None
 
 
+def display_name(row: Conversation) -> str:
+    """Who a conversation is with: the live customer card's name, else the WhatsApp name, else the number."""
+    card = row.customer if row.customer is not None and row.customer.deleted_at is None else None
+    return (card.name if card else "") or row.contact_name or row.phone
+
+
 def conversation_out(row: Conversation) -> dict:
     """A conversation as every read and write returns it."""
     card = (
@@ -200,7 +219,7 @@ def conversation_out(row: Conversation) -> dict:
         "id": row.id,
         "phone": row.phone,
         "contact_name": row.contact_name,
-        "display_name": customer_name or row.contact_name or row.phone,
+        "display_name": display_name(row),
         "customer_id": card.id if card else None,
         "customer_name": customer_name,
         "assigned_to_id": row.assigned_to_id,
@@ -419,18 +438,62 @@ def conversation_summary(ctx: OperationContext, data: SummaryIn) -> dict:
     counts = live_conversations().aggregate(
         open=Count("id", filter=Q(status=Conversation.Status.OPEN)),
         unread_conversations=Count("id", filter=Q(unread_count__gt=0)),
-        awaiting_reply=Count(
-            "id",
-            filter=Q(
-                status=Conversation.Status.OPEN,
-                last_message_direction=Message.Direction.INBOUND,
-            ),
-        ),
+        awaiting_reply=Count("id", filter=AWAITING_REPLY),
     )
     row = channel(ctx.scope)
     return {
         **counts,
         "cap_reached": bool(row and row.cap_reached(clock.business_month())),
+    }
+
+
+@operation(
+    "whatsapp_inbox.conversation.count_awaiting_reply",
+    kind="query",
+    permission="whatsapp_inbox.view",
+    input=AwaitingCountIn,
+    output=AwaitingCountOut,
+    expose_api=True,
+    ai={
+        "description": "How many WhatsApp customers are waiting for an answer from the business: open "
+        "conversations whose last message is the customer's."
+    },
+)
+def count_awaiting_reply(ctx: OperationContext, data: AwaitingCountIn) -> dict:
+    return {"count": live_conversations().filter(AWAITING_REPLY).count()}
+
+
+#: How far back the device's notices go when nobody says (the shell tells each one once, as it comes).
+NOTICES_WINDOW = dt.timedelta(hours=24)
+
+
+@operation(
+    "whatsapp_inbox.conversation.notices",
+    kind="query",
+    permission="whatsapp_inbox.view",
+    input=NoticesIn,
+    output=NoticesOut,
+    expose_api=True,
+    ai={
+        "description": "The WhatsApp customers left waiting for an answer lately, the newest first: who, what she "
+        "wrote last and when (each new message of hers is news again)."
+    },
+)
+def notices(ctx: OperationContext, data: NoticesIn) -> dict:
+    """Each conversation waiting for an answer whose customer wrote since ``data.since``, by her last message: the
+    device tells each (conversation, message instant) once, so a customer writing again is told again."""
+    since = data.since or clock.now() - NOTICES_WINDOW
+    rows = (
+        live_conversations()
+        .filter(AWAITING_REPLY, last_inbound_at__gte=since)
+        .select_related("customer")
+        .order_by("-last_inbound_at", "-id")[: data.limit]
+    )
+    return {
+        "rows": [
+            {"id": row.id, "at": row.last_inbound_at, "name": display_name(row), "preview": row.last_message_preview}
+            for row in rows
+        ]
     }
 
 

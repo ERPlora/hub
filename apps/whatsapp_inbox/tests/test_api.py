@@ -35,6 +35,16 @@ ROUTES = {
         "whatsapp_inbox.conversation.summary",
     ),
     (
+        "GET",
+        "/whatsapp_inbox/conversations/count_awaiting_reply",
+        "whatsapp_inbox.conversation.count_awaiting_reply",
+    ),
+    (
+        "GET",
+        "/whatsapp_inbox/conversations/notices",
+        "whatsapp_inbox.conversation.notices",
+    ),
+    (
         "POST",
         "/whatsapp_inbox/conversations/mark_read",
         "whatsapp_inbox.conversation.mark_read",
@@ -170,6 +180,18 @@ def test_the_inbox_over_http(employee_client):
         employee_client, "/whatsapp_inbox/notes", {"id": row["id"], "text": "Llamar"}
     )
     assert (note.status_code, note.json()["author_name"]) == (201, "Luis")
+
+
+@pytest.mark.django_db
+def test_who_waits_for_an_answer_over_http(employee_client):
+    # WHATSAPP_INBOX-F09: the bell's count and the device's notices, for an integration as for the Hub.
+    receive("wamid.1", contact_name="Ana")
+    count = get(employee_client, "/whatsapp_inbox/conversations/count_awaiting_reply")
+    assert (count.status_code, count.json()) == (200, {"count": 1})
+    told = get(employee_client, "/whatsapp_inbox/conversations/notices", limit=10)
+    assert told.status_code == 200
+    assert [(row["name"], row["preview"]) for row in told.json()["rows"]] == [("Ana", "Hola, ¿tenéis hora mañana?")]
+    assert get(employee_client, "/whatsapp_inbox/conversations/notices", limit=101).status_code == 422
 
 
 @pytest.mark.django_db

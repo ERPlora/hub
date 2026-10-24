@@ -87,6 +87,33 @@ export interface SummaryOut {
   cap_reached: boolean;
 }
 
+// WHATSAPP_INBOX-F09: who waits for an answer, read by the Home's bell and the device's notices (base).
+export type AwaitingCountIn = Record<string, never>;
+
+export interface AwaitingCountOut {
+  count: number;
+}
+
+export interface NoticesIn {
+  /** Only the customers who wrote from this instant on (ISO); empty = the last 24 hours. */
+  since?: string | null;
+  /** 1 to 100; 20 by default. */
+  limit?: number;
+}
+
+export interface NoticeOut {
+  /** The conversation's id. */
+  id: string;
+  /** When the customer wrote her last message, still unanswered. */
+  at: string;
+  name: string;
+  preview: string;
+}
+
+export interface NoticesOut {
+  rows: NoticeOut[];
+}
+
 export interface AssignIn extends ConversationRefIn {
   assignee_id?: number;
   /** A name, username or email, or `me`. */
@@ -336,6 +363,8 @@ declare module '@erplora/ui/sdk' {
     'whatsapp_inbox.conversation.detail': { input: ConversationRefIn; output: ConversationDetailOut };
     'whatsapp_inbox.conversation.by_phone': { input: ByPhoneIn; output: ByPhoneOut };
     'whatsapp_inbox.conversation.summary': { input: SummaryIn; output: SummaryOut };
+    'whatsapp_inbox.conversation.count_awaiting_reply': { input: AwaitingCountIn; output: AwaitingCountOut };
+    'whatsapp_inbox.conversation.notices': { input: NoticesIn; output: NoticesOut };
     'whatsapp_inbox.conversation.mark_read': { input: ConversationRefIn; output: ConversationOut };
     'whatsapp_inbox.conversation.assign': { input: AssignIn; output: ConversationOut };
     'whatsapp_inbox.conversation.set_status': { input: SetStatusIn; output: ConversationOut };

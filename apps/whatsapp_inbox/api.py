@@ -23,6 +23,7 @@ from apps.whatsapp_inbox.schemas import (
     NoteAddIn,
     NoteListIn,
     NoteRefIn,
+    NoticesIn,
     SendIn,
     SetStatusIn,
     TemplateCreateIn,
@@ -65,6 +66,24 @@ async def conversation_by_phone(request, params: Query[ByPhoneIn]):
 )
 async def conversation_summary(request):
     return await run_operation(request, queries.conversation_summary)
+
+
+@bind(
+    router,
+    "whatsapp_inbox.conversation.count_awaiting_reply",
+    "/whatsapp_inbox/conversations/count_awaiting_reply",
+)
+async def conversation_count_awaiting_reply(request):
+    return await run_operation(request, queries.count_awaiting_reply)
+
+
+@bind(
+    router,
+    "whatsapp_inbox.conversation.notices",
+    "/whatsapp_inbox/conversations/notices",
+)
+async def conversation_notices(request, params: Query[NoticesIn]):
+    return await run_operation(request, queries.notices, params)
 
 
 @bind(

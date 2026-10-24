@@ -1,8 +1,22 @@
 """The WhatsApp inbox declares its module metadata, its menu, its permissions and what each role gets."""
 
+from pathlib import Path
+
 from django.apps import apps
 from django.conf import settings
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import (
+    BellCounter,
+    Category,
+    DeviceNotice,
+    LiveAppConfig,
+    Nav,
+    module_configs,
+    permissions_for_role,
+)
+
+from apps.whatsapp_inbox import events
 
 
 def inbox():
@@ -130,7 +144,9 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
     from live.operations import registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("whatsapp_inbox.")}
-    assert len(ops) == 42  # FLOW-F31 added message.notify, the narrow send an automation may be granted
+    # FLOW-F31 added message.notify, the narrow send an automation may be granted; WHATSAPP_INBOX-F09 the bell's
+    # count and the device's notices.
+    assert len(ops) == 44
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and len(str(op.ai.get("description", ""))) > 20, name
         if op.kind == "command":
@@ -151,3 +167,90 @@ def test_the_worker_resumes_what_was_left_for_erplora():
             "catch_up": "collapse",
         }
     ]
+
+
+# ── The Home's hooks (PLAN-HUB round 2026-10-21) and the device's notices (round 2026-10-23) ──────────────────
+
+#: What changes whether a conversation waits for an answer (open, its last message the customer's, not erased): a
+#: message arrives (the customer's, or the echo of one sent from the business's phone), one is sent from the Hub, its
+#: status changes (open, pending, closed) or it is erased. Never a read, an assignment, a note nor a card joined.
+AWAITING = [
+    events.MESSAGE_RECEIVED,
+    events.MESSAGE_SENT,
+    events.STATUS_CHANGED,
+    events.ERASED,
+]
+
+
+def test_the_bell_counts_the_customers_waiting_for_an_answer():
+    """WHATSAPP_INBOX-F09: the old module's counter of the bell (its module.json ``bell``, whatsapp_inbox#244,
+    hub#1678), «WhatsApp customers waiting for an answer», on what the inbox calls waiting for an answer, leading
+    to the inbox; whoever may read the inbox sees it."""
+    [counter] = inbox().bell
+    assert isinstance(counter, BellCounter)
+    assert (
+        counter.key,
+        counter.operation,
+        dict(counter.params),
+        counter.route,
+        str(counter.label),
+        counter.icon,
+        counter.permission,
+    ) == (
+        "awaiting_reply",
+        "whatsapp_inbox.conversation.count_awaiting_reply",
+        {},
+        "/whatsapp_inbox/inbox",
+        "WhatsApp customers waiting for an answer",
+        "ion:chatbubbles-outline",
+        "whatsapp_inbox.view",
+    )
+    assert list(counter.refresh_on) == AWAITING
+
+
+def test_the_counter_says_the_old_words_in_spanish():
+    with translation.override("es"):
+        assert str(inbox().bell[0].label) == "Clientes de WhatsApp esperando respuesta"
+
+
+def test_the_counters_events_re_run_its_query_and_its_icon_is_registered():
+    counter = inbox().bell[0]
+    assert live_registry.is_subscribable(counter.operation)
+    assert set(counter.refresh_on) <= set(live_registry.subscribable[counter.operation])
+    assert set(counter.refresh_on) <= set(events.ALL)
+    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    assert f"'{counter.icon.removeprefix('ion:')}'" in icons
+
+
+def test_it_tells_the_device_of_each_customer_left_waiting():
+    """hub#2303 (whatsapp_inbox#244): the installed app tells the device, with a system notice, of each message of a
+    customer that is left waiting for an answer: «WhatsApp · {name}» with what the customer wrote; a tap opens that
+    conversation in the inbox. Refreshed by a message arriving and by a conversation opened again."""
+    [notice] = inbox().notices
+    assert isinstance(notice, DeviceNotice)
+    assert (notice.key, notice.operation, list(notice.when), dict(notice.params)) == (
+        "awaiting_reply",
+        "whatsapp_inbox.conversation.notices",
+        [],
+        {},
+    )
+    assert [str(text) for text in notice.title] == [
+        "WhatsApp · {name}",
+        "WhatsApp customer waiting for an answer",
+    ]
+    assert [str(text) for text in notice.body] == ["{preview}"]
+    assert notice.route == "/whatsapp_inbox/inbox?conversation={id}"
+    assert notice.permission == "whatsapp_inbox.view"
+    assert list(notice.refresh_on) == [events.MESSAGE_RECEIVED, events.STATUS_CHANGED]
+    assert live_registry.is_subscribable(notice.operation)
+    assert set(notice.refresh_on) <= set(live_registry.subscribable[notice.operation])
+
+
+def test_the_notice_falls_back_to_the_old_words_in_spanish():
+    with translation.override("es"):
+        assert str(inbox().notices[0].title[1]) == "Cliente de WhatsApp esperando respuesta"
+
+
+def test_the_inbox_has_no_setup_steps_nor_panels():
+    # The old module declared neither (its module.json has only `bell`).
+    assert (inbox().setup, inbox().widgets) == ([], [])

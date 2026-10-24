@@ -76,6 +76,9 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        # The Home's bell and the device's notices (WHATSAPP_INBOX-F09).
+        *(counter.label for counter in config.bell),
+        *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
         *module_texts(schemas),
         *module_texts(queries),
         *module_texts(services),
