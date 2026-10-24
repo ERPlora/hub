@@ -89,7 +89,12 @@ export function parseInline(source: string, links = true): Inline[] {
         const label = parseInline(source.slice(i + 1, close), false);
         const target = source.slice(close + 2, end).trim();
         if (isHubPath(target)) out.push({ kind: 'link', path: target, label });
-        else for (const piece of label) piece.kind === 'text' ? pushText(out, piece.text) : out.push(piece);
+        else {
+          for (const piece of label) {
+            if (piece.kind === 'text') pushText(out, piece.text);
+            else out.push(piece);
+          }
+        }
         i = end + 1;
         continue;
       }

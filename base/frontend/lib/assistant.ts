@@ -196,7 +196,9 @@ export function createAssistant(deps: AssistantDeps = {}) {
         else if (frame.type === 'usage') state.usage = { used: frame.used, limit: frame.limit, resets_at: frame.resets_at, demo: frame.demo };
         else if (frame.type === 'confirm') confirm = { card: frame.card, call: frame.call };
         else if (frame.type === 'error') {
-          const { type: _type, code, ...details } = frame;
+          const { code, ...rest } = frame;
+          const details: Record<string, unknown> = { ...rest };
+          delete details.type;
           failure = { code, details };
         } else if (frame.type === 'done') doneFrame = frame;
       };

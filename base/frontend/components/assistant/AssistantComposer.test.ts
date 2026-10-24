@@ -10,23 +10,17 @@ import AssistantComposer from './AssistantComposer.vue';
 
 let assistant: Assistant;
 let posted: TurnBody[];
-let hold: (() => void) | null;
 
 beforeEach(() => {
   posted = [];
-  hold = null;
   assistant = createAssistant({
     storage: memoryStorage(),
     openStorage: memoryStorage(),
     post: (body: TurnBody, options: TurnOptions) => {
       posted.push(body);
-      return new Promise<void>((resolve, reject) => {
-        hold = () => {
-          options.onFrame({ type: 'text', text: 'ok' });
-          options.onFrame({ type: 'done', append: [{ role: 'assistant', content: 'ok' }], pending: [], continuation: null });
-          resolve();
-        };
-        options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      // The answer never comes: only «Stop» ends the turn.
+      return new Promise<void>((_resolve, reject) => {
+        options.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
       });
     },
   });
