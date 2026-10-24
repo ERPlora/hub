@@ -8,8 +8,18 @@ from live.live_registry import live_registry
 from live.meta import module_configs
 
 from base import live as base_live
-from base.events import FAILED_EVENT_CREATED, FAILED_EVENT_DISCARDED, FAILED_EVENT_RETRIED, HUB_STATE_APPLIED
+from base.events import (
+    BLUEPRINT_IMPORTED,
+    FAILED_EVENT_CREATED,
+    FAILED_EVENT_DISCARDED,
+    FAILED_EVENT_RETRIED,
+    HUB_DATA_RESET,
+    HUB_STATE_APPLIED,
+    IMPORT_UNDONE,
+)
 
+#: What Settings › Data does to the business (APP-BASE-2): the Home reads itself again after each (BASE-G131).
+DATA = {BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET}
 FAILED_EVENTS = (FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED)
 
 
@@ -24,14 +34,16 @@ def test_the_registry_is_valid():
 def test_the_three_queries_and_their_events():
     on = {name: events for name, events in live_registry.subscribable.items() if name.startswith("base.")}
     assert on == {
-        "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED}),
-        "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED}),
+        "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED, *DATA}),
+        "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED, *DATA}),
         # The failed events the relay gives up on, resent or discarded change the bell's row (APP-BASE-7).
-        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *FAILED_EVENTS}),
+        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA, *FAILED_EVENTS}),
         "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED}),
         # Apps (APP-BASE-4): the photo gives or takes the right to a paid module.
         "base.app.list": [HUB_STATE_APPLIED],
         "base.plan.usage": [HUB_STATE_APPLIED],
+        "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
+        "base.import.list": sorted(DATA),
         # System (APP-BASE-7): the failed events, and the photo (it turns the app they were for on or off).
         "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
         # The status re-runs on the photo and on every reconnection (a deploy's new release shows by itself); the log
@@ -60,3 +72,12 @@ def test_a_booking_re_runs_the_devices_notices():
     assert "base.notice.list" in live_registry.affected(["appointment.appointment.cancelled"])
     assert "base.notice.list" in live_registry.affected([HUB_STATE_APPLIED])
     assert "base.notice.list" not in live_registry.affected(["demo.item.created"])
+
+
+def test_loading_undoing_or_resetting_re_runs_the_home_and_the_loads():
+    """BASE-G131: the Home reads its list, its panels and its bell again after a load, without reloading the page."""
+    for event in DATA:
+        assert {"base.setup.status", "base.widget.list", "base.bell.counters", "base.import.list"} <= (
+            live_registry.affected([event])
+        )
+    assert "base.notice.list" not in live_registry.affected([BLUEPRINT_IMPORTED])

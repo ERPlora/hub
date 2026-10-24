@@ -7,7 +7,8 @@ Estado de la app: en construcción (2026-10-22)
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
 > (el del hub viejo: saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
 > la actividad), con lo que acompaña a cualquier pantalla: la campana, «Actualizar plan» y la franja que
-> avisa cuando todavía no se puede facturar. Las plantillas y Ajustes › Datos llegan en la parte siguiente.
+> avisa cuando todavía no se puede facturar. También «Apps», «Plan y límites» de Sistema y las plantillas: la
+> tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer).
 
 ## Para qué sirve y para quién
 
@@ -19,6 +20,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
 - **Los paneles de las apps**: cifras, listas y gráficos que se mueven solos cuando algo cambia en el
   negocio, sin recargar.
 - **La actividad**: las últimas ventas.
+- **Empezar con una plantilla** de un negocio como el suyo y, en «Ajustes», guardar una copia de sus datos o
+  cargar la de otro negocio.
 
 Quién lo usa:
 
@@ -52,6 +55,9 @@ backoffice.
 Arriba, el nombre del negocio y «Hoy» con la fecha larga; mientras el negocio no tiene nombre, un saludo
 según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo, en este orden:
 
+- **«Empieza con un negocio como el tuyo»**, solo para quien administra el negocio y mientras el negocio no
+  tiene nada de lo que trae una plantilla: hasta cuatro plantillas con «Usar esta», «Ver todas las
+  plantillas» y «Ahora no».
 - **«Mis apps»**: una baldosa por app, con su icono y su nombre; las que más se abren en este navegador,
   primero. En el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
 - **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan,
@@ -101,6 +107,19 @@ navegador).
 Desde «Sistema» en el menú lateral, la pestaña «Plan y límites»: «Los límites de tu plan» con «Dentro del
 límite» o «Cerca del límite», las tarjetas «Personas» y «Dispositivos» y dónde se gestionan los planes.
 
+### Ajustes · Datos y copias
+Se abre con «Ajustes» en el menú lateral. Abajo, la pestaña «Datos y copias» (las demás pestañas de Ajustes
+del hub viejo llegan con sus flujos). Arriba, un selector con «Importar» (lo que se abre), «Exportar» y
+«Restablecer»; lo elegido queda en el enlace, así que se puede compartir y Atrás sale de Ajustes.
+
+- **Importar**: «Elige qué cargar», con «Subir desde archivo» y las plantillas en tarjetas o en lista, con
+  «Buscar plantillas»; cada una con su idioma, su país, su versión, lo que trae y «Usar plantilla». Después,
+  «Revisa lo que trae» y el «Informe de la importación».
+- **Exportar**: el nombre y el idioma del archivo, «¿Para qué es este archivo?», las apps con sus casillas
+  «App» y «Datos», y «Exportar».
+- **Restablecer**: «Deshacer una importación», con una fila por importación que se puede deshacer, y
+  «Restablecer el negocio», con lo que tiene cada sección.
+
 ### Sistema · Recursos
 Desde «Sistema» en el menú lateral. Cinco pestañas abajo: «Recursos», «Plan y límites», «Actualizaciones», «Eventos
 caídos» y «Registros» (esta, solo para quien administra el negocio); se abre «Recursos»: «Recursos en la nube» con la
@@ -124,6 +143,15 @@ evento…» y el filtro de nivel.
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; la campana, «Todo al día. Sin notificaciones.». |
 | Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en la campana, «No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión.». |
 | Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. |
+
+En la pantalla Ajustes · Datos y copias:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando plantillas…»; en «Exportar» y «Restablecer», las filas en gris. |
+| Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
+| Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
+| Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. |
 
 ## Flujos
 
@@ -157,15 +185,25 @@ evento…» y el filtro de nivel.
 | BASE-F26 | Entender por qué una app no se abre | hecho |
 | BASE-F27 | Ver una app de pago bloqueada | hecho |
 | BASE-F28 | Ver cuánto de los límites del plan se está usando | parcial |
-| BASE-F29 | Abrir Sistema y moverse por sus pestañas | hecho |
-| BASE-F30 | Ver cuánto está usando el hub | parcial |
-| BASE-F31 | Saber qué versión corre y qué se le ha actualizado | parcial |
-| BASE-F32 | Ver el registro de sucesos del sistema | hecho |
-| BASE-F33 | Ver los eventos caídos | hecho |
-| BASE-F34 | Reenviar un evento caído | hecho |
-| BASE-F35 | Reenviar todos los eventos caídos | hecho |
-| BASE-F36 | Descartar un evento caído | hecho |
-| BASE-F37 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
+| BASE-F29 | Elegir una plantilla del catálogo para importar | hecho |
+| BASE-F30 | Subir un fichero para importar | hecho |
+| BASE-F31 | Revisar y cargar lo que trae el fichero | hecho |
+| BASE-F32 | Leer el informe de la importación | hecho |
+| BASE-F33 | Volver al informe de una importación que no entró entera y reintentar | hecho |
+| BASE-F34 | Deshacer una importación | hecho |
+| BASE-F35 | Exportar una copia de seguridad o una plantilla | hecho |
+| BASE-F36 | Elegir qué apps, datos y tablas viajan en la exportación | hecho |
+| BASE-F37 | Restablecer el negocio por secciones | parcial |
+| BASE-F38 | Ver Inicio al día después de importar una plantilla | hecho |
+| BASE-F39 | Abrir Sistema y moverse por sus pestañas | hecho |
+| BASE-F40 | Ver cuánto está usando el hub | parcial |
+| BASE-F41 | Saber qué versión corre y qué se le ha actualizado | parcial |
+| BASE-F42 | Ver el registro de sucesos del sistema | hecho |
+| BASE-F43 | Ver los eventos caídos | hecho |
+| BASE-F44 | Reenviar un evento caído | hecho |
+| BASE-F45 | Reenviar todos los eventos caídos | hecho |
+| BASE-F46 | Descartar un evento caído | hecho |
+| BASE-F47 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -192,14 +230,16 @@ Implicados: INVENTORY-F28
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
 <!-- origen: old-hub:HUB_SHELL-F25 -->
-Estado: parcial — sin la fila de salud del hub (la impresora y WhatsApp con «Ver sistema») ni la propuesta de plantilla, que llega con las plantillas
+Estado: parcial — sin la fila de salud del hub (la impresora y WhatsApp con «Ver sistema»)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
   1. Tras entrar se abre el Inicio (también desde «Inicio» en el menú lateral).
   2. Arriba, el nombre del negocio (el de erplora.com) y «Hoy» con la fecha larga en el idioma de la
      aplicación; mientras el negocio no tiene nombre, «Buenos días», «Buenas tardes» o «Buenas noches».
-  3. Debajo, en este orden: «Mis apps», «Termina de configurar tu negocio» y el tablero de paneles.
+  3. Debajo, en este orden: «Empieza con un negocio como el tuyo» (solo mientras el negocio está vacío y
+     para quien lo administra, BASE-F38), «Mis apps», «Termina de configurar tu negocio» y el tablero de
+     paneles.
   4. Abajo, dos pestañas: «Resumen» (lo anterior) y «Actividad».
 Entra: el nombre del negocio y la fecha del dispositivo.
 Sale: nada guardado.
@@ -349,7 +389,7 @@ Pasos:
   1. Un aviso entre apps (por ejemplo, «venta cobrada» hacia Facturación) agotó sus reintentos.
   2. La campana de un administrador sube en el momento, sin esperar ni recargar, y al abrirla enseña
      «Eventos caídos» con cuántos hay.
-  3. Al tocar la fila se abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F33).
+  3. Al tocar la fila se abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
   4. Cuando no queda ninguno, la fila desaparece.
 Entra: cuántos avisos de este negocio quedaron sin entregar, solo para quien administra el negocio.
 Sale: nada.
@@ -666,7 +706,234 @@ Quien no administra el negocio ve «Solo quien administra el negocio ve el plan 
 cuanto erplora.com lo envíe.».
 Implicados: ninguno
 
-### BASE-F29 Abrir Sistema y moverse por sus pestañas
+### BASE-F29 Elegir una plantilla del catálogo para importar
+<!-- origen: old-hub:HUB_SHELL-F175 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Abre «Ajustes» en el menú lateral; en «Datos y copias», «Importar» es lo que se abre. Dice «Carga una
+     plantilla: llena tus apps con sus datos —una carta, servicios, mesas— listos para usar.» y, debajo,
+     «Elige qué cargar».
+  2. Mientras llegan, «Cargando plantillas…». Después, una tarjeta por plantilla (o una fila, con la vista de
+     lista): su nombre, su descripción, su «Idioma» y su «País» por su nombre, su «Versión» y lo que «Trae»
+     (cuántas categorías, productos, servicios, zonas o mesas). Primero las del país del negocio y, dentro,
+     las del idioma de la persona.
+  3. «Buscar plantillas» busca por el nombre, la descripción o las apps que trae.
+  4. Pulsa «Usar plantilla» en la que le sirva: el botón gira mientras se lee y se abre «Revisa lo que
+     trae» (BASE-F31).
+Entra: las plantillas del Hub, una por sector e idioma (hoy restaurante y peluquería, en español y en
+inglés).
+Sale: nada guardado hasta cargarla.
+Si falla: «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con
+«Reintentar»; sin plantillas, «Todavía no hay plantillas para tu negocio.»; una búsqueda sin resultado,
+«Ninguna plantilla coincide con tu búsqueda.»; si la plantilla no se puede leer, «No se pudo leer el
+fichero: {reason}» y se queda en la elección. Quien no administra el negocio lee «Solo un administrador
+puede ver e importar plantillas.».
+Implicados: INVENTORY-F12
+
+### BASE-F30 Subir un fichero para importar
+<!-- origen: old-hub:HUB_SHELL-F176 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. En «Importar», pulsa «Subir desde archivo» y elige un .blueprint.zip: una copia de seguridad de este
+     negocio o una plantilla que exportó otro.
+  2. Mientras se lee, el botón gira. Después se abre «Revisa lo que trae» (BASE-F31).
+  3. Tras un error se puede elegir el mismo fichero otra vez.
+Entra: el fichero, de 5 MB como mucho.
+Sale: nada guardado hasta cargarlo.
+Si falla: «No se pudo leer el fichero: {reason}» con el motivo (no es un .blueprint.zip, está dañado, lo
+hizo una versión más nueva de ERPlora o pasa de 5 MB) y se queda en la elección.
+Implicados: ninguno
+
+### BASE-F31 Revisar y cargar lo que trae el fichero
+<!-- origen: old-hub:HUB_SHELL-F177 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Tras elegir una plantilla o un fichero sale «Revisa lo que trae»: «Nombre», «Tipo» («Plantilla» o
+     «Copia de seguridad»), «Idioma» y «País» por su nombre, cuántas «Apps» y, si es un fichero, cuándo se
+     hizo («Creado»).
+  2. Debajo, una casilla por app con lo que trae (cada parte y sus filas). Vienen marcadas las que están encendidas
+     en el negocio; una app apagada dice «Esta app está apagada en tu negocio: no se cargará nada suyo.» y una
+     que este negocio no tiene, «Este negocio no tiene esta app: no se cargará nada suyo.». Los clientes de
+     una plantilla se quedan fuera: «Datos personales: solo se cargan desde una copia de seguridad.». Lo que
+     el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí».
+  3. Desmarca las apps que no quiera y pulsa «Importar» («Importando…»), o «Elegir otro» para volver.
+  4. Al terminar sale el informe (BASE-F32). Lo que ya había en el negocio se queda como estaba: no se
+     duplica ni se sobrescribe.
+Entra: la plantilla o el fichero y las apps marcadas.
+Sale: en cada app marcada, lo que trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus
+categorías, productos, servicios, zonas, mesas y, desde una copia de seguridad, clientes), y el informe
+guardado (`base.blueprint.imported`).
+Si falla: «La importación falló: {reason}» y se queda en la revisión; sin ninguna app marcada, «Elige al
+menos una app.» y no se puede importar; si ninguna de sus apps está encendida, «Nada de este fichero puede
+cargarse en tu negocio: ninguna de sus apps está encendida.».
+Implicados: INVENTORY-F12
+
+### BASE-F32 Leer el informe de la importación
+<!-- origen: old-hub:HUB_SHELL-F178 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Al terminar, «Informe de la importación» con cómo fue: «Todo ha entrado.», «No todo entró.» o «No ha
+     entrado nada.».
+  2. Una fila por app con su etiqueta: «Aplicado», «Ya lo tenías», «Aplicado en parte», «Falló», «Nada que
+     copiar», «Descartado», «App apagada», «No está en este negocio» o «No elegida». Debajo, por cada parte,
+     «{created} creadas · {already} ya estaban · {failed} fallaron» y, de lo que falló, su nombre y el
+     motivo.
+  3. Lo dejado fuera a propósito sale en «Se ha dejado fuera a propósito».
+  4. «Ver las plantillas» vuelve al catálogo; «Ir al inicio» lleva al Inicio.
+Entra: el informe de la importación.
+Sale: nada; el informe queda guardado en el negocio.
+Si falla: una etiqueta que la pantalla no conoce sale como «Falló» con su texto tal cual, nunca como un
+éxito.
+Implicados: ninguno
+
+### BASE-F33 Volver al informe de una importación que no entró entera y reintentar
+<!-- origen: old-hub:HUB_SHELL-F179 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
+Pasos:
+  1. Al abrir «Importar», si la última importación no entró entera y no se deshizo, sale primero su informe,
+     con «Este es el informe de tu última importación de {name} ({date}). No todo entró.».
+  2. Si vino de una plantilla, pulsa «Reintentar lo que falta» («Reintentando…»): se vuelve a cargar la misma
+     versión de la plantilla y solo entra lo que faltaba; lo que ya entró no se toca ni se duplica. Sale el
+     informe nuevo.
+  3. Si vino de un fichero subido a mano, el botón sale apagado con «Esta importación vino de un archivo
+     subido a mano, así que no se puede reintentar sola. Vuelve a subir el archivo y elige solo lo que
+     falló.»; si esa versión de la plantilla ya no está, con «La versión de la plantilla que usó esta
+     importación ya no está en el catálogo, así que no se ha reintentado: otra versión podría cargar datos
+     distintos.».
+  4. «Ver las plantillas» deja ese informe y abre el catálogo.
+Entra: la última importación y su informe.
+Sale: lo que faltaba, si ahora entra, y el informe nuevo (`base.blueprint.imported`).
+Si falla: «El reintento falló: {reason}» y el informe sigue a la vista.
+Implicados: ninguno
+
+### BASE-F34 Deshacer una importación
+<!-- origen: old-hub:HUB_SHELL-F180 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Restablecer
+Pasos:
+  1. En «Restablecer», «Deshacer una importación» («Quita solo lo que trajo esa importación. Lo que hayas
+     creado después se conserva.»): una fila por importación que trajo algo y no se deshizo, con su nombre,
+     cuándo, quién y cuántas filas trajo, y «Deshacer».
+  2. Pulsa «Deshacer»: «Deshacer «{name}»», con «Se borrarán las {n} filas que trajo esta importación. Lo que
+     creaste después se conserva.». No pide escribir nada: se puede volver a importar.
+  3. Confirma con «Deshacer» (o «Cancelar»).
+  4. Sale «Importación deshecha:» con una línea por app («{app} — {n} filas borradas»); lo que no se pudo
+     borrar (algo que otra app todavía usa) sale aparte con su motivo. Lo que tiene cada sección se pone al
+     día.
+Entra: la importación elegida.
+Sale: borradas exactamente las filas que trajo; lo creado después se queda (`base.import.undone`).
+Si falla: el motivo sale en la propia ventana, que no se cierra (en el hub viejo no se decía nada); una
+importación ya deshecha, «Esta importación ya se deshizo.».
+Implicados: ninguno
+
+### BASE-F35 Exportar una copia de seguridad o una plantilla
+<!-- origen: old-hub:HUB_SHELL-F173 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Exportar
+Pasos:
+  1. Abre «Exportar»: «Empaqueta las apps de este negocio —y, si quieres, sus datos— en un archivo que
+     puedes cargar en otro negocio o guardar como copia.».
+  2. Escribe el «Nombre» (viene el del negocio; sin él, el de su dirección) y elige el «Idioma»; debajo, el
+     nombre final del archivo («Archivo: {file}»).
+  3. Responde «¿Para qué es este archivo?»: «Copia de seguridad de este negocio» (la que viene marcada; lleva
+     también los clientes) o «Plantilla para compartir» (nunca lleva clientes).
+  4. Elige las apps y sus datos (BASE-F36) y pulsa «Exportar» («Exportando…»).
+  5. El archivo baja con el navegador y sale «{file} descargado.».
+Entra: el nombre, el idioma, para qué es y lo marcado.
+Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas; nunca personas, PIN
+ni datos fiscales. En el negocio no se guarda nada.
+Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre para el archivo.» y no se puede
+exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.».
+Implicados: ninguno
+
+### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
+<!-- origen: old-hub:HUB_SHELL-F174 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Exportar
+Pasos:
+  1. En «Exportar», bajo «Apps» («Elige qué apps registra el archivo y si sus datos viajan con él.»), una fila
+     por app encendida con dos casillas, «App» y «Datos». Vienen todas con la app marcada y sin datos; una app
+     sin nada propio dice «Nada propio que copiar».
+  2. Desmarcar la app desmarca sus datos. «Seleccionar todo» marca todas las apps y sus datos;
+     «Deseleccionar todo» las desmarca todas.
+  3. Al marcar «Datos» de una app sale debajo «Datos de {app}», con una casilla por cada parte y sus filas;
+     desmarcar una la deja fuera. En una plantilla los clientes no se pueden marcar:
+     «Solo en una copia de seguridad».
+  4. Mientras no se desmarque ninguna parte de una app, viaja todo lo suyo, también lo que esa app traiga
+     más adelante.
+Entra: las apps encendidas y cuántas filas tiene cada parte.
+Sale: nada guardado; lo marcado viaja al exportar.
+Si falla: «No se han podido cargar las apps de este negocio.» con «Reintentar»; sin ninguna app marcada no
+se puede exportar.
+Implicados: ninguno
+
+### BASE-F37 Restablecer el negocio por secciones
+<!-- origen: old-hub:HUB_SHELL-F181 -->
+Estado: parcial — mientras el negocio comparte su base de datos con otros negocios no se puede vaciar: la pantalla lo explica y no ofrece el botón; se podrá cuando cada negocio tenga la suya
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Restablecer
+Pasos:
+  1. En «Restablecer», «Restablecer el negocio»: «Borra definitivamente los datos que marques. No se puede
+     deshacer: si dudas, exporta antes una copia.», con «Exportar una copia antes», que abre «Exportar».
+  2. Dice qué no se borra nunca: «Solo se borra lo que cada sección enumera aquí. Las ventas, las facturas,
+     los registros fiscales, las personas y sus accesos, los archivos y los ajustes del negocio se quedan
+     siempre.».
+  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total.
+  4. Con su propia base de datos, marca las secciones y pulsa «Restablecer el negocio»: «Esto no se puede
+     deshacer», con «Se borrarán definitivamente {n} filas:» y el desglose. Escribe el nombre del negocio
+     («Escribe «{name}» para confirmar») y pulsa «Borrar definitivamente» (o «Cancelar»).
+  5. Sale «Negocio restablecido:» con una línea por sección («{app} — {n} filas borradas») y la lista se
+     recalcula.
+  6. Hoy, con la base de datos compartida, sale «Restablecer el negocio todavía no está disponible. Deshaz una
+     importación o quita lo que quieras desde cada app.», sin casillas ni botón.
+Entra: lo que tiene cada sección y lo marcado.
+Sale: borrado definitivo de lo marcado (`base.hub.data_reset`).
+Si falla: el motivo sale en la ventana, que no se cierra: un nombre que no es el del negocio, «El nombre no
+coincide.». Quien no administra el negocio lee «Solo un administrador puede deshacer importaciones o
+restablecer el negocio.».
+Implicados: ninguno
+
+### BASE-F38 Ver Inicio al día después de importar una plantilla
+<!-- origen: old-hub:HUB_SHELL-F39 old-hub:HUB_SHELL-F26 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Inicio · Resumen
+Pasos:
+  1. Mientras el negocio no tiene nada de lo que trae una plantilla, quien lo administra ve arriba «Empieza
+     con un negocio como el tuyo» («Elige el que más se parezca al tuyo y te dejamos tus apps listas con su
+     catálogo de una vez. Después tendrás que poner tus propios datos.»): hasta cuatro plantillas, una por
+     tipo de negocio y en su idioma si la hay (primero las de su país), con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
+     copias» y «Ahora no» cierra la tarjeta en este dispositivo.
+  2. Pulsa «Usar esta»: «Preparando «{name}»…» mientras se carga, sin pantallas intermedias.
+  3. En la misma tarjeta, «Ya tienes tus apps y tu catálogo» («Lo que queda es lo que solo puedes contestar
+     tú: los datos de tu negocio. Los tienes en la lista de abajo.») con «Continuar», que la cierra.
+  4. Sin recargar, el Inicio se pone al día: «Termina de configurar tu negocio» cuenta como hechos los pasos
+     que resolvió la plantilla y los paneles se refrescan. Igual tras cargar una plantilla o un fichero desde
+     «Datos y copias».
+Entra: las plantillas y si el negocio todavía está vacío.
+Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`).
+Si falla: si no entró todo, «No todo ha entrado» con «Estas no han entrado: {apps}.» (o «Hay algo más que
+no ha entrado.») y «Ver el informe»; si no se pudo abrir, «No se ha podido abrir esa plantilla» con «No ha
+cambiado nada en tu negocio: {reason}» e «Intentar otra vez»; si se cortó a medias, «La configuración no ha
+terminado» con «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a
+intentarlo.» y «Ver el informe», sin reintento. Si las plantillas no se pueden leer, «No se han podido
+cargar las plantillas para empezar.» con «Reintentar» y «Ahora no».
+Implicados: BASE-F01, INVENTORY-F12
+
+### BASE-F39 Abrir Sistema y moverse por sus pestañas
 <!-- origen: old-hub:HUB_SHELL-F135 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -675,17 +942,16 @@ Pasos:
   1. Pulsa «Sistema» en el menú lateral, o llega desde la fila «Eventos caídos» de la campana.
   2. Abajo hay cinco pestañas, en este orden: «Recursos», «Plan y límites», «Actualizaciones», «Eventos caídos» y
      «Registros». Se abre «Recursos». La pestaña elegida queda en la dirección: un enlace o recargar abre la misma.
-  3. Una pestaña que no existe abre «Recursos»; la antigua de las copias lleva a «Ajustes», a la pestaña de los
-     datos del negocio.
+  3. Una pestaña que no existe abre «Recursos»; la antigua de las copias lleva a «Ajustes» › «Datos y copias».
   4. Quien no es propietario ni administrador ve cuatro: «Registros» no existe para él y, si la pide, se abre
      «Recursos». En «Recursos» lee «Solo el dueño o un administrador puede ver cuánto está usando el hub.» y en
      «Eventos caídos», «Solo el dueño o un administrador puede ver los eventos caídos.», sin «Reintentar».
 Entra: el papel de la persona en el negocio; a quien no lo administra no se le pide nada que el hub le negaría.
 Sale: nada guardado.
-Si falla: cada pestaña dice lo suyo (BASE-F30 a BASE-F33).
+Si falla: cada pestaña dice lo suyo (BASE-F40 a BASE-F43).
 Implicados: ninguno
 
-### BASE-F30 Ver cuánto está usando el hub
+### BASE-F40 Ver cuánto está usando el hub
 <!-- origen: old-hub:HUB_SHELL-F136 -->
 Estado: parcial — sin CPU, memoria ni conexiones del negocio: un solo servicio atiende a todos los negocios y ninguna cifra es solo suya; el tamaño y el uso de su base de datos llegan cuando cada negocio tenga la suya
 Actor: propietario, administrador
@@ -703,7 +969,7 @@ Si falla: «No se pudo consultar el sistema» — «Las métricas y los registro
 volver a intentarlo.» con «Reintentar».
 Implicados: ninguno
 
-### BASE-F31 Saber qué versión corre y qué se le ha actualizado
+### BASE-F41 Saber qué versión corre y qué se le ha actualizado
 <!-- origen: old-hub:HUB_SHELL-F142 -->
 Estado: parcial — la versión y su fecha sí; sin la lista de lo cambiado en cada app: todas las apps se publican juntas, en un solo despliegue y sin notas de versión
 Actor: propietario, administrador
@@ -722,14 +988,14 @@ Si falla: «No se pudo consultar el sistema» — «Las métricas y los registro
 volver a intentarlo.» con «Reintentar».
 Implicados: ninguno
 
-### BASE-F32 Ver el registro de sucesos del sistema
+### BASE-F42 Ver el registro de sucesos del sistema
 <!-- origen: old-hub:HUB_SHELL-F144 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Registros
 Pasos:
   1. Abre la pestaña «Registros»: el título es «Registro de eventos». Para quien no administra el negocio la
-     pestaña no existe (BASE-F29).
+     pestaña no existe (BASE-F39).
   2. Ve los 50 últimos sucesos entre las apps del negocio, el más reciente primero, con «Hora», «Nivel»
      («Información», «Aviso» o «Error», en una pastilla) y «Evento»: su nombre, la app que lo anotó y qué ha pasado
      con él en su idioma (entregado, esperando, en «Eventos caídos»…). Nunca lo que llevaba dentro.
@@ -743,7 +1009,7 @@ Si falla: «No se pudo cargar el registro. Comprueba la conexión y reintenta.»
 eventos: todavía no ha pasado nada entre las apps de este negocio.».
 Implicados: ninguno
 
-### BASE-F33 Ver los eventos caídos
+### BASE-F43 Ver los eventos caídos
 <!-- origen: old-hub:HUB_SHELL-F145 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -767,7 +1033,7 @@ reintenta.» con «Reintentar» a la vista: un fallo nunca sale como «Todo en o
 lee «Solo el dueño o un administrador puede ver los eventos caídos.».
 Implicados: ninguno
 
-### BASE-F34 Reenviar un evento caído
+### BASE-F44 Reenviar un evento caído
 <!-- origen: old-hub:HUB_SHELL-F146 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -785,7 +1051,7 @@ reenvió o lo descartó antes), «la app a la que iba ya no está activa en este
 reenviarlo.» o «solo el dueño o un administrador puede hacerlo.».
 Implicados: ninguno
 
-### BASE-F35 Reenviar todos los eventos caídos
+### BASE-F45 Reenviar todos los eventos caídos
 <!-- origen: old-hub:HUB_SHELL-F147 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -801,10 +1067,10 @@ Pasos:
      app parada se quedan.
 Entra: los avisos caídos de este negocio.
 Sale: los avisos, pendientes de nuevo; `base.failed_event.retried`, con cuántos.
-Si falla: «No se pudo reenviar:» y el motivo, como en BASE-F34.
+Si falla: «No se pudo reenviar:» y el motivo, como en BASE-F44.
 Implicados: ninguno
 
-### BASE-F36 Descartar un evento caído
+### BASE-F46 Descartar un evento caído
 <!-- origen: old-hub:HUB_SHELL-F148 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -820,10 +1086,10 @@ Pasos:
 Entra: el aviso elegido y, si quiere, por qué.
 Sale: el aviso cerrado para siempre, con quién, cuándo y por qué; no se borra ni se vuelve a intentar.
 `base.failed_event.discarded`.
-Si falla: «No se pudo descartar:» y el motivo, como en BASE-F34.
+Si falla: «No se pudo descartar:» y el motivo, como en BASE-F44.
 Implicados: ninguno
 
-### BASE-F37 Informar de un error de la pantalla sin que nadie lo pida
+### BASE-F47 Informar de un error de la pantalla sin que nadie lo pida
 <!-- origen: old-hub:HUB_SHELL-F149 -->
 Estado: hecho
 Actor: sistema
@@ -914,6 +1180,28 @@ Implicados: ninguno
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
   `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
+- Plantillas y Ajustes › Datos (BASE-F29–F38, APP-BASE-2): `base/blueprint.py` (sin ORM) tiene el formato
+  `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
+  `data/<app>.<parte>.json`; 5 MB, 50 MB al descomprimir y 200 entradas como mucho; `BlueprintInvalid.reason`),
+  el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.template_apps(vertical)`) y las siete
+  partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
+  `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones
+  de su app (nunca su ORM; las filas se enlazan por nombre, gh:hub#2626). Lo que ya existe se salta.
+- Operaciones (permiso `base.administer_hub`, ruta en `base/api.py` bajo `/api/settings/data/`): consultas
+  `base.blueprint.list` (con `empty`, viva), `base.blueprint.export` (GET, el fichero en base64),
+  `base.import.list` (con `unfinished`, viva) y `base.dataset.list`; órdenes `base.blueprint.inspect` (no escribe;
+  orden porque su entrada es un fichero), `base.blueprint.import` (plantilla, fichero o `retry_of`),
+  `base.import.undo` y `base.hub.reset` (`dry_run` = el plan). Eventos `base.blueprint.imported`,
+  `base.import.undone` y `base.hub.data_reset`, tras los que se re-ejecutan las consultas vivas del Inicio.
+- `base.ImportBatch` (modelo de hub, migración `0009`) guarda cada importación: informe, filas creadas por parte
+  (lo que deshace), origen y versión de la plantilla (lo que reintenta).
+- Fase 1: los negocios comparten base de datos, así que `base.hub.reset` sin `dry_run` responde 409
+  `base.reset_shared_database` (`available: false` en el plan) y «vacío» mira las filas de todos.
+- Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
+  del viejo llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
+  no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
+  `test_services_data.py`, `test_queries_data.py`; Vitest en `base/frontend/**`; e2e `tests/e2e/base-data.spec.ts`
+  (vacía lo que trae una plantilla por las operaciones de cada app antes de empezar).
 
 - **Apps (APP-BASE-4: BASE-F14…F28).** `base/entitlement.py` aplica el derecho de uso (PLAN §20.4–§20.5): un
   módulo con `premium = False` siempre lo tiene; uno con `premium = True` necesita su id en `modules[]` de la última
@@ -941,22 +1229,24 @@ Implicados: ninguno
 - Fase 1: no hay activación por negocio (`AppActivation`, `base.app.*`, 202 «Activando…», 409 `base.app_required`,
   el veto de VeriFactu): BASE-F18, F19 (su aviso), F21–F25 quedan `parcial` hasta la fase 2 (FIX-BASE-APP-TURN-OFF-VETO).
 
-- **Sistema (APP-BASE-7: BASE-F29…F37).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
-  `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`); a quien no
+- **Sistema (APP-BASE-7: BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
+  `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña
+  «Datos y copias» de APP-BASE-2); a quien no
   administra no se le monta ningún componente que pida lo que el Hub le negaría (gh:hub#2519).
-- Consultas (`base/queries.py`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system`: motor,
+- Consultas (`base/queries.py`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system/status`: motor,
   `shared`/`own` según `Hub.db_name`, `version` y `released_at` de `base/system.py`, que lee `APP_VERSION` y
   `APP_RELEASED_AT` del entorno del despliegue; sin ellos, `dev` y `null`), `base.event.list` (`GET /api/system/events`:
   las 50 últimas `live.OutboxEvent` del host con su `EventDelivery` resumida y traducida; nunca el `payload`) y
   `base.failed_event.list` (`GET /api/system/failed-events`: las `EventDelivery` `dead` del host, hasta 100, con
   `retryable` = su app está en `relay.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto (test de
   dos hubs en `base/tests/test_queries_system.py`).
-- Comandos (`base/services.py`, `base.administer_hub`, `ai=` con `risk`): `base.failed_event.retry` (`POST
-  /api/system/failed-events/{id}/retry`: `pending`, `attempts` 0, solo a su `app_label`; 409 `base.app_inactive` si la
-  app no está activa), `base.failed_event.retry_all` (`POST /api/system/failed-events/retry-all`: `SKIP LOCKED`, todas
-  las reenviables del host) y `base.failed_event.discard` (`POST /api/system/failed-events/{id}/discard`: estado
-  `discarded` con `closed_at`, `closed_by` y `close_reason`, migración `0009_event_delivery_discard`; la fila no se
-  borra). Una que ya no está `dead` o es de otro host: 404 `not_found`. Cada uno anota su evento en el outbox.
+- Comandos (`base/services.py`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
+  `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
+  409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
+  /api/system/failed-events/retry_all`: `SKIP LOCKED`, todas las reenviables del host) y `base.failed_event.discard`
+  (`POST /api/system/failed-events/discard`: estado `discarded` con `closed_at`, `closed_by` y `close_reason`, migración
+  `0010_event_delivery_discard`; la fila no se borra). Una que ya no está `dead` o es de otro host: 404 `not_found`.
+  Cada uno anota su evento en el outbox.
 - El relay (`base/relay.py`, `_deliver_one` en `services.py`) avisa `base.failed_event.created` al host tras el COMMIT
   cuando se rinde (último intento o más allá de la profundidad máxima); no va al outbox (un oyente de todo evento que
   fallara en él se alimentaría solo). `base/live.py` re-ejecuta `base.failed_event.list`, `base.event.list` y
@@ -978,6 +1268,8 @@ Implicados: ninguno
 - No inventa cifras: un panel o un paso que no se puede comprobar no sale o dice «No disponible».
 - No guarda el tablero en el servidor: es de cada dispositivo, como en el hub viejo.
 - No enseña nunca a un cliente los ejemplos de la app Demo.
+- Importar no trae personas, PIN, datos fiscales ni los ajustes del negocio; exportar no los lleva nunca, ni
+  archivos ni imágenes.
 - No tiene formulario de soporte propio: «Reportar un problema» abre el de erplora.com, que manda el aviso
   con la cuenta y el negocio; el hub no guarda nada.
 - No vende ni enseña importes: el precio y la compra de una app de pago son de la Tienda de erplora.com, y en la

@@ -15,6 +15,10 @@ def test_every_event_is_named_as_the_convention_says():
         "base.demo.code_created",
         "base.demo.expired",
         "base.demo.purged",
+        # Settings › Data (APP-BASE-2): a load, an undo, a reset.
+        "base.blueprint.imported",
+        "base.import.undone",
+        "base.hub.data_reset",
         # System (APP-BASE-7): the events the relay gives up on, resent or discarded.
         "base.failed_event.created",
         "base.failed_event.retried",

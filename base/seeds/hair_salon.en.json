@@ -1,0 +1,36 @@
+{
+  "name": "Hair salon",
+  "description": "A sample list of services —cuts, colour, treatments and styling— with their duration, price and VAT, and the products the salon sells. Swap the services and prices for yours.",
+  "language": "en",
+  "country": "ES",
+  "vertical": "hair_salon",
+  "version": "1",
+  "data": {
+    "service.category": [
+      {"name": "Cuts", "description": "", "parent": "", "icon": "ion:cut-outline", "color": "#1e88e5", "sort_order": 1},
+      {"name": "Colour", "description": "", "parent": "", "icon": "ion:color-palette-outline", "color": "#d81b60", "sort_order": 2},
+      {"name": "Treatments", "description": "", "parent": "", "icon": "ion:water-outline", "color": "#00897b", "sort_order": 3},
+      {"name": "Styling", "description": "", "parent": "", "icon": "ion:sparkles-outline", "color": "#8e24aa", "sort_order": 4}
+    ],
+    "service.service": [
+      {"name": "Women's cut", "category": "Cuts", "tax_category_key": "service.generic", "pricing_type": "fixed", "price": 2500, "min_price": null, "max_price": null, "cost": 0, "duration_minutes": 45, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "Wash, cut and blow-dry.", "short_description": "", "is_bookable": true, "requires_confirmation": false, "allow_online_booking": true, "sort_order": 1, "is_featured": true, "sku": "", "barcode": "", "notes": ""},
+      {"name": "Men's cut", "category": "Cuts", "tax_category_key": "service.generic", "pricing_type": "fixed", "price": 1500, "min_price": null, "max_price": null, "cost": 0, "duration_minutes": 30, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "", "short_description": "", "is_bookable": true, "requires_confirmation": false, "allow_online_booking": true, "sort_order": 2, "is_featured": true, "sku": "", "barcode": "", "notes": ""},
+      {"name": "Children's cut", "category": "Cuts", "tax_category_key": "service.generic", "pricing_type": "fixed", "price": 1200, "min_price": null, "max_price": null, "cost": 0, "duration_minutes": 20, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "Up to 12 years old.", "short_description": "", "is_bookable": true, "requires_confirmation": false, "allow_online_booking": true, "sort_order": 3, "is_featured": false, "sku": "", "barcode": "", "notes": ""},
+      {"name": "Root colour", "category": "Colour", "tax_category_key": "service.generic", "pricing_type": "fixed", "price": 3500, "min_price": null, "max_price": null, "cost": 0, "duration_minutes": 60, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "", "short_description": "", "is_bookable": true, "requires_confirmation": false, "allow_online_booking": true, "sort_order": 1, "is_featured": false, "sku": "", "barcode": "", "notes": ""},
+      {"name": "Highlights", "category": "Colour", "tax_category_key": "service.generic", "pricing_type": "from", "price": 6000, "min_price": 6000, "max_price": 12000, "cost": 0, "duration_minutes": 120, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "The price depends on the length of the hair.", "short_description": "", "is_bookable": true, "requires_confirmation": true, "allow_online_booking": true, "sort_order": 2, "is_featured": false, "sku": "", "barcode": "", "notes": ""},
+      {"name": "Moisturising treatment", "category": "Treatments", "tax_category_key": "service.generic", "pricing_type": "fixed", "price": 2500, "min_price": null, "max_price": null, "cost": 0, "duration_minutes": 30, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "", "short_description": "", "is_bookable": true, "requires_confirmation": false, "allow_online_booking": true, "sort_order": 1, "is_featured": false, "sku": "", "barcode": "", "notes": ""},
+      {"name": "Blow-dry", "category": "Styling", "tax_category_key": "service.generic", "pricing_type": "fixed", "price": 2000, "min_price": null, "max_price": null, "cost": 0, "duration_minutes": 30, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "Wash and blow-dry.", "short_description": "", "is_bookable": true, "requires_confirmation": false, "allow_online_booking": true, "sort_order": 1, "is_featured": false, "sku": "", "barcode": "", "notes": ""},
+      {"name": "Updo", "category": "Styling", "tax_category_key": "service.generic", "pricing_type": "fixed", "price": 4000, "min_price": null, "max_price": null, "cost": 0, "duration_minutes": 60, "buffer_before": 0, "buffer_after": 0, "max_capacity": 1, "description": "", "short_description": "", "is_bookable": true, "requires_confirmation": false, "allow_online_booking": true, "sort_order": 2, "is_featured": false, "sku": "", "barcode": "", "notes": ""}
+    ],
+    "inventory.category": [
+      {"name": "Retail products", "tax_category_key": "product.generic", "description": "", "icon": "ion:bag-handle-outline", "color": "#3880ff", "order": 1}
+    ],
+    "inventory.product": [
+      {"name": "Repair shampoo", "sku": "RET-01", "price": 1490, "cost": 700, "stock": "10", "low_stock_threshold": "3", "unit": "ud", "ean13": "", "description": "250 ml.", "tax_category_key": "product.generic", "categories": ["Retail products"], "track_stock": null, "is_active": true},
+      {"name": "Conditioner", "sku": "RET-02", "price": 1390, "cost": 650, "stock": "10", "low_stock_threshold": "3", "unit": "ud", "ean13": "", "description": "250 ml.", "tax_category_key": "product.generic", "categories": ["Retail products"], "track_stock": null, "is_active": true},
+      {"name": "Hair mask", "sku": "RET-03", "price": 1850, "cost": 900, "stock": "6", "low_stock_threshold": "2", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "product.generic", "categories": ["Retail products"], "track_stock": null, "is_active": true},
+      {"name": "Strong-hold hairspray", "sku": "RET-04", "price": 990, "cost": 450, "stock": "8", "low_stock_threshold": "2", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "product.generic", "categories": ["Retail products"], "track_stock": null, "is_active": true},
+      {"name": "Styling wax", "sku": "RET-05", "price": 1150, "cost": 500, "stock": "8", "low_stock_threshold": "2", "unit": "ud", "ean13": "", "description": "", "tax_category_key": "product.generic", "categories": ["Retail products"], "track_stock": null, "is_active": true}
+    ]
+  }
+}
