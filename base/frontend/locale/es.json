@@ -683,6 +683,115 @@
       "loading": "Cargando los dispositivos…",
       "loadError": "No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo."
     },
+    "files": {
+      "title": "Archivos",
+      "folders": "Carpetas",
+      "root": "Archivos",
+      "search": "Buscar archivos…",
+      "view": {
+        "label": "Vista",
+        "grid": "Cuadrícula",
+        "list": "Lista"
+      },
+      "upload": "Subir archivo",
+      "newFolder": "Nueva carpeta",
+      "space": {
+        "label": "Espacio",
+        "unlimited": "{used} usados · Sin límite",
+        "of": "{used} de {limit}"
+      },
+      "loading": "Cargando archivos…",
+      "empty": "Sin archivos",
+      "emptyHint": "Sube un archivo o arrástralo aquí.",
+      "noMatch": "Ningún archivo de esta carpeta coincide con «{search}».",
+      "error": {
+        "heading": "No se pudieron cargar los archivos"
+      },
+      "retry": "Reintentar",
+      "folder": "Carpeta",
+      "actions": {
+        "label": "Acciones de «{name}»",
+        "open": "Abrir",
+        "download": "Descargar",
+        "rename": "Renombrar",
+        "renameFolder": "Renombrar carpeta",
+        "move": "Mover a…",
+        "delete": "Eliminar",
+        "deleteFolder": "Eliminar carpeta"
+      },
+      "drop": "Suelta los archivos para subirlos aquí",
+      "uploading": "Subiendo {done} de {total}…",
+      "uploaded": "Archivos subidos.",
+      "uploadedAs": "Se ha subido como «{name}»: ya había uno con ese nombre.",
+      "uploadFailed": "No se pudo subir «{name}»: {reason}",
+      "newFolderDialog": {
+        "title": "Nueva carpeta",
+        "name": "Nombre de la carpeta",
+        "create": "Crear carpeta",
+        "done": "Carpeta creada."
+      },
+      "renameDialog": {
+        "title": "Renombrar",
+        "titleFolder": "Renombrar carpeta",
+        "name": "Nombre nuevo",
+        "save": "Renombrar",
+        "done": "Renombrado."
+      },
+      "moveDialog": {
+        "title": "Mover «{name}»",
+        "to": "Carpeta",
+        "save": "Mover",
+        "done": "Movido a «{folder}».",
+        "failed": "No se pudo mover: {reason}"
+      },
+      "deleteDialog": {
+        "fileTitle": "Eliminar archivo",
+        "folderTitle": "Eliminar carpeta",
+        "fileMessage": "Vas a eliminar «{name}». Esta acción no se puede deshacer.",
+        "folderMessage": "Vas a eliminar «{name}» y todo su contenido. Esto no se puede deshacer.",
+        "confirm": "Eliminar",
+        "cancel": "Cancelar",
+        "fileDone": "Archivo eliminado.",
+        "folderDone": "Carpeta eliminada.",
+        "failed": "No se pudo eliminar: {reason}"
+      },
+      "downloadFailed": "No se pudo descargar «{name}»: {reason}",
+      "preview": {
+        "close": "Cerrar",
+        "download": "Descargar",
+        "zoomIn": "Ampliar",
+        "zoomOut": "Reducir",
+        "loading": "Abriendo el archivo…",
+        "none": {
+          "heading": "Sin vista previa",
+          "body": "Este tipo de archivo no se puede mostrar aquí. Descárgalo para abrirlo con una aplicación de tu dispositivo."
+        },
+        "error": {
+          "heading": "No se pudo abrir el archivo",
+          "body": "No llegó el contenido del archivo. Revisa la conexión e inténtalo de nuevo."
+        },
+        "pdfPages": "Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.",
+        "textCut": "Mostrando el principio del archivo. Descárgalo para leerlo entero.",
+        "tableCut": "Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas."
+      },
+      "refusal": {
+        "invalidName": "Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.",
+        "folderMissing": "Esa carpeta ya no existe. Actualiza la lista.",
+        "missing": "Ese archivo o carpeta ya no existe. Actualiza la lista.",
+        "exists": "Ya hay un archivo o una carpeta con ese nombre aquí.",
+        "alreadyThere": "Ya está en esa carpeta.",
+        "intoItself": "Una carpeta no se puede mover dentro de sí misma.",
+        "typeRefused": "Los programas (.{extension}) no se pueden guardar en Archivos: podrían dañar a quien los abra.",
+        "tooLarge": "Ese archivo pesa más de 25 MB, lo máximo que admite Archivos.",
+        "noSpace": "No queda espacio para ese archivo: tu plan incluye {space}.",
+        "notWhole": "El archivo no llegó entero. Vuelve a subirlo.",
+        "storeUnavailable": "El almacén de archivos no ha respondido. Inténtalo de nuevo en un momento.",
+        "onlyAdmin": "Solo un administrador puede modificar los archivos.",
+        "sessionExpired": "Tu sesión ha caducado. Vuelve a entrar e inténtalo otra vez.",
+        "connection": "Comprueba la conexión y vuelve a intentarlo.",
+        "generic": "Algo ha fallado. Inténtalo de nuevo."
+      }
+    },
     "assistant": {
       "title": "Asistente",
       "open": "Asistente",

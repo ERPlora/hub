@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c2680fd777b9b43b5fc40c12714a0a817b63ac69fb5246eac15c4aca86dcc0da -->
+<!-- generated from WORKBOOK.md sha256:aefdbfa76085607665ce97cfc85935a732534fa5a3a8603ca90fae44427f06d5 -->
 
 ## What it is for and who it is for
 
@@ -15,6 +15,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
   another business's.
 - **The business's details**, in "Settings": its name, its country, its time zone, its currency and its
   language, as erplora.com has them, and where to go to change them.
+- **The business's files**, in "Files": the documents the team keeps in folders (suppliers' invoices,
+  contracts, letters, photos), to open, download and tidy them from any device.
 - **The assistant**, with the sparkles in the top bar: they ask it about the business, writing or by voice, and it
   does what the person could do with their buttons, always after they confirm it.
 
@@ -164,6 +166,18 @@ and, for whoever runs the business, "Devices".
 ### Your business is being prepared
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
+### Files
+From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
+which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
+"Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
+folder" and "Upload file". Below, the open folder's path, with ⋮ beside it to rename, move or delete that folder;
+"Space", with what is used and the plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder
+holds: the folders first and then the files, each with its icon, its name, its size (in the list, also when it
+changed) and its ⋮: "Open", "Download", "Rename", "Move to…" and "Delete". In the list, each name takes one line:
+what does not fit is cut with "…" and the extension always shows whole; on a phone, the size and the date go under
+the name, in grey. Tapping a file opens it in the viewer, with
+its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
+
 ### Assistant
 The panel the "Assistant" sparkles of the top bar open (on a phone, inside "More options"), on the right. On a tablet
 or a computer it stays beside the screen and pushes it, so they keep working with it open; on a phone it covers it,
@@ -213,6 +227,15 @@ On the Settings · Data and backups screen:
 | Empty | "There are no templates for your business yet.", "No template matches your search.", "This business has no app on to export." and "There is nothing to reset: no section has data.". |
 | Error | "The templates could not be loaded right now. You can still import a file." with "Retry"; "The apps of this business could not be loaded." and "What each section has could not be worked out.", with "Retry". |
 | No permission | "Only an administrator can see and import templates.", "Only an administrator can export the business." and "Only an administrator can undo imports or reset the business."; the Home's templates card does not show. |
+
+On the Files screen:
+
+| State | What the person sees |
+|---|---|
+| Loading | "Loading files…"; in the viewer, "Opening the file…". |
+| Empty | "No files" and, to whoever administers the business, "Upload a file or drag it here."; a search with no results, "No file in this folder matches “{search}”.". |
+| Error | "The files could not be loaded" with the reason and "Retry", never "No files"; in the viewer, "The file could not be opened" with "The file's content did not arrive. Check the connection and try again.". |
+| No permission | Whoever does not administer the business sees, opens and downloads, without "New folder", "Upload file", "Rename", "Move to…" or "Delete". |
 
 ## Flows
 
@@ -289,21 +312,26 @@ On the Settings · Data and backups screen:
 | BASE-F69 | Name a device | done |
 | BASE-F70 | Remove a device that was lost | done |
 | BASE-F71 | Remove at once the devices nobody uses | done |
-| BASE-F72 | Open and close the assistant's panel | done |
-| BASE-F73 | Ask the assistant and read how it writes | done |
-| BASE-F74 | Attach a file or dictate by voice | done |
-| BASE-F75 | Read the answer: text, lists, tables and links | done |
-| BASE-F76 | Go to a screen from an answer | done |
-| BASE-F77 | Confirm an action before it runs | done |
-| BASE-F78 | Dangerous actions: type to confirm, or not from the chat | done |
-| BASE-F79 | Check what the assistant says against what it really did | done |
-| BASE-F80 | What the assistant can do depending on who asks: permissions and a manager's PIN | partial |
-| BASE-F81 | Ask it for several things in a row | done |
-| BASE-F82 | The conversation: what is kept, where and when it is deleted | done |
-| BASE-F83 | The assistant in the setup | done |
-| BASE-F84 | See the assistant's plan, the usage limit and extend it | done |
-| BASE-F85 | Report a bad answer | done |
-| BASE-F86 | The assistant without a connection, with the service down or without a plan | done |
+| BASE-F72 | See the business's files | done |
+| BASE-F73 | Upload files and make folders | done |
+| BASE-F74 | Preview and download a file | partial |
+| BASE-F75 | Move and rename a file or a folder | done |
+| BASE-F76 | Delete a file or a folder | done |
+| BASE-F77 | Open and close the assistant's panel | done |
+| BASE-F78 | Ask the assistant and read how it writes | done |
+| BASE-F79 | Attach a file or dictate by voice | done |
+| BASE-F80 | Read the answer: text, lists, tables and links | done |
+| BASE-F81 | Go to a screen from an answer | done |
+| BASE-F82 | Confirm an action before it runs | done |
+| BASE-F83 | Dangerous actions: type to confirm, or not from the chat | done |
+| BASE-F84 | Check what the assistant says against what it really did | done |
+| BASE-F85 | What the assistant can do depending on who asks: permissions and a manager's PIN | partial |
+| BASE-F86 | Ask it for several things in a row | done |
+| BASE-F87 | The conversation: what is kept, where and when it is deleted | done |
+| BASE-F88 | The assistant in the setup | done |
+| BASE-F89 | See the assistant's plan, the usage limit and extend it | done |
+| BASE-F90 | Report a bad answer | done |
+| BASE-F91 | The assistant without a connection, with the service down or without a plan | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -514,7 +542,7 @@ Steps:
 In: the list of what is missing, with the permissions of whoever asks.
 Out: nothing saved.
 If it fails: without the assistant, the steps keep leading to their screen from the list.
-Involved: BASE-F83
+Involved: BASE-F88
 
 ### BASE-F13 Lose access on a role change or on leaving the business
 Status: done
@@ -1598,7 +1626,115 @@ Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
 Involved: BASE-F70
 
-### BASE-F72 Open and close the assistant's panel
+### BASE-F72 See the business's files
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Files
+Steps:
+  1. Tap "Files" in the side menu. While it loads: "Loading files…".
+  2. See the tree of folders on the left (on a narrow screen, the "Folders" selector), the open folder's path, what
+     it holds in "Grid" (what shows first) or in "List", and "Space": what the business's files and its apps' take,
+     against the plan's limit ("{used} of {limit}") or, if it has none, "{used} used · No limit".
+  3. Go into a folder by tapping it in the tree, in the grid or in the selector, and come back through the path. The
+     open folder stays in the address, so it can be shared with the team.
+  4. Search by name in "Search files…", only inside the open folder; with no results, "No file in this folder
+     matches “{search}”.".
+  5. An empty folder says "No files" (to whoever administers the business, also "Upload a file or drag it here.").
+  6. The folder brings itself up to date when someone on the team uploads, moves, renames or deletes something, from
+     any device.
+In: the files and folders of this business, never another's. The folders the apps use for their own things (the
+website's images) do not show here.
+Out: nothing saved.
+If it fails: "The files could not be loaded" with the reason ("The file store did not answer. Try again in a
+moment." or "Check the connection and try again.") and "Retry"; a failure never shows as "No files".
+Involved: none
+
+### BASE-F73 Upload files and make folders
+Status: done
+Actor: owner, administrator
+Screen: Files
+Steps:
+  1. In the open folder, tap "Upload file" and choose one or several, or drag them onto the manager ("Drop the files
+     to upload them here"). While they upload: "Uploading {done} of {total}…".
+  2. "Files uploaded." shows and they appear in the folder. If there was already one with the same name, it is not
+     overwritten: the new one is kept as "name (1).ext" and "Uploaded as “{name}”: there was already one with that
+     name." shows.
+  3. For a new folder, tap "New folder", type the "Folder name" (up to 100 characters) and tap "Create folder".
+     "Folder created." shows and the folder appears in the tree and in the open folder.
+In: the files, up to 25 MB each, or the folder's name; the open folder.
+Out: the file or the folder, in the business's files (`base.file.uploaded`, `base.file.folder_created`).
+If it fails: each refused file says why, without stopping the others: "Could not upload “{name}”: {reason}", with
+"That file weighs more than 25 MB, the most Files takes.", "Programs (.{extension}) can't be kept in Files: they
+could harm whoever opens them.", "There is no space left for that file: your plan includes {space}." or "The file did
+not arrive whole. Upload it again.". What was uploaded and what was refused show in a single notice: one notice shows
+at a time and the new one closes the one before, never one on top of another. When making a folder, the dialog stays open with the reason: "That name is not
+valid. Use a name without slashes or lone dots." or "There is already a file or folder with that name here.".
+Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only an
+administrator can change the files.".
+Involved: none
+
+### BASE-F74 Preview and download a file
+Status: partial — Excel sheets (xlsx) and Word documents (docx) say "No preview" and are downloaded, and a data file (.json) is shown tidied but not foldable; the old hub's viewer showed them
+Actor: owner, administrator, manager, employee
+Screen: Files
+Steps:
+  1. Tap a file, or "Open" in its ⋮. A large viewer opens inside the hub, with the name as its title, "Download" and
+     "Close".
+  2. It shows images (whole in the viewer, never larger than the original, with "Zoom in" and "Zoom out"), PDFs (the
+     first 30 pages; if it is longer, "Showing the first {shown} of {total} pages. Download the file to read it
+     all."), text, logs and code, CSV and TSV as a table, data files (.json) tidied, audio and video. Of a very long
+     text, "Showing the beginning of the file. Download it to read it all."; of a table of more than 500 rows,
+     "Showing the first {shown} rows. Download the file to see them all.".
+  3. Any other type: "No preview" with "This type of file can't be shown here. Download it to open it with an app on
+     your device.".
+  4. "Download", in the viewer or in the ⋮, saves the file with its name.
+In: the file, which the hub reads from its store with the person's session; the browser never goes to the store and
+the file is not kept in any cache.
+Out: nothing saved.
+If it fails: "The file could not be opened" with "The file's content did not arrive. Check the connection and try
+again.", never a blank viewer; if it could not be downloaded, "Could not download “{name}”: {reason}".
+Involved: none
+
+### BASE-F75 Move and rename a file or a folder
+Status: done
+Actor: owner, administrator
+Screen: Files
+Steps:
+  1. To rename, choose "Rename" (or "Rename folder") in the ⋮: a dialog with the current name already typed (up to
+     255 characters). Tap "Rename" and "Renamed." shows.
+  2. To move, choose "Move to…": "Move “{name}”" with the business's folders as a tree, starting at "Files"; choose
+     one and tap "Move". The file or the folder can also be dragged onto a folder of the tree or of the grid. "Moved
+     to “{folder}”." shows (to the very top, "Moved to “Files”.").
+  3. A folder is moved or renamed with everything in it. If it is the open folder (its ⋮, beside the path), the
+     screen follows it to its new place. It is never offered as a destination of itself or of its own folders.
+In: the file or the folder and the new name, or the destination folder.
+Out: the change, in the business's files (`base.file.renamed`, `base.file.moved`).
+If it fails: the dialog stays open with the reason: "There is already a file or folder with that name here.", "It is
+already in that folder.", "A folder can't be moved inside itself.", "That name is not valid. Use a name without
+slashes or lone dots." or "That file or folder no longer exists. Refresh the list."; when dragging, "Could not move:
+{reason}". Whoever does not administer the business does not see "Rename" or "Move to…" and, if they try anyway,
+reads "Only an administrator can change the files.".
+Involved: none
+
+### BASE-F76 Delete a file or a folder
+Status: done
+Actor: owner, administrator
+Screen: Files
+Steps:
+  1. Choose "Delete" (or "Delete folder") in the ⋮ of a file, of a folder or of the open folder.
+  2. The screen asks: "Delete file" with "You are about to delete “{name}”. This cannot be undone.", or "Delete
+     folder" with "You are about to delete “{name}” and everything in it. This cannot be undone.".
+  3. Tap "Delete" (or "Cancel"). "File deleted." or "Folder deleted." shows. If the open folder was deleted, the
+     screen goes up to the one above.
+In: the file or the folder.
+Out: the file or the folder, with everything it held, out of the business's files; there is no bin
+(`base.file.deleted`).
+If it fails: "Could not delete: {reason}", with "That file or folder no longer exists. Refresh the list." or "Your
+session has expired. Sign in again and try once more.". Whoever does not administer the business does not see
+"Delete" and, if they try anyway, reads "Only an administrator can change the files.".
+Involved: none
+
+### BASE-F77 Open and close the assistant's panel
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1610,24 +1746,24 @@ Steps:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the
      panel), by tapping the veil on a phone, by tapping the sparkles again or with "Go to …" in an answer
-     (BASE-F76).
+     (BASE-F81).
   4. If it is left open, it stays open on changing screen and on reloading: the device only remembers whether it was
      open or closed.
 In: the session.
-Out: on opening it, the panel reads the assistant's messages the business has left this month (BASE-F84) and the
-list of what is left to set up, for its shortcuts (BASE-F83); closing it asks for nothing.
+Out: on opening it, the panel reads the assistant's messages the business has left this month (BASE-F89) and the
+list of what is left to set up, for its shortcuts (BASE-F88); closing it asks for nothing.
 If it fails: it has no failure of its own. Without a session (the way in, the PIN) there are no sparkles. Closing the
 panel does not cut an answer already on its way: it keeps being written and, if it asks for a confirmation, the card
-shows over whatever screen is there (BASE-F77).
-Involved: BASE-F73, BASE-F77, BASE-F83, BASE-F84
+shows over whatever screen is there (BASE-F82).
+Involved: BASE-F78, BASE-F82, BASE-F88, BASE-F89
 
-### BASE-F73 Ask the assistant and read how it writes
+### BASE-F78 Ask the assistant and read how it writes
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the conversation empty, the panel shows the sparkles, "Ask me about your sales, your stock or anything
-     about your business." and the setup's shortcuts (BASE-F83).
+     about your business." and the setup's shortcuts (BASE-F88).
   2. They write in "Write a message…" and press Enter or "Send". With a keyboard, Shift+Enter starts a new line; on a
      touch screen, Enter starts a new line and "Send" sends. "Send" is off with the box empty and no attachments.
   3. Their message shows on the right just as they wrote it. Below, the assistant's bubble, with three dots that move
@@ -1639,13 +1775,13 @@ Steps:
   6. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
   7. Under each finished answer, "Read aloud" reads it with the device's own voice, if it has one, and "Stop
      reading" stops it.
-In: what the person writes; the whole conversation travels with each question (BASE-F82).
-Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F84).
-If it fails: without a connection, with the service down, without a plan or without messages: BASE-F86 and BASE-F84.
+In: what the person writes; the whole conversation travels with each question (BASE-F87).
+Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F89).
+If it fails: without a connection, with the service down, without a plan or without messages: BASE-F91 and BASE-F89.
 "Stop" does not undo an action that had already been done.
-Involved: BASE-F82, BASE-F84, BASE-F86
+Involved: BASE-F87, BASE-F89, BASE-F91
 
-### BASE-F74 Attach a file or dictate by voice
+### BASE-F79 Attach a file or dictate by voice
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1659,7 +1795,7 @@ Steps:
      two minutes it stops by itself.
   4. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
      itself**: the person reviews it and taps "Send", and what they ask goes through its card like any other request
-     (BASE-F77).
+     (BASE-F82).
 In: the files (8 MB each and 20 MB among all those of a question) or the recording.
 Out: the file travels with the question to erplora.com, which reads it; the recording goes through the business to
 erplora.com's transcription. The browser never talks to erplora.com directly.
@@ -1669,9 +1805,9 @@ or CSV." or "menu.pdf could not be read.". With the microphone blocked, "Microph
 your browser to dictate."; a recording too long, "The recording is too long: dictate a shorter message."; no voice,
 "Nothing was heard. Try again closer to the microphone."; and if it cannot be transcribed, "The audio could not be
 transcribed. Try again.".
-Involved: BASE-F73, BASE-F77
+Involved: BASE-F78, BASE-F82
 
-### BASE-F75 Read the answer: text, lists, tables and links
+### BASE-F80 Read the answer: text, lists, tables and links
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1679,15 +1815,15 @@ Steps:
   1. The answer is painted with its format: bold, italics, code, headings, bulleted or numbered lists and tables.
   2. A table fits in the bubble: its cells break the text instead of widening the panel, also on a phone.
   3. A link is read by its text, without brackets nor address. It can only be tapped if it leads to a screen of this
-     business (BASE-F76); any other address, from outside or made up, stays as text.
+     business (BASE-F81); any other address, from outside or made up, stays as text.
   4. What the panel does not understand (code blocks, images, quotes) stays as plain text. The person's message
      always shows just as they wrote it.
 In: the assistant's text.
 Out: nothing; it is only painted. The panel never paints HTML that comes in an answer.
 If it fails: a badly written answer reads as text: it is never lost nor breaks the panel.
-Involved: BASE-F76
+Involved: BASE-F81
 
-### BASE-F76 Go to a screen from an answer
+### BASE-F81 Go to a screen from an answer
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1702,11 +1838,11 @@ Steps:
 In: the screens the answer names; those of this business and of its apps that are on.
 Out: the screen opened; nothing is asked for.
 If it fails: a screen this business does not have (that of an app that is off, a made-up address) does not show as a
-button nor as a link, and the answer carries the notice of BASE-F79. If the person may not see the screen they reach,
+button nor as a link, and the answer carries the notice of BASE-F84. If the person may not see the screen they reach,
 that screen tells them.
-Involved: BASE-F72, BASE-F79
+Involved: BASE-F77, BASE-F84
 
-### BASE-F77 Confirm an action before it runs
+### BASE-F82 Confirm an action before it runs
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -1726,9 +1862,9 @@ Out: if accepted, the action done in its app, with the same event as if its butt
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". If the page is reloaded with the card open nothing is done, and the answer ends in "The
 answer was cut off." with "Try again".
-Involved: BASE-F78, BASE-F79, BASE-F81
+Involved: BASE-F83, BASE-F84, BASE-F86
 
-### BASE-F78 Dangerous actions: type to confirm, or not from the chat
+### BASE-F83 Dangerous actions: type to confirm, or not from the chat
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -1746,12 +1882,12 @@ Steps:
   5. Resetting the business and exporting a copy are never done from the chat: they are done in Settings › Data and
      backups.
 In: the risk the app declares in each action, and its data.
-Out: if accepted, as in BASE-F77.
+Out: if accepted, as in BASE-F82.
 If it fails: what was typed and does not match does not let it run; cancelling does nothing and the assistant counts
 it as cancelled.
-Involved: BASE-F35, BASE-F37, BASE-F77
+Involved: BASE-F35, BASE-F37, BASE-F82
 
-### BASE-F79 Check what the assistant says against what it really did
+### BASE-F84 Check what the assistant says against what it really did
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1764,18 +1900,18 @@ Steps:
   3. If it writes an identifier that no lookup of the turn returned and that the person did not write: "This answer
      shows an identifier the assistant did not really read. Do not trust it.".
   4. If it points to a screen this business does not have: "This answer points to a screen that does not exist
-     here.", and without "Go to …" (BASE-F76).
+     here.", and without "Go to …" (BASE-F81).
   5. The notices carry their alert icon, are not written by the assistant and stay with the message, also on
      reloading. A clean answer carries none.
-  6. The receipts of BASE-F77 say what was really done, action by action.
+  6. The receipts of BASE-F82 say what was really done, action by action.
 In: what was done in the turn, with its result, and what its lookups returned.
 Out: the notices and the receipts, kept with the conversation.
 If it fails: "Done" means the action of its app ended without an error: if an app answers fine without having changed
 anything, it is that action that has to say so. If the turn ends in an error, the bubble carries its failure
-(BASE-F86), the notices of what it got to say and the receipts of what was indeed done.
-Involved: BASE-F76, BASE-F77, BASE-F86
+(BASE-F91), the notices of what it got to say and the receipts of what was indeed done.
+Involved: BASE-F81, BASE-F82, BASE-F91
 
-### BASE-F80 What the assistant can do depending on who asks: permissions and a manager's PIN
+### BASE-F85 What the assistant can do depending on who asks: permissions and a manager's PIN
 Status: partial — approval with a manager's PIN does not exist in the Hub yet (it comes with People and permissions): the action that would ask for it is refused
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1791,9 +1927,9 @@ Out: the action done with that person as its author.
 If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
 says so. What a manager would have to approve cannot be approved from the chat: it stays undone, with the same
 receipt.
-Involved: BASE-F13, BASE-F77
+Involved: BASE-F13, BASE-F82
 
-### BASE-F81 Ask it for several things in a row
+### BASE-F86 Ask it for several things in a row
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1801,7 +1937,7 @@ Steps:
   1. The person asks for a chain ("create the category Drinks and the product Draught beer at €2.50").
   2. The assistant solves it in rounds: it reads what it needs without asking, asks for an action, it is done and it
      goes on. All it says goes to the same bubble.
-  3. Each action that changes something asks for its own card (BASE-F77), one after the other: accepting the first
+  3. Each action that changes something asks for its own card (BASE-F82), one after the other: accepting the first
      does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
      those left.
   4. If they cancel one, the assistant knows and decides how to go on. What was already done stays done.
@@ -1810,10 +1946,10 @@ Steps:
 In: the request; the result of each action, which goes back to the assistant.
 Out: as many actions as cards accepted, each in its app and with its receipt.
 If it fails: if an action fails half way, the assistant gets it and tells it; the earlier ones are not undone. With
-the network cut half way, BASE-F86.
-Involved: BASE-F77, BASE-F86
+the network cut half way, BASE-F91.
+Involved: BASE-F82, BASE-F91
 
-### BASE-F82 The conversation: what is kept, where and when it is deleted
+### BASE-F87 The conversation: what is kept, where and when it is deleted
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1835,7 +1971,7 @@ tab is open, but does not survive a reload. A kept one that cannot be read, or a
 conversation that is too long says "This conversation is too long: start a new one." with "New conversation".
 Involved: BASE-F59, BASE-F60, BASE-F61
 
-### BASE-F83 The assistant in the setup
+### BASE-F88 The assistant in the setup
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1850,15 +1986,15 @@ Steps:
   4. From the setup (the button or a shortcut), before each question the assistant reads the list again: what is
      pending, what stops invoicing, what is done and what is an administrator's. A business that gets set up half way
      through the chat stops being described as not set up.
-  5. What they ask it to do (turn an app on, load a template) goes through its card (BASE-F77).
+  5. What they ask it to do (turn an app on, load a template) goes through its card (BASE-F82).
 In: the list of what is missing, with what that person may see (BASE-F01).
 Out: the list, for the assistant; the normal conversation.
 If it fails: if the list cannot be read, the assistant knows it and does not say the business is set up, and the
 shortcuts are left at "What is left to set up?". Each step keeps its "Set up" in the list: with the assistant down,
 nobody is left without a way out.
-Involved: BASE-F01, BASE-F12, BASE-F77
+Involved: BASE-F01, BASE-F12, BASE-F82
 
-### BASE-F84 See the assistant's plan, the usage limit and extend it
+### BASE-F89 See the assistant's plan, the usage limit and extend it
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1879,9 +2015,9 @@ In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
 answering is what counts.
-Involved: BASE-F11, BASE-F86
+Involved: BASE-F11, BASE-F91
 
-### BASE-F85 Report a bad answer
+### BASE-F90 Report a bad answer
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1898,7 +2034,7 @@ Out: the report, for erplora.com's team to review. Anyone can report.
 If it fails: "The report could not be sent. Try again.", and the window stays open with what was chosen and written.
 Involved: none
 
-### BASE-F86 The assistant without a connection, with the service down or without a plan
+### BASE-F91 The assistant without a connection, with the service down or without a plan
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -1913,10 +2049,10 @@ Steps:
   4. With too many questions in a row, "Too many questions in a row: wait 60 seconds and try again.".
   5. If the session ends half way through the chat, "Your session has ended. Sign in again to keep talking." with
      "Sign in again".
-  6. Running out of messages or having a plan without the assistant is no breakdown: BASE-F84.
+  6. Running out of messages or having a plan without the assistant is no breakdown: BASE-F89.
   7. "Try again" asks the same question again: it is never lost.
 In: what happened to the question.
-Out: the failure, in the bubble and kept with the conversation (BASE-F82); it does not reach the assistant as if it
+Out: the failure, in the bubble and kept with the conversation (BASE-F87); it does not reach the assistant as if it
 had said it.
 If it fails: a failure with nothing written leaves no empty bubble: only the sentence with its way out.
-Involved: BASE-F73, BASE-F82, BASE-F84
+Involved: BASE-F78, BASE-F87, BASE-F89

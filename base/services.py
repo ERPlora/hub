@@ -71,7 +71,7 @@ from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from base import access, auth, blueprint, events, queries, registry, signing, system
+from base import access, auth, blueprint, events, files, queries, registry, signing, system
 from base import assistant
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
@@ -108,6 +108,14 @@ from base.schemas import (
     FailedEventIn,
     FailedEventOutId,
     FailedEventRetryAllIn,
+    FileDeletedOut,
+    FileDeleteIn,
+    FileFolderCreateIn,
+    FileMoveIn,
+    FilePathOut,
+    FileRenameIn,
+    FileSavedOut,
+    FileUploadIn,
     HubCancelIn,
     HubOut,
     HubRegisterOut,
@@ -1855,6 +1863,142 @@ def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     profile.save()
     record_event(ctx, events.PROFILE_UPDATED, {})
     return {"avatar_url": ""}
+
+
+# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────────
+# The old hub's Files (``POST /api/media/upload|folder|rename|move``, ``DELETE /api/media``; HUB_SHELL-F131, F133,
+# F134): the business's files in the hub file store (``base.files``), on the hub of the request only. Who runs the
+# business uploads, makes folders and renames (``base.upload_files``) and deletes (``base.delete_files``); moving takes
+# both, as it deletes where the file was and uploads where it goes. Each write records its event in its transaction;
+# the store is written first, so a refusal of the store leaves no event (a lost event leaves the file: the listing
+# reads the store, never the events).
+UPLOAD_FILES = "base.upload_files"
+DELETE_FILES = "base.delete_files"
+
+
+def _space_limit(ctx: OperationContext) -> int | None:
+    return files.space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
+
+
+def _file_bytes(content_base64: str) -> bytes:
+    try:
+        return base64.b64decode(content_base64, validate=True)
+    except (binascii.Error, ValueError):
+        message = gettext("The file did not arrive whole. Upload it again.")
+        raise InvalidPayload(message, code="base.file_not_base64", fields={"content_base64": message}) from None
+
+
+@operation(
+    "base.file.upload",
+    kind="command",
+    permission=UPLOAD_FILES,
+    input=FileUploadIn,
+    output=FileSavedOut,
+    expose_api=True,
+    ai={
+        "description": "Keeps a file the person attached in the business's files, in a folder by its path (the "
+        "folder «Facturas»; empty: the top). Never overwrites: a taken name becomes «name (1).ext». 25 MB at most; "
+        "programs are refused.",
+        "risk": "normal",
+    },
+)
+def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
+    """BASE-G83: keep the file, numbered when its name is taken, within the plan's space."""
+    with translation.override(ctx.language):
+        content = _file_bytes(data.content_base64)
+        saved = files.upload(
+            storages["hub_files"], hub_id(ctx.scope), data.folder, data.name, content, limit_bytes=_space_limit(ctx)
+        )
+    record_event(ctx, events.FILE_UPLOADED, {"path": saved["path"]})
+    return saved
+
+
+@operation(
+    "base.file.create_folder",
+    kind="command",
+    permission=UPLOAD_FILES,
+    input=FileFolderCreateIn,
+    output=FilePathOut,
+    expose_api=True,
+    ai={
+        "description": "Makes a new, empty folder in the business's files, inside another by its path (the folder "
+        "«Facturas»; empty: the top). Refused when that name is taken there.",
+        "risk": "normal",
+    },
+)
+def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
+    """BASE-G83: a new folder, never over a file or folder of that name."""
+    with translation.override(ctx.language):
+        made = files.create_folder(storages["hub_files"], hub_id(ctx.scope), data.parent, data.name)
+    record_event(ctx, events.FILE_FOLDER_CREATED, {"path": made["path"]})
+    return made
+
+
+@operation(
+    "base.file.rename",
+    kind="command",
+    permission=UPLOAD_FILES,
+    input=FileRenameIn,
+    output=FilePathOut,
+    expose_api=True,
+    ai={
+        "description": "Gives a file or a folder of the business's files another name, where it is (the file "
+        "«Facturas/marzo.pdf» becomes «abril.pdf»). Refused when the new name is taken there.",
+        "risk": "normal",
+    },
+)
+def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
+    """BASE-G85: a new name in the same folder; a folder takes everything in it along."""
+    with translation.override(ctx.language):
+        renamed = files.rename(storages["hub_files"], hub_id(ctx.scope), data.path, data.name)
+    if renamed["path"] != data.path:
+        record_event(ctx, events.FILE_RENAMED, {"path": renamed["path"], "from": data.path})
+    return renamed
+
+
+@operation(
+    "base.file.move",
+    kind="command",
+    permission=DELETE_FILES,
+    input=FileMoveIn,
+    output=FilePathOut,
+    expose_api=True,
+    ai={
+        "description": "Moves a file or a folder of the business's files into another folder, both by their path "
+        "(the file «marzo.pdf» into the folder «Facturas»; empty: the top). Never overwrites, and a folder never "
+        "goes inside itself.",
+        "risk": "normal",
+    },
+)
+def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
+    """BASE-G85: to another folder; deleting where it was and uploading where it goes."""
+    with translation.override(ctx.language):
+        if not ctx.has(UPLOAD_FILES):
+            raise PermissionDenied(gettext("Only who runs the business can change the files."))
+        moved = files.move(storages["hub_files"], hub_id(ctx.scope), data.path, data.to)
+    record_event(ctx, events.FILE_MOVED, {"path": moved["path"], "from": data.path})
+    return moved
+
+
+@operation(
+    "base.file.delete",
+    kind="command",
+    permission=DELETE_FILES,
+    input=FileDeleteIn,
+    output=FileDeletedOut,
+    expose_api=True,
+    ai={
+        "description": "Deletes a file of the business's files, or a folder and everything in it, by its path (the "
+        "folder «Facturas/2025»). There is no bin: it cannot be undone.",
+        "risk": "high",
+    },
+)
+def file_delete(ctx: OperationContext, data: FileDeleteIn) -> dict:
+    """BASE-G86: the file, or the folder and everything in it; no bin."""
+    with translation.override(ctx.language):
+        deleted = files.delete(storages["hub_files"], hub_id(ctx.scope), data.path)
+    record_event(ctx, events.FILE_DELETED, {"path": deleted["path"], "folder": deleted["folder"]})
+    return deleted
 
 
 # ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────

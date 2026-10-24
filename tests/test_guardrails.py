@@ -99,6 +99,11 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database "
         "(round 2026-10-21)."
     ),
+    "base/files.py": (
+        "Files (APP-BASE-8) writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
+        "delete) under the hub's prefix: no model and no database (it imports neither, "
+        "base/tests/test_files.py::test_files_touches_no_model_nor_database); only base.file.* operations reach it."
+    ),
 }
 
 #: Attributes that are a model's manager: ``Model.objects…`` is always the ORM.

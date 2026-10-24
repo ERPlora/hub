@@ -145,7 +145,7 @@ tope de demos vivas (`MAX_CONCURRENT_DEMOS`).
 
 ## El asistente (`base-assistant.spec.ts`)
 
-Prueba el asistente del Hub (BASE-F72…F86) con sus dependencias de verdad: el Hub de la pila, la pasarela del SaaS de
+Prueba el asistente del Hub (BASE-F77…F91) con sus dependencias de verdad: el Hub de la pila, la pasarela del SaaS de
 la pila (`/internal/assistant/*` y `/internal/speech/transcribe`) y, detrás, el proveedor falso
 `tests/e2e/assistant-provider.ts`, un servidor HTTP en 127.0.0.1 que habla la API de OpenAI y que la propia spec
 arranca en `E2E_AI_PROVIDER_PORT` (por defecto, el puerto del Hub + 2). Ningún test llega a un proveedor real ni

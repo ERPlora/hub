@@ -9,6 +9,7 @@ from uuid import UUID
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
+from django.core.files.storage import storages
 from django.db.models import Max
 from django.http import HttpRequest
 from django.utils import timezone, translation
@@ -19,7 +20,7 @@ from live.meta import Category
 from live.models import OutboxEvent
 from live.operations import operation
 
-from base import access, blueprint, business, entitlement, home, system
+from base import access, blueprint, business, entitlement, files, home, system
 from base.auth import saas_url
 from base.models import (
     AccessSettings,
@@ -69,6 +70,10 @@ from base.schemas import (
     EventListOut,
     FailedEventListIn,
     FailedEventListOut,
+    FileListIn,
+    FileListOut,
+    FileOut,
+    FileReadIn,
     HubGetIn,
     HubOut,
     HubsBySlugIn,
@@ -1019,6 +1024,62 @@ def shell_access(request: HttpRequest, slug: str) -> dict[str, Any]:
         "switch_user": offered and bool(pin_people(slug)),
         "idle_minutes": settings.pin_inactivity_minutes if offered and settings.pin_policy == access.ALWAYS else None,
     }
+
+
+# ── Files (APP-BASE-8) ─────────────────────────────────────────────────────────────────────────────────────────
+# The old hub's Files (``GET /api/media``, ``/raw``; HUB_SHELL-F130, F132): the business's files in the hub file store
+# (``base.files``), on the hub of the request only. Everyone of the hub sees and opens them.
+VIEW_FILES = "base.view_files"
+UPLOAD_FILES = "base.upload_files"
+DELETE_FILES = "base.delete_files"
+
+
+def space_limit(ctx: OperationContext) -> int | None:
+    """The space for files of the plan in the SaaS's last photo of the hub of ``ctx``; ``None``: no limit."""
+    return files.space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
+
+
+@operation(
+    "base.file.list",
+    kind="query",
+    permission=VIEW_FILES,
+    input=FileListIn,
+    output=FileListOut,
+    expose_api=True,
+    ai={
+        "description": "Lists the business's files: every folder, and the files of one folder by its path (the "
+        "folder «Facturas/2026»; empty: the top), each with its name, size and date, and the space they take "
+        "against what the plan includes."
+    },
+)
+def file_list(ctx: OperationContext, data: FileListIn) -> dict:
+    """BASE-G82: the tree, the folder's files, the space used and what this person may do with them."""
+    with translation.override(ctx.language):
+        listing = files.listing(storages["hub_files"], hub_id(ctx.scope), data.folder)
+    used = listing.pop("used_bytes")
+    return {
+        **listing,
+        "space": {"used_bytes": used, "limit_bytes": space_limit(ctx)},
+        "can": {"upload": ctx.has(UPLOAD_FILES), "delete": ctx.has(DELETE_FILES)},
+    }
+
+
+@operation(
+    "base.file.read",
+    kind="query",
+    permission=VIEW_FILES,
+    input=FileReadIn,
+    output=FileOut,
+    expose_api=True,
+    ai={
+        "description": "Finds one file of the business by its path (the file «Facturas/marzo.pdf»): its name, size "
+        "and type. Its bytes are read at the same address by whoever may see the files."
+    },
+)
+def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
+    """BASE-G84: the file, described; ``base.api`` streams its bytes to the person who asked."""
+    with translation.override(ctx.language):
+        return files.describe(storages["hub_files"], hub_id(ctx.scope), data.path)
 
 
 # ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────

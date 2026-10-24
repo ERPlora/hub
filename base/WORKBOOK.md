@@ -10,7 +10,8 @@ Estado de la app: en construcción (2026-10-22)
 > avisa cuando todavía no se puede facturar. También «Apps», «Plan y límites» de Sistema y las plantillas: la
 > tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer). El acceso (entrar con la
 > cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los dispositivos) está en sus propias pantallas,
-> más abajo, y el asistente, en su panel, al final.
+> más abajo.
+> Y «Archivos»: los documentos del negocio, en carpetas; y el asistente, en su panel, al final.
 
 ## Para qué sirve y para quién
 
@@ -26,6 +27,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
   cargar la de otro negocio.
 - **Los datos del negocio**, en «Ajustes»: su nombre, su país, su zona horaria, su moneda y su idioma, tal como
   los tiene erplora.com, y adónde ir para cambiarlos.
+- **Los archivos del negocio**, en «Archivos»: los documentos que el equipo guarda en carpetas (facturas de
+  proveedores, contratos, cartas, fotos), para abrirlos, descargarlos y ordenarlos desde cualquier dispositivo.
 - **El asistente**, con los destellos de la barra de arriba: se le pregunta por el negocio, escribiendo o con la voz,
   y hace lo que la persona podría hacer con sus botones, siempre después de que ella lo confirme.
 
@@ -178,6 +181,18 @@ Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo
 ### Estamos preparando tu negocio
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
 
+### Archivos
+Desde «Archivos» en el menú lateral; la ve todo el equipo. A la izquierda, «Carpetas»: el árbol de carpetas del
+negocio, que empieza en «Archivos» (lo de arriba del todo), con la carpeta abierta resaltada; en una pantalla
+estrecha, el árbol se pliega en el selector «Carpetas». A la derecha, «Buscar archivos…», «Lista» y «Cuadrícula» y,
+para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, la ruta de la carpeta abierta, con ⋮ al
+lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y el límite del plan («{used} de {limit}»)
+o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las carpetas y luego los archivos, cada uno con su
+icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮: «Abrir», «Descargar», «Renombrar», «Mover a…»
+y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se corta con «…» y la extensión se ve
+siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris. Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en
+imágenes y PDF).
+
 ### Asistente
 El panel que se abre con los destellos «Asistente» de la barra de arriba (en un móvil, dentro de «Más opciones»), a la
 derecha. En una tableta o un ordenador se queda al lado de la pantalla y la empuja, así que se sigue trabajando con él
@@ -227,6 +242,15 @@ En la pantalla Ajustes · Datos y copias:
 | Vacío | «Todavía no hay plantillas para tu negocio.», «Ninguna plantilla coincide con tu búsqueda.», «Este negocio no tiene ninguna app encendida que exportar.» y «No hay nada que restablecer: ninguna sección tiene datos.». |
 | Error | «No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.» con «Reintentar»; «No se han podido cargar las apps de este negocio.» y «No se ha podido calcular lo que tiene cada sección.», con «Reintentar». |
 | Sin permiso | «Solo un administrador puede ver e importar plantillas.», «Solo un administrador puede exportar el negocio.» y «Solo un administrador puede deshacer importaciones o restablecer el negocio.»; la tarjeta de plantillas del Inicio no sale. |
+
+En la pantalla Archivos:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando archivos…»; en el visor, «Abriendo el archivo…». |
+| Vacío | «Sin archivos» y, a quien administra el negocio, «Sube un archivo o arrástralo aquí.»; una búsqueda sin resultados, «Ningún archivo de esta carpeta coincide con «{search}».». |
+| Error | «No se pudieron cargar los archivos» con el motivo y «Reintentar», nunca «Sin archivos»; en el visor, «No se pudo abrir el archivo» con «No llegó el contenido del archivo. Revisa la conexión e inténtalo de nuevo.». |
+| Sin permiso | Quien no administra el negocio ve, abre y descarga, sin «Nueva carpeta», «Subir archivo», «Renombrar», «Mover a…» ni «Eliminar». |
 
 ## Flujos
 
@@ -303,21 +327,26 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F69 | Ponerle nombre a un dispositivo | hecho |
 | BASE-F70 | Quitar un dispositivo que se ha perdido | hecho |
 | BASE-F71 | Quitar de golpe los dispositivos que nadie usa | hecho |
-| BASE-F72 | Abrir y cerrar el panel del asistente | hecho |
-| BASE-F73 | Preguntar al asistente y leer cómo escribe | hecho |
-| BASE-F74 | Adjuntar un archivo o dictar por voz | hecho |
-| BASE-F75 | Leer la respuesta: texto, listas, tablas y enlaces | hecho |
-| BASE-F76 | Ir a una pantalla desde una respuesta | hecho |
-| BASE-F77 | Confirmar una acción antes de que se ejecute | hecho |
-| BASE-F78 | Acciones peligrosas: escribir para confirmar, o no desde el chat | hecho |
-| BASE-F79 | Comprobar lo que dice el asistente contra lo que de verdad hizo | hecho |
-| BASE-F80 | Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable | parcial |
-| BASE-F81 | Pedirle varias cosas seguidas | hecho |
-| BASE-F82 | La conversación: qué se guarda, dónde y cuándo se borra | hecho |
-| BASE-F83 | El asistente en la puesta en marcha | hecho |
-| BASE-F84 | Ver el plan del asistente, el límite de uso y ampliarlo | hecho |
-| BASE-F85 | Informar de una respuesta mala | hecho |
-| BASE-F86 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
+| BASE-F72 | Ver los archivos del negocio | hecho |
+| BASE-F73 | Subir archivos y crear carpetas | hecho |
+| BASE-F74 | Previsualizar y descargar un archivo | parcial |
+| BASE-F75 | Mover y renombrar un archivo o una carpeta | hecho |
+| BASE-F76 | Borrar un archivo o una carpeta | hecho |
+| BASE-F77 | Abrir y cerrar el panel del asistente | hecho |
+| BASE-F78 | Preguntar al asistente y leer cómo escribe | hecho |
+| BASE-F79 | Adjuntar un archivo o dictar por voz | hecho |
+| BASE-F80 | Leer la respuesta: texto, listas, tablas y enlaces | hecho |
+| BASE-F81 | Ir a una pantalla desde una respuesta | hecho |
+| BASE-F82 | Confirmar una acción antes de que se ejecute | hecho |
+| BASE-F83 | Acciones peligrosas: escribir para confirmar, o no desde el chat | hecho |
+| BASE-F84 | Comprobar lo que dice el asistente contra lo que de verdad hizo | hecho |
+| BASE-F85 | Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable | parcial |
+| BASE-F86 | Pedirle varias cosas seguidas | hecho |
+| BASE-F87 | La conversación: qué se guarda, dónde y cuándo se borra | hecho |
+| BASE-F88 | El asistente en la puesta en marcha | hecho |
+| BASE-F89 | Ver el plan del asistente, el límite de uso y ampliarlo | hecho |
+| BASE-F90 | Informar de una respuesta mala | hecho |
+| BASE-F91 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -539,7 +568,7 @@ Pasos:
 Entra: la lista de lo que falta, con los permisos de quien pregunta.
 Sale: nada guardado.
 Si falla: sin asistente, los pasos siguen llevando a su pantalla desde la lista.
-Implicados: BASE-F83
+Implicados: BASE-F88
 
 ### BASE-F13 Perder el acceso al cambiar de rol o al salir del negocio
 <!-- origen: old-saas:SAAS_AUTH-F22 -->
@@ -1687,7 +1716,122 @@ Sale: esos dispositivos olvidados, como BASE-F70.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
 Implicados: BASE-F70
 
-### BASE-F72 Abrir y cerrar el panel del asistente
+### BASE-F72 Ver los archivos del negocio
+<!-- origen: old-hub:HUB_SHELL-F130 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Archivos
+Pasos:
+  1. Pulsa «Archivos» en el menú lateral. Mientras carga: «Cargando archivos…».
+  2. Ve el árbol de carpetas a la izquierda (en una pantalla estrecha, el selector «Carpetas»), la ruta de la
+     carpeta abierta, lo que hay en ella en «Cuadrícula» (lo primero que sale) o en «Lista», y «Espacio»: lo que
+     ocupan los archivos del negocio y los de sus apps, contra el límite del plan («{used} de {limit}») o, si no tiene,
+     «{used} usados · Sin límite».
+  3. Entra en una carpeta pulsándola en el árbol, en la cuadrícula o en el selector, y vuelve por la ruta. La carpeta
+     abierta queda en el enlace, así que se puede compartir con el equipo.
+  4. Busca por el nombre en «Buscar archivos…», solo dentro de la carpeta abierta; sin resultados, «Ningún archivo
+     de esta carpeta coincide con «{search}».».
+  5. Una carpeta vacía dice «Sin archivos» (a quien administra el negocio, también «Sube un archivo o arrástralo
+     aquí.»).
+  6. La carpeta se pone al día sola cuando alguien del equipo sube, mueve, renombra o elimina algo, desde cualquier
+     dispositivo.
+Entra: los archivos y las carpetas de este negocio, nunca los de otro. Las carpetas que usan las apps para lo suyo
+(las imágenes de la web) no salen aquí.
+Sale: nada guardado.
+Si falla: «No se pudieron cargar los archivos» con el motivo («El almacén de archivos no ha respondido. Inténtalo de
+nuevo en un momento.» o «Comprueba la conexión y vuelve a intentarlo.») y «Reintentar»; un fallo nunca sale como «Sin
+archivos».
+Implicados: ninguno
+
+### BASE-F73 Subir archivos y crear carpetas
+<!-- origen: old-hub:HUB_SHELL-F131 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Archivos
+Pasos:
+  1. En la carpeta abierta pulsa «Subir archivo» y elige uno o varios, o los arrastra al gestor («Suelta los
+     archivos para subirlos aquí»). Mientras suben: «Subiendo {done} de {total}…».
+  2. Sale «Archivos subidos.» y aparecen en la carpeta. Si ya había uno con el mismo nombre, no se pisa: el nuevo se
+     guarda como «nombre (1).ext» y sale «Se ha subido como «{name}»: ya había uno con ese nombre.».
+  3. Para una carpeta nueva pulsa «Nueva carpeta», escribe el «Nombre de la carpeta» (hasta 100 caracteres) y pulsa
+     «Crear carpeta». Sale «Carpeta creada.» y la carpeta aparece en el árbol y en la carpeta abierta.
+Entra: los archivos, de hasta 25 MB cada uno, o el nombre de la carpeta; la carpeta abierta.
+Sale: el archivo o la carpeta, en los archivos del negocio (`base.file.uploaded`, `base.file.folder_created`).
+Si falla: cada archivo rechazado dice por qué, sin parar los demás: «No se pudo subir «{name}»: {reason}», con «Ese
+archivo pesa más de 25 MB, lo máximo que admite Archivos.», «Los programas (.{extension}) no se pueden guardar
+en Archivos: podrían dañar a quien los abra.», «No queda espacio para ese archivo: tu plan incluye {space}.» o «El
+archivo no llegó entero. Vuelve a subirlo.». Lo subido y lo rechazado salen en un solo aviso: se ve un aviso a
+la vez y el nuevo cierra el anterior, nunca uno encima de otro. Al crear una carpeta, el diálogo sigue abierto con el motivo: «Ese nombre
+no es válido. Usa un nombre sin barras ni puntos sueltos.» o «Ya hay un archivo o una carpeta con ese nombre aquí.».
+Quien no administra el negocio no ve los botones y, si lo intenta igual, lee «Solo un administrador puede modificar
+los archivos.».
+Implicados: ninguno
+
+### BASE-F74 Previsualizar y descargar un archivo
+<!-- origen: old-hub:HUB_SHELL-F132 -->
+Estado: parcial — las hojas de Excel (xlsx) y los documentos de Word (docx) dicen «Sin vista previa» y se descargan, y un archivo de datos (.json) se ve ordenado pero sin plegar; el visor del hub viejo los enseñaba
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Archivos
+Pasos:
+  1. Pulsa un archivo, o «Abrir» en su ⋮. Se abre un visor grande dentro del hub, con el nombre como título,
+     «Descargar» y «Cerrar».
+  2. Enseña imágenes (enteras en el visor, nunca más grandes que el original, con «Ampliar» y «Reducir»), PDF (las
+     primeras 30 páginas; si es más largo, «Mostrando las primeras {shown} de {total} páginas. Descarga el archivo
+     para leerlo entero.»), texto, registros y código, CSV y TSV como tabla, archivos de datos (.json) ordenados, audio y vídeo. De un texto
+     muy largo, «Mostrando el principio del archivo. Descárgalo para leerlo entero.»; de una tabla de más de 500
+     filas, «Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.».
+  3. Cualquier otro tipo: «Sin vista previa» con «Este tipo de archivo no se puede mostrar aquí. Descárgalo para
+     abrirlo con una aplicación de tu dispositivo.».
+  4. «Descargar», en el visor o en el ⋮, guarda el archivo con su nombre.
+Entra: el archivo, que el hub lee de su almacén con la sesión de la persona; el navegador nunca va al almacén y el
+archivo no queda guardado en ninguna caché.
+Sale: nada guardado.
+Si falla: «No se pudo abrir el archivo» con «No llegó el contenido del archivo. Revisa la conexión e inténtalo de
+nuevo.», nunca un visor en blanco; si no se pudo descargar, «No se pudo descargar «{name}»: {reason}».
+Implicados: ninguno
+
+### BASE-F75 Mover y renombrar un archivo o una carpeta
+<!-- origen: old-hub:HUB_SHELL-F133 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Archivos
+Pasos:
+  1. Para renombrar, elige «Renombrar» (o «Renombrar carpeta») en el ⋮: un diálogo con el nombre actual ya escrito
+     (hasta 255 caracteres). Pulsa «Renombrar» y sale «Renombrado.».
+  2. Para mover, elige «Mover a…»: «Mover «{name}»» con las carpetas del negocio en árbol, empezando por
+     «Archivos»; elige una y pulsa «Mover». También puede arrastrar el archivo o la carpeta a una carpeta del árbol o
+     de la cuadrícula. Sale «Movido a «{folder}».» (a lo de arriba del todo, «Movido a «Archivos».»).
+  3. Una carpeta se mueve o se renombra con todo lo que tiene. Si es la carpeta abierta (su ⋮, junto a la ruta), la
+     pantalla la sigue a su sitio nuevo. Nunca se ofrece como destino de sí misma ni de las suyas.
+Entra: el archivo o la carpeta y el nombre nuevo, o la carpeta de destino.
+Sale: el cambio, en los archivos del negocio (`base.file.renamed`, `base.file.moved`).
+Si falla: el diálogo sigue abierto con el motivo: «Ya hay un archivo o una carpeta con ese nombre aquí.», «Ya está en
+esa carpeta.», «Una carpeta no se puede mover dentro de sí misma.», «Ese nombre no es válido. Usa un nombre sin barras
+ni puntos sueltos.» o «Ese archivo o carpeta ya no existe. Actualiza la lista.»; al arrastrar, «No se pudo mover:
+{reason}». Quien no administra el negocio no ve «Renombrar» ni «Mover a…» y, si lo intenta igual, lee «Solo un
+administrador puede modificar los archivos.».
+Implicados: ninguno
+
+### BASE-F76 Borrar un archivo o una carpeta
+<!-- origen: old-hub:HUB_SHELL-F134 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Archivos
+Pasos:
+  1. Elige «Eliminar» (o «Eliminar carpeta») en el ⋮ de un archivo, de una carpeta o de la carpeta abierta.
+  2. La pantalla pregunta: «Eliminar archivo» con «Vas a eliminar «{name}». Esta acción no se puede deshacer.», o
+     «Eliminar carpeta» con «Vas a eliminar «{name}» y todo su contenido. Esto no se puede deshacer.».
+  3. Pulsa «Eliminar» (o «Cancelar»). Sale «Archivo eliminado.» o «Carpeta eliminada.». Si eliminó la carpeta
+     abierta, la pantalla sube a la de arriba.
+Entra: el archivo o la carpeta.
+Sale: el archivo o la carpeta, con todo lo que tenía, fuera de los archivos del negocio; no hay papelera
+(`base.file.deleted`).
+Si falla: «No se pudo eliminar: {reason}», con «Ese archivo o carpeta ya no existe. Actualiza la lista.» o «Tu sesión
+ha caducado. Vuelve a entrar e inténtalo otra vez.». Quien no administra el negocio no ve «Eliminar» y, si lo intenta
+igual, lee «Solo un administrador puede modificar los archivos.».
+Implicados: ninguno
+
+### BASE-F77 Abrir y cerrar el panel del asistente
 <!-- origen: old-hub:HUB_SHELL-F185 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1700,25 +1844,25 @@ Pasos:
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
      del panel), tocando el velo en el móvil, volviendo a pulsar los destellos o con «Ir a …» en una respuesta
-     (BASE-F76).
+     (BASE-F81).
   4. Si se deja abierto, sigue abierto al cambiar de pantalla y al recargar: el dispositivo recuerda solo si estaba
      abierto o cerrado.
 Entra: la sesión.
-Sale: al abrirlo, el panel lee los mensajes del asistente que le quedan al negocio este mes (BASE-F84) y la lista de
-lo que falta por configurar, para sus atajos (BASE-F83); cerrarlo no pide nada.
+Sale: al abrirlo, el panel lee los mensajes del asistente que le quedan al negocio este mes (BASE-F89) y la lista de
+lo que falta por configurar, para sus atajos (BASE-F88); cerrarlo no pide nada.
 Si falla: no tiene fallo propio. Sin sesión (la entrada, el PIN) no hay destellos. Cerrar el panel no corta una
 respuesta que ya viene: sigue escribiéndose y, si pide confirmación, la tarjeta sale encima de la pantalla que haya
-(BASE-F77).
-Implicados: BASE-F73, BASE-F77, BASE-F83, BASE-F84
+(BASE-F82).
+Implicados: BASE-F78, BASE-F82, BASE-F88, BASE-F89
 
-### BASE-F73 Preguntar al asistente y leer cómo escribe
+### BASE-F78 Preguntar al asistente y leer cómo escribe
 <!-- origen: old-hub:HUB_SHELL-F186 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la conversación vacía, el panel enseña los destellos, «Pregúntame por tus ventas, tu inventario o cualquier
-     cosa de tu negocio.» y los atajos de la puesta en marcha (BASE-F83).
+     cosa de tu negocio.» y los atajos de la puesta en marcha (BASE-F88).
   2. Escribe en «Escribe un mensaje…» y pulsa Intro o «Enviar». Con teclado, Mayús+Intro salta de línea; en una
      pantalla táctil, Intro salta de línea y se envía con «Enviar». «Enviar» no se activa con el cuadro vacío y sin
      adjuntos.
@@ -1731,13 +1875,13 @@ Pasos:
   6. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
   7. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del propio dispositivo, si la tiene, y
      «Dejar de leer» la para.
-Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F82).
-Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F84).
-Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F86 y BASE-F84. «Detener» no deshace
+Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F87).
+Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F89).
+Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F91 y BASE-F89. «Detener» no deshace
 una acción que ya se había hecho.
-Implicados: BASE-F82, BASE-F84, BASE-F86
+Implicados: BASE-F87, BASE-F89, BASE-F91
 
-### BASE-F74 Adjuntar un archivo o dictar por voz
+### BASE-F79 Adjuntar un archivo o dictar por voz
 <!-- origen: old-hub:HUB_SHELL-F187 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1752,7 +1896,7 @@ Pasos:
      solo.
   4. Al parar sale «Transcribiendo…» y el texto cae en el cuadro, detrás de lo que hubiera escrito. **No se envía
      solo**: la persona lo revisa y pulsa «Enviar», y lo que pida pasa por su tarjeta como cualquier otra petición
-     (BASE-F77).
+     (BASE-F82).
 Entra: los archivos (8 MB cada uno y 20 MB entre todos los de una pregunta) o la grabación.
 Sale: el archivo viaja con la pregunta a erplora.com, que lo lee; la grabación pasa por el negocio a la
 transcripción de erplora.com. El navegador nunca habla directamente con erplora.com.
@@ -1762,9 +1906,9 @@ PDF, Word, Excel, texto o CSV.» o «No se ha podido leer menu.pdf.». Con el mi
 micrófono está denegado. Permítelo en tu navegador para dictar.»; una grabación demasiado larga, «La grabación es
 demasiado larga: dicta un mensaje más corto.»; sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del
 micrófono.»; y si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.».
-Implicados: BASE-F73, BASE-F77
+Implicados: BASE-F78, BASE-F82
 
-### BASE-F75 Leer la respuesta: texto, listas, tablas y enlaces
+### BASE-F80 Leer la respuesta: texto, listas, tablas y enlaces
 <!-- origen: old-hub:HUB_SHELL-F188 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1774,15 +1918,15 @@ Pasos:
      tablas.
   2. Una tabla cabe en la burbuja: sus celdas parten el texto en lugar de ensanchar el panel, también en un móvil.
   3. Un enlace se lee por su texto, sin corchetes ni dirección. Solo se puede pulsar si lleva a una pantalla de este
-     negocio (BASE-F76); cualquier otra dirección, de fuera o inventada, se queda como texto.
+     negocio (BASE-F81); cualquier otra dirección, de fuera o inventada, se queda como texto.
   4. Lo que el panel no entiende (bloques de código, imágenes, citas) se queda como texto corriente. El mensaje de la
      persona sale siempre tal cual lo escribió.
 Entra: el texto del asistente.
 Sale: nada; solo se pinta. El panel nunca pinta HTML que venga en una respuesta.
 Si falla: una respuesta mal escrita se lee como texto: nunca se pierde ni rompe el panel.
-Implicados: BASE-F76
+Implicados: BASE-F81
 
-### BASE-F76 Ir a una pantalla desde una respuesta
+### BASE-F81 Ir a una pantalla desde una respuesta
 <!-- origen: old-hub:HUB_SHELL-F189 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1798,11 +1942,11 @@ Pasos:
 Entra: las pantallas que nombra la respuesta; las de este negocio y las de sus apps encendidas.
 Sale: la pantalla abierta; no se pide nada.
 Si falla: una pantalla que este negocio no tiene (la de una app apagada, una dirección inventada) no sale como botón
-ni como enlace, y la respuesta lleva el aviso de BASE-F79. Si la persona no puede ver la pantalla a la que llega, se
+ni como enlace, y la respuesta lleva el aviso de BASE-F84. Si la persona no puede ver la pantalla a la que llega, se
 lo dice esa pantalla.
-Implicados: BASE-F72, BASE-F79
+Implicados: BASE-F77, BASE-F84
 
-### BASE-F77 Confirmar una acción antes de que se ejecute
+### BASE-F82 Confirmar una acción antes de que se ejecute
 <!-- origen: old-hub:HUB_SHELL-F190 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1822,9 +1966,9 @@ Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hu
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Si se recarga la página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se
 cortó.» con «Reintentar».
-Implicados: BASE-F78, BASE-F79, BASE-F81
+Implicados: BASE-F83, BASE-F84, BASE-F86
 
-### BASE-F78 Acciones peligrosas: escribir para confirmar, o no desde el chat
+### BASE-F83 Acciones peligrosas: escribir para confirmar, o no desde el chat
 <!-- origen: old-hub:HUB_SHELL-F191 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1842,11 +1986,11 @@ Pasos:
      extremos), y el negocio lo vuelve a comprobar antes de hacerlo.
   5. Restablecer el negocio y exportar una copia nunca se hacen desde el chat: se hacen en Ajustes › Datos y copias.
 Entra: el riesgo que la app declara en cada acción y sus datos.
-Sale: si se acepta, como BASE-F77.
+Sale: si se acepta, como BASE-F82.
 Si falla: lo escrito que no coincide no deja ejecutar; cancelar no hace nada y el asistente lo cuenta como cancelado.
-Implicados: BASE-F35, BASE-F37, BASE-F77
+Implicados: BASE-F35, BASE-F37, BASE-F82
 
-### BASE-F79 Comprobar lo que dice el asistente contra lo que de verdad hizo
+### BASE-F84 Comprobar lo que dice el asistente contra lo que de verdad hizo
 <!-- origen: old-hub:HUB_SHELL-F192 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1860,18 +2004,18 @@ Pasos:
   3. Si escribe un identificador que ninguna consulta del turno devolvió y que la persona no escribió: «Esta
      respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.».
   4. Si señala una pantalla que este negocio no tiene: «Esta respuesta señala una pantalla que no existe aquí.», y
-     sin «Ir a …» (BASE-F76).
+     sin «Ir a …» (BASE-F81).
   5. Los avisos llevan su icono de alerta, no los escribe el asistente y se quedan con el mensaje, también al
      recargar. Una respuesta limpia no lleva ninguno.
-  6. Los recibos de BASE-F77 dicen qué se hizo de verdad, acción por acción.
+  6. Los recibos de BASE-F82 dicen qué se hizo de verdad, acción por acción.
 Entra: lo que se hizo en el turno, con su resultado, y lo que devolvieron sus consultas.
 Sale: los avisos y los recibos, guardados con la conversación.
 Si falla: «Hecho» quiere decir que la acción de su app acabó sin error: si una app responde bien sin haber cambiado
-nada, es esa acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F86), los
+nada, es esa acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F91), los
 avisos de lo que llegó a decir y los recibos de lo que sí se hizo.
-Implicados: BASE-F76, BASE-F77, BASE-F86
+Implicados: BASE-F81, BASE-F82, BASE-F91
 
-### BASE-F80 Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable
+### BASE-F85 Lo que el asistente puede hacer según quién pregunta: permisos y PIN de un responsable
 <!-- origen: old-hub:HUB_SHELL-F193 -->
 Estado: parcial — la aprobación con el PIN de un responsable todavía no existe en el Hub (llega con Personas y permisos): la acción que la pediría se niega
 Actor: propietario, administrador, responsable, empleado
@@ -1887,9 +2031,9 @@ Entra: la sesión de quien pregunta, que firma cada acción.
 Sale: la acción hecha con esa persona como autora.
 Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Lo que
 haría falta que aprobara un responsable no se puede aprobar desde el chat: se queda sin hacer, con el mismo recibo.
-Implicados: BASE-F13, BASE-F77
+Implicados: BASE-F13, BASE-F82
 
-### BASE-F81 Pedirle varias cosas seguidas
+### BASE-F86 Pedirle varias cosas seguidas
 <!-- origen: old-hub:HUB_SHELL-F194 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1898,7 +2042,7 @@ Pasos:
   1. La persona pide una cadena («crea la categoría Bebidas y el producto Caña a 2,50 €»).
   2. El asistente la resuelve por rondas: lee lo que necesita sin preguntar, pide una acción, se hace y sigue. Todo lo
      que dice va a la misma burbuja.
-  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F77), una detrás de otra: aceptar la primera no acepta
+  3. Cada acción que cambia algo pide su propia tarjeta (BASE-F82), una detrás de otra: aceptar la primera no acepta
      las siguientes. Si detrás esperan más, la tarjeta lleva «Cancelar todo», que cancela esta y las que faltan.
   4. Si cancela una, el asistente lo sabe y decide cómo seguir. Lo ya hecho se queda hecho.
   5. Una petición admite como mucho seis rondas: es un freno contra los bucles, no un cupo. Pasadas, «He parado: esto
@@ -1906,10 +2050,10 @@ Pasos:
 Entra: la petición; el resultado de cada acción, que vuelve al asistente.
 Sale: tantas acciones como tarjetas aceptadas, cada una en su app y con su recibo.
 Si falla: si una acción falla a mitad, el asistente lo recibe y lo cuenta; las anteriores no se deshacen. Con la red
-cortada a mitad, BASE-F86.
-Implicados: BASE-F77, BASE-F86
+cortada a mitad, BASE-F91.
+Implicados: BASE-F82, BASE-F91
 
-### BASE-F82 La conversación: qué se guarda, dónde y cuándo se borra
+### BASE-F87 La conversación: qué se guarda, dónde y cuándo se borra
 <!-- origen: old-hub:HUB_SHELL-F195 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1933,7 +2077,7 @@ vacía. Una conversación demasiado larga dice «Esta conversación es demasiado
 conversación».
 Implicados: BASE-F59, BASE-F60, BASE-F61
 
-### BASE-F83 El asistente en la puesta en marcha
+### BASE-F88 El asistente en la puesta en marcha
 <!-- origen: old-hub:HUB_SHELL-F196 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1949,15 +2093,15 @@ Pasos:
   4. Desde la puesta en marcha (el botón o un atajo), antes de cada pregunta el asistente vuelve a leer la lista: lo
      pendiente, lo que impide facturar, lo hecho y lo que le toca a un administrador. Un negocio que se configura a
      mitad de la charla deja de describirse como sin configurar.
-  5. Lo que pida hacer (encender una app, cargar una plantilla) pasa por su tarjeta (BASE-F77).
+  5. Lo que pida hacer (encender una app, cargar una plantilla) pasa por su tarjeta (BASE-F82).
 Entra: la lista de lo que falta, con lo que esa persona puede ver (BASE-F01).
 Sale: la lista, para el asistente; la conversación normal.
 Si falla: si la lista no se puede leer, el asistente lo sabe y no dice que el negocio está configurado, y los atajos
 se quedan en «¿Qué falta por configurar?». Cada paso sigue teniendo su «Configurar» en la lista: con el asistente
 caído nadie se queda sin salida.
-Implicados: BASE-F01, BASE-F12, BASE-F77
+Implicados: BASE-F01, BASE-F12, BASE-F82
 
-### BASE-F84 Ver el plan del asistente, el límite de uso y ampliarlo
+### BASE-F89 Ver el plan del asistente, el límite de uso y ampliarlo
 <!-- origen: old-hub:HUB_SHELL-F197 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1979,9 +2123,9 @@ Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.
 Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
 Si falla: si no se puede leer el plan, no se enseña nada y se puede preguntar igual: lo que diga erplora.com al
 responder es lo que vale.
-Implicados: BASE-F11, BASE-F86
+Implicados: BASE-F11, BASE-F91
 
-### BASE-F85 Informar de una respuesta mala
+### BASE-F90 Informar de una respuesta mala
 <!-- origen: old-hub:HUB_SHELL-F198 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -2000,7 +2144,7 @@ Si falla: «No se pudo enviar la denuncia. Inténtalo de nuevo.», y la ventana 
 escrito.
 Implicados: ninguno
 
-### BASE-F86 El asistente sin conexión, con el servicio caído o sin plan
+### BASE-F91 El asistente sin conexión, con el servicio caído o sin plan
 <!-- origen: old-hub:HUB_SHELL-F199 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -2016,13 +2160,13 @@ Pasos:
   4. Con demasiadas preguntas seguidas, «Demasiadas preguntas seguidas: espera 60 segundos y vuelve a intentarlo.».
   5. Si la sesión termina a mitad de la charla, «Tu sesión ha terminado. Vuelve a entrar para seguir hablando.» con
      «Volver a entrar».
-  6. Quedarse sin mensajes o tener un plan sin asistente no es una avería: BASE-F84.
+  6. Quedarse sin mensajes o tener un plan sin asistente no es una avería: BASE-F89.
   7. «Reintentar» vuelve a hacer la misma pregunta: nunca se pierde.
 Entra: lo que pasó con la pregunta.
-Sale: el fallo, en la burbuja y guardado con la conversación (BASE-F82); al asistente no le llega como si lo hubiera
+Sale: el fallo, en la burbuja y guardado con la conversación (BASE-F87); al asistente no le llega como si lo hubiera
 dicho él.
 Si falla: un fallo sin nada escrito no deja una burbuja vacía: solo la frase con su salida.
-Implicados: BASE-F73, BASE-F82, BASE-F84
+Implicados: BASE-F78, BASE-F87, BASE-F89
 
 ## Para quien lo mantiene
 
@@ -2254,7 +2398,28 @@ Implicados: BASE-F73, BASE-F82, BASE-F84
   `pages/{Login,PinSetup,SwitchUser,Profile,Settings}Page.test.ts` y `frontend/main.test.ts`; e2e
   `tests/e2e/base-access.spec.ts` (dos personas, dos dispositivos, plan Gratis, una cuenta de Ventas abierta durante
   el cambio de usuario).
-- **Asistente** (APP-BASE-9, BASE-F72…F86; PLAN §30, ronda 2026-10-22b): es **plataforma** dentro de `base/`, no un
+- Archivos (BASE-F72…F76) no tiene modelo ni tabla: lista el almacén `STORAGES["hub_files"]` (`base/storage.py`: S3
+  con bucket, si no disco bajo `MEDIA_ROOT`) bajo `hub-<hex>/files/<ruta>` con `base/files.py` (sin ORM: nombres y
+  rutas, el `.keep` de una carpeta vacía, listar, subir, carpeta, renombrar, mover, borrar y `file_response`). Las
+  operaciones, todas con `ai=`: `base.file.list` y `base.file.read` (`queries.py`, `base.view_files`), y en
+  `services.py` `base.file.upload`, `create_folder` y `rename` (`base.upload_files`), `move` (`base.delete_files` y
+  además `base.upload_files`) y `delete` (`base.delete_files`). Rutas `/api/files`, `/api/files/raw` (los bytes con
+  `Cache-Control: private, no-store`, adjunto salvo `inline` en un tipo que se puede enseñar, CSP `sandbox`; su
+  descripción en JSON con `Accept: application/json`) y `/api/files/{upload,folder,rename,move,delete}`; eventos
+  `base.file.*` y consulta viva `base.file.list`. Nunca por `/p/media/` (público y con caché de un año: solo las
+  `PUBLIC_FOLDERS`). Topes: 25 MB por archivo (cuerpo de 35,1 MB en base64), nombre de 255 bytes, carpeta de 100
+  caracteres y ruta de 980 bytes; los programas (`BLOCKED_EXTENSIONS`, la lista de Gmail) se rechazan. Subir nunca pisa:
+  la escritura es condicional (`If-None-Match: *` en S3, `O_EXCL` en disco) y, si otra subida del mismo nombre llegó
+  antes, toma el siguiente nombre libre. Un listado lee solo la carpeta abierta (`Delimiter` en S3); el árbol de carpetas
+  y lo que ocupan los archivos salen del índice del hub, guardado en la caché (`base.files:<hex>:*`, 10 minutos como
+  mucho): una subida le suma sus bytes y crear, renombrar, mover o borrar lo olvidan, así que un lote de subidas y los
+  listados de después recorren los archivos una sola vez; lo que guardan las apps se cuenta en cada llamada. El espacio
+  es el de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
+  guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
+  enseña. Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
+  hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
+  `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A).
+- **Asistente** (APP-BASE-9, BASE-F77…F91; PLAN §30, ronda 2026-10-22b): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. `base/assistant.py` (sin ORM) tiene el catálogo de herramientas (`catalog`: toda
   `@operation` de las apps activas cuyo `ai=` tiene descripción y cuyo permiso tiene la persona, salvo las «Not an
@@ -2311,6 +2476,10 @@ Implicados: BASE-F73, BASE-F82, BASE-F84
   en las caras de una caja.
 - No tiene contraseña propia: la cuenta es la de erplora.com; el PIN y la placa solo abren una caja en la que ya se
   entró con una cuenta.
+- Archivos no enseña las carpetas que usan las apps para lo suyo (las imágenes de la web): las gestiona cada app; los
+  registros del sistema están en «Sistema» › «Registros».
+- Archivos no tiene papelera, no copia, no comparte por enlace ni busca en todas las carpetas a la vez; tampoco guarda
+  programas ni archivos de más de 25 MB.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.
 - El asistente no busca en Internet ni convierte divisas (llegan con la etapa ERP), y no hace nada que la persona no
