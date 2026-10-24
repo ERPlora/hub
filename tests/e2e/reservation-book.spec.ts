@@ -460,3 +460,79 @@ test('Seating a party leaves the next reservation of its table held: Reserved ag
     await context.close();
   }
 });
+
+/** A Spanish mobile no other run has (nine digits from 6): the local digits the staff type. */
+function localPhone(): string {
+  return `6${String(Date.now() + Math.floor(Math.random() * 1000)).slice(-8)}`;
+}
+
+// flow: RESERVATION-F06 RESERVATION-F08
+test('A phone typed without prefix for a chosen card is kept international; one that is not a number is said on its field', async ({ browser }) => {
+  // In Spanish, as the business sees it: the owner's session with the language the jump would set.
+  const { context, page } = await ownerPage(browser, '/reservation/reservations');
+  try {
+    await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    await page.goto(`${A}/reservation/reservations`);
+    await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    const view = shown(page);
+    const guest = `${TAG} Lucía`;
+    const card = await post<{ id: string; phone: string }>(context, '/customer/customers', { name: guest, phone: localPhone() });
+    const typed = localPhone();
+
+    // «Nueva reserva»: her card chosen in the customer search, and another number typed without prefix.
+    await view.locator('[data-testid=reservation-list-add]').click();
+    const form = page.locator('[data-testid=reservation-form]');
+    await form.locator('[data-testid=customer-search-trigger]').click();
+    const search = page.locator('ion-modal[data-testid=customer-search-modal]');
+    await search.locator('[data-testid=customer-picker-search] input').fill(guest);
+    await search.locator(`[data-testid=customer-picker-result-${card.id}]`).click();
+    await expect(search).toBeHidden();
+    const phone = form.locator('[data-testid=reservation-form-guest_phone] input');
+    await expect(phone).toHaveValue(card.phone);
+
+    // Not a number of its country: the reason is Customers', under «Teléfono», and nothing is booked.
+    await phone.fill('600111');
+    await form.locator('[data-testid=reservation-form-date] input').fill(SOON.date);
+    await form.locator('[data-testid=reservation-form-time] input').fill(SOON_TIME);
+    await form.locator('[data-testid=reservation-form-party_size] input').fill('2');
+    await form.locator('[data-testid=reservation-form-submit]').click();
+    const refusal = 'No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo internacional (+44…).';
+    await expect(form.locator('[data-testid=reservation-form-guest_phone]')).toHaveClass(/ion-invalid/);
+    await expect(form.locator('[data-testid=reservation-form-guest_phone]')).toContainText(refusal);
+    await expect(form).toBeVisible();
+    expect(psql(`select count(*) from reservation_reservation where customer_id = '${card.id}'`)).toBe('0');
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(form.locator('[data-testid=reservation-form-guest_phone]')).toContainText(refusal);
+      await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-form-${viewport.label}`), fullPage: true });
+    }
+    await page.setViewportSize({ width: 1280, height: 860 });
+
+    // Her other number, typed without prefix: kept international, as her card keeps hers.
+    await phone.fill(typed);
+    await form.locator('[data-testid=reservation-form-submit]').click();
+    await expect(form).toBeHidden();
+    const saved = psql(`select id || ' ' || guest_phone from reservation_reservation where customer_id = '${card.id}'`).split(' ');
+    expect(saved[1]).toBe(`+34${typed}`);
+    const id = saved[0];
+
+    // Open it again (F08): the phone it shows is the international one; another bad one changes nothing.
+    if (SOON.date !== TODAY.date) await view.locator('[data-testid=reservation-day-next]').click();
+    const row = view.locator(`[data-testid=reservation-list-row][data-id="${id}"]`);
+    await expect(row).toContainText('Pendiente');
+    await rowAction(page, 'reservation-list', id, 'edit');
+    await expect(phone).toHaveValue(`+34${typed}`);
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(phone).toHaveValue(`+34${typed}`);
+      await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-${viewport.label}`), fullPage: true });
+    }
+    await page.setViewportSize({ width: 1280, height: 860 });
+    await phone.fill('600111');
+    await form.locator('[data-testid=reservation-form-submit]').click();
+    await expect(form.locator('[data-testid=reservation-form-guest_phone]')).toContainText(refusal);
+    expect(psql(`select guest_phone from reservation_reservation where id = '${id}'`)).toBe(`+34${typed}`);
+  } finally {
+    await context.close();
+  }
+});

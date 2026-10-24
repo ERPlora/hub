@@ -282,22 +282,27 @@ Pasos:
    origen y las notas. «Reservar».
 3. La reserva nace Pendiente (o Confirmada, si se confirman solas: entonces retiene su mesa).
 4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5».
-Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas.
+Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas. El
+teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
+espacios), también el que se teclea con la ficha ya elegida; uno escrito con el prefijo de otro país
+conserva el suyo. Es el número con el que WhatsApp encuentra la conversación del cliente
+(RESERVATION-F19).
 Sale: la reserva, ligada a la ficha del cliente (avisa: `reservation.reservation.created`).
 Si falla: no se guarda nada y lo escrito se queda; el primer motivo que aplica, en este orden: un
-teléfono que no es de su país (el motivo de Clientes, en el campo Teléfono, antes que nada más: nunca
-después de «¿Reservar igualmente?»); sin teléfono (o sin correo) cuando son obligatorios: «Este negocio
-pide un teléfono en cada reserva.»; una hora ya pasada: «Esa hora ya ha pasado.»; solo por internet o
-WhatsApp, comensales fuera de los límites («Ese número de comensales está fuera de los límites del
-negocio (1–20 comensales).»), menos antelación de la mínima («Hay que reservar con al menos 1 h de
-antelación.») o más allá de los días máximos («Solo se reserva hasta 30 días vista.»); día bloqueado:
-«Esa fecha está bloqueada (festivo o cierre): ese día no se aceptan reservas.»; negocio cerrado a esa
-hora (Horarios): «A esa hora el negocio está cerrado.»; ninguna franja cubre esa hora: «No hay servicio
-a esa hora: ninguna franja la cubre.»; franja llena: «Esa franja ya está completa para ese día.» (al
-personal se le pregunta «¿Reservar igualmente?» y, si lo confirma, la reserva entra; por internet o
-WhatsApp, nunca); mesa fuera de servicio: «Esa mesa no se puede reservar: está bloqueada o fuera de
-servicio.»; mesa ya reservada a esa hora: «La mesa 5 ya tiene una reserva de 21:00 a 23:00.». Dos
-reservas a la vez sobre el último hueco o sobre la misma mesa y hora: entra una y la otra recibe su
+teléfono que no es de su país (el motivo de Clientes, «No es un teléfono válido de su país: revisa las
+cifras o escríbelo con su prefijo internacional (+44…).», en el campo Teléfono, antes que nada más: nunca
+después de «¿Reservar igualmente?»; tampoco se crea la ficha); sin teléfono (o sin correo) cuando son
+obligatorios: «Este negocio pide un teléfono en cada reserva.»; una hora ya pasada: «Esa hora ya ha
+pasado.»; solo por internet o WhatsApp, comensales fuera de los límites («Ese número de comensales está
+fuera de los límites del negocio (1–20 comensales).»), menos antelación de la mínima («Hay que reservar
+con al menos 1 h de antelación.») o más allá de los días máximos («Solo se reserva hasta 30 días
+vista.»); día bloqueado: «Esa fecha está bloqueada (festivo o cierre): ese día no se aceptan reservas.»;
+negocio cerrado a esa hora (Horarios): «A esa hora el negocio está cerrado.»; ninguna franja cubre esa
+hora: «No hay servicio a esa hora: ninguna franja la cubre.»; franja llena: «Esa franja ya está completa
+para ese día.» (al personal se le pregunta «¿Reservar igualmente?» y, si lo confirma, la reserva entra;
+por internet o WhatsApp, nunca); mesa fuera de servicio: «Esa mesa no se puede reservar: está bloqueada o
+fuera de servicio.»; mesa ya reservada a esa hora: «La mesa 5 ya tiene una reserva de 21:00 a 23:00.».
+Dos reservas a la vez sobre el último hueco o sobre la misma mesa y hora: entra una y la otra recibe su
 motivo (en la franja llena, el personal puede después reservar igualmente; en la mesa, nunca).
 Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
 
@@ -330,9 +335,12 @@ Pasos:
    llena con «Reservar igualmente». Si estaba confirmada, Mesas mueve su retención a la mesa y la hora
    nuevas, o la suelta si se queda sin mesa (TABLE-F26).
 3. Una reserva sentada, completada, cancelada o no presentada solo cambia sus notas.
-Entra: los campos cambiados.
+Entra: los campos cambiados. El teléfono nuevo se guarda en formato internacional, como en el alta; el
+mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio.
 Sale: la reserva cambiada (avisa: `reservation.reservation.updated`).
-Si falla: los motivos de RESERVATION-F06; en otro estado: «Esta reserva ya no se puede cambiar: solo sus
+Si falla: los motivos de RESERVATION-F06, y el primero, un teléfono que no es de su país: «No es un
+teléfono válido de su país: revisa las cifras o escríbelo con su prefijo internacional (+44…).», en el
+campo Teléfono, y no cambia nada; en otro estado: «Esta reserva ya no se puede cambiar: solo sus
 notas.».
 Implicados: TABLE-F26, RESERVATION-F06, RESERVATION-F18
 
@@ -425,10 +433,12 @@ Pasos:
 1. Busca al cliente o escribe su nombre y, si quieres, su teléfono (con teléfono se liga a su ficha como
    una reserva), la fecha, la hora que prefiere, los comensales y las notas.
 2. «Añadir a la lista de espera»: sale en la lista, en el orden en que se apuntó, En espera.
-Entra: cliente (o nombre y teléfono), fecha, hora preferida, comensales, notas.
+Entra: cliente (o nombre y teléfono), fecha, hora preferida, comensales, notas. El teléfono se guarda en
+formato internacional, como en una reserva (RESERVATION-F06), también con la ficha ya elegida.
 Sale: la entrada (avisa: `reservation.waitlist.created`).
 Si falla: sin nombre ni cliente: lo dice el formulario; un teléfono que no es de su país: el motivo de
-Clientes.
+Clientes, «No es un teléfono válido de su país: revisa las cifras o escríbelo con su prefijo
+internacional (+44…).», en el campo Teléfono, y no se apunta a nadie ni se crea la ficha.
 Implicados: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Marcar contactado o quitar de la lista de espera
@@ -451,8 +461,9 @@ Estado: hecho
 Actor: empleado, responsable, asistente
 Pantalla: Lista de espera (fila → «Convertir»)
 Pasos:
-1. Hay sitio: «Convertir». Se crea la reserva con los datos de la propia entrada (cliente, fecha, hora
-   preferida, comensales, notas), con la duración por defecto, y la entrada queda Convertida.
+1. Hay sitio: «Convertir». Se crea la reserva con los datos de la propia entrada (cliente, su teléfono en
+   formato internacional, fecha, hora preferida, comensales, notas), con la duración por defecto, y la
+   entrada queda Convertida.
 2. La conversión comprueba que la hora no haya pasado, el día bloqueado, el horario del negocio y la
    franja con sitio: es el personal quien la hace, a menudo para ahora mismo (sin antelación, días
    máximos ni límites de comensales). Con la franja llena, se pregunta «¿Convertir igualmente?».
@@ -766,9 +777,15 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
 - **Clientes**: sin ficha elegida y con teléfono, se busca la ficha viva con ese número
   (`customer.customer.by_phone`; entre varias, la del mismo nombre sin mayúsculas ni acentos, si no la
   primera) y, si no hay, se crea (`customer.customer.create`, origen Teléfono, En el local, WhatsApp o
-  Web), antes de la puerta: un teléfono que Clientes rechaza se dice primero. La reserva copia el
-  nombre, el teléfono y el correo de la ficha elegida si no se escriben otros; con la ficha encontrada o
-  creada por el teléfono, el teléfono queda como lo guarda Clientes (+34600111222).
+  Web), antes de la puerta. La reserva copia el nombre, el teléfono y el correo de la ficha elegida si no
+  se escriben otros. **El teléfono tecleado** (alta, cambio y lista de espera) pasa siempre por
+  `typed_phone` = `apps.customer.phones.to_e164(raw, business_country(ctx))`, lo primero de la operación,
+  con la ficha elegida o sin ella (como Citas al editar el teléfono): E.164, el `+` de otro país se
+  respeta, y uno inválido es `InvalidPayload` `reservation.phone_invalid` con el `PHONE_INVALID` de
+  Clientes en `guest_phone` (texto prestado: vive en el catálogo de Clientes, `test_i18n.BORROWED`). La
+  receta `reservation_confirmed` de WhatsApp busca la conversación por ese número exacto (F19). Las
+  filas anteriores las pasó a E.164 la migración `0002_guest_phone_e164` (reglas de `to_e164` copiadas,
+  país `ES` de la fase 1; lo que no es número válido se queda como estaba).
 - **Hora del negocio**: fase 1, `settings.TIME_ZONE` (Europe/Madrid). El día y la hora se guardan de
   pared; «ahora» es la hora del negocio.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cancelar, no presentado y
