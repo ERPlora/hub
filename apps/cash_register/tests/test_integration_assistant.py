@@ -65,7 +65,7 @@ def test_the_summary_runs_by_itself_and_tells_the_model_the_session_the_count_th
         ("cash_register.session.closing_summary", "query", "ok")
     ]
     told = json.loads(plan["append"][0]["content"])
-    assert (told["number"], told["counted"], told["expected_balance"], told["difference"]) == (
+    assert (told["number"], told["closing_balance"], told["expected_balance"], told["difference"]) == (
         session.number,
         25000,
         10150,

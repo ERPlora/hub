@@ -448,12 +448,12 @@ def test_the_close_summary_has_the_session_the_count_said_the_expected_and_the_d
         "register_name": "",
         "opened_by": "tester",
         "opening_balance": 10000,
-        "counted": 25000,
+        "closing_balance": 25000,
         "expected_balance": 12150,
         "difference": 12850,
         "expected_hidden": False,
-        "count_required": True,
-        "review": NOTHING_PENDING,
+        "require_closing_balance": True,
+        "pending": NOTHING_PENDING,
     }
     assert seen.opened_at == session.opened_at
     # It only reads: the session stays open and nothing is said.
@@ -464,7 +464,7 @@ def test_the_close_summary_has_the_session_the_count_said_the_expected_and_the_d
 def test_the_close_summary_counts_a_shortfall_as_a_negative_difference():
     open_session(10000)
     seen = summarize(closing_balance=9500)
-    assert (seen.counted, seen.expected_balance, seen.difference) == (9500, 10000, -500)
+    assert (seen.closing_balance, seen.expected_balance, seen.difference) == (9500, 10000, -500)
 
 
 def test_the_close_summary_names_its_drawer_and_the_session_said_by_its_number():
@@ -479,7 +479,7 @@ def test_a_blind_count_keeps_the_expected_and_the_difference_out_of_the_cashiers
     run("cash_register.settings.update", {"require_blind_count": True})
     open_session(10000)
     cashier = summarize(ctx_for("hub_employee"), closing_balance=25000)
-    assert (cashier.counted, cashier.expected_balance, cashier.difference, cashier.expected_hidden) == (
+    assert (cashier.closing_balance, cashier.expected_balance, cashier.difference, cashier.expected_hidden) == (
         25000,
         None,
         None,
@@ -507,7 +507,7 @@ def test_with_the_count_required_a_close_summary_without_a_count_asks_for_it_as_
     # With the count not required, the summary goes without a count nor a difference.
     run("cash_register.settings.update", {"require_closing_balance": False})
     seen = summarize()
-    assert (seen.counted, seen.expected_balance, seen.difference, seen.count_required) == (None, 10000, None, False)
+    assert (seen.closing_balance, seen.expected_balance, seen.difference, seen.require_closing_balance) == (None, 10000, None, False)
 
 
 def test_the_close_summary_of_a_session_that_cannot_be_closed_is_refused_as_the_close_is():
@@ -563,7 +563,7 @@ def test_the_close_summary_carries_what_is_still_pending_in_sales_the_kitchen_an
             "document": {"receipt_id": "T-1", "items": [], "total": 0.0, "payment_method": "Cash"},
         },
     )
-    review = summarize(closing_balance=10000).review
+    review = summarize(closing_balance=10000).pending
     assert (review.open_checks, sorted(review.open_check_labels)) == (2, ["Table 4", "Table 7"])
     assert (review.unserved, review.unserved_labels) == (1, ["Terrace 2"])
     # The receipt waiting, and the kitchen ticket's own paper (the kitchen queues it, with no printer to take it).
@@ -577,7 +577,7 @@ def test_an_app_not_on_in_the_business_has_nothing_pending_in_the_close_summary(
     open_session(10000)
     for name in ("kitchen.ticket.board", "printing.job.summary"):
         monkeypatch.delitem(registry, name)
-    assert summarize(closing_balance=10000).review.model_dump() == NOTHING_PENDING
+    assert summarize(closing_balance=10000).pending.model_dump() == NOTHING_PENDING
 
 
 def test_an_app_off_in_the_business_has_nothing_pending_in_the_close_summary(monkeypatch):
@@ -590,7 +590,7 @@ def test_an_app_off_in_the_business_has_nothing_pending_in_the_close_summary(mon
         raise AppInactive("Kitchen is not on in this business.")
 
     monkeypatch.setitem(registry, "kitchen.ticket.board", _replaced(registry["kitchen.ticket.board"], off))
-    assert summarize(closing_balance=10000).review.model_dump() == NOTHING_PENDING
+    assert summarize(closing_balance=10000).pending.model_dump() == NOTHING_PENDING
 
 
 def test_a_reading_refused_makes_the_review_of_the_close_summary_incomplete():
@@ -606,7 +606,7 @@ def test_a_reading_refused_makes_the_review_of_the_close_summary_incomplete():
         actor="x",
         permissions=frozenset({"cash_register.view_session", "cash_register.close_session", "kitchen.view_ticket"}),
     )
-    review = summarize(closer, closing_balance=10000).review
+    review = summarize(closer, closing_balance=10000).pending
     assert (review.open_checks, review.prints, review.incomplete) == (0, 0, True)
 
 

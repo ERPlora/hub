@@ -392,7 +392,9 @@ class ClosingSummaryOut(Schema):
     opened_at: datetime = Field(description="When it opened.")
     opened_by: str = Field(description="Who opened it.")
     opening_balance: int = Field(description="Its opening float, in cents.")
-    counted: int | None = Field(description="The counted cash said, in cents; none = closing without a count.")
+    closing_balance: int | None = Field(
+        description="The counted cash said, in cents; none = closing without a count."
+    )
     expected_balance: int | None = Field(
         description="The cash there should be now, in cents; none when a blind count hides it from the reader."
     )
@@ -403,8 +405,8 @@ class ClosingSummaryOut(Schema):
     expected_hidden: bool = Field(
         description="A blind count hides the expected (and so the difference) from the reader: never guess them."
     )
-    count_required: bool = Field(description="The settings ask for the count to close.")
-    review: ShiftReviewOut = Field(description="What is still pending at the close.")
+    require_closing_balance: bool = Field(description="The settings ask for the count to close.")
+    pending: ShiftReviewOut = Field(description="What is still pending at the close (the shift review).")
 
 
 class AutoCloseOut(Schema):

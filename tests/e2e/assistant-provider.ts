@@ -40,11 +40,11 @@ export interface Seen {
 /** The close's summary as the Hub's `cash_register.session.closing_summary` answers it (the fields the model says). */
 export interface CloseCashSummary {
   number: string;
-  counted: number | null;
+  closing_balance: number | null;
   expected_balance: number | null;
   difference: number | null;
   expected_hidden: boolean;
-  review: {
+  pending: {
     open_checks: number;
     open_check_labels: string[];
     unserved: number;
@@ -62,14 +62,14 @@ const named = (count: number, labels: string[]) => (labels.length ? `${count} ($
  *  that a blind count left out), and what is still pending at the close. */
 export function closeCashSummary(summary: CloseCashSummary): string {
   const lines = [`Vas a cerrar la sesión **${summary.number}**:`, ''];
-  if (summary.counted !== null) lines.push(`- Contado: ${euros(summary.counted)}`);
+  if (summary.closing_balance !== null) lines.push(`- Contado: ${euros(summary.closing_balance)}`);
   if (summary.expected_hidden || summary.expected_balance === null) {
     lines.push('- Arqueo ciego: el cierre lo comparará al confirmar.');
   } else {
     lines.push(`- Esperado: ${euros(summary.expected_balance)}`);
     if (summary.difference !== null) lines.push(`- Diferencia: ${euros(summary.difference, true)}`);
   }
-  const review = summary.review;
+  const review = summary.pending;
   if (review.open_checks) lines.push(`- Cuentas abiertas: ${named(review.open_checks, review.open_check_labels)}`);
   if (review.unserved) lines.push(`- Comandas sin servir: ${named(review.unserved, review.unserved_labels)}`);
   if (review.prints) lines.push(`- Impresiones sin salir: ${review.prints}`);

@@ -190,12 +190,12 @@ export interface ClosingSummaryOut {
   opened_at: string;
   opened_by: string;
   opening_balance: number;
-  counted: number | null;
+  closing_balance: number | null;
   expected_balance: number | null;
   difference: number | null;
   expected_hidden: boolean;
-  count_required: boolean;
-  review: ShiftReviewOut;
+  require_closing_balance: boolean;
+  pending: ShiftReviewOut;
 }
 
 export interface AutoCloseOut {

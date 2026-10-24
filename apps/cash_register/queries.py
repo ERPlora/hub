@@ -976,10 +976,11 @@ def shift_review(ctx: OperationContext) -> dict:
     expose_api=True,
     ai={
         "description": "The summary of closing the drawer, before closing it: what closing a cash session (the open one "
-        "unless its number is said) would give with the cash counted in cents: its number, the counted cash and, unless a blind count hides them from "
-        "the reader, the expected cash and the difference (negative = short); and what is still pending at the close "
-        "(open checks, kitchen tickets not served, prints that did not come out). Changes nothing. Read it before "
-        "closing and tell the person this summary; with the count required and none said, it asks for the count."
+        "unless its number is said) would give with the cash counted in cents: its number, the counted cash and, "
+        "unless a blind count hides them from the reader, the expected cash and the difference (negative = short); and "
+        "what is still pending at the close (open checks, kitchen tickets not served, prints that did not come out). "
+        "Changes nothing. Read it before closing and tell the person this summary; with the count required and none "
+        "said, it asks for the count."
     },
 )
 def closing_summary(ctx: OperationContext, params: ClosingSummaryIn) -> dict:
@@ -996,12 +997,12 @@ def closing_summary(ctx: OperationContext, params: ClosingSummaryIn) -> dict:
         "opened_at": session.opened_at,
         "opened_by": session.opened_by,
         "opening_balance": session.opening_balance,
-        "counted": counted,
+        "closing_balance": counted,
         "expected_balance": expected,
         "difference": None if expected is None or counted is None else counted - expected,
         "expected_hidden": hidden,
-        "count_required": settings.require_closing_balance,
-        "review": shift_review(ctx),
+        "require_closing_balance": settings.require_closing_balance,
+        "pending": shift_review(ctx),
     }
 
 

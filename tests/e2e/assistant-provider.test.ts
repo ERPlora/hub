@@ -62,11 +62,11 @@ describe('answerTo', () => {
     });
     const summary = {
       number: 'S-261024-0001',
-      counted: 25000,
+      closing_balance: 25000,
       expected_balance: 23000,
       difference: 2000,
       expected_hidden: false,
-      review: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
+      pending: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
     };
     const read = [question, asked('cash_register__session__closing_summary'), { role: 'tool', content: JSON.stringify(summary) }];
     const close = answerTo(read);
@@ -91,7 +91,7 @@ describe('answerTo', () => {
   });
 
   it('the close summary as the model says it: the expected and the difference only when they came, and what is pending', () => {
-    const base = { number: 'S-1', counted: 25000, review: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
+    const base = { number: 'S-1', closing_balance: 25000, pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
     expect(closeCashSummary({ ...base, expected_balance: 23000, difference: 2000, expected_hidden: false })).toBe(
       'Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Esperado: 230.00 €\n- Diferencia: +20.00 €',
     );
@@ -103,7 +103,7 @@ describe('answerTo', () => {
       expected_balance: null,
       difference: null,
       expected_hidden: true,
-      review: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 1, unserved_labels: ['Terraza 2'], prints: 3, print_usages: ['receipt'], incomplete: true },
+      pending: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 1, unserved_labels: ['Terraza 2'], prints: 3, print_usages: ['receipt'], incomplete: true },
     });
     expect(pending).toContain('- Cuentas abiertas: 2 (Mesa 4 · Mesa 7)');
     expect(pending).toContain('- Comandas sin servir: 1 (Terraza 2)');

@@ -144,7 +144,7 @@ def test_the_close_summary_is_read_over_http_before_closing(employee_client):
     session = post(employee_client, "/cash_register/sessions/open", {"opening_balance": 10000}).json()
     seen = get(employee_client, "/cash_register/sessions/closing_summary", closing_balance=9500)
     assert seen.status_code == 200
-    assert (seen.json()["number"], seen.json()["counted"], seen.json()["difference"]) == (session["number"], 9500, -500)
+    assert (seen.json()["number"], seen.json()["closing_balance"], seen.json()["difference"]) == (session["number"], 9500, -500)
     asked = get(employee_client, "/cash_register/sessions/closing_summary")
     assert asked.status_code == 409
     assert asked.json()["error"]["code"] == "cash_register.closing_balance_required"
