@@ -2,7 +2,8 @@
 // Inventory's products priced at Taxes' real VAT (Spain), a Customers card on the check, a quick note on
 // a line. The owner sells in cash with change and sees the ticket with its VAT row; sells by card to a
 // customer found in the till; a product without tax category is refused; on a phone the cart is the
-// drawer behind the FAB; the employee charges but never voids, refunds nor reads the figures. A marked
+// drawer behind the FAB; the employee charges and sees «Void» and «Refund» (each asks a manager's approval:
+// sale-approval.spec.ts) but never reads the figures. A marked
 // line is charged on its own (SALE-F22) with its ticket, and the rest closes the check; on full screen
 // the checkout sheet still opens and charges on top of the till.
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
@@ -27,11 +28,18 @@ test.afterAll(() => {
   // The kitchen tickets this file's rounds opened (their dishes name its products): they go with their checks, or
   // the next spec's kitchen display and cash close show them as their own.
   const tickets = psql(`select coalesce(string_agg(distinct quote_literal(ticket_id::text), ','), 'null') from kitchen_ticketitem where name like '% ${RUN}'`);
+  // What this worker's `RUN` charged: after a failed test Playwright starts a new worker, whose `beforeAll` makes a new
+  // `RUN` that may charge nothing (the tests after the failure), so no round of its own reaches the kitchen.
+  const charged = Number(psql(`select count(*) from sale_saleline where sku like 'E2E-POS-%-${RUN}'`));
   cleanSales();
   cleanCustomers();
   cleanInventory();
   restoreDrawer();
-  expect(tickets, `the rounds of ${RUN} reached the kitchen`).not.toBe('null');
+  // What it charged reached the kitchen: Kitchen is free and on in every business (base.entitlement), and «Charge»
+  // sends what is pending first (sales#439). Not read from `/me`, which the till also reads: a Kitchen said «off» by
+  // mistake would stop both the rounds and this check. Without it the check below would be empty by mistake.
+  if (charged > 0) expect(tickets, `the rounds of ${RUN} reached the kitchen`).not.toBe('null');
+  if (tickets === 'null') return;
   expect(
     psql(`select (select count(*) from kitchen_ticket where id::text in (${tickets})) + (select count(*) from kitchen_ticketitem where ticket_id::text in (${tickets})) + (select count(*) from kitchen_logentry where ticket_id::text in (${tickets}))`),
     `kitchen rows of ${RUN} left behind`,
@@ -273,7 +281,7 @@ test('the till on a phone: the cart is the drawer behind the button with its cou
   expect((await newestSaleOf(context, water.sku)).total).toBe(110);
 });
 
-test('the employee charges at the till but never voids, refunds nor reads the figures', async ({ browser }) => {
+test('the employee charges at the till and sees «Void» and «Refund» on their sale, but never reads the figures', async ({ browser }) => {
   const { context, page } = await hostPage(browser, A, { next: '/sale/pos', credentials: EMPLOYEE });
   try {
     await tillReady(page);
@@ -289,7 +297,11 @@ test('the employee charges at the till but never voids, refunds nor reads the fi
     await page.goto(`${A}/sale/sales`);
     await shown(page).locator('[data-testid=sales-table-row]').first().waitFor({ state: 'visible' });
     await expect(shown(page).locator('[data-testid=sales-kpis]')).toHaveCount(0);
-    await expect(shown(page).locator('[data-testid$=-void], [data-testid$=-refund]')).toHaveCount(0);
+    // Since FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (hub#250) the cashier sees «Void» and «Refund»: either asks a
+    // manager's approval, which sale-approval.spec.ts walks end to end.
+    const sold = await newestSaleOf(context, water.sku);
+    await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-void]`).first()).toBeVisible();
+    await expect(shown(page).locator(`[data-testid=sales-table-row-${sold.id}-refund]`).first()).toBeVisible();
     await page.screenshot({ path: shot('sale-sales-employee') });
   } finally {
     await context.close();

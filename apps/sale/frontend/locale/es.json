@@ -32,6 +32,17 @@
       "screenMenu": "Pantalla",
       "fullscreen": "Pantalla completa",
       "exitFullscreen": "Salir de pantalla completa",
+      "speak": {
+        "label": "Hablar",
+        "stop": "Parar",
+        "listening": "Escuchando…",
+        "transcribing": "Transcribiendo…",
+        "offline": "Sin conexión: para hablar con el asistente hace falta internet.",
+        "denied": "El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.",
+        "empty": "No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.",
+        "tooLong": "La grabación es demasiado larga: di algo más corto.",
+        "failed": "No se ha podido transcribir el audio. Inténtalo de nuevo."
+      },
       "categories": "Categorías",
       "all": "Todos",
       "more": "Más…",

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The till's catalogue column (WORKBOOK «Vender»; SALE-F01 step 1, F07): the category strip with the
-// magnifier and the ⋮ screen menu, the notices, and the grid. Everything comes from Inventory's own
+// magnifier, the «Speak» key (the assistant by voice, PLAN §30) and the ⋮ screen menu, the notices, and the grid. Everything comes from Inventory's own
 // operations: the categories by name, the count of «All», and the articles of the category in use in
 // windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too.
 // The grid and the search show what is sold out in Inventory too, greyed (SALE-F07), and the counts count
@@ -31,6 +31,7 @@ import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ScreenMenu from './ScreenMenu.vue';
 import ServiceGrid from './ServiceGrid.vue';
+import SpeakKey from './SpeakKey.vue';
 import { SERVICES } from './till';
 
 const props = withDefaults(
@@ -156,6 +157,7 @@ function pickService(service: ServiceSaleOut): void {
         v-else
         class="pos-catalog__spacer"
       />
+      <SpeakKey />
       <ScreenMenu />
     </div>
     <ProductSearch
