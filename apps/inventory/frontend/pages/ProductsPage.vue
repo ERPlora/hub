@@ -60,6 +60,8 @@ const canDelete = can('inventory.delete_product');
 const canMove = can('inventory.adjust_stock');
 const canImport = computed(() => session.can('inventory.import_product') && session.can('inventory.add_product'));
 const canExport = can('inventory.export_product');
+/** The «Not configured» chip of a row: what it says, also its `title` when a narrow column cuts it to «…». */
+const unconfiguredText = computed(() => `${t('inventory.tax.unconfigured')} · ${t('inventory.tax.unconfiguredReason')}`);
 
 // ── The list ──────────────────────────────────────────────────────────────────────────────────────
 const table = useServerTable<NonNullable<InputOf<'inventory.product.list'>['sort']>>({ sort: 'name' });
@@ -393,21 +395,26 @@ async function exportFile(): Promise<void> {
         <span data-testid="inventory-product-stock">{{ row.tracks_stock ? formatQuantity(row.stock, locale) : '—' }}</span>
       </template>
       <template #status="{ row }">
-        <span class="inventory-products__status">
-          <ion-chip
-            v-if="row.needs_tax_setup"
-            color="warning"
-            class="inventory-products__unconfigured"
-            :disabled="!canChange"
-            :title="$t('inventory.tax.unconfiguredReason')"
-            :data-testid="`inventory-products-unconfigured-${row.id}`"
-            @click.stop="canChange && openForm(row)"
-          >
-            <HubIcon name="ion:alert-circle-outline" />
-            <ion-label><span>{{ `${$t('inventory.tax.unconfigured')} · ${$t('inventory.tax.unconfiguredReason')}` }}</span></ion-label>
-          </ion-chip>
+        <!-- The chip is the cell's own box, never inside one that clips: the table measures its whole width
+             (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED). -->
+        <ion-chip
+          v-if="row.needs_tax_setup"
+          color="warning"
+          class="inventory-products__unconfigured"
+          :disabled="!canChange"
+          :title="unconfiguredText"
+          :data-testid="`inventory-products-unconfigured-${row.id}`"
+          @click.stop="canChange && openForm(row)"
+        >
+          <HubIcon name="ion:alert-circle-outline" />
+          <ion-label><span>{{ unconfiguredText }}</span></ion-label>
+        </ion-chip>
+        <span
+          v-else
+          class="inventory-products__status"
+        >
           <ion-toggle
-            v-else-if="canChange"
+            v-if="canChange"
             :key="`${row.id}-${switchRevision[row.id] ?? 0}`"
             color="success"
             :aria-label="$t('inventory.products.active')"
@@ -420,12 +427,23 @@ async function exportFile(): Promise<void> {
             v-else
             :data-testid="`inventory-products-active-text-${row.id}`"
           >{{ row.is_active ? $t('inventory.common.yes') : $t('inventory.common.no') }}</span>
+          <!-- Beside the switch, or under it when the column is narrow: never squeezing it. -->
           <ion-badge
             v-if="row.is_sold_out"
             color="danger"
             :data-testid="`inventory-products-sold-out-${row.id}`"
-          >{{ $t('inventory.products.soldOut') }}</ion-badge>
+          >
+            {{ $t('inventory.products.soldOut') }}
+          </ion-badge>
         </span>
+        <ion-badge
+          v-if="row.needs_tax_setup && row.is_sold_out"
+          color="danger"
+          class="inventory-products__sold-out"
+          :data-testid="`inventory-products-sold-out-${row.id}`"
+        >
+          {{ $t('inventory.products.soldOut') }}
+        </ion-badge>
       </template>
       <template #empty>
         <EmptyState
@@ -489,10 +507,36 @@ async function exportFile(): Promise<void> {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  vertical-align: middle;
 }
 
+/* A block on one line, not Ionic's flex box (where a text never ends in «…»): it shrinks with a narrow column,
+   its icon first and always in sight and its text ending in «…»; its `scrollWidth` stays its whole width, which
+   the table gives its column while the row has room. Its line is the chip's 32px (the shell leaves it no padding
+   on top and below), so icon and text sit in its middle as Ionic's centred flex box had them. */
 .inventory-products__unconfigured {
+  display: inline-block;
+  max-width: 100%;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 32px;
   cursor: pointer;
+}
+
+.inventory-products__unconfigured ion-label {
+  display: inline;
+}
+
+.inventory-products__unconfigured ion-icon {
+  vertical-align: middle;
+}
+
+/* Beside the chip: in the row's cell (a flex box) and on a card's line alike. */
+.inventory-products__sold-out {
+  flex-shrink: 0;
+  margin-inline-start: 8px;
+  vertical-align: middle;
 }
 </style>
