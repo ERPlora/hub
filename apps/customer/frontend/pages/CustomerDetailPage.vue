@@ -9,7 +9,7 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import { useRouter } from 'vue-router';
 
 import ActivityPanel from '../components/ActivityPanel.vue';
@@ -66,6 +66,7 @@ const original = ref<CustomerFields>();
 const form = ref<CustomerFields>();
 const fieldValues = ref<Record<string, string>>({});
 const update = useCommand('customer.customer.update');
+const cardForm = useTemplateRef<InstanceType<typeof CustomerForm>>('cardForm');
 const SHOWN = [...ESSENTIAL_FIELDS, ...MORE_FIELDS];
 const errors = computed(() => refusalFields(update.error.value));
 const failure = computed(() => {
@@ -85,6 +86,8 @@ function startEdit(): void {
 
 async function save(): Promise<void> {
   if (!original.value || !form.value || !customer.value || !form.value.name.trim()) return;
+  // A number or a date the browser could not read would go as "" and empty its field: told under it, not sent.
+  if (cardForm.value && !cardForm.value.readable()) return;
   try {
     await update.run({
       id: props.id,
@@ -215,6 +218,7 @@ async function save(): Promise<void> {
             {{ failure }}
           </InlineFeedback>
           <CustomerForm
+            ref="cardForm"
             v-model="form"
             v-model:field-values="fieldValues"
             mode="edit"

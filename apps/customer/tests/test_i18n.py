@@ -200,3 +200,17 @@ def test_a_custom_value_of_the_wrong_type_is_refused_in_spanish_under_its_field(
         f"field_values.{since.id}": "Introduce una fecha válida.",
     }
     assert not models.CustomFieldValue.objects.filter(customer=ana).exists()
+
+
+@pytest.mark.parametrize(
+    ("key", "message"),
+    [("invalidNumber", services.FIELD_INVALID_NUMBER), ("invalidDate", services.FIELD_INVALID_DATE)],
+)
+def test_what_the_card_cannot_read_is_worded_as_the_server_refuses_it(key, message):
+    """A number or a date the browser cannot read is told by the form itself (it never reaches the server): in
+    each language it says what the server says for the same value."""
+    frontend = Path(apps.get_app_config("customer").path) / "frontend" / "locale"
+    for language in ("en", "es"):
+        texts = json.loads((frontend / f"{language}.json").read_text(encoding="utf-8"))
+        with translation.override(language):
+            assert texts["customer"]["form"][key] == str(message), language

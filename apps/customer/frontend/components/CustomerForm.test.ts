@@ -1,7 +1,8 @@
 /* eslint-disable vue/one-component-per-file -- the ion-popover stub and the host of each case */
 // The card's form (CUSTOMER-F01, F04, F11): one form for «Add» and «Edit». Name, phone, email, tax
 // id and company in sight; the rest behind «More details» when adding; in «Edit» everything, the
-// custom fields with their own control and «Active». The server's 422 lands under its field. The
+// custom fields with their own control and «Active». The server's 422 lands under its field, and so does
+// a number or a date the browser cannot read, which stops the save. The
 // country is the shared Combo (the product's `ok-combo`, customers#72): typed to filter, stored as
 // its ISO code, clearable.
 import { Combo, type ComboOption } from '@erplora/ui/components';
@@ -39,6 +40,19 @@ const PopoverStub = defineComponent({
 afterEach(() => {
   document.body.replaceChildren();
 });
+
+/** What a browser does with «tres» in a number input or 31/02 in a date one: the page reads "" and the input
+ *  says it could not read it (`validity.badInput`). Returns the input, to make it readable again. */
+function unreadable(id: string): HTMLInputElement {
+  const host = document.querySelector(`ion-input[data-testid="customer-form-${id}"]`)!;
+  const native = host.querySelector('input') ?? host.appendChild(document.createElement('input'));
+  Object.defineProperty(native, 'validity', { value: { badInput: true }, configurable: true });
+  return native;
+}
+
+/** The message painted under a field (none: `undefined`). */
+const errorText = (id: string): string | undefined =>
+  document.querySelector<HTMLElement & { errorText?: string }>(`ion-input[data-testid="customer-form-${id}"]`)!.errorText;
 
 interface Setup {
   mode?: 'create' | 'edit';
@@ -275,6 +289,31 @@ describe('CustomerForm: «Edit» (F04)', () => {
   it('paints the server\'s message of a custom field under it (field_values.<id>)', async () => {
     const s = await setup({ mode: 'edit', customFields: FIELDS, errors: { 'field_values.f4': 'Enter a number.' } });
     expect(s.input('field-f4')!.props('errorText')).toBe('Enter a number.');
+  });
+
+  it('a number or a date the browser cannot read is told under its field, as the server words it, and stops the save', async () => {
+    const s = await setup({ mode: 'edit', customFields: FIELDS, locale: 'es', errors: { phone: 'No es un teléfono válido.' } });
+    for (const id of ['field-f4', 'field-f5', 'birthday']) unreadable(id);
+    expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(false);
+    await flush();
+    expect(['field-f4', 'field-f5', 'birthday', 'phone'].map((id) => s.input(id)!.props('errorText'))).toEqual([
+      'Introduce un número.',
+      'Introduce una fecha válida.',
+      'Introduce una fecha válida.',
+      'No es un teléfono válido.',
+    ]);
+    expect(s.input('field-f4')!.classes()).toContain('ion-invalid');
+    expect(errorText('anniversary')).toBeUndefined();
+  });
+
+  it('with every number and date readable it lets the save go, and a previous «cannot read» is gone', async () => {
+    const s = await setup({ mode: 'edit', customFields: FIELDS });
+    const native = unreadable('field-f4');
+    expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(false);
+    Object.defineProperty(native, 'validity', { value: { badInput: false } });
+    expect(s.wrapper.findComponent(CustomerForm).vm.readable()).toBe(true);
+    await flush();
+    expect(errorText('field-f4')).toBeUndefined();
   });
 
   it('«Active» unticked goes up as false', async () => {
