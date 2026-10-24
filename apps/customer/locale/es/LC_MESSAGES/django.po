@@ -451,10 +451,10 @@ msgid "This field is required."
 msgstr "Este campo es obligatorio."
 
 msgid "Enter a number."
-msgstr "Escribe un número."
+msgstr "Introduce un número."
 
 msgid "Enter a valid date."
-msgstr "Escribe una fecha válida."
+msgstr "Introduce una fecha válida."
 
 msgid "Choose yes or no."
 msgstr "Elige sí o no."

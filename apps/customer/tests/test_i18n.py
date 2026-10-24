@@ -9,8 +9,11 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from live.errors import InvalidPayload
 
 from apps.customer import models, queries, schemas, services
+
+from .conftest import run
 
 LOCALE = Path(apps.get_app_config("customer").path) / "locale" / "es" / "LC_MESSAGES"
 _STRING = re.compile(r'^"(.*)"$')
@@ -154,3 +157,46 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
     assert response.json()["error"]["fields"]["phone"].startswith(
         "No es un teléfono válido de su país"
     )
+
+
+def compiled(path: Path) -> dict[str, str]:
+    """The singular entries of a compiled catalogue, as Django reads them (the header left out)."""
+    with path.open("rb") as catalogue:
+        entries = gettext.GNUTranslations(catalogue)._catalog
+    return {key: text for key, text in entries.items() if isinstance(key, str) and key}
+
+
+def test_what_live_also_translates_says_the_same_here():
+    """``live`` goes first in ``INSTALLED_APPS``: Django's joined catalogue keeps its Spanish for a message both
+    translate without context, so the app's own wording would never reach the user (a custom number field refused
+    with live's «Introduce un número.», never with the app's)."""
+    live = compiled(
+        Path(apps.get_app_config("live").path) / "locale" / "es" / "LC_MESSAGES" / "django.mo"
+    )
+    ours = compiled(LOCALE / "django.mo")
+    assert sorted(
+        f"{message!r}: live «{text}», customer «{ours[message]}»"
+        for message, text in live.items()
+        if "\x04" not in message and message in ours and ours[message] != text
+    ) == []
+
+
+@pytest.mark.django_db
+def test_a_custom_value_of_the_wrong_type_is_refused_in_spanish_under_its_field():
+    """CUSTOMER-F04 «Si falla»: what the person reads in Spanish under each field."""
+    visits = models.CustomField.objects.create(name="Visits", field_type="number")
+    since = models.CustomField.objects.create(name="Since", field_type="date")
+    ana = models.Customer.objects.create(name="Ana")
+    sent = [
+        {"field_id": visits.id, "value": "three"},
+        {"field_id": since.id, "value": "2026-02-31"},
+    ]
+    with translation.override("es"):
+        with pytest.raises(InvalidPayload) as refused:
+            run("customer.customer.update", schemas.CustomerPatchIn(id=ana.id, field_values=sent))
+        fields = {key: str(text) for key, text in refused.value.fields.items()}
+    assert fields == {
+        f"field_values.{visits.id}": "Introduce un número.",
+        f"field_values.{since.id}": "Introduce una fecha válida.",
+    }
+    assert not models.CustomFieldValue.objects.filter(customer=ana).exists()

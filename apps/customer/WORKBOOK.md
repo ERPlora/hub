@@ -279,7 +279,7 @@ Sale: la ficha y sus campos guardados en una sola escritura, y el aviso de ficha
 corregido. Guardar sin cambiar nada no avisa a nadie. El consentimiento queda anotado con la
 dirección para la que se dio: cambiar el teléfono o el email no lo traslada (CUSTOMER-F14).
 Si falla: un campo obligatorio vacío («Este campo es obligatorio.»), un valor que no encaja con su
-tipo («Escribe un número.», «Escribe una fecha válida.», «Elige una de las opciones.»), un campo que
+tipo («Introduce un número.», «Introduce una fecha válida.», «Elige una de las opciones.»), un campo que
 ya no existe o un teléfono que no es de su país rechazan TODO el guardado y el motivo sale junto a su
 campo. La casilla «Activo» desmarcada solo cambia la cifra «Activos»: la ficha sigue saliendo en
 búsquedas, en el TPV y en WhatsApp.
