@@ -50,11 +50,6 @@ const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `s
 
 /** The hub's catalogues, `en` and `es`: what a text on screen is checked against. */
 const CATALOG = loadCatalog(HUB_DIR);
-/**
- * Texts left in English by a defect outside base, each with the FIX that takes it away (then it goes from here):
- * Ionic names the shell's side menu «menu» when the menu has no name of its own (`packages/ui`, shell's `App.vue`).
- */
-const KNOWN_ELSEWHERE = new Map([['menu', 'FIX-UI-SHELL-MENU-LANDMARK-NAMED-IN-ENGLISH']]);
 
 interface Owner {
   context: BrowserContext;
@@ -188,7 +183,7 @@ async function settled(page: Page, where: string): Promise<void> {
 async function screen(page: Page, name: string, language: Language, size: Size): Promise<void> {
   const where = `${name} in ${language} at ${size.label}`;
   await settled(page, where);
-  const texts = (await visibleTexts(page)).filter((text) => !data.has(normalText(text)) && !KNOWN_ELSEWHERE.has(normalText(text)));
+  const texts = (await visibleTexts(page)).filter((text) => !data.has(normalText(text)));
   expect(wrongLanguage(texts, language, CATALOG), `${where}: texts in the other language`).toEqual([]);
   expect(rawKeys(texts), `${where}: message keys on view`).toEqual([]);
   await page.mouse.move(0, 0);
