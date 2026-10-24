@@ -5,6 +5,7 @@ of frames (``text/event-stream``) the panel reads with ``fetch``; the gateway is
 import json
 
 import pytest
+from asgiref.sync import async_to_sync
 from django.urls import resolve
 
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
@@ -15,9 +16,14 @@ HOST = {"HTTP_HOST": "a.localhost:8000"}
 ASK = {"role": "user", "content": "¿cuántos elementos tengo?"}
 
 
+async def _read(stream) -> bytes:
+    return b"".join([chunk async for chunk in stream])
+
+
 def frames(response) -> list[dict]:
-    assert response["Content-Type"].startswith("text/event-stream")
-    body = b"".join(response).decode()
+    """The frames of a turn, read as the server streams them: asynchronously (ASGI), piece by piece."""
+    assert response["Content-Type"].startswith("text/event-stream") and response.is_async
+    body = async_to_sync(_read)(response.streaming_content).decode()
     return [json.loads(chunk[len("data: "):]) for chunk in body.split("\n\n") if chunk.startswith("data: ")]
 
 
