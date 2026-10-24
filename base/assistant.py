@@ -80,6 +80,12 @@ def operation_of(name: str, tools: dict[str, Operation]) -> Operation | None:
     return None
 
 
+def named(name: str) -> Operation | None:
+    """The registered operation the tool ``name`` stands for, offered or not: only to name it in a receipt (BASE-G118:
+    «Not done, not allowed: Create in Demo»); it never runs from here."""
+    return operation_of(name, registry)
+
+
 def description(op: Operation) -> str:
     ai = op.ai if isinstance(op.ai, dict) else None
     return str(ai.get("description", "")).strip() if ai else ""

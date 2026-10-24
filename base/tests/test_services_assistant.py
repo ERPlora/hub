@@ -166,10 +166,21 @@ def test_stop_cancels_this_write_and_the_rest_of_the_chain():
 # ── What the person may not do is not done (BASE-G118; gh:hub#11) ────────────────────────────────────────────────
 
 
+def test_a_tool_that_does_not_exist_is_refused_with_its_own_name():
+    plan = turn({"call_id": "c1", "name": "demo__item__explode", "arguments": "{}"}, permissions=EMPLOYEE)
+    assert (plan["executed"][0]["name"], plan["executed"][0]["app"], plan["executed"][0]["kind"]) == ("demo__item__explode", "", "")
+
+
 def test_a_tool_this_person_was_not_offered_is_refused_and_writes_nothing():
     write = call("demo.item.create", {"name": "Mesa 4"})
     plan = turn(write, decision={"call_id": "c1", "accepted": True}, permissions=EMPLOYEE)
     assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("refused", "not_available")
+    # The receipt names what was refused, as the person's panel says it («Not done, not allowed: Create in Demo»).
+    assert (plan["executed"][0]["name"], plan["executed"][0]["app"], plan["executed"][0]["kind"]) == (
+        "demo.item.create",
+        "demo",
+        "command",
+    )
     assert plan["confirm"] is None
     assert "Mesa 4" not in items()
 

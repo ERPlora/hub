@@ -65,8 +65,10 @@ test.beforeEach(() => {
 
 const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
 const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]');
-const lastAnswer = (page: Page): Locator => answers(page).last();
+/** The assistant's answers, each one its row (a failure before any word has no bubble). */
+const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
+/** The last answer's bubble: its words. */
+const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
 
 /** Answers the card with its button (`submit` or `cancel`) and waits until it has gone: while Ionic dismisses a modal,
@@ -401,7 +403,7 @@ test('BASE-G124 — without connection the foot says so; a cut or a service down
   await context.setOffline(true);
   await expect(panel(page).locator('[data-testid="assistant-offline"]')).toHaveText('No connection: you can write, and send when it is back.');
   await box(page).fill('Hola');
-  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeDisabled();
+  await expect(panel(page).locator('[data-testid="assistant-send"] button')).toBeDisabled();
   await context.setOffline(false);
   await expect(panel(page).locator('[data-testid="assistant-offline"]')).toHaveCount(0);
 
@@ -429,7 +431,7 @@ test('BASE-G118 — what the assistant can do is what the person can: a write th
   await openPanel(page);
   const name = `Mesa empleado ${Date.now().toString(36)}`;
   await ask(page, `E2E-CREATE ${name}`);
-  await expect(card(page)).toHaveCount(0);
+  await expect(card(page)).toBeHidden();
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Not done, not allowed: Create in Demo');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   // The tools offered to the model were only what this person may use.

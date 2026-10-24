@@ -78,6 +78,17 @@ describe('AssistantMessage', () => {
     wrapper.unmount();
   });
 
+  it('a failure before any word: no empty bubble, the failure in its place (BASE-G124)', async () => {
+    const { wrapper } = await mountBubble(answer({ error: 'assistant.unavailable' }));
+    expect(wrapper.find('[data-testid="assistant-answer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="assistant-bubble-assistant"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="assistant-failure"]').exists()).toBe(true);
+    wrapper.unmount();
+    const partial = await mountBubble(answer({ text: 'Hoy has', error: 'assistant.cut' }));
+    expect(partial.wrapper.get('[data-testid="assistant-bubble-assistant"]').text()).toContain('Hoy has');
+    partial.wrapper.unmount();
+  });
+
   it('a failure says what happened and offers its way out', async () => {
     const { wrapper } = await mountBubble(answer({ error: 'assistant.unreachable' }));
     expect(wrapper.text()).toContain('No se pudo contactar con el asistente.');

@@ -1967,7 +1967,8 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         if decision is not None and decision.call_id == call.call_id:
             stopped = decision.stop
             decision = None
-        op = assistant.operation_of(call.name, tools)
+        # What ran, or was refused, by its name: a write this person was not offered is named too (BASE-G118).
+        op = assistant.operation_of(call.name, tools) or assistant.named(call.name)
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
         executed.append(
             {

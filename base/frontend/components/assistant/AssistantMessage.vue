@@ -94,8 +94,11 @@ const finished = computed(() => props.bubble.done && props.bubble.text !== '' &&
   <div
     v-else
     class="assistant-row"
+    data-testid="assistant-answer"
   >
+    <!-- A failure before any word has no bubble: its sentence is the answer (BASE-G124). -->
     <div
+      v-if="!(bubble.error && !bubble.text)"
       class="assistant-bubble"
       data-testid="assistant-bubble-assistant"
     >
