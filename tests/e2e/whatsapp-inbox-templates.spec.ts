@@ -26,6 +26,7 @@ import {
   PREFIX,
   pushChannel,
   receive,
+  restorePhoto,
   SEED_TEMPLATES,
   seedErplora,
   template,
@@ -45,6 +46,7 @@ test.beforeAll(async () => {
 
 test.afterAll(() => {
   cleanUp();
+  restorePhoto();
 });
 
 const TABLE = 'whatsapp-inbox-templates';

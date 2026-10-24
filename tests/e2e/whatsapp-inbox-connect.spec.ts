@@ -16,7 +16,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, metaGraph, pushChannel, seedErplora } from './whatsapp-helpers';
+import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 test.beforeAll(async () => {
   // erplora.com takes `a`'s number (its test seed) and this Hub takes its photo.
@@ -25,7 +25,10 @@ test.beforeAll(async () => {
   await metaGraph();
 });
 
-test.afterAll(() => cleanUp());
+test.afterAll(() => {
+  cleanUp();
+  restorePhoto();
+});
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12';
 const number = (page: Page) => shown(page).locator('[data-testid=whatsapp-inbox-number]');

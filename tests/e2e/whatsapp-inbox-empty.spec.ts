@@ -8,7 +8,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
 import { noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, metaGraph, pushChannel, seedErplora } from './whatsapp-helpers';
+import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 const SIZES = [
   { label: '375', width: 375, height: 667 },
@@ -25,7 +25,10 @@ test.beforeAll(async () => {
   cleanUp();
 });
 
-test.afterAll(() => cleanUp());
+test.afterAll(() => {
+  cleanUp();
+  restorePhoto();
+});
 
 const empty = (page: Page): Locator => shown(page).locator('[data-testid=whatsapp-inbox-empty]');
 

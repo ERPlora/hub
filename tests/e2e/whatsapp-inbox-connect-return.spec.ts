@@ -26,7 +26,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, login, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { BUSINESS_ID, CODE, EXPIRED_CODE, type GraphCall, type GraphThread, NUMBER_ID, SHOWN_NAME, WABA_ID } from './whatsapp-graph';
-import { cleanUp, metaGraph, pushChannel, seedErplora } from './whatsapp-helpers';
+import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-LOCAL-HTTP-RETURN-PAGE-REFUSED';
 const RETURN_PAGE = `${SAAS}/whatsapp/return`;
@@ -155,6 +155,7 @@ test.beforeAll(async () => {
 
 test.afterAll(() => {
   cleanUp();
+  restorePhoto();
 });
 
 test.beforeEach(async () => {

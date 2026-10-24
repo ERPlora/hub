@@ -19,7 +19,16 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { choose, confirmDialog, signedIn } from './flow-helpers';
 import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, post, settled } from './service-helpers';
-import { cleanUp as cleanUpInbox, e2ePhone, metaGraph, pushChannel, receive, seedErplora, template } from './whatsapp-helpers';
+import {
+  cleanUp as cleanUpInbox,
+  e2ePhone,
+  metaGraph,
+  pushChannel,
+  receive,
+  restorePhoto,
+  seedErplora,
+  template,
+} from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -68,7 +77,10 @@ test.beforeAll(async () => {
   await metaGraph();
   pushChannel({ status: 'connected', templates: [CONFIRMED] });
 });
-test.afterAll(cleanUp);
+test.afterAll(() => {
+  cleanUp();
+  restorePhoto();
+});
 
 /** The outbox relay as the worker runs it on every tick, pass after pass until one finds nothing to do. */
 function relayPass(): void {
