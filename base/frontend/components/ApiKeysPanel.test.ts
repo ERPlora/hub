@@ -148,7 +148,6 @@ describe('ApiKeysPanel', () => {
   });
 
   it('the token once, with «Copy» that says «Copied» for two seconds', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const m = await open({ onApi: () => Response.json({ key: key(), token: TOKEN }) });
     await m.result(m.call, 'base.api_key.list', LIST);
     await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
@@ -160,12 +159,13 @@ describe('ApiKeysPanel', () => {
     await flush();
     expect(byTestId('api-key-token-value')?.textContent).toBe(TOKEN);
     expect(document.body.textContent).toContain('This is the only time the whole secret is shown.');
+    // Fake timers only from here: `flush` waits on real zero-delay timeouts.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     (byTestId('api-key-token-copy') as HTMLElement).click();
-    await flush();
+    await vi.advanceTimersByTimeAsync(0);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(TOKEN);
     expect(byTestId('api-key-token-copy')?.textContent).toContain('Copied');
-    vi.advanceTimersByTime(2000);
-    await flush();
+    await vi.advanceTimersByTimeAsync(2000);
     expect(byTestId('api-key-token-copy')?.textContent).toContain('Copy');
   });
 
