@@ -7,21 +7,41 @@ from uuid import UUID
 
 from django.contrib.auth.hashers import check_password
 from django.http import HttpRequest
-from django.utils import translation
+from django.db.models import Max
+from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy
 from live.context import OperationContext
-from live.errors import NotFound
+from live.errors import NotFound, Unauthorized
 from live.operations import operation
 
 from base import access, home
-from base.models import AccessSettings, Credential, EventDelivery, Hub, Membership, Profile, TrustedDevice
+from base.models import (
+    AccessSettings,
+    Credential,
+    EventDelivery,
+    Hub,
+    Membership,
+    Profile,
+    SessionOwner,
+    TrustedDevice,
+)
+from base.operations import hub_id
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
+from base.storage import media_url
 from base.throttle import client_key
 from base.schemas import (
     AccessDoorIn,
     AccessDoorOut,
+    AccessSettingsIn,
+    AccessSettingsOut,
+    DeviceCurrentIn,
+    DeviceCurrentOut,
+    DeviceListIn,
+    DeviceListOut,
+    ProfileIn,
+    ProfileOut,
     BellCountersIn,
     BellCountersOut,
     DemoSlugIn,
@@ -93,7 +113,8 @@ def _user(actor: Any) -> dict[str, str] | None:
         return None
     if not hasattr(actor, "get_username"):  # the platform itself (live.context.system_context)
         return {"id": str(actor), "label": str(actor)}
-    return {"id": str(actor.pk), "label": actor.get_full_name() or actor.get_username()}
+    # Named as in this hub: its «My profile» name, else its account's (APP-BASE-3).
+    return {"id": str(actor.pk), "label": person_label(actor)}
 
 
 @operation("base.hub.get", kind="query", permission=None, input=HubGetIn, output=HubOut)
@@ -349,3 +370,132 @@ def device_of_entry(request: HttpRequest) -> TrustedDevice | None:
 
 def has_pin(user) -> bool:
     return Credential.objects.filter(username=user.get_username()).exclude(pin_hash="").exists()
+
+
+@operation(
+    "base.device.current",
+    kind="query",
+    permission=VIEW_HOME,
+    input=DeviceCurrentIn,
+    output=DeviceCurrentOut,
+    ai={"description": "Says whether the device the person is using is shared (a till: PIN, a shift) or personal."},
+)
+def device_current(ctx: OperationContext, data: DeviceCurrentIn) -> dict[str, Any]:
+    """«This device» of Settings › General (BASE-G72): the mode of the browser that asks, and whether the hub knows it
+    (someone entered with an account from it). An unknown one reads as shared, the strict mode."""
+    device = device_of(ctx.request)
+    if device is None:
+        return {"known": False, "mode": access.SHARED, "mode_set_by": "", "mode_set_at": None}
+    return {"known": True, "mode": device.mode, "mode_set_by": device.mode_set_by, "mode_set_at": device.mode_set_at}
+
+
+@operation(
+    "base.device.list",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=DeviceListIn,
+    output=DeviceListOut,
+    ai={
+        "description": "Lists the devices someone entered this hub from: name, browser, shared or personal, whether "
+        "it has a session open now and until when, who entered last and when, and which ones nobody used in 30 days."
+    },
+)
+def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
+    """«Devices» of Settings › General (BASE-G63): never a device's token, which is its proof. Phase 1 lists the rows
+    of the shared table (every scope's), as every hub model does until each hub has its database."""
+    now = timezone.now()
+    here = device_of(ctx.request)
+    devices = list(TrustedDevice.objects.order_by("-last_entry_at"))
+    until = dict(
+        SessionOwner.objects.filter(host=ctx.scope.key, device_id__in=[d.pk for d in devices], session__expire_date__gt=now)
+        .values("device_id")
+        .annotate(until=Max("session__expire_date"))
+        .values_list("device_id", "until")
+    )
+    rows = [
+        {
+            "id": device.pk,
+            "name": device.name,
+            "agent": device.agent,
+            "mode": device.mode,
+            "current": here is not None and device.pk == here.pk,
+            "in_use": device.pk in until,
+            "session_until": until.get(device.pk),
+            "last_entry_at": device.last_entry_at,
+            "last_user": device.last_user_label,
+            "created_at": device.created_at,
+            "unused": _unused(device, here, now),
+        }
+        for device in devices
+    ]
+    return {"devices": rows, "unused": sum(row["unused"] for row in rows)}
+
+
+def _unused(device: TrustedDevice, here: TrustedDevice | None, now) -> bool:
+    return (here is None or device.pk != here.pk) and device.last_entry_at < now - access.UNUSED_AFTER
+
+
+def unused_devices(here: TrustedDevice | None):
+    """The devices «Remove the unused» removes (BASE-G66): nobody entered on them in 30 days, never the one in hand."""
+    old = TrustedDevice.objects.filter(last_entry_at__lt=timezone.now() - access.UNUSED_AFTER)
+    return old.exclude(pk=here.pk) if here is not None else old
+
+
+@operation(
+    "base.access.settings",
+    kind="query",
+    permission=VIEW_HOME,
+    input=AccessSettingsIn,
+    output=AccessSettingsOut,
+    ai={
+        "description": "Reads how the business asks who is at the till: whether the PIN pad shows, when it asks "
+        "again (after some minutes without use, or once per shift) and how many digits a PIN has."
+    },
+)
+def access_settings_get(ctx: OperationContext, data: AccessSettingsIn) -> dict[str, Any]:
+    """The «PIN pad» card of Settings › General (BASE-G62, G151): what the Hub confirmed, for everyone of the hub."""
+    row = access_settings()
+    return {
+        "pin_policy": row.pin_policy,
+        "pin_inactivity_minutes": row.pin_inactivity_minutes,
+        "pin_length": row.pin_length,
+        "can_change": ctx.has(ADMINISTER_HUB),
+    }
+
+
+@operation(
+    "base.profile.get",
+    kind="query",
+    permission=VIEW_HOME,
+    input=ProfileIn,
+    output=ProfileOut,
+    ai={"description": "Reads the person's own profile in this hub: name, contact email, language and appearance."},
+)
+def profile_get(ctx: OperationContext, data: ProfileIn) -> dict[str, Any]:
+    """«My profile» (BASE-G125): always the profile of whoever asks; without a row, the account's name."""
+    user = signed_in(ctx)
+    profile = Profile.objects.filter(username=user.get_username()).first()
+    role = Membership.objects.filter(user=user, host=ctx.scope.key).values_list("role", flat=True).first() or ""
+    return {
+        "first_name": profile.first_name if profile else user.first_name,
+        "last_name": profile.last_name if profile else user.last_name,
+        "contact_email": profile.contact_email if profile else "",
+        "avatar_url": avatar_url(ctx, profile.avatar) if profile and profile.avatar else "",
+        "language": profile.language if profile else "",
+        "theme_mode": profile.theme_mode if profile else "",
+        "palette": profile.palette if profile else "",
+        "role": role,
+        "has_pin": has_pin(user),
+        "pin_length": access_settings().pin_length,
+    }
+
+
+def signed_in(ctx: OperationContext):
+    """The person of the session, or 401: «My profile» and one's own PIN are nobody's without one."""
+    if ctx.actor is None or not hasattr(ctx.actor, "get_username"):
+        raise Unauthorized(gettext("Sign in to see your profile."), code="base.sign_in_required")
+    return ctx.actor
+
+
+def avatar_url(ctx: OperationContext, name: str) -> str:
+    return media_url(hub_id(ctx.scope), name)

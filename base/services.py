@@ -24,8 +24,11 @@ turns into the owner's session (:func:`open_demo_session`); the worker's reaper 
 that ended, each with ``base.demo.purge``, and forgets them after ``DEMO_TOMBSTONE_DAYS``.
 """
 
+import base64
+import binascii
 import datetime as dt
 import hashlib
+import io
 import json
 import logging
 import secrets
@@ -41,6 +44,10 @@ from django.contrib.auth import get_user_model, login
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.sessions.models import Session
+from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.storage import storages
+from django.core.validators import validate_email
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Max, Q
 from django.db.models.signals import post_save
@@ -56,21 +63,28 @@ from live.operations import get as get_operation
 from live.operations import operation
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
+from PIL import Image as PILImage
+from PIL import UnidentifiedImageError
 
 from base import access, auth, events, queries, registry, signing
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.middleware import PLATFORM_SESSION_HOST, session_host
 from base.models import (
+    AccessSettings,
     Credential,
     DemoCode,
     EventDelivery,
     Hub,
     Membership,
+    Profile,
     SessionOwner,
     TaskSchedule,
     TrustedDevice,
 )
+from base.media import AVATARS_FOLDER
+from base.operations import hub_id
+from base.storage import hub_prefix
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas import (
     DemoCodeIn,
@@ -88,8 +102,26 @@ from base.schemas import (
     HubSeedLocalOut,
     HubStateIn,
     HubStateOut,
+    AccessSettingsIn,
+    AccessSettingsOut,
+    AccessSettingsUpdateIn,
+    AvatarIn,
+    AvatarOut,
+    AvatarRemoveIn,
+    DeviceByIdIn,
+    DeviceCurrentOut,
+    DeviceModeIn,
+    DevicePruneIn,
+    DevicePruneOut,
+    DeviceRemoveOut,
+    DeviceRenameIn,
     PinSetIn,
     PinSetOut,
+    PreferencesIn,
+    PreferencesOut,
+    ProfileIn,
+    ProfileOut,
+    ProfileUpdateIn,
     SessionRevokeIn,
     SessionRevokeOut,
 )
@@ -1168,3 +1200,281 @@ def too_many_message(wait: int, lead: str) -> str:
     return f"{lead} " + ngettext(
         "Wait %(minutes)s minute and try again.", "Wait %(minutes)s minutes and try again.", minutes
     ) % {"minutes": minutes}
+
+
+def badge_key() -> bytes:
+    """The hub's key of the badges' digests (``access.badge_digest``): made once, with the system's randomness, and
+    kept in the business's row of ``AccessSettings``, never readable by any route. Two first uses at once end with
+    the same key: the row is locked while it is made."""
+    with transaction.atomic():
+        row = AccessSettings.objects.select_for_update().first()
+        if row is None:
+            try:
+                with transaction.atomic():
+                    row = AccessSettings.objects.create(badge_key=secrets.token_hex(32))
+            except IntegrityError:
+                row = AccessSettings.objects.select_for_update().get()
+        if not row.badge_key:
+            row.badge_key = secrets.token_hex(32)
+            row.save(update_fields=["badge_key"])
+        return bytes.fromhex(row.badge_key)
+
+
+def badge_owner(slug: str, raw: str):
+    """The active person of ``slug`` whose card ``raw`` is, else ``None``; the card's digest, for its brake."""
+    card = access.clean_badge(raw)
+    if card is None:
+        return None, access.token_digest(raw[:64])
+    digest = access.badge_digest(card, key=badge_key())
+    credential = Credential.objects.filter(badge_digest=digest).first()
+    if credential is None:
+        return None, digest
+    membership = (
+        Membership.objects.filter(host=slug, user__username=credential.username, user__is_active=True)
+        .select_related("user")
+        .first()
+    )
+    return (membership.user if membership is not None else None), digest
+
+
+def _actor_label(ctx: OperationContext) -> str:
+    return queries.person_label(ctx.actor)[:150] if hasattr(ctx.actor, "get_username") else str(ctx.actor)[:150]
+
+
+@operation(
+    "base.device.mode_set",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=DeviceModeIn,
+    output=DeviceCurrentOut,
+    ai={
+        "description": "Makes the device the person is using shared (a till several people use: PIN, a shift) or "
+        "personal (one person's: no PIN, 30 days). Only on the device itself."
+    },
+)
+def device_mode_set(ctx: OperationContext, data: DeviceModeIn) -> dict:
+    """«This device» (BASE-G72): the mode of the browser that asks, never another's. The sessions opened from now on
+    follow it; the open one keeps its end, fixed when it opened."""
+    device = queries.device_of(ctx.request, for_update=True)
+    if device is None:
+        raise NotFound(
+            gettext("Nobody has signed in with an account on this device yet: sign in once with your account on it."),
+            code="base.device_unknown",
+        )
+    device.mode, device.mode_set_by, device.mode_set_at = data.mode, _actor_label(ctx), timezone.now()
+    device.save(update_fields=["mode", "mode_set_by", "mode_set_at"])
+    record_event(ctx, events.DEVICE_MODE_CHANGED, {"id": str(device.pk), "mode": data.mode})
+    return {"known": True, "mode": device.mode, "mode_set_by": device.mode_set_by, "mode_set_at": device.mode_set_at}
+
+
+def _device(device_id) -> TrustedDevice:
+    device = TrustedDevice.objects.select_for_update().filter(pk=device_id).first()
+    if device is None:
+        raise NotFound(gettext("That device is no longer registered here. Refresh the list."), code="base.device_unknown")
+    return device
+
+
+@operation(
+    "base.device.rename",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=DeviceRenameIn,
+    output=DeviceByIdIn,
+    ai={"description": "Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»)."},
+)
+def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
+    """«Name it» (BASE-G64): the one thing of a device the business decides."""
+    name = data.name.strip()
+    if len(name) > access.DEVICE_NAME_MAX_LENGTH:
+        raise InvalidPayload(
+            gettext("That name is too long. Give it a shorter one and save again."),
+            code="base.device_name_too_long",
+            fields={"name": "too_long"},
+        )
+    device = _device(data.id)
+    device.name = name
+    device.save(update_fields=["name"])
+    record_event(ctx, events.DEVICE_RENAMED, {"id": str(device.pk)})
+    return {"id": device.pk}
+
+
+@operation(
+    "base.device.remove",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=DeviceByIdIn,
+    output=DeviceRemoveOut,
+    ai={
+        "description": "Removes a lost device from the hub: its session ends at once and the PIN stops working on "
+        "it until someone signs in with an account on it again. Removing the one in hand signs the person out."
+    },
+)
+def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
+    """«Remove this device» (BASE-G65): the device is cut off, not its people; whoever has an account can enter on it
+    again, and then it is a new device."""
+    device = _device(data.id)
+    here = queries.device_of(ctx.request)
+    yours = here is not None and here.pk == device.pk
+    _remove_devices([device.pk])
+    record_event(ctx, events.DEVICE_REMOVED, {"id": str(device.pk)})
+    return {"removed": 1, "yours": yours}
+
+
+@operation(
+    "base.device.prune",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=DevicePruneIn,
+    output=DevicePruneOut,
+    ai={"description": "Removes at once the devices of the hub nobody used in 30 days, never the one in hand."},
+)
+def device_prune(ctx: OperationContext, data: DevicePruneIn) -> dict:
+    """«Remove the unused» (BASE-G66): those nobody entered on in 30 days, as BASE-G65 removes one."""
+    ids = list(queries.unused_devices(queries.device_of(ctx.request)).select_for_update().values_list("pk", flat=True))
+    _remove_devices(ids)
+    record_event(ctx, events.DEVICES_PRUNED, {"removed": len(ids)})
+    return {"removed": len(ids)}
+
+
+def _remove_devices(ids: list) -> None:
+    """End the sessions on the devices ``ids`` on every host (their tabs wake and leave) and forget the devices."""
+    if not ids:
+        return
+    _end_sessions(SessionOwner.objects.filter(device_id__in=ids))
+    TrustedDevice.objects.filter(pk__in=ids).delete()
+
+
+@operation(
+    "base.access.settings_update",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=AccessSettingsUpdateIn,
+    output=AccessSettingsOut,
+    ai={
+        "description": "Changes how the business asks who is at the till: show the PIN pad or not, ask again after "
+        "1, 5, 10, 15 or 30 minutes without use or once per shift, and PINs of 4 or 6 digits."
+    },
+)
+def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) -> dict:
+    """The «PIN pad» card (BASE-G62, G151): only the fields sent change. The PINs of the other length keep working
+    until their owners change them; the sessions already open keep their end."""
+    changes = data.dict(exclude_none=True)
+    if not changes:
+        raise InvalidPayload(gettext("Nothing to change."), code="base.nothing_to_change")
+    row = AccessSettings.objects.select_for_update().first()
+    if row is None:
+        try:
+            with transaction.atomic():
+                row = AccessSettings.objects.create()
+        except IntegrityError:
+            row = AccessSettings.objects.select_for_update().get()
+    for field, value in changes.items():
+        setattr(row, field, value)
+    row.updated_by = _actor_label(ctx)
+    row.save()
+    record_event(ctx, events.ACCESS_SETTINGS_CHANGED, changes)
+    return queries.access_settings_get(ctx, AccessSettingsIn())
+
+
+def _profile(user) -> Profile:
+    profile = Profile.objects.select_for_update().filter(username=user.get_username()).first()
+    if profile is None:
+        profile = Profile(username=user.get_username(), first_name=user.first_name[:150], last_name=user.last_name[:150])
+    return profile
+
+
+@operation(
+    "base.profile.update",
+    kind="command",
+    permission=VIEW_HOME,
+    input=ProfileUpdateIn,
+    output=ProfileOut,
+    ai={"description": "Saves the person's own name, last name and contact email in this hub (not their sign-in email)."},
+)
+def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
+    """«Save my data» (BASE-G125): how the person appears in this hub. The contact email gives and takes no access."""
+    user = queries.signed_in(ctx)
+    email = data.contact_email.strip()
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            raise InvalidPayload(gettext("Enter a valid email address."), code="base.email_invalid", fields={"contact_email": "invalid"}) from None
+    profile = _profile(user)
+    profile.first_name, profile.last_name, profile.contact_email = data.first_name.strip(), data.last_name.strip(), email
+    profile.save()
+    record_event(ctx, events.PROFILE_UPDATED, {})
+    return queries.profile_get(ctx, ProfileIn())
+
+
+@operation(
+    "base.profile.preferences_set",
+    kind="command",
+    permission=VIEW_HOME,
+    input=PreferencesIn,
+    output=PreferencesOut,
+    ai={"description": "Sets the person's own language (Spanish, English or the business's) and appearance."},
+)
+def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
+    """«Preferences» (BASE-G125): saved as chosen and applied at once; empty = the business's. They follow the person
+    on any device of the hub (the language from their next entry on another one)."""
+    user = queries.signed_in(ctx)
+    profile = _profile(user)
+    profile.language, profile.theme_mode, profile.palette = data.language, data.theme_mode, data.palette
+    profile.save()
+    record_event(ctx, events.PROFILE_UPDATED, {})
+    language = queries.language_of(user, ctx.scope.key) or settings.LANGUAGE_CODE
+    return {"language": language, "theme_mode": profile.theme_mode, "palette": profile.palette}
+
+
+#: The largest photo, in bytes (before base64); the old Hub's.
+MAX_AVATAR_BYTES = 2 * 1024 * 1024
+_AVATAR_FORMATS = {"image/jpeg": ("JPEG", "jpg"), "image/png": ("PNG", "png"), "image/webp": ("WEBP", "webp")}
+
+
+@operation("base.profile.avatar_set", kind="command", permission=VIEW_HOME, input=AvatarIn, output=AvatarOut)
+def avatar_set(ctx: OperationContext, data: AvatarIn) -> dict:
+    """«Change photo» (BASE-G125): a JPG, PNG or WebP of 2 MB at most, kept in the hub's files under ``avatars/`` by
+    its content's hash (served to the people of this hub only, ``base.media``). Not an assistant tool: it takes a
+    file."""
+    user = queries.signed_in(ctx)
+    refused = gettext("The photo could not be saved. Use a JPG, PNG or WebP of up to 2 MB.")
+    try:
+        raw = base64.b64decode(data.data_base64, validate=True)
+    except (binascii.Error, ValueError):
+        raise InvalidPayload(refused, code="base.avatar_invalid") from None
+    pillow_format, extension = _AVATAR_FORMATS[data.content_type]
+    if not raw or len(raw) > MAX_AVATAR_BYTES or not _is_image(raw, pillow_format):
+        raise InvalidPayload(refused, code="base.avatar_invalid")
+    name = f"{AVATARS_FOLDER}{hashlib.sha256(raw).hexdigest()}.{extension}"
+    key = f"{hub_prefix(hub_id(ctx.scope))}/{name}"
+    store = storages["hub_files"]
+    if not store.exists(key):
+        store.save(key, ContentFile(raw))
+    profile = _profile(user)
+    profile.avatar = name
+    profile.save()
+    record_event(ctx, events.PROFILE_UPDATED, {})
+    return {"avatar_url": queries.avatar_url(ctx, name)}
+
+
+def _is_image(raw: bytes, pillow_format: str) -> bool:
+    try:
+        with PILImage.open(io.BytesIO(raw)) as image:
+            if image.format != pillow_format:
+                return False
+            image.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError, PILImage.DecompressionBombError):
+        return False
+    return True
+
+
+@operation("base.profile.avatar_remove", kind="command", permission=VIEW_HOME, input=AvatarRemoveIn, output=AvatarOut)
+def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
+    """«Remove» (BASE-G125): the profile forgets its photo (the file, named by its content, may be someone else's)."""
+    user = queries.signed_in(ctx)
+    profile = _profile(user)
+    profile.avatar = ""
+    profile.save()
+    record_event(ctx, events.PROFILE_UPDATED, {})
+    return {"avatar_url": ""}

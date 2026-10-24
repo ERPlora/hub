@@ -15,6 +15,15 @@ DEMO_EXPIRED = "base.demo.expired"
 DEMO_PURGED = "base.demo.purged"
 #: Someone chose or changed their PIN (APP-BASE-3): the grid of «Switch user» has another face. Names nobody.
 PIN_SET = "base.pin.set"
+#: An administrator made a device shared or personal, named it, removed it, or removed the unused ones (APP-BASE-3).
+DEVICE_MODE_CHANGED = "base.device.mode_changed"
+DEVICE_RENAMED = "base.device.renamed"
+DEVICE_REMOVED = "base.device.removed"
+DEVICES_PRUNED = "base.device.pruned"
+#: How the business asks who is at the till changed (the PIN pad, when it asks again, the PIN's digits).
+ACCESS_SETTINGS_CHANGED = "base.access.settings_changed"
+#: Someone changed their own profile (name, contact email, photo, preferences). Names nobody else.
+PROFILE_UPDATED = "base.profile.updated"
 
 ALL = [
     HUB_REGISTERED,
@@ -26,4 +35,10 @@ ALL = [
     DEMO_EXPIRED,
     DEMO_PURGED,
     PIN_SET,
+    DEVICE_MODE_CHANGED,
+    DEVICE_RENAMED,
+    DEVICE_REMOVED,
+    DEVICES_PRUNED,
+    ACCESS_SETTINGS_CHANGED,
+    PROFILE_UPDATED,
 ]

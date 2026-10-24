@@ -209,6 +209,13 @@ def _with_language(response: HttpResponse, locale: str) -> HttpResponse:
     language = _supported_language(locale)
     if language is not None:
         translation.activate(language)
+        with_language_cookie(response, language)
+    return response
+
+
+def with_language_cookie(response: HttpResponse, language: str) -> None:
+    """Leave Django's language cookie of ``language`` on ``response`` (the login's, «My profile»'s preferences)."""
+    if _supported_language(language) is not None:
         response.set_cookie(
             settings.LANGUAGE_COOKIE_NAME,
             language,
@@ -219,7 +226,6 @@ def _with_language(response: HttpResponse, locale: str) -> HttpResponse:
             httponly=settings.LANGUAGE_COOKIE_HTTPONLY,
             samesite=settings.LANGUAGE_COOKIE_SAMESITE,
         )
-    return response
 
 
 @require_POST
@@ -379,3 +385,27 @@ def _pin_too_many(wait: int) -> JsonResponse:
     response = _refused(429, "base.too_many_attempts", services.too_many_message(wait, gettext("Too many wrong attempts.")))
     response["Retry-After"] = str(wait)
     return response
+
+
+
+@require_POST
+@never_cache
+def auth_badge(request: HttpRequest) -> HttpResponse:
+    """``POST /auth/badge {badge, next}``: the session of the person of this hub whose card it is (BASE-G56). The same
+    door and brakes as the PIN's, counted against the card (its digest) instead of a person."""
+    door = _device_door(request)
+    if isinstance(door, HttpResponse):
+        return door
+    slug, device, body = door
+    user, card = services.badge_owner(slug, str(body.get("badge", ""))[:128])
+    wait = access.PIN_PERSON_LIMIT.wait(slug, "badge", card)
+    if wait:
+        return _pin_too_many(wait)
+    if user is None:
+        access.PIN_PERSON_LIMIT.failed(slug, "badge", card)
+        access.PIN_ADDRESS_LIMIT.failed(slug, client_key(request))
+        return _refused(
+            401, "base.badge_unknown", gettext("That badge opens nothing here. Enter with your PIN or ask an administrator.")
+        )
+    access.PIN_PERSON_LIMIT.clear(slug, "badge", card)
+    return _entered(request, user, device, SessionOwner.Credential.BADGE, slug, body)
