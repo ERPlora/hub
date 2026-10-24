@@ -8,8 +8,10 @@ never overwrites in silence: a second «a.pdf» is «a (1).pdf» (Google Drive, 
 """
 
 import datetime as dt
+import re
 import unicodedata
 import uuid
+from pathlib import Path
 
 import boto3
 import pytest
@@ -17,6 +19,8 @@ from botocore.exceptions import EndpointConnectionError
 from botocore.stub import Stubber
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, InMemoryStorage, storages
+from django.utils import translation
+from django.utils.translation import gettext
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 from storages.backends.s3 import S3Storage
 from storages.utils import clean_name, safe_join
@@ -546,3 +550,30 @@ def test_the_refusals_are_the_api_s_statuses():
     storage = InMemoryStorage()
     files.create_folder(storage, A, "", "x")
     assert isinstance(pytest.raises(Conflict, files.create_folder, storage, A, "", "x").value, Conflict)
+
+
+# ── Every sentence in Spanish too ─────────────────────────────────────────────────────────────────────────────
+
+#: The sentences the refusals of Files say, as written in its code (``gettext("…")`` in ``base/files.py`` and in the
+#: Files block of ``base/services.py``); the API and the assistant pass them on to the person, so each one has its
+#: Spanish.
+_SERVICES = Path(files.__file__).with_name("services.py").read_text().split("── Files (APP-BASE-8) ──", 1)[1]
+SENTENCES = sorted(
+    set(re.findall(r'gettext\(\s*"((?:[^"\\]|\\.)*)"', Path(files.__file__).read_text() + _SERVICES.split("\n# ── ", 1)[0]))
+)
+
+
+def test_files_says_its_refusals_in_some_words():
+    assert len(SENTENCES) >= 10
+
+
+@pytest.mark.parametrize("sentence", SENTENCES)
+def test_every_refusal_of_files_reads_in_spanish(sentence):
+    with translation.override("es"):
+        assert gettext(sentence) != sentence
+
+
+def test_a_refusal_reaches_a_spanish_person_in_spanish(store):
+    with translation.override("es"):
+        message = str(pytest.raises(InvalidPayload, files.upload, store, A, "", "setup.exe", b"MZ").value)
+    assert message == "Los programas (.exe) no se pueden guardar en Archivos: podrían dañar a quien los abra."
