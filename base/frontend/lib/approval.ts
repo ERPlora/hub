@@ -82,7 +82,7 @@ async function askInDialog(question: ApprovalQuestion): Promise<string | null> {
     import('@ionic/vue'),
     import('../components/ApprovalDialog.vue'),
   ]);
-  const modal = await modalController.create({ component: ApprovalDialog, componentProps: { question } });
+  const modal = await modalController.create({ component: ApprovalDialog, componentProps: { question }, cssClass: APPROVAL_DIALOG_CLASS });
   await modal.present();
   const { data, role } = await modal.onDidDismiss<string>();
   return role === APPROVED && typeof data === 'string' ? data : null;
@@ -90,3 +90,7 @@ async function askInDialog(question: ApprovalQuestion): Promise<string | null> {
 
 /** The role the dialog closes with once somebody approved (its data: the pass). */
 export const APPROVED = 'approved';
+
+/** The dialog's own class: from a tablet up it is as tall as its whole PIN pad (ApprovalDialog.vue), never Ionic's
+ *  fixed 600×600 card, which cut the pad's last row, the 0 and erase. */
+export const APPROVAL_DIALOG_CLASS = 'approval-dialog-modal';
