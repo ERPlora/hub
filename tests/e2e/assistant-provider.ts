@@ -123,7 +123,9 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
   const closeCash = /E2E-CLOSE-CASH (\d+)/.exec(question);
   if (closeCash) {
     const counted = Number(closeCash[1]);
-    const results = messages.filter((message) => message.role === 'tool');
+    // The results of this request only: a conversation may have closed (or cancelled) a drawer before.
+    const asked = messages.findLastIndex((message) => message.role === 'user');
+    const results = messages.slice(asked + 1).filter((message) => message.role === 'tool');
     if (results.length === 0) return call('cash_register__session__closing_summary', { closing_balance: counted });
     if (results.length === 1) {
       const summary = JSON.parse(textOf(results[0].content)) as CloseCashSummary & { error?: unknown };

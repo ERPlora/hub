@@ -79,6 +79,11 @@ describe('answerTo', () => {
     expect(finish(close.frames)).toEqual(['tool_calls']);
     const closed = [...read, asked('cash_register__session__close'), { role: 'tool', content: '{"status": "closed"}' }];
     expect(textOf(answerTo(closed).frames)).toBe('Hecho.');
+    // Asked again in the same conversation (after a «Cancel»): the summary again, read now, never the old one.
+    const again = [...closed, { role: 'assistant', content: 'Hecho.' }, question];
+    expect(toolOf(answerTo(again).frames).name).toBe('cash_register__session__closing_summary');
+    const readAgain = [...again, asked('cash_register__session__closing_summary'), { role: 'tool', content: JSON.stringify({ ...summary, number: 'S-261024-0002' }) }];
+    expect(toolOf(answerTo(readAgain).frames).arguments).toBe('{"session":"S-261024-0002","closing_balance":25000}');
     // A summary refused (the count required and not said, no open session): it is said, and nothing is asked for.
     const refused = [question, asked('cash_register__session__closing_summary'), { role: 'tool', content: '{"error": {"code": "cash_register.no_open_session"}}' }];
     expect(toolOf(answerTo(refused).frames).name).toBe('');
