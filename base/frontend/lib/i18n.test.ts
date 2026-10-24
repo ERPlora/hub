@@ -30,6 +30,12 @@ describe('useBaseI18n', () => {
     expect(api().t('base.setup.progress', { done: 1, total: 3 })).toBe('1 de 3 hechos');
   });
 
+  it('picks the plural form («a | b») by the placeholder `n`, with no count of its own', () => {
+    const { api } = harness('es');
+    expect(api().t('base.data.rows', { n: 1 })).toBe('1 fila');
+    expect(api().t('base.data.rows', { n: 12 })).toBe('12 filas');
+  });
+
   it('follows the language of the shell', async () => {
     const { i18n, wrapper, api } = harness('en');
     expect(api().locale.value).toBe('en');
