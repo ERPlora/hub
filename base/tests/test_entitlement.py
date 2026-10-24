@@ -206,6 +206,20 @@ def test_an_operation_of_a_blocked_app_answers_402(modules):
 
 
 @pytest.mark.django_db
+def test_the_402_is_said_in_the_language_of_who_asks(modules):
+    keep("a", photo())
+    said = {}
+    for language in ("en", "es"):
+        asking = OperationContext(scope=A, actor=None, permissions=frozenset({"*"}), language=language)
+        with pytest.raises(EntitlementBlocked) as refused:
+            operation("stock.item.list")(asking, AnyIn())
+        said[language] = refused.value.message
+
+    assert said["es"] != said["en"]
+    assert all("Stock" in message and "erplora.com" in message for message in said.values())
+
+
+@pytest.mark.django_db
 def test_the_same_operation_runs_where_the_business_has_the_right(modules):
     keep("a", photo("stock"))
     keep("b", photo())
