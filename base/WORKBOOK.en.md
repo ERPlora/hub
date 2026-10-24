@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:357f8e33c16613d1163d33cf5172fb6e6f304643f03fe501bc3ba5703594c203 -->
+<!-- generated from WORKBOOK.md sha256:12032a8ef99563b689c1322c68bbc126b7c862f93a46b3e2a156da7c028e6cd7 -->
 
 ## What it is for and who it is for
 
@@ -13,6 +13,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
 - **The activity**: the latest sales.
 - **Start with a template** of a business like theirs and, in "Settings", keep a copy of its data or load
   another business's.
+- **The business's details**, in "Settings": its name, its country, its time zone, its currency and its
+  language, as erplora.com has them, and where to go to change them.
 
 Who uses it:
 
@@ -95,9 +97,18 @@ browser).
 From "System" in the side menu, the "Plan and limits" tab: "Your plan's limits" with "Within the limit" or
 "Close to the limit", the "People" and "Devices" cards and where plans are managed.
 
+### Settings · Business
+It opens with "Settings" in the side menu: it is the first of the tabs at the bottom, "Business", "Printing" and
+"Data and backups". The "Your business" card shows, with no fields to fill in, "Business name", "Country", "Time
+zone" (with the time it is there), "Currency" and "Business language", each with a line that says what it is
+for. Below, where they are changed and, for the owner and the administrator, "Change on erplora.com". Further
+down, "Fiscal data", which opens Invoicing's issuer.
+
+### Settings · Printing
+The "Printing" tab: a single row, "Printers and ticket", which opens the Printing app.
+
 ### Settings · Data and backups
-It opens with "Settings" in the side menu. At the bottom, the "Data and backups" tab (the old hub's other
-Settings tabs come with their flows). On top, a selector with "Import" (what opens), "Export" and "Reset";
+The "Data and backups" tab of "Settings", the last one. On top, a selector with "Import" (what opens), "Export" and "Reset";
 the one chosen stays in the link, so it can be shared and Back leaves Settings.
 
 - **Import**: "Choose what to load", with "Upload from file" and the templates as cards or as a list, with
@@ -116,6 +127,15 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell, "All caught up. No notifications.". |
 | Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell, "Could not check the notifications. They will show up when the connection is back.". |
 | No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. |
+
+On the Settings · Business screen:
+
+| State | What the person sees |
+|---|---|
+| Loading | "Loading the business’s data…". |
+| Empty | A demo has no name nor country: those rows read "—", and below, "This demo has no business on erplora.com: its data does not change.". |
+| Error | "Couldn’t load the business’s data" with "Nothing has changed. Check the connection and try again." and "Retry"; never a blank card. |
+| No permission | Whoever does not administer the business sees it the same, without "Change on erplora.com" and with "Only the owner or an administrator changes them, on erplora.com."; "Fiscal data" does not show to whoever may not write the issuer. |
 
 On the Settings · Data and backups screen:
 
@@ -168,6 +188,10 @@ On the Settings · Data and backups screen:
 | BASE-F36 | Choose which apps, data and tables travel in the export | done |
 | BASE-F37 | Reset the business by sections | partial |
 | BASE-F38 | See the Home up to date after importing a template | done |
+| BASE-F39 | Open Settings and move through its tabs | done |
+| BASE-F40 | See the business's country | done |
+| BASE-F41 | See the business's currency | partial |
+| BASE-F42 | Change the business's language on erplora.com | partial |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -852,3 +876,73 @@ be opened" with "Nothing has changed in your business: {reason}" and "Try again"
 again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with
 could not be loaded." with "Retry" and "Not now".
 Involved: BASE-F01, INVENTORY-F12
+
+### BASE-F39 Open Settings and move through its tabs
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Settings
+Steps:
+  1. Tap "Settings" in the side menu, or arrive from a link on another screen.
+  2. At the bottom, the tabs "Business", "Printing" and "Data and backups"; "Business" opens. The tab chosen
+     stays in the link, so a saved link comes back to it and Back leaves Settings instead of walking its tabs.
+     On the phone the three fit, whole.
+  3. Old links still take you to their place: the one of the old taxes tab opens "Business", and the one of a
+     tab that no longer exists opens the first.
+  4. In "Printing", "Printers and ticket" ("Add your printer and set up the printed and digital ticket") opens
+     the Printing app; when it is not there, it says "Install the Printing app to add your printer and set up the
+     ticket" and takes you to "Apps".
+In: the business's apps.
+Out: nothing saved.
+If it fails: it does not fail: it is navigation. Each tab says in itself when it could not load its own (BASE-F40,
+BASE-F29).
+Involved: PRINTING-F06, BASE-F29, BASE-F40
+
+### BASE-F40 See the business's country
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Settings · Business
+Steps:
+  1. In "Business", "Country" ("The one of its taxes and its invoices") says, in the person's language, the
+     country the business was signed up with on erplora.com.
+  2. It is not chosen here: below it reads "The country does not change once the business is ready.", because
+     its invoices are of one country. While the business is being prepared, it is changed on erplora.com
+     (HUBS-F15).
+In: the country erplora.com signed the business up with.
+Out: nothing saved; with it, the business's templates come first and "Finish setting up your business" knows
+which steps are its own.
+If it fails: if the business's details cannot be read, "Couldn’t load the business’s data" with "Retry". A demo
+has no country: "—".
+Involved: HUBS-F15, BASE-F01, BASE-F29
+
+### BASE-F41 See the business's currency
+Status: partial — the apps still write the amounts in euros even when the business's country pays in another currency: it fits Spain and Portugal, not a country of another currency
+Actor: owner, administrator, manager, employee
+Screen: Settings · Business
+Steps:
+  1. In "Business", "Currency" ("Its country’s, for prices and totals") says the currency with its code and its
+     name in the person's language: "EUR · Euro".
+  2. It is not chosen: it is the one of the business's country, as in the market's payment terminals. A business
+     without a country (a demo) is in euros.
+In: the business's country.
+Out: nothing saved.
+If it fails: as in BASE-F40.
+Involved: BASE-F40
+
+### BASE-F42 Change the business's language on erplora.com
+Status: partial — whoever has not chosen a language of their own still sees the screen in their browser's, not in the business's, until the hub uses each person's language
+Actor: owner, administrator
+Screen: Settings · Business
+Steps:
+  1. In "Business", "Business language" ("The one of whoever has not chosen their own") says the business's
+     language by its name.
+  2. Tap "Change on erplora.com": the business's settings on erplora.com open in another tab, where it is
+     changed and "Save changes" is tapped (HUBS-F15).
+  3. Without reloading, "Business" shows the new language as soon as the business receives it; the same with the
+     name and the time zone.
+In: the language erplora.com saved.
+Out: nothing saved in the business: it receives it from erplora.com (`base.hub.registered`).
+If it fails: if the business does not answer, erplora.com keeps the change and sends it again (HUBS-F08);
+meanwhile, "Business" stays with the previous one. Whoever does not administer the business does not see the
+button: "Only the owner or an administrator changes them, on erplora.com.". In a demo, "This demo has no business
+on erplora.com: its data does not change.".
+Involved: HUBS-F15, HUBS-F08
