@@ -28,6 +28,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: Condition] }>();
 const phrasing = usePhrasing();
+/** «Data»'s list: its names («1. Read an appointment › Start date, as text») wrap instead of being cut. */
+const DATA_LIST = { cssClass: 'flow-conditions__data-list' };
 
 const rows = ref<ConditionRow[]>(conditionRows(props.modelValue));
 watch(
@@ -130,6 +132,7 @@ function remove(index: number): void {
         fill="outline"
         mode="md"
         interface="popover"
+        :interface-options="DATA_LIST"
         @ion-change="setPath(index, String($event.detail.value))"
       >
         <IonSelectOption
@@ -310,5 +313,14 @@ function remove(index: number): void {
 .flow-conditions__hint {
   font-size: 0.78rem;
   color: var(--ep-muted, var(--ion-color-medium));
+}
+</style>
+
+<style>
+/* «Data»'s list is a popover outside this component: a long name wraps, never cut with «…» (two
+   «1. Read an appointment › Customer n…» could not be told apart). */
+ion-popover.flow-conditions__data-list ion-radio::part(label) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 </style>

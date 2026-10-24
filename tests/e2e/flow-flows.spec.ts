@@ -417,3 +417,67 @@ for (const viewport of VIEWPORTS) {
     }
   });
 }
+
+// flow: FLOW-F11 · FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH — in Spanish, what a read of an appointment leaves is named in
+// Spanish in «Dato» and in «¿Qué dato?» («Fecha de inicio, en texto»: the day Appointments leaves ready to say), never by
+// its internal name made readable («Start date label»). Nothing is saved.
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F11: what a read of an appointment leaves is named in Spanish at ${viewport.label}`, async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+    const page = await context.newPage();
+    try {
+      await login(page, A, '/');
+      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+      await page.goto(`${A}/flow/automations/new`);
+      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+      const editor = shown(page);
+      await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
+
+      // «Consultar algo» → «Leer una cita»; then «Solo sigue si…», whose «Dato» offers what the read leaves.
+      await editor.locator('[data-testid=flow-editor-add-query]').click();
+      await search(page, 'flow-step-action-s1', 'leer una cita');
+      await page.locator('[data-testid="flow-step-action-s1-option-appointment.appointment.get"]').click();
+      await expect(editor.locator('[data-testid=flow-step-action-s1] input')).toHaveValue('Leer una cita');
+      await editor.locator('[data-testid=flow-editor-add-condition]').click();
+      await editor.locator('[data-testid=flow-step-cond-s2-add]').click();
+      await editor.locator('[data-testid=flow-step-cond-s2-path-0]').click();
+      const data = page.locator('ion-popover.select-popover:not(.overlay-hidden)');
+      await expect(data.locator('ion-radio', { hasText: '1. Leer una cita › Fecha de inicio, en texto' })).toHaveCount(1);
+      await expect(data.locator('ion-radio', { hasText: '1. Leer una cita › Hora de inicio, en texto' })).toHaveCount(1);
+      await expect(data.locator('ion-radio', { hasText: /\blabel\b/i })).toHaveCount(0);
+      // The list shows each name whole, never cut with «…» (two «1. Leer una cita › Nomb…» could not be told apart).
+      const cut = await data.locator('ion-radio').evaluateAll((radios) =>
+        radios
+          .filter((radio) => {
+            const label = radio.shadowRoot?.querySelector<HTMLElement>('[part=label]');
+            return !label || label.scrollWidth > label.clientWidth;
+          })
+          .map((radio) => radio.textContent?.trim() ?? ''),
+      );
+      expect(cut, 'names cut in «Dato»').toEqual([]);
+      await settled(page);
+      await page.screenshot({ path: shot(`FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-data-${viewport.label}`) });
+      await data.locator('ion-radio', { hasText: 'Fecha de inicio, en texto' }).click();
+      await expect(data).toHaveCount(0);
+      await expect(editor.locator('[data-testid=flow-step-cond-s2-path-0]')).toContainText('Fecha de inicio, en texto');
+
+      // «Insertar un dato» opens «¿Qué dato?»: the same words.
+      const picker = page.locator('ion-modal[data-testid=flow-picker]');
+      const presented = picker.evaluate((modal) => new Promise<void>((resolve) => modal.addEventListener('ionModalDidPresent', () => resolve(), { once: true })));
+      await editor.locator('[data-testid=flow-step-cond-s2-insert-0]').click();
+      await presented;
+      await expect(picker.locator('ion-title')).toHaveText('¿Qué dato?');
+      await expect(picker.locator('[data-testid="flow-picker-steps.s1.start_date_label"]')).toContainText('1. Leer una cita › Fecha de inicio, en texto');
+      await expect(picker.locator('[data-testid="flow-picker-steps.s1.start_time_label"]')).toContainText('1. Leer una cita › Hora de inicio, en texto');
+      await expect(picker.locator('.flow-picker__label', { hasText: /\blabel\b/i })).toHaveCount(0);
+      await picker.locator('[data-testid="flow-picker-steps.s1.start_date_label"]').scrollIntoViewIfNeeded();
+      await settled(page);
+      await page.screenshot({ path: shot(`FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-${viewport.label}`) });
+      await picker.locator('[data-testid=flow-picker-close]').click();
+      await expect(picker).toBeHidden();
+      await noHorizontalScroll(page, viewport.label);
+    } finally {
+      await context.close();
+    }
+  });
+}
