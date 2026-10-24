@@ -756,7 +756,6 @@
         "run": "Run it",
         "cancel": "Cancel",
         "cancelAll": "Cancel all",
-        "typeWord": "Type {word} to confirm",
         "count": "It acts on {count} records.",
         "notFromChat": "I cannot tell how many records this would change, so I do not do it from here. Open its screen, where you can see them.",
         "yes": "Yes",

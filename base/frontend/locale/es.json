@@ -756,7 +756,6 @@
         "run": "Ejecutar",
         "cancel": "Cancelar",
         "cancelAll": "Cancelar todo",
-        "typeWord": "Escribe {word} para confirmar",
         "count": "Afecta a {count} registros.",
         "notFromChat": "No puedo saber cuántos registros cambiaría esto, así que no lo hago desde aquí. Ábrelo en su pantalla, donde puedes verlos.",
         "yes": "Sí",
