@@ -96,6 +96,7 @@ async function attach(m: Awaited<ReturnType<typeof composer>>, ...files: File[])
 }
 
 describe('AssistantComposer', () => {
+  // gh:hub#1811: the old box had no stable name, so no robot (nor screen reader) could write to the assistant.
   it('the box has a stable name and its placeholder, and Enter sends what was written', async () => {
     const m = await composer();
     // Ionic Vue sets these as the element's properties (the textarea inside reads them).
@@ -170,6 +171,7 @@ describe('AssistantComposer', () => {
     expect(m.wrapper.find('[data-testid="assistant-mic"]').exists()).toBe(false);
   });
 
+  // gh:hub#629: the microphone in the panel, voice to text through erplora.com.
   it('dictating: the words land in the box after what was written, and nothing is sent', async () => {
     const voice = microphone();
     const m = await composer({ voice });

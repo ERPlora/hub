@@ -24,6 +24,7 @@ afterEach(() => {
 });
 
 describe('the chrome of base', () => {
+  // gh:hub#38: the topbar's parity with the old shell: the assistant's sparkles and the bell at its end.
   it('the topbar: the assistant, then the bell', async () => {
     const { wrapper } = await mountBase(TopbarChrome);
     const order = [...wrapper.element.parentElement!.querySelectorAll('[data-testid="assistant-button"], [data-testid="hub-bell"]')];

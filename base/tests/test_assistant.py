@@ -89,6 +89,14 @@ def test_what_the_person_asks_to_do_ranks_the_operation_that_does_it():
     assert "service.service.create" in offered
 
 
+def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
+    """gh:hub#1044: asked «what version of ERPlora do I have?», the old assistant said there was none."""
+    tools = assistant.catalog(ctx({"base.view_home", "base.administer_hub"}))
+    offered = [op.name for op in assistant.relevant(tools, ["¿Qué versión de ERPlora tengo?"], "es")]
+    assert "base.system.status" in offered
+    assert "base.system.status" not in assistant.catalog(ctx(EMPLOYEE))
+
+
 def test_the_checklist_read_is_always_at_hand():
     tools = assistant.catalog(ctx({"*"}))
     assert "base.setup.status" in [op.name for op in assistant.relevant(tools, ["zzz"], "es")]
@@ -179,6 +187,8 @@ def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
 
 def test_the_instructions_set_the_language_the_money_and_the_screens():
     text = assistant.instructions(language="es", currency="EUR", business="Bar Pepe", screens={"/settings": "Ajustes"})
+    # gh:hub#1046: the old assistant answered anything (films, cinemas) on the business's allowance.
+    assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
     assert "EUR" in text and "cents" in text
     assert "[Ajustes](/settings)" in text
@@ -313,6 +323,7 @@ def test_an_allowance_spent_is_not_a_breakdown(gateway):
     ],
 )
 def test_a_refusal_of_the_gateway_is_one_of_ours(gateway, status, code, expected):
+    """gh:hub#1738: the old hub said «Could not reach the assistant» for any refusal; each one is said as it is."""
     gateway.reply("/internal/assistant/chat/stream", status=status, json={"error": {"code": code, "message": "x"}}, headers={"Retry-After": "40"})
     error = frames_of(**TURN)[-1]
     assert (error["type"], error["code"]) == ("error", expected)
