@@ -18,7 +18,19 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 import { cleanUp as cleanUpCards } from './customer-helpers';
 import { A, EMPLOYEE, hostPage, login, SAAS, shot, shown } from './helpers';
 import { filterBy } from './service-helpers';
-import { cleanUp, e2ePhone, flowShots, metaGraph, PREFIX, pushChannel, receive, seedErplora, template, waId } from './whatsapp-helpers';
+import {
+  cleanUp,
+  e2ePhone,
+  flowShots,
+  metaGraph,
+  PREFIX,
+  pushChannel,
+  receive,
+  restorePhoto,
+  seedErplora,
+  template,
+  waId,
+} from './whatsapp-helpers';
 
 test.beforeAll(async () => {
   // erplora.com takes `a`'s number (its test seed): what the Hub hands it reaches Meta.
@@ -30,6 +42,7 @@ test.beforeAll(async () => {
 test.afterAll(() => {
   cleanUp();
   cleanUpCards();
+  restorePhoto();
 });
 
 const rowOf = (page: Page, phone: string) => shown(page).locator('[data-testid=whatsapp-inbox-row]', { hasText: phone });

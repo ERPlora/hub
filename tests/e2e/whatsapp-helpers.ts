@@ -7,6 +7,10 @@
 // Never Meta, never a row written by hand: the operation commits and notifies, and the open pages update live.
 // What a run creates is named `e2e.…` and deleted in the spec's `afterAll`.
 //
+// The seed's push replaces `a`'s photo with erplora.com's, plan included (Free: one device): `seedErplora` keeps the
+// photo it replaces and `restorePhoto`, last in the `afterAll` of every spec that seeds (whatsapp-photo.test.ts), puts
+// it back, so no spec run after it on the same database finds `a` on erplora.com's plan (whatsapp-photo.spec.ts).
+//
 // The run's real erplora.com (`SAAS_URL`) also takes part: `seedErplora` gives the hub `a` its WhatsApp number there
 // with erplora.com's own test seed (`tests/e2e/panel/whatsapp_hub_seed.py` of its checkout: `a` and `b` with this
 // Hub's ids, a number with a made-up Meta permission, the photo pushed to this Hub), so the Hub's doors to it (5, 6,
@@ -144,24 +148,44 @@ const hubIds = (): Record<string, string> =>
       .map((row) => row.split('=')),
   );
 
+/** Where `a`'s photo (`state` and its version) waits from a spec's first `seedErplora` until `restorePhoto` puts it
+ *  back: a table of the run's database, so a shell's quoting never touches the photo. */
+const PHOTO_BACKUP = 'e2e_backup_whatsapp_photo';
+
 /** Gives `a` its WhatsApp number in the run's erplora.com, with erplora.com's own test seed, and has it push the
  *  photo to this Hub: what the seed printed (`delivered` true when this Hub took it). The seed also keeps `a`'s
  *  templates as erplora.com does after reading Meta's list (`SEED_TEMPLATES`) and sets the month's usage to `used`
  *  (whatsapp-seed.ts).
+ *  That photo replaces `a`'s with erplora.com's, plan included (Free: one device), so the spec's first seed keeps the
+ *  one it replaces until `restorePhoto`, the last step of the spec's `afterAll` (whatsapp-photo.test.ts says so).
  *  Running it again keeps what exists, connects the number again (a reconnect asked by Meta is cleared), sets the
- *  usage again and pushes once more. */
+ *  usage again and pushes once more; the photo kept stays the first seed's. */
 export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_error: string } {
   const script = join(SAAS_DIR, 'tests', 'e2e', 'panel', 'whatsapp_hub_seed.py');
   if (!existsSync(script)) {
     throw new Error(`erplora.com's checkout with ${script} is needed (E2E_SAAS_DIR): see whatsapp-helpers.ts.`);
   }
   const ids = hubIds();
+  psql(
+    `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as select id, state, state_version from base_hub where slug = 'a'`,
+  );
   const out = execFileSync('uv', ['run', 'python', script, ids.a, ids.b, ...seedArguments(seed)], {
     cwd: SAAS_DIR,
     encoding: 'utf8',
     env: { ...process.env, DEBUG: 'True', DB_NAME: SAAS_DB, HUB_INTERNAL_URL: `http://127.0.0.1:${STACK.hubPort}` },
   });
   return JSON.parse(out.trim().split('\n').at(-1) ?? '{}');
+}
+
+/** Puts back `a`'s photo as it was before the spec's first `seedErplora`, its version too: a spec run after it on the
+ *  same database finds `a` as it was, never on erplora.com's Free plan, whose one device ends another device's session
+ *  (BASE-G57). It goes last in the `afterAll` of every spec that seeds, after anything else there that pushes a photo
+ *  (a seed again, erplora.com's plan put back). With nothing seeded since the last one, it changes nothing. */
+export function restorePhoto(): void {
+  if (psql(`select to_regclass('${PHOTO_BACKUP}') is not null`) !== 't') return;
+  psql(
+    `update base_hub h set state = b.state, state_version = b.state_version from ${PHOTO_BACKUP} b where b.id = h.id; drop table ${PHOTO_BACKUP}`,
+  );
 }
 
 const GRAPH_RUN: ErploraRun = {
