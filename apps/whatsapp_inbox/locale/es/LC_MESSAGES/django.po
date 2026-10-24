@@ -31,6 +31,15 @@ msgctxt "whatsapp menu"
 msgid "Settings"
 msgstr "Ajustes"
 
+msgid "WhatsApp customers waiting for an answer"
+msgstr "Clientes de WhatsApp esperando respuesta"
+
+msgid "WhatsApp · {display_name}"
+msgstr "WhatsApp · {display_name}"
+
+msgid "WhatsApp customer waiting for an answer"
+msgstr "Cliente de WhatsApp esperando respuesta"
+
 msgctxt "whatsapp channel"
 msgid "Not connected"
 msgstr "Sin conectar"

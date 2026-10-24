@@ -245,6 +245,36 @@ class SummaryOut(Schema):
     )
 
 
+class AwaitingCountIn(Schema):
+    pass
+
+
+class AwaitingCountOut(Schema):
+    count: int = Field(
+        description="Open conversations whose last message is the customer's: customers waiting for an answer."
+    )
+
+
+class NoticesIn(Schema):
+    since: datetime | None = Field(
+        None, description="Only the customers who wrote from this instant on; empty = the last 24 hours."
+    )
+    limit: int = Field(20, ge=1, le=100, description="How many, the newest first (1 to 100).")
+
+
+class NoticeOut(Schema):
+    id: UUID = Field(description="The conversation's id.")
+    at: datetime = Field(description="When the customer wrote her last message, still unanswered.")
+    display_name: str = Field(description="Who: the customer card's name, else her WhatsApp name, else her number.")
+    last_message_preview: str = Field(
+        description="What she wrote last (empty for a photo or a location without a caption)."
+    )
+
+
+class NoticesOut(Schema):
+    rows: list[NoticeOut] = Field(description="The customers left waiting for an answer, the newest first.")
+
+
 class AssignIn(ConversationRefIn):
     assignee_id: int | None = Field(
         None, description="The id of the person to assign it to."

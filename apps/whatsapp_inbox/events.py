@@ -52,6 +52,13 @@ ALL = [
     TEMPLATE_DELETED,
 ]
 
+#: What changes whether a conversation waits for an answer (WHATSAPP_INBOX-F09; the bell's count): a message arrives
+#: (the customer's, or the echo of one sent from the business's phone), one is sent from the Hub, its status changes or
+#: it is erased. Never a read, an assignment, a note nor a card joined.
+AWAITING_REPLY_EVENTS = [MESSAGE_RECEIVED, MESSAGE_SENT, STATUS_CHANGED, ERASED]
+#: What may leave a customer waiting anew (the device's notices): a message of hers, or a conversation opened again.
+NOTICE_EVENTS = [MESSAGE_RECEIVED, STATUS_CHANGED]
+
 # The Customers app's events (its WORKBOOK fixes their payload: ``{"id"}``, merged adds ``absorbed_id``).
 CUSTOMER_CREATED = "customer.customer.created"
 CUSTOMER_UPDATED = "customer.customer.updated"
