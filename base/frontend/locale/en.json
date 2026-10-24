@@ -588,6 +588,15 @@
         "appearance": "Appearance",
         "appearanceHelp": "Choose the mode and the palette you prefer.",
         "palette": "Theme palette",
+        "palettes": {
+          "erplora": "ERPlora",
+          "terracotta": "Terracotta",
+          "corporate": "Corporate",
+          "minimal": "Minimal",
+          "forest": "Forest",
+          "ocean": "Ocean",
+          "violet": "Violet"
+        },
         "mode": "Theme",
         "modes": {
           "system": "System (auto)",

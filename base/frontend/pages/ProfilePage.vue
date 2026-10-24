@@ -395,7 +395,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
                 :class="`profile__swatch--${palette}`"
                 aria-hidden="true"
               />
-              <span class="profile__palette-name">{{ palette.charAt(0).toUpperCase() + palette.slice(1) }}</span>
+              <span class="profile__palette-name">{{ t(`base.profile.prefs.palettes.${palette}`) }}</span>
             </button>
           </div>
           <h4 class="profile__eyebrow">
