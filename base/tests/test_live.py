@@ -34,6 +34,10 @@ def test_the_three_queries_and_their_events():
         "base.plan.usage": [HUB_STATE_APPLIED],
         # System (APP-BASE-7): the failed events, and the photo (it turns the app they were for on or off).
         "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
+        # The status re-runs on the photo and on every reconnection (a deploy's new release shows by itself); the log
+        # also when a failed event appears, is resent or discarded (its level changes).
+        "base.system.status": [HUB_STATE_APPLIED],
+        "base.event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
     }
 
 

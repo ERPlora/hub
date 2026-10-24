@@ -35,3 +35,7 @@ live("base.plan.usage", on=[HUB_STATE_APPLIED])
 # ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
 # The failed events follow the relay, who resends or discards them, and the photo (it turns their app on or off).
 live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
+# The status: the photo, and every reconnection of the stream (a deploy) sends it again with the new release.
+live("base.system.status", on=[HUB_STATE_APPLIED])
+# The log: what a new event brings shows when the tab opens again; a failed event changes the level of its row at once.
+live("base.event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
