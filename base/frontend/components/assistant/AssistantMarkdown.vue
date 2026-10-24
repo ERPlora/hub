@@ -2,7 +2,7 @@
 // An answer of the assistant with its format (BASE-G113): the tree of `lib/assistant-markdown.ts` painted with Vue's
 // own elements — never `v-html`, so nothing the model writes is a tag. A link only to a screen this hub serves
 // (`screenExists`), named as the menu names it when the answer gave it no label (`nameOf`, BASE-G114); clicking it
-// emits `go` (the panel navigates). Any other path is text. A table scrolls sideways inside its own box.
+// emits `go` (the panel navigates). Any other path is text. A table fits the bubble, or scrolls inside its own box.
 import { computed, type FunctionalComponent, h, type VNodeChild } from 'vue';
 
 import { type Inline, parseMarkdown } from '../../lib/assistant-markdown';
@@ -123,6 +123,13 @@ const Inlines: FunctionalComponent<{ inlines: Inline[] }> = (inner) => inner.inl
 .assistant-md ol:last-child {
   margin-bottom: 0;
 }
+/* The page's reset takes the markers away: a list says it is one. */
+.assistant-md ul {
+  list-style: disc;
+}
+.assistant-md ol {
+  list-style: decimal;
+}
 .assistant-md ul,
 .assistant-md ol {
   margin: 0 0 8px;
@@ -144,22 +151,26 @@ const Inlines: FunctionalComponent<{ inlines: Inline[] }> = (inner) => inner.inl
   text-decoration: underline;
   cursor: pointer;
 }
-/* A table scrolls inside its own box: at 390 px the panel never moves sideways (BASE-G113). */
+/* A table fits the bubble, its long cells broken between words; one that still cannot (many columns) scrolls inside
+   its own box: at 390 px the panel never moves sideways (BASE-G113). */
 .assistant-table {
   max-width: 100%;
   margin: 0 0 8px;
   overflow-x: auto;
 }
 .assistant-table table {
+  width: 100%;
   border-collapse: collapse;
   font-size: 0.92em;
 }
 .assistant-table th,
 .assistant-table td {
+  min-width: 4.5em;
   padding: 4px 8px;
   border: 1px solid var(--ion-color-step-150, #e3e3e3);
   text-align: start;
-  white-space: nowrap;
+  vertical-align: top;
+  overflow-wrap: break-word;
 }
 .assistant-table th {
   font-weight: 600;
