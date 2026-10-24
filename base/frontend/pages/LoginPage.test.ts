@@ -92,6 +92,15 @@ describe('LoginPage — the PIN pad of a shared till', () => {
     expect(access.leaveTo).toHaveBeenCalledWith('/sale/pos');
   });
 
+  it('on «Account» a badge reads nothing: only the PIN pad listens for one', async () => {
+    const { wrapper } = await login([PIN_DOOR]);
+    await wrapper.get('[data-testid="access-tab-account"]').trigger('click');
+    await flush();
+    for (const key of [...'0012345678', 'Enter']) document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    await flush();
+    expect(access.enterWith).not.toHaveBeenCalled();
+  });
+
   it('an address that tried too many PINs hears how long to wait, and «Account» stays', async () => {
     const { wrapper } = await login([{ ...PIN_DOOR, people: [], wait: 170 }]);
     expect(wrapper.get('[data-testid="access-wait"]').text()).toBe('Too many wrong attempts. Wait 3 min and try again.');

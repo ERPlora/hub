@@ -27,6 +27,8 @@ describe('PinDoor', () => {
     const { wrapper } = await door();
     const faces = wrapper.findAll('[data-testid="pin-face"]');
     expect(faces.map((face) => face.text())).toEqual(['ALAna López', 'BBea']);
+    // A long name is cut with «…» on its face: the face names it whole.
+    expect(faces.map((face) => face.attributes('title'))).toEqual(['Ana López', 'Bea']);
     expect(wrapper.text()).toContain('Choose your user');
     expect(wrapper.find('[data-testid="pinpad"]').exists()).toBe(false);
   });

@@ -115,6 +115,12 @@ class TestTheDevicesOfTheHub:
         assert answer["unused"] == 1
         assert token not in json.dumps(answer) and "token" not in json.dumps(answer)
 
+    def test_the_one_in_hand_is_never_unused_however_old(self, client, owner):
+        here = a_device(client, last_entry_at=timezone.now() - dt.timedelta(days=40))
+        answer = get(client, "/devices").json()
+        [row] = [row for row in answer["devices"] if row["id"] == str(here.pk)]
+        assert (row["current"], row["unused"], answer["unused"]) == (True, False, 0)
+
     def test_it_says_which_one_has_a_session_open_and_until_when(self, client, fake_saas):
         fake_saas()
         enter(client)
