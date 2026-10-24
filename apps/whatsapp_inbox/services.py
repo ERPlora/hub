@@ -137,6 +137,8 @@ CAP_REACHED = _(
 #: A plan that includes no WhatsApp messages (0, ADR-0474): no month brings any, so not «until next month».
 NO_PLAN_MESSAGES = _("Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan.")
 SEND_REFUSED = _("erplora.com did not send the message.")
+#: Meta's 190, as erplora.com says it (``whatsapp.reconnect_needed``): only connecting the number again fixes it.
+RECONNECT_NEEDED = _("WhatsApp's permission for your number expired: connect it again.")
 SAAS_UNREACHABLE = _("erplora.com did not answer: the message has not left. Try again.")
 SEND_UNKNOWN = _(
     "erplora.com did not confirm the message. Try again: it is never sent twice."
@@ -195,14 +197,19 @@ _ON_ITS_WAY = (Message.Status.QUEUED, Message.Status.SENDING)
 _VARIABLE = re.compile(r"\{\{\s*(\d+)\s*\}\}")
 #: A number exactly in international format: a plus, the country and its digits, nothing else.
 _INTERNATIONAL = re.compile(r"\+[1-9]\d{6,14}")
-#: erplora.com's 409 codes the Hub knows by name; any other is «erplora.com did not send it».
-_REFUSALS = {"whatsapp.cap_reached": "whatsapp_inbox.cap_reached"}
+#: erplora.com's 409 codes the Hub knows by name → (its code, its own words or ``None`` for erplora.com's); any
+#: other is «erplora.com did not send it», with Meta's reason.
+_REFUSALS = {
+    "whatsapp.cap_reached": ("whatsapp_inbox.cap_reached", None),
+    "whatsapp.reconnect_needed": ("whatsapp_inbox.reconnect_needed", RECONNECT_NEEDED),
+}
 #: erplora.com's 409 codes for a template the Hub says in its own words (never blaming ERPlora for Meta:
 #: gh:hub#2731); any other is Meta's refusal, with Meta's reason.
 _TEMPLATE_REFUSALS = {
     "whatsapp.meta_unreachable": ("whatsapp_inbox.meta_unreachable", META_UNREACHABLE),
     "whatsapp.meta_rate_limited": ("whatsapp_inbox.meta_rate_limited", META_RATE_LIMITED),
     "whatsapp.not_connected": ("whatsapp_inbox.channel_not_connected", NOT_CONNECTED),
+    "whatsapp.reconnect_needed": ("whatsapp_inbox.reconnect_needed", RECONNECT_NEEDED),
 }
 _TEMPLATE_ON_ITS_WAY = (Template.SubmitState.QUEUED, Template.SubmitState.SENDING)
 
@@ -1207,8 +1214,8 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
         return {"status": message.status}  # a status from Meta already settled it
     elif data.kind == gateway.REFUSED:
         message.status = Message.Status.FAILED
-        message.error_code = _REFUSALS.get(data.code, "whatsapp_inbox.send_refused")
-        message.error_message = (data.message or str(SEND_REFUSED))[:500]
+        message.error_code, own = _REFUSALS.get(data.code, ("whatsapp_inbox.send_refused", None))
+        message.error_message = (str(own) if own else data.message or str(SEND_REFUSED))[:500]
     else:
         message.status = Message.Status.SENDING
         unknown = data.kind == gateway.UNKNOWN

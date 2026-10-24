@@ -5,7 +5,7 @@
 // the composer says nothing can be sent while the number is not connected, with the reason's code, and
 // opens when erplora.com reports it connected; a reply is kept and handed to the run's real erplora.com, where
 // erplora.com's own test seed gave `a` a number (whatsapp-helpers.ts, `seedErplora`): erplora.com takes it to Meta,
-// which refuses the seed's made-up permission, and the bubble says «Not delivered» with that reason, never «Sent»
+// which refuses the seed's made-up permission, and the bubble says «Not delivered» in the Hub's words, never «Sent»
 // (Meta's statuses through erplora.com: whatsapp-inbox-erplora.spec.ts); a template with its variable, handed over
 // the same way; a note, «Pending», «Assign to me»,
 // «Create card» joining a Customers card; «Erase this number's data» asked first. An attachment, the
@@ -125,9 +125,11 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   await expect(shown(page).locator('[data-testid=whatsapp-inbox-not-connected]')).toBeHidden();
   await expect(blocked).toBeHidden();
 
-  // F32: the reply is kept and handed to erplora.com (door 5), which takes it to Meta: Meta refuses the seed's
-  // made-up permission and erplora.com says so (409), so the bubble says «Not delivered» with that reason and offers
-  // no «Retry» (the same key would get the same answer); never «Sent» without Meta's id.
+  // F32, F34: the reply is kept and handed to erplora.com (door 5), which takes it to Meta: Meta refuses the seed's
+  // made-up permission with its 190 and erplora.com says so (409 `whatsapp.reconnect_needed`), so the bubble says
+  // «Not delivered» in the Hub's words, never Meta's, and offers no «Retry» (the same key would get the same answer);
+  // never «Sent» without Meta's id. The number this spec pushed stays connected (its version is above erplora.com's
+  // next photo), so the bubble says only what happened to that message, with no «Reconnect».
   const text = panel(page).locator('[data-testid=whatsapp-inbox-composer-text] textarea');
   await expect(text).toBeEnabled();
   await text.fill('Sí, a las 17:00 tenemos hueco.');
@@ -136,8 +138,10 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   await expect(reply).toBeVisible();
   await expect(text).toHaveValue('');
   await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not delivered', { timeout: 30_000 });
-  await expect(reply.locator('.wa-bubble__error')).toContainText("Meta's reason:");
+  await expect(reply.locator('[data-testid=whatsapp-inbox-message-error]')).toHaveAttribute('data-code', 'whatsapp_inbox.reconnect_needed');
+  await expect(reply.locator('.wa-bubble__error')).toHaveText("WhatsApp's permission for your number had expired.");
   await expect(reply.locator('[data-testid=whatsapp-inbox-message-retry]')).toHaveCount(0);
+  await expect(reply.locator('[data-testid=whatsapp-inbox-message-reconnect]')).toHaveCount(0);
   // What it says can be read on the business's bubble (WCAG AA, 4.5:1): the text, «Not delivered» and why.
   for (const part of ['.wa-bubble__body', '[data-testid=whatsapp-inbox-message-status]', '.wa-bubble__error']) {
     expect(await contrast(reply, part), part).toBeGreaterThanOrEqual(4.5);
@@ -159,11 +163,11 @@ test('the owner reads, answers, organises and erases a WhatsApp conversation; th
   });
   await templates.locator('[data-testid=whatsapp-inbox-template-form-submit]').click();
   await expect(templates).toBeHidden();
-  // Handed to erplora.com (door 5) like a reply: Meta refuses the seed's permission, «Not delivered» with the reason.
+  // Handed to erplora.com (door 5) like a reply: Meta refuses the seed's permission, «Not delivered» in the Hub's words.
   const sentTemplate = bubbles(page, 'outbound').filter({ hasText: 'e2e_recordatorio' });
   await expect(sentTemplate).toBeVisible();
   await expect(sentTemplate.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not delivered', { timeout: 30_000 });
-  await expect(sentTemplate.locator('.wa-bubble__error')).toContainText("Meta's reason:");
+  await expect(sentTemplate.locator('.wa-bubble__error')).toHaveText("WhatsApp's permission for your number had expired.");
 
   // F36: an internal note, in the thread.
   await panel(page).locator('[data-testid=whatsapp-inbox-composer-mode-note]').click();

@@ -304,6 +304,7 @@ async function removeNote(note: NoteOut): Promise<void> {
         :loading="messagesStatus === 'loading'"
         :error="messagesError && !detailError ? messagesError.message : undefined"
         :has-more="hasMore"
+        :reconnect-needed="props.channel?.status === 'reconnect_needed'"
         @earlier="pages += 1"
         @delete-note="removeNote"
         @retry="(message) => act(() => retry.run({ id: message.id }))"
