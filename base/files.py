@@ -411,13 +411,16 @@ def _index(store: Storage, hub: uuid.UUID) -> Index:
         parts = item.key.split("/")
         if all(_is_name(part) for part in parts[:-1]) and (parts[-1] == MARKER or _is_name(parts[-1])):
             folders.update("/".join(parts[:index]) for index in range(1, len(parts)))
-    # Kept only if no write of Files came while walking (each one moves the generation): never what the walk missed.
-    if _cached("read the index", lambda: cache.get(generation_key, 0), None) == generation:
-        _cached(
-            "keep the index",
-            lambda: cache.set_many({folders_key: sorted(folders), bytes_key: size}, INDEX_SECONDS),
-            None,
-        )
+    # Kept first, the generation read back after: a write of Files that came while walking or while keeping (each one
+    # moves the generation before it touches the index) forgets what was kept, so never what the walk missed. Read
+    # back before keeping, a write landing in between (one round trip of the cache) stayed out until the index expired.
+    _cached(
+        "keep the index",
+        lambda: cache.set_many({folders_key: sorted(folders), bytes_key: size}, INDEX_SECONDS),
+        None,
+    )
+    if _cached("read the generation", lambda: cache.get(generation_key, 0), None) != generation:
+        _cached("forget the index", lambda: cache.delete_many([folders_key, bytes_key]), None)
     return Index(frozenset(folders), size)
 
 

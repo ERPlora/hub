@@ -557,6 +557,41 @@ def test_a_cache_that_does_not_answer_costs_a_walk_never_a_wrong_listing(store, 
     assert (names(listing), listing["used_bytes"]) == (["a.pdf"], len(PDF))
 
 
+def test_each_hub_keeps_its_own_index_never_another_s(store):
+    # rv-hub-240 (round 2): the index is kept per hub in the cache; with one key for every hub, B would list A's
+    # folders and count A's bytes as its own space. Judged while A still has files and folders.
+    files.create_folder(store, A, "", "Facturas")
+    files.upload(store, A, "Facturas", "marzo.pdf", PDF)
+    a = files.listing(store, A, "")
+    assert (tree(a["folders"]), a["used_bytes"]) == ([("Facturas", [])], len(PDF))  # kept from here on
+    b = files.listing(store, B, "")
+    assert (tree(b["folders"]), b["used_bytes"]) == ([], 0)
+    files.upload(store, B, "", "b.pdf", PDF)
+    assert files.listing(store, B, "")["used_bytes"] == len(PDF)
+    assert files.listing(store, A, "")["used_bytes"] == len(PDF)
+
+
+def test_a_write_that_comes_while_the_walk_is_being_kept_is_never_lost(store, monkeypatch):
+    # rv-hub-240 (round 2): the generation was read back BEFORE the walk was kept, so a write of Files landing between
+    # that read and the keeping (one cache round trip) left the kept index without it until it expired (10 minutes):
+    # a folder made on another device said «no longer exists» and an upload's bytes were missing from the space.
+    from django.core.cache import cache
+
+    real_set_many = cache.set_many
+
+    def another_device_writes_then_the_walk_is_kept(mapping, timeout):
+        monkeypatch.setattr(cache, "set_many", real_set_many)
+        files.create_folder(store, A, "", "Nueva")
+        files.upload(store, A, "Nueva", "a.pdf", PDF)
+        return real_set_many(mapping, timeout)
+
+    monkeypatch.setattr(cache, "set_many", another_device_writes_then_the_walk_is_kept)
+    files.listing(store, A, "")
+    listing = files.listing(store, A, "")
+    assert (tree(listing["folders"]), listing["used_bytes"]) == ([("Nueva", [])], len(PDF))
+    assert names(files.listing(store, A, "Nueva")) == ["a.pdf"]
+
+
 def stale_free_name(monkeypatch, *names):
     """Two uploads of one name at once: each works out the free name before either writes, so the second one's first
     answer is the name the first one is writing now (``names``); then the real one."""
