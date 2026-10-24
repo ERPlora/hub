@@ -5,7 +5,8 @@
 // asked once when it is not. A failed read says «Unavailable», never the figure it had. A panel with its own
 // `component` mounts that component of its app (`apps/<app>/frontend/components/<component>.vue`). A timeline says
 // when each entry happened in the device's time (the Hub has no business zone in the browser): «4:23», «Ayer 18:10»,
-// «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06).
+// «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06). An
+// amount is in the business's currency (BASE-G98: «zł» in a Polish business, «€» in a Spanish one), never a fixed euro.
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
@@ -14,6 +15,7 @@ import { type Component, computed, defineAsyncComponent, onMounted, onUnmounted,
 import type { WidgetDef } from '../operations';
 import { widgetView } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
+import { useBusinessMoney } from '../lib/money';
 
 const props = defineProps<{ widget: WidgetDef }>();
 
@@ -72,6 +74,8 @@ const custom = loader
 
 const op = props.widget.operation as OpName | null;
 const source: Source | undefined = !props.widget.component && op ? (props.widget.live ? followed(op) : askedOnce(op)) : undefined;
+/** The business's currency for a declarative panel's amounts (BASE-G98); a panel of its own component formats its own. */
+const money = source ? useBusinessMoney() : undefined;
 
 const unavailable = computed(
   () => (props.widget.component ? !custom || componentFailed.value : !source || source.failed.value),
@@ -87,7 +91,7 @@ if (props.widget.kind === 'timeline') {
   onUnmounted(() => clearInterval(clock));
 }
 const view = computed(() =>
-  source ? widgetView(props.widget, source.data.value, locale.value, { now: now.value }) : { kind: 'empty' as const },
+  source ? widgetView(props.widget, source.data.value, locale.value, { now: now.value, money: money?.value }) : { kind: 'empty' as const },
 );
 
 /** The sparkline's points in a 100×40 box, lowest value at the bottom. */

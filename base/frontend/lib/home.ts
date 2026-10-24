@@ -113,31 +113,41 @@ export function rowsOf(result: unknown): Row[] {
   return [result as Row];
 }
 
+/** A business's currency (ISO 4217) and its decimals, as `base.business.get` says them (BASE-G98). */
+export interface Money {
+  currency: string;
+  decimals: number;
+}
+
 const numberFormats = new Map<string, Intl.NumberFormat>();
 
-function numberFormat(locale: string, format: string): Intl.NumberFormat {
-  const id = `${locale}|${format}`;
+function formatOptions(format: string, money: Money | undefined): Intl.NumberFormatOptions {
+  if (format === 'currency') {
+    // The symbol a till of that country prints («zł», «€»); until the business is known, the amount alone.
+    const digits = { minimumFractionDigits: money?.decimals ?? 2, maximumFractionDigits: money?.decimals ?? 2 };
+    return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
+  }
+  if (format === 'percent') return { style: 'percent', maximumFractionDigits: 1 };
+  if (format === 'compact') return { notation: 'compact' };
+  return {};
+}
+
+function numberFormat(locale: string, format: string, money?: Money): Intl.NumberFormat {
+  const id = format === 'currency' ? `${locale}|${format}|${money?.currency ?? ''}|${money?.decimals ?? ''}` : `${locale}|${format}`;
   let found = numberFormats.get(id);
   if (!found) {
-    const options: Intl.NumberFormatOptions =
-      format === 'currency'
-        ? { style: 'currency', currency: 'EUR' }
-        : format === 'percent'
-          ? { style: 'percent', maximumFractionDigits: 1 }
-          : format === 'compact'
-            ? { notation: 'compact' }
-            : {};
-    found = new Intl.NumberFormat(locale, options);
+    found = new Intl.NumberFormat(locale, formatOptions(format, money));
     numberFormats.set(id, found);
   }
   return found;
 }
 
-/** A value of a panel as text: money in cents (the server's), a percentage as 0–100, else the number. */
-export function formatValue(value: unknown, format: unknown, locale: string): string {
+/** A value of a panel as text: money in cents (the server's) in the business's currency (`money`; without it, the
+ *  amount alone), a percentage as 0–100, else the number. */
+export function formatValue(value: unknown, format: unknown, locale: string, money?: Money): string {
   const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
   if (Number.isNaN(number)) return String(value);
-  if (format === 'currency') return numberFormat(locale, 'currency').format(number / 100);
+  if (format === 'currency') return numberFormat(locale, 'currency', money).format(number / 100);
   if (format === 'percent') return numberFormat(locale, 'percent').format(number / 100);
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);
 }
@@ -175,12 +185,12 @@ export interface ChartBar {
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const numeric = (value: unknown): number => (typeof value === 'number' ? value : Number(value));
 
-function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown) {
+function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined) {
   const read = rows
     .map((row) => ({ label: text(row[widget.map.label]), value: numeric(row[widget.map.value]) }))
     .filter((bar) => bar.label !== '' && Number.isFinite(bar.value));
   const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => bar.value), 0);
-  return read.map((bar) => ({ ...bar, text: formatValue(bar.value, format, locale), share: max > 0 ? bar.value / max : 0 }));
+  return read.map((bar) => ({ ...bar, text: formatValue(bar.value, format, locale, money), share: max > 0 ? bar.value / max : 0 }));
 }
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -293,8 +303,8 @@ export function formatMoment(value: string, locale: string, options: MomentOptio
 
 /** A chart's bars, its days named in the person's language (the old hub's gh:hub#2392): a week by its weekdays, a
  *  longer series by its dates (its weekdays would repeat); a label that is no day stays as it is. */
-function chartBars(widget: WidgetDef, rows: Row[], locale: string, format: unknown): ChartBar[] {
-  const read = bars(widget, rows, locale, format);
+function chartBars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined): ChartBar[] {
+  const read = bars(widget, rows, locale, format, money);
   const days = read.map((bar) => isoDay(bar.label));
   const times = days.filter((day) => day !== undefined).map((day) => day.getTime());
   const style: DayStyle = times.length && Math.max(...times) - Math.min(...times) < 7 * DAY_MS ? 'weekday' : 'date';
@@ -309,9 +319,15 @@ function chartBars(widget: WidgetDef, rows: Row[], locale: string, format: unkno
   });
 }
 
+/** How a panel is read: its timeline's moments (`MomentOptions`) and its amounts' currency, the business's. */
+export interface ViewOptions extends MomentOptions {
+  money?: Money;
+}
+
 /** What a declarative panel paints from its operation's result; `empty` = «No data», never a made-up 0. A timeline's
- *  moments are read at `moment.now` in `moment.timeZone`. */
-export function widgetView(widget: WidgetDef, result: unknown, locale: string, moment: MomentOptions = {}): WidgetView {
+ *  moments are read at `moment.now` in `moment.timeZone`; an amount, in `moment.money`. */
+export function widgetView(widget: WidgetDef, result: unknown, locale: string, moment: ViewOptions = {}): WidgetView {
+  const { money } = moment;
   const rows = rowsOf(result);
   const first = rows[0];
   const format = widget.options.format;
@@ -321,7 +337,7 @@ export function widgetView(widget: WidgetDef, result: unknown, locale: string, m
     case 'stat': {
       const value = first?.[widget.map.value];
       if (value === undefined || value === null) return { kind: 'empty' };
-      const shown = formatValue(value, format, locale);
+      const shown = formatValue(value, format, locale, money);
       if (widget.kind === 'kpi') return { kind: 'kpi', value: shown, label: undefined };
       const severity = text(first?.[widget.map.severity ?? ''] ?? widget.options.severity) || 'normal';
       return { kind: 'stat', value: shown, label: text(first?.[widget.map.label ?? '']) || label, severity };
@@ -330,14 +346,14 @@ export function widgetView(widget: WidgetDef, result: unknown, locale: string, m
       const series = rows.map((row) => numeric(row[widget.map.series])).filter(Number.isFinite);
       if (series.length === 0) return { kind: 'empty' };
       const last = widget.map.value ? first?.[widget.map.value] : series.at(-1);
-      return { kind: 'sparkline', series, value: last === undefined ? undefined : formatValue(last, format, locale) };
+      return { kind: 'sparkline', series, value: last === undefined ? undefined : formatValue(last, format, locale, money) };
     }
     case 'bar-list': {
-      const read = bars(widget, rows, locale, widget.options.valueFormat ?? format);
+      const read = bars(widget, rows, locale, widget.options.valueFormat ?? format, money);
       return read.length ? { kind: 'bar-list', bars: read } : { kind: 'empty' };
     }
     case 'chart': {
-      const read = chartBars(widget, rows, locale, format);
+      const read = chartBars(widget, rows, locale, format, money);
       return read.length ? { kind: 'chart', bars: read } : { kind: 'empty' };
     }
     case 'timeline': {
