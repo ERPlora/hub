@@ -184,6 +184,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 
   test(`BASE-G11 — the employee has no API keys nor Approvals at ${width}`, async ({ browser }) => {
+    // The documentation hidden, whatever the test before left: then «API» is not in the employee's menu either.
+    hideTheDocs();
     const { context, page } = await signedIn(browser, viewport, '/employees#apikeys', true);
     const problems = await collectProblems(page);
     await expect(shown(page).locator('[data-testid="people-row"], [data-testid="people-card"]').first()).toBeVisible();
