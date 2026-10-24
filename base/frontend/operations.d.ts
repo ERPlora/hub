@@ -639,5 +639,8 @@ declare module '@erplora/ui/sdk' {
     'base.approval.list': { input: NoInput; output: { approvals: ApprovalRow[] } };
     'base.approval.approvers': { input: { operation: string }; output: { people: Approver[]; pin_length: number } };
     'base.approval.approve': { input: ApprovalInput; output: ApprovalPass };
+    'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[]; keys_available: boolean } };
+    'base.api_doc.settings': { input: NoInput; output: { docs_enabled: boolean; can_change: boolean } };
+    'base.api_doc.settings_update': { input: { docs_enabled: boolean }; output: { docs_enabled: boolean; can_change: boolean } };
   }
 }

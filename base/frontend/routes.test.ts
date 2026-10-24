@@ -14,6 +14,7 @@ vi.mock('./pages/SystemPage.vue', () => ({ default: { name: 'SystemPage' } }));
 vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
 vi.mock('./pages/EmployeesPage.vue', () => ({ default: { name: 'EmployeesPage' } }));
 vi.mock('./pages/PersonPage.vue', () => ({ default: { name: 'PersonPage' } }));
+vi.mock('./pages/ApiDocsPage.vue', () => ({ default: { name: 'ApiDocsPage' } }));
 
 async function page(path: string): Promise<string> {
   const route = routes.find((r) => r.path === path);
@@ -36,6 +37,7 @@ describe('base routes', () => {
       // Employees and a person's page (APP-BASE-5): the tab in the hash (`#roles`, `#apikeys`, `#approvals`).
       ['/employees', 'base-employees', true],
       ['/employees/:person', 'base-person', true],
+      ['/api-docs', 'base-api-docs', true],
     ]);
   });
 
@@ -49,6 +51,7 @@ describe('base routes', () => {
     expect(await page('/settings')).toBe('SettingsPage');
     expect(await page('/employees')).toBe('EmployeesPage');
     expect(await page('/employees/:person')).toBe('PersonPage');
+    expect(await page('/api-docs')).toBe('ApiDocsPage');
   });
 
   it('takes the old `/import` and `/export` pages to Settings › Data, Export already open for the second', () => {

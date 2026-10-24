@@ -446,10 +446,24 @@ async function confirmRevoke(): Promise<void> {
       @confirm="confirmRevoke()"
       @cancel="revoking = null"
     />
+    <RouterLink
+      to="/api-docs"
+      class="api-keys-docs"
+      data-testid="api-keys-docs"
+    >
+      {{ t('base.apiKeys.docs') }}
+    </RouterLink>
   </section>
 </template>
 
 <style scoped>
+.api-keys-docs {
+  align-self: flex-start;
+  color: var(--ion-color-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .api-keys {
   display: flex;
   flex-direction: column;

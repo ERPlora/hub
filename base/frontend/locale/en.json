@@ -876,7 +876,8 @@
         "scopesRequired": "Choose at least one app and what the key may do on it.",
         "scopeUnknown": "That app does not publish what the key would do on it.",
         "denied": "Only whoever runs the business manages the API keys."
-      }
+      },
+      "docs": "API documentation"
     },
     "approval": {
       "title": "An approval is needed",
@@ -917,6 +918,31 @@
         "requestedBy": "Asked by",
         "way": "With",
         "used": "State"
+      }
+    },
+    "apiDocs": {
+      "title": "API documentation",
+      "intro": "The API of this business: what its apps publish for other systems. To call it, create a key in Employees › API keys and send it as «Authorization: Bearer <key>».",
+      "keysSoon": "API keys are not available yet for this business: you can read the documentation, but no system can call it yet.",
+      "download": "Download OpenAPI (JSON)",
+      "empty": "None of this business’s apps publishes its API yet.",
+      "error": "Could not load the documentation.",
+      "retry": "Retry",
+      "loading": "Loading the documentation…",
+      "hidden": "The API documentation is hidden in this business.",
+      "showIt": "Show it in Settings › General",
+      "parameters": "Parameters",
+      "body": "Body",
+      "required": "required",
+      "card": {
+        "title": "API documentation",
+        "toggle": "Show the API documentation",
+        "note": "Adds a page with the documentation of the API, for whoever connects another system.",
+        "open": "Open the API documentation",
+        "adminOnly": "Only who runs the business can change it.",
+        "saveFailed": "Could not save the change.",
+        "loadFailed": "Could not load the setting.",
+        "retry": "Retry"
       }
     }
   }

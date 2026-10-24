@@ -4,11 +4,13 @@
 // hub's order: «General» first (APP-BASE-3), with «This device» (BASE-G72), «PIN pad» (G151, G62) and «Devices»
 // (G63…G66), whose list is an administrator's: whoever does not run the hub reads why instead, and no list is asked
 // for. Then «Business» and «Printing» (APP-BASE-6) and «Data and backups» (BASE-G101–G109, APP-BASE-2); the old `#hub`
-// opens General and `#tax` Business. Permissions arrives with its flows, never painted empty.
+// opens General and `#tax` Business. General ends with «API documentation» (APP-BASE-5, BASE-G100). Permissions arrives
+// with its flows, never painted empty.
 import { AppPage, type ShellTab, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import ApiDocsCard from '../components/ApiDocsCard.vue';
 import DeviceModeCard from '../components/DeviceModeCard.vue';
 import DevicesCard from '../components/DevicesCard.vue';
 import PinPolicyCard from '../components/PinPolicyCard.vue';
@@ -64,6 +66,8 @@ const tab = computed<SettingsTab>({
           {{ t('base.devices.adminOnly') }}
         </p>
       </section>
+      <!-- ── The API's documentation, shown or hidden (APP-BASE-5) ── -->
+      <ApiDocsCard />
     </template>
     <BusinessPanel v-else-if="tab === 'business'" />
     <TicketsPanel v-else-if="tab === 'tickets'" />

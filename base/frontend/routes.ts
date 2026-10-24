@@ -80,6 +80,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/PersonPage.vue'),
     meta: { auth: true },
   },
+  // The API's documentation (BASE-G150, G04), when the business shows it (Settings › General, BASE-G100).
+  {
+    path: '/api-docs',
+    name: 'base-api-docs',
+    component: () => import('./pages/ApiDocsPage.vue'),
+    meta: { auth: true },
+  },
   { path: '/import', redirect: { path: '/settings', hash: '#data' } },
   { path: '/export', redirect: { path: '/settings', query: { data: 'export' }, hash: '#data' } },
 ];

@@ -62,7 +62,7 @@ function type(field: Element, value: string) {
 }
 
 async function open(options: Parameters<typeof mountBase>[1] = {}) {
-  const m = await mountBase(ApiKeysPanel, { path: '/employees#apikeys', routes: ['/employees'], ...options });
+  const m = await mountBase(ApiKeysPanel, { path: '/employees#apikeys', routes: ['/employees', '/api-docs'], ...options });
   const call = await m.live();
   return { ...m, call };
 }
@@ -110,6 +110,15 @@ describe('ApiKeysPanel', () => {
     const m = await open({ locale: 'es' });
     await m.result(m.call, 'base.api_key.list', { available: true, keys: [], apps: APPS });
     expect(m.wrapper.text()).toContain('Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.');
+  });
+
+  it('leads to the API’s documentation, with keys or without them yet', async () => {
+    for (const available of [true, false]) {
+      const m = await open();
+      await m.result(m.call, 'base.api_key.list', { ...LIST, available, keys: available ? LIST.keys : [] });
+      expect(m.wrapper.get('[data-testid="api-keys-docs"]').attributes('href'), String(available)).toBe('/api-docs');
+      m.wrapper.unmount();
+    }
   });
 
   it('a business that cannot have keys yet is told so, with nothing to create', async () => {

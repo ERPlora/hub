@@ -876,7 +876,8 @@
         "scopesRequired": "Elige al menos una app y qué puede hacer la key en ella.",
         "scopeUnknown": "Esa app no publica lo que la key haría en ella.",
         "denied": "Solo quien lleva el negocio gestiona las API keys."
-      }
+      },
+      "docs": "Documentación de la API"
     },
     "approval": {
       "title": "Hace falta una aprobación",
@@ -917,6 +918,31 @@
         "requestedBy": "Lo pidió",
         "way": "Con",
         "used": "Estado"
+      }
+    },
+    "apiDocs": {
+      "title": "Documentación de la API",
+      "intro": "La API de este negocio: lo que publican sus apps para otros sistemas. Para llamarla, crea una llave en Empleados › API keys y envíala como «Authorization: Bearer <llave>».",
+      "keysSoon": "Las API keys todavía no están disponibles para este negocio: puedes leer la documentación, pero aún ningún sistema puede llamarla.",
+      "download": "Descargar OpenAPI (JSON)",
+      "empty": "Ninguna app de este negocio publica todavía su API.",
+      "error": "No se pudo cargar la documentación.",
+      "retry": "Reintentar",
+      "loading": "Cargando la documentación…",
+      "hidden": "La documentación de la API está oculta en este negocio.",
+      "showIt": "Muéstrala en Ajustes › General",
+      "parameters": "Parámetros",
+      "body": "Cuerpo",
+      "required": "obligatorio",
+      "card": {
+        "title": "Documentación de la API",
+        "toggle": "Mostrar documentación de la API",
+        "note": "Añade una página con la documentación de la API, para quien conecte otro sistema.",
+        "open": "Abrir la documentación de la API",
+        "adminOnly": "Solo quien administra el negocio puede cambiarlo.",
+        "saveFailed": "No se pudo guardar el cambio.",
+        "loadFailed": "No se pudo cargar el ajuste.",
+        "retry": "Reintentar"
       }
     }
   }
