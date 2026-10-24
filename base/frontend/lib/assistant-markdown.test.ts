@@ -2,7 +2,7 @@
 // the old hub's `assistant-markdown.test.ts`.
 import { describe, expect, it } from 'vitest';
 
-import { type Block, type Inline, linkPaths, parseMarkdown } from './assistant-markdown';
+import { type Block, type Inline, linkPaths, parseMarkdown, spokenText } from './assistant-markdown';
 
 const text = (value: string): Inline => ({ kind: 'text', text: value });
 const paragraph = (...inlines: Inline[]): Block => ({ kind: 'paragraph', inlines });
@@ -110,5 +110,14 @@ describe('linkPaths', () => {
   it('the screens an answer names, once each and in order', () => {
     const blocks = parseMarkdown('Ve a [Ajustes](/settings) o a /apps; luego [Ajustes](/settings).');
     expect(linkPaths(blocks)).toEqual(['/settings', '/apps']);
+  });
+});
+
+describe('spokenText (BASE-G113, «Read aloud»)', () => {
+  it('reads the words of an answer, never its marks, a path or the table’s lines', () => {
+    const text = '## Ventas\n\nHoy **120 €**, ver [Ajustes](/settings) o /customer/customers.\n\n- uno\n- dos\n\n| Día | Total |\n|---|---|\n| Lunes | 80 € |';
+    const nameOf = (path: string) => (path === '/customer/customers' ? 'Clientes' : undefined);
+    expect(spokenText(parseMarkdown(text), nameOf)).toBe('Ventas. Hoy 120 €, ver Ajustes o Clientes. uno. dos. Día, Total. Lunes, 80 €.');
+    expect(spokenText(parseMarkdown('Mira /reports.'), nameOf)).toBe('Mira.');
   });
 });

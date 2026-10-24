@@ -201,3 +201,32 @@ export function linkPaths(blocks: Block[]): string[] {
   }
   return found;
 }
+
+function spokenInlines(inlines: Inline[], nameOf?: (path: string) => string | undefined): string {
+  return inlines
+    .map((inline) => {
+      if (inline.kind === 'text' || inline.kind === 'code') return inline.text;
+      if (inline.kind === 'link') return inline.label ? spokenInlines(inline.label, nameOf) : (nameOf?.(inline.path) ?? '');
+      return spokenInlines(inline.children, nameOf);
+    })
+    .join('');
+}
+
+/** What «Read aloud» says of an answer: its words, sentence by sentence — a screen by its name (`nameOf`), never a
+ *  path or a mark; a table row by row, its cells with commas. */
+export function spokenText(blocks: Block[], nameOf?: (path: string) => string | undefined): string {
+  const lines = blocks.flatMap((block) => {
+    if (block.kind === 'paragraph' || block.kind === 'heading') return [spokenInlines(block.inlines, nameOf)];
+    if (block.kind === 'list') return block.items.map((item) => spokenInlines(item, nameOf));
+    const row = (cells: Inline[][]) => cells.map((cell) => spokenInlines(cell, nameOf).trim()).join(', ');
+    return [row(block.head), ...block.rows.map(row)];
+  });
+  return lines
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => (/[.!?…:]$/.test(line) ? line : `${line}.`))
+    .join(' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
