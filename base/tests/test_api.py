@@ -104,6 +104,14 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/system/failed-events/retry", "base.failed_event.retry"),
         ("POST", "/api/system/failed-events/retry_all", "base.failed_event.retry_all"),
         ("POST", "/api/system/failed-events/discard", "base.failed_event.discard"),
+        # Files (APP-BASE-8): base/tests/test_files_api.py.
+        ("GET", "/api/files", "base.file.list"),
+        ("GET", "/api/files/raw", "base.file.read"),
+        ("POST", "/api/files/upload", "base.file.upload"),
+        ("POST", "/api/files/folder", "base.file.create_folder"),
+        ("POST", "/api/files/rename", "base.file.rename"),
+        ("POST", "/api/files/move", "base.file.move"),
+        ("POST", "/api/files/delete", "base.file.delete"),
     } | {(method, f"/api{path}", op) for method, path, op in WAY_IN}
 
 

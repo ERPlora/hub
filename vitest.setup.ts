@@ -95,12 +95,21 @@ beforeEach(() => {
 
 afterEach(async () => {
   try {
+    // What the test itself armed is counted before any tick can run it: on a loaded machine a short timer ran while
+    // the setup let the page's teardown run, slipped through and fired into the next test (a 0 ms one always did).
+    const armedByTest = new Set(armed.keys());
     unmountMounted();
     if (typeof document !== 'undefined') document.body.innerHTML = '';
-    // What leaving the page sets off arms its timers in the next ticks: let them run before counting.
+    const left = [...armed].filter(([id]) => armedByTest.has(id));
+    for (const [id] of left) {
+      real.clearTimeout(id);
+      armed.delete(id);
+    }
+    // What leaving the page sets off arms its timers in the next ticks: let them run before counting those.
     for (let i = 0; i < 3; i++) await new Promise((resolve) => real.setTimeout(resolve, 0));
-    if (armed.size) {
-      throw new Error(`real timers still armed when the test ends (each would fire into the torn-down page):\n${[...armed.values()].join('\n')}`);
+    const outlived = [...left.map(([, where]) => where), ...armed.values()];
+    if (outlived.length) {
+      throw new Error(`real timers still armed when the test ends (each would fire into the torn-down page):\n${outlived.join('\n')}`);
     }
   } finally {
     // A failed test's leftovers must not fire into the next one.

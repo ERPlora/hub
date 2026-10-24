@@ -6,3 +6,8 @@ declare module '*.vue' {
   const component: DefineComponent;
   export default component;
 }
+
+// pdf.js's worker module ships no types: Files' preview hands it to pdf.js as `globalThis.pdfjsWorker` (base/frontend/lib/pdf.ts).
+declare module 'pdfjs-dist/legacy/build/pdf.worker.mjs' {
+  export const WorkerMessageHandler: unknown;
+}
