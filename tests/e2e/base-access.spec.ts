@@ -208,6 +208,55 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
   });
 });
 
+/** How the head of «My profile» lays its name out: in how many lines, whether it fits its box, and whether what does not
+ *  fit ends in «…» (the whole name stays in its `title`). */
+async function nameLayout(name: Locator) {
+  return name.evaluate((heading) => {
+    const range = document.createRange();
+    range.selectNodeContents(heading);
+    const tops = new Set([...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)));
+    const style = getComputedStyle(heading);
+    const box = heading.getBoundingClientRect();
+    return {
+      lines: tops.size,
+      fits: heading.scrollWidth <= heading.clientWidth + 1,
+      ellipsis: style.textOverflow === 'ellipsis' && style.overflowX === 'hidden',
+      inside: box.right <= document.documentElement.clientWidth + 1,
+      title: heading.getAttribute('title'),
+    };
+  });
+}
+
+test('BASE-G125: a name that is an email address shows whole or ends in «…» at every size, never cut mid-word', async () => {
+  const page = owner.page;
+  const address = 'ana.lopez.fernandez@restaurante-ejemplo.es';
+  await page.goto(`${origin}/profile`);
+  const profile = shown(page);
+  await fill(profile.getByTestId('profile-first-name'), address);
+  await fill(profile.getByTestId('profile-last-name'), '');
+  await profile.getByTestId('profile-save').click();
+  await expect(profile.getByTestId('profile-saved')).toHaveText('Profile saved');
+  for (const size of [{ name: '375', width: 375, height: 667 }, ...SIZES]) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const name = shown(page).getByTestId('profile-name');
+    await expect(name).toHaveText(address);
+    await untilStill(page);
+    const layout = await nameLayout(name);
+    // One line, inside the screen: whole where it fits, else ending in «…»; never broken across lines mid-word.
+    expect({ size: size.name, ...layout }).toMatchObject({ size: size.name, lines: 1, inside: true, title: address });
+    expect(layout.fits || layout.ellipsis, `${size.name}: cut without «…»`).toBe(true);
+    if (size.width >= 834) expect(layout.fits, `${size.name}: whole`).toBe(true);
+    await toTop(page);
+    await page.screenshot({ path: shot(`APP-BASE-3-BASE-G125-email-${size.name}`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // The name the rest of the run expects.
+  await fill(shown(page).getByTestId('profile-first-name'), 'Ana');
+  await fill(shown(page).getByTestId('profile-last-name'), 'López');
+  await shown(page).getByTestId('profile-save').click();
+  await expect(shown(page).getByTestId('profile-name')).toHaveText('Ana López');
+});
+
 test('BASE-G72 BASE-G151 BASE-G62 BASE-G63 BASE-G64: Settings › General shows this device, the PIN pad and the devices; one is named', async () => {
   const page = owner.page;
   await page.goto(`${origin}/settings`);

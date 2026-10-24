@@ -228,7 +228,11 @@ const text = (value: unknown): string => (value === null || value === undefined 
           decorative
         />
         <div class="profile__who">
-          <h1 class="profile__name">
+          <h1
+            class="profile__name"
+            data-testid="profile-name"
+            :title="fullName"
+          >
             {{ fullName }}
           </h1>
           <p class="profile__subtitle">
@@ -545,7 +549,12 @@ const text = (value: unknown): string => (value === null || value === undefined 
   margin: 0;
   font-size: 1.75rem;
   font-weight: 700;
-  overflow-wrap: anywhere;
+  /* One line, as an account's head says a name: what does not fit ends in «…», never cut in two across lines (an
+     email address used as a name breaks at its hyphens, and Ionic's `body` anywhere); the whole name is in its title
+     and in the form below. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .profile__subtitle {
