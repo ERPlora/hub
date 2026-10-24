@@ -138,6 +138,16 @@ class TestEnteringWithThePin:
         assert (response.status_code, code(response)) == (401, "base.pin_incorrect")
         assert client.get("/api/me", HTTP_HOST=HOST).json()["user"] is None
 
+    def test_the_pin_pad_s_refusals_speak_the_till_s_language(self, client, ana):
+        # The pad paints the Hub's sentence as it comes: a Spanish till reads it in Spanish (base/locale, en + es).
+        a_device(client)
+        cred = with_pin(ana, "4826")
+        response = pin(client, cred.pk, "4827", HTTP_ACCEPT_LANGUAGE="es")
+        assert response.json()["error"]["message"] == "PIN incorrecto."
+        client.cookies.pop(access.DEVICE_COOKIE)
+        refused = pin(client, cred.pk, "4826", HTTP_ACCEPT_LANGUAGE="es")
+        assert refused.json()["error"]["message"].startswith("En este dispositivo todavía no funciona el PIN.")
+
     @pytest.mark.parametrize("who", ["another_hubs", "deactivated", "unknown", "not_an_id", "no_pin"])
     def test_whoever_is_not_a_person_of_this_hub_with_that_pin_hears_the_same(self, client, make_user, who):
         a_device(client)

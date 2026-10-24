@@ -689,3 +689,317 @@ msgstr "“%(value)s” no es un valor binario válido."
 #, python-format
 msgid "No %s matches the given query."
 msgstr "Ningún %s coincide con la consulta."
+
+#: auth_views.py:342
+msgid "Wrong PIN."
+msgstr "PIN incorrecto."
+
+# Django 6.1.2 ships these with an empty Spanish translation, so the admin of hubs.erplora.com showed them in English
+# (APP-ACCOUNTS-6). They are Django's messages, not base's: a makemessages of base marks them obsolete, keep them.
+# base/tests/test_admin_django_catalog.py asks for every hole of Django's Spanish catalogues behind the admin.
+#: auth_views.py:357
+#| msgid "The app \"%s\" could not be found."
+msgid "The request could not be read."
+msgstr "No se pudo leer la petición."
+
+#: auth_views.py:366
+msgid ""
+"This device does not work with a PIN yet. Sign in once here with your "
+"account and from then on it will."
+msgstr "En este dispositivo todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará."
+
+#: auth_views.py:369
+msgid "This device does not ask for a PIN: sign in with your account."
+msgstr "Este dispositivo no pide PIN: entra con tu cuenta."
+
+#: auth_views.py:385
+#| msgid "Too many sign-in attempts"
+msgid "Too many wrong attempts."
+msgstr "Demasiados intentos fallidos."
+
+#: auth_views.py:408
+msgid ""
+"That badge opens nothing here. Enter with your PIN or ask an administrator."
+msgstr "Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador."
+
+#: models.py:70
+#| msgid "country"
+msgctxt "way in"
+msgid "Account"
+msgstr "Cuenta"
+
+#: models.py:71
+msgctxt "way in"
+msgid "PIN"
+msgstr "PIN"
+
+#: models.py:72
+msgctxt "way in"
+msgid "Badge"
+msgstr "Placa"
+
+#: models.py:82 models.py:143
+msgid "device"
+msgstr "dispositivo"
+
+#: models.py:84 models.py:165
+msgid "way in"
+msgstr "forma de entrar"
+
+#: models.py:122
+msgctxt "device mode"
+msgid "Shared"
+msgstr "Compartido"
+
+#: models.py:123
+msgctxt "device mode"
+msgid "Personal"
+msgstr "Personal"
+
+#: models.py:126
+#| msgid "Create another demo"
+msgid "Opened on another device"
+msgstr "Abierta en otro dispositivo"
+
+#: models.py:128
+msgid "token digest"
+msgstr "huella del token"
+
+#: models.py:129
+msgid "mode"
+msgstr "modo"
+
+#: models.py:130
+msgid "mode set by"
+msgstr "modo elegido por"
+
+#: models.py:131
+msgid "mode set at"
+msgstr "modo elegido el"
+
+#: models.py:133
+msgid "browser"
+msgstr "navegador"
+
+#: models.py:134
+#| msgid "last error"
+msgid "last person in"
+msgstr "última persona que entró"
+
+#: models.py:135
+msgid "last person in (name)"
+msgstr "última persona que entró (nombre)"
+
+#: models.py:136
+#| msgid "last error"
+msgid "last entry"
+msgstr "última entrada"
+
+#: models.py:137
+#| msgid "created at"
+msgid "added at"
+msgstr "añadido el"
+
+#: models.py:139
+#| msgid "session owners"
+msgid "sessions ended because"
+msgstr "sesiones cerradas porque"
+
+#: models.py:140
+#| msgid "session owner"
+msgid "sessions ended at"
+msgstr "sesiones cerradas el"
+
+#: models.py:144
+msgid "devices"
+msgstr "dispositivos"
+
+#: models.py:158 models.py:232
+msgid "person"
+msgstr "persona"
+
+#: models.py:159
+msgid "PIN"
+msgstr "PIN"
+
+#: models.py:160
+msgid "PIN set at"
+msgstr "PIN puesto el"
+
+#: models.py:161
+msgid "badge"
+msgstr "placa"
+
+#: models.py:162
+msgid "badge set at"
+msgstr "placa puesta el"
+
+#: models.py:166
+msgid "ways in"
+msgstr "formas de entrar"
+
+#: models.py:184
+msgid "Always, and again after a while without use"
+msgstr "Siempre, y otra vez tras un rato sin usar"
+
+#: models.py:185
+msgid "Once per shift"
+msgstr "Una vez por turno"
+
+#: models.py:186
+msgid "Never"
+msgstr "Nunca"
+
+#: models.py:188
+msgid "single row"
+msgstr "fila única"
+
+#: models.py:189
+msgid "ask for the PIN"
+msgstr "pedir el PIN"
+
+#: models.py:190
+msgid "ask again after (minutes)"
+msgstr "volver a pedir tras (minutos)"
+
+#: models.py:191
+msgid "PIN digits"
+msgstr "dígitos del PIN"
+
+#: models.py:192
+msgid "badge key"
+msgstr "clave de las placas"
+
+#: models.py:194
+#| msgid "updated at"
+msgid "updated by"
+msgstr "cambiado por"
+
+#: models.py:197 models.py:198
+msgid "way in settings"
+msgstr "ajustes de entrada"
+
+#: models.py:222
+#| msgid "This business is suspended"
+msgid "The business's language"
+msgstr "El idioma del negocio"
+
+#: models.py:227
+#| msgid "This business is suspended"
+msgid "The business's appearance"
+msgstr "La apariencia del negocio"
+
+#: models.py:228
+msgid "System"
+msgstr "Sistema"
+
+#: models.py:229
+msgid "Light"
+msgstr "Claro"
+
+#: models.py:230
+msgid "Dark"
+msgstr "Oscuro"
+
+#: models.py:233
+msgid "first name"
+msgstr "nombre"
+
+#: models.py:234
+#| msgid "last run"
+msgid "last name"
+msgstr "apellidos"
+
+#: models.py:235
+msgid "contact email"
+msgstr "correo de contacto"
+
+#: models.py:236
+msgid "photo"
+msgstr "foto"
+
+#: models.py:238
+msgid "appearance"
+msgstr "apariencia"
+
+#: models.py:239
+msgid "palette"
+msgstr "paleta"
+
+#: models.py:243
+msgid "profile"
+msgstr "perfil"
+
+#: models.py:244
+msgid "profiles"
+msgstr "perfiles"
+
+#: queries.py:515
+msgid "Sign in to see your profile."
+msgstr "Entra para ver tu perfil."
+
+#: services.py:1156
+msgid "Sign in to choose your PIN."
+msgstr "Entra para elegir tu PIN."
+
+#: services.py:1161
+msgid "Too many tries to change the PIN."
+msgstr "Demasiados intentos de cambiar el PIN."
+
+#: services.py:1171
+msgid "That is not your current PIN. Type it right to set a new one."
+msgstr "Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo."
+
+#: services.py:1175
+msgid "Another active person already has that PIN: choose a different one."
+msgstr "Ese PIN ya lo tiene otra persona activa: elige otro."
+
+#: services.py:1189
+#, python-format
+msgid "The PIN must have %(length)s digits."
+msgstr "El PIN debe tener %(length)s dígitos."
+
+#: services.py:1190
+msgid "The PIN takes digits only."
+msgstr "El PIN solo lleva números."
+
+#: services.py:1192
+msgid ""
+"That PIN is too easy to guess: avoid repeated digits (1111) and runs (1234)."
+msgstr "Ese PIN es demasiado fácil de adivinar: evita dígitos repetidos (1111) y secuencias (1234)."
+
+#: services.py:1201
+#| msgid "Try again in %(minutes)s minute."
+#| msgid_plural "Try again in %(minutes)s minutes."
+msgid "Wait %(minutes)s minute and try again."
+msgid_plural "Wait %(minutes)s minutes and try again."
+msgstr[0] "Espera %(minutes)s minuto y vuelve a intentarlo."
+msgstr[1] "Espera %(minutes)s minutos y vuelve a intentarlo."
+msgstr[2] "Espera %(minutes)s minutos y vuelve a intentarlo."
+
+#: services.py:1261
+msgid ""
+"Nobody has signed in with an account on this device yet: sign in once with "
+"your account on it."
+msgstr "En este dispositivo todavía no ha entrado nadie con una cuenta: entra una vez en él con tu cuenta."
+
+#: services.py:1273
+msgid "That device is no longer registered here. Refresh the list."
+msgstr "Ese dispositivo ya no está registrado aquí. Actualiza la lista."
+
+#: services.py:1290
+msgid "That name is too long. Give it a shorter one and save again."
+msgstr "Ese nombre es demasiado largo. Ponle uno más corto y vuelve a guardar."
+
+#: services.py:1363
+msgid "Nothing to change."
+msgstr "No hay nada que cambiar."
+
+#: services.py:1402
+#| msgid "Another hub has this address."
+msgid "Enter a valid email address."
+msgstr "Escribe un correo electrónico válido."
+
+#: services.py:1441
+msgid "The photo could not be saved. Use a JPG, PNG or WebP of up to 2 MB."
+msgstr "No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB."
