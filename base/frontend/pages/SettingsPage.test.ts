@@ -3,7 +3,7 @@
 // (APP-BASE-6: printers and the ticket) and «Data and backups» (APP-BASE-2). The old hub's addresses still land:
 // `#tax` on Business; one it does not have (`#hub`, `#store`, `#permissions`) on the first tab.
 import { AppPage } from '@erplora/ui/shell';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mountBase } from '../__tests__/mount-base';
 import SettingsPage from './SettingsPage.vue';
@@ -55,12 +55,15 @@ describe('SettingsPage', () => {
 
   it('choosing a tab replaces the address’s hash, so Back leaves Settings instead of walking its tabs', async () => {
     const m = await settings('/settings#business');
-    const before = m.router.options.history.state.position;
+    // Memory history (mount-base) keeps no `state.position`: the proof is the call itself — a replace, never a push.
+    const replace = vi.spyOn(m.router, 'replace');
+    const push = vi.spyOn(m.router, 'push');
     m.wrapper.getComponent(AppPage).vm.$emit('update:tab', 'tickets');
     await m.router.isReady();
     await new Promise((resolve) => setTimeout(resolve));
     expect(m.router.currentRoute.value.hash).toBe('#tickets');
-    expect(m.router.options.history.state.position).toBe(before);
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
     expect(m.wrapper.find('tickets-panel-stub').exists()).toBe(true);
   });
 });
