@@ -1,8 +1,8 @@
 // flow: BASE-G52 BASE-G53 BASE-G54 BASE-G55 BASE-G56 BASE-G57 BASE-G58 BASE-G59 BASE-G60 BASE-G61 BASE-G62 BASE-G63
-// BASE-G64 BASE-G65 BASE-G66 BASE-G72 BASE-G125 BASE-G126 BASE-G151 (base/WORKBOOK.md, «Acceso»; APP-BASE-3)
+// BASE-G64 BASE-G65 BASE-G66 BASE-G72 BASE-G81 BASE-G125 BASE-G126 BASE-G151 (base/WORKBOOK.md, «Acceso»; APP-BASE-3)
 // The way in of a business on the Free plan (one device at a time), two people and two browsers: the owner enters with
-// their erplora.com account on a first device (A), names themselves and chooses a PIN in «My profile», names the
-// device in Settings; the employee enters with theirs on a till (B), which asks them to create their PIN and ends A's
+// their erplora.com account on a first device (A), names themselves (the side menu takes the name at once) and chooses
+// a PIN in «My profile», names the device in Settings and sees it in use in System › «Plan and limits»; the employee enters with theirs on a till (B), which asks them to create their PIN and ends A's
 // session (the plan covers one device). On B: sign out (the PIN pad), a wrong and a right PIN, a badge, «Switch user»
 // over the screen in use, the idle lock, a session that ends, removing the unused device and the one in hand. Fresh
 // accounts signed up on the SaaS's screens and a business created through its API, as the panel creates it
@@ -139,6 +139,13 @@ async function userMenu(page: Page, id: string): Promise<void> {
   await page.locator(`ion-popover [data-testid="user-menu-${id}"]`).click();
 }
 
+/** The labels of a segment that do not fit their button (its text ends in «…»). */
+async function cutLabels(segment: Locator): Promise<string[]> {
+  return segment
+    .locator('ion-label')
+    .evaluateAll((labels) => labels.filter((label) => label.scrollWidth > label.clientWidth).map((label) => label.textContent ?? ''));
+}
+
 /** The name the session gives the person in hand (`base.session.me`). */
 async function whoIsIn(page: Page, origin: string): Promise<string | null> {
   const me = await api<{ user: { label: string } | null }>(page.context(), origin, 'GET', '/me');
@@ -184,6 +191,8 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
   await fill(profile.getByTestId('profile-last-name'), 'López');
   await profile.getByTestId('profile-save').click();
   await expect(profile.getByTestId('profile-saved')).toHaveText('Profile saved');
+  // The side menu (pinned at 1440) takes the new name at once, without a reload.
+  await expect(page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name')).toHaveText('Ana López');
   await expect(profile.getByTestId('profile-pin')).toContainText('You do not have a PIN yet.');
   await fill(profile.getByTestId('profile-pin-new'), OWNER_PIN);
   await fill(profile.getByTestId('profile-pin-repeat'), OWNER_PIN);
@@ -193,6 +202,8 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
   expect(psql(`SELECT count(*) FROM base_credential WHERE username = '${usernameOf(owner.credentials.email)}' AND pin_hash <> ''`)).toBe('1');
   await atEverySize(page, 'BASE-G125', async () => {
     await expect(shown(page).getByTestId('profile-summary')).toContainText('Ana López');
+    // «System (auto)», «Light» and «Dark» whole at every size, never «System (au…».
+    expect(await cutLabels(shown(page).getByTestId('profile-mode'))).toEqual([]);
     await toTop(page);
   });
 });
@@ -211,6 +222,19 @@ test('BASE-G72 BASE-G151 BASE-G62 BASE-G63 BASE-G64: Settings › General shows 
   await expect(settings.getByTestId('device-row').filter({ hasText: 'The one you are using' })).toContainText('Office');
   await atEverySize(page, 'BASE-G63', async () => {
     await expect(shown(page).getByTestId('devices-card')).toContainText('Office');
+    await toTop(page);
+  });
+});
+
+test('BASE-G81: «Plan and limits» counts the devices in use: the one in hand, of the one the Free plan covers', async () => {
+  const page = owner.page;
+  await page.goto(`${origin}/system#plan`);
+  const devices = shown(page).getByTestId('system-plan-devices');
+  await expect(devices.getByTestId('system-plan-devices-used')).toHaveText('1');
+  await expect(devices).toContainText('Up to 1');
+  await expect(devices).toContainText('With a session open now.');
+  await atEverySize(page, 'BASE-G81', async () => {
+    await expect(shown(page).getByTestId('system-plan-devices-used')).toHaveText('1');
     await toTop(page);
   });
 });

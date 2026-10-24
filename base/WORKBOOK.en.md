@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2cd9806d0371dd0aa3758eff21707ecd3a6bcb66c5ee17f7343ef39d9efccc85 -->
+<!-- generated from WORKBOOK.md sha256:b7ae49ea46f01669bd12b58a08efd2245a839c9845096fef9b79e1c2e2ab9c67 -->
 
 ## What it is for and who it is for
 
@@ -183,7 +183,7 @@ On the Settings · Data and backups screen:
 | BASE-F25 | See an app refuse to be turned off | partial |
 | BASE-F26 | Understand why an app does not open | done |
 | BASE-F27 | See a paid app blocked | done |
-| BASE-F28 | See how much of the plan's limits is in use | partial |
+| BASE-F28 | See how much of the plan's limits is in use | done |
 | BASE-F29 | Choose a template of the catalogue to import | done |
 | BASE-F30 | Upload a file to import | done |
 | BASE-F31 | Review and load what the file brings | done |
@@ -669,25 +669,27 @@ passes. A demo business has every app, the paid ones too, to try them.
 Involved: APPS-F07
 
 ### BASE-F28 See how much of the plan's limits is in use
-Status: partial — without how many devices are in use: the hub does not count its devices yet (it comes with the trusted devices); memory, CPU and database are no longer measured per business (erplora.com measures the use)
+Status: done
 Actor: owner, administrator
 Screen: System · Plan and limits
 Steps:
   1. They tap "System" in the side menu: "Plan and limits" opens.
   2. They see "Your plan's limits" with "Within the limit" or "Close to the limit", the "People" card (the
      business's active people against the ones the plan allows, with its bar; or "No limit") and the
-     "Devices" one ("Up to" and the plan's limit, or "No limit").
+     "Devices" one: how many have a session open now ("With a session open now.") and, in its tag, "Up to" and
+     the plan's limit, or "No limit".
   3. With every place taken: "You are running out of room in your plan" — "Your plan has every place taken, so
      you cannot add anyone else.", with no button.
   4. Below: "Plans are managed from your ERPlora account, on erplora.com.". It updates by itself when the plan
-     or the people change.
-In: the plan's limits erplora.com passes to the hub and the business's active people.
+     or the people change; the devices' figure, on opening the screen.
+In: the plan's limits erplora.com passes to the hub, the business's active people and the devices with a session
+open on it (the same ones the cap of BASE-F44 counts).
 Out: nothing saved.
 If it fails: "We could not read your plan" — "Check the connection and try again." with "Retry". Whoever does
 not run the business sees "Only whoever runs the business can see the plan and its limits.", without "Retry". While
 the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com
 sends it.".
-Involved: none
+Involved: BASE-F44
 
 ### BASE-F29 Choose a template of the catalogue to import
 Status: done
@@ -1009,7 +1011,7 @@ Steps:
 In: the devices the plan covers, which erplora.com passes to the business.
 Out: the sessions of the devices left over, ended, and the reason kept on each one to tell it.
 If it fails: with no limit in the plan nothing ends.
-Involved: BASE-F11
+Involved: BASE-F11, BASE-F28
 
 ### BASE-F45 The session ends while working
 Status: done
@@ -1122,14 +1124,14 @@ Steps:
   1. They open the user card of the menu and tap "Profile". At the top, their face, their name, "Your identity
      and your personal preferences in this business." and their role.
   2. In "Account details" they change "First name", "Last name" or "Email" ("Only to contact you: it is not the
-     email you sign in with.") and tap "Save my details": "Profile saved".
+     email you sign in with.") and tap "Save my details": "Profile saved", and the side menu already says the new name, without reloading.
   3. "Choose image" uploads a JPG, PNG or WebP photo of up to 2 MB ("Photo updated"); "Remove" deletes it
      ("Photo removed").
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
      palette" and "Theme": "System (auto)", "Light", "Dark") are saved on choosing and applied at once; "Use the
      business’s appearance" undoes their own.
 In: the profile of whoever has the session.
-Out: their name in this business (the one on the faces and in "Devices"), their photo, their language and their
+Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
 appearance, which follow them on any device they enter. The email is only for contact: it does not change the
 erplora.com account.
 If it fails: if the profile could not be read, "Could not load the profile" — "Your details stay the same. Check

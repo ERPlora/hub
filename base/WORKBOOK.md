@@ -197,7 +197,7 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F25 | Ver que una app se niega a desactivarse | parcial |
 | BASE-F26 | Entender por qué una app no se abre | hecho |
 | BASE-F27 | Ver una app de pago bloqueada | hecho |
-| BASE-F28 | Ver cuánto de los límites del plan se está usando | parcial |
+| BASE-F28 | Ver cuánto de los límites del plan se está usando | hecho |
 | BASE-F29 | Elegir una plantilla del catálogo para importar | hecho |
 | BASE-F30 | Subir un fichero para importar | hecho |
 | BASE-F31 | Revisar y cargar lo que trae el fichero | hecho |
@@ -709,25 +709,27 @@ Implicados: APPS-F07
 
 ### BASE-F28 Ver cuánto de los límites del plan se está usando
 <!-- origen: old-hub:HUB_SHELL-F128 -->
-Estado: parcial — sin cuántos dispositivos se usan: el hub aún no lleva la cuenta de sus dispositivos (llega con los dispositivos de confianza); la memoria, la CPU y la base de datos ya no se miden por negocio (el uso lo mide erplora.com)
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Sistema · Plan y límites
 Pasos:
   1. Pulsa «Sistema» en el menú lateral: se abre «Plan y límites».
   2. Ve «Los límites de tu plan» con «Dentro del límite» o «Cerca del límite», la tarjeta «Personas» (las
      personas activas del negocio frente a las que permite el plan, con su barra; o «Sin límite») y la de
-     «Dispositivos» («Hasta» y el tope del plan, o «Sin límite»).
+     «Dispositivos»: cuántos tienen ahora una sesión abierta («Con una sesión abierta ahora.») y, en su etiqueta,
+     «Hasta» y el tope del plan, o «Sin límite».
   3. Con todas las plazas ocupadas: «Te estás quedando sin margen en tu plan» — «Tu plan tiene todas las plazas
      ocupadas, así que no puedes añadir a nadie más.», sin botón.
   4. Abajo: «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.». Se pone al día solo cuando
-     cambian el plan o las personas.
-Entra: los topes del plan que erplora.com le pasa al hub y las personas activas del negocio.
+     cambian el plan o las personas; la cifra de dispositivos, al abrir la pantalla.
+Entra: los topes del plan que erplora.com le pasa al hub, las personas activas del negocio y los dispositivos con
+una sesión abierta en él (los mismos que cuenta el tope de BASE-F44).
 Sale: nada guardado.
 Si falla: «No hemos podido leer tu plan» — «Comprueba la conexión y vuelve a intentarlo.» con «Reintentar».
 Quien no administra el negocio ve «Solo quien administra el negocio ve el plan y sus límites.», sin
 «Reintentar». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en
 cuanto erplora.com lo envíe.».
-Implicados: ninguno
+Implicados: BASE-F44
 
 ### BASE-F29 Elegir una plantilla del catálogo para importar
 <!-- origen: old-hub:HUB_SHELL-F175 -->
@@ -1071,7 +1073,7 @@ Pasos:
 Entra: los dispositivos que cubre el plan, que erplora.com le pasa al negocio.
 Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardado en cada uno para decírselo.
 Si falla: sin tope en el plan no se cierra nada.
-Implicados: BASE-F11
+Implicados: BASE-F11, BASE-F28
 
 ### BASE-F45 La sesión termina mientras se trabaja
 <!-- origen: old-hub:HUB_SHELL-F07 -->
@@ -1191,14 +1193,14 @@ Pasos:
   1. Abre la tarjeta de usuario del menú y pulsa «Perfil». Arriba, su cara, su nombre, «Tu identidad y tus
      preferencias personales en este negocio.» y su rol.
   2. En «Datos de la cuenta» cambia «Nombre», «Apellidos» o «Correo electrónico» («Solo para contactarte: no es el
-     correo con el que entras.») y pulsa «Guardar mis datos»: «Perfil guardado».
+     correo con el que entras.») y pulsa «Guardar mis datos»: «Perfil guardado», y el menú lateral ya dice el nombre nuevo, sin recargar.
   3. «Elegir imagen» sube una foto JPG, PNG o WebP de hasta 2 MB («Foto actualizada»); «Quitar» la borra («Foto
      quitada»).
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
      tema» y «Tema»: «Sistema (auto)», «Claro», «Oscuro») se guardan al elegir y se aplican al momento; «Usar la
      apariencia del negocio» deshace lo propio.
 Entra: el perfil de quien tiene la sesión.
-Sale: su nombre en este negocio (el que sale en las caras y en «Dispositivos»), su foto, su idioma
+Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
 y su apariencia, que le siguen en cualquier dispositivo en el que entre. El correo es solo de contacto: no cambia
 la cuenta de erplora.com.
 Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» — «Tus datos siguen igual. Comprueba la
@@ -1502,7 +1504,11 @@ Implicados: BASE-F57
   lectura aparte que pueda fallar), pinta la apariencia propia y, tras un cambio de usuario (anunciado en
   `sessionStorage`), dice «Ahora atiende {name}» y olvida la apariencia anterior. Cambiar de usuario abre la sesión
   nueva sobre la vieja y recarga la pantalla en curso (`location.replace`): nada de quien se fue queda en memoria
-  (gh:hub#2538, #2539); la cuenta abierta de Ventas la recuerda su app (`useCurrentCheck`).
+  (gh:hub#2538, #2539); la cuenta abierta de Ventas la recuerda su app (`useCurrentCheck`). Guardar el nombre en Mi
+  perfil llama a `sessionChanged()` (`lib/access.ts`) y `frontend/main.ts` vuelve a leer `base.session.me`, que es la
+  sesión que pinta el shell (el menú lateral); si esa lectura falla, se queda la que había.
+- «Plan y límites» (BASE-F28, `queries.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F44
+  (`services._end_other_devices`): los `device_id` distintos de las sesiones vivas del host (`SessionOwner`).
 - Fase 1 (tablas compartidas, `docs/plans/2026-10-22-fase-2-tenencia.md` §5): `TrustedDevice`, `Credential`,
   `AccessSettings` y `Profile` son de todo el despliegue hasta la BD por hub, así que la lista de dispositivos, el
   dial y «Quitar» alcanzan a todos los negocios (como `Customer.objects.all()` en las apps); las caras y los PIN sí
