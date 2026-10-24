@@ -265,8 +265,10 @@ class NoticesIn(Schema):
 class NoticeOut(Schema):
     id: UUID = Field(description="The conversation's id.")
     at: datetime = Field(description="When the customer wrote her last message, still unanswered.")
-    name: str = Field(description="Who: the customer card's name, else her WhatsApp name, else her number.")
-    preview: str = Field(description="What she wrote last (empty for a photo or a location without a caption).")
+    display_name: str = Field(description="Who: the customer card's name, else her WhatsApp name, else her number.")
+    last_message_preview: str = Field(
+        description="What she wrote last (empty for a photo or a location without a caption)."
+    )
 
 
 class NoticesOut(Schema):

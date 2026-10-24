@@ -224,7 +224,7 @@ def test_the_counters_events_re_run_its_query_and_its_icon_is_registered():
 
 def test_it_tells_the_device_of_each_customer_left_waiting():
     """hub#2303 (whatsapp_inbox#244): the installed app tells the device, with a system notice, of each message of a
-    customer that is left waiting for an answer: «WhatsApp · {name}» with what the customer wrote; a tap opens that
+    customer that is left waiting for an answer: «WhatsApp · {display_name}» with what the customer wrote; a tap opens that
     conversation in the inbox. Refreshed by a message arriving and by a conversation opened again."""
     [notice] = inbox().notices
     assert isinstance(notice, DeviceNotice)
@@ -235,10 +235,10 @@ def test_it_tells_the_device_of_each_customer_left_waiting():
         {},
     )
     assert [str(text) for text in notice.title] == [
-        "WhatsApp · {name}",
+        "WhatsApp · {display_name}",
         "WhatsApp customer waiting for an answer",
     ]
-    assert [str(text) for text in notice.body] == ["{preview}"]
+    assert [str(text) for text in notice.body] == ["{last_message_preview}"]
     assert notice.route == "/whatsapp_inbox/inbox?conversation={id}"
     assert notice.permission == "whatsapp_inbox.view"
     assert list(notice.refresh_on) == [events.MESSAGE_RECEIVED, events.STATUS_CHANGED]

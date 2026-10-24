@@ -491,7 +491,12 @@ def notices(ctx: OperationContext, data: NoticesIn) -> dict:
     )
     return {
         "rows": [
-            {"id": row.id, "at": row.last_inbound_at, "name": display_name(row), "preview": row.last_message_preview}
+            {
+                "id": row.id,
+                "at": row.last_inbound_at,
+                "display_name": display_name(row),
+                "last_message_preview": row.last_message_preview,
+            }
             for row in rows
         ]
     }

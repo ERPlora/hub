@@ -95,8 +95,8 @@ class WhatsappInboxConfig(LiveAppConfig):
         DeviceNotice(
             key="awaiting_reply",
             operation="whatsapp_inbox.conversation.notices",
-            title=[_("WhatsApp · {name}"), _("WhatsApp customer waiting for an answer")],
-            body=["{preview}"],
+            title=[_("WhatsApp · {display_name}"), _("WhatsApp customer waiting for an answer")],
+            body=["{last_message_preview}"],
             route="/whatsapp_inbox/inbox?conversation={id}",
             permission="whatsapp_inbox.view",
             refresh_on=NOTICE_EVENTS,

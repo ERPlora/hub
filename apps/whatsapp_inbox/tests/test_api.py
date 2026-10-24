@@ -190,7 +190,7 @@ def test_who_waits_for_an_answer_over_http(employee_client):
     assert (count.status_code, count.json()) == (200, {"count": 1})
     told = get(employee_client, "/whatsapp_inbox/conversations/notices", limit=10)
     assert told.status_code == 200
-    assert [(row["name"], row["preview"]) for row in told.json()["rows"]] == [("Ana", "Hola, ¿tenéis hora mañana?")]
+    assert [(row["display_name"], row["last_message_preview"]) for row in told.json()["rows"]] == [("Ana", "Hola, ¿tenéis hora mañana?")]
     assert get(employee_client, "/whatsapp_inbox/conversations/notices", limit=101).status_code == 422
 
 

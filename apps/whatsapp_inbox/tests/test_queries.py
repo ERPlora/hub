@@ -439,7 +439,7 @@ def test_the_notices_are_the_customers_left_waiting_the_newest_first(three):
 
     rows = notices(ctx=ctx_for("hub_employee"))
 
-    assert [(row["id"], row["name"], row["preview"]) for row in rows] == [
+    assert [(row["id"], row["display_name"], row["last_message_preview"]) for row in rows] == [
         (str(three["Carla"].id), "Carla", "¿Me confirmas?"),
         (str(three["Ana"].id), "Ana López", "Hola, ¿tenéis hora mañana?"),
         (str(three["Bea"].id), "Bea", "Hola, ¿tenéis hora mañana?"),
@@ -459,8 +459,8 @@ def test_an_answered_pending_closed_erased_or_old_conversation_is_not_told(three
     receive("wamid.e", "34600555555", contact_name="", sent_at=at(3))
 
     # Dora wrote 25 hours ago (beyond the last day); a customer with no WhatsApp name is told by her number.
-    assert [(row["name"]) for row in notices()] == ["+34600555555"]
-    assert [row["name"] for row in notices({"since": at(26 * 60)})] == ["+34600555555", "Dora"]
+    assert [row["display_name"] for row in notices()] == ["+34600555555"]
+    assert [row["display_name"] for row in notices({"since": at(26 * 60)})] == ["+34600555555", "Dora"]
     assert len(notices({"since": at(26 * 60), "limit": 1})) == 1
 
 

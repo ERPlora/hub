@@ -106,8 +106,8 @@ export interface NoticeOut {
   id: string;
   /** When the customer wrote her last message, still unanswered. */
   at: string;
-  name: string;
-  preview: string;
+  display_name: string;
+  last_message_preview: string;
 }
 
 export interface NoticesOut {
