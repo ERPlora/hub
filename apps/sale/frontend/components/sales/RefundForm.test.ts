@@ -3,12 +3,15 @@
 // re-proposes the marked lines' share, «Refund everything» puts the full proposal back, every amount can
 // be edited, and the button «Refund <amount>» says why it cannot go yet (aria-disabled, never a dead
 // tap). `sale.sale.refund` carries the attempt key born when the window opened, the same on a retry, so
-// a lost answer never refunds twice. A refusal is read inside the window, which stays open.
+// a lost answer never refunds twice. A refusal is read inside the window, which stays open. The cashier, who may not
+// refund, is asked for a manager's approval (BASE-F84): approved with the manager's PIN, the very same refund goes once;
+// «Cancel» on the approval leaves its refusal inside the window.
 import { InlineFeedback } from '@erplora/ui/components';
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, errorFrame, flush, ionValue, mountSale } from '../../__tests__/mount-sale';
+import { approvalDialog, approvalSettled, asksApproval, CANCELLED } from '../../__tests__/approval-dialog';
+import { click, EMPLOYEE, errorFrame, flush, ionValue, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import type { LineOption, RefundOptionsOut, TenderOption } from '../../operations';
 import RefundForm from './RefundForm.vue';
@@ -17,7 +20,9 @@ import RefundTenderCard from './RefundTenderCard.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
+  const { modalControllerStub } = await import('../../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
@@ -27,6 +32,7 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
 beforeEach(() => {
   vi.mocked(toastSuccess).mockClear();
   vi.mocked(toastError).mockClear();
+  approvalDialog.reset();
 });
 
 const tender = (id: string, over: Partial<TenderOption> = {}): TenderOption => ({
@@ -71,8 +77,8 @@ const prop = (el: Element, name: string): unknown => (el as unknown as Record<st
 /** What a person reads in `el`: its texts in order, one space apart. */
 const words = (el: Element): string => [...el.childNodes].map((n) => plain(n.textContent ?? '').trim()).filter(Boolean).join(' ');
 
-async function setup(data: RefundOptionsOut | null = options(), locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(RefundForm, { props: { saleId: 's1' }, locale });
+async function setup(data: RefundOptionsOut | null = options(), locale: 'en' | 'es' = 'en', session = undefined as typeof EMPLOYEE | undefined) {
+  const m = await mountSale(RefundForm, { props: { saleId: 's1' }, locale, session });
   const call = await m.live();
   if (data) await m.result('sale.refund.options', data);
   const cards = () => m.wrapper.findAllComponents(RefundTenderCard);
@@ -250,6 +256,37 @@ describe('RefundForm: refunding', () => {
     expect(keys[1]).toBe(keys[0]);
     expect(s.wrapper.emitted('refunded')).toHaveLength(1);
     expect(s.find('refund-error').exists()).toBe(false);
+  });
+
+  it('the cashier is asked for a manager’s approval, and the manager’s PIN refunds the very same attempt once', async () => {
+    const s = await setup(options(), 'en', EMPLOYEE);
+    let calls = 0;
+    s.net.onApi(() =>
+      calls++ === 0
+        ? Response.json(asksApproval('sale.sale.refund', 'Refund a sale'), { status: 403 })
+        : Response.json({ already: false, refund_id: 'r1', sale_id: 's1', total: 1500, fully_refunded: true }),
+    );
+    await s.reason('Broken');
+    await s.confirm();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Refund a sale']);
+    const [asked, approved] = s.refunds().map((call) => call.body);
+    expect(approved).toEqual(asked);
+    expect(toastSuccess).toHaveBeenCalledWith('Refund recorded.');
+    expect(s.wrapper.emitted('refunded')).toHaveLength(1);
+  });
+
+  it('«Cancel» on the approval leaves its refusal inside the window', async () => {
+    const s = await setup(options(), 'es', EMPLOYEE);
+    approvalDialog.answer = CANCELLED;
+    s.answer(403, { error: { ...asksApproval('sale.sale.refund', 'Devolver una venta').error, message: 'Esto necesita la aprobación de un encargado.' } });
+    await s.reason('Roto');
+    await s.confirm();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Devolver una venta']);
+    expect(s.refunds()).toHaveLength(1);
+    expect(s.find('refund-error').text()).toContain('Esto necesita la aprobación de un encargado.');
+    expect(s.wrapper.emitted('refunded')).toBeUndefined();
   });
 
   it('an answer that never came says a retry will not refund twice', async () => {

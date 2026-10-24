@@ -4,7 +4,8 @@
 // runs `sale.sale.void`, says «Sale voided» and closes (the row turns Voided and «Voided» goes up by
 // themselves, live). A refusal (a full invoice, a sale with refunds, voided elsewhere at the same time)
 // is read inside the window, in the server's words (a failure it did not word: «The sale could not be
-// voided»), and the window stays open.
+// voided»), and the window stays open. Whoever may not void is asked for a manager's approval (BASE-F84):
+// approved with the manager's PIN, the very same void goes once; «Cancel» leaves its refusal here.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -12,6 +13,7 @@ import { IonTextarea } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useT } from '../../composables/useT';
+import { withApproval } from '../../lib/approval';
 import { refusal } from '../../lib/refusal';
 import type { SaleRow } from '../../operations';
 
@@ -48,7 +50,7 @@ async function confirm(): Promise<void> {
   missing.value = !text;
   if (!text) return;
   try {
-    await command.run({ sale_id: sale.id, reason: text });
+    await withApproval(() => command.run({ sale_id: sale.id, reason: text }));
   } catch {
     return; // The window shows `command.error`.
   }
