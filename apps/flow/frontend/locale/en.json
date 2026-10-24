@@ -2527,7 +2527,7 @@
       "draft": "Change waiting for Meta",
       "editable": "Can be changed here",
       "deleting": "Being deleted at Meta",
-      "sendable": "Only the sendable ones",
+      "sendable": "Can be sent now",
       "supported": "Sent from here",
       "submit_state": "Sending to Meta",
       "submit_error": "Why it failed at Meta",

@@ -85,7 +85,10 @@ class PayloadReader:
     function (also by tuple, ``|=``, ``[key] =``, ``update`` or ``setdefault``), a parameter (through the
     callers of its function in the module, a ``**`` one by the keywords they pass), a call of a function
     of the module (what it returns), ``dict(…)``, ``a | b``, ``a if … else b`` and a comprehension whose
-    keys are filtered by a known list. Anything else is reported in ``unread``.
+    keys are filtered by a known list. Anything else is reported in ``unread``. A value under a key is
+    followed when it is a dict literal, a function of the module or a variable that holds one of those
+    (assigned, or passed by the callers); any other value (an id, a text, a flag, a method call) counts
+    as not a dict.
     """
 
     def __init__(self, source: str, where: str):
@@ -173,7 +176,49 @@ class PayloadReader:
                 return set()
             returns = [node.value for node in ast.walk(function) if isinstance(node, ast.Return)]
             return set().union(*(self._nested(found, function, seen | {function.name}) for found in returns if found))
+        if isinstance(value, ast.Name):
+            return self._nested_name(value.id, scope, seen)
         return set()
+
+    def _nested_name(self, name: str, scope: ast.AST, seen: frozenset[str]) -> set[str]:
+        """A variable that may hold a dict: what it is assigned in the function or, as a parameter, what
+        the callers pass; none for anything else (a flag, an id)."""
+        assigned = [
+            node.value
+            for node in ast.walk(scope)
+            if isinstance(node, (ast.Assign, ast.AnnAssign))
+            and node.value is not None
+            and any(
+                isinstance(target, ast.Name) and target.id == name
+                for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+            )
+        ]
+        if assigned:
+            return set().union(*(self._nested(value, scope, seen) for value in assigned))
+        if not isinstance(scope, _FUNCTIONS) or scope.name in seen:
+            return set()
+        positional, named = self._parameters(scope)
+        if name not in named:
+            return set()
+        keys: set[str] = set()
+        for call in ast.walk(self.tree):
+            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == scope.name:
+                passed = self._argument(call, positional, name)
+                if passed is not None:
+                    keys |= self._nested(passed, self._scope(call), seen | {scope.name})
+        return keys
+
+    @staticmethod
+    def _parameters(function: ast.AST) -> tuple[list[str], set[str]]:
+        """``(positional names, every name)`` of a function's parameters."""
+        arguments = function.args
+        positional = [arg.arg for arg in (*arguments.posonlyargs, *arguments.args)]
+        return positional, {*positional, *(arg.arg for arg in arguments.kwonlyargs)}
+
+    def _argument(self, call: ast.Call, positional: list[str], name: str) -> ast.expr | None:
+        """What ``call`` passes as the parameter ``name``, by position or by keyword."""
+        index = positional.index(name) if name in positional else None
+        return call.args[index] if index is not None and index < len(call.args) else self._keyword(call, name)
 
     def _returned(self, function: ast.AST, site: str, seen: frozenset[str]) -> set[str]:
         if function.name in seen:
@@ -229,8 +274,7 @@ class PayloadReader:
         """What the callers of ``function`` in the module pass as its parameter ``name``; ``None`` if it
         has no such parameter."""
         arguments = function.args
-        positional = [arg.arg for arg in (*arguments.posonlyargs, *arguments.args)]
-        named = {*positional, *(arg.arg for arg in arguments.kwonlyargs)}
+        positional, named = self._parameters(function)
         is_rest = arguments.kwarg is not None and arguments.kwarg.arg == name
         if name not in named and not is_rest:
             return None
@@ -249,9 +293,7 @@ class PayloadReader:
                     elif keyword.arg not in named:
                         keys |= self.read(ast.Dict(keys=[ast.Constant(keyword.arg)], values=[keyword.value]), scope, site, inner)
                 continue
-            index = positional.index(name) if name in positional else None
-            value = call.args[index] if index is not None and index < len(call.args) else self._keyword(call, name)
-            keys |= self.read(value, scope, site, inner)
+            keys |= self.read(self._argument(call, positional, name), scope, site, inner)
         return keys
 
     def _filtered(self, comprehension: ast.DictComp, site: str) -> set[str]:
@@ -322,7 +364,14 @@ def _send(ctx, name, payload):
     record_event(ctx, name, payload)
 
 
+def notify(ctx, item, person, flag):
+    record_event(ctx, "a.b.notified", {"person": person, "flag": flag})
+    _event(ctx, "a.b.carried", item, who=person, by=flag)
+
+
 def create(ctx, item, changes):
+    person = {"deep": 1}
+    notify(ctx, item, person, True)
     _event(ctx, "a.b.created", item, by_keyword=1, **{"spread": 2})
     _send(ctx, "a.b.sent", {"passed": 1})
     record_event(ctx, "a.b.listed", {"rows": [1, 2], "when": None})
@@ -344,8 +393,9 @@ def test_the_reader_follows_every_way_a_module_builds_a_payload():
     assert set(reader.keys) == {
         "number", "by_keyword", "spread", "passed", "when", "id", "nested", "nested.inner", "merged",
         "unpacked", "indexed", "updated", "or_ed", "defaulted", "date", "time", "guest",
+        "person", "person.deep", "flag", "who", "who.deep", "by",
     }  # fmt: skip
-    assert reader.unread == ["sample.py:30: payload_from_elsewhere()"]
+    assert reader.unread == ["sample.py:37: payload_from_elsewhere()"]
 
 
 def test_the_reader_reads_every_payload_of_the_modules():

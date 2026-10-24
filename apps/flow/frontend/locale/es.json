@@ -2527,7 +2527,7 @@
       "draft": "Cambio pendiente en Meta",
       "editable": "Se puede cambiar aquí",
       "deleting": "Borrándose en Meta",
-      "sendable": "Solo las que se pueden enviar",
+      "sendable": "Se puede enviar",
       "supported": "Se envía desde aquí",
       "submit_state": "Envío a Meta",
       "submit_error": "Motivo del fallo en Meta",
