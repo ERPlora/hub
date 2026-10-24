@@ -26,7 +26,7 @@ FAILED_EVENTS = (FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCAR
 #: The way in's live queries (APP-BASE-3) have their own test: base/tests/test_access_live.py.
 WAY_IN = ("base.access.", "base.device.", "base.profile.")
 #: People and permissions' (APP-BASE-5) too: base/tests/test_people.py.
-PEOPLE = ("base.person.", "base.role.")
+PEOPLE = ("base.person.", "base.role.", "base.api_key.")
 
 
 def declared(hook):

@@ -794,6 +794,89 @@
         "ownerOnly": "Only the owner changes the owner's way in.",
         "ownBadge": "Nobody registers their own badge: ask another administrator."
       }
+    },
+    "apiKeys": {
+      "intro": "A key lets another system (your accountant's, your online shop) read or write this business's data through its API.",
+      "new": "New API key",
+      "search": "Search API key…",
+      "empty": "No API keys yet. Create one so that another system can read or write your business's data.",
+      "loadError": "Your API keys could not be loaded.",
+      "unavailableHeading": "Not available yet",
+      "unavailable": "API keys are not available yet in this business.",
+      "never": "Never",
+      "columns": {
+        "name": "Name",
+        "token": "Token",
+        "permissions": "Permissions",
+        "state": "State",
+        "created": "Created",
+        "lastUsed": "Last use",
+        "limit": "Limit"
+      },
+      "modes": {
+        "full": "Full access",
+        "read": "Read only",
+        "write": "Write only",
+        "per_app": "Per app"
+      },
+      "kinds": {
+        "read": "Read",
+        "write": "Write"
+      },
+      "short": {
+        "read": "R",
+        "write": "W"
+      },
+      "states": {
+        "active": "Active",
+        "revoked": "Revoked"
+      },
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "revoked": "«{name}» revoked.",
+      "form": {
+        "title": "New API key",
+        "submit": "Create key",
+        "cancel": "Cancel",
+        "name": "Name",
+        "namePlaceholder": "Accountant — invoices",
+        "rate": "Requests per minute",
+        "rateHint": "From 1 to 10,000.",
+        "mode": "What this key may do",
+        "generalHint": "The general modes cover every app of your business, also the ones you add later.",
+        "perAppHint": "Tick what the key may do on each app.",
+        "app": "App",
+        "noApps": "No app publishes its API yet."
+      },
+      "token": {
+        "title": "API key created",
+        "heading": "Copy the token now",
+        "once": "This is the only time the whole secret is shown. Keep it somewhere safe: it will not be shown again.",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "It could not be copied to the clipboard.",
+        "done": "Done"
+      },
+      "rotateConfirm": {
+        "title": "Rotate the API key",
+        "message": "«{name}» gets a new token. The current one stops working at once.",
+        "confirm": "Rotate"
+      },
+      "revokeConfirm": {
+        "title": "Revoke the API key",
+        "message": "You are about to revoke «{name}». Any system using this token loses access at once. This cannot be undone.",
+        "confirm": "Revoke"
+      },
+      "errors": {
+        "create": "The API key could not be created.",
+        "rotate": "The API key could not be rotated.",
+        "revoke": "The API key could not be revoked.",
+        "revoked": "That key was revoked: it never works again.",
+        "gone": "That key no longer exists. Refresh the list and try again.",
+        "scopesRequired": "Choose at least one app and what the key may do on it.",
+        "scopeUnknown": "That app does not publish what the key would do on it.",
+        "denied": "Only whoever runs the business manages the API keys."
+      }
     }
   }
 }

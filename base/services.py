@@ -93,7 +93,18 @@ from base.operations import hub_id
 from base.storage import hub_prefix
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base import people as people_rules
-from base.schemas import BadgeSetIn, PersonDetailOut, PersonIn
+from base.schemas import (
+    ApiKeyCreateIn,
+    ApiKeyIdIn,
+    ApiKeyRevokeOut,
+    ApiKeyTokenOut,
+    BadgeSetIn,
+    PersonDetailOut,
+    PersonIn,
+)
+from base import api_keys
+from base.models import ApiKey
+from base.throttle import client_key
 from base.schemas import (
     BlueprintImportIn,
     BlueprintSourceIn,
@@ -1978,3 +1989,171 @@ def person_badge_remove(ctx: OperationContext, data: PersonIn) -> dict:
     credential.save(update_fields=["badge_digest", "badge_set_at"])
     record_event(ctx, events.PERSON_BADGE_REMOVED, {"person": data.person})
     return _person_answer(ctx, data.person)
+
+
+# ── People and permissions: the business's API keys (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+def _api_keys_available(ctx: OperationContext) -> None:
+    """A key lives in its hub's own database; while the business shares phase 1's with others, a key of it would open
+    theirs too: none is made yet («not available yet», never the infrastructure's words)."""
+    if not has_own_database(Hub.objects.filter(slug=ctx.scope.key).first()):
+        raise Conflict(
+            gettext("API keys are not available yet for this business."), code="base.api_keys_unavailable"
+        )
+
+
+def _checked_scopes(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
+    """What a key per app may do on each app, of those this business has that publish it; nothing for the others."""
+    if data.mode != ApiKey.Mode.PER_APP:
+        return {}
+    offered = {app["id"]: app for app in queries.api_apps(ctx)}
+    scopes = {app: sorted(set(kinds)) for app, kinds in data.scopes.items() if kinds}
+    if not scopes:
+        raise InvalidPayload(
+            gettext("Choose at least one app and what the key may do on it."),
+            code="base.api_key_scopes_required",
+            fields={"scopes": "required"},
+        )
+    for app, kinds in scopes.items():
+        found = offered.get(app)
+        if found is None or any(not found[kind] for kind in kinds):
+            raise InvalidPayload(
+                gettext("That app does not publish what the key would do on it."),
+                code="base.api_key_scope_unknown",
+                fields={"scopes": app},
+            )
+    return scopes
+
+
+def _new_token_for(key: ApiKey) -> str:
+    token = api_keys.new_token()
+    key.token_digest, key.prefix = api_keys.digest(token), token[: api_keys.PREFIX_LENGTH]
+    return token
+
+
+@operation(
+    "base.api_key.create",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyCreateIn,
+    output=ApiKeyTokenOut,
+    ai={
+        "description": "Not an assistant tool (its token is a secret shown once, never in a chat): makes an API key "
+        "for another system, with a name, its requests a minute and what it may do.",
+        "risk": "high",
+    },
+)
+def api_key_create(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
+    """«New API key» (BASE-G146): its token once; the hub keeps its digest and its first characters."""
+    _api_keys_available(ctx)
+    name = " ".join(data.name.split())
+    if not name:
+        raise InvalidPayload(gettext("Give the key a name."), code="base.api_key_name_required", fields={"name": "required"})
+    key = ApiKey(
+        name=name,
+        mode=data.mode,
+        scopes=_checked_scopes(ctx, data),
+        rate_per_minute=data.rate_per_minute,
+        created_by=_actor_label(ctx),
+    )
+    token = _new_token_for(key)
+    key.save()
+    record_event(ctx, events.API_KEY_CREATED, {"id": str(key.id), "mode": key.mode})
+    return {"key": queries.api_key_out(key), "token": token}
+
+
+def _live_key(key_id: UUID) -> ApiKey:
+    key = ApiKey.objects.select_for_update().filter(pk=key_id).first()
+    if key is None:
+        raise NotFound(gettext("That key no longer exists. Refresh the list and try again."), code="base.api_key_not_found")
+    if key.revoked_at is not None:
+        raise Conflict(gettext("That key was revoked: it never works again."), code="base.api_key_revoked")
+    return key
+
+
+@operation(
+    "base.api_key.rotate",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyIdIn,
+    output=ApiKeyTokenOut,
+    ai={
+        "description": "Not an assistant tool (its new token is a secret shown once): gives an API key a new token; "
+        "the old one stops working at once.",
+        "risk": "high",
+    },
+)
+def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
+    """«Rotate» (BASE-G147): a new token, shown once; the old one stops at once (its digest is gone)."""
+    _api_keys_available(ctx)
+    key = _live_key(data.id)
+    token = _new_token_for(key)
+    key.rotated_at = timezone.now()
+    key.save(update_fields=["token_digest", "prefix", "rotated_at"])
+    record_event(ctx, events.API_KEY_ROTATED, {"id": str(key.id)})
+    return {"key": queries.api_key_out(key), "token": token}
+
+
+@operation(
+    "base.api_key.revoke",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyIdIn,
+    output=ApiKeyRevokeOut,
+    ai={
+        "description": "Revokes an API key: any system using it loses access at once, for good. The key stays listed "
+        "as revoked.",
+        "risk": "high",
+    },
+)
+def api_key_revoke(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
+    """«Revoke» (BASE-G148): at once and for good; the key is kept, for the record."""
+    _api_keys_available(ctx)
+    key = _live_key(data.id)
+    key.revoked_at, key.revoked_by = timezone.now(), _actor_label(ctx)
+    key.save(update_fields=["revoked_at", "revoked_by"])
+    record_event(ctx, events.API_KEY_REVOKED, {"id": str(key.id)})
+    return {"key": queries.api_key_out(key)}
+
+
+#: A key's last use is written at most once a minute: a busy integration does not write on every call.
+API_KEY_LAST_USE_EVERY = dt.timedelta(minutes=1)
+
+
+def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyCaller | None":
+    """The caller of ``token`` on the published operation ``op``, in the request's hub (``base.api_keys.KeyDoor``).
+
+    ``None`` (the session's door goes on) on a business that shares phase 1's database, or for a token nobody issued
+    here (counted against the address); 429 once the address tried too many, or the key passed its pace; 403 when the
+    key may not do this on this app."""
+    hub = getattr(request, "hub", None)
+    if not has_own_database(hub):
+        return None
+    address = client_key(request)
+    wait = api_keys.KEY_ADDRESS_LIMIT.wait(hub.slug, address)
+    if wait:
+        raise OperationError(
+            too_many_message(wait, gettext("Too many keys tried from here.")),
+            code="base.too_many_api_key_tries",
+            status=429,
+        )
+    key = ApiKey.objects.filter(token_digest=api_keys.digest(token), revoked_at=None).first()
+    if key is None:
+        api_keys.KEY_ADDRESS_LIMIT.failed(hub.slug, address)
+        return None
+    if not api_keys.allows(key.mode, key.scopes, op.app_label, api_keys.kind_of(op)):
+        raise PermissionDenied(
+            gettext("This API key may not do that on this app."), code="base.api_key_scope"
+        )
+    if api_keys.over_pace(key.pk, key.rate_per_minute):
+        raise OperationError(
+            gettext("This API key went past its requests a minute: wait a moment."),
+            code="base.api_key_rate_limited",
+            status=429,
+        )
+    now = timezone.now()
+    if key.last_used_at is None or now - key.last_used_at >= API_KEY_LAST_USE_EVERY:
+        ApiKey.objects.filter(pk=key.pk).update(last_used_at=now)
+    granted = frozenset({op.permission}) if op.permission else frozenset()
+    return api_keys.KeyCaller(key_id=str(key.pk), name=key.name, prefix=key.prefix, permissions=granted)

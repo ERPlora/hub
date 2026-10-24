@@ -32,7 +32,7 @@ from base.schemas import (
     ProfileUpdateIn,
 )
 
-from base.schemas import BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
+from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
 
 router = Router(tags=["base"])
 
@@ -282,3 +282,26 @@ async def person_badge_remove(request, data: PersonIn):
 @bind(router, "base.role.list", "/roles")
 async def role_list(request):
     return await run_operation(request, queries.role_list)
+
+
+# ── People and permissions: the business's API keys (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+@bind(router, "base.api_key.list", "/keys")
+async def api_key_list(request):
+    return await run_operation(request, queries.api_key_list)
+
+
+@bind(router, "base.api_key.create", "/keys")
+async def api_key_create(request, data: ApiKeyCreateIn):
+    return await run_operation(request, services.api_key_create, data)
+
+
+@bind(router, "base.api_key.rotate", "/keys/rotate")
+async def api_key_rotate(request, data: ApiKeyIdIn):
+    return await run_operation(request, services.api_key_rotate, data)
+
+
+@bind(router, "base.api_key.revoke", "/keys/revoke")
+async def api_key_revoke(request, data: ApiKeyIdIn):
+    return await run_operation(request, services.api_key_revoke, data)

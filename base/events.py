@@ -51,6 +51,11 @@ PERSON_PIN_REMOVED = "base.person.pin_removed"
 PERSON_BADGE_SET = "base.person.badge_set"
 PERSON_BADGE_REMOVED = "base.person.badge_removed"
 PERSON_EVENTS = (PERSON_PIN_REMOVED, PERSON_BADGE_SET, PERSON_BADGE_REMOVED)
+#: An API key made, rotated (a new token) or revoked; its token never travels in an event.
+API_KEY_CREATED = "base.api_key.created"
+API_KEY_ROTATED = "base.api_key.rotated"
+API_KEY_REVOKED = "base.api_key.revoked"
+API_KEY_EVENTS = (API_KEY_CREATED, API_KEY_ROTATED, API_KEY_REVOKED)
 
 ALL = [
     HUB_REGISTERED,
@@ -73,4 +78,5 @@ ALL = [
     ACCESS_SETTINGS_CHANGED,
     PROFILE_UPDATED,
     *PERSON_EVENTS,
+    *API_KEY_EVENTS,
 ]

@@ -961,3 +961,61 @@ class RoleOut(Schema):
 
 class RoleListOut(Schema):
     roles: list[RoleOut]
+
+
+# ── People and permissions: the business's API keys and its API's documentation (APP-BASE-5) ──────────────────────
+
+
+class ApiKeyListIn(Schema):
+    """No input: the keys of the business of the request."""
+
+
+class ApiKeyOut(Schema):
+    id: UUID
+    name: str
+    prefix: str = Field(description="The token's first characters, to tell it apart; never the whole token.")
+    mode: Literal["full", "read", "write", "per_app"]
+    scopes: dict[str, list[Literal["read", "write"]]] = Field(description="Per app: what it may do on each app.")
+    rate_per_minute: int
+    created_by: str
+    created_at: dt.datetime
+    rotated_at: dt.datetime | None
+    last_used_at: dt.datetime | None
+    revoked_at: dt.datetime | None
+
+
+class ApiAppOut(Schema):
+    """An app this business has that publishes operations: what a key per app may be given on it."""
+
+    id: str
+    name: str
+    read: bool = Field(description="It publishes queries.")
+    write: bool = Field(description="It publishes commands.")
+
+
+class ApiKeyListOut(Schema):
+    available: bool = Field(description="False while the business shares its database with others: no key yet.")
+    keys: list[ApiKeyOut]
+    apps: list[ApiAppOut]
+
+
+class ApiKeyCreateIn(Schema):
+    name: str = Field(max_length=80)
+    rate_per_minute: int = Field(60, ge=1, le=10_000)
+    mode: Literal["full", "read", "write", "per_app"]
+    scopes: dict[str, list[Literal["read", "write"]]] = Field(default_factory=dict)
+
+
+class ApiKeyIdIn(Schema):
+    id: UUID
+
+
+class ApiKeyTokenOut(Schema):
+    """A key just made or rotated, with its whole token: the only time it is shown."""
+
+    key: ApiKeyOut
+    token: str
+
+
+class ApiKeyRevokeOut(Schema):
+    key: ApiKeyOut

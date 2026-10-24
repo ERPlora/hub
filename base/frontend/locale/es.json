@@ -794,6 +794,89 @@
         "ownerOnly": "Solo el propietario cambia el acceso del propietario.",
         "ownBadge": "Nadie da de alta su propia placa: pídeselo a otro administrador."
       }
+    },
+    "apiKeys": {
+      "intro": "Una llave deja que otro sistema (el de tu gestoría, tu tienda online) lea o escriba datos de este negocio por su API.",
+      "new": "Nueva API key",
+      "search": "Buscar API key…",
+      "empty": "Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.",
+      "loadError": "No se pudieron cargar tus API keys.",
+      "unavailableHeading": "Todavía no disponible",
+      "unavailable": "Las API keys todavía no están disponibles en este negocio.",
+      "never": "Nunca",
+      "columns": {
+        "name": "Nombre",
+        "token": "Token",
+        "permissions": "Permisos",
+        "state": "Estado",
+        "created": "Creada",
+        "lastUsed": "Último uso",
+        "limit": "Límite"
+      },
+      "modes": {
+        "full": "Acceso total",
+        "read": "Solo lectura",
+        "write": "Solo escritura",
+        "per_app": "Por app"
+      },
+      "kinds": {
+        "read": "Lectura",
+        "write": "Escritura"
+      },
+      "short": {
+        "read": "L",
+        "write": "E"
+      },
+      "states": {
+        "active": "Activa",
+        "revoked": "Revocada"
+      },
+      "rotate": "Rotar",
+      "revoke": "Revocar",
+      "revoked": "«{name}» revocada.",
+      "form": {
+        "title": "Nueva API key",
+        "submit": "Crear key",
+        "cancel": "Cancelar",
+        "name": "Nombre",
+        "namePlaceholder": "Gestoría — facturas",
+        "rate": "Peticiones por minuto",
+        "rateHint": "De 1 a 10.000.",
+        "mode": "Qué puede hacer esta key",
+        "generalHint": "Los modos generales cubren todas las apps de tu negocio, también las que añadas después.",
+        "perAppHint": "Marca qué puede hacer la key en cada app.",
+        "app": "App",
+        "noApps": "Ninguna app publica todavía su API."
+      },
+      "token": {
+        "title": "API key creada",
+        "heading": "Copia el token ahora",
+        "once": "Este es el único momento en que se muestra el secreto completo. Guárdalo en un lugar seguro: no se volverá a mostrar.",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "copyFailed": "No se pudo copiar al portapapeles.",
+        "done": "Hecho"
+      },
+      "rotateConfirm": {
+        "title": "Rotar la API key",
+        "message": "«{name}» recibe un token nuevo. El actual deja de funcionar de inmediato.",
+        "confirm": "Rotar"
+      },
+      "revokeConfirm": {
+        "title": "Revocar API key",
+        "message": "Vas a revocar «{name}». Cualquier sistema que use este token dejará de tener acceso de inmediato. Esta acción no se puede deshacer.",
+        "confirm": "Revocar"
+      },
+      "errors": {
+        "create": "No se pudo crear la API key.",
+        "rotate": "No se pudo rotar la API key.",
+        "revoke": "No se pudo revocar la API key.",
+        "revoked": "Esa key está revocada: no vuelve a funcionar.",
+        "gone": "Esa key ya no existe. Actualiza la lista y vuelve a intentarlo.",
+        "scopesRequired": "Elige al menos una app y qué puede hacer la key en ella.",
+        "scopeUnknown": "Esa app no publica lo que la key haría en ella.",
+        "denied": "Solo quien lleva el negocio gestiona las API keys."
+      }
     }
   }
 }

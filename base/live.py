@@ -84,3 +84,5 @@ _PEOPLE = sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *ev
 live("base.person.list", on=_PEOPLE)
 live("base.person.detail", on=_PEOPLE)
 live("base.role.list", on=[HUB_STATE_APPLIED])
+# The keys follow their own making, rotating and revoking; the apps a key may reach, the photo (a paid app comes or goes).
+live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS}))

@@ -381,6 +381,7 @@ class TestFollowedLive:
         assert on["base.person.list"] == people_events
         assert on["base.person.detail"] == people_events
         assert on["base.role.list"] == [events.HUB_STATE_APPLIED]
+        assert on["base.api_key.list"] == sorted({events.HUB_STATE_APPLIED, *events.API_KEY_EVENTS})
 
     def test_the_prefix_of_a_person_is_the_one_of_their_account(self):
         assert people_rules.SAAS_PREFIX == services.SAAS_USERNAME_PREFIX

@@ -489,6 +489,48 @@ export interface HubRoleRow {
   permissions: number;
 }
 
+/** `base.ApiKeyOut`: a key of the business (never its whole token). */
+export type ApiKeyMode = 'full' | 'read' | 'write' | 'per_app';
+export type ApiKind = 'read' | 'write';
+
+export interface ApiKeyRow {
+  id: string;
+  name: string;
+  /** The token's first characters, to tell it apart. */
+  prefix: string;
+  mode: ApiKeyMode;
+  scopes: Record<string, ApiKind[]>;
+  rate_per_minute: number;
+  created_by: string;
+  created_at: string;
+  rotated_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+/** `base.ApiAppOut`: an app this business has that publishes its API. */
+export interface ApiApp {
+  id: string;
+  name: string;
+  read: boolean;
+  write: boolean;
+}
+
+/** `base.ApiKeyListOut`. */
+export interface ApiKeyList {
+  /** False while the business shares its database with others: no key yet. */
+  available: boolean;
+  keys: ApiKeyRow[];
+  apps: ApiApp[];
+}
+
+export interface ApiKeyInput {
+  name: string;
+  rate_per_minute: number;
+  mode: ApiKeyMode;
+  scopes: Record<string, ApiKind[]>;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
@@ -554,5 +596,9 @@ declare module '@erplora/ui/sdk' {
     'base.person.badge_set': { input: { person: string; badge: string }; output: PersonDetail };
     'base.person.badge_remove': { input: { person: string }; output: PersonDetail };
     'base.role.list': { input: NoInput; output: { roles: HubRoleRow[] } };
+    'base.api_key.list': { input: NoInput; output: ApiKeyList };
+    'base.api_key.create': { input: ApiKeyInput; output: { key: ApiKeyRow; token: string } };
+    'base.api_key.rotate': { input: { id: string }; output: { key: ApiKeyRow; token: string } };
+    'base.api_key.revoke': { input: { id: string }; output: { key: ApiKeyRow } };
   }
 }

@@ -87,7 +87,10 @@ from base.schemas import (
     WidgetListOut,
 )
 from base import people as people_rules
-from base.schemas import PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
+from base.schemas import ApiKeyListIn, ApiKeyListOut, PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
+from base.models import ApiKey
+from live.meta import module_configs
+from live.operations import registry as operation_registry
 
 
 @operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut)
@@ -1217,3 +1220,61 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
                 for role in people_rules.ROLE_ORDER
             ]
         }
+
+
+# ── People and permissions: the business's API keys (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+def api_key_out(key: ApiKey) -> dict[str, Any]:
+    """A key as Employees › API keys shows it: never its token, only its first characters."""
+    return {
+        "id": key.id,
+        "name": key.name,
+        "prefix": key.prefix,
+        "mode": key.mode,
+        "scopes": key.scopes if key.mode == ApiKey.Mode.PER_APP and isinstance(key.scopes, dict) else {},
+        "rate_per_minute": key.rate_per_minute,
+        "created_by": key.created_by,
+        "created_at": key.created_at,
+        "rotated_at": key.rotated_at,
+        "last_used_at": key.last_used_at,
+        "revoked_at": key.revoked_at,
+    }
+
+
+def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
+    """The modules this business has (not blocked by its plan) that publish operations (``expose_api``), each with
+    whether it publishes queries (a key may read it) and commands (write), by name in who asks's language."""
+    blocked = entitlement.blocked_apps(ctx.scope)
+    published: dict[str, set[str]] = {}
+    for op in operation_registry.values():
+        if op.expose_api:
+            published.setdefault(op.app_label, set()).add(op.kind)
+    with translation.override(ctx.language):
+        apps = [
+            {"id": config.label, "name": str(config.verbose_name), "read": "query" in kinds, "write": "command" in kinds}
+            for config in module_configs()
+            if (kinds := published.get(config.label)) and config.label not in blocked
+        ]
+    return sorted(apps, key=lambda app: app["name"].casefold())
+
+
+@operation(
+    "base.api_key.list",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyListIn,
+    output=ApiKeyListOut,
+    ai={
+        "description": "Lists this business's API keys for other systems: name, the start of the token (never the "
+        "whole), what each may do (all, read, write or per app), its requests a minute, when it was last used and "
+        "whether it was revoked; and the apps whose API a key can reach."
+    },
+)
+def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
+    """Employees › API keys (BASE-G149, G05): every key, the newest first, and the apps a key per app may reach. While
+    the business shares phase 1's database with others, none is available (``base.services.has_own_database``)."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    available = bool(hub is not None and hub.db_name)
+    keys = [api_key_out(key) for key in ApiKey.objects.all()] if available else []
+    return {"available": available, "keys": keys, "apps": api_apps(ctx)}

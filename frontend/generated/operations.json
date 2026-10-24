@@ -2726,5 +2726,21 @@
   "base.role.list": {
     "method": "get",
     "path": "/api/roles"
+  },
+  "base.api_key.list": {
+    "method": "get",
+    "path": "/api/keys"
+  },
+  "base.api_key.create": {
+    "method": "post",
+    "path": "/api/keys"
+  },
+  "base.api_key.rotate": {
+    "method": "post",
+    "path": "/api/keys/rotate"
+  },
+  "base.api_key.revoke": {
+    "method": "post",
+    "path": "/api/keys/revoke"
   }
 }

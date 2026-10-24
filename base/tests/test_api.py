@@ -83,6 +83,8 @@ def test_the_spas_route_map_names_every_base_route(settings):
     import json
 
     from base.tests.test_access_routes import ROUTES as WAY_IN
+    from base.tests.test_api_keys import KEY_ROUTES as KEYS
+    from base.tests.test_people import PEOPLE_ROUTES as PEOPLE
 
     spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
     mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("base.")}
@@ -104,7 +106,7 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/system/failed-events/retry", "base.failed_event.retry"),
         ("POST", "/api/system/failed-events/retry_all", "base.failed_event.retry_all"),
         ("POST", "/api/system/failed-events/discard", "base.failed_event.discard"),
-    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN}
+    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS}
 
 
 # Settings › Data (APP-BASE-2): the blueprints, the loads, the export and the reset. Reading what a file brings goes by
