@@ -20,6 +20,8 @@ type Box = { x: number; y: number; width: number; height: number };
 
 const menu = (page: Page): Locator => page.locator('ion-menu.dash-menu');
 const entries = (page: Page): Locator => menu(page).locator('ion-item.nav-item');
+/** The platform's entries of the menu, in its order: the ones whose screen exists. */
+const PLATFORM_ENTRIES = ['nav-home', 'nav-settings'];
 
 /** The topbar of the screen on view and its pieces. */
 function topbar(page: Page) {
@@ -65,10 +67,10 @@ test('1440: the menu pinned next to the content, the person on top and the QR be
   expect(pinned.width).toBeLessThanOrEqual(248);
   expect(content.x, 'the content starts where the menu ends, not under it').toBeGreaterThanOrEqual(pinned.x + pinned.width - 1);
 
-  // The person at the top; Home, the only platform entry with a screen today; no module.
+  // The person at the top; the platform entries with a screen today (Home, and Settings: APP-BASE-3); no module.
   await expect(menu(page).locator('[data-testid=user-menu-trigger] .sidebar-user-name')).toBeVisible();
-  await expect(entries(page)).toHaveCount(1);
-  expect(await entries(page).evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(['nav-home']);
+  await expect(entries(page)).toHaveCount(PLATFORM_ENTRIES.length);
+  expect(await entries(page).evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(PLATFORM_ENTRIES);
   const qr = menu(page).locator('[data-testid=sidebar-install-qr] img.sidebar-install-qr-code');
   await expect(qr).toBeVisible();
   expect(await qr.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
@@ -136,7 +138,7 @@ for (const vp of [VIEWPORTS.tablet, VIEWPORTS.phone]) {
     await bar.drawer.click();
     await expect(menu(page)).toBeVisible();
     await expect(menu(page).locator('[data-testid=user-menu-trigger] .sidebar-user-name')).toBeVisible();
-    expect(await entries(page).evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(['nav-home']);
+    expect(await entries(page).evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual(PLATFORM_ENTRIES);
     await expect(menu(page).locator('[data-testid=nav-home] .nav-label')).toBeVisible();
     await expect(menu(page).locator('[data-testid=sidebar-install-qr] img.sidebar-install-qr-code')).toBeVisible();
     await page.waitForTimeout(500); // the drawer's slide-in
