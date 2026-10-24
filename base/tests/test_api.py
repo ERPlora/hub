@@ -93,6 +93,8 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/apps", "base.app.list"),
         ("GET", "/api/system/plan", "base.plan.usage"),
         *DATA_ROUTES,
+        # Business settings (APP-BASE-6).
+        ("GET", "/api/business", "base.business.get"),
         # System (APP-BASE-7)
         ("GET", "/api/system/status", "base.system.status"),
         ("GET", "/api/system/events", "base.event.list"),

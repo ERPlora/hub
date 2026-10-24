@@ -14,6 +14,7 @@ from base.events import (
     FAILED_EVENT_DISCARDED,
     FAILED_EVENT_RETRIED,
     HUB_DATA_RESET,
+    HUB_REGISTERED,
     HUB_STATE_APPLIED,
     IMPORT_UNDONE,
 )
@@ -44,6 +45,8 @@ def test_the_three_queries_and_their_events():
         "base.plan.usage": [HUB_STATE_APPLIED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
         "base.import.list": sorted(DATA),
+        # Business settings (APP-BASE-6): the SaaS registers the business again when it changes on erplora.com.
+        "base.business.get": [HUB_REGISTERED],
         # System (APP-BASE-7): the failed events, and the photo (it turns the app they were for on or off).
         "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
         # The status re-runs on the photo and on every reconnection (a deploy's new release shows by itself); the log

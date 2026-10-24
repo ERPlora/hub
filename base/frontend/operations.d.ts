@@ -289,6 +289,29 @@ export interface HubReset {
   apps: Removal[];
 }
 
+// ── Business settings (APP-BASE-6) ──
+
+/** `base.BusinessOut`: the business as erplora.com registered it, each value named in the person's language. */
+export interface Business {
+  /** Empty in a demo. */
+  name: string;
+  /** ISO 3166-1 alpha-2; empty in a demo. */
+  country: string;
+  country_name: string;
+  /** IANA zone: the business's clock. */
+  timezone: string;
+  language: string;
+  language_name: string;
+  /** ISO 4217: the country's (the euro without a country). */
+  currency: string;
+  /** «EUR · Euro». */
+  currency_label: string;
+  currency_decimals: number;
+  demo: boolean;
+  /** The business's settings on erplora.com; empty in a demo. */
+  settings_url: string;
+}
+
 // ── System (APP-BASE-7) ──
 
 /** `base.SystemStatusOut`: the release running and where the business's data lives. */
@@ -359,6 +382,8 @@ declare module '@erplora/ui/sdk' {
       input: { apps?: string[]; confirm?: string; dry_run?: boolean };
       output: HubReset;
     };
+    // ── Business settings (APP-BASE-6) ──
+    'base.business.get': { input: NoInput; output: Business };
     // System (APP-BASE-7)
     'base.system.status': { input: NoInput; output: SystemStatus };
     'base.event.list': { input: NoInput; output: { entries: EventLogEntry[] } };

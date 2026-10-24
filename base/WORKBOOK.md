@@ -22,6 +22,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
 - **La actividad**: las últimas ventas.
 - **Empezar con una plantilla** de un negocio como el suyo y, en «Ajustes», guardar una copia de sus datos o
   cargar la de otro negocio.
+- **Los datos del negocio**, en «Ajustes»: su nombre, su país, su zona horaria, su moneda y su idioma, tal como
+  los tiene erplora.com, y adónde ir para cambiarlos.
 
 Quién lo usa:
 
@@ -107,9 +109,18 @@ navegador).
 Desde «Sistema» en el menú lateral, la pestaña «Plan y límites»: «Los límites de tu plan» con «Dentro del
 límite» o «Cerca del límite», las tarjetas «Personas» y «Dispositivos» y dónde se gestionan los planes.
 
+### Ajustes · Negocio
+Se abre con «Ajustes» en el menú lateral: es la primera pestaña de las de abajo, «Negocio», «Impresión» y
+«Datos y copias». La tarjeta «Tu negocio» enseña, sin campos que rellenar, «Nombre del negocio», «País», «Zona
+horaria» (con la hora que es allí), «Moneda» e «Idioma del negocio», cada uno con una línea que dice para qué
+sirve. Debajo, dónde se cambian y, para el propietario y el administrador, «Cambiar en erplora.com». Más abajo,
+«Datos fiscales», que abre el emisor de Facturación.
+
+### Ajustes · Impresión
+La pestaña «Impresión»: una sola fila, «Impresoras y tique», que abre la app Impresión.
+
 ### Ajustes · Datos y copias
-Se abre con «Ajustes» en el menú lateral. Abajo, la pestaña «Datos y copias» (las demás pestañas de Ajustes
-del hub viejo llegan con sus flujos). Arriba, un selector con «Importar» (lo que se abre), «Exportar» y
+La pestaña «Datos y copias» de «Ajustes», la última. Arriba, un selector con «Importar» (lo que se abre), «Exportar» y
 «Restablecer»; lo elegido queda en el enlace, así que se puede compartir y Atrás sale de Ajustes.
 
 - **Importar**: «Elige qué cargar», con «Subir desde archivo» y las plantillas en tarjetas o en lista, con
@@ -143,6 +154,15 @@ evento…» y el filtro de nivel.
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; la campana, «Todo al día. Sin notificaciones.». |
 | Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en la campana, «No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión.». |
 | Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. |
+
+En la pantalla Ajustes · Negocio:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando los datos del negocio…». |
+| Vacío | Una demo no tiene nombre ni país: esas filas dicen «—», y debajo, «Esta demo no tiene un negocio en erplora.com: sus datos no se cambian.». |
+| Error | «No se pudieron cargar los datos del negocio» con «Nada ha cambiado. Comprueba la conexión y vuelve a intentarlo.» y «Reintentar»; nunca la tarjeta en blanco. |
+| Sin permiso | Quien no administra el negocio lo ve igual, sin «Cambiar en erplora.com» y con «Solo el propietario o un administrador los cambian, en erplora.com.»; «Datos fiscales» no le sale a quien no puede escribir el emisor. |
 
 En la pantalla Ajustes · Datos y copias:
 
@@ -204,6 +224,10 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F45 | Reenviar todos los eventos caídos | hecho |
 | BASE-F46 | Descartar un evento caído | hecho |
 | BASE-F47 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
+| BASE-F48 | Abrir Ajustes y moverse por sus pestañas | hecho |
+| BASE-F49 | Ver el país del negocio | hecho |
+| BASE-F50 | Ver la moneda del negocio | parcial |
+| BASE-F51 | Cambiar el idioma del negocio en erplora.com | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -1107,6 +1131,82 @@ informes por minuto de la misma persona, el hub no lo apunta. Para contar algo a
 menú de usuario.
 Implicados: ninguno
 
+### BASE-F48 Abrir Ajustes y moverse por sus pestañas
+<!-- origen: old-hub:HUB_SHELL-F155 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes
+Pasos:
+  1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
+  2. Abajo, las pestañas «Negocio», «Impresión» y «Datos y copias»; se abre «Negocio». La pestaña elegida queda
+     en el enlace, así que un enlace guardado vuelve a ella y Atrás sale de Ajustes en vez de recorrer sus
+     pestañas. En el móvil caben las tres, enteras.
+  3. Los enlaces antiguos siguen llevando a su sitio: el de la antigua pestaña de impuestos abre «Negocio», y el
+     de una pestaña que ya no existe abre la primera.
+  4. En «Impresión», «Impresoras y tique» («Da de alta tu impresora y configura el tique impreso y digital»)
+     abre la app Impresión; si no está, dice «Instala la app Impresión para dar de alta tu impresora y configurar
+     el tique» y lleva a «Apps».
+Entra: las apps del negocio.
+Sale: nada guardado.
+Si falla: no falla: es navegación. Cada pestaña dice en ella misma si no ha podido cargar lo suyo (BASE-F49,
+BASE-F29).
+Implicados: PRINTING-F06, BASE-F29, BASE-F49
+
+### BASE-F49 Ver el país del negocio
+<!-- origen: old-hub:HUB_SHELL-F156 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes · Negocio
+Pasos:
+  1. En «Negocio», «País» («El de sus impuestos y sus facturas») dice, en el idioma de la persona, el país con
+     el que el negocio se dio de alta en erplora.com.
+  2. Aquí no se elige: debajo pone «El país no cambia una vez listo el negocio.», porque sus facturas son de un
+     país. Mientras el negocio se prepara, se cambia en erplora.com (HUBS-F15).
+Entra: el país con el que erplora.com dio de alta el negocio.
+Sale: nada guardado; con él, las plantillas del negocio salen primero y «Termina de configurar tu negocio» sabe
+qué pasos le tocan.
+Si falla: si los datos del negocio no se pueden leer, «No se pudieron cargar los datos del negocio» con
+«Reintentar». Una demo no tiene país: «—».
+Implicados: HUBS-F15, BASE-F01, BASE-F29
+
+### BASE-F50 Ver la moneda del negocio
+<!-- origen: old-hub:HUB_SHELL-F158 -->
+Estado: parcial — el Inicio ya escribe sus importes en la moneda del negocio, pero las apps (Ventas, Caja, Facturas, Inventario) todavía en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
+Pasos:
+  1. En «Negocio», «Moneda» («La de su país, para precios y totales») dice la moneda con su código y su nombre
+     en el idioma de la persona: «EUR · Euro».
+  2. No se elige: es la del país del negocio, como en los terminales de cobro del mercado. Un negocio sin país
+     (una demo) va en euros.
+  3. En el Inicio, los importes de los paneles (como «Ventas últimos 7 días») y de «Actividad» van en esa moneda,
+     con su símbolo y sus decimales, como los imprime una caja de ese país: «zł» en un negocio de Polonia, «€» en
+     uno de España. Mientras el negocio no ha contestado, el importe sale sin símbolo, nunca en otra moneda.
+Entra: el país del negocio.
+Sale: nada guardado.
+Si falla: como en BASE-F49.
+Implicados: BASE-F49
+
+### BASE-F51 Cambiar el idioma del negocio en erplora.com
+<!-- origen: old-hub:HUB_SHELL-F159 -->
+Estado: parcial — quien no ha elegido un idioma propio sigue viendo la pantalla en el de su navegador, no en el del negocio, hasta que el hub use el idioma de cada persona
+Actor: propietario, administrador
+Pantalla: Ajustes · Negocio
+Pasos:
+  1. En «Negocio», «Idioma del negocio» («El de quien no haya elegido el suyo») dice el idioma del negocio por su
+     nombre.
+  2. Pulsa «Cambiar en erplora.com»: se abren en otra pestaña los ajustes del negocio en erplora.com, donde lo
+     cambia y pulsa «Guardar cambios» (HUBS-F15).
+  3. Sin recargar, «Negocio» enseña el idioma nuevo en cuanto el negocio lo recibe; igual con el nombre y la zona
+     horaria.
+Entra: el idioma que guardó erplora.com.
+Sale: nada guardado en el negocio: lo recibe de erplora.com (`base.hub.registered`).
+Si falla: si el negocio no responde, erplora.com se queda con el cambio y se lo vuelve a mandar (HUBS-F08);
+mientras tanto, «Negocio» sigue con el anterior. Quien no administra el negocio no ve el botón: «Solo el
+propietario o un administrador los cambian, en erplora.com.». En una demo, «Esta demo no tiene un negocio en
+erplora.com: sus datos no se cambian.».
+Implicados: HUBS-F15, HUBS-F08
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -1263,6 +1363,19 @@ Implicados: ninguno
   `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).
   e2e: `tests/e2e/base-system.spec.ts` (tres tamaños, dos hubs, campana → `#events`).
 
+- **Ajustes del negocio (APP-BASE-6: BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
+  viva con `base.hub.registered`): la fila del registro del ámbito, la que manda el SaaS por `PUT /internal/hubs/{id}`
+  (nombre, país, zona e idioma, HUBS-F15), con la moneda del país (`base/business.py`: CLDR por Babel; sin país,
+  `EUR`), los nombres en el idioma de la persona y `settings_url` = `SAAS_URL/businesses/<id>/settings` (vacío en una
+  demo). El registro se aplica como la plataforma: tras su COMMIT, `base.hub.register` avisa también al canal del
+  propio negocio (`base/tests/test_business_live.py`). El Hub no guarda ni cambia nada de esto y no hay almacén
+  clave/valor de ajustes: el `hub_settings` del runtime viejo se repartió entre sus dueños (país, zona e idioma en el
+  registro; territorio en Impuestos, TAX-F11; emisor en Facturación, INVOICE-F21; la moneda, la del país). Las apps
+  aún cobran en `EUR` (BASE-F50 `parcial`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
+  `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
+  Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
+  `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
+
 ## Lo que NO hace, a propósito
 
 - No inventa cifras: un panel o un paso que no se puede comprobar no sale o dice «No disponible».
@@ -1277,3 +1390,5 @@ Implicados: ninguno
 - No pregunta a erplora.com al abrir una app: usa lo último que erplora.com le pasó del negocio.
 - No inventa cifras de uso: la CPU, la memoria y las conexiones no son de un negocio, así que Sistema no las enseña.
 - No edita un aviso caído ni enseña lo que llevaba: se reenvía tal cual o se descarta, y el descartado se guarda.
+- No cambia el nombre, el país, la zona horaria ni el idioma del negocio: los guarda erplora.com y el hub los
+  recibe. Tampoco deja elegir la moneda: es la del país del negocio.

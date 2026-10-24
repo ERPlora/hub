@@ -15,7 +15,7 @@ from live.meta import Category
 from live.models import OutboxEvent
 from live.operations import operation
 
-from base import blueprint, entitlement, home, system
+from base import blueprint, business, entitlement, home, system
 from base.auth import saas_url
 from base.models import EventDelivery, Hub, ImportBatch, Membership
 from base.registry import hub_answer, internal_only
@@ -29,6 +29,8 @@ from base.schemas import (
     BlueprintFileOut,
     BlueprintListIn,
     BlueprintListOut,
+    BusinessIn,
+    BusinessOut,
     DatasetListIn,
     DatasetListOut,
     ImportListIn,
@@ -479,6 +481,46 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
             if config.label in on
         ]
         return {"apps": sorted(apps, key=lambda app: app["label"])}
+
+
+# ── Business settings and the hub's context (APP-BASE-6) ──
+
+
+@operation(
+    "base.business.get",
+    kind="query",
+    permission=VIEW_HOME,
+    input=BusinessIn,
+    output=BusinessOut,
+    ai={
+        "description": "Reads this business's name, country, time zone, language and currency, as erplora.com "
+        "registered it. They are changed on erplora.com by the owner or an administrator, never here; the country no "
+        "longer changes once the business is ready, and the currency is always the country's."
+    },
+)
+def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
+    """Settings › Business (BASE-G97…G99) and what the old ``/api/hub/context`` gave (BASE-G43): the business as the
+    SaaS registered it, from the registry of this scope, never another's. The currency is its country's
+    (``base.business``); a demo has no business on erplora.com, hence no address to change it, and the deployment's
+    zone and language until the SaaS says otherwise."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    if hub is None:
+        raise NotFound(gettext("There is no business here."))
+    language = hub.language or settings.LANGUAGE_CODE
+    currency = business.currency_of(hub.country)
+    return {
+        "name": hub.name,
+        "country": hub.country,
+        "country_name": business.country_name(hub.country, ctx.language),
+        "timezone": hub.timezone or settings.TIME_ZONE,
+        "language": language,
+        "language_name": business.language_name(language, ctx.language),
+        "currency": currency,
+        "currency_label": business.currency_label(currency, ctx.language),
+        "currency_decimals": business.currency_decimals(currency),
+        "demo": hub.is_demo,
+        "settings_url": "" if hub.is_demo else saas_url(f"/businesses/{hub.id}/settings"),
+    }
 
 
 # ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
