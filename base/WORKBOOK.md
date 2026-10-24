@@ -24,6 +24,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
 - **La actividad**: las últimas ventas.
 - **Empezar con una plantilla** de un negocio como el suyo y, en «Ajustes», guardar una copia de sus datos o
   cargar la de otro negocio.
+- **Los datos del negocio**, en «Ajustes»: su nombre, su país, su zona horaria, su moneda y su idioma, tal como
+  los tiene erplora.com, y adónde ir para cambiarlos.
 
 Quién lo usa:
 
@@ -111,9 +113,19 @@ navegador).
 Desde «Sistema» en el menú lateral, la pestaña «Plan y límites»: «Los límites de tu plan» con «Dentro del
 límite» o «Cerca del límite», las tarjetas «Personas» y «Dispositivos» y dónde se gestionan los planes.
 
+### Ajustes · Negocio
+La segunda pestaña de las de abajo de «Ajustes» («General», «Negocio», «Impresión» y «Datos y copias»). La
+tarjeta «Tu negocio» enseña, sin campos que rellenar, «Nombre del negocio», «País», «Zona
+horaria» (con la hora que es allí), «Moneda» e «Idioma del negocio», cada uno con una línea que dice para qué
+sirve. Debajo, dónde se cambian y, para el propietario y el administrador, «Cambiar en erplora.com». Más abajo,
+«Datos fiscales», que abre el emisor de Facturación.
+
+### Ajustes · Impresión
+La pestaña «Impresión»: una sola fila, «Impresoras y tique», que abre la app Impresión.
+
 ### Ajustes · Datos y copias
-Desde «Ajustes» en el menú lateral, la pestaña «Datos y copias» de abajo, tras «General» (las demás pestañas de
-Ajustes del hub viejo llegan con sus flujos). Arriba, un selector con «Importar» (lo que se abre), «Exportar» y
+La pestaña «Datos y copias» de «Ajustes», la última, tras «General», «Negocio» e «Impresión». Arriba, un selector
+con «Importar» (lo que se abre), «Exportar» y
 «Restablecer»; lo elegido queda en el enlace, así que se puede compartir y Atrás sale de Ajustes.
 
 - **Importar**: «Elige qué cargar», con «Subir desde archivo» y las plantillas en tarjetas o en lista, con
@@ -171,6 +183,15 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 | Vacío | «Aquí aparecerán tus apps. Añade las que necesite tu negocio.»; sin pasos, la lista no sale; «Panel vacío. Pulsa ⋮ para añadir widgets.»; un panel sin datos, «Sin datos»; la campana, «Todo al día. Sin notificaciones.»; «Todavía no ha entrado nadie desde ningún dispositivo.»; en «Cambiar de usuario», «Aquí nadie tiene PIN todavía: se pone en Mi perfil o en Empleados.». |
 | Error | Cada zona falla por su cuenta: «No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», «No se ha podido cargar lo que te falta por configurar» con «Reintentar», «No se han podido cargar los paneles» con «Reintentar», un panel con «No disponible» (nunca la cifra de antes), «No se han podido cargar las últimas ventas» con «Reintentar» y, en la campana, «No se han podido comprobar las notificaciones. Aparecerán cuando vuelva la conexión.». En el acceso: «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.», «No se pudo cargar el perfil» con «Reintentar», «No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.», «No se pudo cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.» y «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.». |
 | Sin permiso | Un paso que la persona no puede hacer: sin botón y «Esto lo tiene que configurar un administrador.». Un panel o un contador que no puede ver, no sale. En Ajustes, quien no administra ve «Este dispositivo» y «Pinpad» con los controles apagados («Solo un administrador puede cambiar cómo entra la gente en este dispositivo.», «Solo un administrador puede cambiar si se pregunta.») y, en lugar de la lista, «Solo un administrador puede ver y quitar los dispositivos.». |
+
+En la pantalla Ajustes · Negocio:
+
+| Estado | Qué ve la persona |
+|---|---|
+| Cargando | «Cargando los datos del negocio…». |
+| Vacío | Una demo no tiene nombre ni país: esas filas dicen «—», y debajo, «Esta demo no tiene un negocio en erplora.com: sus datos no se cambian.». |
+| Error | «No se pudieron cargar los datos del negocio» con «Nada ha cambiado. Comprueba la conexión y vuelve a intentarlo.» y «Reintentar»; nunca la tarjeta en blanco. |
+| Sin permiso | Quien no administra el negocio lo ve igual, sin «Cambiar en erplora.com» y con «Solo el propietario o un administrador los cambian, en erplora.com.»; «Datos fiscales» no le sale a quien no puede escribir el emisor. |
 
 En la pantalla Ajustes · Datos y copias:
 
@@ -232,26 +253,30 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F45 | Reenviar todos los eventos caídos | hecho |
 | BASE-F46 | Descartar un evento caído | hecho |
 | BASE-F47 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
-| BASE-F48 | Entrar con la cuenta de erplora.com | hecho |
-| BASE-F49 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
-| BASE-F50 | Elegir el PIN la primera vez que se entra en una caja | hecho |
-| BASE-F51 | Entrar con PIN | hecho |
-| BASE-F52 | Entrar pasando la placa | hecho |
-| BASE-F53 | Perder la sesión porque se abrió en otro dispositivo | hecho |
-| BASE-F54 | La sesión termina mientras se trabaja | hecho |
-| BASE-F55 | Cerrar la sesión de una caja que nadie toca | hecho |
-| BASE-F56 | Cambiar de usuario sin perder la venta | hecho |
-| BASE-F57 | Cerrar sesión | hecho |
-| BASE-F58 | Decidir si este dispositivo es compartido o personal | hecho |
-| BASE-F59 | Abrir un hub que todavía no está dado de alta | hecho |
-| BASE-F60 | Cambiar mis datos, foto, idioma y apariencia | hecho |
-| BASE-F61 | Cambiar mi PIN desde Mi perfil | hecho |
-| BASE-F62 | Elegir cuántos dígitos tiene el PIN del negocio | hecho |
-| BASE-F63 | Decidir si se pide PIN en la caja y cuándo se vuelve a pedir | hecho |
-| BASE-F64 | Ver los dispositivos en los que se ha entrado | hecho |
-| BASE-F65 | Ponerle nombre a un dispositivo | hecho |
-| BASE-F66 | Quitar un dispositivo que se ha perdido | hecho |
-| BASE-F67 | Quitar de golpe los dispositivos que nadie usa | hecho |
+| BASE-F48 | Abrir Ajustes y moverse por sus pestañas | hecho |
+| BASE-F49 | Ver el país del negocio | hecho |
+| BASE-F50 | Ver la moneda del negocio | parcial |
+| BASE-F51 | Cambiar el idioma del negocio en erplora.com | parcial |
+| BASE-F52 | Entrar con la cuenta de erplora.com | hecho |
+| BASE-F53 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
+| BASE-F54 | Elegir el PIN la primera vez que se entra en una caja | hecho |
+| BASE-F55 | Entrar con PIN | hecho |
+| BASE-F56 | Entrar pasando la placa | hecho |
+| BASE-F57 | Perder la sesión porque se abrió en otro dispositivo | hecho |
+| BASE-F58 | La sesión termina mientras se trabaja | hecho |
+| BASE-F59 | Cerrar la sesión de una caja que nadie toca | hecho |
+| BASE-F60 | Cambiar de usuario sin perder la venta | hecho |
+| BASE-F61 | Cerrar sesión | hecho |
+| BASE-F62 | Decidir si este dispositivo es compartido o personal | hecho |
+| BASE-F63 | Abrir un hub que todavía no está dado de alta | hecho |
+| BASE-F64 | Cambiar mis datos, foto, idioma y apariencia | hecho |
+| BASE-F65 | Cambiar mi PIN desde Mi perfil | hecho |
+| BASE-F66 | Elegir cuántos dígitos tiene el PIN del negocio | hecho |
+| BASE-F67 | Decidir si se pide PIN en la caja y cuándo se vuelve a pedir | hecho |
+| BASE-F68 | Ver los dispositivos en los que se ha entrado | hecho |
+| BASE-F69 | Ponerle nombre a un dispositivo | hecho |
+| BASE-F70 | Quitar un dispositivo que se ha perdido | hecho |
+| BASE-F71 | Quitar de golpe los dispositivos que nadie usa | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -748,13 +773,13 @@ Pasos:
   4. Abajo: «Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.». Se pone al día solo cuando
      cambian el plan o las personas; la cifra de dispositivos, al abrir la pantalla.
 Entra: los topes del plan que erplora.com le pasa al hub, las personas activas del negocio y los dispositivos con
-una sesión abierta en él (los mismos que cuenta el tope de BASE-F53).
+una sesión abierta en él (los mismos que cuenta el tope de BASE-F57).
 Sale: nada guardado.
 Si falla: «No hemos podido leer tu plan» — «Comprueba la conexión y vuelve a intentarlo.» con «Reintentar».
 Quien no administra el negocio ve «Solo quien administra el negocio ve el plan y sus límites.», sin
 «Reintentar». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en
 cuanto erplora.com lo envíe.».
-Implicados: BASE-F53
+Implicados: BASE-F57
 
 ### BASE-F29 Elegir una plantilla del catálogo para importar
 <!-- origen: old-hub:HUB_SHELL-F175 -->
@@ -1157,7 +1182,83 @@ informes por minuto de la misma persona, el hub no lo apunta. Para contar algo a
 menú de usuario.
 Implicados: ninguno
 
-### BASE-F48 Entrar con la cuenta de erplora.com
+### BASE-F48 Abrir Ajustes y moverse por sus pestañas
+<!-- origen: old-hub:HUB_SHELL-F155 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes
+Pasos:
+  1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
+  2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias», en el orden del hub viejo; se abre
+     «General» (BASE-F62). La pestaña elegida queda en el enlace, así que un enlace guardado vuelve a ella y Atrás
+     sale de Ajustes en vez de recorrer sus pestañas. En el móvil caben las cuatro, enteras.
+  3. Los enlaces antiguos siguen llevando a su sitio: el de la antigua «General» abre «General», el de la antigua
+     pestaña de impuestos abre «Negocio», y el de una pestaña que ya no existe abre la primera.
+  4. En «Impresión», «Impresoras y tique» («Da de alta tu impresora y configura el tique impreso y digital»)
+     abre la app Impresión; si no está, dice «Instala la app Impresión para dar de alta tu impresora y configurar
+     el tique» y lleva a «Apps».
+Entra: las apps del negocio.
+Sale: nada guardado.
+Si falla: no falla: es navegación. Cada pestaña dice en ella misma si no ha podido cargar lo suyo (BASE-F49,
+BASE-F29).
+Implicados: PRINTING-F06, BASE-F29, BASE-F49, BASE-F62
+
+### BASE-F49 Ver el país del negocio
+<!-- origen: old-hub:HUB_SHELL-F156 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes · Negocio
+Pasos:
+  1. En «Negocio», «País» («El de sus impuestos y sus facturas») dice, en el idioma de la persona, el país con
+     el que el negocio se dio de alta en erplora.com.
+  2. Aquí no se elige: debajo pone «El país no cambia una vez listo el negocio.», porque sus facturas son de un
+     país. Mientras el negocio se prepara, se cambia en erplora.com (HUBS-F15).
+Entra: el país con el que erplora.com dio de alta el negocio.
+Sale: nada guardado; con él, las plantillas del negocio salen primero y «Termina de configurar tu negocio» sabe
+qué pasos le tocan.
+Si falla: si los datos del negocio no se pueden leer, «No se pudieron cargar los datos del negocio» con
+«Reintentar». Una demo no tiene país: «—».
+Implicados: HUBS-F15, BASE-F01, BASE-F29
+
+### BASE-F50 Ver la moneda del negocio
+<!-- origen: old-hub:HUB_SHELL-F158 -->
+Estado: parcial — el Inicio ya escribe sus importes en la moneda del negocio, pero las apps (Ventas, Caja, Facturas, Inventario) todavía en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
+Pasos:
+  1. En «Negocio», «Moneda» («La de su país, para precios y totales») dice la moneda con su código y su nombre
+     en el idioma de la persona: «EUR · Euro».
+  2. No se elige: es la del país del negocio, como en los terminales de cobro del mercado. Un negocio sin país
+     (una demo) va en euros.
+  3. En el Inicio, los importes de los paneles (como «Ventas últimos 7 días») y de «Actividad» van en esa moneda,
+     con su símbolo y sus decimales, como los imprime una caja de ese país: «zł» en un negocio de Polonia, «€» en
+     uno de España. Mientras el negocio no ha contestado, el importe sale sin símbolo, nunca en otra moneda.
+Entra: el país del negocio.
+Sale: nada guardado.
+Si falla: como en BASE-F49.
+Implicados: BASE-F49
+
+### BASE-F51 Cambiar el idioma del negocio en erplora.com
+<!-- origen: old-hub:HUB_SHELL-F159 -->
+Estado: parcial — quien no ha elegido un idioma propio sigue viendo la pantalla en el de su navegador, no en el del negocio, hasta que el hub use el idioma de cada persona
+Actor: propietario, administrador
+Pantalla: Ajustes · Negocio
+Pasos:
+  1. En «Negocio», «Idioma del negocio» («El de quien no haya elegido el suyo») dice el idioma del negocio por su
+     nombre.
+  2. Pulsa «Cambiar en erplora.com»: se abren en otra pestaña los ajustes del negocio en erplora.com, donde lo
+     cambia y pulsa «Guardar cambios» (HUBS-F15).
+  3. Sin recargar, «Negocio» enseña el idioma nuevo en cuanto el negocio lo recibe; igual con el nombre y la zona
+     horaria.
+Entra: el idioma que guardó erplora.com.
+Sale: nada guardado en el negocio: lo recibe de erplora.com (`base.hub.registered`).
+Si falla: si el negocio no responde, erplora.com se queda con el cambio y se lo vuelve a mandar (HUBS-F08);
+mientras tanto, «Negocio» sigue con el anterior. Quien no administra el negocio no ve el botón: «Solo el
+propietario o un administrador los cambian, en erplora.com.». En una demo, «Esta demo no tiene un negocio en
+erplora.com: sus datos no se cambian.».
+Implicados: HUBS-F15, HUBS-F08
+
+### BASE-F52 Entrar con la cuenta de erplora.com
 <!-- origen: old-hub:HUB_SHELL-F01 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1169,7 +1270,7 @@ Pasos:
   2. En erplora.com entra como siempre: email y contraseña, Google o su código de verificación.
   3. Vuelve al negocio ya dentro, en la pantalla que había pedido (un enlace a una pestaña, como
      `/settings#data` o `/system#plan`, vuelve a esa pestaña) o en **Inicio**. Si este dispositivo pide PIN,
-     el negocio ya entra en sus cajas con PIN y la persona aún no tiene uno, antes le pide elegirlo (BASE-F50).
+     el negocio ya entra en sus cajas con PIN y la persona aún no tiene uno, antes le pide elegirlo (BASE-F54).
 Entra: la cuenta que comprueba erplora.com; este navegador.
 Sale: la sesión de la persona en este negocio y este navegador convertido en un dispositivo de confianza del
 negocio (sale en «Dispositivos», compartido mientras nadie diga lo contrario). La sesión dura un turno de 12 horas
@@ -1178,7 +1279,7 @@ Si falla: erplora.com dice por qué no entra (credenciales, verificación, «No 
 negocio no guarda nada hasta que vuelve con la persona identificada.
 Implicados: BASE-F13
 
-### BASE-F49 Entrar desde el panel de erplora.com sin volver a teclear la contraseña
+### BASE-F53 Entrar desde el panel de erplora.com sin volver a teclear la contraseña
 <!-- origen: old-hub:HUB_SHELL-F02 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1187,23 +1288,23 @@ Pasos:
   1. En erplora.com, con la sesión abierta, pulsa entrar en su negocio.
   2. El negocio se abre con la persona ya dentro, en **Inicio**, sin pasar por ninguna pantalla de entrada.
 Entra: el pase de un solo uso que da erplora.com.
-Sale: lo mismo que BASE-F48: la sesión y este navegador como dispositivo de confianza del negocio, así que
+Sale: lo mismo que BASE-F52: la sesión y este navegador como dispositivo de confianza del negocio, así que
 después ofrece el pinpad, sale en «Dispositivos» y su modo se puede cambiar.
 Si falla: un pase caducado o ya usado no abre nada: el negocio vuelve a pedir la entrada de erplora.com.
-Implicados: BASE-F48
+Implicados: BASE-F52
 
-### BASE-F50 Elegir el PIN la primera vez que se entra en una caja
+### BASE-F54 Elegir el PIN la primera vez que se entra en una caja
 <!-- origen: old-hub:HUB_SHELL-F03 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Crea tu PIN de acceso
 Pasos:
-  1. Tras entrar con la cuenta (BASE-F48) en un dispositivo compartido de un negocio que pide PIN, donde otra
+  1. Tras entrar con la cuenta (BASE-F52) en un dispositivo compartido de un negocio que pide PIN, donde otra
      persona ya entra con el suyo, y si la persona aún no tiene PIN, sale «Crea tu PIN de acceso» — «Con él
      entrarás en esta caja sin tu contraseña.».
   2. Teclea el PIN en el teclado de círculos: «Elige un PIN de {n} dígitos» (4 o 6, lo que diga el negocio).
   3. Repite: «Confirma tu PIN». Al acertar se guarda y entra donde iba.
-  4. «Ahora no» lo deja para más tarde: entra igual y puede elegirlo en **Mi perfil** (BASE-F61).
+  4. «Ahora no» lo deja para más tarde: entra igual y puede elegirlo en **Mi perfil** (BASE-F65).
 Entra: la sesión recién abierta; los dígitos del PIN del negocio.
 Sale: el PIN de la persona, guardado cifrado; su cara aparece en «Cambiar de usuario» al momento y en el pinpad
 de **Acceso** en menos de un minuto.
@@ -1212,9 +1313,9 @@ repetidos o seguidos: «Ese PIN es demasiado fácil de adivinar: evita dígitos 
 (1234).». Ya lo usa otra persona: «Ese PIN ya lo tiene otra persona activa: elige otro.». Sin conexión: «No se
 pudo guardar el PIN. Vuelve a intentarlo.». Un negocio en el que nadie tiene PIN no lo pide al entrar: el primero
 se elige en **Mi perfil**.
-Implicados: BASE-F48, BASE-F61
+Implicados: BASE-F52, BASE-F65
 
-### BASE-F51 Entrar con PIN
+### BASE-F55 Entrar con PIN
 <!-- origen: old-hub:HUB_SHELL-F04 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1238,9 +1339,9 @@ Un dispositivo en el que nunca se entró con una cuenta, o que un administrador 
 todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Sin
 conexión, «No se pudo entrar. Comprueba la conexión e inténtalo de nuevo.»; si no se puede leer quién trabaja
 aquí, «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.».
-Implicados: BASE-F50, BASE-F63
+Implicados: BASE-F54, BASE-F67
 
-### BASE-F52 Entrar pasando la placa
+### BASE-F56 Entrar pasando la placa
 <!-- origen: old-hub:HUB_SHELL-F05 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1252,12 +1353,12 @@ Pasos:
   3. Entras como el dueño de la tarjeta.
 Entra: el número que lee el lector. Solo se atiende en la pestaña «PIN» de un dispositivo que ofrece el pinpad y
 en **Cambiar de usuario**; en «Cuenta» o mientras se elige el PIN, no.
-Sale: lo mismo que BASE-F51.
+Sale: lo mismo que BASE-F55.
 Si falla: una tarjeta que no es de nadie o cuyo dueño ya no está: «Esa placa no abre nada aquí. Entra con tu PIN
 o pídeselo a un administrador.»; cuenta como un intento fallido. El pinpad sigue disponible.
-Implicados: BASE-F51
+Implicados: BASE-F55
 
-### BASE-F53 Perder la sesión porque se abrió en otro dispositivo
+### BASE-F57 Perder la sesión porque se abrió en otro dispositivo
 <!-- origen: old-hub:HUB_SHELL-F06 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1275,7 +1376,7 @@ Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardad
 Si falla: sin tope en el plan no se cierra nada.
 Implicados: BASE-F11, BASE-F28
 
-### BASE-F54 La sesión termina mientras se trabaja
+### BASE-F58 La sesión termina mientras se trabaja
 <!-- origen: old-hub:HUB_SHELL-F07 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1291,9 +1392,9 @@ Pasos:
 Entra: la sesión que ya no existe.
 Sale: nada guardado; la venta a medias la conserva su app.
 Si falla: sin red, la pantalla no da la sesión por terminada.
-Implicados: BASE-F13, BASE-F66
+Implicados: BASE-F13, BASE-F70
 
-### BASE-F55 Cerrar la sesión de una caja que nadie toca
+### BASE-F59 Cerrar la sesión de una caja que nadie toca
 <!-- origen: old-hub:HUB_SHELL-F08 -->
 Estado: hecho
 Actor: sistema
@@ -1307,9 +1408,9 @@ Entra: los minutos del negocio, que llegan con la propia página (no hay una lec
 Sale: la sesión cerrada en el negocio. La cuenta abierta la conserva su app.
 Si falla: con «Hasta cerrar sesión», en un dispositivo personal o donde no se pide PIN no se cierra nada; aunque
 la pantalla se quede colgada, una sesión abierta mientras el negocio pide siempre el PIN no dura más de 1 hora.
-Implicados: BASE-F63
+Implicados: BASE-F67
 
-### BASE-F56 Cambiar de usuario sin perder la venta
+### BASE-F60 Cambiar de usuario sin perder la venta
 <!-- origen: old-hub:HUB_SHELL-F09 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1331,9 +1432,9 @@ Si falla: PIN erróneo: «PIN incorrecto.» y quien estaba dentro sigue dentro. 
 intentos fallidos.» y los minutos que tiene que esperar. Nadie con PIN: «Aquí nadie tiene PIN todavía: se
 pone en Mi perfil o en Empleados.». Sin poder leer quién trabaja aquí: «No se pudo cargar quién trabaja aquí.
 Comprueba la conexión e inténtalo de nuevo.».
-Implicados: BASE-F51, BASE-F52
+Implicados: BASE-F55, BASE-F56
 
-### BASE-F57 Cerrar sesión
+### BASE-F61 Cerrar sesión
 <!-- origen: old-hub:HUB_SHELL-F10 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1348,7 +1449,7 @@ Sale: la sesión cerrada en el negocio.
 Si falla: si el negocio no contesta, la sesión caduca sola.
 Implicados: ninguno
 
-### BASE-F58 Decidir si este dispositivo es compartido o personal
+### BASE-F62 Decidir si este dispositivo es compartido o personal
 <!-- origen: old-hub:HUB_SHELL-F11 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1367,9 +1468,9 @@ Si falla: quien no administra ve las opciones apagadas y «Solo un administrador
 en este dispositivo.». Un navegador en el que nunca se entró con la cuenta: «Este navegador todavía no es un
 dispositivo del negocio: entra una vez aquí con tu cuenta y podrás elegir.». Sin conexión: «No se pudo cambiar
 este dispositivo. Comprueba la conexión e inténtalo de nuevo.».
-Implicados: BASE-F51
+Implicados: BASE-F55
 
-### BASE-F59 Abrir un hub que todavía no está dado de alta
+### BASE-F63 Abrir un hub que todavía no está dado de alta
 <!-- origen: old-hub:HUB_SHELL-F12 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1384,7 +1485,7 @@ Si falla: una dirección que no es de ningún negocio no existe; un negocio dado
 disponible.».
 Implicados: ninguno
 
-### BASE-F60 Cambiar mis datos, foto, idioma y apariencia
+### BASE-F64 Cambiar mis datos, foto, idioma y apariencia
 <!-- origen: old-hub:HUB_SHELL-F21 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1409,7 +1510,7 @@ conexión y vuelve a intentarlo.» con «Reintentar». Al guardar: «No se pudo 
 preferencias. Comprueba la conexión e inténtalo de nuevo.».
 Implicados: ninguno
 
-### BASE-F61 Cambiar mi PIN desde Mi perfil
+### BASE-F65 Cambiar mi PIN desde Mi perfil
 <!-- origen: old-hub:HUB_SHELL-F22 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -1427,15 +1528,15 @@ coinciden.»; fácil de adivinar: «Ese PIN es demasiado fácil de adivinar: evi
 secuencias (1234).»; ya lo usa otra persona: «Ese PIN ya lo tiene otra persona activa: elige otro.»; el actual no
 es: «Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.»; treinta intentos en una hora:
 «Demasiados intentos de cambiar el PIN.» y los minutos que tiene que esperar.
-Implicados: BASE-F50
+Implicados: BASE-F54
 
-### BASE-F62 Elegir cuántos dígitos tiene el PIN del negocio
+### BASE-F66 Elegir cuántos dígitos tiene el PIN del negocio
 <!-- origen: old-hub:HUB_SHELL-F100 -->
 Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · General
 Pasos:
-  1. Con el pinpad encendido (BASE-F63), bajo «Dígitos del PIN» elige «4 dígitos» o «6 dígitos».
+  1. Con el pinpad encendido (BASE-F67), bajo «Dígitos del PIN» elige «4 dígitos» o «6 dígitos».
   2. Se guarda al momento. Debajo: «Todo el mundo teclea el mismo número de dígitos, que es lo que permite que el
      teclado entre al último en vez de pedirte confirmar. Los PIN que ya se usan siguen funcionando hasta que su
      dueño los cambie.».
@@ -1443,9 +1544,9 @@ Pasos:
 Entra: la elección.
 Sale: la longitud del PIN del negocio. No toca los PIN que ya hay.
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.».
-Implicados: BASE-F63
+Implicados: BASE-F67
 
-### BASE-F63 Decidir si se pide PIN en la caja y cuándo se vuelve a pedir
+### BASE-F67 Decidir si se pide PIN en la caja y cuándo se vuelve a pedir
 <!-- origen: old-hub:HUB_SHELL-F99 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1468,9 +1569,9 @@ vuelve a pedirlo por turno.
 Si falla: «No se pudo cambiar. Comprueba la conexión e inténtalo de nuevo.». Si no se puede leer: «No se pudo
 cargar cómo pide el PIN el negocio. Comprueba la conexión e inténtalo de nuevo.». Quien no administra ve los
 controles apagados y «Solo un administrador puede cambiar si se pregunta.».
-Implicados: BASE-F51, BASE-F55
+Implicados: BASE-F55, BASE-F59
 
-### BASE-F64 Ver los dispositivos en los que se ha entrado
+### BASE-F68 Ver los dispositivos en los que se ha entrado
 <!-- origen: old-hub:HUB_SHELL-F101 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1488,9 +1589,9 @@ Sale: nada guardado.
 Si falla: quien no administra ve «Solo un administrador puede ver y quitar los dispositivos.», sin lista. Si no
 llega: «No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo.», nunca «Todavía no ha
 entrado nadie desde ningún dispositivo.», que es solo para una lista de verdad vacía.
-Implicados: BASE-F65, BASE-F66, BASE-F67
+Implicados: BASE-F69, BASE-F70, BASE-F71
 
-### BASE-F65 Ponerle nombre a un dispositivo
+### BASE-F69 Ponerle nombre a un dispositivo
 <!-- origen: old-hub:HUB_SHELL-F102 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1504,9 +1605,9 @@ Entra: el nombre.
 Sale: el nombre del dispositivo, el único dato de la fila que decide el negocio.
 Si falla: «No se pudo cambiar el nombre. Comprueba la conexión e inténtalo de nuevo.» o «Ese nombre es demasiado
 largo. Ponle uno más corto y vuelve a guardar.».
-Implicados: BASE-F64
+Implicados: BASE-F68
 
-### BASE-F66 Quitar un dispositivo que se ha perdido
+### BASE-F70 Quitar un dispositivo que se ha perdido
 <!-- origen: old-hub:HUB_SHELL-F103 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1523,9 +1624,9 @@ Sale: el dispositivo olvidado y sus sesiones cerradas: se corta el dispositivo, 
 entrar en él con su cuenta.
 Si falla: «No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.» o «Ese dispositivo ya
 no está registrado aquí. Actualiza la lista.»; nunca queda como hecho lo que se rechazó.
-Implicados: BASE-F54, BASE-F64
+Implicados: BASE-F58, BASE-F68
 
-### BASE-F67 Quitar de golpe los dispositivos que nadie usa
+### BASE-F71 Quitar de golpe los dispositivos que nadie usa
 <!-- origen: old-hub:HUB_SHELL-F104 -->
 Estado: hecho
 Actor: propietario, administrador
@@ -1538,9 +1639,9 @@ Pasos:
      él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.».
   3. Confirma con «Quitar».
 Entra: qué dispositivos lleva 30 días sin usar nadie.
-Sale: esos dispositivos olvidados, como BASE-F66.
+Sale: esos dispositivos olvidados, como BASE-F70.
 Si falla: «No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.».
-Implicados: BASE-F66
+Implicados: BASE-F70
 
 ## Para quien lo mantiene
 
@@ -1706,7 +1807,19 @@ Implicados: BASE-F66
   `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).
   e2e: `tests/e2e/base-system.spec.ts` (tres tamaños, dos hubs, campana → `#events`).
 
-- **Acceso (APP-BASE-3: BASE-F48…F67).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
+- **Ajustes del negocio (APP-BASE-6: BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
+  viva con `base.hub.registered`): la fila del registro del ámbito, la que manda el SaaS por `PUT /internal/hubs/{id}`
+  (nombre, país, zona e idioma, HUBS-F15), con la moneda del país (`base/business.py`: CLDR por Babel; sin país,
+  `EUR`), los nombres en el idioma de la persona y `settings_url` = `SAAS_URL/businesses/<id>/settings` (vacío en una
+  demo). El registro se aplica como la plataforma: tras su COMMIT, `base.hub.register` avisa también al canal del
+  propio negocio (`base/tests/test_business_live.py`). El Hub no guarda ni cambia nada de esto y no hay almacén
+  clave/valor de ajustes: el `hub_settings` del runtime viejo se repartió entre sus dueños (país, zona e idioma en el
+  registro; territorio en Impuestos, TAX-F11; emisor en Facturación, INVOICE-F21; la moneda, la del país). Las apps
+  aún cobran en `EUR` (BASE-F50 `parcial`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
+  `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
+  Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
+  `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
+- **Acceso (APP-BASE-3: BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),
   `Credential` (por `username`: `pin_hash` argon2id y `badge_digest` = HMAC-SHA256 del número con
@@ -1714,10 +1827,10 @@ Implicados: BASE-F66
   `pin_inactivity_minutes`, `pin_length` 4/6; un valor que esta versión no entiende se lee como el de fábrica,
   `base/access.py`) y `Profile` (nombre, correo de contacto, foto, idioma, apariencia). En control, `SessionOwner`
   anota además `device_id` y `credential` (`account`, `pin`, `badge`).
-- Entrar con la cuenta (BASE-F48, F49) es el canje de siempre (`/auth/callback`) más `services.trust_device` (la
+- Entrar con la cuenta (BASE-F52, F53) es el canje de siempre (`/auth/callback`) más `services.trust_device` (la
   cookie `hub_device`), la duración de la sesión por dispositivo y negocio (`access.session_lifetime`: 12 h
   compartido, 30 días personal, tope de 1 h con `always`) y `_end_other_devices`, que aplica `plan.max_devices` de
-  la foto (BASE-F53). El PIN y la placa son vistas de Django tras el CSRF, porque abren sesión (ninguna operación
+  la foto (BASE-F57). El PIN y la placa son vistas de Django tras el CSRF, porque abren sesión (ninguna operación
   lo hace): `POST /auth/pin {person, pin, next}` y `POST /auth/badge {badge, next}` (`base/auth_views.py`), en este
   orden: freno por dirección (`PIN_ADDRESS_LIMIT`, 20 en 15 min), dispositivo compartido de un negocio que pregunta
   (403 `base.device_not_trusted`, `base.pin_not_offered`), freno por persona (`PIN_PERSON_LIMIT`, 5 en 5 min; la
@@ -1748,7 +1861,7 @@ Implicados: BASE-F66
   (gh:hub#2538, #2539); la cuenta abierta de Ventas la recuerda su app (`useCurrentCheck`). Guardar el nombre en Mi
   perfil llama a `sessionChanged()` (`lib/access.ts`) y `frontend/main.ts` vuelve a leer `base.session.me`, que es la
   sesión que pinta el shell (el menú lateral); si esa lectura falla, se queda la que había.
-- «Plan y límites» (BASE-F28, `queries.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F53
+- «Plan y límites» (BASE-F28, `queries.plan_usage`) cuenta los dispositivos en uso con la regla del tope de BASE-F57
   (`services._end_other_devices`): los `device_id` distintos de las sesiones vivas del host (`SessionOwner`).
 - Fase 1 (tablas compartidas, `docs/plans/2026-10-22-fase-2-tenencia.md` §5): `TrustedDevice`, `Credential`,
   `AccessSettings` y `Profile` son de todo el despliegue hasta la BD por hub, así que la lista de dispositivos, el
@@ -1775,7 +1888,8 @@ Implicados: BASE-F66
 - No pregunta a erplora.com al abrir una app: usa lo último que erplora.com le pasó del negocio.
 - No inventa cifras de uso: la CPU, la memoria y las conexiones no son de un negocio, así que Sistema no las enseña.
 - No edita un aviso caído ni enseña lo que llevaba: se reenvía tal cual o se descarta, y el descartado se guarda.
-
+- No cambia el nombre, el país, la zona horaria ni el idioma del negocio: los guarda erplora.com y el hub los
+  recibe. Tampoco deja elegir la moneda: es la del país del negocio.
 - No guarda un PIN ni el número de una placa: solo lo que permite comprobarlos, y nunca enseña el correo de nadie
   en las caras de una caja.
 - No tiene contraseña propia: la cuenta es la de erplora.com; el PIN y la placa solo abren una caja en la que ya se

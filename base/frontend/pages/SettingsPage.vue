@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// Settings (the old hub's `/settings`): the footer tabbar of its sections, the tab in the hash so a link opens it and
-// Back leaves the page instead of walking its tabs. «General» first, as in the old hub (APP-BASE-3): «This device»
-// (BASE-G72), «PIN pad» (G151, G62) and «Devices» (G63…G66), whose list is an administrator's: whoever does not run the
-// hub reads why instead, and no list is asked for. Then «Data and backups» (`#data`, BASE-G101–G109, APP-BASE-2). Hub,
-// Business, Tickets and Permissions arrive with their flows (APP-BASE-6), never painted empty.
+// Settings (the old hub's `/settings`; BASE-G96): the footer tabbar of its sections, the tab in the hash (`#general`,
+// `#business`, `#tickets`, `#data`) so a link opens it and Back leaves the page instead of walking its tabs. In the old
+// hub's order: «General» first (APP-BASE-3), with «This device» (BASE-G72), «PIN pad» (G151, G62) and «Devices»
+// (G63…G66), whose list is an administrator's: whoever does not run the hub reads why instead, and no list is asked
+// for. Then «Business» and «Printing» (APP-BASE-6) and «Data and backups» (BASE-G101–G109, APP-BASE-2); the old `#hub`
+// opens General and `#tax` Business. Permissions arrives with its flows, never painted empty.
 import { AppPage, type ShellTab, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -11,6 +12,8 @@ import { useRoute, useRouter } from 'vue-router';
 import DeviceModeCard from '../components/DeviceModeCard.vue';
 import DevicesCard from '../components/DevicesCard.vue';
 import PinPolicyCard from '../components/PinPolicyCard.vue';
+import BusinessPanel from '../components/settings/BusinessPanel.vue';
+import TicketsPanel from '../components/settings/TicketsPanel.vue';
 import DataPanel from '../components/data/DataPanel.vue';
 import { type SettingsTab, settingsTab } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
@@ -23,7 +26,12 @@ const session = useSession();
 const canManage = computed(() => session.can('base.administer_hub'));
 
 const tabs = computed<ShellTab[]>(() => [
+  // ── General: this device, the PIN pad and the devices (APP-BASE-3) ──
   { id: 'general', label: t('base.settings.tabs.general'), icon: 'ion:settings-outline' },
+  // ── Business settings (APP-BASE-6) ──
+  { id: 'business', label: t('base.settings.tabs.business'), icon: 'ion:wallet-outline' },
+  { id: 'tickets', label: t('base.settings.tabs.tickets'), icon: 'lucide:receipt' },
+  // ── Data (APP-BASE-2) ──
   { id: 'data', label: t('base.settings.tabs.data'), icon: 'ion:swap-vertical-outline' },
 ]);
 const tab = computed<SettingsTab>({
@@ -57,6 +65,8 @@ const tab = computed<SettingsTab>({
         </p>
       </section>
     </template>
+    <BusinessPanel v-else-if="tab === 'business'" />
+    <TicketsPanel v-else-if="tab === 'tickets'" />
     <DataPanel v-else-if="tab === 'data'" />
   </AppPage>
 </template>

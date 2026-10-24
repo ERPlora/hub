@@ -4,7 +4,7 @@ import { DataTable } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { errorFrame, flush, mountBase, OWNER, subId } from '../__tests__/mount-base';
+import { business, errorFrame, flush, mountBase, OWNER, POLISH, subId } from '../__tests__/mount-base';
 import HomeActivity from './HomeActivity.vue';
 
 const WITH_SALES: SessionMe = { ...OWNER, permissions: [...OWNER.permissions, 'sale.view'], apps: [{ label: 'sale', state: 'on' }] };
@@ -59,6 +59,7 @@ describe('HomeActivity', () => {
   it('paints date, sale, customer, method, amount in euros and the status in the history’s words', async () => {
     const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
     const call = await m.live();
+    await m.result(call, 'base.business.get', business());
     await m.result(call, 'sale.sale.list', {
       rows: [sale('1'), sale('2', { status: 'voided', total: 500 }), sale('3', { status: 'parked' })],
       total: 3,
@@ -76,6 +77,18 @@ describe('HomeActivity', () => {
       ['Anulada', 'danger'],
       ['Otro', 'neutral'],
     ]);
+  });
+
+  // BASE-G98: the amount of each sale is in the business's currency, never a fixed euro.
+  it("writes each sale's amount in the business's currency: zł in a Polish business", async () => {
+    const m = await mountBase(HomeActivity, { session: WITH_SALES, locale: 'es' });
+    const call = await m.live();
+    await m.result(call, 'sale.sale.list', { rows: [sale('1')], total: 1, limit: 100, offset: 0 });
+    expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).toContain('12,50');
+    expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).not.toContain('€');
+    await m.result(call, 'base.business.get', business(POLISH));
+    expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).toContain('12,50\u00a0zł');
+    expect(m.wrapper.get('[data-testid="home-activity-row"]').text()).not.toContain('€');
   });
 
   it('filters by method and by status behind the funnel, with the methods of the sales on screen', async () => {

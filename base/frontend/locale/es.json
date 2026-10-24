@@ -214,6 +214,8 @@
       "tabs": {
         "label": "Secciones de Ajustes",
         "data": "Datos y copias",
+        "business": "Negocio",
+        "tickets": "Impresión",
         "general": "General"
       }
     },
@@ -468,6 +470,36 @@
         "empty": "Sin eventos: todavía no ha pasado nada entre las apps de este negocio.",
         "error": "No se pudo cargar el registro. Comprueba la conexión y reintenta."
       }
+    },
+    "settingsBusiness": {
+      "title": "Tu negocio",
+      "loading": "Cargando los datos del negocio…",
+      "loadError": "No se pudieron cargar los datos del negocio",
+      "loadErrorBody": "Nada ha cambiado. Comprueba la conexión y vuelve a intentarlo.",
+      "retry": "Reintentar",
+      "name": "Nombre del negocio",
+      "nameHint": "El que sale en la pantalla y en los tiques",
+      "country": "País",
+      "countryHint": "El de sus impuestos y sus facturas",
+      "timezone": "Zona horaria",
+      "timezoneHint": "La de las fechas y los horarios del negocio",
+      "currency": "Moneda",
+      "currencyHint": "La de su país, para precios y totales",
+      "language": "Idioma del negocio",
+      "languageHint": "El de quien no haya elegido el suyo",
+      "none": "—",
+      "whereAdmin": "El nombre, la zona horaria y el idioma se cambian en erplora.com. El país no cambia una vez listo el negocio.",
+      "whereOthers": "Solo el propietario o un administrador los cambian, en erplora.com.",
+      "whereDemo": "Esta demo no tiene un negocio en erplora.com: sus datos no se cambian.",
+      "change": "Cambiar en erplora.com",
+      "fiscal": "Datos fiscales",
+      "fiscalHint": "Razón social, NIF y domicilio: los que usan las facturas",
+      "fiscalInstall": "Instala la app Facturación para escribir los datos fiscales"
+    },
+    "settingsTickets": {
+      "printers": "Impresoras y tique",
+      "printersHint": "Da de alta tu impresora y configura el tique impreso y digital",
+      "install": "Instala la app Impresión para dar de alta tu impresora y configurar el tique"
     },
     "pinpad": {
       "erase": "Borrar"

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:744a3be58d6f7425176b01dff0b9c8c31f3ad41e2184a32530d60943159f9197 -->
+<!-- generated from WORKBOOK.md sha256:3ca58e4739cbc601c1235d5e5d868d7b4c05f0d9637587c6374885b4f93b6dd8 -->
 
 ## What it is for and who it is for
 
@@ -13,6 +13,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
 - **The activity**: the latest sales.
 - **Start with a template** of a business like theirs and, in "Settings", keep a copy of its data or load
   another business's.
+- **The business's details**, in "Settings": its name, its country, its time zone, its currency and its
+  language, as erplora.com has them, and where to go to change them.
 
 Who uses it:
 
@@ -97,9 +99,19 @@ browser).
 From "System" in the side menu, the "Plan and limits" tab: "Your plan's limits" with "Within the limit" or
 "Close to the limit", the "People" and "Devices" cards and where plans are managed.
 
+### Settings · Business
+The second of the tabs at the bottom of "Settings" ("General", "Business", "Printing" and "Data and backups").
+The "Your business" card shows, with no fields to fill in, "Business name", "Country", "Time
+zone" (with the time it is there), "Currency" and "Business language", each with a line that says what it is
+for. Below, where they are changed and, for the owner and the administrator, "Change on erplora.com". Further
+down, "Fiscal data", which opens Invoicing's issuer.
+
+### Settings · Printing
+The "Printing" tab: a single row, "Printers and ticket", which opens the Printing app.
+
 ### Settings · Data and backups
-From "Settings" in the side menu, the "Data and backups" tab at the bottom, after "General" (the old hub's
-other Settings tabs come with their flows). On top, a selector with "Import" (what opens), "Export" and "Reset";
+The "Data and backups" tab of "Settings", the last one, after "General", "Business" and "Printing". On top, a
+selector with "Import" (what opens), "Export" and "Reset";
 the one chosen stays in the link, so it can be shared and Back leaves Settings.
 
 - **Import**: "Choose what to load", with "Upload from file" and the templates as cards or as a list, with
@@ -157,6 +169,15 @@ The page that shows at the address of a business erplora.com is still preparing;
 | Empty | "Your apps will show up here. Add the ones your business needs."; with no steps, the list does not show; "Empty panel. Tap ⋮ to add widgets."; a panel without data, "No data"; the bell, "All caught up. No notifications."; "Nobody has entered from any device yet."; in "Switch user", "Nobody here has a PIN yet: give one in My profile or in Employees.". |
 | Error | Each zone fails on its own: "Could not load your apps. Reload the page; if it keeps failing, sign in again.", "Could not load what is left to set up" with "Retry", "Could not load the panels" with "Retry", a panel with "Unavailable" (never the figure it had), "Could not load the latest sales" with "Retry" and, in the bell, "Could not check the notifications. They will show up when the connection is back.". In the way in: "Could not load the PIN pad. You can still enter with your account.", "Could not load the profile" with "Retry", "Could not load this device. Check the connection and try again.", "Could not load how the business asks for the PIN. Check the connection and try again." and "Could not load the devices. Check the connection and try again.". |
 | No permission | A step the person cannot do: no button and "An administrator has to set this up.". A panel or a counter they may not see does not show. In Settings, whoever does not run the business sees "This device" and "PIN pad" with the controls off ("Only an administrator can change how people enter on this device.", "Only an administrator can change whether it asks.") and, instead of the list, "Only an administrator can see and remove the devices.". |
+
+On the Settings · Business screen:
+
+| State | What the person sees |
+|---|---|
+| Loading | "Loading the business’s data…". |
+| Empty | A demo has no name nor country: those rows read "—", and below, "This demo has no business on erplora.com: its data does not change.". |
+| Error | "Couldn’t load the business’s data" with "Nothing has changed. Check the connection and try again." and "Retry"; never a blank card. |
+| No permission | Whoever does not administer the business sees it the same, without "Change on erplora.com" and with "Only the owner or an administrator changes them, on erplora.com."; "Fiscal data" does not show to whoever may not write the issuer. |
 
 On the Settings · Data and backups screen:
 
@@ -218,26 +239,30 @@ On the Settings · Data and backups screen:
 | BASE-F45 | Resend all the failed events | done |
 | BASE-F46 | Discard a failed event | done |
 | BASE-F47 | Report an error of the screen without anyone asking | done |
-| BASE-F48 | Enter with the erplora.com account | done |
-| BASE-F49 | Enter from the erplora.com panel without typing the password again | done |
-| BASE-F50 | Choose the PIN the first time one enters a till | done |
-| BASE-F51 | Enter with a PIN | done |
-| BASE-F52 | Enter by passing the badge | done |
-| BASE-F53 | Lose the session because it was opened on another device | done |
-| BASE-F54 | The session ends while working | done |
-| BASE-F55 | Close the session of a till nobody touches | done |
-| BASE-F56 | Switch user without losing the sale | done |
-| BASE-F57 | Sign out | done |
-| BASE-F58 | Decide whether this device is shared or personal | done |
-| BASE-F59 | Open a hub that is not set up yet | done |
-| BASE-F60 | Change my details, photo, language and appearance | done |
-| BASE-F61 | Change my PIN from My profile | done |
-| BASE-F62 | Choose how many digits the business's PIN has | done |
-| BASE-F63 | Decide whether the till asks for a PIN and when it asks again | done |
-| BASE-F64 | See the devices someone has entered on | done |
-| BASE-F65 | Name a device | done |
-| BASE-F66 | Remove a device that was lost | done |
-| BASE-F67 | Remove at once the devices nobody uses | done |
+| BASE-F48 | Open Settings and move through its tabs | done |
+| BASE-F49 | See the business's country | done |
+| BASE-F50 | See the business's currency | partial |
+| BASE-F51 | Change the business's language on erplora.com | partial |
+| BASE-F52 | Enter with the erplora.com account | done |
+| BASE-F53 | Enter from the erplora.com panel without typing the password again | done |
+| BASE-F54 | Choose the PIN the first time one enters a till | done |
+| BASE-F55 | Enter with a PIN | done |
+| BASE-F56 | Enter by passing the badge | done |
+| BASE-F57 | Lose the session because it was opened on another device | done |
+| BASE-F58 | The session ends while working | done |
+| BASE-F59 | Close the session of a till nobody touches | done |
+| BASE-F60 | Switch user without losing the sale | done |
+| BASE-F61 | Sign out | done |
+| BASE-F62 | Decide whether this device is shared or personal | done |
+| BASE-F63 | Open a hub that is not set up yet | done |
+| BASE-F64 | Change my details, photo, language and appearance | done |
+| BASE-F65 | Change my PIN from My profile | done |
+| BASE-F66 | Choose how many digits the business's PIN has | done |
+| BASE-F67 | Decide whether the till asks for a PIN and when it asks again | done |
+| BASE-F68 | See the devices someone has entered on | done |
+| BASE-F69 | Name a device | done |
+| BASE-F70 | Remove a device that was lost | done |
+| BASE-F71 | Remove at once the devices nobody uses | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -708,13 +733,13 @@ Steps:
   4. Below: "Plans are managed from your ERPlora account, on erplora.com.". It updates by itself when the plan
      or the people change; the devices' figure, on opening the screen.
 In: the plan's limits erplora.com passes to the hub, the business's active people and the devices with a session
-open on it (the same ones the cap of BASE-F53 counts).
+open on it (the same ones the cap of BASE-F57 counts).
 Out: nothing saved.
 If it fails: "We could not read your plan" — "Check the connection and try again." with "Retry". Whoever does
 not run the business sees "Only whoever runs the business can see the plan and its limits.", without "Retry". While
 the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com
 sends it.".
-Involved: BASE-F53
+Involved: BASE-F57
 
 ### BASE-F29 Choose a template of the catalogue to import
 Status: done
@@ -1093,7 +1118,80 @@ with more than 30 reports a minute from the same person, the hub does not note i
 "Report a problem" in the user menu.
 Involved: none
 
-### BASE-F48 Enter with the erplora.com account
+### BASE-F48 Open Settings and move through its tabs
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Settings
+Steps:
+  1. Tap "Settings" in the side menu, or arrive from a link on another screen.
+  2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", in the old hub's order;
+     "General" opens (BASE-F62). The tab chosen stays in the link, so a saved link comes back to it and Back
+     leaves Settings instead of walking its tabs. On the phone the four fit, whole.
+  3. Old links still take you to their place: the one of the old "General" opens "General", the one of the old
+     taxes tab opens "Business", and the one of a tab that no longer exists opens the first.
+  4. In "Printing", "Printers and ticket" ("Add your printer and set up the printed and digital ticket") opens
+     the Printing app; when it is not there, it says "Install the Printing app to add your printer and set up the
+     ticket" and takes you to "Apps".
+In: the business's apps.
+Out: nothing saved.
+If it fails: it does not fail: it is navigation. Each tab says in itself when it could not load its own (BASE-F49,
+BASE-F29).
+Involved: PRINTING-F06, BASE-F29, BASE-F49, BASE-F62
+
+### BASE-F49 See the business's country
+Status: done
+Actor: owner, administrator, manager, employee
+Screen: Settings · Business
+Steps:
+  1. In "Business", "Country" ("The one of its taxes and its invoices") says, in the person's language, the
+     country the business was signed up with on erplora.com.
+  2. It is not chosen here: below it reads "The country does not change once the business is ready.", because
+     its invoices are of one country. While the business is being prepared, it is changed on erplora.com
+     (HUBS-F15).
+In: the country erplora.com signed the business up with.
+Out: nothing saved; with it, the business's templates come first and "Finish setting up your business" knows
+which steps are its own.
+If it fails: if the business's details cannot be read, "Couldn’t load the business’s data" with "Retry". A demo
+has no country: "—".
+Involved: HUBS-F15, BASE-F01, BASE-F29
+
+### BASE-F50 See the business's currency
+Status: partial — the Home already writes its amounts in the business's currency, but the apps (Sales, Cash register, Invoicing, Inventory) still in euros even when the business's country pays in another currency: it fits Spain and Portugal, not a country of another currency
+Actor: owner, administrator, manager, employee
+Screen: Settings · Business; Home · Summary and Home · Activity
+Steps:
+  1. In "Business", "Currency" ("Its country’s, for prices and totals") says the currency with its code and its
+     name in the person's language: "EUR · Euro".
+  2. It is not chosen: it is the one of the business's country, as in the market's payment terminals. A business
+     without a country (a demo) is in euros.
+  3. On the Home, the amounts of the panels (such as "Sales, last 7 days") and of "Activity" are in that currency,
+     with its symbol and its decimals, as a till of that country prints them: "zł" in a business in Poland, "€" in
+     one in Spain. While the business has not answered, the amount shows without a symbol, never in another currency.
+In: the business's country.
+Out: nothing saved.
+If it fails: as in BASE-F49.
+Involved: BASE-F49
+
+### BASE-F51 Change the business's language on erplora.com
+Status: partial — whoever has not chosen a language of their own still sees the screen in their browser's, not in the business's, until the hub uses each person's language
+Actor: owner, administrator
+Screen: Settings · Business
+Steps:
+  1. In "Business", "Business language" ("The one of whoever has not chosen their own") says the business's
+     language by its name.
+  2. Tap "Change on erplora.com": the business's settings on erplora.com open in another tab, where it is
+     changed and "Save changes" is tapped (HUBS-F15).
+  3. Without reloading, "Business" shows the new language as soon as the business receives it; the same with the
+     name and the time zone.
+In: the language erplora.com saved.
+Out: nothing saved in the business: it receives it from erplora.com (`base.hub.registered`).
+If it fails: if the business does not answer, erplora.com keeps the change and sends it again (HUBS-F08);
+meanwhile, "Business" stays with the previous one. Whoever does not administer the business does not see the
+button: "Only the owner or an administrator changes them, on erplora.com.". In a demo, "This demo has no business
+on erplora.com: its data does not change.".
+Involved: HUBS-F15, HUBS-F08
+
+### BASE-F52 Enter with the erplora.com account
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1105,7 +1203,7 @@ Steps:
   3. They come back to the business already in, on the screen they had asked for (a link to a tab, such as
      `/settings#data` or `/system#plan`, comes back to that tab) or on **Home**. If this device asks for a PIN,
      the business already enters its tills with a PIN and the person has none yet, it first asks them to choose
-     it (BASE-F50).
+     it (BASE-F54).
 In: the account erplora.com checks; this browser.
 Out: the person's session in this business and this browser turned into a trusted device of the business (it
 shows in "Devices", shared until someone says otherwise). The session lasts a 12-hour shift on a shared device,
@@ -1114,7 +1212,7 @@ If it fails: erplora.com says why they do not get in (credentials, verification,
 hub"); the business keeps nothing until it comes back with the person identified.
 Involved: BASE-F13
 
-### BASE-F49 Enter from the erplora.com panel without typing the password again
+### BASE-F53 Enter from the erplora.com panel without typing the password again
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1122,22 +1220,22 @@ Steps:
   1. At erplora.com, with the session open, they tap enter their business.
   2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
 In: the one-time pass erplora.com gives.
-Out: the same as BASE-F48: the session and this browser as a trusted device of the business, so it then offers
+Out: the same as BASE-F52: the session and this browser as a trusted device of the business, so it then offers
 the PIN pad, shows in "Devices" and its mode can be changed.
 If it fails: an expired or already used pass opens nothing: the business asks for erplora.com's sign-in again.
-Involved: BASE-F48
+Involved: BASE-F52
 
-### BASE-F50 Choose the PIN the first time one enters a till
+### BASE-F54 Choose the PIN the first time one enters a till
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Create your PIN
 Steps:
-  1. After entering with the account (BASE-F48) on a shared device of a business that asks for a PIN, where
+  1. After entering with the account (BASE-F52) on a shared device of a business that asks for a PIN, where
      someone else already enters with theirs, and if the person has no PIN yet, "Create your PIN" shows — "With
      it you will enter this till without your password.".
   2. They type the PIN on the keypad of circles: "Choose a {n}-digit PIN" (4 or 6, whatever the business says).
   3. They repeat it: "Confirm your PIN". Once it matches it is saved and they go where they were going.
-  4. "Not now" leaves it for later: they enter all the same and can choose it in **My profile** (BASE-F61).
+  4. "Not now" leaves it for later: they enter all the same and can choose it in **My profile** (BASE-F65).
 In: the session just opened; the business's PIN digits.
 Out: the person's PIN, stored encrypted; their face shows in "Switch user" at once and on the PIN pad of
 **Access** within a minute.
@@ -1146,9 +1244,9 @@ Repeated or consecutive digits: "That PIN is too easy to guess: avoid repeated d
 Someone else already uses it: "Another active person already has that PIN: choose a different one.". Without a
 connection: "Could not save the PIN. Try again.". A business in which nobody has a PIN does not ask for it on
 entering: the first one is chosen in **My profile**.
-Involved: BASE-F48, BASE-F61
+Involved: BASE-F52, BASE-F65
 
-### BASE-F51 Enter with a PIN
+### BASE-F55 Enter with a PIN
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1171,9 +1269,9 @@ which nobody ever entered with an account, or that an administrator removed: "Th
 PIN yet. Sign in once here with your account and from then on it will.". Without a connection, "Could not enter.
 Check the connection and try again."; if who works here cannot be read, "Could not load the PIN pad. You can
 still enter with your account.".
-Involved: BASE-F50, BASE-F63
+Involved: BASE-F54, BASE-F67
 
-### BASE-F52 Enter by passing the badge
+### BASE-F56 Enter by passing the badge
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1184,12 +1282,12 @@ Steps:
   3. They come in as the card's owner.
 In: the number the reader reads. It is only listened to on the "PIN" tab of a device that offers the PIN pad and
 in **Switch user**; on "Account" or while the PIN is being chosen, it is not.
-Out: the same as BASE-F51.
+Out: the same as BASE-F55.
 If it fails: a card that is nobody's or whose owner is gone: "That badge opens nothing here. Enter with your PIN
 or ask an administrator."; it counts as a failed attempt. The PIN pad stays available.
-Involved: BASE-F51
+Involved: BASE-F55
 
-### BASE-F53 Lose the session because it was opened on another device
+### BASE-F57 Lose the session because it was opened on another device
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1206,7 +1304,7 @@ Out: the sessions of the devices left over, ended, and the reason kept on each o
 If it fails: with no limit in the plan nothing ends.
 Involved: BASE-F11, BASE-F28
 
-### BASE-F54 The session ends while working
+### BASE-F58 The session ends while working
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1221,9 +1319,9 @@ Steps:
 In: the session that no longer exists.
 Out: nothing saved; the half-made sale is kept by its app.
 If it fails: without a network, the screen does not take the session as ended.
-Involved: BASE-F13, BASE-F66
+Involved: BASE-F13, BASE-F70
 
-### BASE-F55 Close the session of a till nobody touches
+### BASE-F59 Close the session of a till nobody touches
 Status: done
 Actor: system
 Screen: Access
@@ -1236,9 +1334,9 @@ In: the business's minutes, which come with the page itself (there is no separat
 Out: the session closed in the business. The open check is kept by its app.
 If it fails: with "Until signing out", on a personal device or where no PIN is asked nothing closes; even if the
 screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour.
-Involved: BASE-F63
+Involved: BASE-F67
 
-### BASE-F56 Switch user without losing the sale
+### BASE-F60 Switch user without losing the sale
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Switch user
@@ -1259,9 +1357,9 @@ If it fails: wrong PIN: "Wrong PIN." and whoever was in stays in. Too many attem
 and the minutes they have to wait. Nobody with a PIN: "Nobody here has a PIN yet: give one in My profile or in
 Employees.". Without being able to read who works here: "Could not load who works here. Check the connection and
 try again.".
-Involved: BASE-F51, BASE-F52
+Involved: BASE-F55, BASE-F56
 
-### BASE-F57 Sign out
+### BASE-F61 Sign out
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
@@ -1275,7 +1373,7 @@ Out: the session closed in the business.
 If it fails: if the business does not answer, the session expires by itself.
 Involved: none
 
-### BASE-F58 Decide whether this device is shared or personal
+### BASE-F62 Decide whether this device is shared or personal
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1293,9 +1391,9 @@ If it fails: whoever does not run the business sees the options off and "Only an
 people enter on this device.". A browser in which nobody ever entered with the account: "This browser is not a
 device of the business yet: enter once here with your account and you will be able to choose.". Without a
 connection: "Could not change this device. Check the connection and try again.".
-Involved: BASE-F51
+Involved: BASE-F55
 
-### BASE-F59 Open a hub that is not set up yet
+### BASE-F63 Open a hub that is not set up yet
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
@@ -1309,7 +1407,7 @@ If it fails: an address that belongs to no business does not exist; a business t
 is no longer available.".
 Involved: none
 
-### BASE-F60 Change my details, photo, language and appearance
+### BASE-F64 Change my details, photo, language and appearance
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -1333,7 +1431,7 @@ save the photo. Use a JPG, PNG or WebP of up to 2 MB."; preferences: "Could not 
 connection and try again.".
 Involved: none
 
-### BASE-F61 Change my PIN from My profile
+### BASE-F65 Change my PIN from My profile
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -1349,14 +1447,14 @@ match."; easy to guess: "That PIN is too easy to guess: avoid repeated digits (1
 else already uses it: "Another active person already has that PIN: choose a different one."; the current one is
 not it: "That is not your current PIN. Type it right to set a new one."; thirty tries in an hour: "Too many tries
 to change the PIN." and the minutes they have to wait.
-Involved: BASE-F50
+Involved: BASE-F54
 
-### BASE-F62 Choose how many digits the business's PIN has
+### BASE-F66 Choose how many digits the business's PIN has
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
 Steps:
-  1. With the PIN pad on (BASE-F63), under "PIN digits" they choose "4 digits" or "6 digits".
+  1. With the PIN pad on (BASE-F67), under "PIN digits" they choose "4 digits" or "6 digits".
   2. It is saved at once. Below: "Everyone types the same number of digits, which is what lets the keypad enter
      at the last one instead of asking you to confirm. The PINs in use keep working until their owner changes
      them.".
@@ -1364,9 +1462,9 @@ Steps:
 In: the choice.
 Out: the length of the business's PIN. It does not touch the PINs there are.
 If it fails: "Could not change it. Check the connection and try again.".
-Involved: BASE-F63
+Involved: BASE-F67
 
-### BASE-F63 Decide whether the till asks for a PIN and when it asks again
+### BASE-F67 Decide whether the till asks for a PIN and when it asks again
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1387,9 +1485,9 @@ back to asking per shift.
 If it fails: "Could not change it. Check the connection and try again.". If it cannot be read: "Could not load
 how the business asks for the PIN. Check the connection and try again.". Whoever does not run the business sees
 the controls off and "Only an administrator can change whether it asks.".
-Involved: BASE-F51, BASE-F55
+Involved: BASE-F55, BASE-F59
 
-### BASE-F64 See the devices someone has entered on
+### BASE-F68 See the devices someone has entered on
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1406,9 +1504,9 @@ Out: nothing saved.
 If it fails: whoever does not run the business sees "Only an administrator can see and remove the devices.",
 with no list. If it does not arrive: "Could not load the devices. Check the connection and try again.", never
 "Nobody has entered from any device yet.", which is only for a truly empty list.
-Involved: BASE-F65, BASE-F66, BASE-F67
+Involved: BASE-F69, BASE-F70, BASE-F71
 
-### BASE-F65 Name a device
+### BASE-F69 Name a device
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1420,9 +1518,9 @@ In: the name.
 Out: the device's name, the only detail of the row the business decides.
 If it fails: "Could not change the name. Check the connection and try again." or "That name is too long. Give it
 a shorter one and save again.".
-Involved: BASE-F64
+Involved: BASE-F68
 
-### BASE-F66 Remove a device that was lost
+### BASE-F70 Remove a device that was lost
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1438,9 +1536,9 @@ Out: the device forgotten and its sessions ended: the device is cut off, not the
 again with their account.
 If it fails: "Could not remove this device. Check the connection and try again." or "That device is no longer
 registered here. Refresh the list."; what was refused never stays as done.
-Involved: BASE-F54, BASE-F64
+Involved: BASE-F58, BASE-F68
 
-### BASE-F67 Remove at once the devices nobody uses
+### BASE-F71 Remove at once the devices nobody uses
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -1452,6 +1550,6 @@ Steps:
      account. Those used in the last 30 days and the one you are using stay.".
   3. They confirm with "Remove".
 In: which devices nobody has used for 30 days.
-Out: those devices forgotten, as in BASE-F66.
+Out: those devices forgotten, as in BASE-F70.
 If it fails: "Could not remove the unused devices. Check the connection and try again.".
-Involved: BASE-F66
+Involved: BASE-F70

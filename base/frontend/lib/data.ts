@@ -16,15 +16,17 @@ import type {
 
 // ── The address ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The tabs of Settings that exist today: the others (Hub, Business, Tickets, Permissions) come with APP-BASE-6. */
-/** Settings' tabs, «General» first as in the old hub (APP-BASE-3), then «Data and backups» (APP-BASE-2). */
-export type SettingsTab = 'general' | 'data';
-export const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'data'];
+// The old hub's tabs, in its order and with its addresses: «General» first (APP-BASE-3), Business and Printing
+// (APP-BASE-6), then «Data and backups» (APP-BASE-2).
+export type SettingsTab = 'general' | 'business' | 'tickets' | 'data';
+export const SETTINGS_TABS: readonly SettingsTab[] = ['general', 'business', 'tickets', 'data'];
+/** Old addresses still linked: `#hub` was General; published versions of VeriFactu open `#tax`, the business's tab. */
+const SETTINGS_TAB_ALIASES: Readonly<Record<string, SettingsTab>> = { hub: 'general', tax: 'business' };
 
-/** The tab a hash opens (`#data`); none, or an unknown one — the old `#hub`, `#tax`… — opens the first, as the old hub. */
+/** The tab a hash opens (`#data`); one it does not have — the old `#store`, `#permissions`… — opens the first, as the old hub. */
 export function settingsTab(hash: string): SettingsTab {
   const wanted = hash.replace(/^#/, '');
-  return SETTINGS_TABS.find((tab) => tab === wanted) ?? SETTINGS_TABS[0];
+  return SETTINGS_TABS.find((tab) => tab === wanted) ?? SETTINGS_TAB_ALIASES[wanted] ?? SETTINGS_TABS[0];
 }
 
 export type DataSection = 'import' | 'export' | 'reset';

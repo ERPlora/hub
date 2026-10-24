@@ -214,6 +214,8 @@
       "tabs": {
         "label": "Settings sections",
         "data": "Data and backups",
+        "business": "Business",
+        "tickets": "Printing",
         "general": "General"
       }
     },
@@ -468,6 +470,36 @@
         "empty": "No events yet: nothing has gone between this business's apps.",
         "error": "The log could not be loaded. Check the connection and try again."
       }
+    },
+    "settingsBusiness": {
+      "title": "Your business",
+      "loading": "Loading the business’s data…",
+      "loadError": "Couldn’t load the business’s data",
+      "loadErrorBody": "Nothing has changed. Check the connection and try again.",
+      "retry": "Retry",
+      "name": "Business name",
+      "nameHint": "The one on the screen and on the tickets",
+      "country": "Country",
+      "countryHint": "The one of its taxes and its invoices",
+      "timezone": "Time zone",
+      "timezoneHint": "The one of the business’s dates and hours",
+      "currency": "Currency",
+      "currencyHint": "Its country’s, for prices and totals",
+      "language": "Business language",
+      "languageHint": "The one of whoever has not chosen their own",
+      "none": "—",
+      "whereAdmin": "The name, the time zone and the language are changed on erplora.com. The country does not change once the business is ready.",
+      "whereOthers": "Only the owner or an administrator changes them, on erplora.com.",
+      "whereDemo": "This demo has no business on erplora.com: its data does not change.",
+      "change": "Change on erplora.com",
+      "fiscal": "Fiscal data",
+      "fiscalHint": "Legal name, tax ID and address: the ones the invoices use",
+      "fiscalInstall": "Install the Invoicing app to write the fiscal data"
+    },
+    "settingsTickets": {
+      "printers": "Printers and ticket",
+      "printersHint": "Add your printer and set up the printed and digital ticket",
+      "install": "Install the Printing app to add your printer and set up the ticket"
     },
     "pinpad": {
       "erase": "Erase"

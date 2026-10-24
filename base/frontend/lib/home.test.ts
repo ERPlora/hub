@@ -7,6 +7,7 @@ import {
   activeWidgetKeys,
   blockingItems,
   checklistView,
+  formatValue,
   greetingSlot,
   heading,
   orderByUse,
@@ -153,6 +154,43 @@ describe('blockingItems (the strip)', () => {
   });
 });
 
+const EUR = { currency: 'EUR', decimals: 2 };
+const PLN = { currency: 'PLN', decimals: 2 };
+
+// BASE-G98: an amount of the Home is in the business's currency (its country's, as Settings › Business says), with
+// its decimals and the symbol a till of that country prints — a Polish business reads «zł», a Spanish one «€» —,
+// never a fixed euro; until the business is known, the amount without a symbol, never another currency's.
+describe('formatValue: the business currency (BASE-G98)', () => {
+  it("writes an amount (the server's cents) in the business's currency, by its local symbol", () => {
+    expect(formatValue(1250, 'currency', 'es', EUR)).toBe('12,50\u00a0€');
+    expect(formatValue(1250, 'currency', 'es', PLN)).toBe('12,50\u00a0zł');
+    expect(formatValue(1250, 'currency', 'en', PLN)).toBe('zł\u00a012.50');
+  });
+
+  it('with as many decimals as the currency has', () => {
+    expect(formatValue(123400, 'currency', 'en', { currency: 'JPY', decimals: 0 })).toBe('¥1,234');
+    expect(formatValue(123456, 'currency', 'en', { currency: 'KWD', decimals: 3 })).toBe('KWD\u00a01,234.560');
+  });
+
+  it('without the business yet, the amount alone, never in a currency it is not', () => {
+    expect(formatValue(1250, 'currency', 'es')).toBe('12,50');
+    expect(formatValue(1250, 'currency', 'en')).toBe('12.50');
+  });
+
+  it("a panel's every amount — a sparkline's last value, each bar of a list — is in the business's currency", () => {
+    const spark = widget('s.days', { kind: 'sparkline', map: { series: 'n' }, options: { format: 'currency' } });
+    expect(widgetView(spark, [{ n: 100 }, { n: 250 }], 'es', { money: PLN })).toMatchObject({ value: '2,50\u00a0zł' });
+    const list = widget('s.top', { kind: 'bar-list', map: { label: 'name', value: 'total' }, options: { valueFormat: 'currency' } });
+    const view = widgetView(list, { rows: [{ name: 'Café', total: 1250 }] }, 'es', { money: PLN });
+    expect(view).toMatchObject({ kind: 'bar-list', bars: [{ label: 'Café', text: '12,50\u00a0zł' }] });
+  });
+
+  it('one format per currency: a business that follows another on the same page keeps its own', () => {
+    expect(formatValue(500, 'currency', 'es', PLN)).toBe('5,00\u00a0zł');
+    expect(formatValue(500, 'currency', 'es', EUR)).toBe('5,00\u00a0€');
+  });
+});
+
 describe('rowsOf / widgetView (BASE-G166)', () => {
   it('reads the rows of a page, a list or one object, as the server reads the first row', () => {
     expect(rowsOf({ rows: [{ a: 1 }], total: 1 })).toEqual([{ a: 1 }]);
@@ -165,7 +203,8 @@ describe('rowsOf / widgetView (BASE-G166)', () => {
   it('a kpi reads `map.value` of the first row, formatted by `options.format`', () => {
     expect(widgetView(widget('demo.k'), { open: 1234 }, 'es')).toEqual({ kind: 'kpi', value: '1234', label: undefined });
     const money = widget('s.k', { map: { value: 'total' }, options: { format: 'currency' } });
-    expect(widgetView(money, { total: 1250 }, 'es')).toMatchObject({ kind: 'kpi', value: '12,50 €' });
+    expect(widgetView(money, { total: 1250 }, 'es', { money: EUR })).toMatchObject({ kind: 'kpi', value: '12,50 €' });
+    expect(widgetView(money, { total: 1250 }, 'es', { money: PLN })).toMatchObject({ kind: 'kpi', value: '12,50 zł' });
   });
 
   it('says «No data» without a row or without the mapped value, never a 0 it did not get', () => {
@@ -215,7 +254,7 @@ describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
   const chart = widget('sale.last_7_days', { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } });
   const days = (labels: string[], total = 0) => ({ rows: labels.map((day) => ({ day, total })) });
   const barsOf = (result: unknown, locale: string) => {
-    const view = widgetView(chart, result, locale);
+    const view = widgetView(chart, result, locale, { money: EUR });
     if (view.kind !== 'chart') throw new Error(`expected a chart, got ${view.kind}`);
     return view.bars;
   };

@@ -87,33 +87,91 @@ function widestDate(cell: Locator): Promise<{ text: string; width: number; room:
 }
 
 type Box = { name: string; left: number; right: number; top: number; bottom: number };
+type Toolbar = { bar: Box; controls: Box[]; settled: boolean };
+type Size = { width: number; height: number };
 
-/** The toolbar row of «Activity» and each control painted in it (`display: none` ones left out). */
-function toolbarBoxes(page: Page): Promise<{ bar: Box; controls: Box[] }> {
-  const bar = shown(page)
-    .locator('.data-table__bar-main')
-    .filter({ has: page.locator('[data-testid=home-activity-search]') });
-  return bar.evaluate((row) => {
-    const box = (el: Element, name: string) => {
-      const r = el.getBoundingClientRect();
-      return { name, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
-    };
-    const style = getComputedStyle(row);
-    const inner = row.getBoundingClientRect();
-    const controls = [...row.children]
-      .filter((el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0)
-      .map((el) => box(el, el.getAttribute('data-testid') ?? el.className.toString().split(' ')[0]));
-    return {
-      bar: {
+/**
+ * The toolbar row of «Activity» and each control painted in it (`display: none` ones left out), read once the page has
+ * settled at `size`. Armed in the page BEFORE the resize (a `goto` to the same `/#actividad` reloads nothing: a read
+ * right after `setViewportSize` raced the page answering the new size, and at 820 coming from 1440 it read the bar
+ * still beside the side menu, 516 px wide, list/cards on a second line). From the `resize` on, each frame, until:
+ *   - the shell answered the size: `ion-split-pane` shows or hides the side menu a frame AFTER the window changes,
+ *     by its `when` (`lg` = 992 px, Ionic's breakpoints);
+ *   - nothing animates (the list/cards switch slides its indicator), in the document or in a shadow root;
+ *   - the bar holds still: the same boxes two frames in a row.
+ * Never a fixed wait; `settled` is false when 600 frames go by without that.
+ */
+async function toolbarAt(page: Page, size: Size): Promise<Toolbar> {
+  await page.evaluate((target) => {
+    const read = () => {
+      const row = [...document.querySelectorAll('.data-table__bar-main')].find((el) =>
+        el.querySelector('[data-testid=home-activity-search]'),
+      );
+      if (!row) return undefined;
+      const box = (el: Element, name: string) => {
+        const r = el.getBoundingClientRect();
+        return { name, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      };
+      const style = getComputedStyle(row);
+      const inner = row.getBoundingClientRect();
+      const controls = [...row.children]
+        .filter((el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0)
+        .map((el) => box(el, el.getAttribute('data-testid') ?? el.className.toString().split(' ')[0]));
+      const bar = {
         name: 'bar',
         left: inner.left + parseFloat(style.paddingLeft),
         right: inner.right - parseFloat(style.paddingRight),
         top: inner.top,
         bottom: inner.bottom,
-      },
-      controls,
+      };
+      return { bar, controls };
     };
-  });
+    const breakpoints: Record<string, string> = {
+      xs: '(min-width: 0px)',
+      sm: '(min-width: 576px)',
+      md: '(min-width: 768px)',
+      lg: '(min-width: 992px)',
+      xl: '(min-width: 1200px)',
+    };
+    const shellAnswered = () => {
+      const pane = document.querySelector('ion-split-pane') as (Element & { when?: unknown }) | null;
+      if (!pane || typeof pane.when !== 'string') return true;
+      return pane.classList.contains('split-pane-visible') === matchMedia(breakpoints[pane.when] ?? pane.when).matches;
+    };
+    const animating = () => {
+      const animations = [...document.getAnimations()];
+      const walk = (root: Document | ShadowRoot) => {
+        for (const el of root.querySelectorAll('*')) {
+          if (!el.shadowRoot) continue;
+          animations.push(...el.shadowRoot.getAnimations());
+          walk(el.shadowRoot);
+        }
+      };
+      walk(document);
+      return animations.some((a) => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity);
+    };
+    (window as unknown as { __toolbar: Promise<unknown> }).__toolbar = new Promise((resolve) => {
+      let last: string | undefined;
+      let frames = 0;
+      const frame = () => {
+        const now = read();
+        const seen = now && JSON.stringify(now);
+        if (now && seen === last && shellAnswered() && !animating()) return resolve({ ...now, settled: true });
+        last = seen;
+        frames += 1;
+        if (frames > 600) return resolve({ bar: now?.bar, controls: now?.controls ?? [], settled: false });
+        requestAnimationFrame(frame);
+      };
+      const onResize = () => {
+        if (innerWidth !== target) return;
+        removeEventListener('resize', onResize);
+        frame();
+      };
+      addEventListener('resize', onResize);
+    });
+  }, size.width);
+  await page.setViewportSize(size);
+  return page.evaluate(() => (window as unknown as { __toolbar: Promise<Toolbar> }).__toolbar);
 }
 
 async function rowOf(page: Page, id: string): Promise<Locator> {
@@ -176,11 +234,11 @@ const TOOLBAR_VIEWPORTS = [...VIEWPORTS, { label: '820', width: 820, height: 118
 
 test('BASE-F09 — the toolbar of «Activity» is one row from 820 to 1440, as in the old hub, and spills nowhere', async ({ page }) => {
   await login(page, A, '/');
+  await page.goto(`${A}/#actividad`);
+  await expect(shown(page).locator('[data-testid=home-activity-filters-toggle]')).toBeVisible();
   for (const vp of TOOLBAR_VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto(`${A}/#actividad`);
-    await expect(shown(page).locator('[data-testid=home-activity-filters-toggle]')).toBeVisible();
-    const { bar, controls } = await toolbarBoxes(page);
+    const { bar, controls, settled } = await toolbarAt(page, vp);
+    expect(settled, `the page settled at ${vp.label}`).toBe(true);
     for (const control of controls) {
       expect(control.left, `${control.name} inside the bar at ${vp.label}`).toBeGreaterThanOrEqual(bar.left - 0.5);
       expect(control.right, `${control.name} inside the bar at ${vp.label}`).toBeLessThanOrEqual(bar.right + 0.5);

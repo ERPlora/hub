@@ -22,6 +22,7 @@ import {
   type StreamCall,
 } from '../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
+import type { Business } from '../operations';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
@@ -36,6 +37,27 @@ export const OWNER: SessionMe = {
 };
 
 export const EMPLOYEE: SessionMe = { ...OWNER, user: { id: 'u2', label: 'Leo' }, permissions: ['base.view_home', 'demo.view'] };
+
+/** What `base.business.get` answers for a Spanish business; `fields` change it (BASE-G98: the Home's amounts are in
+ *  its currency). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+export const POLISH = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
 
 const BLANK = { template: '<div />' };
 

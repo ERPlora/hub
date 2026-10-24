@@ -11,7 +11,14 @@ from live.live_registry import live
 from live.meta import module_configs
 
 from base import events
-from base.events import DATA_EVENTS, FAILED_EVENT_CREATED, FAILED_EVENT_DISCARDED, FAILED_EVENT_RETRIED, HUB_STATE_APPLIED
+from base.events import (
+    DATA_EVENTS,
+    FAILED_EVENT_CREATED,
+    FAILED_EVENT_DISCARDED,
+    FAILED_EVENT_RETRIED,
+    HUB_REGISTERED,
+    HUB_STATE_APPLIED,
+)
 
 #: What changes the failed events: the relay gives one up, who runs the business resends or discards one (APP-BASE-7).
 FAILED_EVENTS = [FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCARDED]
@@ -41,6 +48,10 @@ live("base.plan.usage", on=[HUB_STATE_APPLIED])
 live("base.blueprint.list", on=sorted({HUB_STATE_APPLIED, *DATA_EVENTS}))
 live("base.import.list", on=sorted(DATA_EVENTS))
 
+# ── Business settings and the hub's context (APP-BASE-6) ──
+# The SaaS registers the business again when its owner changes its name, time zone or language on erplora.com
+# (HUBS-F15): Settings › Business follows it without reloading.
+live("base.business.get", on=[HUB_REGISTERED])
 
 # ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
 # The failed events follow the relay, who resends or discards them, and the photo (it turns their app on or off).
