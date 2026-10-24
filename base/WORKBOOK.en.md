@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b7ae49ea46f01669bd12b58a08efd2245a839c9845096fef9b79e1c2e2ab9c67 -->
+<!-- generated from WORKBOOK.md sha256:f80aa3ee1dd1238bb73bf92c0c7decac7d61f3ea766bc98aba99155dd0bfd0a4 -->
 
 ## What it is for and who it is for
 
@@ -910,9 +910,10 @@ Steps:
      erplora.com's sign-in for this business; on a till that does offer it, **Access** shows and they tap the
      "Account" tab and then "Enter with your account".
   2. At erplora.com they sign in as always: email and password, Google or their verification code.
-  3. They come back to the business already in, on the screen they had asked for or on **Home**. If this
-     device asks for a PIN, the business already enters its tills with a PIN and the person has none yet, it
-     first asks them to choose it (BASE-F41).
+  3. They come back to the business already in, on the screen they had asked for (a link to a tab, such as
+     `/settings#data` or `/system#plan`, comes back to that tab) or on **Home**. If this device asks for a PIN,
+     the business already enters its tills with a PIN and the person has none yet, it first asks them to choose
+     it (BASE-F41).
 In: the account erplora.com checks; this browser.
 Out: the person's session in this business and this browser turned into a trusted device of the business (it
 shows in "Devices", shared until someone says otherwise). The session lasts a 12-hour shift on a shared device,

@@ -968,7 +968,8 @@ Pasos:
      este negocio; en una caja que sí lo ofrece sale **Acceso** y pulsa la pestaña «Cuenta» y después «Entrar con
      tu cuenta».
   2. En erplora.com entra como siempre: email y contraseña, Google o su código de verificación.
-  3. Vuelve al negocio ya dentro, en la pantalla que había pedido o en **Inicio**. Si este dispositivo pide PIN,
+  3. Vuelve al negocio ya dentro, en la pantalla que había pedido (un enlace a una pestaña, como
+     `/settings#data` o `/system#plan`, vuelve a esa pestaña) o en **Inicio**. Si este dispositivo pide PIN,
      el negocio ya entra en sus cajas con PIN y la persona aún no tiene uno, antes le pide elegirlo (BASE-F41).
 Entra: la cuenta que comprueba erplora.com; este navegador.
 Sale: la sesión de la persona en este negocio y este navegador convertido en un dispositivo de confianza del
@@ -1394,7 +1395,15 @@ Implicados: BASE-F57
   del punto de connect-history-api-fallback y de `{*path:nonfile}` de ASP.NET Core; ninguna ruta de la SPA lleva
   punto (sus parámetros son ids). Una navegación (sin extensión) sigue igual: con sesión, la SPA y su `csrftoken`;
   sin sesión y pidiendo HTML, el salto al login del SaaS; sin pedir HTML, la SPA; `/` con web publicada, la web
-  (`base/tests/test_spa.py`, `test_public_home.py`; e2e `tests/e2e/fix-hub-spa-static-probes.spec.ts`). Como
+  (`base/tests/test_spa.py`, `test_public_home.py`; e2e `tests/e2e/fix-hub-spa-static-probes.spec.ts`). Ese salto
+  es una página propia (`base/templates/base/jump.html`, `base.auth_views.jump_page`, 200 sin caché) y no un 302: el
+  navegador nunca manda al servidor lo que va tras `#`, y la vuelta por erplora.com (un POST a `/auth/callback`) lo
+  perdía, así que su único script, con el nonce de la CSP, va a `/auth/login?next=<ruta>` con el `#` dentro del
+  `next`, y `/auth/login` salta con su `state` nuevo; sin scripts, `<noscript>` lo hace sin el `#`. El Acceso
+  (`/login`) sigue siendo un 302 de la misma petición: el navegador conserva el `#` en un salto del mismo origen
+  (`nextWithHash` de `base/frontend/lib/access.ts` lo junta al `next`) y el aviso de la sesión terminada se calcula
+  antes de que el middleware de sesiones borre su cookie (`base/tests/test_middleware.py`, `test_access_entry.py`;
+  e2e `tests/e2e/base-deep-link.spec.ts` y BASE-G58 de `base-access.spec.ts`). Como
   `/favicon.ico` es un 404, la SPA declara los iconos del hub viejo, el de la pestaña y el de la pantalla de inicio
   (`LIVE["spa"]["icons"]` de `live.spa`, estáticos de `base` en `base/static/base/icons/`; nunca por CDN).
 - Navegador: el tablero se guarda en `localStorage["dashboard-hub"]` (la clave del viejo) y el uso de

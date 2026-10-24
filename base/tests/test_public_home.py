@@ -157,7 +157,8 @@ def test_a_demo_with_a_published_site_shows_it_and_one_without_jumps_to_its_door
     response = browse(client, host="demo-0000beef.localhost:8000")
     assert (response.status_code, website.served) == (200, ["demo-0000beef"])
     website.published = False
-    assert jumps_to(client, browse(client, host="demo-0000beef.localhost:8000"), "/demo/enter/", "demo-0000beef.localhost:8000")
+    demo = "demo-0000beef.localhost:8000"
+    assert jumps_to(client, browse(client, host=demo), "/demo/enter/", demo)
 
 
 def test_each_hub_asks_about_its_own_site(client, website):

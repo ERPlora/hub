@@ -75,8 +75,8 @@ def test_an_anonymous_browser_goes_to_the_saas_login_of_its_hub(client, path, ho
 
 
 def test_the_jump_page_carries_the_fragment_the_browser_never_sends(client):
-    # «/settings#data» reaches the server as «/settings»: only the page's script knows the «#data» it adds to ``next``,
-    # so the person lands on the tab the link named after erplora.com (BASE-G52).
+    # «/settings#data» reaches the server as «/settings»: only the page's script knows the «#data» it adds to
+    # ``next``, so the person lands on the tab the link named after erplora.com (BASE-G52).
     page = browse(client, "/settings")
     html = page.content.decode()
     nonce = re.search(r"'nonce-([^']+)'", page["Content-Security-Policy"]).group(1)
@@ -93,7 +93,7 @@ def test_the_jump_page_speaks_the_language_of_the_browser_without_scripts(client
 
 
 def test_the_jump_page_leaves_the_state_to_the_login_it_sends_to(client):
-    # The page is not the jump to erplora.com: /auth/login is, with its own fresh state (a cached page never replays one).
+    # The page is not the jump to erplora.com: /auth/login is, with its own fresh state (no page replays one).
     assert not browse(client, "/demo/items").cookies
 
 
