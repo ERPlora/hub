@@ -7,12 +7,21 @@
 // document, lets what that sets off run, and fails if a real timeout or interval the test armed is still pending,
 // naming where it was armed. It watches the real timers, not Vitest's fake clock: a file with fake timers of its
 // own works as before, and a timer put on a fake clock dies with that clock — it cannot outlive the page.
+// A page mounted alone paints the icons the running app paints (`createShell` registers them when the app starts), and
+// Ionic's elements attach as in a browser (`fillHappyDomGaps`, as packages/ui's own setup does).
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { fillHappyDomGaps } from '@erplora/ui/testing';
 import { enableAutoUnmount } from '@vue/test-utils';
 import { afterEach, beforeEach } from 'vitest';
 import { render, toRaw } from 'vue';
+
+// The hub does not depend on ionicons itself: its registry is global (`window.Ionicons`), so the copy @erplora/ui
+// installs registers the shell's icons, as apps/inventory's and apps/customer's harnesses did; the shell's registry
+// itself, as its barrel would boot the whole shell.
+import { addIcons } from './packages/ui/node_modules/ionicons';
+import { ION_ICONS } from './packages/ui/src/shell/icons';
 
 type Timer = ReturnType<typeof setTimeout>;
 type Handler = (...args: unknown[]) => void;
@@ -72,6 +81,12 @@ enableAutoUnmount((unmount) => {
 // Vue arms a one-off 3 s timer (its devtools hook) the first time it renders in a browser: armed here, before any
 // test watches, it is no test's.
 if (typeof document !== 'undefined') render(null, document.createElement('div'));
+
+// Without them each `ion-icon` warns with its whole element and tries the network, and each Ionic element logs a
+// TypeError: megabytes of output per file, which the run's main process must take in while the files ask it for their
+// modules (a cold import then outlasts a test). Both are no-ops without a DOM.
+if (typeof window !== 'undefined') addIcons(ION_ICONS);
+fillHappyDomGaps();
 
 beforeEach(() => {
   // What the file armed before its tests (this setup, its imports, a `beforeAll`) is not the test's.

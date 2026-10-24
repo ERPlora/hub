@@ -62,6 +62,12 @@ export const POLISH = { country: 'PL', country_name: 'Poland', currency: 'PLN', 
 const BLANK = { template: '<div />' };
 
 /** The browser's localStorage (the test environment has none): `vi.stubGlobal('localStorage', memoryStorage())`. */
+/** The name a screen reader reads. Attached, `ion-button` moves `aria-label` from its host to the native button of its
+ *  shadow root (Ionic's `inheritAriaAttributes`), as in a browser; packages/ui's FormModal tests read it the same. */
+export function accessibleName(element: Element): string | null | undefined {
+  return element.shadowRoot?.querySelector('button')?.getAttribute('aria-label') ?? element.getAttribute('aria-label');
+}
+
 export function memoryStorage(): Storage {
   const store = new Map<string, string>();
   return {
