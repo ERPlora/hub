@@ -104,6 +104,7 @@ function expectIonicPadding(measured: ChipBox, what: string): void {
 
 test('UI shell relleno de ion-chip — a category of the product form keeps Ionic’s padding, at every width', async ({ browser }) => {
   const { context, page } = await ownerPage(browser, '/inventory/products');
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   try {
     const drinks = await post<{ id: string; name: string }>(context, '/inventory/categories', { name: `${TAG} drinks ${RUN}` });
     const food = await post<{ id: string; name: string }>(context, '/inventory/categories', { name: `${TAG} food ${RUN}` });
