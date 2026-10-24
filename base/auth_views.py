@@ -276,13 +276,15 @@ NOTICE_DEVICE_LIMIT = "device_limit"
 
 def way_in(request: HttpRequest, next_path: str) -> HttpResponseRedirect:
     """Where a browser without a session goes to enter this hub (BASE-G55, G57, G58): the hub's Access page when it is
-    a shared device of the hub of a business that asks, with somebody to choose, or when the Access page has something
-    to tell; else erplora.com's sign-in for this hub, as always (a demo, its own door)."""
+    a shared device of the hub of a business that asks, with somebody to choose (telling, if so, that the session
+    ended), or when another device's entry ended this one (the plan covers fewer devices); else erplora.com's sign-in
+    for this hub, as always, which brings the person straight back while its own session lives (a demo, its own
+    door)."""
     slug = HostScopeResolver().resolve(request).key
     if _is_demo(request):
         return auth.demo_login_redirect(slug, next_path)
     notice = _notice(request)
-    if notice or queries.pin_door_open(request, slug):
+    if notice == NOTICE_DEVICE_LIMIT or queries.pin_door_open(request, slug):
         return HttpResponseRedirect(f"{ACCESS_PAGE}?{urlencode({'next': next_path, **({'notice': notice} if notice else {})})}")
     return auth.login_redirect(slug, next_path)
 

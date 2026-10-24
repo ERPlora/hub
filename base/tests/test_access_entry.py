@@ -1,9 +1,10 @@
 """The way in of a browser without a session (BASE-G54, G55, G57, G58, G61): the PIN pad or erplora.com's sign-in.
 
 A page of the hub loaded without a session goes to the hub's «Access» (``/login``) when this browser is a shared device
-of the hub, of a business that asks, with somebody to choose on its grid, or when it has something to say: the session
-ended («ended») or another device's entry ended it («device_limit», the plan covers fewer devices). Anywhere else it
-goes, as before, straight to erplora.com's sign-in for this hub. After an entry with the account on a device that asks,
+of the hub, of a business that asks, with somebody to choose on its grid (saying, if so, that the session ended:
+«ended»), or when another device's entry ended it («device_limit», the plan covers fewer devices). Anywhere else it
+goes, as before, straight to erplora.com's sign-in for this hub, which brings the person back while its own session
+lives. After an entry with the account on a device that asks,
 in a business that already enters by PIN, a person without one is asked to choose it first (``/pin/setup``), and may
 leave it for later.
 """
@@ -101,12 +102,23 @@ class TestThePinPadOrTheSaas:
 
 
 class TestWhatTheAccessPageSays:
-    def test_a_session_that_ended_says_so_even_where_the_pin_is_not_offered(self, client, ana):
+    def test_a_session_that_ended_on_a_till_says_so_on_its_pin_pad(self, client, ana):
+        a_device(client)
+        with_pin(ana)
         client.force_login(ana)
         Session.objects.all().delete()
         response = page(client)
         assert response["Location"].startswith("/login?")
         assert query(response) == {"next": "/sale/pos", "notice": "ended"}
+
+    @pytest.mark.parametrize("device", ["none", "personal"])
+    def test_a_session_that_ended_where_the_pin_is_not_offered_goes_on_to_erplora_com(self, client, ana, device):
+        # erplora.com's sign-in brings the person straight back when its own session is alive (BASE-F13), as before.
+        if device == "personal":
+            a_device(client, mode=access.PERSONAL)
+        client.force_login(ana)
+        Session.objects.all().delete()
+        assert page(client)["Location"].startswith(SAAS_LOGIN)
 
     def test_another_device_s_entry_says_the_plan_covers_fewer_devices(self, client, ana):
         a_device(client, mode=access.PERSONAL, ended_reason=TrustedDevice.EndedReason.DEVICE_LIMIT)

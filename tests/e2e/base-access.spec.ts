@@ -4,8 +4,9 @@
 // their erplora.com account on a first device (A), names themselves and chooses a PIN in «My profile», names the
 // device in Settings; the employee enters with theirs on a till (B), which asks them to create their PIN and ends A's
 // session (the plan covers one device). On B: sign out (the PIN pad), a wrong and a right PIN, a badge, «Switch user»
-// over the screen in use, the idle lock, removing the unused device and the one in hand. Fresh accounts signed up on
-// the SaaS's screens and a business created through its API, as the panel creates it (base-session-revoke.spec.ts).
+// over the screen in use, the idle lock, a session that ends, removing the unused device and the one in hand. Fresh
+// accounts signed up on the SaaS's screens and a business created through its API, as the panel creates it
+// (base-session-revoke.spec.ts).
 // Never a PIN in the hubs `a`/`b` (it would change every other spec's way in); the business's dial is put back after.
 import { createHmac } from 'node:crypto';
 
@@ -305,7 +306,32 @@ test('BASE-G59: a till of a business that always asks goes back to the PIN pad a
   await expect.poll(() => psql('SELECT pin_policy FROM base_accesssettings')).toBe('per_shift');
 });
 
-test('BASE-G66 BASE-G65 BASE-G58: the device nobody uses goes; removing the one in hand ends the session and says so', async () => {
+test('BASE-G58: the till’s session ends while working: its next page is its PIN pad, which says so', async () => {
+  // Its shift is over (or an administrator ended it): the session is past its time. The business's only live session
+  // is the till's (A's ended with the employee's entry).
+  const ended = psql(
+    `WITH ended AS (UPDATE django_session SET expire_date = now() - interval '1 minute' WHERE expire_date > now() AND ` +
+      `session_key IN (SELECT session_id FROM base_sessionowner WHERE host = '${business.slug}') RETURNING 1) ` +
+      'SELECT count(*) FROM ended',
+  );
+  expect(ended, 'the till’s session, and only it').toBe('1');
+  await till.goto(`${origin}/settings`);
+  await expect(till).toHaveURL(/\/login\?next=%2Fsettings&notice=ended$/, { timeout: SAAS_STEP });
+  await expect(shown(till).getByTestId('access-notice')).toContainText('Your session has ended');
+  await expect(shown(till).getByTestId('access-tabs')).toBeVisible();
+  await atEverySize(till, 'BASE-G58', async () => {
+    await expect(shown(till).getByTestId('access-notice')).toBeVisible();
+  });
+  await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
+  await press(till, OWNER_PIN);
+  await expect(till).toHaveURL(`${origin}/settings`);
+  expect(await whoIsIn(till, origin)).toBe('Ana López');
+  // At most, the live stream heard the end first (a 401 the SDK reads as «the session ended», `host-closed.ts`).
+  const during = refused.slice(2);
+  expect(during.length <= 1 && during.every((answer) => answer === '401 GET /api/live'), refused.join('\n')).toBe(true);
+});
+
+test('BASE-G66 BASE-G65: the device nobody uses goes; removing the one in hand ends its session', async () => {
   psql(`UPDATE base_trusteddevice SET last_entry_at = now() - interval '40 days' WHERE name = 'Office'`);
   await till.reload();
   const devices = shown(till).getByTestId('devices-card');
@@ -314,24 +340,30 @@ test('BASE-G66 BASE-G65 BASE-G58: the device nobody uses goes; removing the one 
   await devices.getByTestId('devices-prune-confirm').click();
   await expect(devices.getByTestId('device-row').filter({ hasText: 'Office' })).toHaveCount(0);
 
+  const inHand = psql(
+    'SELECT o.device_id FROM base_sessionowner o JOIN django_session s ON s.session_key = o.session_id ' +
+      `WHERE o.host = '${business.slug}' AND s.expire_date > now()`,
+  );
+  expect(inHand, 'the till’s session names its device').toMatch(/^[0-9a-f-]{36}$/);
   const mine = devices.getByTestId('device-row').filter({ hasText: 'The one you are using' });
   await mine.getByTestId('device-remove').click();
   await expect(mine.getByTestId('device-remove-ask')).toContainText('It is the device you are using');
-  // gh:hub#2577: two sign-outs, a badge and two switches of user so far, and the till's only refusals (and console
-  // errors: the browser logs every one) are the wrong PIN's and the unknown badge's.
-  expect(refused).toEqual(['401 POST /auth/pin', '401 POST /auth/badge']);
-  expect((await problems()).console).toHaveLength(2);
+  // gh:hub#2577: two sign-outs, an ended session, a badge and three switches of user so far, and the till's only
+  // refusals (and console errors: the browser logs every one) are the wrong PIN's, the unknown badge's and, at most,
+  // the live stream's when the session ended.
+  expect(refused.slice(0, 2)).toEqual(['401 POST /auth/pin', '401 POST /auth/badge']);
+  const before = refused.length;
+  expect((await problems()).console).toHaveLength(before);
   await mine.getByTestId('device-remove-confirm').click();
-  await expect(till).toHaveURL(/\/login\?next=%2F&notice=ended$/, { timeout: SAAS_STEP });
-  await expect(shown(till).getByTestId('access-notice')).toContainText('Your session has ended');
-  await expect(shown(till).getByTestId('access-tabs')).toHaveCount(0);
-  await atEverySize(till, 'BASE-G58', async () => {
-    await expect(shown(till).getByTestId('access-notice')).toBeVisible();
-  });
+  // Its session ended and the hub no longer knows the browser: erplora.com's sign-in, whose session is alive, brings
+  // the person of this browser's account back in, on a device the hub trusts anew.
+  await expect(till).toHaveURL(`${origin}/`, { timeout: SAAS_STEP });
+  expect(await whoIsIn(till, origin)).toBe('Bea');
+  expect(psql(`SELECT count(*) FROM base_trusteddevice WHERE id = '${inHand}'`)).toBe('0');
   const seen = await problems();
   // Then, at most, the live stream hears that the session ended before the page leaves (the SDK's way to know,
   // `host-closed.ts`: a race with the navigation), and nothing else.
-  const after = refused.slice(2);
+  const after = refused.slice(before);
   expect(after.length <= 1 && after.every((answer) => answer === '401 GET /api/live'), refused.join('\n')).toBe(true);
   expect(seen.console, seen.console.join('\n')).toHaveLength(refused.length);
   expect(seen.page, seen.page.join('\n')).toEqual([]);

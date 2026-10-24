@@ -82,6 +82,8 @@ def test_the_spas_route_map_names_every_base_route(settings):
     # frontend/generated/operations.json: the op → route map the SDK's client uses (hand-written until V3).
     import json
 
+    from base.tests.test_access_routes import ROUTES as WAY_IN
+
     spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
     mine = {(route["method"].upper(), route["path"], op) for op, route in spa.items() if op.startswith("base.")}
     assert mine == {
@@ -92,4 +94,4 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/home/notices", "base.notice.list"),
         ("GET", "/api/apps", "base.app.list"),
         ("GET", "/api/system/plan", "base.plan.usage"),
-    }
+    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN}
