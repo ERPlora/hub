@@ -107,14 +107,47 @@ async function ask(page: Page, text: string, options: { settle?: boolean } = {})
   if (options.settle ?? true) await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
 }
 
-/** The panel as a person sees it at each size, saved as `APP-BASE-9-<key>-<size>`. */
-async function shots(page: Page, key: string, ready: () => Promise<void> = async () => undefined): Promise<void> {
+/** The panel as a person sees it at each size, saved as `APP-BASE-9-<key>-<size>`; `settled`, when given, must hold at
+ *  the very moment of each capture. */
+async function shots(
+  page: Page,
+  key: string,
+  ready: () => Promise<void> = async () => undefined,
+  settled?: () => Promise<boolean>,
+): Promise<void> {
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await ready();
     await untilStill(page);
+    if (settled) expect(await settled(), `APP-BASE-9-${key}-${vp.label} caught before it settled`).toBe(true);
     await page.screenshot({ path: shot(`APP-BASE-9-${key}-${vp.label}`) });
   }
+}
+
+/** The dangerous card ready for its capture: «Confirmation» focused (the dialog focuses it once presented, after its own
+ *  animation) and its label floating, then one frame for the label's move to start, so `untilStill` waits for it. */
+async function confirmationReady(page: Page): Promise<void> {
+  await expect(card(page)).toBeVisible();
+  const field = card(page).locator('[data-testid="assistant-confirm-input"]');
+  await expect(field).toHaveClass(/\bhas-focus\b/);
+  await expect(field).toHaveClass(/\blabel-floating\b/);
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+}
+
+/** The dangerous card's «Confirmation» as its capture must show it: focused, its label floated and still (rv-ui-35: the
+ *  first size caught the first frame of the label's move, with a gap in the outline). */
+async function confirmationSettled(page: Page): Promise<boolean> {
+  return card(page)
+    .locator('[data-testid="assistant-confirm-input"]')
+    .evaluate((field) => {
+      const label = field.querySelector('.label-text-wrapper');
+      return (
+        field.classList.contains('has-focus') &&
+        field.classList.contains('label-floating') &&
+        label !== null &&
+        label.getAnimations().length === 0
+      );
+    });
 }
 
 async function freshPage(browser: Browser, credentials = EMPLOYEE): Promise<Page> {
@@ -313,7 +346,7 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   // The native button inside `ion-button` (its host carries no role for `aria-disabled` to count).
   const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
   await expect(submit).toBeDisabled();
-  await shots(page, 'BASE-G116', () => expect(card(page)).toBeVisible());
+  await shots(page, 'BASE-G116', () => confirmationReady(page), () => confirmationSettled(page));
   await page.setViewportSize({ width: 1440, height: 900 });
   const typing = card(page).locator('[data-testid="assistant-confirm-input"] input');
   // Typed wrong: «Run it» stays off and nothing is deleted.
