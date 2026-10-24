@@ -38,6 +38,8 @@ const shown = computed(() => session.can('base.view_home') && canDictate(props.v
 const offline = ref(globalThis.navigator?.onLine === false);
 const recording = shallowRef<Recording | null>(null);
 const transcribing = ref(false);
+/** The browser is still asking for the microphone: a second tap meanwhile opens no second recording. */
+const starting = ref(false);
 /** Greyed: offline and not recording (a recording can always be stopped). */
 const unavailable = computed(() => offline.value && !recording.value);
 
@@ -77,7 +79,7 @@ async function transcribe(current: Recording): Promise<void> {
 }
 
 async function press(): Promise<void> {
-  if (transcribing.value) return;
+  if (transcribing.value || starting.value) return;
   const current = recording.value;
   if (current) {
     recording.value = null;
@@ -88,6 +90,7 @@ async function press(): Promise<void> {
     return transcribe(current);
   }
   if (offline.value) return warn(t('sale.pos.speak.offline'));
+  starting.value = true;
   try {
     // Two minutes: it stops by itself and what was said is transcribed.
     const started = await recordVoice(props.voice, () => {
@@ -102,6 +105,8 @@ async function press(): Promise<void> {
     if (denied) return warn(t('sale.pos.speak.denied'));
     console.error('sale: the microphone did not start', error);
     void toast(t('sale.pos.speak.failed'), 'danger');
+  } finally {
+    starting.value = false;
   }
 }
 

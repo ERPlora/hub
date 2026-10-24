@@ -222,6 +222,25 @@ describe('SpeakKey: dictating into the assistant', () => {
     expect(voice.released).toHaveBeenCalled();
     expect(k.transcriptions()).toEqual([]);
   });
+
+  it('a second tap while the browser still asks for the microphone opens no second recording', async () => {
+    let grant: (stream: MediaStream) => void = () => undefined;
+    const released = vi.fn();
+    const voice = {
+      ...microphone(),
+      getUserMedia: vi.fn(() => new Promise<MediaStream>((resolve) => (grant = resolve))),
+    };
+    const k = await key({ voice });
+    await k.press();
+    await k.press();
+    expect(voice.getUserMedia).toHaveBeenCalledTimes(1);
+    grant({ getTracks: () => [{ stop: released }] } as unknown as MediaStream);
+    await settle();
+    expect(k.button().text()).toBe('Parar');
+    await k.press();
+    expect(released).toHaveBeenCalledTimes(1);
+    expect(k.transcriptions()).toHaveLength(1);
+  });
 });
 
 describe('SpeakKey: without connection', () => {
