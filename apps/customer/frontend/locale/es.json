@@ -125,7 +125,9 @@
       "notes": "Notas internas",
       "customFields": "Campos personalizados",
       "active": "Activo",
-      "required": "{name} *"
+      "required": "{name} *",
+      "invalidNumber": "Introduce un número.",
+      "invalidDate": "Introduce una fecha válida."
     },
     "importCsv": {
       "button": "Importar CSV",

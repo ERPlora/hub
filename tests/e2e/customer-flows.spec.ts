@@ -79,6 +79,26 @@ test('CUSTOMER-F01: «Add» creates a card from its name; a refused phone is tol
   await expect(rowNamed(page, 'customer-list', name)).toBeVisible();
 });
 
+// flow: CUSTOMER-F01 — the browser reads a birthday that does not exist (31/02) as "": saved, the card had none
+test('CUSTOMER-F01: a birthday that does not exist is told under «Birthday» and nothing is created', async ({ page }) => {
+  await login(page, A, '/customer/customers');
+  await customersReady(page);
+  await shown(page).locator('[data-testid=customer-list-add]').click();
+  const dialog = page.locator('ion-modal[data-testid=customer-create]');
+  const name = e2eName('F01 Birthday');
+  await inputOf(dialog, 'customer-form-name').fill(name);
+  await dialog.locator('[data-testid=customer-form-more] summary').click();
+  const birthday = dialog.locator('ion-input[data-testid=customer-form-birthday]');
+  await birthday.locator('input').focus();
+  await page.keyboard.type('31022026');
+  expect(await birthday.locator('input').evaluate((e: HTMLInputElement) => [e.value, e.validity.badInput])).toEqual(['', true]);
+  await dialog.locator('[data-testid=customer-create-submit]').click();
+  await expect(birthday.locator('.error-text')).toHaveText('Enter a valid date.');
+  await expect(dialog).toBeVisible();
+  const found = await api<{ rows: { name: string }[] }>(page.context(), A, 'GET', `/customer/customers?search=${encodeURIComponent(name)}`);
+  expect(found.data.rows).toEqual([]);
+});
+
 // flow: CUSTOMER-F02 · gh:customers#95 — on a phone the card names the row once
 test('CUSTOMER-F02: the search finds a card by its phone however it is typed; the phone card names it once', async ({ page, context }) => {
   await login(page, A, '/customer/customers');
@@ -121,6 +141,74 @@ test('CUSTOMER-F04: «Edit» turns the data into the form; «Save» says «Custo
   await expect(toast(page)).toContainText(/Customer updated|Cliente actualizado/);
   await expect.poll(async () => (await cardOf(context, card.id)).data).toMatchObject({ id: card.id });
   expect(((await cardOf(context, card.id)).data as unknown as { city: string }).city).toBe('Sevilla');
+});
+
+// flow: CUSTOMER-F04 (textos «Si falla» de los campos personalizados) · FIX-HUB-CUSTOMER-ES-MSGIDS-SHADOWED-BY-LIVE —
+// the browser reads «tres» in a number input and 31/02 in a date one as "": saved, the stored values were emptied
+test('CUSTOMER-F04 in Spanish: «tres» in a number field and 31/02 in a date one are told under them, and nothing is saved', async ({ browser }) => {
+  const context = await browser.newContext({ baseURL: A, locale: 'es-ES' });
+  const page = await context.newPage();
+  try {
+    await login(page, A, '/customer/customers');
+    await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+    const field = async (name: string, type: 'number' | 'date'): Promise<string> => {
+      const res = await api<{ id: string }>(context, A, 'POST', '/customer/fields', { name: e2eName(name), field_type: type });
+      expect(res.status, `create the ${type} field`).toBe(201);
+      return res.data.id;
+    };
+    const visits = await field('F04 Visits', 'number');
+    const since = await field('F04 Since', 'date');
+    const card = await createCard(context, { name: e2eName('F04 Spanish') });
+    const stored = [
+      { field_id: visits, value: '3' },
+      { field_id: since, value: '2026-02-01' },
+    ];
+    expect((await api(context, A, 'POST', '/customer/customers/update', { id: card.id, field_values: stored })).status).toBe(200);
+    /** The card's stored value of each of the two fields. */
+    const values = async () =>
+      Object.fromEntries(
+        ((await cardOf(context, card.id)).data as unknown as { custom_fields: { field_id: string; value: string }[] }).custom_fields
+          .filter((f) => f.field_id === visits || f.field_id === since)
+          .map((f) => [f.field_id, f.value]),
+      );
+
+    await openCard(page, card.id);
+    await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    await shown(page).locator('[data-testid=customer-detail-edit]').click();
+    const form = shown(page).locator('[data-testid=customer-edit-form]');
+    const number = form.locator(`ion-input[data-testid=customer-form-field-${visits}]`);
+    const date = form.locator(`ion-input[data-testid=customer-form-field-${since}]`);
+    await number.locator('input').fill('');
+    await number.locator('input').pressSequentially('tres');
+    await date.locator('input').fill('');
+    await date.locator('input').focus();
+    await page.keyboard.type('31022026');
+    for (const input of [number, date]) {
+      expect(await input.locator('input').evaluate((e: HTMLInputElement) => [e.value, e.validity.badInput])).toEqual(['', true]);
+    }
+    await form.locator('[data-testid=customer-edit-save]').click();
+
+    await expect(number.locator('.error-text')).toHaveText('Introduce un número.');
+    await expect(date.locator('.error-text')).toHaveText('Introduce una fecha válida.');
+    await expect(number).toHaveClass(/ion-invalid/);
+    await expect(toast(page)).toHaveCount(0);
+    for (const vp of FLOW_VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(async () => {
+        await form.locator('[data-testid=customer-form-custom-fields]').scrollIntoViewIfNeeded({ timeout: 2000 });
+        await expect(number.locator('.error-text')).toBeInViewport({ timeout: 1000 });
+        await expect(date.locator('.error-text')).toBeInViewport({ timeout: 1000 });
+      }, `both errors at ${vp.label}`).toPass();
+      await expect.poll(() => horizontalOverflow(page), `sideways scroll at ${vp.label}`).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: shot(`FIX-HUB-CUSTOMER-ES-MSGIDS-SHADOWED-BY-LIVE-${vp.label}`) });
+    }
+    await expect(form).toBeVisible();
+    expect(await values()).toEqual({ [visits]: '3', [since]: '2026-02-01' });
+  } finally {
+    await context.close();
+  }
 });
 
 // flow: CUSTOMER-F05

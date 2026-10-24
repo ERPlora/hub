@@ -125,7 +125,9 @@
       "notes": "Internal notes",
       "customFields": "Custom fields",
       "active": "Active",
-      "required": "{name} *"
+      "required": "{name} *",
+      "invalidNumber": "Enter a number.",
+      "invalidDate": "Enter a valid date."
     },
     "importCsv": {
       "button": "Import CSV",
