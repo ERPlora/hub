@@ -443,6 +443,29 @@ class ApiKey(UUIDModel):
         return f"{self.name} ({self.prefix}…)"
 
 
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+class ApiSettings(UUIDModel):
+    """Whether the business shows the documentation of its API (BASE-G100): one row at most; without it, hidden."""
+
+    singleton = models.BooleanField(_("single row"), default=True, editable=False)
+    docs_enabled = models.BooleanField(pgettext_lazy("api settings", "show the API documentation"), default=False)
+    updated_at = models.DateTimeField(pgettext_lazy("api settings", "updated at"), auto_now=True)
+    updated_by = models.CharField(pgettext_lazy("api settings", "updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+
+    class Meta:
+        verbose_name = pgettext_lazy("api settings", "API settings")
+        verbose_name_plural = pgettext_lazy("api settings", "API settings")
+        constraints = [
+            models.UniqueConstraint(fields=["singleton"], name="base_apisettings_single_row"),
+            models.CheckConstraint(condition=Q(singleton=True), name="base_apisettings_singleton"),
+        ]
+
+    def __str__(self) -> str:
+        return "API documentation shown" if self.docs_enabled else "API documentation hidden"
+
+
 # ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
 
 

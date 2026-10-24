@@ -1087,3 +1087,29 @@ class ApprovalOut(Schema):
 
 class ApprovalListOut(Schema):
     approvals: list[ApprovalOut]
+
+
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+
+
+class ApiDocIn(Schema):
+    """No input."""
+
+
+class ApiDocOut(Schema):
+    document: dict = Field(description="The OpenAPI document of what this business's apps publish.")
+    apps: list[ApiAppOut] = Field(description="The apps in it (its tags), by name.")
+    keys_available: bool = Field(description="Whether this business can make API keys yet.")
+
+
+class ApiDocSettingsIn(Schema):
+    """No input."""
+
+
+class ApiDocSettingsOut(Schema):
+    docs_enabled: bool
+    can_change: bool = Field(description="Whether who asks may change it (who runs the business).")
+
+
+class ApiDocSettingsUpdateIn(Schema):
+    docs_enabled: bool

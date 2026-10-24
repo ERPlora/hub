@@ -84,6 +84,7 @@ def test_the_spas_route_map_names_every_base_route(settings):
 
     from base.tests.test_access_routes import ROUTES as WAY_IN
     from base.tests.test_api_keys import KEY_ROUTES as KEYS
+    from base.tests.test_api_docs import API_DOC_ROUTES as API_DOCS
     from base.tests.test_approvals import APPROVAL_ROUTES as APPROVALS
     from base.tests.test_people import PEOPLE_ROUTES as PEOPLE
 
@@ -107,7 +108,7 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/system/failed-events/retry", "base.failed_event.retry"),
         ("POST", "/api/system/failed-events/retry_all", "base.failed_event.retry_all"),
         ("POST", "/api/system/failed-events/discard", "base.failed_event.discard"),
-    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS}
+    } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS}
 
 
 # Settings › Data (APP-BASE-2): the blueprints, the loads, the export and the reset. Reading what a file brings goes by

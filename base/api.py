@@ -323,3 +323,22 @@ async def approval_approvers(request, data: Query[ApproversIn]):
 @bind(router, "base.approval.approve", "/approvals")
 async def approval_approve(request, data: ApprovalIn):
     return await run_operation(request, services.approval_approve, data)
+
+
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+from base.schemas import ApiDocSettingsUpdateIn  # noqa: E402
+
+
+@bind(router, "base.api_doc.get", "/api-docs")
+async def api_doc_get(request):
+    return await run_operation(request, queries.api_doc_get)
+
+
+@bind(router, "base.api_doc.settings", "/api-docs/settings")
+async def api_doc_settings(request):
+    return await run_operation(request, queries.api_doc_settings)
+
+
+@bind(router, "base.api_doc.settings_update", "/api-docs/settings/update")
+async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
+    return await run_operation(request, services.api_doc_settings_update, data)

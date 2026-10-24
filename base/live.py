@@ -88,4 +88,7 @@ live("base.role.list", on=[HUB_STATE_APPLIED])
 live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS}))
 # Approvals follow each approval given and each pass spent; who may approve, the ways in and the photo (the roles).
 live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
+# The API's documentation: shown or hidden; the document itself, also the photo (an app its plan gives comes or goes).
+live("base.api_doc.settings", on=[events.API_DOC_SETTINGS_CHANGED])
+live("base.api_doc.get", on=sorted({events.API_DOC_SETTINGS_CHANGED, HUB_STATE_APPLIED}))
 live("base.approval.approvers", on=sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS}))

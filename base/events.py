@@ -60,6 +60,8 @@ API_KEY_EVENTS = (API_KEY_CREATED, API_KEY_ROTATED, API_KEY_REVOKED)
 APPROVAL_GRANTED = "base.approval.granted"
 APPROVAL_USED = "base.approval.used"
 APPROVAL_EVENTS = (APPROVAL_GRANTED, APPROVAL_USED)
+#: Whoever runs the business showed or hid the documentation of its API.
+API_DOC_SETTINGS_CHANGED = "base.api_doc.settings_changed"
 
 ALL = [
     HUB_REGISTERED,
@@ -84,4 +86,5 @@ ALL = [
     *PERSON_EVENTS,
     *API_KEY_EVENTS,
     *APPROVAL_EVENTS,
+    API_DOC_SETTINGS_CHANGED,
 ]

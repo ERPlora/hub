@@ -2292,3 +2292,37 @@ def approval_spend(ctx: OperationContext, data: ApprovalSpendIn) -> dict:
     approval.save(update_fields=["used_at"])
     record_event(ctx, events.APPROVAL_USED, {"id": str(approval.pk), "operation": approval.operation})
     return {"spent": True, "id": str(approval.pk), "approver": approval.approved_by_name}
+
+
+
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+from base.models import ApiSettings  # noqa: E402
+from base.schemas import ApiDocSettingsIn, ApiDocSettingsOut, ApiDocSettingsUpdateIn  # noqa: E402
+
+
+@operation(
+    "base.api_doc.settings_update",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=ApiDocSettingsUpdateIn,
+    output=ApiDocSettingsOut,
+    ai={
+        "description": "Shows or hides the documentation of this business's API (for whoever connects another "
+        "system); it comes hidden.",
+        "risk": "low",
+    },
+)
+def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn) -> dict:
+    """«Show the API documentation» (BASE-G100): saved at once."""
+    row = ApiSettings.objects.select_for_update().first()
+    if row is None:
+        try:
+            with transaction.atomic():
+                row = ApiSettings.objects.create()
+        except IntegrityError:
+            row = ApiSettings.objects.select_for_update().get()
+    row.docs_enabled = data.docs_enabled
+    row.updated_by = _actor_label(ctx)
+    row.save()
+    record_event(ctx, events.API_DOC_SETTINGS_CHANGED, {"docs_enabled": data.docs_enabled})
+    return queries.api_doc_settings(ctx, ApiDocSettingsIn())

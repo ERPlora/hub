@@ -1363,3 +1363,53 @@ def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
         if holds(user, ctx.scope, op.permission)
     ]
     return {"people": sorted(people, key=lambda person: person["name"].casefold()), "pin_length": pin_length}
+
+
+
+# ── People and permissions: the API's documentation (APP-BASE-5) ───────────────────────────────────────────────────
+from base import api_docs  # noqa: E402
+from base.models import ApiSettings  # noqa: E402
+from base.schemas import ApiDocIn, ApiDocOut, ApiDocSettingsIn, ApiDocSettingsOut  # noqa: E402
+from live.errors import Conflict  # noqa: E402
+
+
+def api_docs_enabled() -> bool:
+    row = ApiSettings.objects.first()
+    return bool(row is not None and row.docs_enabled)
+
+
+@operation(
+    "base.api_doc.settings",
+    kind="query",
+    permission=VIEW_HOME,
+    input=ApiDocSettingsIn,
+    output=ApiDocSettingsOut,
+    ai={"description": "Says whether this business shows the documentation of its API, and whether who asks may change it."},
+)
+def api_doc_settings(ctx: OperationContext, data: ApiDocSettingsIn) -> dict:
+    """«Show the API documentation» in Settings › General (BASE-G100); off without a row."""
+    return {"docs_enabled": api_docs_enabled(), "can_change": ctx.has(ADMINISTER_HUB)}
+
+
+@operation(
+    "base.api_doc.get",
+    kind="query",
+    permission=VIEW_HOME,
+    input=ApiDocIn,
+    output=ApiDocOut,
+    ai={
+        "description": "Not an assistant tool (a long technical document): the OpenAPI document of the API this "
+        "business's apps publish for other systems, when the business shows it."
+    },
+)
+def api_doc_get(ctx: OperationContext, data: ApiDocIn) -> dict:
+    """The API's documentation (BASE-G150, G48): what the apps this business has publish; not given while hidden."""
+    if not api_docs_enabled():
+        raise Conflict(gettext("The API documentation is hidden in this business."), code="base.api_docs_hidden")
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    apps = api_apps(ctx)
+    return {
+        "document": api_docs.public_document({app["id"] for app in apps}),
+        "apps": apps,
+        "keys_available": bool(hub is not None and hub.db_name),
+    }

@@ -2754,5 +2754,17 @@
   "base.approval.approve": {
     "method": "post",
     "path": "/api/approvals"
+  },
+  "base.api_doc.get": {
+    "method": "get",
+    "path": "/api/api-docs"
+  },
+  "base.api_doc.settings": {
+    "method": "get",
+    "path": "/api/api-docs/settings"
+  },
+  "base.api_doc.settings_update": {
+    "method": "post",
+    "path": "/api/api-docs/settings/update"
   }
 }

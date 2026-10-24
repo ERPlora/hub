@@ -42,5 +42,7 @@ def test_every_event_is_named_as_the_convention_says():
         # A manager's approval given, and spent (APP-BASE-5).
         "base.approval.granted",
         "base.approval.used",
+        # The API's documentation shown or hidden (APP-BASE-5).
+        "base.api_doc.settings_changed",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)
