@@ -265,8 +265,10 @@ def active_apps_label(label: str) -> LiveAppConfig | None:
 
 
 def confirmed(card_: dict, typed: str) -> bool:
-    """Whether ``typed`` is what the card asks (exactly, but for the spaces around); a normal write asks nothing."""
-    return not card_["blocked"] and (card_["confirm_word"] == "" or typed.strip() == card_["confirm_word"])
+    """Whether ``typed`` is what the card asks, as the platform's ``ConfirmDialog`` compares it (``@erplora/ui``: spaces
+    around and case ignored, accents not); a normal write asks nothing; a blocked one, never."""
+    word = card_["confirm_word"]
+    return not card_["blocked"] and (word == "" or typed.strip().casefold() == word.casefold())
 
 
 # ── A tool, run as the person (BASE-G115, G118) ──────────────────────────────────────────────────────────────────

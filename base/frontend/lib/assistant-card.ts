@@ -87,8 +87,9 @@ export function cardLine(card: AssistantCard, format: CardFormat): string {
     .join(' · ');
 }
 
-/** Whether `typed` is what the card asks (exactly, but for the spaces around); a normal write asks nothing. */
+/** Whether `typed` is what the card asks, as `ConfirmDialog` (which asks it) and the server compare it: spaces around
+ *  and case ignored, accents not; a normal write asks nothing; a blocked one, never. */
 export function typedMatches(card: AssistantCard, typed: string): boolean {
   if (card.blocked) return false;
-  return card.confirm_word === '' || typed.trim() === card.confirm_word;
+  return card.confirm_word === '' || typed.trim().toLocaleLowerCase() === card.confirm_word.toLocaleLowerCase();
 }

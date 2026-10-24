@@ -128,7 +128,7 @@ def test_a_dangerous_write_runs_only_with_the_word_typed():
     delete = call("demo.item.delete", {"id": created["id"]})
     asked_card = turn(delete)["confirm"]
     assert (asked_card["risk"], asked_card["confirm_word"]) == ("high", "CONFIRMAR")
-    wrong = turn(delete, decision={"call_id": "c1", "accepted": True, "typed": "confirmar"})
+    wrong = turn(delete, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMA"})
     assert wrong["executed"][0]["outcome"] == "cancelled"
     assert "Barra" in items()
     right = turn(delete, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})

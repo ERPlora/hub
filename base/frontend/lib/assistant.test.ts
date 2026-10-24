@@ -102,8 +102,29 @@ describe('several things in a row (BASE-G115, G119)', () => {
     await assistant.ask('crea Mesa 4');
     expect(bodies.map((body) => body.pending)).toEqual([undefined, [LIST], [CREATE]]);
     expect(bodies[1].continuation).toBe('tok');
-    expect(assistant.state.confirm).toEqual({ card: CARD, call: CREATE });
+    expect(assistant.state.confirm).toEqual({ card: CARD, call: CREATE, more: false });
     expect(assistant.state.busy).toBe(true);
+  });
+
+  it('«Cancel all» is offered only when more actions wait behind this one', async () => {
+    const SECOND: PendingCall = { ...CREATE, call_id: 'c2' };
+    const { post } = hub([{ type: 'confirm', card: CARD, call: CREATE }, done({ append: [asked(CREATE, SECOND)], pending: [CREATE, SECOND] })]);
+    const assistant = assistantWith(post);
+    await assistant.ask('crea dos');
+    expect(assistant.state.confirm?.more).toBe(true);
+  });
+
+  it('a write that names no record is not done from the chat: no card, the turn goes on and says so', async () => {
+    const BLOCKED = { ...CARD, risk: 'high' as const, blocked: true, confirm_word: 'CONFIRMAR' };
+    const { post, bodies } = hub(
+      [{ type: 'confirm', card: BLOCKED, call: CREATE }, done({ append: [asked(CREATE)], pending: [CREATE] })],
+      [{ type: 'text', text: 'Hazlo desde Citas.' }, done({ append: [{ role: 'tool', tool_call_id: 'c1', content: '{}' }] })],
+    );
+    const assistant = assistantWith(post);
+    await assistant.ask('borra todas');
+    expect(bodies[1].decision).toEqual({ call_id: 'c1', accepted: false, typed: '', stop: false });
+    expect(assistant.state.confirm).toBeNull();
+    expect(assistant.state.thread.bubbles.at(-1)).toMatchObject({ blocked: true, done: true });
   });
 
   it('the yes goes with its call; the no too, and the model is told', async () => {

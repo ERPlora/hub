@@ -35,11 +35,13 @@ export interface Bubble {
   notices: GroundingNotice[];
   /** False while it is being written. */
   done: boolean;
-  /** Why it ended without an answer (a code of `assistant-errors.ts`). */
+  /** Why it ended without an answer (a code of `assistant-guide.ts`'s `errorView`). */
   error?: string;
   /** Numbers of the error's sentence (the allowance's). */
   details?: Record<string, unknown>;
   stopped?: boolean;
+  /** A dangerous write of the turn that names no record was not done from the chat. */
+  blocked?: boolean;
   /** The question that led to an answer (for «Report a problem»). */
   question?: string;
   /** What ran in the turn, for the receipts under the bubble. */

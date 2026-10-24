@@ -135,10 +135,12 @@ def test_a_dangerous_write_that_names_no_record_is_not_done_from_the_chat():
     assert card["blocked"] is True
 
 
-def test_the_typed_confirmation_matches_exactly_but_for_the_spaces_around():
+def test_the_typed_confirmation_is_compared_as_the_platforms_dialog_does():
+    """As ``ConfirmDialog`` of ``@erplora/ui`` (the dialog that asks it): spaces around and case ignored, accents not."""
     card = assistant.card(get("demo.item.delete"), {"id": "x"}, "es")
     assert assistant.confirmed(card, "  CONFIRMAR ")
-    assert not assistant.confirmed(card, "confirmar")
+    assert assistant.confirmed(card, "confirmar")
+    assert not assistant.confirmed(card, "CONFIRMA")
     assert not assistant.confirmed(card, "")
     normal = assistant.card(get("demo.item.create"), {"name": "x"}, "es")
     assert assistant.confirmed(normal, "")

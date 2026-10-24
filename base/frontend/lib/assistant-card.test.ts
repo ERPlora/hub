@@ -71,10 +71,11 @@ describe('the one line of a normal write', () => {
 });
 
 describe('what a dangerous write asks to type', () => {
-  it('matches exactly, but for the spaces around', () => {
+  it('is compared as ConfirmDialog and the server do: spaces around and case ignored', () => {
     const high = card({ risk: 'high', confirm_word: 'CONFIRMAR' });
     expect(typedMatches(high, ' CONFIRMAR ')).toBe(true);
-    expect(typedMatches(high, 'confirmar')).toBe(false);
+    expect(typedMatches(high, 'confirmar')).toBe(true);
+    expect(typedMatches(high, 'CONFIRMA')).toBe(false);
     expect(typedMatches(card(), '')).toBe(true);
     expect(typedMatches(card({ risk: 'high', confirm_word: '3', count: 3 }), '3')).toBe(true);
   });

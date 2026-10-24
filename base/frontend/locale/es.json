@@ -682,6 +682,166 @@
       "adminOnly": "Solo un administrador puede ver y quitar los dispositivos.",
       "loading": "Cargando los dispositivos…",
       "loadError": "No se pudieron cargar los dispositivos. Comprueba la conexión e inténtalo de nuevo."
+    },
+    "assistant": {
+      "title": "Asistente",
+      "open": "Asistente",
+      "close": "Cerrar",
+      "newConversation": "Nueva conversación",
+      "empty": "Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.",
+      "setupIntro": "Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.",
+      "placeholder": "Escribe un mensaje…",
+      "send": "Enviar",
+      "stop": "Detener",
+      "attach": "Adjuntar archivo",
+      "removeFile": "Quitar adjunto",
+      "dictate": "Dictar por voz",
+      "stopRecording": "Detener la grabación",
+      "transcribing": "Transcribiendo…",
+      "listen": "Leer en voz alta",
+      "stopListening": "Dejar de leer",
+      "noAnswer": "(sin respuesta)",
+      "stopped": "Detenido.",
+      "writing": "El asistente está escribiendo",
+      "goTo": "Ir a {name}",
+      "retry": "Reintentar",
+      "signIn": "Volver a entrar",
+      "upgrade": "Mejorar el plan",
+      "askOwner": "Pídele a quien administra el negocio que mejore el plan.",
+      "usage": "Te quedan {left} de {limit} mensajes este mes.",
+      "renews": "Se renuevan el {date}.",
+      "offline": "Sin conexión: puedes escribir y enviar cuando vuelva.",
+      "files": {
+        "tooLarge": "{name} es demasiado grande: 8 MB como mucho por archivo.",
+        "tooMuch": "Los archivos de una pregunta suman 20 MB como mucho.",
+        "unsupported": "{name} no se puede adjuntar: imágenes, PDF, Word, Excel, texto o CSV.",
+        "unreadable": "No se ha podido leer {name}."
+      },
+      "voice": {
+        "denied": "El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.",
+        "failed": "No se ha podido transcribir el audio. Inténtalo de nuevo.",
+        "tooLong": "La grabación es demasiado larga: dicta un mensaje más corto.",
+        "empty": "No se ha oído nada. Inténtalo de nuevo más cerca del micrófono."
+      },
+      "shortcuts": {
+        "missing": "¿Qué falta por configurar?",
+        "step": "¿Cómo configuro «{title}»?"
+      },
+      "errors": {
+        "unreachable": "No se pudo contactar con el asistente. Comprueba la conexión y vuelve a intentarlo.",
+        "unavailable": "El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.",
+        "cut": "La respuesta se cortó.",
+        "quotaSpent": "Has usado todos los mensajes del asistente de este mes ({used} de {limit}).",
+        "noPlan": "Tu plan no incluye el asistente.",
+        "rateLimited": "Demasiadas preguntas seguidas: espera {seconds} segundos y vuelve a intentarlo.",
+        "tooLarge": "Esta conversación es demasiado larga: empieza una nueva.",
+        "tooManySteps": "He parado: esto necesitaba demasiados pasos. Pídelo por partes.",
+        "signedOut": "Tu sesión ha terminado. Vuelve a entrar para seguir hablando."
+      },
+      "notices": {
+        "claimed_change": "El asistente ha dicho que hizo un cambio, pero no se ejecutó ninguna acción. No se ha modificado nada.",
+        "unread_id": "Esta respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.",
+        "unknown_screen": "Esta respuesta señala una pantalla que no existe aquí."
+      },
+      "receipts": {
+        "ok": "Hecho: {action} en {app}",
+        "cancelled": "No se hizo, cancelado: {action} en {app}",
+        "error": "No se hizo, falló: {action} en {app}",
+        "refused": "No se hizo, sin permiso: {action} en {app}"
+      },
+      "card": {
+        "title": "El asistente quiere ejecutar una acción",
+        "message": "{action} en {app}: {line}",
+        "highMessage": "{action} en {app}. Revisa cada dato antes de seguir.",
+        "run": "Ejecutar",
+        "cancel": "Cancelar",
+        "cancelAll": "Cancelar todo",
+        "typeWord": "Escribe {word} para confirmar",
+        "count": "Afecta a {count} registros.",
+        "notFromChat": "No puedo saber cuántos registros cambiaría esto, así que no lo hago desde aquí. Ábrelo en su pantalla, donde puedes verlos.",
+        "yes": "Sí",
+        "no": "No",
+        "items": "ningún elemento | 1 elemento | {count} elementos",
+        "actions": {
+          "create": "Crear",
+          "add": "Añadir",
+          "update": "Cambiar",
+          "set": "Cambiar",
+          "delete": "Borrar",
+          "remove": "Quitar",
+          "void": "Anular",
+          "refund": "Devolver",
+          "cancel": "Cancelar",
+          "close": "Cerrar",
+          "open": "Abrir",
+          "confirm": "Confirmar",
+          "complete": "Completar",
+          "issue": "Emitir",
+          "send": "Enviar",
+          "import": "Importar",
+          "move": "Mover",
+          "assign": "Asignar",
+          "archive": "Archivar",
+          "restore": "Restaurar",
+          "approve": "Aprobar",
+          "reject": "Rechazar",
+          "enable": "Activar",
+          "disable": "Desactivar",
+          "other": "Hacer esto"
+        },
+        "fields": {
+          "name": "Nombre",
+          "price": "Precio",
+          "amount": "Importe",
+          "note": "Nota",
+          "notes": "Notas",
+          "status": "Estado",
+          "email": "Correo",
+          "phone": "Teléfono",
+          "quantity": "Cantidad",
+          "qty": "Cantidad",
+          "description": "Descripción",
+          "duration_minutes": "Duración (minutos)",
+          "date": "Fecha",
+          "time": "Hora",
+          "starts_at": "Empieza",
+          "ends_at": "Termina",
+          "customer_id": "Cliente",
+          "reason": "Motivo",
+          "id": "Registro",
+          "ids": "Registros",
+          "title": "Título",
+          "category": "Categoría"
+        }
+      },
+      "report": {
+        "action": "Denunciar un problema",
+        "title": "Denunciar esta respuesta",
+        "intro": "Si esta respuesta del asistente te parece incorrecta o dañina, envíanosla y la revisaremos.",
+        "reason": "¿Qué le pasa?",
+        "reasons": {
+          "incorrect": "Es incorrecta",
+          "harmful": "Es dañina u ofensiva",
+          "instructions": "No hace lo que pedí",
+          "other": "Otra cosa"
+        },
+        "comment": "Comentario (opcional)",
+        "send": "Denunciar",
+        "sent": "Gracias, hemos recibido tu denuncia.",
+        "failed": "No se pudo enviar la denuncia. Inténtalo de nuevo."
+      },
+      "screens": {
+        "home": "Inicio",
+        "apps": "Apps",
+        "settings": "Ajustes",
+        "system": "Sistema",
+        "profile": "Mi perfil",
+        "employees": "Empleados",
+        "files": "Archivos"
+      },
+      "setup": {
+        "ask": "Pedírselo al asistente"
+      }
     }
   }
 }

@@ -39,7 +39,8 @@ export interface AssistantState {
   thread: Thread;
   /** A turn in flight, or a card waiting for its answer. */
   busy: boolean;
-  confirm: { card: AssistantCard; call: PendingCall } | null;
+  /** The card of the write that waits; `more`: other actions wait behind it («Cancel all»). */
+  confirm: { card: AssistantCard; call: PendingCall; more: boolean } | null;
   usage: AssistantUsage | null;
   /** What the person is writing and attaching, not sent yet. */
   draft: string;
@@ -187,7 +188,7 @@ export function createAssistant(deps: AssistantDeps = {}) {
       const current: Turn = turn;
       controller = new AbortController();
       let doneFrame: Extract<TurnFrame, { type: 'done' }> | null = null;
-      let confirm: AssistantState['confirm'] = null;
+      let confirm: { card: AssistantCard; call: PendingCall } | null = null;
       let failure: { code: string; details: Record<string, unknown> } | null = null;
       const onFrame = (frame: TurnFrame) => {
         if (frame.type === 'text') current.bubble.text += frame.text;
@@ -224,8 +225,15 @@ export function createAssistant(deps: AssistantDeps = {}) {
       }
       const stopped = failure as { code: string; details: Record<string, unknown> } | null;
       if (stopped) return finish(stopped.code, stopped.details);
-      if (confirm) {
-        state.confirm = confirm;
+      const waiting = confirm as { card: AssistantCard; call: PendingCall } | null;
+      if (waiting && waiting.card.blocked) {
+        // Not done from the chat (a dangerous write that names no record): no card, the model hears it and says where.
+        current.bubble.blocked = true;
+        decision = { call_id: waiting.call.call_id, accepted: false, typed: '', stop: false };
+        continue;
+      }
+      if (waiting) {
+        state.confirm = { ...waiting, more: current.pending.length > 1 };
         save();
         return;
       }
@@ -336,6 +344,11 @@ let shared: Assistant | undefined;
 export function useAssistant(): Assistant {
   shared ??= createAssistant({ storage: browserStorage('sessionStorage'), openStorage: browserStorage('localStorage') });
   return shared;
+}
+
+/** Puts `instance` as the tab's assistant (a test's own), or forgets it (`undefined`). */
+export function installAssistant(instance: Assistant | undefined): void {
+  shared = instance;
 }
 
 /** Signing out forgets the conversation of the tab (BASE-G120), even if the panel was never opened. */
