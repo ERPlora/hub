@@ -54,6 +54,28 @@ async function noProblems(problems: Awaited<ReturnType<typeof collectProblems>>)
   expect(seen.page).toEqual([]);
 }
 
+/** The side menu's entries, in order (`nav-<id>`), painted or folded away. */
+async function menuIds(page: Page): Promise<string[]> {
+  return page.locator('ion-menu.dash-menu ion-item.nav-item').evaluateAll((items) => items.map((item) => item.getAttribute('data-testid') ?? ''));
+}
+
+/** The side menu captured: pinned on a desktop; on a phone or a tablet, opened from the bar and closed again. */
+async function snapMenu(page: Page, key: string, width: number): Promise<void> {
+  const pinned = width >= 992;
+  if (!pinned) {
+    await shown(page).locator('ion-menu-button').click();
+    await expect(page.locator('ion-menu.dash-menu')).toHaveClass(/show-menu/);
+  }
+  await snap(page, key, width);
+  if (!pinned) {
+    await page.locator('ion-menu.dash-menu').evaluate((menu) => (menu as HTMLElement & { close(): Promise<boolean> }).close());
+    await expect(page.locator('ion-menu.dash-menu')).not.toHaveClass(/show-menu/);
+  }
+}
+
+/** The owner's menu with the API documentation hidden: every platform entry with a screen, «API» not. */
+const OWNER_MENU = ['nav-home', 'nav-employees', 'nav-files', 'nav-apps', 'nav-system', 'nav-settings'];
+
 /** Opens a tab of the footer tabbar (`tab-<id>`). */
 async function tab(page: Page, id: string): Promise<void> {
   await testid(page, `tab-${id}`).click();
@@ -74,6 +96,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(people.first()).toBeVisible();
     await expect(shown(page).getByText('Account').first()).toBeVisible();
     await snap(page, 'BASE-G142', width);
+    // The side menu: whoever runs the business sees every entry with a screen; «API» only with the docs shown.
+    await expect.poll(() => menuIds(page)).toEqual(OWNER_MENU);
+    await snapMenu(page, 'FIX-SIDEBAR-owner', width);
     // «Roles»: the four of erplora.com.
     await tab(page, 'roles');
     await expect(page).toHaveURL(/\/employees#roles$/);
@@ -132,8 +157,19 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(page).toHaveURL(/\/settings/);
     const card = testid(page, 'api-docs-card');
     await card.scrollIntoViewIfNeeded();
+    // «API» in the side menu comes and goes with the switch, live (the old hub's, between System and Settings).
+    const apiEntry = page.locator('ion-menu.dash-menu [data-testid="nav-api"]');
+    await expect(apiEntry).toHaveCount(0);
     await testid(page, 'api-docs-toggle').click();
     await expect(testid(page, 'api-docs-open')).toBeVisible();
+    await expect(apiEntry).toHaveCount(1);
+    expect(await menuIds(page)).toEqual([...OWNER_MENU.slice(0, -1), 'nav-api', 'nav-settings']);
+    await snapMenu(page, 'BASE-G100-menu-api', width);
+    await testid(page, 'api-docs-toggle').click();
+    await expect(testid(page, 'api-docs-open')).toHaveCount(0);
+    await expect(apiEntry).toHaveCount(0);
+    await testid(page, 'api-docs-toggle').click();
+    await expect(apiEntry).toHaveCount(1);
     await snap(page, 'BASE-G100', width);
     await testid(page, 'api-docs-open').click();
     await expect(page).toHaveURL(/\/api-docs$/);
@@ -156,6 +192,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(testid(page, 'tab-apikeys')).toHaveCount(0);
     await expect(testid(page, 'tab-approvals')).toHaveCount(0);
     await snap(page, 'BASE-G11-employee', width);
+    // FIX-UI-SIDEBAR-SYSTEM-VISIBLE-TO-EMPLOYEE: the menu never offers what the employee cannot open (System is for
+    // whoever runs the business; Square and Toast hide it the same).
+    await expect.poll(() => menuIds(page)).toEqual(['nav-home', 'nav-employees', 'nav-files', 'nav-apps', 'nav-settings']);
+    await snapMenu(page, 'FIX-SIDEBAR-employee', width);
     await noProblems(problems);
     await context.close();
   });

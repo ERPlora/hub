@@ -24,9 +24,9 @@ const admin = computed(() => session.can('base.administer_hub'));
 
 const ICONS: Record<EmployeesTab, string> = {
   personal: 'ion:people-outline',
-  roles: 'ion:shield-outline',
+  roles: 'ion:shield-checkmark-outline',
   apikeys: 'ion:keypad-outline',
-  approvals: 'ion:checkmark-done-outline',
+  approvals: 'ion:finger-print-outline',
 };
 
 const tabs = computed<ShellTab[]>(() =>

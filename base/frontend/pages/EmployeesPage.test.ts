@@ -36,9 +36,9 @@ describe('EmployeesPage', () => {
     expect(page.props('title')).toBe('Empleados');
     expect(page.props('tabs')).toEqual([
       { id: 'personal', label: 'Personal', icon: 'ion:people-outline' },
-      { id: 'roles', label: 'Roles', icon: 'ion:shield-outline' },
+      { id: 'roles', label: 'Roles', icon: 'ion:shield-checkmark-outline' },
       { id: 'apikeys', label: 'API keys', icon: 'ion:keypad-outline' },
-      { id: 'approvals', label: 'Aprobaciones', icon: 'ion:checkmark-done-outline' },
+      { id: 'approvals', label: 'Aprobaciones', icon: 'ion:finger-print-outline' },
     ]);
     expect(page.props('tabsLabel')).toBe('Secciones de Empleados');
   });

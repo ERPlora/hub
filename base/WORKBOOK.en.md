@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2e4dda0580e4b631746251f603968bd0f42f8e7d4e4b6917c99276b4d3a2b52d -->
+<!-- generated from WORKBOOK.md sha256:5fc1e7bfaca09b6c4a22e623b0199c28ee3dc5300b123afe417cddb296618fd5 -->
 
 ## What it is for and who it is for
 
@@ -69,6 +69,13 @@ also opens with the Home's link ending in `#actividad`.
 ### The bell
 At the top right, after "My apps". Its number adds up the pending notices; tapped, one row per notice
 ("Failed events (2)") that leads to its screen. With nothing: "All caught up. No notifications.".
+
+### The side menu
+On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
+"Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever may open its screen:
+"System", to whoever runs the business; "API", while the API documentation is shown (BASE-F91), and it appears or goes
+when the switch changes, without reloading. An employee sees "Home", "Employees", "Files", "Apps" and "Settings". At
+the bottom, the QR code and "Upgrade plan".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and the brand. It opens this business's plan page on
@@ -1965,8 +1972,8 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: API documentation
 Steps:
-  1. With the documentation shown (BASE-F91), it opens from **Settings › General** ("Open the API documentation")
-     or from **Employees › API keys** ("API documentation").
+  1. With the documentation shown (BASE-F91), it opens from "API" in the side menu, from **Settings › General**
+     ("Open the API documentation") or from **Employees › API keys** ("API documentation").
   2. They read "The API of this business: what its apps publish for other systems. To call it, create a key in
      Employees › API keys and send it as “Authorization: Bearer <key>”.".
   3. A section per app, with its calls (the method, the address and what it does); opening one, its "Parameters"
@@ -1988,7 +1995,8 @@ Screen: Settings · General
 Steps:
   1. In **Settings › General**, under "API documentation", the switch "Show the API documentation" ("Adds a page
      with the documentation of the API, for whoever connects another system."). It comes off.
-  2. Turning it on saves it at once and "Open the API documentation" shows; turning it off, it goes away.
+  2. Turning it on saves it at once and "Open the API documentation" shows and, in the side menu, "API" (between
+     "System" and "Settings"), without reloading; turning it off, both go away.
 In: the switch.
 Out: the business's setting. Event `base.api_doc.settings_changed`.
 If it fails: "Could not save the change." and the switch goes back to what was saved; "Could not load the

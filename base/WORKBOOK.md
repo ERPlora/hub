@@ -83,6 +83,13 @@ Se abre también con el enlace del Inicio terminado en `#actividad`.
 Arriba a la derecha, después de «Mis apps». Su número suma los avisos pendientes; al tocarla, una fila
 por aviso («Eventos caídos (2)») que lleva a su pantalla. Sin nada: «Todo al día. Sin notificaciones.».
 
+### El menú lateral
+A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y las entradas de la plataforma en dos
+grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien puede abrir
+su pantalla: «Sistema», a quien administra el negocio; «API», mientras la documentación de la API está mostrada
+(BASE-F91), y aparece o se va al cambiar el interruptor, sin recargar. Un empleado ve «Inicio», «Empleados»,
+«Archivos», «Apps» y «Ajustes». Abajo, el código QR y «Actualizar plan».
+
 ### «Actualizar plan»
 Al pie del menú lateral, entre el código QR y la marca. Abre la página del plan de este negocio en
 erplora.com, en una pestaña nueva. Solo en el navegador: en la app instalada no está.
@@ -2064,8 +2071,8 @@ Estado: hecho
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Documentación de la API
 Pasos:
-  1. Con la documentación mostrada (BASE-F91), se abre desde **Ajustes › General** («Abrir la documentación de la
-     API») o desde **Empleados › API keys** («Documentación de la API»).
+  1. Con la documentación mostrada (BASE-F91), se abre desde «API» en el menú lateral, desde **Ajustes › General**
+     («Abrir la documentación de la API») o desde **Empleados › API keys** («Documentación de la API»).
   2. Lee «La API de este negocio: lo que publican sus apps para otros sistemas. Para llamarla, crea una llave en
      Empleados › API keys y envíala como «Authorization: Bearer <llave>».».
   3. Una sección por app, con sus llamadas (el método, la dirección y qué hace); al abrir una, sus «Parámetros» y su
@@ -2088,7 +2095,8 @@ Pantalla: Ajustes · General
 Pasos:
   1. En **Ajustes › General**, en «Documentación de la API», el interruptor «Mostrar documentación de la API»
      («Añade una página con la documentación de la API, para quien conecte otro sistema.»). Viene apagado.
-  2. Al encenderlo se guarda al instante y sale «Abrir la documentación de la API»; al apagarlo, desaparece.
+  2. Al encenderlo se guarda al instante y salen «Abrir la documentación de la API» y, en el menú lateral, «API»
+     (entre «Sistema» y «Ajustes»), sin recargar; al apagarlo, desaparecen los dos.
 Entra: el interruptor.
 Sale: el ajuste del negocio. Evento `base.api_doc.settings_changed`.
 Si falla: «No se pudo guardar el cambio.» y el interruptor vuelve a lo guardado; «No se pudo cargar el ajuste.» con
