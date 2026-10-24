@@ -31,6 +31,15 @@ msgctxt "whatsapp menu"
 msgid "Settings"
 msgstr "Ajustes"
 
+msgid "WhatsApp customers waiting for an answer"
+msgstr "Clientes de WhatsApp esperando respuesta"
+
+msgid "WhatsApp · {display_name}"
+msgstr "WhatsApp · {display_name}"
+
+msgid "WhatsApp customer waiting for an answer"
+msgstr "Cliente de WhatsApp esperando respuesta"
+
 msgctxt "whatsapp channel"
 msgid "Not connected"
 msgstr "Sin conectar"
@@ -408,6 +417,9 @@ msgstr "Tu plan no incluye mensajes de WhatsApp: no se puede enviar nada hasta q
 
 msgid "erplora.com did not send the message."
 msgstr "erplora.com no ha enviado el mensaje."
+
+msgid "WhatsApp's permission for your number expired: connect it again."
+msgstr "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
 
 msgid "erplora.com did not answer: the message has not left. Try again."
 msgstr "erplora.com no ha contestado: el mensaje no ha salido. Vuelve a intentarlo."

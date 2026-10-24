@@ -43,7 +43,10 @@ describe('whatsapp_inbox routes.ts', () => {
 
   it('matches the navigation of apps.py, entry for entry', () => {
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/whatsapp_inbox\/[a-z]+)"/g)].map((m) => m[1]);
+    // The menu's block only: the bell and the device's notices lead to the inbox too (WHATSAPP_INBOX-F09).
+    const navigation = appsPy.match(/^ {4}navigation = \[[\s\S]*?^ {4}\]$/m)?.[0] ?? '';
+    expect(navigation).not.toBe('');
+    const paths = [...navigation.matchAll(/"(\/whatsapp_inbox\/[a-z]+)"/g)].map((m) => m[1]);
     expect(paths).toEqual(routes.map((r) => r.path));
   });
 });

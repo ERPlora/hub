@@ -76,6 +76,9 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        # The Home's bell and the device's notices (WHATSAPP_INBOX-F09).
+        *(counter.label for counter in config.bell),
+        *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
         *module_texts(schemas),
         *module_texts(queries),
         *module_texts(services),
@@ -141,6 +144,7 @@ def test_spanish_texts():
             "Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja escribirle "
             "con una plantilla aprobada."
         )
+        assert str(services.RECONNECT_NEEDED) == "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
 
 
 @pytest.mark.django_db

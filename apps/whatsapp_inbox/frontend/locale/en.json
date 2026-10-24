@@ -92,6 +92,7 @@
       "audioError": "The voice note could not be loaded.",
       "template": "Template: {name}",
       "failedReason": "Meta's reason: {reason}",
+      "permissionExpired": "WhatsApp's permission for your number had expired.",
       "kinds": {
         "image": "Photo",
         "sticker": "Sticker",
@@ -137,7 +138,8 @@
         "cap_reached": "This month's WhatsApp messages of your plan are spent: nothing can be sent until next month.",
         "unconfigured": "This Hub cannot reach erplora.com, so nothing can be sent from it."
       },
-      "notIncluded": "Your plan does not include WhatsApp messages: nothing can be sent."
+      "notIncluded": "Your plan does not include WhatsApp messages: nothing can be sent.",
+      "reconnectNeeded": "The number needs reconnecting in Settings to send."
     },
     "templates": {
       "sendTitle": "Send a template",

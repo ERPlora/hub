@@ -1,4 +1,4 @@
-// flow: WHATSAPP_INBOX-F03, WHATSAPP_INBOX-F08, WHATSAPP_INBOX-F34, WHATSAPP_INBOX-F38, WHATSAPP_INBOX-F32, WHATSAPP_INBOX-F10, WHATSAPP_INBOX-F11
+// flow: WHATSAPP_INBOX-F03, WHATSAPP_INBOX-F08, WHATSAPP_INBOX-F34, WHATSAPP_INBOX-F38, WHATSAPP_INBOX-F32, WHATSAPP_INBOX-F02, WHATSAPP_INBOX-F10, WHATSAPP_INBOX-F11
 // The inbox through the run's REAL erplora.com, in a hidden Chrome: only Meta is played (whatsapp-helpers.ts, «The
 // run's real erplora.com»: what to run beside this stack). erplora.com's own test seed gives `a` its number (a made-up
 // Meta permission) and pushes its photo here; then:
@@ -6,15 +6,18 @@
 //   one message), the owner's answer from the WhatsApp Business app, Meta's statuses of it and the option she taps —
 //   reaches the open inbox through erplora.com's doors 1 and 2, without a reload; each post fails on the spot, saying
 //   why, unless erplora.com handed every message it carries to this Hub (`metaHandsOver`);
-// - F32: the owner's reply goes through erplora.com (door 5) to Meta, which refuses the made-up permission: the bubble
-//   says «Not delivered» with erplora.com's reason, and erplora.com's next photo says the number must be reconnected;
+// - F32, F34, F02: the owner's reply goes through erplora.com (door 5) to Meta, which refuses the made-up permission
+//   (its 190, erplora.com's `whatsapp.reconnect_needed`): the bubble says «Not delivered» in the Hub's words, never
+//   Meta's, and once erplora.com's next photo says the number must be reconnected, «Needs reconnecting» with
+//   «Reconnect» (to Settings), and the box says why nothing leaves — in Spanish too
+//   (FIX-HUB-WHATSAPP-INBOX-RECONNECT-NEEDED-REFUSAL-390|834|1440);
 // - F10, F11: erasing a number, in the inbox or from the customer's card, has erplora.com forget it (door 6), which
 //   confirms.
 // Each flow's screen in three sizes (FIX-HUB-WHATSAPP-INBOX-CONNECT-DOORS-10-12-<flow>-390|834|1440). What it creates
 // is named `e2e.…` and deleted after the file; erplora.com's side lives in its own run database.
 import { execFileSync } from 'node:child_process';
 
-import { expect, type Page, test } from '@playwright/test';
+import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanUpCards, inputOf } from './customer-helpers';
 import { A, HUB_DIR, login, psql, shot, shown } from './helpers';
@@ -86,8 +89,9 @@ const conversationOf = (phone: string) => psql(`select id from whatsapp_inbox_co
 const erasure = (id: string) =>
   psql(`select erase_status || '|' || erase_phone || '|' || phone from whatsapp_inbox_conversation where id = '${id}'`);
 
-test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbox through erplora.com, and a reply goes to Meta through it', async ({
+test('WHATSAPP_INBOX-F03, F08, F34, F38, F32 and F02: what Meta says reaches the inbox through erplora.com, and a reply goes to Meta through it', async ({
   page,
+  browser,
 }) => {
   const phone = e2ePhone();
   const name = `${PREFIX}Ana ${Date.now().toString(36)}`;
@@ -169,8 +173,9 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbo
     await expect(option).toBeVisible();
   });
 
-  // F32: the reply is kept and handed to erplora.com, which takes it to Meta; Meta refuses the seed's made-up
-  // permission, so the bubble says «Not delivered» with erplora.com's reason — the one the Hub kept — and no «Retry».
+  // F32, F34: the reply is kept and handed to erplora.com, which takes it to Meta; Meta refuses the seed's made-up
+  // permission with its 190, which erplora.com says as «reconnect needed»: the bubble says «Not delivered» in the
+  // Hub's words — never Meta's «Invalid OAuth access token» — and no «Retry» (it would fail again).
   const text = panel(page).locator('[data-testid=whatsapp-inbox-composer-text] textarea');
   await text.fill('Perfecto, te esperamos.');
   await panel(page).locator('[data-testid=whatsapp-inbox-composer-send]').click();
@@ -180,17 +185,66 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38 and F32: what Meta says reaches the inbo
   const kept = psql(
     `select m.status || '|' || m.error_code || '|' || m.error_message from whatsapp_inbox_message m join whatsapp_inbox_conversation c on c.id = m.conversation_id where c.phone = '${phone}' and m.origin = 'hub' order by m.created_at desc limit 1`,
   ).split('|');
-  expect(kept.slice(0, 2)).toEqual(['failed', 'whatsapp_inbox.send_refused']);
-  expect(kept[2]).not.toBe('');
-  await expect(reply.locator('.wa-bubble__error')).toContainText(kept[2]);
-  await shots(page, 'F32', async () => {
-    await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Not delivered');
-  });
+  expect(kept).toEqual(['failed', 'whatsapp_inbox.reconnect_needed', "WhatsApp's permission for your number expired: connect it again."]);
+  const why = reply.locator('[data-testid=whatsapp-inbox-message-error]');
+  await expect(why).toHaveAttribute('data-code', 'whatsapp_inbox.reconnect_needed');
+  await expect(reply).not.toContainText(/OAuth|Meta's reason/);
 
-  // Meta refused the permission: erplora.com's next photo says the number must be reconnected, and the inbox follows.
+  // F02: erplora.com's next photo says the number must be reconnected; the inbox follows without a reload: the bubble
+  // says «Needs reconnecting» with «Reconnect», and the box says why nothing leaves.
   await expect(shown(page).locator('[data-testid=whatsapp-inbox-reconnect]')).toBeVisible({ timeout: 30_000 });
+  await expect(why).toContainText('Needs reconnecting');
+  await expect(reply.locator('[data-testid=whatsapp-inbox-message-reconnect]')).toHaveText('Reconnect');
+  await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-blocked]')).toHaveText(
+    'The number needs reconnecting in Settings to send.',
+  );
+  await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-send]')).toHaveJSProperty('disabled', true);
+  await shots(page, 'F32', async () => {
+    await expect(why).toContainText('Needs reconnecting');
+  });
   expect(await page.evaluate(() => (window as unknown as { e2eNoReload?: boolean }).e2eNoReload === true)).toBe(true);
+
+  await inSpanish(browser, conversationOf(phone));
 });
+
+/** The same refused reply in Spanish, in the three sizes: «Hay que reconectar» with «Volver a conectar», which leads
+ *  to «Tu número» in Ajustes, and the box saying why nothing leaves (WHATSAPP_INBOX-F34, F02). */
+async function inSpanish(browser: Browser, conversation: string): Promise<void> {
+  const context = await browser.newContext({ baseURL: A, locale: 'es-ES' });
+  try {
+    const page = await context.newPage();
+    const next = `/whatsapp_inbox/inbox?conversation=${conversation}`;
+    await login(page, A, next);
+    await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    await page.goto(`${A}${next}`);
+    await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+    const reply = bubbles(page, 'outbound').filter({ hasText: 'te esperamos' });
+    const why = reply.locator('[data-testid=whatsapp-inbox-message-error]');
+    const reconnect = reply.locator('[data-testid=whatsapp-inbox-message-reconnect]');
+    await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toHaveText('No entregado', { timeout: 30_000 });
+    await expect(why).toContainText('Hay que reconectar');
+    await expect(reconnect).toHaveText('Volver a conectar');
+    await expect(reply).not.toContainText(/OAuth|Motivo de Meta/);
+    await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-blocked]')).toHaveText(
+      'Hay que reconectar el número en Ajustes para enviar.',
+    );
+    for (const viewport of FLOW_VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await reply.scrollIntoViewIfNeeded();
+      await expect(reconnect).toBeVisible();
+      await settled(page);
+      await noHorizontalScroll(page, `reconnect ${viewport.label}`);
+      await page.screenshot({ path: shot(`FIX-HUB-WHATSAPP-INBOX-RECONNECT-NEEDED-REFUSAL-${viewport.label}`) });
+    }
+    await reconnect.click();
+    await expect(page).toHaveURL(/\/whatsapp_inbox\/settings$/);
+    await expect(shown(page).locator('[data-testid=whatsapp-inbox-number]')).toContainText('Hay que reconectar');
+  } finally {
+    await context.close();
+  }
+}
 
 test('WHATSAPP_INBOX-F10: erasing a number in the inbox has erplora.com forget it', async ({ page }) => {
   const phone = e2ePhone();

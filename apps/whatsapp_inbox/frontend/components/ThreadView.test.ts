@@ -3,9 +3,10 @@
 // from the phone marked, photos and voice notes from erplora.com in their bubble (the rest, and what does not
 // load, opened there), internal notes in their own colour with
 // «Delete note» for whoever may; «View earlier», «No messages yet.», «Loading…» and the error.
+import type { SessionMe } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, mountInbox } from '../__tests__/mount-inbox';
+import { click, EMPLOYEE, mountInbox } from '../__tests__/mount-inbox';
 import type { MessageOut, NoteOut } from '../operations';
 import ThreadView from './ThreadView.vue';
 
@@ -46,9 +47,13 @@ const note = (over: Partial<NoteOut> = {}): NoteOut => ({
   ...over,
 });
 
-async function setup(props: Record<string, unknown>, locale: 'en' | 'es' = 'en') {
+async function setup(props: Record<string, unknown>, locale: 'en' | 'es' = 'en', session?: SessionMe) {
   vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
-  const m = await mountInbox(ThreadView, { props: { messages: [], notes: [], loading: false, hasMore: false, now: NOW, ...props }, locale });
+  const m = await mountInbox(ThreadView, {
+    props: { messages: [], notes: [], loading: false, hasMore: false, now: NOW, ...props },
+    locale,
+    session,
+  });
   vi.useRealTimers();
   const bubbles = () => m.wrapper.findAll('[data-testid="whatsapp-inbox-message"], [data-testid="whatsapp-inbox-note"]');
   return { ...m, bubbles };
@@ -105,6 +110,57 @@ describe('ThreadView', () => {
       expect(error.text(), locale).toBe(said);
       expect(s.bubbles()[0].text(), locale).not.toMatch(/Meta's reason|Motivo de Meta|The plan's WhatsApp/);
     }
+  });
+
+  describe('a send refused because WhatsApp’s permission expired (WHATSAPP_INBOX-F34, F02)', () => {
+    const expired = message({
+      id: 'x',
+      direction: 'outbound',
+      origin: 'hub',
+      status: 'failed',
+      wa_message_id: null,
+      error_code: 'whatsapp_inbox.reconnect_needed',
+      error_message: "WhatsApp's permission for your number expired: connect it again.",
+    });
+    const why = (s: Awaited<ReturnType<typeof setup>>) => s.bubbles()[0].find('[data-testid="whatsapp-inbox-message-error"]');
+    const reconnect = (s: Awaited<ReturnType<typeof setup>>) => s.bubbles()[0].find('[data-testid="whatsapp-inbox-message-reconnect"]');
+
+    it('says «Needs reconnecting», as «Your number» does, with «Reconnect» to Settings and no «Retry»', async () => {
+      for (const [locale, said, action] of [
+        ['en', 'Needs reconnecting', 'Reconnect'],
+        ['es', 'Hay que reconectar', 'Volver a conectar'],
+      ] as const) {
+        const s = await setup({ messages: [expired], reconnectNeeded: true }, locale);
+        expect(s.bubbles()[0].find('[data-testid="whatsapp-inbox-message-status"]').text(), locale).toBe(
+          locale === 'en' ? 'Not delivered' : 'No entregado',
+        );
+        expect(why(s).attributes('data-code'), locale).toBe('whatsapp_inbox.reconnect_needed');
+        expect(why(s).text(), locale).toContain(said);
+        expect(reconnect(s).text(), locale).toBe(action);
+        expect(s.bubbles()[0].text(), locale).not.toMatch(/Meta's reason|Motivo de Meta|OAuth/);
+        expect(s.bubbles()[0].find('[data-testid="whatsapp-inbox-message-retry"]').exists(), locale).toBe(false);
+        await click(reconnect(s).element);
+        expect(s.router.currentRoute.value.path, locale).toBe('/whatsapp_inbox/settings');
+      }
+    });
+
+    it('whoever cannot configure sees only the reason', async () => {
+      const s = await setup({ messages: [expired], reconnectNeeded: true }, 'en', EMPLOYEE);
+      expect(why(s).text()).toContain('Needs reconnecting');
+      expect(reconnect(s).exists()).toBe(false);
+    });
+
+    it('once the number is back, the bubble keeps only what happened to that message', async () => {
+      for (const [locale, said] of [
+        ['en', "WhatsApp's permission for your number had expired."],
+        ['es', 'El permiso de WhatsApp para tu número había caducado.'],
+      ] as const) {
+        const s = await setup({ messages: [expired], reconnectNeeded: false }, locale);
+        expect(why(s).text(), locale).toBe(said);
+        expect(reconnect(s).exists(), locale).toBe(false);
+        expect(s.bubbles()[0].text(), locale).not.toMatch(/Needs reconnecting|Hay que reconectar/);
+      }
+    });
   });
 
   it('opens an attachment at erplora.com in a new tab, named by its kind, file and caption', async () => {

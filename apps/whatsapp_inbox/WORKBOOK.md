@@ -169,7 +169,7 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F06 | Ver una foto, una nota de voz o un documento | hecho | comun |
 | WHATSAPP_INBOX-F07 | Asignar una conversación a alguien del equipo | hecho | comun |
 | WHATSAPP_INBOX-F08 | Contestar desde la app de WhatsApp Business del móvil | hecho | comun |
-| WHATSAPP_INBOX-F09 | Ver quién espera respuesta | hecho (filtro y recuento; la campana del Hub llegará con la barra superior) | comun |
+| WHATSAPP_INBOX-F09 | Ver quién espera respuesta | hecho | comun |
 | WHATSAPP_INBOX-F10 | Borrar los datos de un número sin ficha | hecho | comun |
 | WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | hecho | comun |
 | WHATSAPP_INBOX-F12 | Unir dos fichas de la misma clienta | hecho | comun |
@@ -244,7 +244,8 @@ Sale: las conversaciones guardadas no se tocan; aviso `whatsapp_inbox.channel.di
 Si falla: si erplora.com no contesta o no confirma, el diálogo lo dice y el número sigue como estaba (en un
 momento **Tu número** dice cómo quedó); si erplora.com no tenía ningún número conectado para este negocio,
 lo dice y **Tu número** queda «Sin conectar». Mientras siga «Hay que reconectar», **Enviar** dice por qué no
-sale; lo guardado se sigue leyendo.
+sale («Hay que reconectar el número en Ajustes para enviar.») y un mensaje que no se entregó por eso dice
+«Hay que reconectar» con **Volver a conectar**; lo guardado se sigue leyendo.
 Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F03 Recibir un mensaje en la bandeja
@@ -364,18 +365,23 @@ Implicados: erplora.com, la app WhatsApp Business del móvil
 
 ### WHATSAPP_INBOX-F09 Ver quién espera respuesta
 <!-- origen: old-hub:HUB_SHELL-F61 old-hub:HUB_SHELL-F64 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f09 wf:whatsapp-cita#rec_wa_cita-f09 wf:whatsapp-mesa#rec_wa_mesa-f09 -->
-Estado: hecho (filtro y recuento; la campana del Hub llegará con la barra superior)
+Estado: hecho
 Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
 1. En **Filtros**, elegir **Estado: Abierta** y **Sin leer** y pulsar **Aplicar**: quedan las
    conversaciones cuyo último mensaje es del cliente.
-2. El recuento de conversaciones esperando respuesta está disponible para la campana del Hub.
-3. Al ordenar por cualquier columna, las filas sin ese dato van al final, en los dos sentidos.
-Entra: los filtros y el orden.
-Sale: la lista filtrada y el recuento (`whatsapp_inbox.conversation.summary`); nada cambia.
+2. La campana del Hub cuenta **Clientes de WhatsApp esperando respuesta** y lleva a la **Bandeja de entrada**.
+   Baja sola en cuanto alguien contesta (desde el Hub o desde el móvil), la deja pendiente o la cierra, y no sale
+   cuando no espera nadie.
+3. En la app instalada, cada mensaje de un cliente que se queda sin contestar avisa con una notificación del
+   sistema, con su nombre y lo que escribió; al tocarla se abre esa conversación en la **Bandeja de entrada**.
+4. Al ordenar por cualquier columna, las filas sin ese dato van al final, en los dos sentidos.
+Entra: los filtros y el orden; los mensajes de los clientes.
+Sale: la lista filtrada y los recuentos (`whatsapp_inbox.conversation.summary`,
+`whatsapp_inbox.conversation.count_awaiting_reply`) y los avisos (`whatsapp_inbox.conversation.notices`); nada cambia.
 Si falla: el motivo con **Reintentar**.
-Implicados: la campana de la barra superior (cuando exista)
+Implicados: la campana de la barra superior, los avisos de la app instalada
 
 ### WHATSAPP_INBOX-F10 Borrar los datos de un número sin ficha
 <!-- origen: old-saas:SAAS_WHATSAPP_INBOX-F21 old-hub:HUB-F251 old:whatsapp_inbox/workflow/canal-y-bandeja.md#whatsapp_inbox-f10 -->
@@ -917,7 +923,11 @@ Actor: todos
 Pantalla: Bandeja de entrada
 Pasos:
 1. Cada mensaje enviado lleva su estado: **Enviando…**, **Enviado**, **Entregado**, **Leído**, **No
-   entregado** (con el motivo de Meta o de erplora.com) o **No enviado** (con **Reintentar**).
+   entregado** (con el motivo de Meta o de erplora.com) o **No enviado** (con **Reintentar**). Si no se
+   entregó porque WhatsApp retiró el permiso del número, dice «Hay que reconectar» con **Volver a conectar**,
+   que lleva a **Tu número** en **Ajustes** (solo quien puede configurar; sin **Reintentar**, que volvería a
+   fallar); con el número de vuelta, el mensaje queda con «El permiso de WhatsApp para tu número había
+   caducado.».
 2. Cambia solo, sin recargar, cuando erplora.com lo cuenta.
 Entra: cada estado que erplora.com recibe de Meta para un mensaje del Hub.
 Sale: el estado solo avanza (un «Entregado» que llega tarde no deshace un «Leído»); un estado que llega
@@ -998,6 +1008,8 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 | `whatsapp_inbox.conversation.detail` | Una conversación (por id, número o nombre) con su ficha, su asignación y si la ventana de 24 h está abierta |
 | `whatsapp_inbox.conversation.by_phone` | La conversación de un número exacto (formato internacional), o ninguna: para avisar desde otra app |
 | `whatsapp_inbox.conversation.summary` | Abiertas, sin leer y esperando respuesta, y si el tope del mes está gastado |
+| `whatsapp_inbox.conversation.count_awaiting_reply` | Cuántos clientes esperan respuesta (abiertas con el último mensaje del cliente): lo cuenta la campana |
+| `whatsapp_inbox.conversation.notices` | Los clientes que esperan respuesta, del más reciente al más antiguo, con quién, lo último que escribió y cuándo: los avisos del dispositivo |
 | `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo |
 | `whatsapp_inbox.note.list` | Las notas internas de una conversación |
 | `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta |
@@ -1155,7 +1167,10 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   quien lo pide desde la bandeja compartida; sin negocio guardado (anterior a `0007`), con el de quien lo pide.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
-  `whatsapp_inbox.cap_reached`, cualquier otro como `whatsapp_inbox.send_refused`); conexión fallida o un
+  `whatsapp_inbox.cap_reached`; `whatsapp.reconnect_needed`, el 190 de Meta, como
+  `whatsapp_inbox.reconnect_needed` con el texto del Hub (`RECONNECT_NEEDED`), nunca el de Meta, y la burbuja
+  lo dice como **Tu número** mientras el canal siga `reconnect_needed`; cualquier otro como
+  `whatsapp_inbox.send_refused`, con el motivo de Meta); conexión fallida o un
   4xx que no es 409 (también un 429: ir más despacio no es el tope) → no ha salido (`sending`,
   `whatsapp_inbox.saas_unreachable`); 5xx, tiempo de lectura agotado o 200 sin id → no se sabe
   (`sending`, `whatsapp_inbox.send_unknown`). Los dos últimos se reintentan **con la misma clave** («No
@@ -1165,8 +1180,9 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - **Una plantilla nunca se registra dos veces.** Cada guardado lleva su `submit_key` (la pantalla genera
   una por guardado; el asistente, una por intención); el mismo guardado repetido es la misma fila y la
   misma entrega. 200 `{meta_id, status}` → la plantilla (o su `draft`) pasa a lo que Meta dice; 409 →
-  `failed` con el motivo de Meta (`whatsapp.meta_unreachable`, `whatsapp.meta_rate_limited` y
-  `whatsapp.not_connected` se dicen con palabras del Hub, sin culpar a ERPlora); sin respuesta →
+  `failed` con el motivo de Meta (`whatsapp.meta_unreachable`, `whatsapp.meta_rate_limited`,
+  `whatsapp.not_connected` y `whatsapp.reconnect_needed` se dicen con palabras del Hub, sin culpar a ERPlora);
+  sin respuesta →
   `sending`, y `template.retry` la entrega con la misma clave; un `failed` reintentado va con clave nueva
   (la misma daría el mismo rechazo).
 - **La lista de Meta nunca pisa al Hub**: una plantilla `DRAFT` que va de camino conserva lo escrito, un
@@ -1314,8 +1330,11 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
    ```
 
    Respuestas: 200 `{"wa_message_id": "wamid…"}` (aceptado por Meta); 409
-   `{"error": {"code": "whatsapp.cap_reached" | "whatsapp.not_connected" | "whatsapp.window_closed" |
-   "whatsapp.template_not_approved" | "whatsapp.recipient_blocked", "message": "…"}}` = no ha salido;
+   `{"error": {"code": "whatsapp.cap_reached" | "whatsapp.not_connected" | "whatsapp.reconnect_needed" |
+   "whatsapp.window_closed" | "whatsapp.template_not_approved" | "whatsapp.recipient_blocked" |
+   "whatsapp.meta_rejected", "message": "…"}}` = no ha salido (`reconnect_needed`: el permiso caducó o se
+   retiró, el 190 de Meta, y erplora.com marca el número «Hay que reconectar» con foto nueva; `meta_rejected`:
+   otro rechazo de Meta, con su motivo);
    un 4xx que no es 409 (también 429) = no ha salido; 5xx o sin respuesta = no se sabe. erplora.com
    **nunca envía dos veces la misma clave** (devuelve el `wa_message_id` que ya tenía) y **reserva el
    cupo del mes de forma atómica al aceptar**: dos envíos simultáneos no pueden pasar ambos el tope.
@@ -1423,7 +1442,14 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
   `apps.whatsapp_inbox.events.react` (ya en la fase 1, `base/relay.py`); en la fase 2, el worker ejecuta
   la tarea `resume_deliveries` de `apps.py` en cada hub (`hub_due`), y el trabajo diferido de esta app
   entra con `use_hub(hub)`.
-- La campana de la barra superior puede leer `whatsapp_inbox.conversation.summary` (`awaiting_reply`).
+- La campana de la barra superior lee `whatsapp_inbox.conversation.count_awaiting_reply` (la declaración `bell`
+  de `apps.py`, con el permiso `whatsapp_inbox.view`), que comparte con `summary` la única definición de
+  «esperando respuesta» (`AWAITING_REPLY` de `queries.py`); se refresca con `AWAITING_REPLY_EVENTS` de `events.py`.
+- Los avisos del dispositivo (`notices` de `apps.py`, hub#2303) leen `whatsapp_inbox.conversation.notices`: una
+  fila por conversación esperando respuesta con `at` = el último mensaje del cliente (`last_inbound_at`), así que
+  el dispositivo, que cuenta cada par (`id`, `at`) una vez, avisa de nuevo cuando el cliente vuelve a escribir.
+  Con ellos, quien puede leer la bandeja figura en `sources` de `base.notice.list` y la app instalada le pide
+  permiso para avisar aunque el negocio solo use WhatsApp (hub#2306).
 - Las fotos y las notas de voz del hilo (F06) se cargan de erplora.com: la CSP del Hub permite su origen en
   `img-src` y `media-src` (`config/settings.py`, hub#147), y erplora.com las sirve a quien tiene su sesión
   (`<slug>.erplora.com` y `erplora.com` son un mismo sitio, así que la cookie viaja).
@@ -1495,7 +1521,8 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
 | Estados `active`/`closed`, solo el borrado cierra | Abierta / pendiente / cerrada, a mano; un mensaje nuevo reabre | Mercado (Zendesk, Fresha, Shopify) |
 | Asignar tecleando el identificador, solo el administrador | Selector del equipo + «Asignármela»; el responsable asigna | Mercado (Shopify, Chakra); el producto actual lo marcaba «parcial» |
 | Sin notas | Notas internas (F36) | Mercado (Fresha, Intercom, Front) |
-| «Necesita atención» lo ponían las recetas | Filtro **Sin leer** + recuento `awaiting_reply` | Sin recetas no hay quien la ponga |
+| «Necesita atención» lo ponían las recetas | Filtro **Sin leer** + la campana **Clientes de WhatsApp esperando respuesta** (`awaiting_reply`) | Sin recetas no hay quien la ponga |
+| La app instalada avisaba cuando subía el contador de la campana (hub#2303) | Un aviso del dispositivo por cada mensaje de un cliente que queda sin contestar | Mercado (WhatsApp Business, Shopify Inbox, Square, Fresha avisan de cada mensaje); un aviso por subida del contador callaría al cliente que vuelve a escribir tras cerrarse sin respuesta |
 | Fotos y audio dentro del hilo, descargados por una puerta del Hub | Fotos y notas de voz dentro del hilo, servidas por erplora.com; vídeos y documentos con **Abrir el adjunto** | El Hub no guarda ni pasa archivos: erplora.com los sirve con la sesión de la persona y la CSP del Hub permite su origen (ver «Contrato con `base`») |
 | Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31), con la entrega a Meta por erplora.com; sin cabecera con archivo | El Hub no guarda archivos; la cabecera con foto, vídeo o documento se hace en WhatsApp Manager |
 | Repaso cada 15 min de conversaciones sin ficha | Se une al recibir y al guardar la ficha | No hay conversaciones anteriores a la app nueva que repasar |
