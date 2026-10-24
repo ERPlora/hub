@@ -1959,8 +1959,9 @@ Estado: hecho
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Empleados · Personal
 Pasos:
-  1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya),
-     «Email» (solo para quien administra), «Rol», «Acceso» y «Estado».
+  1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya;
+     en una fila, un nombre que no cabe se corta y sale entero al pasar por encima), «Email» (solo para quien
+     administra), «Rol», «Acceso» y «Estado».
   2. «Acceso» dice cómo entra: «Cuenta» siempre, y «PIN» y «Placa» si los tiene (por ejemplo, «Cuenta + PIN +
      Placa»).
   3. «Estado» dice «Activo» o, si erplora.com ya la invitó y aún no ha entrado, «Aún no ha entrado».

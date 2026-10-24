@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:def5e501a794e3fbf9115fcd4d351b987091e2c01d4ee88bfc151587fb9566a5 -->
+<!-- generated from WORKBOOK.md sha256:5028cd6bdaf50cc6d6ee43954c40f52241e87c19002306efccae9ea8f212f3d4 -->
 
 ## What it is for and who it is for
 
@@ -1869,8 +1869,9 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Employees · Staff
 Steps:
-  1. In **Employees › Staff**, a row per person (on a phone, a card): "User" (with "You" on one's own), "Email"
-     (only for whoever runs the business), "Role", "Access" and "Status".
+  1. In **Employees › Staff**, a row per person (on a phone, a card): "User" (with "You" on one's own; in a row, a
+     name that does not fit is cut and shows whole on hovering over it), "Email" (only for whoever runs the business),
+     "Role", "Access" and "Status".
   2. "Access" says how they get in: "Account" always, and "PIN" and "Badge" if they have them (for example,
      "Account + PIN + Badge").
   3. "Status" says "Active" or, if erplora.com already invited them and they have not come in yet, "Not in yet".
