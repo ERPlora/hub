@@ -2702,5 +2702,21 @@
   "base.profile.avatar_remove": {
     "method": "post",
     "path": "/api/me/avatar/remove"
+  },
+  "base.assistant.turn": {
+    "method": "post",
+    "path": "/api/assistant/turn"
+  },
+  "base.assistant.usage": {
+    "method": "get",
+    "path": "/api/assistant/usage"
+  },
+  "base.assistant.report": {
+    "method": "post",
+    "path": "/api/assistant/report"
+  },
+  "base.assistant.transcribe": {
+    "method": "post",
+    "path": "/api/assistant/transcribe"
   }
 }

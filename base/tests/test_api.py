@@ -104,6 +104,11 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("POST", "/api/system/failed-events/retry", "base.failed_event.retry"),
         ("POST", "/api/system/failed-events/retry_all", "base.failed_event.retry_all"),
         ("POST", "/api/system/failed-events/discard", "base.failed_event.discard"),
+        # Assistant (APP-BASE-9)
+        ("POST", "/api/assistant/turn", "base.assistant.turn"),
+        ("GET", "/api/assistant/usage", "base.assistant.usage"),
+        ("POST", "/api/assistant/report", "base.assistant.report"),
+        ("POST", "/api/assistant/transcribe", "base.assistant.transcribe"),
     } | {(method, f"/api{path}", op) for method, path, op in WAY_IN}
 
 
