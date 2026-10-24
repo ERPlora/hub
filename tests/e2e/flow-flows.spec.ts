@@ -10,7 +10,7 @@
 // list searches, filters, sorts, switches by its named switch and in bulk (F02, F03), copies and deletes
 // (F06, F07). Two drafts of the assistant: one discarded (F19), the other reviewed, saved, allowed, turned
 // on and run (F18). What a run creates is tagged `E2E FlowF` (plus the ids of the cards it used) and goes.
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
@@ -327,6 +327,91 @@ for (const viewport of VIEWPORTS) {
       await rowAction(page, 'flow-list', copyId!, 'delete');
       await confirmDialog(page, `Delete «Copy of ${name}»?`, () => snap('FLOW-F07'));
       await expect(copy).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+// flow: FLOW-F10 FLOW-F11 · FIX-FLOW-PAYMENT-LABELS-NOT-PAGOS-TERMS — in Spanish, what Payments sends and does is
+// said in Payments' own words (its «Métodos» tab, «Cancelar pago»): «método de pago» and «se cancela un pago». «Forma
+// de pago» stays Sales' word, so a trigger or a step of each app is told apart. Nothing is saved.
+const PAYMENT_EVENTS: Array<[string, string]> = [
+  ['payment.method.activated', 'se activa un método de pago'],
+  ['payment.method.created', 'se crea un método de pago'],
+  ['payment.method.deactivated', 'se desactiva un método de pago'],
+  ['payment.method.updated', 'cambia un método de pago'],
+  ['payment.payment.cancelled', 'se cancela un pago'],
+];
+const PAYMENT_COMMANDS: Array<[string, string]> = [
+  ['payment.method.activate', 'Activar un método de pago'],
+  ['payment.method.create', 'Crear un método de pago'],
+  ['payment.method.deactivate', 'Desactivar un método de pago'],
+  ['payment.method.update', 'Cambiar un método de pago'],
+];
+const PAYMENT_QUERIES: Array<[string, string]> = [
+  ['payment.method.get', 'Leer un método de pago'],
+  ['payment.method.list', 'Buscar métodos de pago'],
+];
+
+/** Opens the list of the `Combo` `testid` (once open, it covers its own field) filtered by `query`; its options. */
+async function search(page: Page, testid: string, query: string): Promise<Locator> {
+  const input = shown(page).locator(`[data-testid=${testid}] input`);
+  if ((await input.getAttribute('aria-expanded')) !== 'true') await input.click();
+  await input.fill(query);
+  return page.locator(`[data-testid^=${testid}-option-]`);
+}
+
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F10 y FLOW-F11: the triggers and steps of Payments say its own words in Spanish at ${viewport.label}`, async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+    const page = await context.newPage();
+    try {
+      await login(page, A, '/');
+      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+      await page.goto(`${A}/flow/automations/new`);
+      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+      // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+      if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+      const editor = shown(page);
+      await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
+
+      // FLOW-F10: «Elige qué pasa». Sales' own keeps «forma de pago»; none of Payments' answers to it.
+      await editor.locator('[data-testid=flow-trigger-open]').click();
+      await choose(page, 'flow-trigger-kind', 'Pasa algo');
+      const byForma = await search(page, 'flow-trigger-event', 'forma de pago');
+      await expect(page.locator('[data-testid="flow-trigger-event-option-sale.payment_method.created"]')).toContainText(
+        'se añade una forma de pago a las ventas',
+      );
+      await expect(byForma.and(page.locator('[data-testid^="flow-trigger-event-option-payment."]'))).toHaveCount(0);
+      const events = await search(page, 'flow-trigger-event', 'pagos');
+      for (const [event, words] of PAYMENT_EVENTS) {
+        await expect(page.locator(`[data-testid="flow-trigger-event-option-${event}"]`)).toContainText(words);
+      }
+      const ofPayments = events.and(page.locator('[data-testid^="flow-trigger-event-option-payment."]'));
+      await expect(ofPayments).toHaveCount(9);
+      await expect(ofPayments.filter({ hasText: /forma de pago|anula/ })).toHaveCount(0);
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await page.screenshot({ path: shot(`FIX-FLOW-PAYMENT-LABELS-NOT-PAGOS-TERMS-${viewport.label}`) });
+      await page.locator('[data-testid="flow-trigger-event-option-payment.payment.cancelled"]').click();
+      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Cuando se cancela un pago');
+
+      // FLOW-F11: «Qué hacer» and «Qué consultar», with the same words.
+      await editor.locator('[data-testid=flow-editor-add-command]').click();
+      const commands = await search(page, 'flow-step-action-s1', 'método de pago');
+      for (const [action, words] of PAYMENT_COMMANDS) {
+        await expect(page.locator(`[data-testid="flow-step-action-s1-option-${action}"]`)).toContainText(words);
+      }
+      await expect(commands.filter({ hasText: 'forma de pago' })).toHaveCount(0);
+      await settled(page);
+      await page.screenshot({ path: shot(`FIX-FLOW-PAYMENT-LABELS-NOT-PAGOS-TERMS-steps-${viewport.label}`) });
+      await page.locator('[data-testid="flow-step-action-s1-option-payment.method.create"]').click();
+      await editor.locator('[data-testid=flow-editor-add-query]').click();
+      await search(page, 'flow-step-action-s2', 'método');
+      for (const [query, words] of PAYMENT_QUERIES) {
+        await expect(page.locator(`[data-testid="flow-step-action-s2-option-${query}"]`)).toContainText(words);
+      }
     } finally {
       await context.close();
     }

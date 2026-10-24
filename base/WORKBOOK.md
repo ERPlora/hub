@@ -131,6 +131,21 @@ La pestaña «Datos y copias» de «Ajustes», la última. Arriba, un selector c
 - **Restablecer**: «Deshacer una importación», con una fila por importación que se puede deshacer, y
   «Restablecer el negocio», con lo que tiene cada sección.
 
+### Sistema · Recursos
+Desde «Sistema» en el menú lateral. Cinco pestañas abajo: «Recursos», «Plan y límites», «Actualizaciones», «Eventos
+caídos» y «Registros» (esta, solo para quien administra el negocio); se abre «Recursos»: «Recursos en la nube» con la
+pastilla «Nube», la tarjeta «Base de datos» y por qué no hay cifras de CPU, memoria ni conexiones.
+
+### Sistema · Actualizaciones
+«Qué te hemos actualizado»: la versión que corre, cuándo se publicó y que el hub se actualiza solo.
+
+### Sistema · Eventos caídos
+Una tarjeta por aviso entre apps que agotó sus reintentos, con «Reenviar» y «Descartar»; arriba, «Reenviar todos».
+
+### Sistema · Registros
+«Registro de eventos»: la tabla «Hora», «Nivel» y «Evento» (en el móvil, una tarjeta por suceso), con «Buscar
+evento…» y el filtro de nivel.
+
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
@@ -171,7 +186,7 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F07 | Personalizar el tablero de paneles | hecho |
 | BASE-F08 | Mantener los paneles al día sin recargar | hecho |
 | BASE-F09 | Consultar la actividad reciente | hecho |
-| BASE-F10 | Ver en la campana los avisos entre apps que no se entregaron | parcial |
+| BASE-F10 | Ver en la campana los avisos entre apps que no se entregaron | hecho |
 | BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | parcial |
 | BASE-F12 | Pedirle al asistente que repase la configuración | parcial |
 | BASE-F13 | Perder el acceso al cambiar de rol o al salir del negocio | hecho |
@@ -200,10 +215,19 @@ En la pantalla Ajustes · Datos y copias:
 | BASE-F36 | Elegir qué apps, datos y tablas viajan en la exportación | hecho |
 | BASE-F37 | Restablecer el negocio por secciones | parcial |
 | BASE-F38 | Ver Inicio al día después de importar una plantilla | hecho |
-| BASE-F39 | Abrir Ajustes y moverse por sus pestañas | hecho |
-| BASE-F40 | Ver el país del negocio | hecho |
-| BASE-F41 | Ver la moneda del negocio | parcial |
-| BASE-F42 | Cambiar el idioma del negocio en erplora.com | parcial |
+| BASE-F39 | Abrir Sistema y moverse por sus pestañas | hecho |
+| BASE-F40 | Ver cuánto está usando el hub | parcial |
+| BASE-F41 | Saber qué versión corre y qué se le ha actualizado | parcial |
+| BASE-F42 | Ver el registro de sucesos del sistema | hecho |
+| BASE-F43 | Ver los eventos caídos | hecho |
+| BASE-F44 | Reenviar un evento caído | hecho |
+| BASE-F45 | Reenviar todos los eventos caídos | hecho |
+| BASE-F46 | Descartar un evento caído | hecho |
+| BASE-F47 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
+| BASE-F48 | Abrir Ajustes y moverse por sus pestañas | hecho |
+| BASE-F49 | Ver el país del negocio | hecho |
+| BASE-F50 | Ver la moneda del negocio | parcial |
+| BASE-F51 | Cambiar el idioma del negocio en erplora.com | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -382,14 +406,15 @@ Implicados: SALE-F28
 
 ### BASE-F10 Ver en la campana los avisos entre apps que no se entregaron
 <!-- origen: old-hub:HUB_SHELL-F62 -->
-Estado: parcial — la fila aún no lleva a ningún sitio: la pantalla Sistema, donde se reenvían o descartan, llega más adelante
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: La campana
 Pasos:
   1. Un aviso entre apps (por ejemplo, «venta cobrada» hacia Facturación) agotó sus reintentos.
   2. La campana de un administrador sube en el momento, sin esperar ni recargar, y al abrirla enseña
      «Eventos caídos» con cuántos hay.
-  3. Cuando no queda ninguno, la fila desaparece.
+  3. Al tocar la fila se abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
+  4. Cuando no queda ninguno, la fila desaparece.
 Entra: cuántos avisos de este negocio quedaron sin entregar, solo para quien administra el negocio.
 Sale: nada.
 Si falla: un empleado o un responsable no ve la fila. Si no se puede preguntar, la campana se queda con
@@ -689,7 +714,7 @@ Estado: parcial — sin cuántos dispositivos se usan: el hub aún no lleva la c
 Actor: propietario, administrador
 Pantalla: Sistema · Plan y límites
 Pasos:
-  1. Pulsa «Sistema» en el menú lateral: se abre «Plan y límites».
+  1. Pulsa «Sistema» en el menú lateral y, abajo, la pestaña «Plan y límites».
   2. Ve «Los límites de tu plan» con «Dentro del límite» o «Cerca del límite», la tarjeta «Personas» (las
      personas activas del negocio frente a las que permite el plan, con su barra; o «Sin límite») y la de
      «Dispositivos» («Hasta» y el tope del plan, o «Sin límite»).
@@ -932,7 +957,181 @@ intentarlo.» y «Ver el informe», sin reintento. Si las plantillas no se puede
 cargar las plantillas para empezar.» con «Reintentar» y «Ahora no».
 Implicados: BASE-F01, INVENTORY-F12
 
-### BASE-F39 Abrir Ajustes y moverse por sus pestañas
+### BASE-F39 Abrir Sistema y moverse por sus pestañas
+<!-- origen: old-hub:HUB_SHELL-F135 -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Sistema · Recursos
+Pasos:
+  1. Pulsa «Sistema» en el menú lateral, o llega desde la fila «Eventos caídos» de la campana.
+  2. Abajo hay cinco pestañas, en este orden: «Recursos», «Plan y límites», «Actualizaciones», «Eventos caídos» y
+     «Registros». Se abre «Recursos». La pestaña elegida queda en la dirección: un enlace o recargar abre la misma.
+  3. Una pestaña que no existe abre «Recursos»; la antigua de las copias lleva a «Ajustes» › «Datos y copias».
+  4. Quien no es propietario ni administrador ve cuatro: «Registros» no existe para él y, si la pide, se abre
+     «Recursos». En «Recursos» lee «Solo el dueño o un administrador puede ver cuánto está usando el hub.» y en
+     «Eventos caídos», «Solo el dueño o un administrador puede ver los eventos caídos.», sin «Reintentar».
+Entra: el papel de la persona en el negocio; a quien no lo administra no se le pide nada que el hub le negaría.
+Sale: nada guardado.
+Si falla: cada pestaña dice lo suyo (BASE-F40 a BASE-F43).
+Implicados: ninguno
+
+### BASE-F40 Ver cuánto está usando el hub
+<!-- origen: old-hub:HUB_SHELL-F136 -->
+Estado: parcial — sin CPU, memoria ni conexiones del negocio: un solo servicio atiende a todos los negocios y ninguna cifra es solo suya; el tamaño y el uso de su base de datos llegan cuando cada negocio tenga la suya
+Actor: propietario, administrador
+Pantalla: Sistema · Recursos
+Pasos:
+  1. Abre «Sistema»: se abre «Recursos». Mientras carga: «Consultando el sistema…».
+  2. El título es «Recursos en la nube», con la pastilla «Nube».
+  3. La tarjeta «Base de datos» dice «PostgreSQL» y, debajo, «Base de datos compartida» (o «Base de datos propia»
+     cuando el negocio tiene la suya).
+  4. Debajo: «El uso de CPU, memoria y conexiones no se mide por negocio: los servidores de ERPlora atienden a todos
+     los negocios a la vez y crecen solos cuando hace falta.». Nunca una cifra inventada ni un cero.
+Entra: en qué base de datos está el negocio.
+Sale: nada guardado.
+Si falla: «No se pudo consultar el sistema» — «Las métricas y los registros no están disponibles ahora. Puedes
+volver a intentarlo.» con «Reintentar».
+Implicados: ninguno
+
+### BASE-F41 Saber qué versión corre y qué se le ha actualizado
+<!-- origen: old-hub:HUB_SHELL-F142 -->
+Estado: parcial — la versión y su fecha sí; sin la lista de lo cambiado en cada app: todas las apps se publican juntas, en un solo despliegue y sin notas de versión
+Actor: propietario, administrador
+Pantalla: Sistema · Actualizaciones
+Pasos:
+  1. Abre la pestaña «Actualizaciones». El título es «Qué te hemos actualizado» y una pastilla dice por qué
+     versión va el hub. Mientras carga: «Consultando la versión…».
+  2. Debajo, el día en que se actualizó o, si no se sabe, «No sabemos cuándo se publicó esta versión.»: nunca una
+     fecha inventada.
+  3. Y: «Este hub se actualiza solo cuando publicamos una versión nueva, sin cortar el servicio: no tienes que
+     instalar nada.». No hay botón de actualizar.
+  4. Quien no administra el negocio ve el título y ese texto, sin la versión.
+Entra: la versión que corre y cuándo se publicó.
+Sale: nada guardado.
+Si falla: «No se pudo consultar el sistema» — «Las métricas y los registros no están disponibles ahora. Puedes
+volver a intentarlo.» con «Reintentar».
+Implicados: ninguno
+
+### BASE-F42 Ver el registro de sucesos del sistema
+<!-- origen: old-hub:HUB_SHELL-F144 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Sistema · Registros
+Pasos:
+  1. Abre la pestaña «Registros»: el título es «Registro de eventos». Para quien no administra el negocio la
+     pestaña no existe (BASE-F39).
+  2. Ve los 50 últimos sucesos entre las apps del negocio, el más reciente primero, con «Hora», «Nivel»
+     («Información», «Aviso» o «Error», en una pastilla) y «Evento»: su nombre, la app que lo anotó y qué ha pasado
+     con él en su idioma (entregado, esperando, en «Eventos caídos»…). Nunca lo que llevaba dentro.
+  3. Busca con «Buscar evento…», filtra por nivel y va de 20 en 20. En el móvil, cada suceso es una tarjeta
+     encabezada por su hora.
+  4. El registro se pone al día solo cuando un aviso cae, se reenvía o se descarta; lo demás, al volver a abrir la
+     pestaña.
+Entra: los últimos sucesos de este negocio, nunca los de otro.
+Sale: nada guardado.
+Si falla: «No se pudo cargar el registro. Comprueba la conexión y reintenta.» con «Reintentar». Sin sucesos: «Sin
+eventos: todavía no ha pasado nada entre las apps de este negocio.».
+Implicados: ninguno
+
+### BASE-F43 Ver los eventos caídos
+<!-- origen: old-hub:HUB_SHELL-F145 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Sistema · Eventos caídos
+Pasos:
+  1. Llega desde la fila «Eventos caídos» de la campana (BASE-F10) o pulsando la pestaña «Eventos caídos».
+  2. Mientras carga: «Cargando los eventos caídos…». Con eventos: «Arregla la causa (un permiso, una app parada…) y
+     reenvía. El evento no se edita: si la causa sigue, vuelve a caer aquí.».
+  3. Cada aviso es una tarjeta con su nombre, cuántas veces se intentó, de qué app a cuál iba (por ejemplo, de
+     «Ventas / TPV» para «Facturación»), cuándo pasó y su último error tal cual, con «Reenviar» y «Descartar».
+     Arriba, «Reenviar todos». Si la app a la que iba ya no está activa, la tarjeta dice que no se puede reenviar
+     hasta activarla, sin «Reenviar».
+  4. Salen los 100 más recientes; con más, la pantalla dice cuántos se ven de cuántos.
+  5. La lista y la campana se ponen al día solas cuando un aviso cae, se reenvía o se descarta.
+  6. Sin ninguno: «Todo en orden» — «No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio
+     nunca la pierde.».
+Entra: los avisos entre apps de este negocio que agotaron sus reintentos, nunca los de otro.
+Sale: nada guardado.
+Si falla: «No se pudo consultar el sistema» — «No se pudo cargar la cola de eventos caídos. Comprueba la conexión y
+reintenta.» con «Reintentar» a la vista: un fallo nunca sale como «Todo en orden». Quien no administra el negocio
+lee «Solo el dueño o un administrador puede ver los eventos caídos.».
+Implicados: ninguno
+
+### BASE-F44 Reenviar un evento caído
+<!-- origen: old-hub:HUB_SHELL-F146 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Sistema · Eventos caídos
+Pasos:
+  1. Quien arregló la causa (encendió la app, completó los datos del negocio…) pulsa «Reenviar» en su tarjeta; el
+     botón se desactiva mientras se hace.
+  2. Sale «Evento reenviado.», la tarjeta desaparece y la campana baja en el momento.
+  3. El aviso vuelve a la cola con los intentos a cero y solo lo recibe la app que había fallado; si la causa
+     sigue, vuelve a caer aquí.
+Entra: el aviso elegido.
+Sale: el aviso, otra vez en la cola; `base.failed_event.retried`.
+Si falla: «No se pudo reenviar:» y el motivo: «ese evento ya no está en la cola; actualiza la lista.» (alguien lo
+reenvió o lo descartó antes), «la app a la que iba ya no está activa en este negocio; actívala y vuelve a
+reenviarlo.» o «solo el dueño o un administrador puede hacerlo.».
+Implicados: ninguno
+
+### BASE-F45 Reenviar todos los eventos caídos
+<!-- origen: old-hub:HUB_SHELL-F147 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Sistema · Eventos caídos
+Pasos:
+  1. Tras un fallo que tumbó varios avisos, arregla la causa y pulsa «Reenviar todos» (solo sale con avisos en la
+     lista).
+  2. Confirma en «¿Reenviar todos los eventos caídos?» — «Los que se pueden reenviar vuelven a la cola; los que iban
+     a una app parada se quedan aquí.» con «Reenviar todos» (o «Cancelar»: no pasa nada).
+  3. Sale cuántos se reenviaron («Eventos reenviados: 2.») y la lista y la campana se vacían; si no había ninguno
+     que se pudiera reenviar: «No había nada que reenviar.».
+  4. Vuelven a la cola todos los reenviables del negocio, también los que no caben en la lista; los que iban a una
+     app parada se quedan.
+Entra: los avisos caídos de este negocio.
+Sale: los avisos, otra vez en la cola; `base.failed_event.retried`, con cuántos.
+Si falla: «No se pudo reenviar:» y el motivo, como en BASE-F44.
+Implicados: ninguno
+
+### BASE-F46 Descartar un evento caído
+<!-- origen: old-hub:HUB_SHELL-F148 -->
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Sistema · Eventos caídos
+Pasos:
+  1. Decide que un aviso no debe entregarse nunca (está repetido, ya se hizo a mano) y pulsa «Descartar» en su
+     tarjeta.
+  2. Se abre la ventana «¿Descartar este evento para siempre?», que dice qué aviso no llegará nunca a qué app y que
+     se guarda quién lo descartó, cuándo y por qué, avisa «Si era una venta para Facturación, esa venta se queda sin
+     factura.» y pide «Por qué (opcional)».
+  3. Pulsa «Descartar para siempre» (o «Cancelar»: no pasa nada).
+  4. Sale «Evento descartado (se guarda para auditoría).», la tarjeta desaparece y la campana baja.
+Entra: el aviso elegido y, si quiere, por qué.
+Sale: el aviso cerrado para siempre, con quién, cuándo y por qué; no se borra ni se vuelve a intentar.
+`base.failed_event.discarded`.
+Si falla: «No se pudo descartar:» y el motivo, como en BASE-F44.
+Implicados: ninguno
+
+### BASE-F47 Informar de un error de la pantalla sin que nadie lo pida
+<!-- origen: old-hub:HUB_SHELL-F149 -->
+Estado: hecho
+Actor: sistema
+Pantalla: ninguna
+Pasos:
+  1. La persona no hace nada: cuando la pantalla tiene un error que nadie recogió (también al pintar una parte de la
+     pantalla o en una espera que falló sin tratar), se apunta solo.
+  2. Se envía al hub sin ventana, sin captura y sin preguntar, aunque la pestaña se esté cerrando.
+  3. Un error idéntico no se vuelve a enviar en 30 segundos, y se recuerdan como mucho 50 distintos.
+  4. El hub lo deja en su registro de errores con el negocio, la persona y la pantalla donde pasó.
+Entra: el mensaje del error, su traza y la pantalla, solo con sesión.
+Sale: una línea en el registro de errores del hub; en el navegador no se guarda nada.
+Si falla: no pasa nada visible: el envío no se reintenta ni genera otro informe. Sin sesión, o con más de 30
+informes por minuto de la misma persona, el hub no lo apunta. Para contar algo a mano, «Reportar un problema» del
+menú de usuario.
+Implicados: ninguno
+
+### BASE-F48 Abrir Ajustes y moverse por sus pestañas
 <!-- origen: old-hub:HUB_SHELL-F155 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -949,11 +1148,11 @@ Pasos:
      el tique» y lleva a «Apps».
 Entra: las apps del negocio.
 Sale: nada guardado.
-Si falla: no falla: es navegación. Cada pestaña dice en ella misma si no ha podido cargar lo suyo (BASE-F40,
+Si falla: no falla: es navegación. Cada pestaña dice en ella misma si no ha podido cargar lo suyo (BASE-F49,
 BASE-F29).
-Implicados: PRINTING-F06, BASE-F29, BASE-F40
+Implicados: PRINTING-F06, BASE-F29, BASE-F49
 
-### BASE-F40 Ver el país del negocio
+### BASE-F49 Ver el país del negocio
 <!-- origen: old-hub:HUB_SHELL-F156 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
@@ -970,7 +1169,7 @@ Si falla: si los datos del negocio no se pueden leer, «No se pudieron cargar lo
 «Reintentar». Una demo no tiene país: «—».
 Implicados: HUBS-F15, BASE-F01, BASE-F29
 
-### BASE-F41 Ver la moneda del negocio
+### BASE-F50 Ver la moneda del negocio
 <!-- origen: old-hub:HUB_SHELL-F158 -->
 Estado: parcial — el Inicio ya escribe sus importes en la moneda del negocio, pero las apps (Ventas, Caja, Facturas, Inventario) todavía en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
 Actor: propietario, administrador, responsable, empleado
@@ -985,10 +1184,10 @@ Pasos:
      uno de España. Mientras el negocio no ha contestado, el importe sale sin símbolo, nunca en otra moneda.
 Entra: el país del negocio.
 Sale: nada guardado.
-Si falla: como en BASE-F40.
-Implicados: BASE-F40
+Si falla: como en BASE-F49.
+Implicados: BASE-F49
 
-### BASE-F42 Cambiar el idioma del negocio en erplora.com
+### BASE-F51 Cambiar el idioma del negocio en erplora.com
 <!-- origen: old-hub:HUB_SHELL-F159 -->
 Estado: parcial — quien no ha elegido un idioma propio sigue viendo la pantalla en el de su navegador, no en el del negocio, hasta que el hub use el idioma de cada persona
 Actor: propietario, administrador
@@ -1123,15 +1322,48 @@ Implicados: HUBS-F15, HUBS-F08
   viva con la foto): `plan.max_users`/`max_devices` de la foto (0 = sin tope) frente a las `Membership` activas del
   host; los dispositivos, sin cuenta. Tests: `base/tests/test_queries_apps.py`.
 - Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`, las del hub viejo;
-  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, hoy solo «Plan y límites»; las demás pestañas de Sistema
-  llegan con su parte) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
+  reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema (APP-BASE-7)» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
   de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
   en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
   «Contratar en erplora.com» solo con `base.administer_hub` y `useSurface().isWeb`. e2e: `tests/e2e/base-apps.spec.ts`.
 - Fase 1: no hay activación por negocio (`AppActivation`, `base.app.*`, 202 «Activando…», 409 `base.app_required`,
   el veto de VeriFactu): BASE-F18, F19 (su aviso), F21–F25 quedan `parcial` hasta la fase 2 (FIX-BASE-APP-TURN-OFF-VETO).
 
-- **Ajustes del negocio (APP-BASE-6: BASE-F39…F42).** `base.business.get` (`GET /api/business`, `base.view_home`,
+- **Sistema (APP-BASE-7: BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
+  `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña
+  «Datos y copias» de APP-BASE-2); a quien no
+  administra no se le monta ningún componente que pida lo que el Hub le negaría (gh:hub#2519).
+- Consultas (`base/queries.py`, `base.administer_hub`, `ai=`): `base.system.status` (`GET /api/system/status`: motor,
+  `shared`/`own` según `Hub.db_name`, `version` y `released_at` de `base/system.py`, que lee `APP_VERSION` y
+  `APP_RELEASED_AT` del entorno del despliegue; sin ellos, `dev` y `null`), `base.event.list` (`GET /api/system/events`:
+  las 50 últimas `live.OutboxEvent` del host con su `EventDelivery` resumida y traducida; nunca el `payload`) y
+  `base.failed_event.list` (`GET /api/system/failed-events`: las `EventDelivery` `dead` del host, hasta 100, con
+  `retryable` = su app está en `relay.active_apps`). Las tres filtran por `scope_kind`/`scope_key` del contexto (test de
+  dos hubs en `base/tests/test_queries_system.py`).
+- Comandos (`base/services.py`, `base.administer_hub`, `ai=` con `risk`), con el id en el cuerpo:
+  `base.failed_event.retry` (`POST /api/system/failed-events/retry`: `pending`, `attempts` 0, solo a su `app_label`;
+  409 `base.failed_event_app_off` si la app no está activa), `base.failed_event.retry_all` (`POST
+  /api/system/failed-events/retry_all`: `SKIP LOCKED`, todas las reenviables del host) y `base.failed_event.discard`
+  (`POST /api/system/failed-events/discard`: estado `discarded` con `closed_at`, `closed_by` y `close_reason`, migración
+  `0010_event_delivery_discard`; la fila no se borra). Una que ya no está `dead` o es de otro host: 404 `not_found`.
+  Cada uno anota su evento en el outbox.
+- El relay (`base/relay.py`, `relay_deliver_next` en `services.py`) avisa `base.failed_event.created` al host tras el COMMIT
+  cuando se rinde (último intento o más allá de la profundidad máxima); no va al outbox (un oyente de todo evento que
+  fallara en él se alimentaría solo). `base/live.py` re-ejecuta `base.failed_event.list`, `base.event.list` y
+  `base.bell.counters` con `created`, `retried` y `discarded`; `base.system.status`, con `base.hub.state_applied`. Tests:
+  `base/tests/test_services_system.py`, `test_relay.py`, `test_live.py`.
+- Informe de errores de la pantalla: `base/frontend/lib/error-report.ts` (`error`, `unhandledrejection` y
+  `app.config.errorHandler`; `navigator.sendBeacon`, el mismo error una vez cada 30 s, 50 recordados), instalado en
+  `frontend/main.ts`. `POST /api/error-report` (`base/error_report.py`, fuera de ninja: un beacon no lleva CSRF) exige
+  sesión, 30 por minuto y persona (`base.rate_limited`), cuerpo ≤ 16 KB y JSON, y escribe una línea `frontend.error
+  {json}` en ERROR del logger `base.error_report` (host, usuario, pantalla, mensaje y traza recortados); el logging
+  va a la consola y de ahí a CloudWatch (`config/settings.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,
+  `base/frontend/lib/error-report.test.ts`.
+- Pantalla: `SystemPage.vue` con `SystemResources.vue`, `SystemRelease.vue`, `FailedEvents.vue` (descartar en
+  `ConfirmDialog` con motivo; reenviar todos con `confirm`) y `SystemLog.vue` (`DataTable` con tarjetas en el móvil).
+  e2e: `tests/e2e/base-system.spec.ts` (tres tamaños, dos hubs, campana → `#events`).
+
+- **Ajustes del negocio (APP-BASE-6: BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
   viva con `base.hub.registered`): la fila del registro del ámbito, la que manda el SaaS por `PUT /internal/hubs/{id}`
   (nombre, país, zona e idioma, HUBS-F15), con la moneda del país (`base/business.py`: CLDR por Babel; sin país,
   `EUR`), los nombres en el idioma de la persona y `settings_url` = `SAAS_URL/businesses/<id>/settings` (vacío en una
@@ -1139,7 +1371,7 @@ Implicados: HUBS-F15, HUBS-F08
   propio negocio (`base/tests/test_business_live.py`). El Hub no guarda ni cambia nada de esto y no hay almacén
   clave/valor de ajustes: el `hub_settings` del runtime viejo se repartió entre sus dueños (país, zona e idioma en el
   registro; territorio en Impuestos, TAX-F11; emisor en Facturación, INVOICE-F21; la moneda, la del país). Las apps
-  aún cobran en `EUR` (BASE-F41 `parcial`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
+  aún cobran en `EUR` (BASE-F50 `parcial`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
@@ -1156,5 +1388,7 @@ Implicados: HUBS-F15, HUBS-F08
 - No vende ni enseña importes: el precio y la compra de una app de pago son de la Tienda de erplora.com, y en la
   app instalada ni siquiera lleva a ella.
 - No pregunta a erplora.com al abrir una app: usa lo último que erplora.com le pasó del negocio.
+- No inventa cifras de uso: la CPU, la memoria y las conexiones no son de un negocio, así que Sistema no las enseña.
+- No edita un aviso caído ni enseña lo que llevaba: se reenvía tal cual o se descarta, y el descartado se guarda.
 - No cambia el nombre, el país, la zona horaria ni el idioma del negocio: los guarda erplora.com y el hub los
   recibe. Tampoco deja elegir la moneda: es la del país del negocio.

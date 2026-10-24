@@ -95,6 +95,13 @@ def test_the_spas_route_map_names_every_base_route(settings):
         *DATA_ROUTES,
         # Business settings (APP-BASE-6).
         ("GET", "/api/business", "base.business.get"),
+        # System (APP-BASE-7)
+        ("GET", "/api/system/status", "base.system.status"),
+        ("GET", "/api/system/events", "base.event.list"),
+        ("GET", "/api/system/failed-events", "base.failed_event.list"),
+        ("POST", "/api/system/failed-events/retry", "base.failed_event.retry"),
+        ("POST", "/api/system/failed-events/retry_all", "base.failed_event.retry_all"),
+        ("POST", "/api/system/failed-events/discard", "base.failed_event.discard"),
     }
 
 
