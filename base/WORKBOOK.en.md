@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b56ec2de54bc6435c21165c202634531d61c77991671d84d46d8450c2dc281a7 -->
+<!-- generated from WORKBOOK.md sha256:3f1bfe86c4cebe61f2f063c141023506ffbf97da66bda1d2e87c08eb84fbae32 -->
 
 ## What it is for and who it is for
 
@@ -208,8 +208,8 @@ From a row of **Employees › Staff**, for whoever runs the business, with the b
 "Open on erplora.com"), "PIN" and "Badge".
 
 ### An approval is needed
-Over the screen where the action was tried: what is approved, "Who approves it?" with the faces and the PIN pad, and
-"Cancel".
+Over the screen where the action was tried: what is approved, "Who approves it?" with the faces and the PIN pad
+(whole and without scrolling on a phone, a tablet and a desk), and "Cancel".
 
 ### API documentation
 With the back button: how the API is called, "Download the OpenAPI file" and a section per app with its calls.
@@ -369,7 +369,7 @@ On the Employees screens and the API documentation:
 | BASE-F81 | Understand how each person gets in | done |
 | BASE-F82 | See the roles and turn on the ones an app brings | partial |
 | BASE-F83 | Give a person a role | done |
-| BASE-F84 | Approve with a manager's PIN | partial |
+| BASE-F84 | Approve with a manager's PIN | done |
 | BASE-F85 | Look up who approved what | done |
 | BASE-F86 | Create an API key and copy its token | partial |
 | BASE-F87 | Rotate an API key | partial |
@@ -1907,7 +1907,7 @@ If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13
 
 ### BASE-F84 Approve with a manager's PIN
-Status: partial — the approval works for the actions an app names, but no app asks for it yet (voiding a sale, a discount over the limit)
+Status: done
 Actor: employee, manager
 Screen: An approval is needed
 Steps:
@@ -1915,8 +1915,9 @@ Steps:
      error, "An approval is needed" shows with "Approving: {action}", in the app's words.
   2. They read "Ask a manager to enter their PIN to approve it." and "…or to swipe their badge: nothing to press
      first.".
-  3. Under "Who approves it?", the faces of those who may do it themselves and have a PIN. The manager taps theirs
-     and types their PIN ("Another person" goes back to the faces), or swipes their badge at any moment.
+  3. Under "Who approves it?", the faces of those who may do it themselves and have a PIN (with only one, their pad
+     shows at once). The manager taps theirs and types their PIN on the pad, whole in view without scrolling, the 0
+     and "Erase" too ("Another person" goes back to the faces), or swipes their badge at any moment.
   4. The action is done once and "Approved by {name}" shows. The session of whoever asked is not closed.
 In: the name and the PIN, or the badge, of whoever approves.
 Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in

@@ -176,14 +176,15 @@ defineExpose({ clear: () => (digits.value = '') });
 }
 
 .pinpad__keys {
+  --pinpad-key: 72px;
   display: grid;
-  grid-template-columns: repeat(3, 72px);
+  grid-template-columns: repeat(3, var(--pinpad-key));
   gap: 12px;
 }
 
 .pinpad__key {
-  width: 72px;
-  height: 72px;
+  width: var(--pinpad-key);
+  height: var(--pinpad-key);
   border-radius: 50%;
   border: 1px solid var(--ion-color-step-150, #d7d8da);
   background: var(--ion-card-background, var(--ion-background-color));
@@ -212,5 +213,13 @@ defineExpose({ clear: () => (digits.value = '') });
 
 .pinpad__key--icon {
   font-size: 1.375rem;
+}
+
+/* A short screen (a low phone, 667 px tall; a laptop's browser): smaller keys, still well over a finger, so the whole
+   pad fits under what is above it (the approval dialog's texts, the till's faces), never its last row cut off. */
+@media (max-height: 740px) {
+  .pinpad__keys {
+    --pinpad-key: 56px;
+  }
 }
 </style>
