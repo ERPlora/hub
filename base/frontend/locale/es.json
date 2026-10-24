@@ -750,7 +750,7 @@
         "refused": "No se hizo, sin permiso: {action} en {app}"
       },
       "card": {
-        "title": "El asistente quiere ejecutar una acción",
+        "title": "¿Ejecutar esta acción?",
         "message": "{action} en {app}: {line}",
         "highMessage": "{action} en {app}. Revisa cada dato antes de seguir.",
         "run": "Ejecutar",

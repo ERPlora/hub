@@ -750,7 +750,7 @@
         "refused": "Not done, not allowed: {action} in {app}"
       },
       "card": {
-        "title": "The assistant wants to run an action",
+        "title": "Run this action?",
         "message": "{action} in {app}: {line}",
         "highMessage": "{action} in {app}. Check each datum before going on.",
         "run": "Run it",

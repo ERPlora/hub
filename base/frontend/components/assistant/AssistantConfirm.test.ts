@@ -52,7 +52,7 @@ describe('AssistantConfirm', () => {
   it('a normal write: its action, its app and its data in one line, and a click', async () => {
     const { wrapper, dialog } = await card(NORMAL);
     expect(dialog.props('open')).toBe(true);
-    expect(dialog.props('title')).toBe('El asistente quiere ejecutar una acción');
+    expect(dialog.props('title')).toBe('¿Ejecutar esta acción?');
     expect(body()).toContain('Crear en Servicios: Corte caballero · 15,00 € · general');
     expect(dialog.props('requireText')).toBeUndefined();
     expect(dialog.props('tone')).toBe('primary');

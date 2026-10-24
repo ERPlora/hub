@@ -69,6 +69,13 @@ const answers = (page: Page): Locator => panel(page).locator('[data-testid="assi
 const lastAnswer = (page: Page): Locator => answers(page).last();
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
 
+/** Answers the card with its button (`submit` or `cancel`) and waits until it has gone: while Ionic dismisses a modal,
+ *  its focus trap keeps the keyboard inside it. */
+async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
+  await card(page).locator(`[data-testid="assistant-confirm-${button}"]`).click();
+  await expect(card(page)).toBeHidden();
+}
+
 async function home(page: Page): Promise<void> {
   await page.goto(`${A}/`);
   await expect(shown(page).locator('[data-testid="assistant-button"]')).toBeVisible();
@@ -84,6 +91,8 @@ async function openPanel(page: Page): Promise<void> {
 
 /** Writes `text` and sends it with Enter; resolves when the turn has ended (the composer offers «Send» again). */
 async function ask(page: Page, text: string, options: { settle?: boolean } = {}): Promise<void> {
+  // The previous turn has ended (its text may arrive before its end): while one runs, Enter sends nothing.
+  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
   const before = await answers(page).count();
   await box(page).fill(text);
   await box(page).press('Enter');
@@ -233,11 +242,11 @@ test('BASE-G115 — a write waits on its card: «Run it» runs it as the person;
   const name = `Mesa asistente ${Date.now().toString(36)}`;
   await ask(page, `E2E-CREATE ${name}`, { settle: false });
   await expect(card(page)).toBeVisible();
-  await expect(card(page)).toContainText('The assistant wants to run an action');
+  await expect(card(page)).toContainText('Run this action?');
   await expect(card(page)).toContainText(`Create in Demo: ${name}`);
   await shots(page, 'BASE-G115', () => expect(card(page)).toBeVisible());
   await page.setViewportSize({ width: 1440, height: 900 });
-  await card(page).locator('[data-testid="assistant-confirm-submit"]').click();
+  await decide(page, 'submit');
   await expect(lastAnswer(page)).toContainText('Hecho.');
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Done: Create in Demo');
   const made = await api<{ rows: { name: string }[] }>(context, A, 'GET', `/demo/items?search=${encodeURIComponent(name)}`);
@@ -246,7 +255,7 @@ test('BASE-G115 — a write waits on its card: «Run it» runs it as the person;
   const other = `${name} no`;
   await ask(page, `E2E-CREATE ${other}`, { settle: false });
   await expect(card(page)).toBeVisible();
-  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
+  await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toContainText('Not done, cancelled: Create in Demo');
   const none = await api<{ rows: unknown[] }>(context, A, 'GET', `/demo/items?search=${encodeURIComponent(other)}`);
@@ -262,7 +271,7 @@ test('BASE-G119 — several things in a row: the read runs by itself, the write 
   await ask(page, `E2E-CHAIN ${name}`, { settle: false });
   await expect(card(page)).toBeVisible();
   await expect(card(page)).toContainText(`Create in Demo: ${name}`);
-  await card(page).locator('[data-testid="assistant-confirm-submit"]').click();
+  await decide(page, 'submit');
   await expect(lastAnswer(page)).toContainText('Hecho.');
   // The read went to the model with its result, without a card; one message spent for the whole turn.
   const chats = provider.seen.filter((s) => s.path === '/v1/chat/completions').slice(-3);
@@ -282,13 +291,14 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   await expect(card(page)).toBeVisible();
   await expect(card(page)).toContainText('Delete in Demo. Check each datum before going on.');
   await expect(card(page)).toContainText(`Record: ${item.data.id}`);
-  const submit = card(page).locator('[data-testid="assistant-confirm-submit"]');
+  // The native button inside `ion-button` (its host carries no role for `aria-disabled` to count).
+  const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
   await expect(submit).toBeDisabled();
   await shots(page, 'BASE-G116', () => expect(card(page)).toBeVisible());
   await page.setViewportSize({ width: 1440, height: 900 });
   await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
   await expect(submit).toBeEnabled();
-  await submit.click();
+  await decide(page, 'submit');
   await expect(lastAnswer(page)).toContainText('Hecho.');
   const gone = await api(context, A, 'GET', `/demo/items/detail?id=${item.data.id}`);
   expect(gone.status).toBe(404);

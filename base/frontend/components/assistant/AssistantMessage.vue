@@ -170,6 +170,7 @@ const finished = computed(() => props.bubble.done && props.bubble.text !== '' &&
       v-for="notice in bubble.notices"
       :key="notice"
       class="assistant-notice"
+      role="status"
       :data-testid="`assistant-notice-${notice}`"
     >
       <HubIcon name="ion:warning-outline" />
@@ -365,7 +366,11 @@ const finished = computed(() => props.bubble.done && props.bubble.text !== '' &&
   align-items: center;
   gap: 6px;
 }
-.assistant-receipt--ok {
+/* The text in the readable grey (WCAG AA on white, hub#1291); the colour says it in the icon only. */
+.assistant-receipts li {
+  color: var(--ion-color-medium-shade, #5f6368);
+}
+.assistant-receipt--ok :deep(ion-icon) {
   color: var(--ion-color-success-shade, #2b8a3e);
 }
 .assistant-receipt--cancelled,
@@ -382,6 +387,11 @@ const finished = computed(() => props.bubble.done && props.bubble.text !== '' &&
   font-size: 0.88em;
 }
 .assistant-notice {
+  color: var(--ion-color-medium-shade, #5f6368);
+}
+.assistant-notice :deep(ion-icon) {
+  flex: none;
+  margin-top: 2px;
   color: var(--ion-color-warning-shade, #b07d00);
 }
 .assistant-upgrade {
