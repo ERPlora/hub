@@ -61,6 +61,9 @@ DEMO_CODE_TTL_SECONDS = 60
 #: The SaaS's pages of the demo: where its jump comes back with the ``state``, and its door.
 DEMO_ENTER_PATH = "/demo/enter/"
 DEMO_DOOR_PATH = "/demo/"
+#: erplora.com's panel (its businesses, Store, Billing, Account, «Report a problem»): every page of it lives under this
+#: prefix (saas#123, FIX-SAAS-PANEL-UNDER-DASHBOARD-PREFIX); the launcher, the sign-in and the demo stay at the root.
+SAAS_PANEL_PATH = "/dashboard"
 
 #: The ``state`` of this browser's jump to the SaaS's login, signed; only the callback reads it.
 STATE_COOKIE = "hub_login_state"

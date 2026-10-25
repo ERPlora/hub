@@ -78,7 +78,7 @@ def test_the_business_as_the_saas_registered_it_named_in_the_person_s_language(h
         "currency_label": "EUR · Euro",
         "currency_decimals": 2,
         "demo": False,
-        "settings_url": f"https://erplora.com/businesses/{a.id}/settings",
+        "settings_url": f"https://erplora.com/dashboard/businesses/{a.id}/settings",
     }
     in_english = business(language="en")
     assert (in_english["country_name"], in_english["language_name"]) == ("Spain", "Spanish")

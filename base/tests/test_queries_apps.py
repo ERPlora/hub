@@ -110,7 +110,7 @@ def test_what_an_app_needs_and_what_needs_it():
 def test_the_store_of_this_business(settings):
     settings.SAAS_URL = "https://erplora.com"
     hub = Hub.objects.get(slug="a")
-    assert app_list()["store_url"] == f"https://erplora.com/store/modules?business={hub.id}"
+    assert app_list()["store_url"] == f"https://erplora.com/dashboard/store/modules?business={hub.id}"
 
 
 def test_a_paid_app_without_its_right_is_blocked_and_says_so(paid_demo):

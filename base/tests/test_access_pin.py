@@ -108,7 +108,7 @@ class TestTheDoor:
         # the Store's plans of erplora.com (which asks who it is), never this hub's id.
         settings.SAAS_URL = "https://erplora.example"
         answer = door(client)
-        assert answer["plan_url"] == "https://erplora.example/store/plans"
+        assert answer["plan_url"] == "https://erplora.example/dashboard/store/plans"
 
     def test_a_business_of_six_digit_pins_says_so(self, client, ana):
         a_device(client)
