@@ -364,6 +364,43 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   expect(gone.status).toBe(404);
 });
 
+// FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: a datum the screen does not name itself went by its English
+// title, in Spanish too («Pin Length: 6»). Cancelled: nothing changes, so nothing to clean but the language cookie's
+// context, closed at the end.
+test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, also one the screen does not name itself', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  // In Spanish (the Hub's language cookie, as the sign-in sets it).
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const before = await api<Record<string, unknown>>(context, A, 'GET', '/access/settings');
+  expect(before.status, JSON.stringify(before.data)).toBe(200);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  await ask(page, 'E2E-ASK base__access__settings_update {"pin_inactivity_minutes":10,"pin_length":6}', { settle: false });
+  await expect(card(page)).toBeVisible();
+  await expect(card(page)).toContainText('¿Ejecutar esta acción?');
+  await expect(card(page)).toContainText('Revisa cada dato antes de seguir.');
+  await expect(card(page)).toContainText('Volver a pedir tras (minutos): 10');
+  await expect(card(page)).toContainText('Dígitos del PIN: 6');
+  await expect(card(page)).not.toContainText('Pin Length');
+  await expect(card(page)).not.toContainText('Pin Inactivity Minutes');
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
+    await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  expect((await api(context, A, 'GET', '/access/settings')).data).toEqual(before.data);
+  await context.close();
+});
+
 test('BASE-G117 — an answer that says it changed something nothing changed is flagged, outside the answer', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });

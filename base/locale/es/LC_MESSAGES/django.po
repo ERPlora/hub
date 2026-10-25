@@ -1784,3 +1784,35 @@ msgstr "ubicación"
 msgctxt "location"
 msgid "locations"
 msgstr "ubicaciones"
+
+#: base/schemas.py
+msgid "Template"
+msgstr "Plantilla"
+
+#: base/schemas.py
+msgid "File"
+msgstr "Archivo"
+
+#: base/schemas.py
+msgid "Apps to load"
+msgstr "Apps que se cargan"
+
+#: base/schemas.py
+msgid "Person"
+msgstr "Persona"
+
+#: base/schemas.py
+msgid "Folder"
+msgstr "Carpeta"
+
+#: base/schemas.py
+msgid "In folder"
+msgstr "En la carpeta"
+
+#: base/schemas.py
+msgid "File or folder"
+msgstr "Archivo o carpeta"
+
+#: base/schemas.py
+msgid "Move to"
+msgstr "Mover a"

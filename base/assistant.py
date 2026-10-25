@@ -7,7 +7,8 @@ gateway (``saas`` ``assistant/internal.py``), without the ORM.
   done from the chat (``NOT_FROM_CHAT``: emptying the business, a file to download). A turn offers only the few of
   what was asked (``relevant``, at most ``MAX_TOOLS``), never the whole catalogue. A tool runs as the person, by its
   own operation (``run_tool``): the same permission, transaction and refusals as the button on the screen.
-- **A write never runs without the person's yes**: its card (``card``) says what it will send; ``risk="high"`` asks
+- **A write never runs without the person's yes**: its card (``card``) says what it will send, each datum by its name
+  in the person's language (the name its app's models give it: their metadata, no query); ``risk="high"`` asks
   to type a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many; such a write
   that names no record is not done from the chat (``blocked``).
 - **The gateway**: every door is a signed POST (``base.signing``, the secret of every ``/internal`` call) naming this
@@ -28,9 +29,11 @@ from typing import Any
 import httpx
 import pydantic
 from django.conf import settings
+from django.core.exceptions import FieldDoesNotExist
 from django.http import StreamingHttpResponse
 from django.utils import translation
-from django.utils.translation import get_language_info, pgettext_lazy
+from django.utils.text import capfirst
+from django.utils.translation import get_language_info, gettext, pgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, OperationError, PermissionDenied, Unauthorized
 from live.meta import LiveAppConfig, all_live_app_configs
@@ -215,7 +218,52 @@ def _is_money(name: str, prop: dict) -> bool:
     return name.endswith("_cents") or "in cents" in str(prop.get("description", "")).lower()
 
 
-def _field(name: str, prop: dict, value: Any) -> dict:
+def _generated_title(name: str) -> str:
+    """The title pydantic makes up for a field without one (``closing_balance`` → «Closing Balance»)."""
+    return name.title().replace("_", " ").strip()
+
+
+def _in_code_language() -> bool:
+    """Whether the active language is the one the code's texts are written in (and fall back to): English."""
+    return (translation.get_language() or settings.LANGUAGE_CODE).split("-")[0] == settings.LANGUAGE_CODE.split("-")[0]
+
+
+@cache
+def _verbose_name(app_label: str, entity: str, name: str) -> Any:
+    """The name the models of the app ``app_label`` give their field ``name`` (lazy: said in the active language), the
+    model of the operation's ``entity`` first — another may mean something else by it —, or ``None``. Their metadata
+    only: no query."""
+    config = active_apps_label(app_label)
+    if config is None:
+        return None
+    own = entity.replace("_", "")
+    models = sorted(config.get_models(), key=lambda model: not model._meta.model_name.endswith(own))
+    for model in models:
+        try:
+            verbose = getattr(model._meta.get_field(name), "verbose_name", None)
+        except FieldDoesNotExist:
+            continue
+        if verbose:
+            return verbose
+    return None
+
+
+def _label(op: Operation, name: str, title: str | None) -> str:
+    """How the card names the datum ``name``, in the active language and never by a technical name (gh:hub#1040): by the
+    title its schema gives it when a catalog translates it, or as written when the person reads the code's language;
+    else by the name its app's models give that field, the one its screens show; else by its title, through the
+    catalogs. One way for every app: nothing to list here by hand."""
+    if title and title != _generated_title(name):
+        translated = gettext(title)
+        if translated != title or _in_code_language():
+            return translated
+    verbose = _verbose_name(op.app_label, op.name.split(".")[1], name)
+    if verbose is not None:
+        return capfirst(str(verbose))
+    return gettext(title or _generated_title(name))
+
+
+def _field(name: str, label: str, prop: dict, value: Any) -> dict:
     if value is None or value == "" or value == []:
         kind = "empty"
     elif isinstance(value, bool):
@@ -228,19 +276,17 @@ def _field(name: str, prop: dict, value: Any) -> dict:
         kind = "object"
     else:
         kind = "text"
-    return {"name": name, "label": str(prop.get("title") or name), "kind": kind, "value": value}
+    return {"name": name, "label": label, "kind": kind, "value": value}
 
 
 def card(op: Operation, arguments: dict, language: str) -> dict:
-    """What the person sees before ``op`` runs with ``arguments``: its app, its action, each datum it sends (an amount
-    in cents marked ``money``), its risk and, for a dangerous one, what to type (``confirm_word``) — how many records
-    when it names them by ``ids``, and ``blocked`` when it names none (not from the chat)."""
+    """What the person sees before ``op`` runs with ``arguments``: its app, its action, each datum it sends by its name
+    in ``language`` (``_label``; an amount in cents marked ``money``), its risk and, for a dangerous one, what to type
+    (``confirm_word``) — how many records when it names them by ``ids``, and ``blocked`` when it names none (not from
+    the chat)."""
     schema = _schema(op)
     defs = schema.get("$defs", {})
     props = schema.get("properties", {})
-    fields = [
-        _field(name, _resolved(prop, defs), arguments[name]) for name, prop in props.items() if name in arguments
-    ]
     level = risk(op)
     count: int | None = None
     blocked = False
@@ -252,6 +298,12 @@ def card(op: Operation, arguments: dict, language: str) -> dict:
             blocked = True
     config = active_apps_label(op.app_label)
     with translation.override(language):
+        fields = [
+            # The title of the property itself: a ``$ref``'s own is its schema class's name.
+            _field(name, _label(op, name, prop.get("title")), _resolved(prop, defs), arguments[name])
+            for name, prop in props.items()
+            if name in arguments
+        ]
         word = str(count) if count else str(CONFIRM_WORD)
         app_name = str(config.verbose_name) if config is not None else op.app_label
     return {

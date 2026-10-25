@@ -2289,7 +2289,9 @@ Pasos:
   1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»).
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
      línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe sale en la moneda del negocio (nunca
-     en céntimos), un sí o un no como «Sí» o «No» y una lista por cuántos elementos lleva.
+     en céntimos), un sí o un no como «Sí» o «No» y una lista por cuántos elementos lleva. Todo sale en el idioma de
+     la persona, también el nombre de cada dato cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que
+     lo llama su app, nunca un nombre técnico.
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
@@ -2309,8 +2311,8 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Tarjeta de confirmación del asistente
 Pasos:
   1. Una acción que su app marca como peligrosa no se confirma con un clic: la tarjeta dice, por ejemplo, «Borrar en
-     Servicios. Revisa cada dato antes de seguir.», pone cada dato en su línea y pide «Para confirmar, escribe
-     CONFIRMAR:».
+     Servicios. Revisa cada dato antes de seguir.», pone cada dato en su línea con su nombre en el idioma de la
+     persona y pide «Para confirmar, escribe CONFIRMAR:».
   2. Si la acción nombra los registros uno a uno, dice cuántos («Afecta a 3 registros.») y pide escribir ese número
      en lugar de la palabra.
   3. Si no los nombra (todos, o los que cumplen un filtro), no se hace desde el chat: no sale tarjeta, la respuesta dice «No puedo

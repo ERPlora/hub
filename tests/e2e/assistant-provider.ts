@@ -5,6 +5,8 @@
 // - `E2E-FORMAT`: an answer with a heading, bold, a list, a table and a screen of the hub;
 // - `E2E-CREATE <name>`: asks for the write `demo.item.create` with that name, then says it is done;
 // - `E2E-DELETE <id>`: asks for the dangerous write `demo.item.delete` of that item, then says it is done;
+// - `E2E-ASK <tool> <JSON>`: asks for any write by its tool's name with those data as written, then says how it went
+//   (the card of a datum outside the screen's own list, FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH);
 // - `E2E-CHAIN <name>`: reads the items (`demo.item.list`), then asks to create one with that name, then says so;
 // - `E2E-CLOSE-CASH <cents>`: closes the drawer as CASH_REGISTER-F09 asks — reads the close's summary
 //   (`cash_register.session.closing_summary`) with that count, then says it (`closeCashSummary`) and, in the same answer,
@@ -142,6 +144,8 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
   if (create) return call('demo__item__create', { name: create[1].trim() });
   const remove = /E2E-DELETE (\S+)/.exec(question);
   if (remove) return call('demo__item__delete', { id: remove[1] });
+  const named = /E2E-ASK (\S+) (\{.*\})$/m.exec(question);
+  if (named) return call(named[1], JSON.parse(named[2]) as Record<string, unknown>);
   if (question.includes('E2E-FORMAT')) return text(FORMAT_ANSWER);
   if (question.includes('E2E-CLAIM')) return text(CLAIM_ANSWER);
   if (question.includes('E2E-DOWN')) return { status: 500, frames: [], delayMs: 0 };

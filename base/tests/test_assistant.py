@@ -7,10 +7,14 @@ The gateway is ``fake_gateway.FakeGateway``: a real HTTP server on 127.0.0.1 tha
 
 import asyncio
 import json
+import re
+from pathlib import Path
 
 import pytest
+from django.conf import settings
 from live.context import OperationContext, Scope
-from live.operations import get
+from live.operations import Operation, get, registry
+from ninja import Field, Schema
 
 from base import assistant, entitlement
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
@@ -126,6 +130,76 @@ def test_an_amount_in_cents_is_marked_as_money_for_the_card():
     card = assistant.card(get("service.service.create"), {"name": "Corte", "price": 1500}, "es")
     price = next(field for field in card["fields"] if field["name"] == "price")
     assert (price["kind"], price["value"]) == ("money", 1500)
+
+
+def labels(card: dict) -> list[str]:
+    return [field["label"] for field in card["fields"]]
+
+
+def test_every_datum_of_the_card_is_named_in_the_persons_language():
+    """gh:hub#1040, FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: a datum the screen does not name itself
+    (``assistant-card.ts`` ``FIELDS``) went by its schema's English title, in Spanish too («Session»,
+    «Counted cash»)."""
+    close = get("cash_register.session.close")
+    arguments = {"session": "S-1", "closing_balance": 25000}
+    assert labels(assistant.card(close, arguments, "es")) == ["Sesión", "Efectivo contado"]
+    assert labels(assistant.card(close, arguments, "en")) == ["Session", "Counted cash"]
+    pin = assistant.card(get("base.access.settings_update"), {"pin_inactivity_minutes": 10, "pin_length": 6}, "es")
+    assert labels(pin) == ["Volver a pedir tras (minutos)", "Dígitos del PIN"]
+
+
+def test_a_datum_is_named_by_the_model_of_its_operation_before_another_of_its_app():
+    """Two models of an app may name a field of the same name differently: the operation's entity says which."""
+    assert labels(assistant.card(get("base.device.mode_set"), {"mode": "kiosk"}, "es")) == ["Modo"]
+    assert labels(assistant.card(get("base.api_key.create"), {"mode": "read"}, "es")) == ["Qué puede hacer"]
+
+
+class TitledIn(Schema):
+    first_name: str = Field(title="Owner")
+    last_name: str = Field(title="Family name")
+
+
+TITLED = Operation(
+    name="base.profile.titled",
+    kind="command",
+    permission="base.view_home",
+    input=TitledIn,
+    output=TitledIn,
+    expose_api=False,
+    ai={"description": "A write whose schema titles its data.", "risk": "high"},
+    fn=lambda ctx, data: data,
+)
+
+
+def test_a_title_its_app_wrote_names_the_datum_in_its_translation_or_in_english():
+    """A schema's own title is the name its app chose: translated when a catalog has it, as written in English (the
+    language of the code); one nobody translated never reaches a Spanish card: the model's name of the field does."""
+    arguments = {"first_name": "Ana", "last_name": "Gil"}
+    assert labels(assistant.card(TITLED, arguments, "es")) == ["Propietario", "Apellidos"]
+    assert labels(assistant.card(TITLED, arguments, "en")) == ["Owner", "Family name"]
+
+
+def named_by_the_screen() -> set[str]:
+    """The data the card's screen names itself (``assistant-card.ts`` ``FIELDS``: «Record», «Reason»…)."""
+    source = (Path(settings.BASE_DIR) / "base/frontend/lib/assistant-card.ts").read_text()
+    return set(re.findall(r"'([a-z_]+)'", re.search(r"const FIELDS = \[(.*?)\];", source, re.S).group(1)))
+
+
+def test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_name():
+    """Every write of base itself: each datum by a name of its own in Spanish, never the title pydantic makes up from
+    the field («Path», «Content Base64»). Base's half of the fix; each other app answers for its own."""
+    screen = named_by_the_screen()
+    assert {"id", "reason"} <= screen
+    technical: dict[str, list[str]] = {}
+    for op in registry.values():
+        if op.app_label == "base" and op.kind == "command" and assistant.is_tool(op):
+            props = op.input.model_json_schema().get("properties", {})
+            for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+                if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
+                    technical.setdefault(op.name, []).append(field["name"])
+    assert technical == {}
+    moved = assistant.card(get("base.file.move"), {"path": "marzo.pdf", "to": "Facturas"}, "es")
+    assert labels(moved) == ["Archivo o carpeta", "Mover a"]
 
 
 def test_a_dangerous_write_asks_to_type_a_word_in_the_persons_language():

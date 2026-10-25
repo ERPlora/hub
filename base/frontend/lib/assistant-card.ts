@@ -44,7 +44,8 @@ export function actionKey(action: string): string {
   return `base.assistant.card.actions.${verb ?? 'other'}`;
 }
 
-/** The data a card names in the person's language (`base.assistant.card.fields.<name>`); another, by its title. */
+/** The data a card names itself in the person's language (`base.assistant.card.fields.<name>`); another, by the
+ *  label the server gives it in that language (base/assistant.py `_label`). */
 const FIELDS = [
   'name', 'price', 'amount', 'note', 'notes', 'status', 'email', 'phone', 'quantity', 'qty', 'description',
   'duration_minutes', 'date', 'time', 'starts_at', 'ends_at', 'customer_id', 'reason', 'id', 'ids', 'title', 'category',
