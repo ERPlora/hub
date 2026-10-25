@@ -11,6 +11,7 @@ in the reader's language.
 from decimal import Decimal
 
 from babel.numbers import format_currency, format_decimal, format_percent, get_currency_precision
+from django.conf import settings
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum, Window
 from django.db.models.functions import Coalesce, Lag
 from django.template.loader import render_to_string
@@ -56,6 +57,8 @@ from apps.invoice.schemas import (
 )
 from apps.sale.queries import find_sale
 from apps.tax.queries import business_tax_kind, resolve_tax
+from base.business import currency_of
+from base.operations import is_platform_hub
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
@@ -798,7 +801,10 @@ BUSINESS = "base.business.get"
 def business_currency(ctx: OperationContext) -> str:
     """The currency of ``ctx``'s business (ISO 4217), the one a document issued now keeps, as ``base.business.get``
     reads it. Read as the platform: an API key holds only the permission of the operation it opened, and every person
-    of the hub may see it anyway."""
+    of the hub may see it anyway. ERPlora's own hub has no business on erplora.com (phase 1: no registry row,
+    ``create_platform_hub``): its invoices keep the currency of its issuer's country."""
+    if is_platform_hub(ctx.scope):
+        return currency_of(settings.PLATFORM_ISSUER_COUNTRY)
     business = get_operation(BUSINESS)
     return business(system_context(ctx.scope), business.input()).currency
 

@@ -6,6 +6,7 @@ issued keeps the currency it was issued in."""
 
 import pytest
 from django.utils import translation
+from live.context import Scope, system_context
 
 from apps.invoice.models import Invoice
 from apps.invoice.tests.conftest import B, ISSUER, ctx_for, run
@@ -82,3 +83,14 @@ def test_an_invoice_says_the_decimals_of_its_currency_as_the_server_counts_them(
     assert (invoice.currency, invoice.currency_decimals) == (currency, decimals)
     listed = run("invoice.invoice.list", {}).rows
     assert {(row.currency, row.currency_decimals) for row in listed if row.id == invoice.id} == {(currency, decimals)}
+
+
+@pytest.mark.parametrize(("country", "currency"), [("ES", "EUR"), ("PL", "PLN")])
+def test_erploras_own_hub_invoices_in_the_currency_of_its_issuer_s_country(settings, country, currency):
+    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub): ERPlora's
+    # invoices keep the currency of the country its issuer is set up in, Spain's, rather than failing.
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = country
+    platform = ctx_for(scope=Scope("host", "erplora"))
+    run("invoice.issuer.update", ISSUER, platform)
+    assert manual(system_context(platform.scope)).currency == currency
