@@ -115,6 +115,22 @@ def test_the_factory_settings():
     assert settings.auto_close_time == dt.time(4, 0)
 
 
+def test_a_new_row_without_an_hour_closes_at_four():
+    settings = Settings.objects.create()
+    settings.refresh_from_db()
+    assert settings.auto_close_time == dt.time(4, 0)
+
+
+@pytest.mark.parametrize(
+    "instant",
+    ["2026-10-25T03:59:55+00:00", "2026-10-25T04:00:05+00:00", "2026-10-25T12:00:00+00:00"],
+)
+def test_the_auto_close_default_raises_no_check_warning_at_any_hour(monkeypatch, instant):
+    # Django warns fields.W161 when a fixed time default falls within 10 s of the current UTC time.
+    monkeypatch.setattr(timezone, "now", lambda: dt.datetime.fromisoformat(instant))
+    assert Settings._meta.get_field("auto_close_time").check() == []
+
+
 def test_the_auto_close_time_is_a_whole_hour():
     refused(lambda: Settings.objects.create(auto_close_time=dt.time(4, 30)))
 
