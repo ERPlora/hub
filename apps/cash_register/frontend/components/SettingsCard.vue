@@ -67,7 +67,11 @@ const changes = computed<SettingsPatchIn>(() => {
     Object.entries(edits.value).filter(([key, value]) => value !== current[key as keyof SettingsFields]),
   ) as SettingsPatchIn;
 });
-const canSave = computed(() => props.editable && Object.keys(changes.value).length > 0 && !update.pending.value);
+/** Never saved: the factory values apply, and saving them as they come is the business's decision («Your cash drawer»). */
+const neverSaved = computed(() => server.value?.updated_at === null);
+const canSave = computed(
+  () => props.editable && (Object.keys(changes.value).length > 0 || neverSaved.value) && !update.pending.value,
+);
 const saveError = computed(() => refusal(update.error.value, t('cash_register.settings.saveError')));
 
 async function save(): Promise<void> {

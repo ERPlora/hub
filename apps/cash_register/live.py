@@ -17,8 +17,9 @@ SHIFT = [
 
 live("cash_register.settings.get", on=[E.SETTINGS_UPDATED])
 live("cash_register.register.list", on=[E.REGISTER_CREATED, E.REGISTER_UPDATED])
-# The blind count decides who reads the expected; a drawer's name is shown on its sessions.
-live("cash_register.session.list", on=[*SHIFT, E.SETTINGS_UPDATED, E.REGISTER_UPDATED])
+# The blind count decides who reads the expected; a drawer's name is shown on its sessions. The Home's panels follow
+# the same events (apps.py).
+live("cash_register.session.list", on=E.SESSION_EVENTS)
 live(
     "cash_register.session.current", on=[*SHIFT, E.SETTINGS_UPDATED, E.REGISTER_UPDATED]
 )

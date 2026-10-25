@@ -47,9 +47,21 @@ describe('SettingsCard', () => {
     expect(s.field('auto_close_time')?.querySelectorAll('ion-select-option')).toHaveLength(24);
   });
 
-  it('«Save» sends only what changed and says «Settings saved.»', async () => {
+  it('settings never saved can be saved as they come: the business keeps the factory values («Your cash drawer»)', async () => {
     const s = await setup();
     await s.result(OP, FACTORY);
+    expect(prop(s.inDoc('cash-register-settings-save'), 'disabled')).toBe(false);
+    s.answer(200, { ...FACTORY, updated_at: '2026-10-14T10:00:00Z' });
+    await click(s.inDoc('cash-register-settings-save'));
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/cash_register/settings', query: {}, body: {} }]);
+    expect(toastSuccess).toHaveBeenCalledWith('Settings saved.');
+    // Saved once: nothing more to save until something changes.
+    expect(prop(s.inDoc('cash-register-settings-save'), 'disabled')).toBe(true);
+  });
+
+  it('«Save» sends only what changed and says «Settings saved.»', async () => {
+    const s = await setup();
+    await s.result(OP, { ...FACTORY, updated_at: '2026-10-13T09:00:00Z' });
     expect(prop(s.inDoc('cash-register-settings-save'), 'disabled')).toBe(true);
     await ionToggle(s.field('require_blind_count'), true);
     await ionValue(s.field('auto_close_time'), '23:00');
