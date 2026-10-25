@@ -26,6 +26,18 @@ msgstr "Caja controla el efectivo del cajón por turnos. Abre una sesión con el
 msgid "Settings"
 msgstr "Ajustes"
 
+msgid "Your cash drawer"
+msgstr "Tu caja"
+
+msgid "Decide how the till opens and closes: the opening float, the closing count and the POS screen that stays locked until the drawer is open."
+msgstr "Decide cómo se abre y se cierra la caja: el fondo inicial, el arqueo de cierre y la pantalla del TPV que queda bloqueada hasta abrirla."
+
+msgid "Cash register (current session)"
+msgstr "Caja (sesión actual)"
+
+msgid "Recent discrepancies"
+msgstr "Descuadres recientes"
+
 msgid "single row"
 msgstr "fila única"
 

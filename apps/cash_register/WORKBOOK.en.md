@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a8a8990ab4affb59aa720bec12ae05f1e889ee09d3a7e34a3ea9b89cb45ee394 -->
+<!-- generated from WORKBOOK.md sha256:e261a9f766c6bf8c5dbe4e523d3731751d530c5307d90dfcb38007230084b10b -->
 
 ## What it is for and who it is for
 
@@ -64,7 +64,8 @@ Initial setup, step by step:
 ### Cash register
 Menu **Cash register**. At the top, the title "Cash register" and the "Open session" button (off while a
 session is open: "There is already an open cash session. Close it before opening another one."). Below,
-the cash figures: "Current session" and "Recent discrepancies" (CASH_REGISTER-F12). Then the table of
+the cash figures: "Current session" and "Recent discrepancies" (CASH_REGISTER-F12; the same figures also show
+on the **Home** panels). Then the table of
 sessions, from the most recent to the oldest, 50 per page: Session, Opened on, Status ("Open", "Closed"),
 Opening, Expected, Counted, Difference. Search box "Search session…" (by number), filters (status, number
 and the four amounts) and table or card view. Per row: "Detail" always and, in the open session,
@@ -115,6 +116,8 @@ of drawers (name, active) with "Add drawer", "Rename" and "Deactivate"/"Activate
 the settings sees them locked with "You do not have permission to change these settings.". Loading:
 "Loading settings…". Error: "Could not load the settings." with "Retry"; when saving, "Could not save the
 settings.". Saved: "Settings saved.".
+"Save" turns on when something changes and, while the settings have never been saved, also with no
+changes: that way the business keeps the default ones.
 
 ## States of each screen
 
@@ -153,21 +156,28 @@ settings.". Saved: "Settings saved.".
 Status: done
 Vertical: common
 Actor: administrator
-Screen: Cash register settings
+Screen: Home: Finish setting up your business; Cash register settings
 Steps:
-1. Open **Cash register → Settings**.
+1. While the cash register settings have never been saved, on the **Home** the "Finish setting up your
+   business" list brings the step "Your cash drawer" ("Decide how the till opens and closes: the opening
+   float, the closing count and the POS screen that stays locked until the drawer is open."), marked
+   "Recommended". Its "Set up" leads to **Cash register → Settings**, which also opens from the menu.
 2. Turn on or off "Turn on the cash register", "Require an opening float", "Require a count to close",
    "Allow a negative balance", "Blind count" and "Daily auto-close" with its time.
-3. Tap "Save". What you changed is saved; the rest stays as it was.
+3. Tap "Save". What you changed is saved; the rest stays as it was. The first time it can be saved
+   without changing anything: the business keeps the default ones.
 4. "Settings saved." shows and, from that moment, the server applies the required float (F03), the
    required count (F09), the negative balance (F05), the blind count (F07) and the auto-close (F10),
-   whether the order comes from the screen, the assistant or the API.
+   whether the order comes from the screen, the assistant or the API. On the Home, "Your cash drawer"
+   shows done without reloading.
 In: the administrator's decisions.
-Out: the business's cash register settings, a single row (announces: `cash_register.settings.updated`).
-Never saved, the default ones apply.
+Out: the business's cash register settings, a single row (announces: `cash_register.settings.updated`, also
+the first save with no changes). Never saved, the default ones apply and "Your cash drawer" stays pending;
+opening a session does not count it as done.
 If it fails: "Could not save the settings." with the reason, and the settings stay as they were. If the
 reading fails, the screen shows no values (never the default ones as if they were the business's) and
-offers "Retry". Without the settings permission, the fields show locked and there is no "Save".
+offers "Retry". Without the settings permission, the fields show locked, there is no "Save" and the
+Home does not show the step "Your cash drawer".
 Involved: CASH_REGISTER-F03, F05, F07, F09, F10
 
 ### CASH_REGISTER-F02 Add, rename and deactivate a drawer
@@ -404,22 +414,31 @@ If it fails: "Could not load the session detail" or the error of each table with
 Involved: SALE-F28
 
 ### CASH_REGISTER-F12 See the cash register on the home panels
-Status: done — inside **Cash register**, above the table of sessions (the Hub's Home is the grid of apps,
-with no panels; the figures of each app go on its own screen, like those of Sales)
+Status: done
 Vertical: common
 Actor: manager, administrator, employee
-Screen: Cash register
+Screen: Home; Cash register
 Steps:
-1. Open **Cash register**: two cards show above the table.
-2. "Current session" shows the "Expected in the drawer" of the open session and its number, and moves by
-   itself with every charge and every movement; with no open session, "No open session.".
-3. "Recent discrepancies" shows the difference of the last eight closed sessions, from the one closed
+1. On the **Home**, the "Cash register (current session)" panel shows by default with the expected cash in
+   the drawer of the open session, in the business's currency, and moves by itself with every charge,
+   every movement, the opening and the close; with no open session it says "No data". Only whoever may
+   see the expected cash on a blind count has it (the owner, the administrator and the manager); the
+   employee, who counts blind, does not.
+2. "Recent discrepancies" is added with ⋮ ("Customize panel"), where it is grouped under "Cash register":
+   a line for each of the last eight closed sessions, from the one closed latest to the oldest, with its
+   number and its difference with its sign and its cents. Whoever sees the sessions has it.
+3. Also, in **Cash register**, two cards show above the table. "Current session" shows the "Expected in
+   the drawer" of the open session and its number, and moves by itself with every charge and every
+   movement; with no open session, "No open session.".
+4. "Recent discrepancies" shows the difference of the last eight closed sessions, from the one closed
    latest to the oldest, with its sign and its cents and a bar as long as the difference: red if short,
    green if over. A session closed by itself, with no count, shows "—".
 In: the open session, the closed sessions and the business's currency.
 Out: nothing.
-If it fails: "The cash figures could not be loaded." with "Retry". With the blind count, whoever cannot
-see the expected cash sees "—" (F07). With no closed sessions, "No closed sessions yet.".
+If it fails: "The cash figures could not be loaded." with "Retry"; on the Home, a panel that cannot be
+read says "Unavailable". With the blind count, whoever cannot see the expected cash sees "—" in **Cash
+register** and has no expected cash panel on the Home (F07). With no closed sessions, "No closed sessions
+yet." (on the Home, "No data").
 Involved: CASH_REGISTER-F07, F09
 
 ### CASH_REGISTER-F13 Record in the cash register each payment of a sale
@@ -534,7 +553,7 @@ register", "record a cash out of €20"); a drawer, by its name.
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The cash register settings (the default ones if they were never saved) | view sessions | F01 | `cash_register.settings.get` |
+| The cash register settings (the default ones if they were never saved, with no save date) | view sessions | F01 | `cash_register.settings.get` |
 | The drawers, with search by name, an active filter and pages (up to 100) | view sessions | F02, F03 | `cash_register.register.list` |
 | The sessions, from the most recent to the oldest (or by when they were closed), with search by number, filters (status, number, drawer, dates and amounts) and pages | view sessions | F03, F09, F12 | `cash_register.session.list` |
 | The open session with its expected cash (if whoever asks may see it), whether the cash register is turned on and the sale lines in no shift (how many and their cash) | view sessions | F04, F10, F12, F17 | `cash_register.session.current` |
@@ -564,7 +583,7 @@ All of them can be followed live.
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
-| Settings saved | Saving the settings | Which fields changed | `cash_register.settings.updated` |
+| Settings saved | Saving the settings (also the first save with no changes) | Which fields changed (none in that first save) | `cash_register.settings.updated` |
 | New drawer | Adding a drawer | Which one | `cash_register.register.created` |
 | Drawer changed | Renaming, deactivating or activating it | Which one | `cash_register.register.updated` |
 | Session opened | Opening | The session, its number, the float and who | `cash_register.session.opened` |

@@ -72,7 +72,8 @@ Configuración inicial, paso a paso:
 ### Caja
 Menú **Caja**. Arriba, el título «Caja» y el botón «Abrir sesión» (apagado mientras haya una sesión
 abierta: «Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra.»). Debajo, las cifras de la
-caja: «Sesión actual» y «Descuadres recientes» (CASH_REGISTER-F12). Después, la tabla de
+caja: «Sesión actual» y «Descuadres recientes» (CASH_REGISTER-F12; las mismas cifras salen también en
+los paneles del **Inicio**). Después, la tabla de
 sesiones, de la más reciente a la más antigua, 50 por página: Sesión, Abierta el, Estado («Abierta»,
 «Cerrada»), Apertura, Esperado, Contado, Diferencia. Buscador «Buscar sesión…» (por número), filtros
 (estado, número y los cuatro importes) y vista de tabla o tarjetas. Por fila: «Detalle» siempre y,
@@ -125,6 +126,8 @@ la lista de cajones (nombre, activo) con «Añadir cajón», «Cambiar nombre» 
 Quien no puede cambiar los ajustes los ve bloqueados con «No tienes permiso para cambiar estos
 ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los ajustes.» con
 «Reintentar»; al guardar, «No se pudieron guardar los ajustes.». Guardado: «Ajustes guardados.».
+«Guardar» se enciende al cambiar algo y, mientras los ajustes no se han guardado nunca, también sin
+cambios: así el negocio se queda con los de fábrica.
 
 ## Estados de cada pantalla
 
@@ -164,21 +167,28 @@ ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar lo
 Estado: hecho
 Vertical: común
 Actor: administrador
-Pantalla: Ajustes de Caja
+Pantalla: Inicio: Termina de configurar tu negocio; Ajustes de Caja
 Pasos:
-1. Abre **Caja → Ajustes**.
+1. Mientras los ajustes de caja no se han guardado nunca, en el **Inicio** la lista «Termina de
+   configurar tu negocio» trae el paso «Tu caja» («Decide cómo se abre y se cierra la caja: el fondo
+   inicial, el arqueo de cierre y la pantalla del TPV que queda bloqueada hasta abrirla.»), marcado
+   «Recomendado». Su «Configurar» lleva a **Caja → Ajustes**, que también se abre desde el menú.
 2. Enciende o apaga «Activar caja», «Exigir fondo de apertura», «Exigir recuento al cierre», «Permitir
    saldo negativo», «Arqueo ciego» y «Cierre automático diario» con su hora.
-3. Pulsa «Guardar». Se guarda lo que cambiaste; lo demás queda como estaba.
+3. Pulsa «Guardar». Se guarda lo que cambiaste; lo demás queda como estaba. La primera vez se puede
+   guardar sin cambiar nada: el negocio se queda con los de fábrica.
 4. Sale «Ajustes guardados.» y, desde ese momento, el servidor aplica el fondo obligatorio (F03), el
    recuento obligatorio (F09), el saldo negativo (F05), el arqueo ciego (F07) y el cierre automático
-   (F10), venga la orden de la pantalla, del asistente o de la API.
+   (F10), venga la orden de la pantalla, del asistente o de la API. En el Inicio, «Tu caja» sale hecho
+   sin recargar.
 Entra: las decisiones del administrador.
-Sale: los ajustes de caja del negocio, una sola fila (avisa: `cash_register.settings.updated`). Sin
-guardar nunca, valen los de fábrica.
+Sale: los ajustes de caja del negocio, una sola fila (avisa: `cash_register.settings.updated`, también
+el primer guardado sin cambios). Sin guardar nunca, valen los de fábrica y «Tu caja» sigue pendiente;
+abrir una sesión no lo cuenta como hecho.
 Si falla: «No se pudieron guardar los ajustes.» con el motivo, y los ajustes quedan como estaban. Si
 la lectura falla, la pantalla no enseña valores (nunca los de fábrica como si fueran los del negocio)
-y ofrece «Reintentar». Sin el permiso de ajustes, los campos salen bloqueados y no hay «Guardar».
+y ofrece «Reintentar». Sin el permiso de ajustes, los campos salen bloqueados, no hay «Guardar» y el
+Inicio no le enseña el paso «Tu caja».
 Implicados: CASH_REGISTER-F03, F05, F07, F09, F10
 
 ### CASH_REGISTER-F02 Dar de alta, renombrar y desactivar un cajón
@@ -426,22 +436,31 @@ Implicados: SALE-F28
 
 ### CASH_REGISTER-F12 Ver la caja en los paneles del inicio
 <!-- origen: fi:modules/cash_register#widget-cash_register-current_session-kpi fi:modules/cash_register#widget-cash_register-recent_sessions-bar-list old:cash_register/WORKFLOW.md#cash_register-f12 -->
-Estado: hecho — dentro de **Caja**, encima de la tabla de sesiones (el Inicio del Hub es la rejilla de
-apps, sin paneles; las cifras de cada app van en su pantalla, como las de Ventas)
+Estado: hecho
 Vertical: común
 Actor: responsable, administrador, empleado
-Pantalla: Caja
+Pantalla: Inicio; Caja
 Pasos:
-1. Abre **Caja**: encima de la tabla salen dos tarjetas.
-2. «Sesión actual» enseña el «Esperado en el cajón» de la sesión abierta y su número, y se mueve solo
-   con cada cobro y cada movimiento; sin sesión abierta, «No hay ninguna sesión abierta.».
-3. «Descuadres recientes» enseña la diferencia de las ocho últimas sesiones cerradas, de la que se cerró
+1. En el **Inicio**, el panel «Caja (sesión actual)» sale de serie con el efectivo esperado en el cajón
+   de la sesión abierta, en la moneda del negocio, y se mueve solo con cada cobro, cada movimiento, la
+   apertura y el cierre; sin sesión abierta dice «Sin datos». Solo lo tiene quien puede ver el esperado
+   con el arqueo ciego (el propietario, el administrador y el responsable); el empleado, que cuenta
+   a ciegas, no.
+2. «Descuadres recientes» se añade con ⋮ («Personalizar panel»), donde va agrupado bajo «Caja»: una
+   línea por cada una de las ocho últimas sesiones cerradas, de la que se cerró más tarde a la más
+   antigua, con su número y su diferencia con signo y céntimos. Lo tiene quien ve las sesiones.
+3. Además, en **Caja**, encima de la tabla salen dos tarjetas. «Sesión actual» enseña el «Esperado en el
+   cajón» de la sesión abierta y su número, y se mueve solo con cada cobro y cada movimiento; sin sesión
+   abierta, «No hay ninguna sesión abierta.».
+4. «Descuadres recientes» enseña la diferencia de las ocho últimas sesiones cerradas, de la que se cerró
    más tarde a la más antigua, con su signo y sus céntimos y una barra tan larga como la diferencia:
    roja si faltó, verde si sobró. Una sesión cerrada sola, sin recuento, sale «—».
 Entra: la sesión abierta, las sesiones cerradas y la moneda del negocio.
 Sale: nada.
-Si falla: «No se pudieron cargar las cifras de la caja.» con «Reintentar». Con el arqueo ciego, quien no
-puede ver el esperado lo ve «—» (F07). Sin sesiones cerradas, «Todavía no hay sesiones cerradas.».
+Si falla: «No se pudieron cargar las cifras de la caja.» con «Reintentar»; en el Inicio, un panel que no
+se puede leer dice «No disponible». Con el arqueo ciego, quien no puede ver el esperado lo ve «—» en
+**Caja** y no tiene el panel del esperado en el Inicio (F07). Sin sesiones cerradas, «Todavía no hay
+sesiones cerradas.» (en el Inicio, «Sin datos»).
 Implicados: CASH_REGISTER-F07, F09
 
 ### CASH_REGISTER-F13 Anotar en la caja cada cobro de una venta
@@ -557,7 +576,7 @@ caja», «apunta una salida de 20 €»); un cajón, por su nombre.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Los ajustes de caja (los de fábrica si nunca se guardaron) | ver sesiones | F01 | `cash_register.settings.get` |
+| Los ajustes de caja (los de fábrica si nunca se guardaron, sin fecha de guardado) | ver sesiones | F01 | `cash_register.settings.get` |
 | Los cajones, con búsqueda por nombre, filtro de activos y páginas (hasta 100) | ver sesiones | F02, F03 | `cash_register.register.list` |
 | Las sesiones, de la más reciente a la más antigua (o por cuándo se cerraron), con búsqueda por número, filtros (estado, número, cajón, fechas e importes) y páginas | ver sesiones | F03, F09, F12 | `cash_register.session.list` |
 | La sesión abierta con su esperado (si quien pregunta puede verlo), si la caja está activada y los cobros fuera de turno (cuántos y su efectivo) | ver sesiones | F04, F10, F12, F17 | `cash_register.session.current` |
@@ -587,7 +606,7 @@ Todas se pueden seguir en vivo.
 
 | Aviso | Cuándo | Qué lleva | Servicio |
 |---|---|---|---|
-| Ajustes guardados | Guardar los ajustes | Qué campos cambiaron | `cash_register.settings.updated` |
+| Ajustes guardados | Guardar los ajustes (también el primer guardado sin cambios) | Qué campos cambiaron (ninguno en ese primer guardado) | `cash_register.settings.updated` |
 | Cajón nuevo | Dar de alta un cajón | Cuál | `cash_register.register.created` |
 | Cajón cambiado | Renombrarlo, desactivarlo o activarlo | Cuál | `cash_register.register.updated` |
 | Sesión abierta | Abrir | La sesión, su número, el fondo y quién | `cash_register.session.opened` |
@@ -710,6 +729,21 @@ cajero del producto actual es un empleado.
 - **Zona horaria (fase 1)**: `Europe/Madrid` (`TIME_ZONE` del Hub) para todos los negocios: día de
   negocio, número de sesión y corte del cierre automático. Cuando el Hub guarde la zona de cada negocio,
   saldrá de ahí.
+- **Inicio** (ronda PLAN-HUB 2026-10-21; FIX-CASH_REGISTER-SETUP-HOOKS): `setup` y `widgets` de `apps.py`, los
+  del `module.json` viejo (sin `bell`). El paso `cash_register.drawer` lee `updated_at` de
+  `cash_register.settings.get` (orden 90, no `required`, permiso `cash_register.manage_settings`, refresco por
+  `cash_register.settings.updated`): el viejo pedía `id`, la fila que solo existía al guardar; aquí los de
+  fábrica valen sin fila, así que lo que dice «el negocio ya decidió» es haberlos guardado una vez (Square,
+  Shopify POS, Toast, Lightspeed, Odoo, Loyverse: la caja se configura encendiéndola y guardando; Business
+  Central da por hecha una guía al ejecutarla). Por eso el primer guardado avisa aunque no cambie nada y la
+  tarjeta deja «Guardar» encendido mientras `updated_at` está vacío. Los dos paneles leen
+  `cash_register.session.list` con `events.SESSION_EVENTS`, las mismas que la re-ejecutan en `live.py`: el
+  esperado (`kpi`, `status=open`, `limit` 1, `expected_balance`; `session.current` lo anida y un `kpi` lee
+  campos de la primera fila) con `cash_register.view_expected_totals`, y los descuadres (`bar-list`, los
+  mismos parámetros que la tarjeta de **Caja**, `number` y `difference`) con `cash_register.view_session` (el
+  «ver informes» del viejo ya no existe, cambio 14). Ningún panel fija moneda, escala ni idioma
+  (gh:cash_register#121, gh:hub#2387, gh:outfitkit#243) ni categoría (gh:cash_register#123); el `kpi` no repite
+  su nombre en `options.label` (gh:hub#1105), así que «Efectivo esperado en caja» del viejo no se pinta.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com`; ids
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
@@ -754,7 +788,7 @@ cajero del producto actual es un empleado.
 12. **El número de sesión toma el día de negocio** (hora del negocio), no el de UTC.
 13. **El estado «Suspendida» desaparece**: nada llevaba a él.
 14. **Permiso «ver informes» desaparece**: ninguna operación lo pedía (era el del panel «Descuadres
-    recientes», que lee las sesiones).
+    recientes», que lee las sesiones: en el Inicio lo tiene quien ve las sesiones).
 15. **El cierre automático cierra a la hora del corte**, con las líneas de antes del corte; las de
     después van a F17 o a la sesión siguiente.
 16. **Abrir, apuntar, contar y cerrar son ventanas (diálogos)** sobre la tabla, como en el resto de
@@ -763,11 +797,13 @@ cajero del producto actual es un empleado.
     todas y una cerrada respondía «La sesión S-… no está abierta»).
 17. **Quién abrió o cerró** se guarda como lo lee una persona (su nombre o su correo), no como el
     identificador interno del usuario.
-18. **Las cifras de la caja están en Caja**: la sesión actual y los descuadres recientes salen encima de la
-    tabla de sesiones, no en el Inicio, que es la rejilla de apps.
+18. **Las cifras de la caja están en Caja y en el Inicio**: la sesión actual y los descuadres recientes salen
+    encima de la tabla de sesiones y, como en el producto actual, en los paneles del Inicio.
 19. **Cerrar la caja pidiéndoselo al asistente enseña antes el resumen** (sesión, contado y, a quien puede
     verlos, esperado y diferencia, y lo pendiente) y pide escribir la palabra; antes el asistente cerraba
     la sesión abierta con el contado, sin resumen previo.
+20. **«Tu caja» se da por hecho al guardar los ajustes una vez**, también sin cambiar nada: los de fábrica
+    valen desde el principio (cambio 3), así que el paso pide la decisión del negocio, no una fila.
 
 ### Lo que NO hace, a propósito
 

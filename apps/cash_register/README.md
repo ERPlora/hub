@@ -28,6 +28,9 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
   «Sesión actual» y «Descuadres recientes» encima de la tabla, e informe X o Z por la cola de recibos de
   Impresión (sin ella, por el navegador); los dos papeles, el del dispositivo y el del navegador, lo
   titulan X o Z.
+- **En el Inicio** (F01, F12): el paso «Tu caja» de «Termina de configurar tu negocio» hasta guardar los
+  ajustes una vez, y los paneles «Caja (sesión actual)» (de serie, solo a quien ve el esperado con el arqueo
+  ciego) y «Descuadres recientes» (para añadir), declarados en `apps.py` y servidos por `base`.
 
 ## Ficha
 
