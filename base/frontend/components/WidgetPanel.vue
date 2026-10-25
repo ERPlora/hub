@@ -417,17 +417,6 @@ const chosenBar = computed(() => {
   background: var(--ion-color-primary);
 }
 
-/* A list with negatives (a cash discrepancy): red short, green over; the amount beside it says the sign too. */
-.widget-bar-fill--negative,
-.widget-chart-bar--negative {
-  background: var(--ion-color-danger);
-}
-
-.widget-bar-fill--positive,
-.widget-chart-bar--positive {
-  background: var(--ion-color-success);
-}
-
 .widget-timeline li {
   display: flex;
   flex-wrap: wrap;
@@ -503,6 +492,18 @@ const chosenBar = computed(() => {
 
 .widget-chart-col[aria-pressed='true'] .widget-chart-bar {
   opacity: 1;
+}
+
+/* A list with negatives (a cash discrepancy): red short, green over; the amount beside it says the sign too. After
+   `.widget-bar-fill` and `.widget-chart-bar`, which weigh the same: the later rule wins. */
+.widget-bar-fill--negative,
+.widget-chart-bar--negative {
+  background: var(--ion-color-danger);
+}
+
+.widget-bar-fill--positive,
+.widget-chart-bar--positive {
+  background: var(--ion-color-success);
 }
 
 .widget-chart-col[aria-pressed='true'] .widget-chart-label {

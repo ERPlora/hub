@@ -446,16 +446,35 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
             span.remove();
             return found;
           };
+          // A chart's bar takes the same colours through the panel's own stylesheet: its plain rule (the primary colour)
+          // must not win over the sign's. No chart has negatives today, so the bar is built with the panel's scope.
+          const scope = [...element.attributes].find((attribute) => attribute.name.startsWith('data-v-'))?.name;
+          const chartBar = (sign: string) => {
+            const span = document.createElement('span');
+            span.className = sign ? `widget-chart-bar widget-chart-bar--${sign}` : 'widget-chart-bar';
+            if (scope) span.setAttribute(scope, '');
+            element.append(span);
+            const found = getComputedStyle(span).backgroundColor;
+            span.remove();
+            return found;
+          };
           return {
             negative: colour('.widget-bar-fill--negative'),
             positive: colour('.widget-bar-fill--positive'),
+            chartNegative: chartBar('negative'),
+            chartPositive: chartBar('positive'),
+            chartPlain: chartBar(''),
             danger: probe('--ion-color-danger'),
             success: probe('--ion-color-success'),
+            primary: probe('--ion-color-primary'),
           };
         });
         expect(painted.negative).toBe(painted.danger);
         expect(painted.positive).toBe(painted.success);
         expect(painted.negative).not.toBe(painted.positive);
+        expect(painted.chartNegative, 'a chart day below zero').toBe(painted.danger);
+        expect(painted.chartPositive, 'a chart day above zero beside one below').toBe(painted.success);
+        expect(painted.chartPlain, 'a chart with no negatives keeps its colour').toBe(painted.primary);
         // The owner's Spanish session with the panel on, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
         if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
