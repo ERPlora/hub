@@ -7,7 +7,7 @@ import { formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { useCurrency } from '../lib/money';
+import { useBusinessMoney } from '../lib/money';
 import { summaryItems } from '../lib/summary';
 import type { SessionOut } from '../operations';
 
@@ -15,8 +15,8 @@ const props = withDefaults(defineProps<{ session: SessionOut; printedAt?: Date |
 
 const t = useT();
 const locale = useLocale();
-const currency = useCurrency();
-const items = computed(() => summaryItems(props.session, t, locale.value, (iso) => formatDateTime(iso, locale.value), currency.value));
+const business = useBusinessMoney();
+const items = computed(() => summaryItems(props.session, t, locale.value, (iso) => formatDateTime(iso, locale.value), business.value));
 const printedOn = computed(() => (props.printedAt ? formatDateTime(props.printedAt, locale.value) : ''));
 </script>
 

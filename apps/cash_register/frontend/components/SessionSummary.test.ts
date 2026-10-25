@@ -25,7 +25,7 @@ describe('SessionSummary', () => {
   it('a business in Poland reads its drawer in zlotys (flow business-currency)', async () => {
     const m = await mountCash(SessionSummary, { props: { session: SESSION }, business: business(POLISH) });
     await m.live();
-    expect(words(m.find('cash-register-summary-expected').element)).toBe('Expected PLN 100.00');
+    expect(words(m.find('cash-register-summary-expected').element)).toBe('Expected zł 100.00');
   });
 
   it('while the business is not read, a figure has no symbol, never the euro', async () => {

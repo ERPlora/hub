@@ -123,6 +123,7 @@ def invoice_row(invoice: Invoice) -> dict:
         "tax_amount": invoice.tax_amount,
         "total_amount": invoice.total_amount,
         "currency": invoice.currency,
+        "currency_decimals": get_currency_precision(invoice.currency),
         "status": invoice.status,
         "source_type": invoice.source_type,
         "rectifies_id": invoice.rectifies_id,

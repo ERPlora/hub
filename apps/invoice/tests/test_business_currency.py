@@ -72,3 +72,13 @@ def test_an_issued_invoice_keeps_its_currency_when_the_business_s_changes(issuer
     invoice = manual()
     business_in("PL")
     assert run("invoice.invoice.get", {"invoice_id": str(invoice.id)}).currency == "EUR"
+
+
+@pytest.mark.parametrize(("country", "currency", "decimals"), [("HU", "HUF", 2), ("JP", "JPY", 0), ("ES", "EUR", 2)])
+def test_an_invoice_says_the_decimals_of_its_currency_as_the_server_counts_them(issuer, country, currency, decimals):
+    # The screens divide its minor units by them: the forint has two here (CLDR), though a browser's Intl says none.
+    business_in(country)
+    invoice = manual()
+    assert (invoice.currency, invoice.currency_decimals) == (currency, decimals)
+    listed = run("invoice.invoice.list", {}).rows
+    assert {(row.currency, row.currency_decimals) for row in listed if row.id == invoice.id} == {(currency, decimals)}

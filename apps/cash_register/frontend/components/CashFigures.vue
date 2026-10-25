@@ -18,12 +18,12 @@ const current = useLive('cash_register.session.current', {});
 const recent = useLive('cash_register.session.list', { status: 'closed', sort: 'closed_at', dir: 'desc', limit: 8 });
 const currency = useLive('cash_register.currency.get', {});
 
-const code = computed(() => currency.data.value?.currency);
+const money = computed(() => currency.data.value);
 const failed = computed(() => !!(current.error.value || recent.error.value || currency.error.value));
 const loading = computed(() => !failed.value && (!current.data.value || !recent.data.value || !currency.data.value));
 
 const session = computed(() => current.data.value?.session ?? null);
-const expected = computed(() => formatMoney(session.value?.expected_balance ?? null, locale.value, code.value));
+const expected = computed(() => formatMoney(session.value?.expected_balance ?? null, locale.value, money.value));
 
 const rows = computed(() => {
   const closed = recent.data.value?.rows ?? [];
@@ -33,7 +33,7 @@ const rows = computed(() => {
     return {
       id: row.id,
       number: row.number,
-      amount: formatSignedMoney(row.difference, locale.value, code.value),
+      amount: formatSignedMoney(row.difference, locale.value, money.value),
       width: `${largest ? Math.round((Math.abs(difference) / largest) * 100) : 0}%`,
       short: difference < 0,
       over: difference > 0,

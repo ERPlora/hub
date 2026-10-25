@@ -10,7 +10,7 @@ import { computed } from 'vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { conceptOf, methodOf } from '../lib/lines';
-import { formatSignedMoney, useCurrency } from '../lib/money';
+import { formatSignedMoney, useBusinessMoney } from '../lib/money';
 import type { MovementListIn, MovementRow } from '../operations';
 
 const props = defineProps<{
@@ -24,7 +24,7 @@ const props = defineProps<{
 
 const t = useT();
 const locale = useLocale();
-const currency = useCurrency();
+const business = useBusinessMoney();
 
 const table = useServerTable('cash_register.movement.list', {
   sort: 'created_at',
@@ -45,7 +45,7 @@ const columns = computed<DataTableColumn<MovementRow>[]>(() => [
     label: t('cash_register.lines.columns.amount'),
     sortable: true,
     align: 'right',
-    format: (_, row) => formatSignedMoney(row.signed_amount, locale.value, currency.value),
+    format: (_, row) => formatSignedMoney(row.signed_amount, locale.value, business.value),
   },
   { key: 'method_type', label: t('cash_register.lines.columns.method'), sortable: true, format: (_, row) => methodOf(row, t) },
   { key: 'description', label: t('cash_register.lines.columns.concept'), format: (_, row) => conceptOf(row, t) },
