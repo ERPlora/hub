@@ -3,8 +3,8 @@
 // it needs a subscription and, for whoever runs the business and only on the web, links to erplora.com's Store
 // (buying is never inside the Hub). A failed read says so with «Retry» and keeps the rows; it is never «no apps».
 // Whoever runs the business turns an app on or off (PLAN-HUB §9): the dialog names what comes along or goes with it,
-// a refusal says why (another app needs it, the app itself, or the plan's limit, with «Upgrade plan»), and the
-// counter says how many of the plan's apps are on.
+// a refusal says why (another app needs it, the app itself, or the plan's limit, with «Upgrade plan») in a notice that
+// stays until it is closed or the next change (hub#2594), and the counter says how many of the plan's apps are on.
 import { AppPage, applySurface, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -240,6 +240,9 @@ describe('AppsPage', () => {
     const posted = (m: Awaited<ReturnType<typeof open>>) =>
       m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
     const refusal = (status: number, error: Record<string, unknown>) => () => Response.json({ error }, { status });
+    /** The refusal's notice: it stays on screen until it is closed or the next change (hub#2594: a toast went
+     *  before its long reason could be read). */
+    const refused = (m: Awaited<ReturnType<typeof open>>) => m.wrapper.find('[data-testid="apps-refused"]');
 
     it('«Turn off» asks with the app and what goes with it, turns it off and reads the menu again', async () => {
       mocks.confirm.mockResolvedValue(true);
@@ -279,7 +282,9 @@ describe('AppsPage', () => {
       await flush();
       expect(mocks.confirm).not.toHaveBeenCalled();
       expect(m.net.api).toEqual([]);
-      expect(vi.mocked(toastError).mock.calls[0][0]).toBe('Turn off Sales first.');
+      expect(refused(m).text()).toContain('Nothing was changed');
+      expect(refused(m).text()).toContain('Turn off Sales first.');
+      expect(toastError).not.toHaveBeenCalled();
     });
 
     it('a 409 from the server says the same, with the apps it names', async () => {
@@ -291,7 +296,9 @@ describe('AppsPage', () => {
       await m.result(m.call, 'base.app.list', APPS);
       await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
       await flush();
-      expect(vi.mocked(toastError).mock.calls[0][0]).toBe('Desactiva antes Sales.');
+      expect(refused(m).text()).toContain('No se ha cambiado nada');
+      expect(refused(m).text()).toContain('Desactiva antes Sales.');
+      expect(toastError).not.toHaveBeenCalled();
       expect(sessionChanged).not.toHaveBeenCalled();
     });
 
@@ -303,7 +310,37 @@ describe('AppsPage', () => {
       await m.result(m.call, 'base.app.list', APPS);
       await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
       await flush();
-      expect(vi.mocked(toastError).mock.calls[0][0]).toBe('VeriFactu has records the AEAT has not accepted yet.');
+      expect(refused(m).text()).toContain('VeriFactu has records the AEAT has not accepted yet.');
+      expect(toastError).not.toHaveBeenCalled();
+    });
+
+    it('a refusal stays until it is closed, and the next change clears it (hub#2594)', async () => {
+      mocks.confirm.mockResolvedValue(true);
+      let answer = refusal(409, { code: 'base.app_vetoed', message: 'Send the pending records first.', app: 'task' });
+      const m = await open('/apps', { onApi: () => answer() });
+      await m.result(m.call, 'base.app.list', APPS);
+      // A minute later the reason is still there: nothing on a timer takes it away.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+      try {
+        await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
+        await vi.advanceTimersByTimeAsync(60_000);
+      } finally {
+        vi.useRealTimers();
+      }
+      await flush();
+      expect(refused(m).text()).toContain('Send the pending records first.');
+
+      await refused(m).find('button.close').trigger('click');
+      await flush();
+      expect(refused(m).exists()).toBe(false);
+
+      await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
+      await flush();
+      expect(refused(m).exists()).toBe(true);
+      answer = () => Response.json({ app: 'task', state: 'off', chosen: false, along: [] });
+      await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
+      await flush();
+      expect(refused(m).exists()).toBe(false);
     });
 
     it('«Turn on» an app that needs nothing turns it on at once and reads the menu again', async () => {
@@ -347,6 +384,7 @@ describe('AppsPage', () => {
       expect(upgrade.text()).toBe('Upgrade plan');
       expect(sessionChanged).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
+      expect(refused(m).exists()).toBe(false);
     });
 
     it('in Spanish, and inside the installed app without the link', async () => {
@@ -379,7 +417,8 @@ describe('AppsPage', () => {
       expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').attributes('disabled')).toBeDefined();
       answer(Response.json({ error: { code: 'internal_error', message: 'Boom.' } }, { status: 500 }));
       await flush();
-      expect(vi.mocked(toastError).mock.calls[0][0]).toBe('Flows could not be changed: Boom.');
+      expect(refused(m).text()).toContain('Flows could not be changed: Boom.');
+      expect(toastError).not.toHaveBeenCalled();
       expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').attributes('disabled')).toBeUndefined();
     });
 

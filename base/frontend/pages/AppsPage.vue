@@ -7,10 +7,12 @@
 // links to erplora.com's Store, where it is bought (never inside the Hub: the stores refuse an app that sells).
 // Whoever runs the business turns an app on or off (PLAN-HUB §9; BASE-F18, F19, F23–F25): «Turn on» asks first when
 // it brings others it needs, naming them; «Turn off» always asks, naming what goes with it, and one another app on
-// needs says which to turn off first. The counter says how many of the plan's apps are on (`max_apps`; what came
-// along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans, only on the web). The
-// menu of this screen is read again after each change; the other screens of the business follow the live list
-// (AppsFollower).
+// needs says which to turn off first. A refusal (another app needs it, the app's own reason, any other failure) is a
+// notice that stays until it is closed or the next change: its reason is often a long sentence of what to do first,
+// which a toast took away before it could be read (hub#2594). The counter says how many of the plan's apps are on
+// (`max_apps`; what came along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
+// only on the web). The menu of this screen is read again after each change; the other screens of the business
+// follow the live list (AppsFollower).
 import {
   DataTable,
   EmptyState,
@@ -21,7 +23,7 @@ import {
   useConfirm,
 } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, type ShellTab, toastError, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, HubIcon, type ShellTab, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -69,6 +71,8 @@ const planUrl = computed(() => (isWeb.value && mayManage.value ? (data.value?.pl
 const pending = ref<string | null>(null);
 /** The plan's limit the last «Turn on» hit; cleared by the next change. */
 const limitHit = ref<number | null>(null);
+/** Why the last change was refused; on screen until it is closed or the next change (hub#2594). */
+const refusal = ref<string | null>(null);
 
 const counter = computed(() => {
   const answer = data.value;
@@ -195,7 +199,7 @@ async function toggle(app: AppRow): Promise<void> {
   if (canTurnOff(app)) {
     const first = offFirst(app, apps.value);
     if (first.length) {
-      void toastError(t('base.appsPage.offFirst', { apps: listOf(first) }));
+      refusal.value = t('base.appsPage.offFirst', { apps: listOf(first) });
       return;
     }
     const along = goesOffWith(app, apps.value);
@@ -231,6 +235,7 @@ async function toggle(app: AppRow): Promise<void> {
 async function change(kind: 'enable' | 'disable', app: AppRow): Promise<void> {
   pending.value = app.id;
   limitHit.value = null;
+  refusal.value = null;
   try {
     const answer = await (kind === 'enable' ? enable : disable).run({ app: app.id });
     const along = answer.along.map((other) => other.name);
@@ -256,14 +261,14 @@ function refused(error: ApiError | undefined, app: AppRow): void {
     const ids = Array.isArray(error.details.required_by) ? (error.details.required_by as string[]) : [];
     const named = offFirst({ ...app, required_by: ids }, apps.value);
     const names = named.length ? named : ids.map((id) => apps.value.find((row) => row.id === id)?.name ?? id);
-    void toastError(t('base.appsPage.offFirst', { apps: listOf(names) }));
+    refusal.value = t('base.appsPage.offFirst', { apps: listOf(names) });
     return;
   }
   if (error?.code === 'base.app_vetoed') {
-    void toastError(error.message);
+    refusal.value = error.message;
     return;
   }
-  void toastError(t('base.appsPage.changeFailed', { app: app.name, reason: error?.message ?? '' }));
+  refusal.value = t('base.appsPage.changeFailed', { app: app.name, reason: error?.message ?? '' });
 }
 
 const searchPlaceholder = computed(() => t(`base.appsPage.search.${tab.value}`));
@@ -305,6 +310,16 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
             rel="noopener"
           >{{ t('base.plan.upgrade') }}</a>
         </template>
+      </InlineFeedback>
+      <InlineFeedback
+        v-if="refusal !== null"
+        tone="danger"
+        dismissible
+        data-testid="apps-refused"
+        :heading="t('base.appsPage.refused')"
+        @dismiss="refusal = null"
+      >
+        {{ refusal }}
       </InlineFeedback>
       <InlineFeedback
         v-if="failed"

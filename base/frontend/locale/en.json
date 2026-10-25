@@ -178,6 +178,7 @@
         "confirm": "Turn off",
         "cancel": "Cancel"
       },
+      "refused": "Nothing was changed",
       "offFirst": "Turn off {apps} first.",
       "changeFailed": "{app} could not be changed: {reason}",
       "limit": {
