@@ -6,6 +6,9 @@
 // - `E2E-CREATE <name>`: asks for the write `demo.item.create` with that name, then says it is done;
 // - `E2E-DELETE <id>`: asks for the dangerous write `demo.item.delete` of that item, then says it is done;
 // - `E2E-CHAIN <name>`: reads the items (`demo.item.list`), then asks to create one with that name, then says so;
+// - `E2E-CLOSE-CASH <cents>`: closes the drawer as CASH_REGISTER-F09 asks — reads the close's summary
+//   (`cash_register.session.closing_summary`) with that count, then says it (`closeCashSummary`) and, in the same answer,
+//   asks for the dangerous write `cash_register.session.close` of the session it named, then says how it went;
 // - `E2E-CLAIM`: says it created something without running anything;
 // - `E2E-DOWN`: the provider fails (500);
 // - `E2E-SLOW`: a long answer, piece by piece, to stop it half-way;
@@ -34,6 +37,46 @@ export interface Seen {
   body: Record<string, unknown> | null;
 }
 
+/** The close's summary as the Hub's `cash_register.session.closing_summary` answers it (the fields the model says). */
+export interface CloseCashSummary {
+  number: string;
+  closing_balance: number | null;
+  expected_balance: number | null;
+  difference: number | null;
+  expected_hidden: boolean;
+  pending: {
+    open_checks: number;
+    open_check_labels: string[];
+    unserved: number;
+    unserved_labels: string[];
+    prints: number;
+    print_usages: string[];
+    incomplete: boolean;
+  };
+}
+
+const euros = (cents: number, signed = false) => `${signed && cents > 0 ? '+' : ''}${(cents / 100).toFixed(2)} €`;
+const named = (count: number, labels: string[]) => (labels.length ? `${count} (${labels.join(' · ')})` : String(count));
+
+/** What the model says of the close's summary before its card: only what the summary carries (never an expected
+ *  that a blind count left out), and what is still pending at the close. */
+export function closeCashSummary(summary: CloseCashSummary): string {
+  const lines = [`Vas a cerrar la sesión **${summary.number}**:`, ''];
+  if (summary.closing_balance !== null) lines.push(`- Contado: ${euros(summary.closing_balance)}`);
+  if (summary.expected_hidden || summary.expected_balance === null) {
+    lines.push('- Arqueo ciego: el cierre lo comparará al confirmar.');
+  } else {
+    lines.push(`- Esperado: ${euros(summary.expected_balance)}`);
+    if (summary.difference !== null) lines.push(`- Diferencia: ${euros(summary.difference, true)}`);
+  }
+  const review = summary.pending;
+  if (review.open_checks) lines.push(`- Cuentas abiertas: ${named(review.open_checks, review.open_check_labels)}`);
+  if (review.unserved) lines.push(`- Comandas sin servir: ${named(review.unserved, review.unserved_labels)}`);
+  if (review.prints) lines.push(`- Impresiones sin salir: ${review.prints}`);
+  if (review.incomplete) lines.push('- No se ha podido comprobar todo lo pendiente.');
+  return lines.join('\n');
+}
+
 type Message = { role: string; content?: unknown; tool_calls?: { function?: { name?: string } }[] };
 
 function textOf(content: unknown): string {
@@ -59,10 +102,12 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
     delayMs,
     frames: [...value.match(/[\s\S]{1,24}/g)!.map((piece) => chunk({ content: piece })), chunk({}, 'stop'), usage],
   });
-  const call = (name: string, args: Record<string, unknown>) => ({
+  /** A tool call in fragments, after what is said first (`said`, in pieces), as OpenAI streams both in one answer. */
+  const call = (name: string, args: Record<string, unknown>, said = '') => ({
     status: 200,
     delayMs: 0,
     frames: [
+      ...(said.match(/[\s\S]{1,24}/g) ?? []).map((piece) => chunk({ content: piece })),
       chunk({ tool_calls: [{ index: 0, id: `call_${Date.now().toString(36)}`, type: 'function', function: { name, arguments: '' } }] }),
       chunk({ tool_calls: [{ index: 0, function: { arguments: JSON.stringify(args) } }] }),
       chunk({}, 'tool_calls'),
@@ -74,6 +119,20 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
     const results = messages.filter((message) => message.role === 'tool').length;
     if (results === 0) return call('demo__item__list', {});
     if (results === 1) return call('demo__item__create', { name: chain[1].trim() });
+  }
+  const closeCash = /E2E-CLOSE-CASH (\d+)/.exec(question);
+  if (closeCash) {
+    const counted = Number(closeCash[1]);
+    // The results of this request only: a conversation may have closed (or cancelled) a drawer before.
+    const asked = messages.findLastIndex((message) => message.role === 'user');
+    const results = messages.slice(asked + 1).filter((message) => message.role === 'tool');
+    if (results.length === 0) return call('cash_register__session__closing_summary', { closing_balance: counted });
+    if (results.length === 1) {
+      const summary = JSON.parse(textOf(results[0].content)) as CloseCashSummary & { error?: unknown };
+      if (!summary.error) {
+        return call('cash_register__session__close', { session: summary.number, closing_balance: counted }, closeCashSummary(summary));
+      }
+    }
   }
   if (last?.role === 'tool') {
     const result = textOf(last.content);

@@ -232,4 +232,16 @@ describe('ProfilePage — Spanish', () => {
     expect(wrapper.text()).toContain('Preferencias');
     expect(wrapper.text()).toContain('Propietario');
   });
+
+  it('names each palette in Spanish, never by its English id (BASE-G152)', async () => {
+    const { wrapper } = await profile(PROFILE, ok, 'es');
+    const names = wrapper.findAll('.profile__palette-name').map((name) => name.text());
+    expect(names).toEqual(['ERPlora', 'Terracota', 'Corporativo', 'Minimalista', 'Bosque', 'Océano', 'Violeta']);
+  });
+
+  it('and in English', async () => {
+    const { wrapper } = await profile(PROFILE, ok, 'en');
+    const names = wrapper.findAll('.profile__palette-name').map((name) => name.text());
+    expect(names).toEqual(['ERPlora', 'Terracotta', 'Corporate', 'Minimal', 'Forest', 'Ocean', 'Violet']);
+  });
 });

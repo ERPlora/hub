@@ -4,16 +4,18 @@
 templates, what a blueprint brings, the export, the loads and the apps' data (their rules are ``base.blueprint``'s)."""
 
 import base64
+import csv
+import io
 from typing import Any
 from uuid import UUID
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from django.core.files.storage import storages
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.http import HttpRequest
 from django.utils import timezone, translation
-from django.utils.translation import gettext, gettext_lazy, ngettext
+from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext
 from live.context import OperationContext
 from live.errors import InvalidPayload, NotFound, Unauthorized
 from live.meta import Category, all_live_app_configs, permissions_for_role
@@ -1326,7 +1328,7 @@ def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
 # ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────
 from base import approvals as approval_rules  # noqa: E402
 from base.models import Approval  # noqa: E402
-from base.schemas import ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut  # noqa: E402
+from base.schemas import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut  # noqa: E402
 from base.permissions import permissions_for  # noqa: E402
 
 #: Employees › Approvals shows the newest 500.
@@ -1379,6 +1381,81 @@ def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
             for row in rows
         ]
     }
+
+
+def _approvals_kept(data: ApprovalExportIn):
+    """The record with the list's search and filters: the days in the business's time zone, the search on what the list
+    shows (the action in words and the two names), in any case."""
+    rows = Approval.objects.order_by("-created_at", "-id")
+    if data.at_from:
+        rows = rows.filter(created_at__date__gte=data.at_from)
+    if data.at_to:
+        rows = rows.filter(created_at__date__lte=data.at_to)
+    if data.operation:
+        rows = rows.filter(operation=data.operation)
+    if data.way:
+        rows = rows.filter(way=data.way)
+    if data.used is not None:
+        rows = rows.filter(used_at__isnull=not data.used)
+    needle = data.search.strip()
+    if needle:
+        named = [
+            name
+            for name in rows.order_by().values_list("operation", flat=True).distinct()
+            if needle.lower() in approval_action(name).lower()
+        ]
+        rows = rows.filter(
+            Q(requested_by_name__icontains=needle) | Q(approved_by_name__icontains=needle) | Q(operation__in=named)
+        )
+    return rows
+
+
+def _approval_cell(text: str) -> str:
+    """A cell a spreadsheet must not run: an apostrophe in front of what it would read as a formula."""
+    return f"'{text}" if text.startswith(blueprint.FORMULA_STARTS) else text
+
+
+@operation(
+    "base.approval.export",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=ApprovalExportIn,
+    output=ApprovalExportOut,
+    ai={
+        "description": "Exports the record of approvals as a CSV file, the newest first, with the search and the filters "
+        "of Employees › Approvals (days, action, PIN or badge, used or not): when, what in words, who approved, who "
+        "asked, how and whether it was used. It names people of the business."
+    },
+)
+def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
+    """Employees › Approvals › «Export CSV» (BASE-F85): every approval the list's search and filters keep, not only the
+    newest it shows, in words and in the person's language."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(
+        [
+            pgettext("approvals export", "When"),
+            pgettext("approvals export", "Action"),
+            pgettext("approvals export", "Approved by"),
+            pgettext("approvals export", "Asked by"),
+            pgettext("approvals export", "With"),
+            pgettext("approvals export", "State"),
+        ]
+    )
+    count = 0
+    for row in _approvals_kept(data):
+        writer.writerow(
+            [
+                timezone.localtime(row.created_at).strftime("%Y-%m-%d %H:%M"),
+                _approval_cell(approval_action(row.operation)),
+                _approval_cell(row.approved_by_name),
+                _approval_cell(row.requested_by_name),
+                str(Approval.Way(row.way).label),
+                pgettext("approvals export", "Used") if row.used_at else pgettext("approvals export", "Not used"),
+            ]
+        )
+        count += 1
+    return {"filename": "approvals.csv", "content_type": "text/csv", "rows": count, "csv": buffer.getvalue()}
 
 
 @operation(

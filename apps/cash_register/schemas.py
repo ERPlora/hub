@@ -352,11 +352,61 @@ class SessionOpenIn(Closed):
 
 
 class SessionCloseIn(SessionRefIn):
+    # The titles name each datum on the assistant's card, as the screen's «Close session» does.
     closing_balance: Cents | None = Field(
         None,
+        title="Counted cash",
         description="The counted cash, in cents (required when the settings ask for the count).",
     )
-    closing_notes: Notes = Field("", description="Notes of the closing.")
+    closing_notes: Notes = Field("", title="Closing notes", description="Notes of the closing.")
+
+
+class ClosingSummaryIn(SessionRefIn):
+    closing_balance: Cents | None = Field(
+        None,
+        description="The counted cash, in cents, as it will be sent to close (required when the settings ask for "
+        "the count).",
+    )
+
+
+class ShiftReviewOut(Schema):
+    """What is still open when the drawer closes (CASH_REGISTER-F08): it warns, it never prevents."""
+
+    open_checks: int = Field(description="Checks still open in Sales.")
+    open_check_labels: list[str] = Field(description="Their titles, at most 20.")
+    unserved: int = Field(description="Kitchen tickets not served yet: being cooked or waiting at the pass.")
+    unserved_labels: list[str] = Field(description="Their table or number, at most 20.")
+    prints: int = Field(description="Prints that did not come out: waiting or failed.")
+    print_usages: list[str] = Field(
+        description="The printing functions they wait in: receipt, kitchen, bar or label."
+    )
+    incomplete: bool = Field(
+        description="One of these could not be read (no permission or a failure): the review may be incomplete."
+    )
+
+
+class ClosingSummaryOut(Schema):
+    session_id: UUID = Field(description="The session that would close.")
+    number: str = Field(description="Its number, S-AAMMDD-NNNN: name it to close exactly this one.")
+    register_name: str = Field(description="Its drawer's name; empty = no drawer.")
+    opened_at: datetime = Field(description="When it opened.")
+    opened_by: str = Field(description="Who opened it.")
+    opening_balance: int = Field(description="Its opening float, in cents.")
+    closing_balance: int | None = Field(
+        description="The counted cash said, in cents; none = closing without a count."
+    )
+    expected_balance: int | None = Field(
+        description="The cash there should be now, in cents; none when a blind count hides it from the reader."
+    )
+    difference: int | None = Field(
+        description="Counted − expected, in cents (positive = over, negative = short); none without a count or "
+        "when the expected is hidden."
+    )
+    expected_hidden: bool = Field(
+        description="A blind count hides the expected (and so the difference) from the reader: never guess them."
+    )
+    require_closing_balance: bool = Field(description="The settings ask for the count to close.")
+    pending: ShiftReviewOut = Field(description="What is still pending at the close (the shift review).")
 
 
 class AutoCloseOut(Schema):

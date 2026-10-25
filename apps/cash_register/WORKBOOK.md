@@ -304,7 +304,8 @@ Pasos:
    movimientos solo las entradas y salidas apuntadas a mano: ni las ventas, ni las anulaciones, ni las
    devoluciones, así que no hay con qué sumar el esperado (Square y Lightspeed ocultan igual el esperado
    en el cierre ciego). El responsable, el propietario y el administrador lo ven todo: la tabla, el
-   detalle, la lista y la ventana de cierre.
+   detalle, la lista y la ventana de cierre. El asistente tampoco se lo dice a quien no puede verlo: el
+   resumen del cierre (F09) le llega sin esperado ni diferencia, y el asistente no los conoce.
 3. El cajero cuenta (F06) y cierra (F09) sin ver el esperado.
 4. Al cerrar aparecen esperado, contado y diferencia para todos.
 Entra: el ajuste «Arqueo ciego» y el permiso de ver el esperado (responsable, propietario y
@@ -345,14 +346,24 @@ Vertical: común
 Actor: empleado, responsable, administrador, asistente
 Pantalla: Caja
 Pasos:
-1. En la fila de la sesión abierta, pulsa «Cerrar» (o llega desde un arqueo de «Cierre», F06).
+1. En la fila de la sesión abierta, pulsa «Cerrar» (o llega desde un arqueo de «Cierre», F06); o
+   pídeselo al asistente («cierra la caja con 250 € contados») y sigue en el paso 5.
 2. Escribe o revisa el «Efectivo contado» (viene del último arqueo de cierre de esa sesión; nunca de
    uno de apertura); si puedes ver el esperado, «Esperado en el cajón» y «Diferencia» se ven mientras
    escribes. Añade «Notas de cierre» si quieres.
 3. Pulsa «Cerrar sesión» (dos veces si la revisión del turno avisó, F08).
 4. Sale «Sesión S-… cerrada · esperado … · contado … · diferencia …»; la fila pasa a «Cerrada» con los
    tres importes fijos para siempre y «Abrir sesión» vuelve a encenderse.
-Entra: el efectivo contado y las notas.
+5. Con el asistente, antes de cerrar nada te enseña el resumen del cierre: el número de la sesión, el
+   efectivo contado y, si puedes ver el esperado, el esperado y la diferencia (con el arqueo ciego, a
+   quien no lo ve no se lo dice: el asistente tampoco lo conoce, F07), y lo que la revisión del turno
+   encuentre pendiente (F08).
+6. Después sale «¿Ejecutar esta acción?» con «Cerrar en Caja. Revisa cada dato antes de seguir.», la
+   sesión y el efectivo contado: escribe «CONFIRMAR» y pulsa «Ejecutar». Se cierra esa misma sesión, a tu
+   nombre y con los tres importes, igual que desde la pantalla.
+7. Si pulsas «Cancelar», no se cierra nada: la sesión sigue abierta y el asistente lo dice («No se hizo,
+   cancelado: Cerrar en Caja»).
+Entra: el efectivo contado y las notas, escritos en la ventana o dichos al asistente.
 Sale: la sesión cerrada con esperado (fondo + ventas y entradas en efectivo − salidas, devoluciones y
 anulaciones en efectivo; lo cobrado o apuntado con tarjeta, transferencia u otro no cuenta), contado y
 diferencia (contado − esperado: positiva sobra, negativa falta), a nombre de quien cierra (avisa:
@@ -361,9 +372,12 @@ pase después (una anulación de ayer) va al turno abierto, nunca a este.
 Si falla: «Escribe el efectivo contado para cerrar la sesión.» con el campo vacío (la pantalla siempre
 lo pide; el ajuste de recuento obligatorio lo hace cumplir también al asistente y a la API); si otro
 dispositivo la cerró antes, «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.»
-(dos cierres a la vez: uno cierra, el otro recibe este aviso). No se reabre una sesión cerrada por
-error: se abre otra con el efectivo real como fondo.
-Implicados: CASH_REGISTER-F06, F08
+(dos cierres a la vez: uno cierra, el otro recibe este aviso). Al asistente, si el recuento es
+obligatorio y no dices cuánto has contado, te lo pide con ese mismo aviso y no sale la confirmación; si
+la sesión del resumen se cierra en otro dispositivo antes de que confirmes, no se cierra ninguna otra:
+sale el aviso de caja cerrada. No se reabre una sesión cerrada por error: se abre otra con el efectivo
+real como fondo.
+Implicados: CASH_REGISTER-F06, F07, F08
 
 ### CASH_REGISTER-F10 Cerrar sola la caja olvidada al final del día
 <!-- origen: old:cash_register/WORKFLOW.md#cash_register-f10 -->
@@ -550,6 +564,7 @@ caja», «apunta una salida de 20 €»); un cajón, por su nombre.
 | Una sesión (por id o número) con su resumen: ventas por forma de pago, devoluciones, entradas, salidas, invitaciones, esperado, contado y diferencia | ver sesiones | F11, F16 | `cash_register.session.get` |
 | Los movimientos de una sesión (o los cobros fuera de turno), con búsqueda, filtros y páginas; con el arqueo ciego, a quien no puede ver el esperado, solo los apuntados a mano de la sesión abierta | ver movimientos | F07, F11, F17 | `cash_register.movement.list` |
 | Los arqueos de una sesión, con páginas | ver arqueos | F06, F09, F11 | `cash_register.count.list` |
+| El resumen del cierre de una sesión (la abierta si no se dice) con el efectivo contado: su número, el contado y, si quien pregunta puede verlo, el esperado y la diferencia, y lo que la revisión del turno encuentra abierto; no cierra nada | cerrar | F08, F09 | `cash_register.session.closing_summary` |
 | La moneda del negocio, sus decimales y sus billetes y monedas | ver sesiones | F06, F12 | `cash_register.currency.get` |
 
 Todas se pueden seguir en vivo.
@@ -591,7 +606,7 @@ momento en que se miran; las pantallas se refrescan con `sale.sale.completed`, `
 - **Ventas** (requisito): los cobros, las anulaciones (la venta anulada y cuándo) y las devoluciones,
   leídos de Ventas; las cuentas abiertas para la revisión del turno.
 - **Cocina** (sin requisito; solo si está encendida): las comandas en marcha para la revisión del turno
-  (KITCHEN-F31).
+  (KITCHEN-F31), en la ventana de cierre y en el resumen del cierre del asistente.
 - **Impresión** (sin requisito; solo si está encendida): lo que espera o falló en la cola, para la revisión
   del turno (PRINTING-F01), y la cola de recibos para el informe X o Z (PRINTING-F17).
 - **Índices de Ventas para estas lecturas** (hecho, `sale/0005_cash_register_indexes`): parciales en
@@ -699,6 +714,17 @@ cajero del producto actual es un empleado.
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
   cerrar, cerrar sola, apuntar y contar) y cada campo de `schemas.py` su `description`.
+- **El cierre por el asistente** (F09; PLAN §30, la primera de las cinco acciones de IA pulidas): la
+  descripción de `session.close` le pide leer antes `session.closing_summary` con el mismo contado,
+  decir su resumen y cerrar nombrando la sesión por el número que dio (así nunca cierra otra que se
+  abriera entre medias). Esa consulta valida como el cierre (sesión abierta y sin pasar su corte;
+  recuento obligatorio: 409 `cash_register.closing_balance_required`), aplica el arqueo ciego (esperado y
+  diferencia vacíos) y lee la revisión del turno de Ventas (`sale.order.list`), Cocina
+  (`kitchen.ticket.board`) e Impresión (`printing.job.summary`) por su nombre, con el permiso de quien
+  pregunta: una app que no está encendida no tiene nada pendiente y una lectura rechazada deja la revisión
+  incompleta. Su nombre no lleva el verbo de una acción (`close_…`): la plataforma nombra la acción de cada
+  recibo por su verbo y una lectura no puede decir «Hecho: Cerrar». La confirmación es la tarjeta de riesgo
+  alto de la plataforma (escribir la palabra, que el servidor vuelve a comprobar).
 
 ### Cambios frente al producto actual
 
@@ -739,6 +765,9 @@ cajero del producto actual es un empleado.
     identificador interno del usuario.
 18. **Las cifras de la caja están en Caja**: la sesión actual y los descuadres recientes salen encima de la
     tabla de sesiones, no en el Inicio, que es la rejilla de apps.
+19. **Cerrar la caja pidiéndoselo al asistente enseña antes el resumen** (sesión, contado y, a quien puede
+    verlos, esperado y diferencia, y lo pendiente) y pide escribir la palabra; antes el asistente cerraba
+    la sesión abierta con el contado, sin resumen previo.
 
 ### Lo que NO hace, a propósito
 

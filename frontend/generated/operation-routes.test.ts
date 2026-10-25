@@ -276,7 +276,7 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(37);
   });
 
-  it('binds the sixteen cash register operations to apps/cash_register/api.py: queries by GET, commands by POST', () => {
+  it('binds the eighteen cash register operations to apps/cash_register/api.py: queries by GET, commands by POST', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'cash_register.settings.get': { method: 'get', path: '/api/cash_register/settings' },
       'cash_register.settings.update': { method: 'post', path: '/api/cash_register/settings' },
@@ -286,6 +286,7 @@ describe('OPERATION_ROUTES', () => {
       'cash_register.session.list': { method: 'get', path: '/api/cash_register/sessions' },
       'cash_register.session.current': { method: 'get', path: '/api/cash_register/sessions/current' },
       'cash_register.session.get': { method: 'get', path: '/api/cash_register/sessions/detail' },
+      'cash_register.session.closing_summary': { method: 'get', path: '/api/cash_register/sessions/closing_summary' },
       'cash_register.session.open': { method: 'post', path: '/api/cash_register/sessions/open' },
       'cash_register.session.close': { method: 'post', path: '/api/cash_register/sessions/close' },
       'cash_register.session.auto_close': { method: 'post', path: '/api/cash_register/sessions/auto_close' },
@@ -296,7 +297,7 @@ describe('OPERATION_ROUTES', () => {
       'cash_register.count.add': { method: 'post', path: '/api/cash_register/counts' },
       'cash_register.currency.get': { method: 'get', path: '/api/cash_register/currency' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(17);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(18);
   });
 
   it('binds the twenty-one routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {

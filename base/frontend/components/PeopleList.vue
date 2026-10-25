@@ -134,7 +134,10 @@ function open(row: Person): void {
             class="people-initials"
             aria-hidden="true"
           >{{ (row as Person).initials }}</span>
-          <span class="people-name">{{ (row as Person).name }}</span>
+          <span
+            class="people-name"
+            :title="(row as Person).name"
+          >{{ (row as Person).name }}</span>
           <StatusPill
             v-if="(row as Person).me"
             size="sm"
@@ -199,6 +202,7 @@ function open(row: Person): void {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .people-initials {
@@ -217,6 +221,8 @@ function open(row: Person): void {
 
 .people-name {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

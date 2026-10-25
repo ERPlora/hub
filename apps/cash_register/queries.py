@@ -5,7 +5,8 @@ The sale lines of a shift are **read from sale** (its requirement: ``Sale``, ``S
 was charged, a void to the shift open when it was voided, a refund to the shift open when it was given.
 A closed session reads only its own copies (``Movement``), made when it closed, so it never moves again.
 What fell in no session (with the drawer closed, after a forgotten shift's cut-off, or confirmed while a
-shift was closing) is the «unassigned» lines.
+shift was closing) is the «unassigned» lines. The close's summary (``session.closing_summary``) reads the shift review
+of other apps by their operations' names (Sales' open checks, Kitchen's board, Printing's queue), as the person.
 """
 
 import datetime as dt
@@ -20,11 +21,14 @@ from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError
+from live.operations import UnknownOperation, operation
+from live.operations import get as operation_named
 
 from apps.cash_register.models import Count, Movement, Register, Session, Settings
 from apps.cash_register.schemas import (
+    ClosingSummaryIn,
+    ClosingSummaryOut,
     CountListIn,
     CountPage,
     CurrencyOut,
@@ -48,6 +52,13 @@ CASH = "cash"
 
 SESSION_NOT_FOUND = _("That cash session does not exist.")
 NO_OPEN_SESSION = _("There is no open cash session: open one first.")
+SESSION_NOT_OPEN = _(
+    "That cash session is closed: a closed session takes no new movements."
+)
+CLOSING_BALANCE_REQUIRED = _("Give the counted cash to close the session.")
+AUTO_CLOSE_DUE = _(
+    "Session %(number)s was due to close by itself at %(time)s: open a new session (this one closes then)."
+)
 REGISTER_NOT_FOUND = _("That drawer is not available.")
 UNKNOWN_DENOMINATION = _("%(value)s is not a note or coin of %(currency)s.")
 NO_DENOMINATIONS = _(
@@ -775,6 +786,35 @@ def named_or_open(
     return session
 
 
+def session_to_close(
+    session_id: UUID | None, number: str | None, *, lock: bool = False
+) -> Session:
+    """The session named (or the open one), still open and not past its daily cut-off: what may be closed or
+    written to. A forgotten session is closed as of its cut (by the next opening or the scheduled task), so
+    nothing written after the cut may land in it. ``lock``: its row locked, for a write."""
+    session = named_or_open(session_id, number, lock=lock)
+    if not session.is_open:
+        raise Conflict(str(SESSION_NOT_OPEN), code="cash_register.session_not_open")
+    cut = auto_close_due_at(session, current_settings(), timezone.now())
+    if cut is not None:
+        raise Conflict(
+            str(AUTO_CLOSE_DUE)
+            % {"number": session.number, "time": f"{timezone.localtime(cut):%H:%M}"},
+            code="cash_register.session_auto_close_due",
+        )
+    return session
+
+
+def require_count(counted: int | None, settings: Settings) -> None:
+    """The count is required to close (the setting): no count, no close — from the screen, the assistant or the API."""
+    if counted is None and settings.require_closing_balance:
+        raise Conflict(
+            str(CLOSING_BALANCE_REQUIRED),
+            code="cash_register.closing_balance_required",
+            fields={"closing_balance": str(CLOSING_BALANCE_REQUIRED)},
+        )
+
+
 _SESSION_SORT = {"number": ("business_day", "sequence")}
 
 
@@ -880,6 +920,90 @@ def current_session(ctx: OperationContext, params: EmptyIn) -> dict:
 )
 def get_session(ctx: OperationContext, params: SessionGetIn) -> dict:
     return session_detail(ctx, find_session(params.session_id, params.session))
+
+
+# ── The close's summary (CASH_REGISTER-F08, F09) ─────────────────────────────────────────────────
+
+
+#: What the shift review reads of other apps, by their operations' names (none is a requirement but Sales):
+#: an app not on in the business has nothing pending; a reading refused leaves the review incomplete.
+OPEN_CHECKS = ("sale.order.list", {"status": "open", "limit": 20})
+KITCHEN_BOARD = ("kitchen.ticket.board", {})
+PRINT_QUEUE = ("printing.job.summary", {})
+#: The titles a review names of each kind: the count says how many there are.
+MAX_LABELS = 20
+
+
+def _reading(ctx: OperationContext, reading: tuple[str, dict]):
+    """``reading``'s answer for ``ctx``'s person: ``None`` when its app is not on in this business (nothing
+    pending there), ``False`` when it was refused or failed (the review is incomplete)."""
+    name, data = reading
+    try:
+        op = operation_named(name)
+    except UnknownOperation:
+        return None
+    try:
+        return op(ctx, op.input.model_validate(data))
+    except AppInactive:
+        return None
+    except OperationError:
+        return False
+
+
+def shift_review(ctx: OperationContext) -> dict:
+    """What is still open as the drawer closes (CASH_REGISTER-F08; Toast's shift review), as the close window
+    shows it: Sales' open checks, the kitchen tickets not served yet and the prints that did not come out."""
+    checks, board, queue = (_reading(ctx, reading) for reading in (OPEN_CHECKS, KITCHEN_BOARD, PRINT_QUEUE))
+    tickets = [*board.cooking, *board.ready] if board else []
+    stuck = [row for row in queue.usages if row.pending + row.failed > 0] if queue else []
+    return {
+        "open_checks": checks.total if checks else 0,
+        "open_check_labels": [row.label for row in checks.rows if row.label][:MAX_LABELS] if checks else [],
+        "unserved": board.cooking_count + board.ready_count if board else 0,
+        "unserved_labels": [ticket.label or f"#{ticket.short_number}" for ticket in tickets][:MAX_LABELS],
+        "prints": sum(row.pending + row.failed for row in stuck),
+        "print_usages": [row.usage for row in stuck],
+        "incomplete": False in (checks, board, queue),
+    }
+
+
+@operation(
+    "cash_register.session.closing_summary",
+    kind="query",
+    permission="cash_register.close_session",
+    input=ClosingSummaryIn,
+    output=ClosingSummaryOut,
+    expose_api=True,
+    ai={
+        "description": "The summary of closing the drawer, before closing it: what closing a cash session (the open one "
+        "unless its number is said) would give with the cash counted in cents: its number, the counted cash and, "
+        "unless a blind count hides them from the reader, the expected cash and the difference (negative = short); and "
+        "what is still pending at the close (open checks, kitchen tickets not served, prints that did not come out). "
+        "Changes nothing. Read it before closing and tell the person this summary; with the count required and none "
+        "said, it asks for the count."
+    },
+)
+def closing_summary(ctx: OperationContext, params: ClosingSummaryIn) -> dict:
+    session = session_to_close(params.session_id, params.session)
+    settings = current_settings()
+    require_count(params.closing_balance, settings)
+    hidden = hides_expected(ctx, session, settings)
+    expected = None if hidden else expected_now(session)
+    counted = params.closing_balance
+    return {
+        "session_id": session.id,
+        "number": session.number,
+        "register_name": session.register.name if session.register_id else "",
+        "opened_at": session.opened_at,
+        "opened_by": session.opened_by,
+        "opening_balance": session.opening_balance,
+        "closing_balance": counted,
+        "expected_balance": expected,
+        "difference": None if expected is None or counted is None else counted - expected,
+        "expected_hidden": hidden,
+        "require_closing_balance": settings.require_closing_balance,
+        "pending": shift_review(ctx),
+    }
 
 
 # ── Movements and counts ─────────────────────────────────────────────────────────────────────────

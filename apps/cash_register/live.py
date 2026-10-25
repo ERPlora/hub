@@ -26,6 +26,11 @@ live(
     "cash_register.session.get",
     on=[*SHIFT, E.COUNT_ADDED, E.SETTINGS_UPDATED, E.REGISTER_UPDATED],
 )
+# The close's summary: its cash figures; what it reads of Sales, Kitchen and Printing is read when it runs.
+live(
+    "cash_register.session.closing_summary",
+    on=[*SHIFT, E.SETTINGS_UPDATED, E.REGISTER_UPDATED],
+)
 # A session's lines, and the unassigned ones (which an opening or a closing moves).
 live("cash_register.movement.list", on=SHIFT)
 live("cash_register.count.list", on=[E.COUNT_ADDED])

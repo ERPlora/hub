@@ -16,7 +16,9 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
   desactivan y nunca se borran.
 - **El turno** (F03, F05, F06, F09): una sesión abierta por negocio, número `S-AAMMDD-NNNN` por día de
   negocio, entradas y salidas con concepto, arqueo por billetes y monedas y cierre con esperado, contado y
-  diferencia congelados.
+  diferencia congelados. El cierre también se pide al asistente («cierra la caja con 250 € contados»): lee
+  antes el resumen del cierre (`session.closing_summary`, ciego para quien no ve el esperado) y cierra con
+  la tarjeta de riesgo alto, escribiendo la palabra.
 - **Lo que viene de Ventas** (F13, F14, F15, F17): cada cobro, anulación y devolución, por forma de pago,
   leído de Ventas al mirar; lo que no cae en ningún turno sale en «Cobros fuera de turno».
 - **Reglas del cierre** (F04, F07, F08, F10): Ventas no cobra en efectivo con la caja cerrada; arqueo ciego
@@ -36,7 +38,7 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
 | `requires` | `["sale"]`; Ventas no requiere Caja (sería un ciclo): pregunta por nombre a `cash_register.session.current` |
 | Usa de otras apps | Ventas, su requisito: lee `Sale`, `SalePayment`, `RefundPayment` y sus cuentas abiertas (`sale.order.list`). Sin requisito, por nombre: Cocina (`kitchen.ticket.board`) e Impresión (`printing.job.summary`; `printing.job.create` encola el informe) |
 | Pantallas | `/cash_register/sessions`, `/cash_register/sessions/:id`, `/cash_register/settings` |
-| Operaciones | 8 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=`; rutas en `/api/cash_register/…` |
+| Operaciones | 9 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=`; rutas en `/api/cash_register/…` |
 | Eventos | 7, `cash_register.<entidad>.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Tarea programada | `auto_close_sessions` → `cash_register.session.auto_close`, `*/5 * * * *`, `collapse` (la corre el worker) |
 | Migraciones | `0001_initial`; los índices que necesita de Ventas están en `sale/0005_cash_register_indexes` |
@@ -54,10 +56,12 @@ TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/cash_register apps/sale/tests
 pnpm test apps/cash_register
 pnpm e2e tests/e2e/cash-register-flows.spec.ts tests/e2e/cash-register-settings.spec.ts \
   tests/e2e/cash-register-shift.spec.ts tests/e2e/sale-cash-gate.spec.ts
+pnpm e2e tests/e2e/cash-register-assistant.spec.ts   # con el SaaS y el proveedor del asistente (tests/e2e/README.md, «El asistente»)
 ```
 
 - `tests/test_integration_sale.py` y `test_integration_printing.py` van contra Ventas e Impresión reales,
-  sin dobles; `tests/test_concurrency.py`, con sesiones reales en hilos.
+  sin dobles; `tests/test_concurrency.py`, con sesiones reales en hilos; `test_integration_assistant.py`,
+  el cierre por el asistente contra su turno real (`base.assistant.turn`).
 - `cash-register-flows.spec.ts` recorre los 17 flujos con pantalla en 390, 834 y 1440.
 
 ## Qué queda fuera
