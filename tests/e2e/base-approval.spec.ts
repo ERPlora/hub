@@ -34,22 +34,35 @@ test.describe.configure({ mode: 'serial' });
 let owner: { context: BrowserContext; page: Page };
 let cashier: { context: BrowserContext; page: Page };
 let started = '';
+let ownerName = '';
 const tickets = new Map<string, SaleOut>();
 
-const usernameOf = (email: string): string => psql(`SELECT username FROM auth_user WHERE email = '${email}'`);
+/**
+ * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
+ * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
+ */
+async function usernameOf(context: BrowserContext): Promise<string> {
+  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
+  expect(me.status, 'GET /api/me').toBe(200);
+  const id = me.data.user?.id ?? '';
+  expect(id, 'the person signed in').not.toBe('');
+  return psql(`SELECT username FROM auth_user WHERE id = '${id}'`);
+}
+
+/** Every account of `email` in this hub's database: the cleanup leaves none of them with what this file made. */
+const accountsOf = (email: string): string => `SELECT username FROM auth_user WHERE email = '${email}'`;
 
 /** The owner's approvals of a void spent since this file started. */
 const spentVoids = (): number =>
   Number(
     psql(
-      `SELECT count(*) FROM base_approval WHERE operation = 'sale.sale.void' AND used_at IS NOT NULL AND approved_by = '${usernameOf(OWNER.email)}' AND created_at >= '${started}'`,
+      `SELECT count(*) FROM base_approval WHERE operation = 'sale.sale.void' AND used_at IS NOT NULL AND approved_by = '${ownerName}' AND created_at >= '${started}'`,
     ),
   );
 
-/** No PIN of the owner's left behind: the business's way in stays erplora.com's. */
+/** No PIN of the owner's left behind, in any of their accounts: the business's way in stays erplora.com's. */
 function forgetThePin(): void {
-  const name = usernameOf(OWNER.email);
-  if (name) psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username = '${name}'`);
+  psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username IN (${accountsOf(OWNER.email)})`);
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -60,6 +73,7 @@ test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext({ baseURL: A });
   owner = { context, page: await context.newPage() };
   await login(owner.page, A, '/sale/sales');
+  ownerName = await usernameOf(context);
   await drawerOff(context);
   await createProduct(context, { name: 'E2E Base approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   for (const viewport of [...VIEWPORTS, SHORT]) {
@@ -79,9 +93,10 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async () => {
   forgetThePin();
-  const asked = usernameOf(EMPLOYEE.email);
-  if (asked && started) {
-    psql(`DELETE FROM base_approval WHERE requested_by = '${asked}' AND operation = 'sale.sale.void' AND created_at >= '${started}'`);
+  if (started) {
+    psql(
+      `DELETE FROM base_approval WHERE requested_by IN (${accountsOf(EMPLOYEE.email)}) AND operation = 'sale.sale.void' AND created_at >= '${started}'`,
+    );
   }
   cleanSales();
   cleanInventory();

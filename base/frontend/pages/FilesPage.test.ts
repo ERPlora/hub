@@ -12,10 +12,11 @@ import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId } from '../__tests
 import type { FileItem, FilesListing } from '../operations';
 import FilesPage from './FilesPage.vue';
 
-const mocks = vi.hoisted(() => ({ confirm: vi.fn(), saveFile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ confirm: vi.fn(), saveFile: vi.fn(), syncSearchbarInputName: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/components')>()),
   useConfirm: () => ({ confirm: mocks.confirm }),
+  syncSearchbarInputName: mocks.syncSearchbarInputName,
 }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
@@ -270,6 +271,15 @@ describe('FilesPage · see (BASE-G82)', () => {
     const m = await open({ locale: 'es' });
     expect(m.wrapper.find('[data-testid="files-space"]').text()).toBe('Espacio: 1,5 MB usados · Sin límite');
     expect(m.wrapper.find('[data-testid="files-folders-label"]').text()).toBe('Carpetas');
+  });
+
+  it('the search box is named by its hint in the person’s language, never Ionic’s English «search text» (BASE-G152)', async () => {
+    mocks.syncSearchbarInputName.mockClear();
+    await open({ locale: 'es' });
+    const search = byTestid('files-search');
+    const calls = mocks.syncSearchbarInputName.mock.calls as unknown as [ParentNode, () => string][];
+    // The shared helper names the first ion-searchbar under the root it gets: that one has to be Files' box.
+    expect(calls.map(([root, name]) => [root.querySelector('ion-searchbar'), name()])).toContainEqual([search, 'Buscar archivos…']);
   });
 });
 

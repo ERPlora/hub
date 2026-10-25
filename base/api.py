@@ -41,7 +41,7 @@ from base.schemas import (
     ProfileUpdateIn,
 )
 
-from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
+from base.schemas import ApiKeyCreateIn, ApiKeyIdIn, ApprovalExportIn, ApprovalIn, ApproversIn, BadgeSetIn, PersonIn  # noqa: E402  (APP-BASE-5)
 
 router = Router(tags=["base"])
 
@@ -381,6 +381,11 @@ async def api_key_revoke(request, data: ApiKeyIdIn):
 @bind(router, "base.approval.list", "/approvals")
 async def approval_list(request):
     return await run_operation(request, queries.approval_list)
+
+
+@bind(router, "base.approval.export", "/approvals/export")
+async def approval_export(request, data: Query[ApprovalExportIn]):
+    return await run_operation(request, queries.approval_export, data)
 
 
 @bind(router, "base.approval.approvers", "/approvals/approvers")

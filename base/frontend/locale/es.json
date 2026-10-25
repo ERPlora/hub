@@ -588,6 +588,15 @@
         "appearance": "Apariencia",
         "appearanceHelp": "Elige el modo y la paleta que prefieras.",
         "palette": "Paleta de tema",
+        "palettes": {
+          "erplora": "ERPlora",
+          "terracotta": "Terracota",
+          "corporate": "Corporativo",
+          "minimal": "Minimalista",
+          "forest": "Bosque",
+          "ocean": "Océano",
+          "violet": "Violeta"
+        },
         "mode": "Tema",
         "modes": {
           "system": "Sistema (auto)",
@@ -907,6 +916,11 @@
       "error": "No se pudo cargar el registro de aprobaciones.",
       "used": "Usada",
       "unused": "Sin usar",
+      "export": {
+        "button": "Exportar CSV",
+        "pending": "Exportando…",
+        "failed": "No se pudieron exportar las aprobaciones: {reason}"
+      },
       "way": {
         "pin": "PIN",
         "badge": "Placa"

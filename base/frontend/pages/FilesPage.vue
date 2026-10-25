@@ -7,7 +7,7 @@
 // renames, moves («Move to…», or by dragging onto a folder) and deletes (asked first); everyone opens (the preview) and
 // downloads. The open folder is in the address (`?folder=`). Every refusal reads its own sentence (hub#1776); every
 // notice is a sentence, never a key (hub#2197).
-import { EmptyState, FormModal, InlineFeedback, UsageMeter, useConfirm } from '@erplora/ui/components';
+import { EmptyState, FormModal, InlineFeedback, UsageMeter, syncSearchbarInputName, useConfirm } from '@erplora/ui/components';
 import { type ApiError, fetchFile, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
 import {
@@ -21,7 +21,7 @@ import {
   IonSelect,
   IonSelectOption,
 } from '@ionic/vue';
-import { computed, ref, useTemplateRef } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import FilePreview from '../components/FilePreview.vue';
@@ -129,6 +129,10 @@ function openFolder(path: string): void {
 }
 
 const folderLabel = (path: string) => (path ? nameOf(path) : t('base.files.root'));
+
+// The search box named by its hint, in the person's language: Ionic names its input «search text» (BASE-G152).
+const toolbar = useTemplateRef<HTMLElement>('toolbar');
+watch([toolbar, locale], ([root]) => syncSearchbarInputName(root, () => t('base.files.search')), { flush: 'post' });
 
 // ── Upload (BASE-G83) ──
 const picker = useTemplateRef<HTMLInputElement>('picker');
@@ -454,7 +458,10 @@ async function askDelete(entry: Entry): Promise<void> {
           </ion-select>
         </div>
         <section class="files-card files-main">
-          <header class="files-toolbar">
+          <header
+            ref="toolbar"
+            class="files-toolbar"
+          >
             <ion-searchbar
               class="files-search"
               data-testid="files-search"
