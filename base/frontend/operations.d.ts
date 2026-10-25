@@ -581,6 +581,25 @@ export interface ApprovalRow {
   used_at: string | null;
 }
 
+/** `base.ApprovalExportIn`: the search and the filters Employees › Approvals keeps on screen, as its table holds them
+ *  (only the active ones; `used` is `'true'` or `'false'`). */
+export interface ApprovalExportQuery {
+  search?: string;
+  at_from?: string;
+  at_to?: string;
+  operation?: string;
+  way?: string;
+  used?: string;
+}
+
+/** `base.ApprovalExportOut`: the CSV the server wrote. */
+export interface ApprovalExport {
+  filename: string;
+  content_type: string;
+  rows: number;
+  csv: string;
+}
+
 /** `base.ApproverOut`: somebody who can approve the action, by name. */
 export interface Approver {
   id: string;
@@ -709,6 +728,7 @@ declare module '@erplora/ui/sdk' {
     'base.api_key.revoke': { input: { id: string }; output: { key: ApiKeyRow } };
     'base.approval.list': { input: NoInput; output: { approvals: ApprovalRow[] } };
     'base.approval.approvers': { input: { operation: string }; output: { people: Approver[]; pin_length: number } };
+    'base.approval.export': { input: ApprovalExportQuery; output: ApprovalExport };
     'base.approval.approve': { input: ApprovalInput; output: ApprovalPass };
     'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[]; keys_available: boolean } };
     'base.api_doc.settings': { input: NoInput; output: { docs_enabled: boolean; can_change: boolean } };

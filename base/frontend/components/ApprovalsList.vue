@@ -2,14 +2,23 @@
 // Employees › Approvals (BASE-G145; the old hub's HUB_SHELL-F93), for who runs the business: the live record of each
 // action that needed a manager's PIN or badge (`base.approval.list`), read only — nobody edits or deletes a row. When,
 // what in the app's words (the old hub showed the command's technical name), who approved it, who asked, how and
-// whether it was used; search by person or action, and on a phone a card each. Empty, nobody had to approve anything
-// yet; a record that cannot be read says so with «Retry».
-import { DataTable, type DataTableColumn, formatDateTime, StatusPill } from '@erplora/ui/components';
+// whether it was used; search by person or action, filter by day, action, how and whether it was used (the old hub
+// filtered by dates, action and level), «Export CSV» of what the search and the filters keep, and on a phone a card each.
+// Empty, nobody had to approve anything yet; a record that cannot be read says so with «Retry».
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableFilterOption,
+  type DataTableFilters,
+  formatDateTime,
+  StatusPill,
+} from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
-import type { ApprovalRow } from '../operations';
+import type { ApprovalExportQuery, ApprovalRow } from '../operations';
+import ApprovalsExportButton from './ApprovalsExportButton.vue';
 
 const { t, locale } = useBaseI18n();
 const { data, status, refresh } = useLive('base.approval.list', {});
@@ -17,13 +26,46 @@ const { data, status, refresh } = useLive('base.approval.list', {});
 const rows = computed<ApprovalRow[]>(() => data.value?.approvals ?? []);
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 
+// What the person has on screen, for «Export CSV»: the search and the active filters (the table drops the empty ones).
+const search = ref('');
+const filters = ref<DataTableFilters>({});
+const exportQuery = computed<ApprovalExportQuery>(() => {
+  const words = search.value.trim();
+  return { ...(words ? { search: words } : {}), ...filters.value };
+});
+
+/** The actions on the record, in words, each once and in alphabetical order: what the «Action» filter offers. */
+const actions = computed<DataTableFilterOption[]>(() =>
+  [...new Map(rows.value.map((row) => [row.operation, row.action])).entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, locale.value)),
+);
+const ways = computed<DataTableFilterOption[]>(() =>
+  (['pin', 'badge'] as const).map((way) => ({ value: way, label: t(`base.approvals.way.${way}`) })),
+);
+const uses = computed<DataTableFilterOption[]>(() => [
+  { value: 'true', label: t('base.approvals.used') },
+  { value: 'false', label: t('base.approvals.unused') },
+]);
+
 const columns = computed<DataTableColumn<ApprovalRow>[]>(() => [
-  { key: 'at', label: t('base.approvals.columns.at'), format: (value: unknown) => formatDateTime(value as string, locale.value), width: '11rem' },
-  { key: 'action', label: t('base.approvals.columns.action'), width: 'minmax(12rem,2fr)' },
+  {
+    key: 'at',
+    label: t('base.approvals.columns.at'),
+    format: (value: unknown) => formatDateTime(value as string, locale.value),
+    width: '11rem',
+    filter: { type: 'daterange' },
+  },
+  {
+    key: 'action',
+    label: t('base.approvals.columns.action'),
+    width: 'minmax(12rem,2fr)',
+    filter: { type: 'select', key: 'operation', options: actions.value },
+  },
   { key: 'approved_by', label: t('base.approvals.columns.approvedBy'), width: 'minmax(8rem,1fr)' },
   { key: 'requested_by', label: t('base.approvals.columns.requestedBy'), width: 'minmax(8rem,1fr)' },
-  { key: 'way', label: t('base.approvals.columns.way'), cell: 'way', width: '7rem' },
-  { key: 'used', label: t('base.approvals.columns.used'), cell: 'used', width: '8rem' },
+  { key: 'way', label: t('base.approvals.columns.way'), cell: 'way', width: '7rem', filter: { type: 'select', options: ways.value } },
+  { key: 'used', label: t('base.approvals.columns.used'), cell: 'used', width: '8rem', filter: { type: 'select', options: uses.value } },
 ]);
 </script>
 
@@ -33,12 +75,15 @@ const columns = computed<DataTableColumn<ApprovalRow>[]>(() => [
       {{ t('base.approvals.intro') }}
     </p>
     <DataTable
+      v-model:search="search"
+      v-model:filters="filters"
       testid="approvals"
       :columns="columns"
       :rows="rows"
       :page-size="20"
       :page-size-options="[]"
       :views="['table', 'cards']"
+      filterable
       :card-title="(row: ApprovalRow) => row.action"
       card-title-column="action"
       :search-keys="['action', 'approved_by', 'requested_by']"
@@ -48,6 +93,9 @@ const columns = computed<DataTableColumn<ApprovalRow>[]>(() => [
       :error="failed ? t('base.approvals.error') : undefined"
       @retry="refresh()"
     >
+      <template #toolbar>
+        <ApprovalsExportButton :query="exportQuery" />
+      </template>
       <template #way="{ row }">
         <span data-testid="approvals-way">{{ t(`base.approvals.way.${(row as ApprovalRow).way}`) }}</span>
       </template>

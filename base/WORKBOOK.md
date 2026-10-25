@@ -293,9 +293,9 @@ En la pantalla Archivos:
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
 | BASE-F02 | Ver el negocio de un vistazo al entrar | parcial |
-| BASE-F03 | Ir a configurar desde el panel «Configura tu negocio» | parcial |
+| BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
-| BASE-F05 | Abrir una app desde «Mis apps» | parcial |
+| BASE-F05 | Abrir una app desde «Mis apps» | hecho |
 | BASE-F06 | Ver los paneles de las apps en Inicio | hecho |
 | BASE-F07 | Personalizar el tablero de paneles | hecho |
 | BASE-F08 | Mantener los paneles al día sin recargar | hecho |
@@ -397,6 +397,7 @@ En la pantalla Archivos:
 | BASE-F104 | Ver el plan del asistente, el límite de uso y ampliarlo | hecho |
 | BASE-F105 | Informar de una respuesta mala | hecho |
 | BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
+| BASE-F107 | Pasar la QA maestra del Hub | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -440,9 +441,9 @@ Si falla: una zona que no carga no tumba las demás; cada una dice lo suyo. En e
 apilan y «Mis apps» se pliega.
 Implicados: ninguno
 
-### BASE-F03 Ir a configurar desde el panel «Configura tu negocio»
+### BASE-F03 Ir a configurar desde «Termina de configurar tu negocio»
 <!-- origen: old-hub:HUB_SHELL-F38 -->
-Estado: parcial — los «Configurar» de cada paso de la lista llevan ya a su pantalla; el panel «Configura tu negocio» y su destino (Ajustes › Datos y copias) llegan con las plantillas
+Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Inicio · Resumen
 Pasos:
@@ -450,11 +451,13 @@ Pasos:
      «Configurar».
   2. Pulsa «Configurar»: se abre la pantalla de la app que completa ese paso.
   3. Al volver al Inicio, la lista ya cuenta el paso como hecho si se completó.
+  4. Mientras el negocio está vacío, quien lo administra empieza más arriba, en «Empieza con un negocio como el
+     tuyo» (BASE-F38): «Ver todas las plantillas» abre «Datos y copias», donde se carga una plantilla o una copia.
 Entra: la pantalla que cada paso declara.
 Sale: nada desde aquí.
 Si falla: mientras esa pantalla no existe en el hub, el paso sale sin «Configurar» (un botón que lleva a
 «no encontrado» es peor que ninguno).
-Implicados: ninguno
+Implicados: BASE-F38
 
 ### BASE-F04 Ver qué pasos de la lista tiene que configurar un administrador
 <!-- origen: old-hub:HUB_SHELL-F29 -->
@@ -473,7 +476,7 @@ Implicados: ninguno
 
 ### BASE-F05 Abrir una app desde «Mis apps»
 <!-- origen: old-hub:HUB_SHELL-F32 -->
-Estado: parcial — «Añadir apps» sale en cuanto el hub tenga la pantalla Apps
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
@@ -1956,8 +1959,9 @@ Estado: hecho
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Empleados · Personal
 Pasos:
-  1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya),
-     «Email» (solo para quien administra), «Rol», «Acceso» y «Estado».
+  1. En **Empleados › Personal**, una fila por persona (en el móvil, una tarjeta): «Usuario» (con «Tú» en la suya;
+     en una fila, un nombre que no cabe se corta y sale entero al pasar por encima), «Email» (solo para quien
+     administra), «Rol», «Acceso» y «Estado».
   2. «Acceso» dice cómo entra: «Cuenta» siempre, y «PIN» y «Placa» si los tiene (por ejemplo, «Cuenta + PIN +
      Placa»).
   3. «Estado» dice «Activo» o, si erplora.com ya la invitó y aún no ha entrado, «Aún no ha entrado».
@@ -2036,11 +2040,15 @@ Pasos:
      ni borrarlo.».
   2. Una fila por aprobación, la última primero: «Cuándo», «Acción» (en palabras), «Autorizado por», «Lo pidió»,
      «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
-  3. Busca con «Buscar por persona o acción…».
+  3. Busca con «Buscar por persona o acción…» y, en «Filtros» (el embudo), filtra por «Cuándo» (un día o unos días
+     seguidos), «Acción» (las que hay en el registro), «Con» y «Estado».
+  4. «Exportar CSV» descarga un archivo con las aprobaciones que dejan la búsqueda y los filtros, también las más
+     antiguas que la lista ya no enseña, con las mismas columnas en su idioma; mientras tanto dice «Exportando…».
 Entra: el registro de aprobaciones.
-Sale: nada; es solo lectura. Se pone al día sola con cada aprobación.
+Sale: nada; es solo lectura (el archivo exportado no cambia nada). Se pone al día sola con cada aprobación.
 Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido
-que autorizar nada en este negocio.».
+que autorizar nada en este negocio.» (y el archivo exportado trae solo la cabecera). Si no se puede exportar, un aviso
+lo dice con su motivo y no se descarga nada.
 Implicados: BASE-F84
 
 ### BASE-F86 Crear una llave de API y copiar su token
@@ -2503,6 +2511,30 @@ dicho él.
 Si falla: un fallo sin nada escrito no deja una burbuja vacía: solo la frase con su salida.
 Implicados: BASE-F93, BASE-F102, BASE-F104
 
+### BASE-F107 Pasar la QA maestra del Hub
+<!-- origen: qa:shared/qa-hub -->
+Estado: hecho
+Actor: el equipo de QA de ERPlora
+Pantalla: todas las de la plataforma del hub
+Pasos:
+  1. El equipo crea en erplora.com, con una cuenta nueva, un negocio de su tipo (un restaurante): el hub lo recibe
+     con su sector y en «Datos y copias» le ofrece primero la plantilla de ese sector, que deja el negocio con su
+     carta y sus mesas.
+  2. Recorre la plataforma como su dueño, en el móvil, la tableta y el ordenador, en español y en inglés: el Inicio
+     con «Resumen» y «Actividad», «Mis apps» y la campana; «Añadir apps» y las tres pestañas de Apps; las pestañas de
+     Ajustes y las secciones de «Datos y copias»; Empleados, la ficha de una persona, los roles, las llaves y las
+     aprobaciones; las cinco pestañas de Sistema; Archivos; «Mi perfil»; una dirección que no existe; y el
+     asistente, que se abre y contesta.
+  3. En cada pantalla comprueba que carga sin error, que nada se sale por un lado y que no queda ningún texto en el
+     otro idioma ni sin traducir.
+  4. El día de un restaurante o de una peluquería (abrir la caja, sentar o dar cita, pedir, cocinar, cobrar con el
+     tique firmado para la AEAT, imprimir y cerrar la caja) lo prueban las apps que lo hacen, cada una con sus flujos.
+Entra: un negocio nuevo creado en erplora.com y sus cuentas de prueba.
+Sale: cada pantalla de la plataforma vista y comprobada en los dos idiomas y los tres tamaños.
+Si falla: lo que falla en una pantalla es un fallo de la app que la tiene y se arregla allí; si erplora.com no tiene
+todavía los tipos de negocio o el asistente de pruebas, la QA no empieza y dice cuál falta.
+Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48, BASE-F92
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -2834,6 +2866,35 @@ Implicados: BASE-F93, BASE-F102, BASE-F104
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
   `tests/e2e/base-employees.spec.ts`.
+- La QA maestra del Hub (BASE-F107 = BASE-G152, `qa:shared/qa-hub`, APP-BASE-10): el contrato de los agentes
+  `qa-hub*` del hub viejo pasa a ser una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`, contra el SaaS de la pila
+  (alta en sus pantallas, negocio por su API con `business_type` del vertical) y su pasarela del asistente con el
+  proveedor de `tests/e2e/assistant-provider.ts`. Pide al SaaS su taxonomía (`seed_taxonomy`, que corre en cada
+  despliegue) y el proveedor sembrado (README de `tests/e2e`, «El asistente» y «La QA maestra»). Cada pantalla se
+  comprueba contra los catálogos del propio hub (`tests/e2e/translations.ts`: los `en`/`es` de la SPA y los `.po`;
+  un texto que solo escribe el otro idioma o una clave a la vista es un fallo) y deja
+  `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>`.
+- Del contrato viejo, lo que es de otras apps (cada flujo con su estado en su WORKBOOK y su e2e): §4 la siembra por
+  vertical = BASE-F29/F31 + plantillas `base/seeds/<vertical>.<idioma>.json` (la carta con la categoría de IVA de
+  cada producto y la sala, de la plantilla; la cocina y la caja, de sus apps). §5 restaurante: R-01 CASH_REGISTER-F03,
+  TABLE-F09; R-02 RESERVATION-F06/F10/F11, TABLE-F28; R-03 TABLE-F10; R-04 SALE-F19, MODIFIER-F07, KITCHEN-F07;
+  R-05/R-06 KITCHEN-F04/F05/F10/F18; R-07 TABLE-F15/F16/F17, SALE-F23/F24; R-08 SALE-F21, PRINTING-F09; R-09
+  SALE-F01/F02/F03, INVOICE-F01/F02, VERIFACTU-F19, PRINTING-F07/F13; R-10 TABLE-F21, CASH_REGISTER-F09/F16,
+  SALE-F28; R-11 SALE-F14/F15/F20/F29/F30/F31, INVOICE-F07/F09/F10. §6 peluquería: B-01 CASH_REGISTER-F03,
+  APPOINTMENT-F01; B-02 APPOINTMENT-F01/F02/F04/F05/F09; B-03 APPOINTMENT-F07, CUSTOMER-F01; B-04 APPOINTMENT-F04;
+  B-05 APPOINTMENT-F17, SALE-F38; B-06 como R-09; B-07 CASH_REGISTER-F09, SALE-F16/F28, STAFF-F21; B-08
+  APPOINTMENT-F09, SALE-F30/F31, STAFF-F21, SERVICE-F12/F14/F22. §7 fiscal: INVOICE-F01/F02/F07/F09/F10/F15 y
+  VERIFACTU-F15/F18/F19/F26/F28 (solo contra el entorno de pruebas de la AEAT). §8 impresión: PRINTING-F01/F02/F04/
+  F07/F09/F10/F13/F14/F17/F18 (la cola de `/ws/print`). Sus specs: `cash-register-*`, `table-flows`, `reservation-book`,
+  `sale-*` (con `sale-invoice-chain`), `modifier-till`, `kitchen-*`, `invoice-sale`, `verifactu-flows`,
+  `printing-*`, `appointment-*`, `staff-commissions`, `service-flows` y `customer-flows`. Lo que aún no está entero
+  es `parcial` en su app: PRINTING-F02 (buscar la impresora en la red), PRINTING-F13 (el cajón al cobrar),
+  PRINTING-F18 (el dispositivo que recoge la cola), SALE-F14 (el descuento) y SERVICE-F14 (vender un bono en el TPV).
+- Del contrato viejo no sigue lo que era proceso de aquella flota: §2 (método: el QA no arregla y abre issues por
+  repo), §2b (el banco de pruebas en PRE con `spawn-hub.sh`), §3 (contar 25–27 módulos y sus `module.json`), §9 (la
+  lista de vigilancia), §10 (el informe PASS/FAIL por escenario) y §11 (el `POST /api/command|query` del runtime en
+  Rust): aquí cada flujo tiene su e2e en `tests/e2e`, el banco es la pila de su README y la API es la de django-ninja
+  de cada operación. La propina sigue fuera (pm#100).
 
 ## Lo que NO hace, a propósito
 

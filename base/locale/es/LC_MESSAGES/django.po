@@ -1570,6 +1570,46 @@ msgstr "Una acción de %(app)s"
 msgid "An action no app names now"
 msgstr "Una acción que ya no nombra ninguna app"
 
+#: queries.py
+msgctxt "approvals export"
+msgid "When"
+msgstr "Cuándo"
+
+#: queries.py
+msgctxt "approvals export"
+msgid "Action"
+msgstr "Acción"
+
+#: queries.py
+msgctxt "approvals export"
+msgid "Approved by"
+msgstr "Autorizado por"
+
+#: queries.py
+msgctxt "approvals export"
+msgid "Asked by"
+msgstr "Lo pidió"
+
+#: queries.py
+msgctxt "approvals export"
+msgid "With"
+msgstr "Con"
+
+#: queries.py
+msgctxt "approvals export"
+msgid "State"
+msgstr "Estado"
+
+#: queries.py
+msgctxt "approvals export"
+msgid "Used"
+msgstr "Usada"
+
+#: queries.py
+msgctxt "approvals export"
+msgid "Not used"
+msgstr "Sin usar"
+
 #: queries.py:1408
 msgid "The API documentation is hidden in this business."
 msgstr "La documentación de la API está oculta en este negocio."

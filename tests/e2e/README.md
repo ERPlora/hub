@@ -171,6 +171,25 @@ CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
 
 La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
 
+## La QA maestra (`base-qa-master.spec.ts`)
+
+La QA maestra del Hub (BASE-F107, la del contrato `qa-hub` del hub viejo): un dueño nuevo se da de alta en las pantallas
+del SaaS de la pila, crea por su API un restaurante (con su tipo de negocio) y el Hub lo recibe con su vertical; carga la
+plantilla de ese vertical y recorre la plataforma entera (Inicio, Apps, Ajustes y Datos, Empleados, Sistema, Archivos, Mi
+perfil, la página de una dirección que no existe y el asistente) en 390, 834 y 1440, en español y en inglés. Cada
+pantalla carga sin error y sin un texto del otro idioma ni una clave a la vista: lo compara con los catálogos del propio
+Hub (`translations.ts`, los `en`/`es` de la SPA y los `.po`). Pide al SaaS de la pila lo mismo que el asistente (arriba)
+y, además, **su taxonomía**, que en cada despliegue siembra `saas-migrate`:
+
+```bash
+# Desde el worktree del SaaS, sobre su BD de la pila (8871 en el ejemplo de arriba):
+env DB_NAME=saas_e2e_8871 uv run python manage.py seed_taxonomy
+```
+
+Sin ella la spec cae al empezar con «no business type of the restaurant vertical». Da de alta una cuenta por ejecución:
+el SaaS deja 10 altas por hora y dirección, así que tras varias ejecuciones seguidas se reinicia su `runserver` (la caché
+local es de memoria). Deja `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>.png` en `.artifacts/`.
+
 ## La página a la vista y los diálogos
 
 `shown(page)` (`helpers.ts`) es la página que enseña `IonRouterOutlet`, nunca un diálogo abierto encima: Ionic Vue

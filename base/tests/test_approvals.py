@@ -10,12 +10,16 @@ runs the business reads it. A query, a command no app names and a command the ca
 PIN is checked as the PIN pad checks it (APP-BASE-3): same hash, same brakes.
 """
 
+import csv
 import datetime as dt
+import io
 import json
+import secrets
 
 import pytest
 from django.apps import apps
 from django.core.cache import cache
+from django.utils import timezone
 from live.models import OutboxEvent
 
 from base.models import AccessSettings, Approval, Membership
@@ -269,6 +273,100 @@ class TestTheRecord:
         assert response.status_code == 403
 
 
+def recorded(operation=APPROVABLE, *, way="pin", used=True, at=None, asked="Eva", approver="Adam") -> Approval:
+    """An approval on the record, as `base.approval.approve` leaves it (`at`: when it was approved)."""
+    row = Approval.objects.create(
+        operation=operation,
+        permission="base.manage",
+        fingerprint=secrets.token_hex(32),
+        token_digest=secrets.token_hex(32),
+        requested_by="saas:3",
+        requested_by_name=asked,
+        approved_by="saas:2",
+        approved_by_name=approver,
+        way=way,
+        expires_at=timezone.now() + dt.timedelta(minutes=2),
+        used_at=timezone.now() if used else None,
+    )
+    if at is not None:
+        Approval.objects.filter(pk=row.pk).update(created_at=at)
+    return row
+
+
+def exported(client, language="en", **filters):
+    response = client.get("/api/approvals/export", filters, HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE=language)
+    assert response.status_code == 200, response.content
+    return response.json()
+
+
+def lines(file: dict) -> list[list[str]]:
+    return list(csv.reader(io.StringIO(file["csv"])))
+
+
+class TestTheExport:
+    """Employees › Approvals › «Export CSV» (BASE-F85; the old hub exported its record): the server writes the file
+    with every approval the search and the filters keep, in words and in the person's language."""
+
+    def test_an_employee_cannot_export_it(self, client, adam, eva):
+        response = client.get("/api/approvals/export", HTTP_HOST=HOST)
+        assert response.status_code == 403
+
+    def test_who_runs_the_business_gets_it_in_words_and_in_their_language(self, client, adam, eva):
+        recorded(at=dt.datetime(2026, 10, 24, 9, 30, tzinfo=dt.UTC))
+        recorded(way="badge", used=False, at=dt.datetime(2026, 10, 23, 18, 5, tzinfo=dt.UTC), asked="Ana", approver="Mario")
+        client.force_login(adam)
+        file = exported(client, "es")
+        assert (file["filename"], file["content_type"], file["rows"]) == ("approvals.csv", "text/csv", 2)
+        assert lines(file) == [
+            ["Cuándo", "Acción", "Autorizado por", "Lo pidió", "Con", "Estado"],
+            ["2026-10-24 11:30", "Change how the till asks who is there", "Adam", "Eva", "PIN", "Usada"],
+            ["2026-10-23 20:05", "Change how the till asks who is there", "Mario", "Ana", "Placa", "Sin usar"],
+        ]
+        assert "base.access" not in file["csv"]
+
+    def test_in_english_too(self, client, adam, eva):
+        recorded(way="badge", used=False)
+        client.force_login(adam)
+        [header, row] = lines(exported(client, "en"))
+        assert header == ["When", "Action", "Approved by", "Asked by", "With", "State"]
+        assert row[4:] == ["Badge", "Not used"]
+
+    def test_nothing_yet_is_only_the_header(self, client, adam, eva):
+        client.force_login(adam)
+        file = exported(client)
+        assert file["rows"] == 0
+        assert lines(file) == [["When", "Action", "Approved by", "Asked by", "With", "State"]]
+
+    def test_the_filters_and_the_search_of_the_list(self, client, adam, eva):
+        recorded(at=dt.datetime(2026, 10, 20, 12, tzinfo=dt.UTC), asked="Eva")
+        recorded("ghost.thing.do", at=dt.datetime(2026, 10, 22, 12, tzinfo=dt.UTC), asked="Ana")
+        recorded(way="badge", used=False, at=dt.datetime(2026, 10, 24, 12, tzinfo=dt.UTC), asked="Luis", approver="Mario")
+        client.force_login(adam)
+
+        def asked(**filters) -> list[str]:
+            return [row[3] for row in lines(exported(client, **filters))[1:]]
+
+        assert asked() == ["Luis", "Ana", "Eva"]
+        assert asked(at_from="2026-10-21") == ["Luis", "Ana"]
+        assert asked(at_to="2026-10-22") == ["Ana", "Eva"]
+        assert asked(at_from="2026-10-21", at_to="2026-10-23") == ["Ana"]
+        assert asked(operation="ghost.thing.do") == ["Ana"]
+        assert asked(way="badge") == ["Luis"]
+        assert asked(used="false") == ["Luis"]
+        assert asked(used="true") == ["Ana", "Eva"]
+        # The search reads what the list shows: the action in words and the two names, in any case.
+        assert asked(search="mario") == ["Luis"]
+        assert asked(search="ANA") == ["Ana"]
+        assert asked(search="no app names") == ["Ana"]
+        assert asked(search="till", way="pin") == ["Eva"]
+
+    def test_a_name_a_spreadsheet_would_run_is_written_as_text(self, client, adam, eva):
+        recorded(asked="=HYPERLINK(1)")
+        client.force_login(adam)
+        [_, row] = lines(exported(client))
+        assert row[3] == "'=HYPERLINK(1)"
+
+
 class TestFollowedLive:
     def test_the_record_follows_each_approval_and_each_pass_spent_and_who_approves_the_people(self):
         from live.live_registry import live_registry
@@ -285,6 +383,7 @@ class TestFollowedLive:
 APPROVAL_ROUTES = {
     ("GET", "/approvals", "base.approval.list"),
     ("GET", "/approvals/approvers", "base.approval.approvers"),
+    ("GET", "/approvals/export", "base.approval.export"),
     ("POST", "/approvals", "base.approval.approve"),
 }
 
