@@ -294,6 +294,8 @@ test.describe('BASE-F06 — a panel row without its value', () => {
         await expect(bar(numbers.counted).locator('.widget-bar-text')).toHaveText(zero);
         await expect(bar(numbers.counted).locator('.widget-bar-track')).toHaveCount(1);
         await expect(panel).not.toContainText('null');
+        // The owner's Spanish session with the panel on, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
+        if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
         await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
         await untilStill(page);
