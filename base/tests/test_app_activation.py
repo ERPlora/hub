@@ -432,6 +432,27 @@ def test_an_app_may_veto_going_off_with_its_reason(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_a_veto_is_said_in_the_language_of_who_asks(monkeypatch):
+    """BASE-F25 (gh:hub#2595: a reason only in English): an app's reason comes in the asker's language, whatever the
+    language the process runs in (the assistant, an API key), even from a hook that only calls gettext."""
+    from django.utils.translation import gettext
+
+    monkeypatch.setattr(
+        apps.get_app_config("task"),
+        "can_disable",
+        lambda ctx: gettext("Turn off %(apps)s first.") % {"apps": "Tareas abiertas"},
+        raising=False,
+    )
+    set_rows(task="on*", staff="on")
+
+    with pytest.raises(Conflict) as refused:
+        disable("task", context=ctx(language="es"))
+
+    assert refused.value.envelope()["error"]["code"] == "base.app_vetoed"
+    assert refused.value.message == "Desactiva antes Tareas abiertas."
+
+
+@pytest.mark.django_db
 def test_what_would_go_off_along_may_veto_too(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
     set_rows(task="on*", staff="on")

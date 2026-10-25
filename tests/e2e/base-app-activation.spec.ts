@@ -6,12 +6,20 @@
 // `APP-BASE-ACTIVATION-<step>-<width>`. The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`,
 // signed); `a`'s photo is put back after the run and its rows of `base_appactivation` are cleared before and after
 // each test (a business without rows has every app on: the baseline).
-// flow: BASE-F18 BASE-F23 BASE-F24 BASE-F26
+// In Spanish, the flows of FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS, each with its capture
+// `FIX-HUB-BASE-APP-ACTIVATION-<flow>-<width>`: «Activar» an app the business does not use (BASE-F18); «Desactivar»
+// Reservations names Tables, which came along only with it, and «Activar» brings both back, naming it (BASE-F19,
+// BASE-F23, BASE-F24); Tables while Reservations needs it is refused with what to turn off first, in a notice that
+// stays until it is closed (BASE-F25, hub#2594); and VeriFactu, with a ticket whose record is not in the AEAT yet,
+// refuses with its own reason (BASE-F25, VERIFACTU-F32). That ticket is issued through Invoicing's API and deleted
+// after the run with its record (`cleanInvoices`), the numbering given back.
+// flow: BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
 import { createHmac } from 'node:crypto';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, api, hostPage, login, psql, shot, shown, untilStill } from './helpers';
+import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = {
@@ -60,9 +68,12 @@ test.beforeAll(() => {
       `create table ${BACKUP} as select id, state, state_version from base_hub where id = '${hubId}'`,
     ].join('; '),
   );
+  snapshotSeries();
 });
 
 test.afterAll(() => {
+  // The ticket BASE-F25 issued, with its VeriFactu record, and the numbering as the run found it.
+  cleanInvoices();
   baseline();
   psql(
     [
@@ -107,6 +118,44 @@ async function menuApps(page: Page): Promise<string[]> {
 async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string) {
   return hostPage(browser, A, { viewport, next });
 }
+
+/** The owner of `a` on `next`, with the Hub in Spanish (its language cookie, as the language picker leaves it). */
+async function signedInSpanish(browser: Browser, viewport: { width: number; height: number }, next: string) {
+  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+  const page = await context.newPage();
+  await login(page, A, next);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  // A reload, not a goto: the login already left the page on `next`, and a goto to the same address with a hash
+  // would not load it again.
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+  return { context, page };
+}
+
+/** The toast that says `text` (one at a time: a new one closes the one on screen). */
+const toast = (page: Page, text: string) => page.locator('ion-toast').filter({ hasText: text }).last();
+
+/** The app names on screen that do not fit their cell and are cut without «…» (a long name such as «Ventas / TPV»
+ *  or «Facturación» in a narrow column): each one is whole, or ends in an ellipsis. */
+async function namesCutShort(page: Page): Promise<string[]> {
+  return shown(page)
+    .locator('[data-testid="apps-row"] .apps-name')
+    .evaluateAll((names) =>
+      names.flatMap((box) => {
+        const text = box.lastElementChild as HTMLElement | null;
+        const cell = box.closest('[role="cell"]') as HTMLElement | null;
+        if (!text || !cell || !text.textContent?.trim()) return [];
+        const edge = cell.getBoundingClientRect().right - parseFloat(getComputedStyle(cell).paddingRight) + 1;
+        const ellipsis = getComputedStyle(text).textOverflow === 'ellipsis' && text.scrollWidth > text.clientWidth;
+        const inside = text.getBoundingClientRect().right <= edge;
+        return inside && (ellipsis || text.scrollWidth <= text.clientWidth + 1) ? [] : [text.textContent.trim()];
+      }),
+    );
+}
+
+/** `a`'s row of `app` as `state:chosen`, or `none`. */
+const stored = (app: string) =>
+  psql(`select coalesce((select state || ':' || chosen from base_appactivation where host = 'a' and app = '${app}'), 'none')`);
 
 test.describe.configure({ mode: 'serial' });
 
@@ -193,6 +242,182 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'website').locator('[data-testid="apps-state"]')).toHaveText('Off');
       expect(psql("select state from base_appactivation where host = 'a' and app = 'website'")).toBe('off');
       await snap(page, 'limit', width);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-F18 — «Activar» in «Añadir apps» an app the business does not use puts it in «Mis apps» and the menu, at ${width}`, async ({ browser }) => {
+    await pushPhoto(GRATIS);
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps#all');
+    try {
+      // A business that does not use Automations (as one born from a vertical without it): off, not in the menu.
+      const off = await api<{ app: string; state: string }>(context, A, 'POST', '/apps/disable', { app: 'flow' });
+      expect(off, 'Automations off before the flow').toMatchObject({ status: 200, data: { app: 'flow', state: 'off' } });
+      await page.reload();
+      await expect(testid(page, 'apps-counter')).toHaveText('16 de 20 apps activadas');
+      await expect(shown(page).locator('[data-testid="apps-row"]').first()).toBeVisible();
+      expect(await namesCutShort(page), `every name whole or ending in «…» at ${width}`).toEqual([]);
+      expect(await menuApps(page)).not.toContain('Automatizaciones');
+      await search(page, 'Automatizaciones');
+      await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
+
+      // It needs no other app: «Activar» turns it on at once, without a question.
+      await testid(page, 'apps-row-flow-toggle').click();
+      await expect(toast(page, 'Automatizaciones está activada.')).toBeVisible();
+      await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
+      await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
+      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      expect(stored('flow')).toBe('on:true');
+      await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).toContain('Automatizaciones');
+
+      // «Mis apps» lists it, with «Abrir».
+      await page.goto(`${A}/apps`);
+      await search(page, 'Automatizaciones');
+      await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+      await snap(page, 'mine', width);
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F18-${width}`) });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test(`BASE-F19 BASE-F23 BASE-F24 — «Desactivar» Reservas takes Mesas with it and «Activar» brings both back, naming it, at ${width}`, async ({ browser }) => {
+    await pushPhoto(GRATIS);
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    try {
+      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      expect(await menuApps(page)).toEqual(expect.arrayContaining(['Reservas', 'Mesas']));
+      await search(page, 'Reservas');
+
+      // BASE-F23 — the question names the app and what goes off with it: Tables, which only Reservations needed.
+      await testid(page, 'apps-row-reservation-toggle').click();
+      const askOff = page.locator('.ep-confirm-dialog').last();
+      await expect(askOff).toContainText('¿Desactivar Reservas?');
+      await expect(askOff).toContainText('Mesas se desactiva con ella: solo la necesitaba Reservas.');
+      await expect(askOff).toContainText('No se borra nada: al volver a activarla, tiene sus datos.');
+      await expect(askOff.getByRole('button', { name: 'Desactivar' })).toBeInViewport({ ratio: 1 });
+      await untilStill(page);
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F23-${width}`) });
+      await askOff.getByRole('button', { name: 'Desactivar' }).click();
+      await expect(toast(page, 'Reservas está desactivada. También se ha desactivado: Mesas.')).toBeVisible();
+      await expect(appRow(page, 'reservation')).toHaveCount(0);
+      await expect(testid(page, 'apps-counter')).toHaveText('16 de 20 apps activadas');
+      expect([stored('reservation'), stored('table')]).toEqual(['off:false', 'off:false']);
+      await expect
+        .poll(async () => (await menuApps(page)).filter((name) => name === 'Reservas' || name === 'Mesas'), {
+          message: 'both leave the menu without a reload',
+        })
+        .toEqual([]);
+
+      // BASE-F19 and BASE-F24 — «Activar» asks first, naming what turns on with it; the notice names it again.
+      await page.goto(`${A}/apps#all`);
+      await search(page, 'Reservas');
+      await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
+      await testid(page, 'apps-row-reservation-toggle').click();
+      const askOn = page.locator('.ep-confirm-dialog').last();
+      await expect(askOn).toContainText('¿Activar Reservas?');
+      await expect(askOn).toContainText('Reservas necesita Mesas: se activa con ella.');
+      await expect(askOn.getByRole('button', { name: 'Activar' })).toBeInViewport({ ratio: 1 });
+      await untilStill(page);
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F19-${width}`) });
+      await askOn.getByRole('button', { name: 'Activar' }).click();
+      await expect(toast(page, 'Reservas está activada. También se ha activado: Mesas.')).toBeVisible();
+      await expect(appRow(page, 'reservation').locator('[data-testid="apps-state"]')).toHaveText('Instalada');
+      await expect(testid(page, 'apps-counter')).toHaveText('17 de 20 apps activadas');
+      // Reservations chosen; Tables came along with it, so it does not count.
+      expect([stored('reservation'), stored('table')]).toEqual(['on:true', 'on:false']);
+      await expect
+        .poll(() => menuApps(page), { message: 'both are back in the menu without a reload' })
+        .toEqual(expect.arrayContaining(['Reservas', 'Mesas']));
+      await snap(page, 'reservations-on-again', width);
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F24-${width}`) });
+    } finally {
+      await context.close();
+    }
+  });
+
+  test(`BASE-F25 — «Desactivar» Mesas while Reservas needs it changes nothing and says what to turn off first, until closed, at ${width}`, async ({ browser }) => {
+    await pushPhoto(GRATIS);
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    try {
+      await search(page, 'Mesas');
+      await testid(page, 'apps-row-table-toggle').click();
+
+      // No question: it cannot go off. The notice says why and what to do, and stays past a toast's time.
+      const refused = testid(page, 'apps-refused');
+      await expect(refused).toContainText('No se ha cambiado nada');
+      await expect(refused).toContainText('Desactiva antes Reservas.');
+      await expect(page.locator('.ep-confirm-dialog:visible')).toHaveCount(0);
+      await page.waitForTimeout(5_000); // longer than the 4.5 s of an error toast (hub#2594)
+      await expect(refused).toBeVisible();
+      await expect(appRow(page, 'table').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+      expect(stored('table'), 'nothing written').toBe('none');
+      await snap(page, 'refused', width);
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F25-${width}`) });
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS-${width}`) });
+
+      // The server says the same if asked anyway: 409, naming the app that needs it.
+      const direct = await api<{ error: { code: string; message: string; required_by: string[] } }>(
+        context,
+        A,
+        'POST',
+        '/apps/disable',
+        { app: 'table' },
+      );
+      expect(direct.status).toBe(409);
+      expect(direct.data.error).toMatchObject({ code: 'base.app_required', message: 'Desactiva antes Reservas.', required_by: ['reservation'] });
+      expect(await menuApps(page)).toContain('Mesas');
+
+      // Closed, it goes; nothing else changed.
+      await refused.locator('button.close').click();
+      await expect(refused).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-F25 — «Desactivar» VeriFactu with a record still to send to the AEAT is refused with its reason, at ${width}`, async ({ browser }) => {
+    await pushPhoto(GRATIS);
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    try {
+      // A ticket issued through Invoicing: VeriFactu seals its record, «Pending» until the AEAT answers (never here).
+      if (issuedIds.size === 0) {
+        await ensureIssuer(context);
+        const issued = await api<{ id: string; verifactu_status: string | null }>(context, A, 'POST', '/invoice/invoices', {
+          series_code: 'TICKET',
+          lines: [{ description: 'e2e BASE-F25 veto', quantity: '1', unit_price: 1000, tax_rate: '21' }],
+        });
+        expect(issued.status, 'Invoicing issues the ticket').toBe(201);
+        expect(issued.data.verifactu_status, 'its record is sealed, still to send').toBe('sealed');
+        issuedIds.add(issued.data.id);
+      }
+
+      await search(page, 'VeriFactu');
+      await testid(page, 'apps-row-verifactu-toggle').click();
+      const askOff = page.locator('.ep-confirm-dialog').last();
+      await expect(askOff).toContainText('¿Desactivar VeriFactu?');
+      await askOff.getByRole('button', { name: 'Desactivar' }).click();
+
+      // VeriFactu's own reason, in Spanish, in the notice that stays; nothing changed.
+      const refused = testid(page, 'apps-refused');
+      await expect(refused).toContainText('No se ha cambiado nada');
+      await expect(refused).toContainText(
+        /VeriFactu aún tiene (1 registro|\d+ registros) por enviar a la AEAT\. Espera a que se envíe?n? o arréglalos? antes de desactivarla\./,
+      );
+      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+      expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(['none', 'none']);
+      expect(await menuApps(page)).toEqual(expect.arrayContaining(['VeriFactu', 'Facturación']));
+      await snap(page, 'vetoed', width);
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F25-veto-${width}`) });
     } finally {
       await context.close();
     }

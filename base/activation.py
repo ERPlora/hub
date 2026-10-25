@@ -15,7 +15,8 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
   lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
 - **An app's veto**: a module may refuse to go off while it has something unfinished (VeriFactu with records the AEAT
   has not accepted yet, VERIFACTU-F32) by defining ``can_disable(self, ctx) -> str | None`` on its ``LiveAppConfig``:
-  the reason, in the person's language, or ``None``. It runs in the transaction of ``base.app.disable``.
+  the reason, in the person's language, or ``None``. It runs in the transaction of ``base.app.disable``, in the
+  language of who asks (``ctx.language``), so a hook that only calls ``gettext`` already answers in it.
 
 What is off is also out of everything that asks which apps are on (``base.relay.active_apps``): its operations answer
 404 ``app_inactive`` (``base.entitlement.operation_database``), the relay and the Home leave it out and the menu does
@@ -24,12 +25,13 @@ not list it. Its tables are never dropped: turned on again, it has its data.
 
 import logging
 from collections.abc import Iterable, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
 from django.core.cache import cache
+from django.utils import translation
 from live.context import Scope
 from live.meta import module_configs
 
@@ -172,13 +174,16 @@ def plan_limit(photo: Any) -> int | None:
 
 
 def veto(labels: Iterable[str], *, ctx: Any, configs: Iterable[Any] | None = None) -> tuple[str, str] | None:
-    """The first of ``labels`` whose ``can_disable(ctx)`` gives a reason, with it; ``None`` when none refuses."""
+    """The first of ``labels`` whose ``can_disable(ctx)`` gives a reason, with it; ``None`` when none refuses. Each
+    hook runs in the language of who asks: its reason is said in it, whatever the process runs in."""
     by_label = {config.label: config for config in (module_configs() if configs is None else configs)}
+    language = getattr(ctx, "language", None)
     for label in labels:
         hook = getattr(by_label.get(label), "can_disable", None)
         if not callable(hook):
             continue
-        reason = hook(ctx)
+        with translation.override(language) if language else nullcontext():
+            reason = hook(ctx)
         if isinstance(reason, str) and reason.strip():
             return label, reason.strip()
     return None
