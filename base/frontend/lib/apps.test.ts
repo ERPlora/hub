@@ -13,6 +13,7 @@ import {
   goesOffWith,
   includedWith,
   offFirst,
+  sellsApart,
   tabOf,
   TAB_HASH,
   turnsOnWith,
@@ -55,8 +56,20 @@ describe('the tabs of Apps', () => {
   });
 
   it('reads the tab from the address, the old hub’s: none is «My apps», #all and #paid the catalogue', () => {
-    expect([tabOf(''), tabOf('#all'), tabOf('#paid'), tabOf('#other')]).toEqual(['mine', 'all', 'paid', 'mine']);
+    const tabs = (paid: boolean) => ['', '#all', '#paid', '#other'].map((hash) => tabOf(hash, paid));
+    expect(tabs(true)).toEqual(['mine', 'all', 'paid', 'mine']);
     expect(TAB_HASH).toEqual({ mine: '', all: '#all', paid: '#paid' });
+  });
+
+  it('with nothing sold apart there is no «Paid»: an old link to #paid opens «Add apps» (PLAN §32)', () => {
+    expect(['', '#all', '#paid', '#other'].map((hash) => tabOf(hash, false))).toEqual(['mine', 'all', 'all', 'mine']);
+  });
+
+  it('says whether the catalogue sells any app apart: every app in every plan sells none (PLAN §32)', () => {
+    expect(sellsApart([TAX, app('sale')])).toBe(false);
+    expect(sellsApart([])).toBe(false);
+    expect(sellsApart(APPS)).toBe(true);
+    expect(sellsApart([TAX, STOCK])).toBe(true);
   });
 });
 

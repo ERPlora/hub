@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:659c80c78927bcd8cc4198f39dd1bef7875bc8dc0e8ff09120839af5cf6ca0bf -->
+<!-- generated from WORKBOOK.md sha256:29584ea55d93cd294f2227e18124fa7607920070697bf748909d5656f25bd254 -->
 
 ## What it is for and who it is for
 
@@ -101,6 +101,7 @@ From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the 
 apps" (every ERPlora app) and "Paid" (the ones subscribed to separately). Each one, a table (or cards) with its
 search, the filters funnel, the order and "Columns": "App" (icon and name), "Category" and "Status"; in "Add
 apps" and "Paid", also "Description", "Price" and "Comes with". "Open" on the row of an app the person can open.
+"Paid" and "Price" only show if some app is subscribed to separately; today none is: every app comes with every plan.
 
 ### The screen of an app that does not open
 In the same address as the app's screen, the reason: "Subscription needed" or "This app is not available in
@@ -698,7 +699,8 @@ Steps:
   2. The amount of a "Paid" app is on erplora.com's Store; whoever runs the business opens it from "Subscribe
      on erplora.com" (BASE-F20).
   3. "Paid" gathers only the apps subscribed to separately: a free one never shows there. If none is sold
-     separately: "No app is sold separately: every app comes with your plan.".
+     separately (today, every app comes with every plan), there is no "Paid" nor "Price", and a link to "Paid"
+     opens "Add apps".
 In: whether each app is subscribed to separately and what the business has subscribed to on erplora.com.
 Out: nothing saved. The hub neither charges nor shows amounts: the price and the purchase are erplora.com's.
 If it fails: without the list, as in "My apps" (BASE-F14).
