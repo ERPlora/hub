@@ -747,7 +747,11 @@ cajero del producto actual es un empleado.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com`; ids
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
-  cerrar, cerrar sola, apuntar y contar) y cada campo de `schemas.py` su `description`.
+  cerrar, cerrar sola, apuntar y contar) y cada campo de `schemas.py` su `description`. La tarjeta de
+  confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
+  «Cajón» para `register_name`, «Efectivo contado», «Notas de cierre») o, si no lo tiene, por el
+  `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
+  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
 - **El cierre por el asistente** (F09; PLAN §30, la primera de las cinco acciones de IA pulidas): la
   descripción de `session.close` le pide leer antes `session.closing_summary` con el mismo contado,
   decir su resumen y cerrar nombrando la sesión por el número que dio (así nunca cierra otra que se
