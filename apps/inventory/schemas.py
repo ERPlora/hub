@@ -13,6 +13,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
@@ -25,6 +26,13 @@ MAX_BATCH = 100
 
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
 SAY_WHICH_CATEGORY = _("Say which category: its id, or its name.")
+
+# How the Inventory screens name the data the models do not (the assistant's card names each datum by its title).
+TAX_CATEGORY = gettext_noop("Tax category")
+CATEGORIES = gettext_noop("Categories")
+FILE_ROWS = gettext_noop("File rows")
+#: The category form's own name for its tax category.
+TAX_RATE = gettext_noop("Tax rate")
 
 UnitCode = Literal["ud", "kg", "g", "t", "l", "ml", "min", "h"]
 ProductType = Literal["physical", "service"]
@@ -149,6 +157,7 @@ class ProductRefIn(Schema):
 
 class ProductSoldOutIn(ProductRefIn):
     sold_out: bool = Field(
+        title=gettext_noop("Sold out"),
         description="True: sold out («86»), the till stops offering it; false: back on sale."
     )
 
@@ -352,12 +361,14 @@ class ProductIn(Schema):
         description="Sale price in cents, per price_quantity of pricing_unit."
     )
     tax_category_key: TaxKey = Field(
+        title=TAX_CATEGORY,
         description="Key of the tax category (Taxes app) that says how it is taxed."
     )
     cost: Cents = Field(0, description="Cost in cents.")
     initial_stock: Quantity = Field(
         Decimal("0"),
         ge=0,
+        title=gettext_noop("Initial stock"),
         description="Stock it starts with; it leaves an 'initial' movement.",
     )
     low_stock_threshold: Quantity | None = Field(
@@ -388,6 +399,7 @@ class ProductIn(Schema):
     category_ids: list[UUID] = Field(
         default_factory=list,
         max_length=MAX_BATCH,
+        title=CATEGORIES,
         description="Categories that group it in the till.",
     )
 
@@ -411,7 +423,7 @@ class ProductPatchIn(ProductRefIn):
     )
     description: Description | None = Field(None, description="New description.")
     tax_category_key: TaxKey | None = Field(
-        None, description="Key of the new tax category; it cannot be emptied."
+        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied."
     )
     is_active: bool | None = Field(
         None, description="Activate (true) or deactivate (false) it."
@@ -431,6 +443,7 @@ class ProductPatchIn(ProductRefIn):
     category_ids: list[UUID] | None = Field(
         None,
         max_length=MAX_BATCH,
+        title=CATEGORIES,
         description="Its categories, all of them: replaces the ones it had.",
     )
 
@@ -466,10 +479,12 @@ class ProductImportIn(Schema):
     rows: list[ProductImportRowIn] = Field(
         min_length=1,
         max_length=MAX_BATCH,
+        title=FILE_ROWS,
         description="The rows, at most 100 per call.",
     )
     dry_run: bool = Field(
         False,
+        title=gettext_noop("Check only"),
         description="True rehearses: every row is checked and reported, nothing is created.",
     )
 
@@ -504,7 +519,7 @@ class CategoryIn(Schema):
         0, ge=0, le=1_000_000, description="Position among the categories."
     )
     tax_category_key: TaxKey | None = Field(
-        None, description="Key of a tax category (Taxes app), optional."
+        None, title=TAX_RATE, description="Key of a tax category (Taxes app), optional."
     )
 
 
@@ -520,7 +535,7 @@ class CategoryPatchIn(CategoryRefIn):
     color: Color | None = Field(None, description="New colour.")
     order: int | None = Field(None, ge=0, le=1_000_000, description="New position.")
     tax_category_key: _text(64) | None = Field(
-        None, description="Key of the new tax category; an empty text removes it."
+        None, title=TAX_RATE, description="Key of the new tax category; an empty text removes it."
     )
 
 
@@ -538,6 +553,7 @@ class CategoryImportIn(Schema):
     rows: list[CategoryImportRowIn] = Field(
         min_length=1,
         max_length=MAX_BATCH,
+        title=FILE_ROWS,
         description="The rows, at most 100 per call.",
     )
 
@@ -554,14 +570,14 @@ class ReceiveLineIn(_ProductLineRef):
 
 class ReceiveIn(Schema):
     items: list[ReceiveLineIn] = Field(
-        min_length=1, max_length=MAX_BATCH, description="The products received."
+        min_length=1, max_length=MAX_BATCH, title=gettext_noop("Products"), description="The products received."
     )
     reference: _text(200) = Field("", description="The delivery note's number.")
 
 
 class CountIn(_ProductLineRef):
     stock: Quantity = Field(
-        ge=0, description="What there really is: the total counted, not the difference."
+        ge=0, title=gettext_noop("Counted stock"), description="What there really is: the total counted, not the difference."
     )
     reason: Reason = Field(description="Why (3 to 500 characters).")
 
@@ -618,7 +634,7 @@ class SaleItemIn(Schema):
 class SaleCompletedIn(Schema):
     sale_id: UUID = Field(description="The sale that was paid.")
     sale_number: str = Field("", description="Its number (AAAAMMDD-NNNN), for the ledger's reference.")
-    items: list[SaleItemIn] = Field(default_factory=list, description="Its lines.")
+    items: list[SaleItemIn] = Field(default_factory=list, title=gettext_noop("Sale lines"), description="Its lines.")
 
 
 class SaleVoidedIn(Schema):
@@ -637,7 +653,9 @@ class SaleRefundedIn(Schema):
     refund_id: UUID = Field(description="The refund: each one gives its units back once.")
     reason: _text(500) = Field("", description="Why it was refunded; it goes on the movement.")
     lines: list[SaleRefundLineIn] = Field(
-        default_factory=list, description="The lines that come back; none = only money."
+        default_factory=list,
+        title=gettext_noop("Returned lines"),
+        description="The lines that come back; none = only money."
     )
 
 

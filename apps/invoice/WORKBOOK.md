@@ -1003,7 +1003,11 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   «emitido» y avisa `sale.sale.invoiced` una vez por documento; «Emitir ahora» ya no lo escribe dos veces.
 - **Validación del NIF**: `python-stdnum` (NIF, NIE y CIF de España; NIF-IVA de la UE con el tipo 02).
 - **Asistente**: cada operación declara `ai` (en las escrituras, `risk`: `high` al emitir, sustituir,
-  rectificar y en el emisor) y cada campo su `description`.
+  rectificar y en el emisor) y cada campo su `description`. La tarjeta de confirmación nombra cada
+  dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo: «Copia», «Líneas»,
+  «Tipo de rectificativa», «Siguiente número», «Venta», «Devolución de la venta») o, si no lo tiene,
+  por el `verbose_name` de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el
+  nombre técnico y lo para `tests/test_integration_assistant.py`.
 
 ### Decisiones (dudas abiertas del producto actual, resueltas con el mercado)
 

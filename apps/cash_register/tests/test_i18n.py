@@ -9,6 +9,7 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from live.operations import registry
 
 from apps.cash_register import models, queries, schemas, services
 
@@ -89,7 +90,20 @@ def visible_texts() -> set[str]:
         *(label for _, label, _ in services.REPORT_LINES),
     ]
     with translation.override("en"):
-        return {source(text) for text in lazies}
+        return {source(text) for text in lazies} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles cash_register's operations give their input data: the assistant's card names each datum by them,
+    so each one needs its Spanish. A title pydantic makes up from the field is not one."""
+    titles = set()
+    for op in registry.values():
+        if op.app_label == "cash_register":
+            for name, prop in op.input.model_json_schema().get("properties", {}).items():
+                title = prop.get("title")
+                if title and title != name.title().replace("_", " "):
+                    titles.add(title)
+    return titles
 
 
 def source(text) -> str:

@@ -2,7 +2,8 @@
 // Apps (BASE-G67…G74; the old hub's AppsPage): the business's apps over the live `base.app.list`, which the SaaS's
 // photo re-runs (a paid app bought on erplora.com turns up without reloading). Three tabs in the address, the old
 // hub's: «My apps» (`/apps`, the apps on, each with «Open»), «Add apps» (`#all`, the whole catalogue with what it
-// does, its price and what comes with it) and «Paid» (`#paid`, only what is bought apart). There is no price here:
+// does, its price and what comes with it) and «Paid» (`#paid`, only what is bought apart). «Paid» and the price are
+// there only while some app is sold apart: with every app in every plan (PLAN §32) none is. There is no amount here:
 // a paid app without its right says it needs a subscription and, for whoever runs the business and only on the web,
 // links to erplora.com's Store, where it is bought (never inside the Hub: the stores refuse an app that sells).
 // Whoever runs the business turns an app on or off (PLAN-HUB §9; BASE-F18, F19, F23–F25): «Turn on» asks first when
@@ -39,6 +40,7 @@ import {
   goesOffWith,
   includedWith,
   offFirst,
+  sellsApart,
   TAB_HASH,
   tabOf,
   turnsOnWith,
@@ -81,13 +83,16 @@ const counter = computed(() => {
   return t('base.appsPage.counter.limited', { enabled: answer.enabled, max: answer.max_apps });
 });
 
+/** Some app is sold apart (none is while every app comes with every plan, PLAN §32): only then «Paid» and «Price». */
+const paid = computed(() => sellsApart(apps.value));
+
 const tabs = computed<ShellTab[]>(() => [
   { id: 'mine', label: t('base.appsPage.tabs.mine'), icon: 'ion:cube-outline' },
   { id: 'all', label: t('base.appsPage.tabs.all'), icon: 'ion:storefront-outline' },
-  { id: 'paid', label: t('base.appsPage.tabs.paid'), icon: 'ion:wallet-outline' },
+  ...(paid.value ? [{ id: 'paid', label: t('base.appsPage.tabs.paid'), icon: 'ion:wallet-outline' }] : []),
 ]);
 const tab = computed<AppsTab>({
-  get: () => tabOf(route.hash),
+  get: () => tabOf(route.hash, paid.value),
   set: (next) => void router.replace({ path: route.path, hash: TAB_HASH[next] }),
 });
 const catalogue = computed(() => tab.value !== 'mine');
@@ -130,12 +135,16 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
   ...(catalogue.value
     ? ([
         { key: 'summary', label: t('base.appsPage.columns.summary'), priority: 'low', width: 'minmax(12rem, 2fr)' },
-        {
-          key: 'right',
-          label: t('base.appsPage.columns.price'),
-          cell: 'price',
-          sortValue: (row) => priceLabel(row),
-        },
+        ...(paid.value
+          ? ([
+              {
+                key: 'right',
+                label: t('base.appsPage.columns.price'),
+                cell: 'price',
+                sortValue: (row) => priceLabel(row),
+              },
+            ] satisfies DataTableColumn<AppRow>[])
+          : []),
         {
           key: 'requires',
           label: t('base.appsPage.columns.comesWith'),

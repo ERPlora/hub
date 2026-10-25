@@ -6,17 +6,24 @@ expected cash only for whoever may see it; the close is a dangerous write: it wa
 and the count, and closes only after the person types the word. Cancelling leaves the session open."""
 
 import json
+from pathlib import Path
 
 import pytest
-from live.operations import get
+from django.apps import apps
+from live.operations import get, registry
 
 from base import assistant
+from base.tests.test_assistant import named_by_the_screen
 from apps.cash_register.models import Session
 from apps.cash_register.tests.conftest import charge, ctx_for, open_session, run
 
 pytestmark = pytest.mark.django_db
 
 ASK = {"role": "user", "content": "cierra la caja con 250 € contados"}
+
+SCREENS = json.loads(
+    (Path(apps.get_app_config("cash_register").path) / "frontend/locale/es.json").read_text()
+)["cash_register"]
 
 
 def call(name, arguments, call_id="c1"):
@@ -157,3 +164,51 @@ def test_a_session_closed_meanwhile_on_another_device_is_not_closed_twice_nor_an
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "cash_register.session_not_open")]
     assert Session.objects.get(pk=session.id).closing_balance == 9000
     assert Session.objects.get(pk=later.id).status == Session.Status.OPEN
+
+
+# ── How the card names the data (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-FIELDS-IN-ENGLISH; base's half is hub#258) ──
+
+
+def labels(card: dict) -> list[str]:
+    return [field["label"] for field in card["fields"]]
+
+
+def cash_register_writes() -> list:
+    return [
+        op
+        for op in registry.values()
+        if op.app_label == "cash_register" and op.kind == "command" and assistant.is_tool(op)
+    ]
+
+
+def test_no_datum_of_a_write_of_cash_register_reaches_a_spanish_card_by_its_technical_name():
+    """Every write of cash_register the assistant may ask for, with all its data: each datum by a name of its own in
+    Spanish, never the title pydantic makes up from the field («Register Name»)."""
+    screen = named_by_the_screen()
+    writes = cash_register_writes()
+    assert len(writes) > 5  # positive control: the registry has cash_register's writes
+    technical: dict[str, list[str]] = {}
+    for op in writes:
+        props = op.input.model_json_schema().get("properties", {})
+        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+            name, label = field["name"], field["label"]
+            if name not in screen and label == name.title().replace("_", " "):
+                technical.setdefault(op.name, []).append(name)
+    assert technical == {}
+
+
+@pytest.mark.parametrize("name", ["cash_register.register.update", "cash_register.session.open"])
+def test_the_card_names_a_drawer_named_by_its_name_as_the_screens_do(name):
+    """The drawer the person names by its name is «Cajón», as the drawers of the settings and «Open session» say."""
+    assert labels(assistant.card(get(name), {"register_name": "Barra"}, "es")) == [SCREENS["open"]["register"]]
+    assert labels(assistant.card(get(name), {"register_name": "Bar"}, "en")) == ["Drawer"]
+
+
+def test_renaming_a_drawer_names_the_drawer_and_its_new_name_apart():
+    arguments = {"register_name": "Barra", "name": "Terraza", "is_active": True}
+    card = assistant.card(get("cash_register.register.update"), arguments, "es")
+    assert labels(card) == [
+        SCREENS["open"]["register"],
+        SCREENS["registers"]["modal"]["name"],
+        SCREENS["registers"]["columns"]["active"],
+    ]

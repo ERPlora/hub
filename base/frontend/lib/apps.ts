@@ -11,11 +11,18 @@ export type AppsTab = 'mine' | 'all' | 'paid';
 /** Each tab's address hash: the old hub's, kept for its links (`/apps#all`). */
 export const TAB_HASH: Readonly<Record<AppsTab, string>> = Object.freeze({ mine: '', all: '#all', paid: '#paid' });
 
-/** The tab an address hash opens; an unknown one is «My apps». */
-export function tabOf(hash: string): AppsTab {
+/** The tab an address hash opens; an unknown one is «My apps». Without `paid` (nothing is sold apart: PLAN §32)
+ *  there is no «Paid», and its old link opens «Add apps», where whatever was sold apart would be. */
+export function tabOf(hash: string, paid: boolean): AppsTab {
   if (hash === TAB_HASH.all) return 'all';
-  if (hash === TAB_HASH.paid) return 'paid';
+  if (hash === TAB_HASH.paid) return paid ? 'paid' : 'all';
   return 'mine';
+}
+
+/** Whether the catalogue sells any app apart (`premium`): with every app in every plan (PLAN §32) none is, and
+ *  «Paid» and «Price» would say nothing but «Free». */
+export function sellsApart(apps: readonly AppRow[]): boolean {
+  return apps.some((app) => app.premium);
 }
 
 /** The rows of a tab: the apps on, every app, or the paid ones (never a free one: hub#2655). */

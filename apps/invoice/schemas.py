@@ -15,6 +15,7 @@ from uuid import UUID
 
 import pycountry
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     BeforeValidator,
@@ -67,6 +68,9 @@ WHICH_INVOICE = _("Say which invoice: its id or its number.")
 WHICH_SALE = _("Say which sale: its id or its number.")
 WHICH_SERIES = _("Say which series: its id, or its code.")
 FIELD_REQUIRED = _("This field is required.")
+#: How the Facturas screens name the data the models do not (the assistant's card names each one by it).
+SALE = gettext_noop("Sale")
+NEXT_NUMBER = gettext_noop("Next number")
 
 Direction = Literal["asc", "desc"]
 VerifactuStatus = Literal["sealed", "unavailable", "pending"]
@@ -189,7 +193,7 @@ class InvoiceRefIn(Schema):
 class SaleRefIn(Schema):
     """A sale of the Sales app, by its id or its number of the day."""
 
-    sale_id: UUID | None = Field(None, description="Id of the sale.")
+    sale_id: UUID | None = Field(None, title=SALE, description="Id of the sale.")
     sale: Annotated[_text(24) | None, BeforeValidator(_blank_to_none)] = Field(
         None,
         description="Number of the sale as printed on its ticket, such as 20261014-0003. Either this or sale_id.",
@@ -311,7 +315,9 @@ class InvoiceGetIn(InvoiceRefIn):
 class DocumentIn(InvoiceRefIn):
     """The printable document of an invoice."""
 
-    duplicate: bool = Field(False, description="Mark the paper as a copy (a reprint).")
+    duplicate: bool = Field(
+        False, title=gettext_noop("Copy"), description="Mark the paper as a copy (a reprint)."
+    )
 
 
 class BySourceIn(SaleRefIn):
@@ -388,7 +394,10 @@ class InvoiceCreateIn(RecipientIn):
     )
     notes: _text(2000) = Field("", description="Free notes printed on the invoice.")
     lines: list[ManualLineIn] = Field(
-        min_length=1, max_length=100, description="The lines, 1 to 100."
+        min_length=1,
+        max_length=100,
+        title=gettext_noop("Lines"),
+        description="The lines, 1 to 100.",
     )
 
 
@@ -431,6 +440,7 @@ class RectifyIn(InvoiceRefIn):
     )
     rectification_type: RectificationType | None = Field(
         None,
+        title=gettext_noop("Type of rectifying invoice"),
         description="R1 error founded in law and art. 80 One, Two and Six LIVA (default), R2 insolvency, R3 bad "
         "debts, R4 other causes. A simplified invoice (ticket) is always rectified as R5.",
     )
@@ -445,7 +455,10 @@ class FromRefundIn(Schema):
 
     model_config = ConfigDict(extra="ignore")
 
-    refund_id: UUID = Field(description="Id of the refund document of the Sales app.")
+    refund_id: UUID = Field(
+        title=gettext_noop("Sale refund"),
+        description="Id of the refund document of the Sales app.",
+    )
 
 
 class FromVoidIn(Schema):
@@ -453,7 +466,7 @@ class FromVoidIn(Schema):
 
     model_config = ConfigDict(extra="ignore")
 
-    sale_id: UUID = Field(description="Id of the voided sale.")
+    sale_id: UUID = Field(title=SALE, description="Id of the voided sale.")
 
 
 class MarkPaidIn(InvoiceRefIn):
@@ -536,6 +549,7 @@ class SeriesCreateIn(Schema):
     next_number: int = Field(
         1,
         ge=1,
+        title=NEXT_NUMBER,
         description="The number its first document takes (to continue another system).",
     )
     is_active: bool = Field(True, description="Offered when issuing by hand.")
@@ -568,6 +582,7 @@ class SeriesUpdateIn(Schema):
     next_number: int | None = Field(
         None,
         ge=1,
+        title=NEXT_NUMBER,
         description="New first number (only while the series has numbered nothing).",
     )
     is_active: bool | None = Field(None, description="Offered when issuing by hand.")

@@ -1,7 +1,7 @@
 // Apps (BASE-G67…G74; the old hub's AppsPage): «My apps», «Add apps» and «Paid» over the live `base.app.list`, in
-// the address (`/apps`, `#all`, `#paid`). «Open» leads to the app's first screen; a paid app without its right says
-// it needs a subscription and, for whoever runs the business and only on the web, links to erplora.com's Store
-// (buying is never inside the Hub). A failed read says so with «Retry» and keeps the rows; it is never «no apps».
+// the address (`/apps`, `#all`, `#paid`); «Paid» and «Price» only while some app is sold apart (PLAN §32). «Open»
+// leads to the app's first screen; a paid app without its right says it needs a subscription and, for whoever runs
+// the business and only on the web, links to erplora.com's Store (buying is never inside the Hub). A failed read says so with «Retry» and keeps the rows; it is never «no apps».
 // Whoever runs the business turns an app on or off (PLAN-HUB §9): the dialog names what comes along or goes with it,
 // a refusal says why (another app needs it, the app itself, or the plan's limit, with «Upgrade plan») in a notice that
 // stays until it is closed or the next change (hub#2594), and the counter says how many of the plan's apps are on.
@@ -134,12 +134,6 @@ describe('AppsPage', () => {
     expect(ids(m.wrapper)).toEqual(['stock']);
   });
 
-  it('«Paid» with nothing bought apart says every app comes with the plan', async () => {
-    const m = await open('/apps#paid', { locale: 'es' });
-    await m.result(m.call, 'base.app.list', { ...LIST, apps: [TAX] });
-    expect(m.wrapper.find('[data-testid="apps-empty"]').text()).toContain('Ninguna app se vende aparte');
-  });
-
   it('says where a paid app’s right comes from', async () => {
     const m = await open('/apps#paid', { locale: 'es' });
     await m.result(m.call, 'base.app.list', {
@@ -220,6 +214,88 @@ describe('AppsPage', () => {
       { id: 'all', label: 'Añadir apps', icon: 'ion:storefront-outline' },
       { id: 'paid', label: 'De pago', icon: 'ion:wallet-outline' },
     ]);
+  });
+
+  // Every app in every plan (PLAN §32): with nothing sold apart, «Paid» and «Price» would only say «Free» again
+  // and again, so they are not there; the day an app is sold apart they come back on their own.
+  describe('with no app sold apart (PLAN §32)', () => {
+    const FREE_LIST: AppList = { ...LIST, apps: [TAX, INVOICE, REPORTS] };
+    const tabIds = (m: Awaited<ReturnType<typeof open>>) =>
+      (m.wrapper.getComponent(AppPage).props('tabs') as { id: string }[]).map((tab) => tab.id);
+    const headers = (m: Awaited<ReturnType<typeof open>>) =>
+      m.wrapper.findAll('[role="columnheader"]').map((header) => header.text());
+
+    it('has no «Paid» tab', async () => {
+      const m = await open('/apps', { locale: 'es' });
+      await m.result(m.call, 'base.app.list', FREE_LIST);
+      expect(m.wrapper.getComponent(AppPage).props('tabs')).toEqual([
+        { id: 'mine', label: 'Mis apps', icon: 'ion:cube-outline' },
+        { id: 'all', label: 'Añadir apps', icon: 'ion:storefront-outline' },
+      ]);
+    });
+
+    it('«Add apps» has no «Price» column, and still names what comes with each app (BASE-F19)', async () => {
+      const m = await open('/apps#all');
+      await m.result(m.call, 'base.app.list', FREE_LIST);
+      expect(headers(m)).not.toContain('Price');
+      expect(headers(m)).toContain('Comes with');
+      expect(m.wrapper.find('[data-testid="apps-price"]').exists()).toBe(false);
+      const invoice = m.wrapper.find('[data-testid="apps-row"][data-id="invoice"]');
+      expect(invoice.text()).not.toContain('Free');
+      expect(invoice.text()).toContain('Taxes');
+    });
+
+    it('an old link to #paid opens «Add apps»', async () => {
+      const m = await open('/apps#paid');
+      await m.result(m.call, 'base.app.list', FREE_LIST);
+      expect(m.wrapper.getComponent(AppPage).props('tab')).toBe('all');
+      expect(ids(m.wrapper)).toEqual(['tax', 'invoice', 'reports']);
+    });
+
+    it('an app sold apart brings «Paid» and «Price» back, live', async () => {
+      const m = await open('/apps#all');
+      await m.result(m.call, 'base.app.list', FREE_LIST);
+      expect(tabIds(m)).toEqual(['mine', 'all']);
+      await m.result(m.call, 'base.app.list', LIST, 2);
+      expect(tabIds(m)).toEqual(['mine', 'all', 'paid']);
+      expect(headers(m)).toContain('Price');
+      expect(m.wrapper.find('[data-testid="apps-row"][data-id="invoice"] [data-testid="apps-price"]').text()).toBe('Free');
+    });
+
+    describe('on a phone, the cards', () => {
+      beforeEach(() => {
+        vi.stubGlobal('matchMedia', (query: string) => ({
+          media: query,
+          matches: true,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }));
+      });
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+      const fields = (m: Awaited<ReturnType<typeof open>>, id: string) =>
+        m.wrapper.findAll(`[data-testid="apps-row"][data-id="${id}"] .data-table__field-label`).map((label) => label.text());
+
+      it('say no price either', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', FREE_LIST);
+        expect(m.wrapper.find('.data-table__card').exists()).toBe(true);
+        expect(fields(m, 'invoice')).not.toContain('Price');
+        expect(fields(m, 'invoice')).toContain('Comes with');
+        expect(m.wrapper.find('[data-testid="apps-price"]').exists()).toBe(false);
+      });
+
+      it('say the price again once an app is sold apart', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', LIST);
+        expect(fields(m, 'invoice')).toContain('Price');
+      });
+    });
   });
 
   describe('turning an app on or off (PLAN-HUB §9)', () => {
