@@ -1,5 +1,5 @@
 // The product form (WORKBOOK «Productos», INVENTORY-F01/F02/F05/F08/F20/F26), the old side panel as a
-// dialog: Name, SKU (locked when editing), Price, «Cost (EUR)», «Initial stock» (create only), «Low
+// dialog: Name, SKU (locked when editing), Price, «Cost (<currency>)», «Initial stock» (create only), «Low
 // stock threshold» (empty = 10), EAN-13, Description, «Type» (create only), «Track stock for this
 // item» with its note, «Unit of measure», «Tax category» (required, none chosen in advance) and
 // «Categories» (when there are any). «Save» / «Save changes» is off while Name, SKU or the tax
@@ -9,7 +9,8 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type ApiCall, category, flush, mountInventory, ok, page, product, refusal, TAX_CATEGORIES, UNITS } from '../__tests__/mount-inventory';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, category, flush, mountInventory, ok, page, POLISH, product, refusal, TAX_CATEGORIES, UNITS, type ApiCall } from '../__tests__/mount-inventory';
 import ProductFormModal from './ProductFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -31,12 +32,13 @@ const searches = (categories: unknown) => (call: ApiCall) =>
 
 async function setup(
   props: Record<string, unknown> = {},
-  options: { locale?: 'en' | 'es'; categories?: unknown; taxes?: unknown; api?: (call: ApiCall) => Response } = {},
+  options: { locale?: 'en' | 'es'; categories?: unknown; taxes?: unknown; api?: (call: ApiCall) => Response; business?: Business | null } = {},
 ) {
   const m = await mountInventory(ProductFormModal, {
     props: { open: true, product: null, units: UNITS.rows, ...props },
     locale: options.locale,
     attach: true,
+    business: options.business,
     api: options.api ?? searches(options.categories ?? CATEGORIES),
   });
   const call = await m.live();
@@ -288,5 +290,17 @@ describe('ProductFormModal: editing', () => {
     expect(s.el('inventory-product-form')?.getAttribute('aria-label')).toBe('Editando producto — Coffee');
     expect(s.el('inventory-product-price')?.value).toBe('2,20');
     expect(s.el('inventory-product-cost')?.label).toBe('Coste (EUR)');
+  });
+
+  describe('the cost in the business’s currency (flow business-currency)', () => {
+    it('a business in Poland reads «Cost (PLN)»', async () => {
+      const s = await setup({}, { business: business(POLISH) });
+      expect(s.el('inventory-product-cost')?.label).toBe('Cost (PLN)');
+    });
+
+    it('while the business is not read, «Cost» without a currency, never the euro', async () => {
+      const s = await setup({}, { business: null });
+      expect(s.el('inventory-product-cost')?.label).toBe('Cost');
+    });
   });
 });

@@ -14,7 +14,7 @@ import { IonButton, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
-import { formatMoney, formatQuantity } from '../lib/format';
+import { formatMoney, formatQuantity, useCurrency } from '../lib/format';
 import { printInBrowser } from '../lib/print-label';
 import BarcodePlate from './BarcodePlate.vue';
 import type { StockAction } from './StockModal.vue';
@@ -26,6 +26,7 @@ const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ stock: [kind: StockAction] }>();
 
 const { t, locale } = useT();
+const currency = useCurrency();
 const session = useSession();
 const canMove = computed(() => session.can('inventory.adjust_stock') && props.product?.product_type === 'physical');
 const canChange = computed(() => session.can('inventory.change_product'));
@@ -116,7 +117,7 @@ async function setSoldOut(value: boolean): Promise<void> {
       <ion-item data-testid="inventory-product-detail-price">
         <ion-label>{{ $t('inventory.common.price') }}</ion-label>
         <ion-note slot="end">
-          {{ formatMoney(product.price, locale) }}
+          {{ formatMoney(product.price, locale, currency) }}
         </ion-note>
       </ion-item>
       <ion-item data-testid="inventory-product-detail-stock">

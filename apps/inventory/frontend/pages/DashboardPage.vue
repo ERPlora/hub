@@ -14,13 +14,14 @@ import { useInventoryTabs } from '../composables/useInventoryTabs';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
-import { formatCount, formatMoney, formatQuantity } from '../lib/format';
+import { formatCount, formatMoney, formatQuantity, useCurrency } from '../lib/format';
 
 type LowRow = OutputOf<'inventory.product.list_low_stock'>['rows'][number];
 
 const PRODUCTS = '/inventory/products';
 
 const { t, locale } = useT();
+const currency = useCurrency();
 const tabs = useInventoryTabs();
 
 const { data: summary, status: summaryStatus, error: summaryError, refresh } = useLive('inventory.stock.get_summary', {});
@@ -58,7 +59,7 @@ const kpis = computed(() => {
     {
       id: 'value',
       label: t('inventory.dashboard.value'),
-      value: formatMoney(s.stock_value, locale.value),
+      value: formatMoney(s.stock_value, locale.value, currency.value),
       icon: 'ion:wallet-outline',
       note: t('inventory.dashboard.valueAtCost'),
     },

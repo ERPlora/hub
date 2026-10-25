@@ -38,7 +38,7 @@ import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
 import { useUnits } from '../composables/useUnits';
 import { saveTextFile } from '../lib/download';
-import { formatMoney, formatQuantity } from '../lib/format';
+import { formatMoney, formatQuantity, useCurrency } from '../lib/format';
 import { filterParams, filtersInUse, PRODUCT_STATUSES, type ProductStatus, type UnreadableEnd, unreadableEnds } from '../lib/productFilters';
 
 type Product = OutputOf<'inventory.product.list'>['rows'][number];
@@ -46,6 +46,7 @@ type Product = OutputOf<'inventory.product.list'>['rows'][number];
 const STATUS_FROM_QUERY: Record<string, ProductStatus> = { unconfigured: 'needs_tax_setup', needs_tax_setup: 'needs_tax_setup', active: 'active', inactive: 'inactive' };
 
 const { t, locale } = useT();
+const currency = useCurrency();
 const tabs = useInventoryTabs();
 const session = useSession();
 const client = useLiveClient();
@@ -83,10 +84,10 @@ watch(
   },
 );
 // Only the filters that really apply narrow the list (an amount it cannot read does not).
-table.restart({ narrowed: filtersInUse(filters.value) > 0 });
-watch(filters, (now) => table.restart({ narrowed: filtersInUse(now) > 0 }));
+table.restart({ narrowed: filtersInUse(filters.value, currency.value) > 0 });
+watch(filters, (now) => table.restart({ narrowed: filtersInUse(now, currency.value) > 0 }));
 
-const listFilters = () => filterParams(filters.value);
+const listFilters = () => filterParams(filters.value, currency.value);
 const { data: result, status: listStatus, error, refresh } = useLiveList(
   'inventory.product.list',
   () => ({ ...listFilters(), ...table.params.value }),
@@ -102,14 +103,14 @@ function unreadableMessage({ name, problem }: UnreadableEnd): string {
   if (problem.reason === 'not_amount') return t('inventory.common.noAmount');
   return t('inventory.common.ambiguousAmount', {
     typed: (filters.value[name] ?? '').trim(),
-    grouped: formatMoney(problem.grouped, locale.value),
-    decimal: formatMoney(problem.decimal, locale.value),
+    grouped: formatMoney(problem.grouped, locale.value, currency.value),
+    decimal: formatMoney(problem.decimal, locale.value, currency.value),
   });
 }
 /** Under each filter: an end it cannot read, else what the server refused (a 422 of the list). */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...(error.value?.fields ?? {}),
-  ...Object.fromEntries(unreadableEnds(filters.value).map((end) => [end.name, unreadableMessage(end)])),
+  ...Object.fromEntries(unreadableEnds(filters.value, currency.value).map((end) => [end.name, unreadableMessage(end)])),
 }));
 /** A refused filter is said under it and the rows stay; any other failure replaces them. */
 const tableError = computed(() =>
@@ -131,7 +132,7 @@ const columns = computed<DataTableColumn<Product>[]>(() => [
     label: t('inventory.common.price'),
     sortable: true,
     align: 'right',
-    format: (value) => formatMoney(Number(value), locale.value),
+    format: (value) => formatMoney(Number(value), locale.value, currency.value),
     filter: { type: 'range', amount: true, keys: ['price_min', 'price_max'] },
   },
   { key: 'stock', label: t('inventory.common.stock'), sortable: true, align: 'right', cell: 'stock', filter: { type: 'range', amount: true, keys: ['stock_min', 'stock_max'] } },

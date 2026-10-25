@@ -1,20 +1,45 @@
 // How the inventory screens paint money, counts, quantities and rates (pages never format by hand),
-// always with the page language's own number format (Intl). Money is whole cents of euros: the Hub
-// has no currency setting yet and every ERPlora business invoices in euros (queries.CURRENCY).
-// Quantities are exact decimals from the API («2.500», at most three decimals): painted ungrouped
-// and without trailing zeros, as the server's CSV writes them (queries.quantity_text).
+// always with the page language's own number format (Intl). Money is whole minor units of the business's
+// currency (`useCurrency`: its country's, as `base.business.get` says it); while it is unknown, a figure without
+// a symbol, never the euro by default. Quantities are exact decimals from the API («2.500», at most three
+// decimals): painted ungrouped and without trailing zeros, as the server's CSV writes them (queries.quantity_text).
+import { computed, type ComputedRef } from 'vue';
 
-const CURRENCY = 'EUR';
+import { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+const NO_CURRENCY_DECIMALS = 2;
 
 const formats = new Map<string, Intl.NumberFormat>();
 const decimalMarks = new Map<string, string>();
 
-function numberFormat(locale: string, kind: 'money' | 'count' | 'quantity' | 'percent'): Intl.NumberFormat {
+/** The business's currency (ISO 4217) as `base.business.get` says it, its country's; `undefined` until it answers. */
+export function useCurrency(): ComputedRef<string | undefined> {
+  const business = useBusinessMoney();
+  return computed(() => business.value?.currency);
+}
+
+function moneyFormat(locale: string, currency: string | undefined): Intl.NumberFormat {
+  const key = `${locale}|money|${currency ?? ''}`;
+  let found = formats.get(key);
+  if (!found) {
+    const digits = { minimumFractionDigits: NO_CURRENCY_DECIMALS, maximumFractionDigits: NO_CURRENCY_DECIMALS };
+    found = new Intl.NumberFormat(locale, currency ? { style: 'currency', currency } : digits);
+    formats.set(key, found);
+  }
+  return found;
+}
+
+/** The decimals of `currency` as CLDR knows them (2 in EUR, 0 in JPY): its minor unit; two while unknown. */
+export function currencyDecimals(currency?: string): number {
+  if (!currency) return NO_CURRENCY_DECIMALS;
+  return moneyFormat('en', currency).resolvedOptions().maximumFractionDigits ?? NO_CURRENCY_DECIMALS;
+}
+
+function numberFormat(locale: string, kind: 'count' | 'quantity' | 'percent'): Intl.NumberFormat {
   const key = `${locale}|${kind}`;
   let found = formats.get(key);
   if (!found) {
     const options: Record<typeof kind, Intl.NumberFormatOptions> = {
-      money: { style: 'currency', currency: CURRENCY },
       count: {},
       quantity: { maximumFractionDigits: 3, useGrouping: false },
       percent: { style: 'percent', maximumFractionDigits: 2 },
@@ -35,9 +60,10 @@ export function decimalMark(locale: string): string {
   return found;
 }
 
-/** Whole cents as euros in `locale` («2,20 €», «€2.20»). */
-export function formatMoney(cents: number, locale: string): string {
-  return numberFormat(locale, 'money').format(cents / 100);
+/** Whole minor units as money of `currency` in `locale` («2,20 €», «€2.20», «PLN 12.50», «¥1,210»; «12,50» while
+ *  the currency is unknown). */
+export function formatMoney(cents: number, locale: string, currency?: string): string {
+  return moneyFormat(locale, currency).format(cents / 10 ** currencyDecimals(currency));
 }
 
 /** A count («12.345» products in Spanish). */
