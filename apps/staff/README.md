@@ -25,7 +25,8 @@ sus ausencias (las pide el empleado y las aprueba un responsable) y lo que ha ga
   horas el mismo día no chocan si no se pisan; «Ausencias de hoy» en el día del negocio.
 - **Comisiones, ajustes y cifras** (F21–F23): lo vendido por cada profesional en un periodo (de Ventas, con
   lo devuelto restado) × su comisión, redondeado una vez por persona; la jornada por defecto; las cifras de
-  la plantilla encima de cada lista (los paneles del Inicio viejo).
+  la plantilla encima de cada lista y, en el Inicio, los cinco paneles del módulo viejo (Plantilla activa,
+  Ausentes hoy y Ausencias de hoy de serie; Ausencias pendientes y Empleados por rol para añadir).
 
 ## Ficha
 
@@ -69,8 +70,8 @@ pnpm e2e tests/e2e/staff-flows.spec.ts tests/e2e/staff-members.spec.ts tests/e2e
 
 ## Qué queda fuera
 
-- Los paneles de Personal en el Inicio: `FIX-STAFF-SETUP-HOOKS`, bloqueada hasta que se mergee APP-BASE-1
-  (hub#168: `base.widget.list`). Hoy salen dentro de Personal.
+- El color de cada rol en las barras de «Empleados por rol» del Inicio: el panel de barras de `base` no pinta
+  colores (fuera de esta app).
 - Borrar las ocho columnas de los ajustes retirados y su CHECK (el paso contract de hub#177), una vez
   desplegado.
 - Lo que Comisiones aún no cuenta, de otras apps: una venta con «Atiende yo» y la sesión de un bono.

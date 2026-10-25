@@ -301,6 +301,11 @@ class TimeOff(UUIDModel):
     def __str__(self) -> str:
         return f"{self.member} {self.start_date}–{self.end_date}"
 
+    @property
+    def leave_type_label(self) -> str:
+        """The type in the language active now (the caller's): what the Home's «Today’s time off» says."""
+        return str(self.get_leave_type_display())
+
 
 def default_workday_start() -> dt.time:
     """The field default as a callable: a fixed time trips ``fields.W161`` within 10 s of that hour (UTC)."""

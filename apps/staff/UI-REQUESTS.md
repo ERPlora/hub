@@ -11,8 +11,14 @@ del Hub está en 07b4392):
 
 ## Iconos
 
-Ninguna pendiente: `ion:shield-outline` (pestaña «Roles», el icono del módulo viejo) ya está registrado
-en `packages/ui` (8c30c2a) y lo usan el menú (`apps/staff/apps.py`) y la barra de pestañas.
+Los del módulo viejo que el shell no registra (`packages/ui/src/shell/icons.ts`), de los paneles del Inicio
+(`widgets` de `apps.py`, FIX-STAFF-SETUP-HOOKS):
+
+- `ion:airplane-outline` — panel «Ausentes hoy»; hoy `ion:log-out-outline`.
+- `ion:hourglass-outline` — panel «Ausencias pendientes»; hoy `ion:time-outline`.
+
+`ion:shield-outline` (pestaña «Roles», el icono del módulo viejo) ya está registrado en `packages/ui`
+(8c30c2a) y lo usan el menú (`apps/staff/apps.py`), la barra de pestañas y el panel «Empleados por rol».
 `ion:ban-outline` («Desactivar», «Cancelar» ausencia) también.
 
 ## Componentes

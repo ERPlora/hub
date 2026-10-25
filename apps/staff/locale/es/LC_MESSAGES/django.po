@@ -33,6 +33,21 @@ msgstr "Ausencias"
 msgid "Schedules"
 msgstr "Horarios"
 
+msgid "Active staff"
+msgstr "Plantilla activa"
+
+msgid "On leave today"
+msgstr "Ausentes hoy"
+
+msgid "Pending time off"
+msgstr "Ausencias pendientes"
+
+msgid "Today’s time off"
+msgstr "Ausencias de hoy"
+
+msgid "Staff by role"
+msgstr "Empleados por rol"
+
 msgid "name"
 msgstr "nombre"
 

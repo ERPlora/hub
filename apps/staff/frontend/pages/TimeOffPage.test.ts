@@ -26,6 +26,7 @@ const off = (id: string, over: Partial<TimeOffOut> = {}): TimeOffOut => ({
   member_id: 'm1',
   member_name: 'Ana López',
   leave_type: 'vacation',
+  leave_type_label: 'Vacation',
   start_date: '2026-11-02',
   end_date: '2026-11-06',
   is_full_day: true,
