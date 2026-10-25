@@ -80,6 +80,20 @@ async def app_list(request):
     return await run_operation(request, queries.app_list)
 
 
+# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app's id in the body.
+from base.schemas import AppChangeIn  # noqa: E402
+
+
+@bind(router, "base.app.enable", "/apps/enable")
+async def app_enable(request, data: AppChangeIn):
+    return await run_operation(request, services.app_enable, data)
+
+
+@bind(router, "base.app.disable", "/apps/disable")
+async def app_disable(request, data: AppChangeIn):
+    return await run_operation(request, services.app_disable, data)
+
+
 @bind(router, "base.plan.usage", "/system/plan")
 async def plan_usage(request):
     return await run_operation(request, queries.plan_usage)

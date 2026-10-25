@@ -15,7 +15,7 @@ from live.context import OperationContext
 from live.errors import OperationError
 from live.slugs import validate_hub_slug
 
-from base.models import Hub, Location, Membership, TaskSchedule
+from base.models import AppActivation, Hub, Location, Membership, TaskSchedule
 from base.registry import REGISTRY_SCOPE
 from base.schemas import DemoSlugIn
 from base.services import demo_expire
@@ -134,6 +134,26 @@ class LocationAdmin(admin.ModelAdmin):
         if obj is not None and obj.is_default:
             return False
         return super().has_delete_permission(request, obj)
+
+
+@admin.register(AppActivation)
+class AppActivationAdmin(admin.ModelAdmin):
+    """Which apps each business turned on or off, and which it chose (PLAN-HUB §9), as they are: read only. Turning
+    one on or off is ``base.app.enable``/``base.app.disable`` (the apps it needs, the plan's limit, the event), never a
+    row edited by hand; a business without rows has every app on (``base.activation``)."""
+
+    list_display = ("host", "app", "state", "chosen", "changed_at")
+    list_filter = ("state", "chosen")
+    search_fields = ("host", "app")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
+        return False
 
 
 def open_hub(request: HttpRequest, slug: str) -> HttpResponseRedirect:

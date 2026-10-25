@@ -1,9 +1,22 @@
 // The rules of the Apps screen (BASE-G67…G74) the browser applies to `base.app.list`: which apps each tab lists,
-// the tab of an address, what comes along with an app, who it comes with, and when «Open» is offered.
+// the tab of an address, what comes along with an app, who it comes with, and when «Open» is offered; and turning an
+// app on or off (PLAN-HUB §9): when each is offered, what comes along or goes with it, and what goes off first.
 import { describe, expect, it } from 'vitest';
 
 import type { AppRow } from '../operations';
-import { appsOfTab, canOpen, comesWith, includedWith, tabOf, TAB_HASH } from './apps';
+import {
+  appsOfTab,
+  canOpen,
+  canTurnOff,
+  canTurnOn,
+  comesWith,
+  goesOffWith,
+  includedWith,
+  offFirst,
+  tabOf,
+  TAB_HASH,
+  turnsOnWith,
+} from './apps';
 
 function app(id: string, fields: Partial<AppRow> = {}): AppRow {
   return {
@@ -16,6 +29,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     premium: false,
     right: 'free',
     state: 'on',
+    chosen: true,
     path: `/${id}`,
     requires: [],
     required_by: [],
@@ -70,5 +84,56 @@ describe('«Open»', () => {
 
   it('never for an app that stopped being on, even with a screen the list still names', () => {
     expect(canOpen(app('stock', { state: 'blocked', path: '/stock' }))).toBe(false);
+  });
+});
+
+describe('turning an app on or off (PLAN-HUB §9)', () => {
+  // sale needs tax and customer; both came along with it, and the business chose task itself.
+  const SALE = app('sale', { name: 'Sales', requires: ['customer', 'tax'] });
+  const TAX_ = app('tax', { name: 'Taxes', chosen: false, required_by: ['sale'] });
+  const CUSTOMER_ = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
+  const TASK = app('task', { name: 'Tasks' });
+  const FLOW = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
+  const PAID = app('stock', { premium: true, right: 'missing', state: 'blocked', path: null });
+  const ON = [SALE, TAX_, CUSTOMER_, TASK, FLOW, PAID];
+
+  it('«Turn on» for an app that is off; «Turn off» for one that is on; neither for one without its right', () => {
+    expect(ON.map((row) => [row.id, canTurnOn(row), canTurnOff(row)])).toEqual([
+      ['sale', false, true],
+      ['tax', false, true],
+      ['customer', false, true],
+      ['task', false, true],
+      ['flow', true, false],
+      ['stock', false, false],
+    ]);
+  });
+
+  it('names what turns on with an app: what it needs that is off, by name', () => {
+    const off = [{ ...SALE, state: 'off' as const, chosen: false }, { ...TAX_, state: 'off' as const }, CUSTOMER_];
+    expect(turnsOnWith(off[0], off)).toEqual(['Taxes']);
+    expect(turnsOnWith(TASK, ON)).toEqual([]);
+  });
+
+  it('names what goes off with an app: what came along with it and nothing else on needs', () => {
+    expect(goesOffWith(SALE, ON)).toEqual(['Customers', 'Taxes']);
+    const chosenTax = { ...TAX_, chosen: true };
+    expect(goesOffWith(SALE, [SALE, chosenTax, CUSTOMER_])).toEqual(['Customers']);
+    const invoice = app('invoice', { name: 'Invoicing', requires: ['customer', 'sale', 'tax'] });
+    const needed = [SALE, { ...TAX_, required_by: ['invoice', 'sale'] }, { ...CUSTOMER_, required_by: ['invoice', 'sale'] }, invoice];
+    expect(goesOffWith(invoice, needed)).toEqual([]);
+  });
+
+  it('names the apps to turn off first: the chosen ones on that need it, else every one that does', () => {
+    expect(offFirst(TAX_, ON)).toEqual(['Sales']);
+    const verifactu = app('verifactu', { name: 'VeriFactu', requires: ['invoice', 'sale', 'tax'] });
+    const invoice = app('invoice', { name: 'Invoicing', chosen: false, requires: ['sale', 'tax'] });
+    const tax = app('tax', { name: 'Taxes', chosen: false, required_by: ['invoice', 'sale', 'verifactu'] });
+    expect(offFirst(tax, [verifactu, invoice, { ...SALE, chosen: false }, tax])).toEqual(['VeriFactu']);
+    expect(offFirst(TASK, ON)).toEqual([]);
+  });
+
+  it('«My apps» lists only the apps on: one turned off is in «Add apps», with its icon and name', () => {
+    expect(appsOfTab(ON, 'mine').map((row) => row.id)).toEqual(['sale', 'tax', 'customer', 'task']);
+    expect(appsOfTab(ON, 'all').map((row) => row.id)).toContain('flow');
   });
 });

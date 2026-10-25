@@ -22,6 +22,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     premium: true,
     right: 'missing',
     state: 'blocked',
+    chosen: false,
     path: null,
     requires: [],
     required_by: [],
@@ -30,7 +31,13 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
 }
 
 const STORE = 'https://erplora.com/store/modules?business=h1';
-const LIST: AppList = { apps: [app('stock', { name: 'Stock' })], store_url: STORE };
+const LIST: AppList = {
+  apps: [app('stock', { name: 'Stock' })],
+  store_url: STORE,
+  plan_url: 'https://erplora.com/store/plans?business=h1',
+  max_apps: null,
+  enabled: 0,
+};
 const STOCK_PAGE = defineComponent({ template: '<div />' });
 
 async function open(path = '/stock/items', options: Parameters<typeof mountBase>[1] = {}) {
@@ -96,6 +103,16 @@ describe('AppBlockedPage', () => {
     await m.result(m.call, 'base.app.list', LIST);
     expect(m.wrapper.find('[data-testid="app-blocked-missing"]').text()).toContain('Esta app no está disponible en este negocio');
     expect(m.wrapper.find('[data-testid="app-blocked-to-apps"]').exists()).toBe(true);
+  });
+
+  it('an app the business turned off says it is not available here and leads to Apps, where it is turned on', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.app.list', { ...LIST, apps: [app('stock', { name: 'Stock', premium: false, right: 'free', state: 'off' })] });
+    expect(m.wrapper.find('[data-testid="app-blocked-missing"]').text()).toContain('This app is not available in this business');
+    expect(m.wrapper.find('[data-testid="app-blocked-subscription"]').exists()).toBe(false);
+    await m.wrapper.find('[data-testid="app-blocked-to-apps"]').trigger('click');
+    await flush();
+    expect(m.router.currentRoute.value.fullPath).toBe('/apps#all');
   });
 
   it('a failed check says so with «Retry», never a reason made up', async () => {

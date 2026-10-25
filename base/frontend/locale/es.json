@@ -129,7 +129,8 @@
       "state": {
         "on": "Activa",
         "installed": "Instalada",
-        "blocked": "Necesita suscripción"
+        "blocked": "Necesita suscripción",
+        "off": "Desactivada"
       },
       "right": {
         "free": "Gratis",
@@ -155,7 +156,39 @@
         "all": "No hay apps que enseñar.",
         "paid": "Ninguna app se vende aparte: todas vienen con tu plan."
       },
-      "noResults": "No hay apps que coincidan con tu búsqueda."
+      "noResults": "No hay apps que coincidan con tu búsqueda.",
+      "toggle": {
+        "on": "Activar",
+        "off": "Desactivar"
+      },
+      "turnedOn": "{app} está activada.",
+      "turnedOff": "{app} está desactivada.",
+      "alsoOn": "También se ha activado: {apps}.",
+      "alsoOff": "También se ha desactivado: {apps}.",
+      "confirmOn": {
+        "title": "¿Activar {app}?",
+        "message": "{app} necesita {apps}: se activa con ella. | {app} necesita {apps}: se activan con ella.",
+        "confirm": "Activar",
+        "cancel": "Cancelar"
+      },
+      "confirmOff": {
+        "title": "¿Desactivar {app}?",
+        "message": "Sale del menú de todos en este negocio. No se borra nada: al volver a activarla, tiene sus datos.",
+        "along": "{apps} se desactiva con ella: solo la necesitaba {app}. | {apps} se desactivan con ella: solo las necesitaba {app}.",
+        "confirm": "Desactivar",
+        "cancel": "Cancelar"
+      },
+      "offFirst": "Apaga antes {apps}.",
+      "changeFailed": "No se ha podido cambiar {app}: {reason}",
+      "limit": {
+        "heading": "El límite de apps de tu plan",
+        "body": "Has llegado al límite de {max} app de tu plan. Mejora el plan o apaga una. | Has llegado al límite de {max} apps de tu plan. Mejora el plan o apaga una.",
+        "upgrade": "Mejorar plan"
+      },
+      "counter": {
+        "limited": "{enabled} de {max} apps activadas",
+        "unlimited": "1 app activada · Sin límite | {enabled} apps activadas · Sin límite"
+      }
     },
     "appBlocked": {
       "checking": "Comprobando por qué no se abre esta app…",

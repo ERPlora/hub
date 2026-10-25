@@ -7,6 +7,8 @@ no event of another one.
 
 import re
 
+import pytest
+
 from live.models import OutboxEvent
 from live.operations import NAME_RE
 
@@ -74,6 +76,7 @@ def test_it_listens_to_nobody():
     assert not getattr(events, "REACTIONS", None)
 
 
+@pytest.mark.django_db  # which apps are on in the business is read from its rows (base.activation)
 def test_only_flow_hears_its_events():
     # CART_CHECKOUT-F13: the relay hands them to flow («*», FLOW-F21) and to no other app.
     for name in events.ALL:

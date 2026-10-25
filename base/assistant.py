@@ -36,7 +36,7 @@ from live.errors import AppInactive, OperationError, PermissionDenied, Unauthori
 from live.meta import LiveAppConfig, all_live_app_configs
 from live.operations import Operation, registry
 
-from base import approvals, entitlement, signing
+from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
 from base.operations import HostScopeResolver
 
@@ -108,9 +108,10 @@ def is_tool(op: Operation) -> bool:
 
 
 def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
-    """The apps on in ``scope``'s business: every app of ours but the paid ones it has no right to."""
-    blocked = entitlement.blocked_apps(scope)
-    return {config.label: config for config in all_live_app_configs() if config.label not in blocked}
+    """The apps on in ``scope``'s business: every app of ours but the paid ones it has no right to and the ones it
+    turned off (``base.activation``)."""
+    left_out = entitlement.blocked_apps(scope) | activation.off_apps(scope)
+    return {config.label: config for config in all_live_app_configs() if config.label not in left_out}
 
 
 def catalog(ctx: OperationContext) -> dict[str, Operation]:

@@ -5,25 +5,55 @@
 // does, its price and what comes with it) and «Paid» (`#paid`, only what is bought apart). There is no price here:
 // a paid app without its right says it needs a subscription and, for whoever runs the business and only on the web,
 // links to erplora.com's Store, where it is bought (never inside the Hub: the stores refuse an app that sells).
-// Phase 1 has every app the business has a right to on: turning one on or off comes with the activation per hub.
-import { DataTable, EmptyState, InlineFeedback, StatusPill, type DataTableAction, type DataTableColumn } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, type ShellTab, useSession, useSurface } from '@erplora/ui/shell';
+// Whoever runs the business turns an app on or off (PLAN-HUB §9; BASE-F18, F19, F23–F25): «Turn on» asks first when
+// it brings others it needs, naming them; «Turn off» always asks, naming what goes with it, and one another app on
+// needs says which to turn off first. The counter says how many of the plan's apps are on (`max_apps`; what came
+// along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans, only on the web). The
+// menu of this screen is read again after each change; the other screens of the business follow the live list
+// (AppsFollower).
+import {
+  DataTable,
+  EmptyState,
+  InlineFeedback,
+  StatusPill,
+  type DataTableAction,
+  type DataTableColumn,
+  useConfirm,
+} from '@erplora/ui/components';
+import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
+import { AppPage, HubIcon, type ShellTab, toastError, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { type AppsTab, appsOfTab, canOpen, comesWith, includedWith, TAB_HASH, tabOf } from '../lib/apps';
+import { sessionChanged } from '../lib/access';
+import {
+  type AppsTab,
+  appsOfTab,
+  canOpen,
+  canTurnOff,
+  canTurnOn,
+  comesWith,
+  goesOffWith,
+  includedWith,
+  offFirst,
+  TAB_HASH,
+  tabOf,
+  turnsOnWith,
+} from '../lib/apps';
 import { useBaseI18n } from '../lib/i18n';
 import type { AppRow } from '../operations';
 
-const { t } = useBaseI18n();
+const { t, locale } = useBaseI18n();
+const { confirm } = useConfirm();
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
 const { isWeb } = useSurface();
 
 const { data, status, refresh } = useLive('base.app.list', {});
+const enable = useCommand('base.app.enable');
+const disable = useCommand('base.app.disable');
 
 const apps = computed<AppRow[]>(() => data.value?.apps ?? []);
 const storeUrl = computed(() => data.value?.store_url ?? '');
@@ -31,6 +61,21 @@ const failed = computed(() => status.value === 'error');
 const loading = computed(() => data.value === undefined && !failed.value);
 /** Who runs the business buys: erplora.com decides the rest by profile. */
 const mayBuy = computed(() => isWeb.value && session.can('base.administer_hub') && storeUrl.value !== '');
+/** Who runs the business turns apps on and off. */
+const mayManage = computed(() => session.can('base.administer_hub'));
+/** The plan's page on erplora.com, only on the web (the Hub never sells inside the installed app). */
+const planUrl = computed(() => (isWeb.value && mayManage.value ? (data.value?.plan_url ?? '') : ''));
+/** The app being turned on or off: only its button waits, and no other starts meanwhile. */
+const pending = ref<string | null>(null);
+/** The plan's limit the last «Turn on» hit; cleared by the next change. */
+const limitHit = ref<number | null>(null);
+
+const counter = computed(() => {
+  const answer = data.value;
+  if (!answer) return '';
+  if (answer.max_apps === null) return t('base.appsPage.counter.unlimited', { enabled: answer.enabled, n: answer.enabled });
+  return t('base.appsPage.counter.limited', { enabled: answer.enabled, max: answer.max_apps });
+});
 
 const tabs = computed<ShellTab[]>(() => [
   { id: 'mine', label: t('base.appsPage.tabs.mine'), icon: 'ion:cube-outline' },
@@ -52,7 +97,13 @@ const categories = computed(() =>
 
 function stateLabel(app: AppRow): string {
   if (app.state === 'blocked') return t('base.appsPage.state.blocked');
+  if (app.state === 'off') return t('base.appsPage.state.off');
   return t(catalogue.value ? 'base.appsPage.state.installed' : 'base.appsPage.state.on');
+}
+
+function stateTone(app: AppRow): 'success' | 'warning' | 'neutral' {
+  if (app.state === 'on') return 'success';
+  return app.state === 'off' ? 'neutral' : 'warning';
 }
 
 function priceLabel(app: AppRow): string {
@@ -99,6 +150,7 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
           type: 'select',
           options: [
             { value: 'on', label: t('base.appsPage.state.installed') },
+            { value: 'off', label: t('base.appsPage.state.off') },
             { value: 'blocked', label: t('base.appsPage.state.blocked') },
           ],
         }
@@ -115,13 +167,103 @@ const actions = computed<DataTableAction<AppRow>[]>(() => [
     pinned: true,
     hidden: (row) => !canOpen(row),
   },
+  {
+    id: 'toggle',
+    // A text button: what it does is its label («Turn on», «Turn off»).
+    label: (row) => t(canTurnOn(row) ? 'base.appsPage.toggle.on' : 'base.appsPage.toggle.off'),
+    color: 'primary',
+    hidden: (row) => !mayManage.value || !(canTurnOn(row) || canTurnOff(row)),
+    loading: (row) => pending.value === row.id,
+    disabled: (row) => pending.value !== null && pending.value !== row.id,
+  },
 ]);
 
-/** «Open», checked again on the answer now on screen: an app that just stopped being on does not open. */
+/** «Open» and «Turn on/off», checked again on the answer now on screen: an app that just changed is not misread. */
 function onAction({ actionId, row }: { actionId: string; row: AppRow }): void {
-  if (actionId !== 'open') return;
   const current = apps.value.find((app) => app.id === row.id);
-  if (current && canOpen(current)) void router.push(current.path as string);
+  if (!current) return;
+  if (actionId === 'open' && canOpen(current)) void router.push(current.path as string);
+  if (actionId === 'toggle' && pending.value === null) void toggle(current);
+}
+
+/** «A», «A and B», «A, B and C», in the screen's language. */
+function listOf(names: readonly string[]): string {
+  return new Intl.ListFormat(locale.value, { style: 'long', type: 'conjunction' }).format(names);
+}
+
+async function toggle(app: AppRow): Promise<void> {
+  if (canTurnOff(app)) {
+    const first = offFirst(app, apps.value);
+    if (first.length) {
+      void toastError(t('base.appsPage.offFirst', { apps: listOf(first) }));
+      return;
+    }
+    const along = goesOffWith(app, apps.value);
+    const message = [
+      t('base.appsPage.confirmOff.message'),
+      along.length ? t('base.appsPage.confirmOff.along', { apps: listOf(along), app: app.name, n: along.length }) : '',
+    ].filter(Boolean);
+    const yes = await confirm({
+      title: t('base.appsPage.confirmOff.title', { app: app.name }),
+      message: message.join(' '),
+      confirmLabel: t('base.appsPage.confirmOff.confirm'),
+      cancelLabel: t('base.appsPage.confirmOff.cancel'),
+      tone: 'danger',
+    });
+    if (yes) await change('disable', app);
+    return;
+  }
+  if (!canTurnOn(app)) return;
+  const along = turnsOnWith(app, apps.value);
+  if (along.length) {
+    const yes = await confirm({
+      title: t('base.appsPage.confirmOn.title', { app: app.name }),
+      message: t('base.appsPage.confirmOn.message', { app: app.name, apps: listOf(along), n: along.length }),
+      confirmLabel: t('base.appsPage.confirmOn.confirm'),
+      cancelLabel: t('base.appsPage.confirmOn.cancel'),
+      tone: 'primary',
+    });
+    if (!yes) return;
+  }
+  await change('enable', app);
+}
+
+async function change(kind: 'enable' | 'disable', app: AppRow): Promise<void> {
+  pending.value = app.id;
+  limitHit.value = null;
+  try {
+    const answer = await (kind === 'enable' ? enable : disable).run({ app: app.id });
+    const along = answer.along.map((other) => other.name);
+    const said = [t(kind === 'enable' ? 'base.appsPage.turnedOn' : 'base.appsPage.turnedOff', { app: app.name })];
+    if (along.length) said.push(t(kind === 'enable' ? 'base.appsPage.alsoOn' : 'base.appsPage.alsoOff', { apps: listOf(along) }));
+    void toastSuccess(said.join(' '));
+    // The menu is the session's: read it again (the other screens of the business follow the live list).
+    sessionChanged();
+  } catch (error) {
+    refused(error as ApiError | undefined, app);
+  } finally {
+    pending.value = null;
+  }
+}
+
+/** Why the server said no, from its code: the limit (the notice), another app needs it, the app's own reason. */
+function refused(error: ApiError | undefined, app: AppRow): void {
+  if (error?.code === 'base.app_limit_reached') {
+    limitHit.value = Number(error.details.max_apps) || data.value?.max_apps || 0;
+    return;
+  }
+  if (error?.code === 'base.app_required') {
+    const ids = Array.isArray(error.details.required_by) ? (error.details.required_by as string[]) : [];
+    const named = offFirst({ ...app, required_by: ids }, apps.value);
+    const names = named.length ? named : ids.map((id) => apps.value.find((row) => row.id === id)?.name ?? id);
+    void toastError(t('base.appsPage.offFirst', { apps: listOf(names) }));
+    return;
+  }
+  if (error?.code === 'base.app_vetoed') {
+    void toastError(error.message);
+    return;
+  }
+  void toastError(t('base.appsPage.changeFailed', { app: app.name, reason: error?.message ?? '' }));
 }
 
 const searchPlaceholder = computed(() => t(`base.appsPage.search.${tab.value}`));
@@ -137,6 +279,33 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
     content-layout="fill"
   >
     <div class="page-fill apps-page">
+      <p
+        v-if="counter"
+        class="apps-counter"
+        data-testid="apps-counter"
+      >
+        {{ counter }}
+      </p>
+      <InlineFeedback
+        v-if="limitHit !== null"
+        tone="warning"
+        data-testid="apps-limit"
+        :heading="t('base.appsPage.limit.heading')"
+      >
+        {{ t('base.appsPage.limit.body', { max: limitHit, n: limitHit }) }}
+        <template
+          v-if="planUrl"
+          #actions
+        >
+          <a
+            class="apps-limit-upgrade"
+            data-testid="apps-limit-upgrade"
+            :href="planUrl"
+            target="_blank"
+            rel="noopener"
+          >{{ t('base.appsPage.limit.upgrade') }}</a>
+        </template>
+      </InlineFeedback>
       <InlineFeedback
         v-if="failed"
         tone="danger"
@@ -191,7 +360,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
           <span class="apps-state">
             <StatusPill
               data-testid="apps-state"
-              :tone="(row as AppRow).state === 'on' ? 'success' : 'warning'"
+              :tone="stateTone(row as AppRow)"
               :label="stateLabel(row as AppRow)"
             />
             <template v-if="(row as AppRow).state === 'blocked'">
@@ -243,6 +412,18 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
+}
+
+.apps-counter {
+  margin: 0 0 8px;
+  color: var(--ion-color-medium-shade, #555);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.apps-limit-upgrade {
+  color: var(--ion-color-primary);
+  font-weight: 600;
 }
 
 .apps-buy {

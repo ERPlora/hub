@@ -77,6 +77,14 @@ FILE_DELETED = "base.file.deleted"
 #: What changes the business's files: Files' listing follows them.
 FILE_EVENTS = (FILE_UPLOADED, FILE_FOLDER_CREATED, FILE_RENAMED, FILE_MOVED, FILE_DELETED)
 
+# ── Apps turned on and off by the business (PLAN-HUB §9) ──
+#: Whoever runs the business turned an app on (``app``) and, with it, what it needs that was off (``along``).
+APP_ENABLED = "base.app.enabled"
+#: Whoever runs the business turned an app off (``app``) and, with it, what only it needed (``along``).
+APP_DISABLED = "base.app.disabled"
+#: What changes which apps are on: the Apps screen, the menu and the Home follow them.
+APP_EVENTS = (APP_ENABLED, APP_DISABLED)
+
 ALL = [
     HUB_REGISTERED,
     HUB_STATE_APPLIED,
@@ -102,4 +110,5 @@ ALL = [
     *API_KEY_EVENTS,
     *APPROVAL_EVENTS,
     API_DOC_SETTINGS_CHANGED,
+    *APP_EVENTS,
 ]

@@ -12,6 +12,7 @@ from live.meta import module_configs
 
 from base import events
 from base.events import (
+    APP_EVENTS,
     DATA_EVENTS,
     FAILED_EVENT_CREATED,
     FAILED_EVENT_DISCARDED,
@@ -26,9 +27,10 @@ FAILED_EVENTS = [FAILED_EVENT_CREATED, FAILED_EVENT_RETRIED, FAILED_EVENT_DISCAR
 
 
 def events_of(hook: str) -> list[str]:
-    """The events that re-run base's query of ``hook`` (``setup``, ``widgets``, ``bell`` or ``notices``)."""
+    """The events that re-run base's query of ``hook`` (``setup``, ``widgets``, ``bell`` or ``notices``): an app
+    turned on or off (by the business, or by the photo's rights) brings its hooks or takes them away."""
     named = {event for config in module_configs() for item in getattr(config, hook) for event in item.refresh_on}
-    return sorted(named | {HUB_STATE_APPLIED})
+    return sorted(named | {HUB_STATE_APPLIED, *APP_EVENTS})
 
 
 live("base.setup.status", on=sorted({*events_of("setup"), *DATA_EVENTS}))
@@ -38,8 +40,9 @@ live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS, *FAILED_
 live("base.notice.list", on=events_of("notices"))
 
 # ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
-# The SaaS's photo gives or takes the right to a paid module (base.entitlement): the Apps screen follows it.
-live("base.app.list", on=[HUB_STATE_APPLIED])
+# The SaaS's photo gives or takes the right to a paid module (base.entitlement) and carries the plan's limit of apps;
+# the business turns apps on and off (base.activation, PLAN-HUB §9): the Apps screen follows both.
+live("base.app.list", on=sorted([HUB_STATE_APPLIED, *APP_EVENTS]))
 # The plan and the members come in the photo too: «Plan and limits» follows it.
 live("base.plan.usage", on=[HUB_STATE_APPLIED])
 
@@ -56,7 +59,7 @@ live("base.business.get", on=[HUB_REGISTERED])
 
 # ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
 # The failed events follow the relay, who resends or discards them, and the photo (it turns their app on or off).
-live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS]))
+live("base.failed_event.list", on=sorted([HUB_STATE_APPLIED, *FAILED_EVENTS, *APP_EVENTS]))
 # The status: the photo, and every reconnection of the stream (a deploy) sends it again with the new release.
 live("base.system.status", on=[HUB_STATE_APPLIED])
 # The log: what a new event brings shows when the tab opens again; a failed event changes the level of its row at once.
@@ -89,7 +92,7 @@ live("base.person.list", on=_PEOPLE)
 live("base.person.detail", on=_PEOPLE)
 live("base.role.list", on=[HUB_STATE_APPLIED])
 # The keys follow their own making, rotating and revoking; the apps a key may reach, the photo (a paid app comes or goes).
-live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS}))
+live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *APP_EVENTS}))
 # Approvals follow each approval given and each pass spent; who may approve, the ways in and the photo (the roles).
 live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
 # The API's documentation: shown or hidden. The document itself is asked once (far bigger than a live result may be).

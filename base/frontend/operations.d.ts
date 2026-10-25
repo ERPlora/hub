@@ -103,11 +103,13 @@ export interface AppRow {
   /** Bought on erplora.com; the Store has its price. */
   premium: boolean;
   right: AppRight;
-  /** «blocked»: no right to it (phase 2 adds turned off, activating and failed). */
-  state: 'on' | 'blocked';
+  /** «off»: the business turned it off (or never on); «blocked»: no right to it (phase 2 adds activating and failed). */
+  state: 'on' | 'off' | 'blocked';
+  /** Turned on by the business itself (what the plan's limit counts); what came along with another app is not. */
+  chosen: boolean;
   /** The first screen of its menu this person may open; null: no «Open». */
   path: string | null;
-  /** What it needs, transitively (it comes along with it), and the apps that need it: ids. */
+  /** What it needs, transitively (it comes along with it), and the apps on that need it (they go off first): ids. */
   requires: string[];
   required_by: string[];
 }
@@ -117,6 +119,25 @@ export interface AppList {
   apps: AppRow[];
   /** erplora.com's Store of this business's modules. */
   store_url: string;
+  /** erplora.com's plans of this business, where a higher limit of apps is bought. */
+  plan_url: string;
+  /** How many apps the plan lets the business choose; null: no limit. */
+  max_apps: number | null;
+  /** How many it chose and are on (what came along with them does not count). */
+  enabled: number;
+}
+
+/** `base.AppChangeIn`: one app of the business, by its id. */
+export interface AppChangeIn {
+  app: string;
+}
+
+/** `base.AppChangeOut`: the app as it is now, and the apps that went on (or off) with it. */
+export interface AppChange {
+  app: string;
+  state: 'on' | 'off';
+  chosen: boolean;
+  along: { id: string; name: string }[];
 }
 
 /** `base.LimitOut`: what is in use (null: the Hub does not count it) against the plan's limit (null: none). */
@@ -632,6 +653,8 @@ declare module '@erplora/ui/sdk' {
     'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
     // Apps (APP-BASE-4)
     'base.app.list': { input: NoInput; output: AppList };
+    'base.app.enable': { input: AppChangeIn; output: AppChange };
+    'base.app.disable': { input: AppChangeIn; output: AppChange };
     'base.plan.usage': { input: NoInput; output: PlanUsage };
     // ── Data (APP-BASE-2) ──
     'base.blueprint.list': { input: NoInput; output: { templates: Template[]; empty: boolean } };

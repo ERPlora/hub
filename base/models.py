@@ -552,6 +552,49 @@ class Location(UUIDModel):
         return self.name
 
 
+# ── Apps turned on and off by the business (PLAN-HUB §9; PLAN-DB §7) ──────────────────────────────────────────────
+
+
+class AppActivation(UUIDModel):
+    """Whether a module is on in a business, and whether the business chose it (the rules: ``base.activation``).
+
+    ``chosen`` is what the plan's ``max_apps`` counts: an app the business turned on itself, never one the closure by
+    ``requires`` brought along. A business without any row has every module on, its roots chosen (the baseline): its
+    first change writes them all down. ``host`` is the business's slug (the scope's key, as ``Membership`` and the
+    outbox keep it): phase 1's businesses share one database (plan 2026-10-22, decision 1), and the cut of S5 leaves
+    one hub per database, where it is always the same. Phase 2 adds the state ``activating``, while the migrator makes
+    an app's tables. The tables of an app off are never dropped.
+    """
+
+    class State(models.TextChoices):
+        ON = "on", pgettext_lazy("app state", "On")
+        OFF = "off", pgettext_lazy("app state", "Off")
+
+    host = models.CharField(_("host"), max_length=63, help_text=_("The hub's slug."))
+    app = models.CharField(pgettext_lazy("app activation", "app"), max_length=100)
+    state = models.CharField(pgettext_lazy("app activation", "state"), max_length=16, choices=State.choices)
+    chosen = models.BooleanField(
+        pgettext_lazy("app activation", "chosen"),
+        default=False,
+        help_text=pgettext_lazy(
+            "app activation", "Turned on by the business itself; what came along with another app is not."
+        ),
+    )
+    changed_at = models.DateTimeField(pgettext_lazy("app activation", "changed at"), auto_now=True)
+
+    class Meta:
+        verbose_name = pgettext_lazy("app activation", "app activation")
+        verbose_name_plural = pgettext_lazy("app activation", "app activations")
+        ordering = ["host", "app"]
+        constraints = [
+            models.UniqueConstraint(fields=["host", "app"], name="base_appactivation_host_app"),
+            models.CheckConstraint(condition=Q(state__in=["on", "off"]), name="base_appactivation_state"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.app} @ {self.host} ({self.state})"
+
+
 # The registry moved to control in S1 (plan 2026-10-22): base/migrations/0004 and 0005 name the validator here, and
 # phase 1's code imports the models from here.
 from control.models import DemoCode, Hub, registry_slug_validator  # noqa: E402, F401

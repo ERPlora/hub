@@ -1744,3 +1744,79 @@ msgstr "ubicación"
 msgctxt "location"
 msgid "locations"
 msgstr "ubicaciones"
+
+#: base/models.py
+msgctxt "app state"
+msgid "On"
+msgstr "Activada"
+
+#: base/models.py
+msgctxt "app state"
+msgid "Off"
+msgstr "Desactivada"
+
+#: base/models.py
+msgid "The hub's slug."
+msgstr "El identificador del hub."
+
+#: base/models.py
+msgctxt "app activation"
+msgid "app"
+msgstr "app"
+
+#: base/models.py
+msgctxt "app activation"
+msgid "state"
+msgstr "estado"
+
+#: base/models.py
+msgctxt "app activation"
+msgid "chosen"
+msgstr "elegida"
+
+#: base/models.py
+msgctxt "app activation"
+msgid "Turned on by the business itself; what came along with another app is not."
+msgstr "La encendió el propio negocio; la que llegó con otra app, no."
+
+#: base/models.py
+msgctxt "app activation"
+msgid "changed at"
+msgstr "cambiada el"
+
+#: base/models.py
+msgctxt "app activation"
+msgid "app activation"
+msgstr "activación de app"
+
+#: base/models.py
+msgctxt "app activation"
+msgid "app activations"
+msgstr "activaciones de apps"
+
+#: base/entitlement.py
+#, python-format
+msgid "%(app)s is turned off in this business."
+msgstr "%(app)s está desactivada en este negocio."
+
+#: base/services.py
+msgid "No app has this id."
+msgstr "Ninguna app tiene este identificador."
+
+#: base/services.py
+#, python-format
+msgid "%(first)s and %(last)s"
+msgstr "%(first)s y %(last)s"
+
+#: base/services.py
+#, python-format
+msgid "Turn off %(apps)s first."
+msgstr "Apaga antes %(apps)s."
+
+#: base/services.py
+#, python-format
+msgid "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off."
+msgid_plural "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off."
+msgstr[0] "Has llegado al límite de %(count)s app de tu plan. Mejora el plan o apaga una."
+msgstr[1] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o apaga una."
+msgstr[2] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o apaga una."

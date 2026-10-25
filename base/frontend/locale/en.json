@@ -129,7 +129,8 @@
       "state": {
         "on": "Active",
         "installed": "Installed",
-        "blocked": "Needs a subscription"
+        "blocked": "Needs a subscription",
+        "off": "Off"
       },
       "right": {
         "free": "Free",
@@ -155,7 +156,39 @@
         "all": "There are no apps to show.",
         "paid": "No app is sold separately: every app comes with your plan."
       },
-      "noResults": "No apps match your search."
+      "noResults": "No apps match your search.",
+      "toggle": {
+        "on": "Turn on",
+        "off": "Turn off"
+      },
+      "turnedOn": "{app} is on.",
+      "turnedOff": "{app} is off.",
+      "alsoOn": "Also turned on: {apps}.",
+      "alsoOff": "Also turned off: {apps}.",
+      "confirmOn": {
+        "title": "Turn on {app}?",
+        "message": "{app} needs {apps}: it turns on with it. | {app} needs {apps}: they turn on with it.",
+        "confirm": "Turn on",
+        "cancel": "Cancel"
+      },
+      "confirmOff": {
+        "title": "Turn off {app}?",
+        "message": "It leaves the menu for everyone in this business. Nothing is deleted: turned on again, it has its data.",
+        "along": "{apps} turns off with it: only {app} needed it. | {apps} turn off with it: only {app} needed them.",
+        "confirm": "Turn off",
+        "cancel": "Cancel"
+      },
+      "offFirst": "Turn off {apps} first.",
+      "changeFailed": "{app} could not be changed: {reason}",
+      "limit": {
+        "heading": "Your plan’s app limit",
+        "body": "You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off. | You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off.",
+        "upgrade": "Upgrade plan"
+      },
+      "counter": {
+        "limited": "{enabled} of {max} apps turned on",
+        "unlimited": "1 app turned on · Unlimited | {enabled} apps turned on · Unlimited"
+      }
     },
     "appBlocked": {
       "checking": "Checking why this app does not open…",
