@@ -730,6 +730,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
   en editar una ficha, que puede cambiar la compensación, desactivar, dar de baja y eliminar un
   horario) y todo campo de entrada lleva `description`; las mismas descripciones salen en el OpenAPI.
+  La tarjeta de confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su
+  `es` en el catálogo: «Semana», «Miembros del personal») o, si no lo tiene, por el `verbose_name`
+  de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el nombre técnico y lo
+  para `tests/test_integration_assistant.py`.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17),
   para el staff de la plataforma; una escritura cruda del admin no deja aviso.
 - Borrar una ficha en el admin (`MemberAdmin.delete_model`, `delete_queryset` y, en POST,
