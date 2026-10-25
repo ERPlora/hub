@@ -6,7 +6,7 @@ Estado de la app: en construcción (2026-10-22)
 > Manual de usuario y especificación de `base`, la plataforma del Hub: siempre está, no se activa ni se
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
 > (el del hub viejo: saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
-> la actividad), con lo que acompaña a cualquier pantalla: la campana, «Actualizar plan» y la franja que
+> la actividad), con lo que acompaña a cualquier pantalla: la campana, «Mejorar plan» y la franja que
 > avisa cuando todavía no se puede facturar. También «Apps», «Plan y límites» de Sistema y las plantillas: la
 > tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer). El acceso (entrar con la
 > cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los dispositivos) está en sus propias pantallas,
@@ -91,9 +91,9 @@ A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y 
 grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien puede abrir
 su pantalla: «Sistema», a quien administra el negocio; «API», mientras la documentación de la API está mostrada
 (BASE-F91), y aparece o se va al cambiar el interruptor, sin recargar. Un empleado ve «Inicio», «Empleados»,
-«Archivos», «Apps» y «Ajustes». Abajo, el código QR y «Actualizar plan».
+«Archivos», «Apps» y «Ajustes». Abajo, el código QR y «Mejorar plan».
 
-### «Actualizar plan»
+### «Mejorar plan»
 Al pie del menú lateral, entre el código QR y la marca. Abre la página del plan de este negocio en
 erplora.com, en una pestaña nueva. Solo en el navegador: en la app instalada no está.
 
@@ -112,14 +112,16 @@ solo su nombre). En el «Resumen» del Inicio no sale (la lista dice lo mismo un
 
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
-«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Cada una, una tabla (o
-tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y nombre), «Categoría» y
-«Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con». «Abrir» en la fila de una
-app que la persona puede abrir.
+«Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps ha elegido
+el negocio frente al límite de su plan: «17 de 20 apps activadas» o, sin límite, «17 apps activadas · Sin límite».
+Cada pestaña, una tabla (o tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y
+nombre), «Categoría» y «Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con».
+«Abrir» en la fila de una app que la persona puede abrir y, para quien administra, «Activar» o «Desactivar».
+Encima de la tabla, cuando toca, el aviso del límite del plan o el de por qué no se ha cambiado una app.
 
 ### La pantalla de una app que no se abre
 En la misma dirección de la pantalla de la app, el motivo: «Suscripción necesaria» o «Esta app no está
-disponible en este negocio», con «Ir a Apps» (y «Contratar en erplora.com» para quien administra, en el
+disponible en este negocio», con «Ir a Apps» (y «Mejorar plan» para quien administra, en el
 navegador).
 
 ### Sistema · Plan y límites
@@ -267,7 +269,7 @@ En el panel del asistente:
 | Cargando | Tres puntos que se mueven en la burbuja del asistente hasta que llega el primer texto («El asistente está escribiendo» para el lector de pantalla), y «Transcribiendo…» mientras se pasa a texto lo dictado. |
 | Vacío | Los destellos, «Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.» (abierto desde la puesta en marcha, «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.») y los atajos. Una respuesta que acaba sin decir nada: «(sin respuesta)». |
 | Error | En la burbuja, con su salida: «No se pudo contactar con el asistente. Comprueba la conexión y vuelve a intentarlo.», «El asistente no está disponible ahora mismo. Vuelve a intentarlo en unos minutos.» o «La respuesta se cortó.», con «Reintentar»; «Esta conversación es demasiado larga: empieza una nueva.» con «Nueva conversación»; «Tu sesión ha terminado. Vuelve a entrar para seguir hablando.» con «Volver a entrar». Sin Internet, en el pie, «Sin conexión: puedes escribir y enviar cuando vuelva.». |
-| Sin permiso | Lo que la persona no puede hacer con sus botones, el asistente tampoco: no se le ofrece y, si lo intenta, el recibo dice «No se hizo, sin permiso: …». Con los mensajes del mes agotados, quien no administra ve «Pídele a quien administra el negocio que mejore el plan.» en lugar de «Mejorar el plan». |
+| Sin permiso | Lo que la persona no puede hacer con sus botones, el asistente tampoco: no se le ofrece y, si lo intenta, el recibo dice «No se hizo, sin permiso: …». Con los mensajes del mes agotados, quien no administra ve «Pídele a quien administra el negocio que mejore el plan.» en lugar de «Mejorar plan». |
 
 En la pantalla Ajustes · Datos y copias:
 
@@ -308,14 +310,14 @@ En la pantalla Archivos:
 | BASE-F15 | Abrir una app desde Apps | hecho |
 | BASE-F16 | Buscar una app en el catálogo | hecho |
 | BASE-F17 | Saber cuánto cuesta una app antes de tenerla | hecho |
-| BASE-F18 | Instalar una app | parcial |
-| BASE-F19 | Saber qué más viene con una app | parcial |
+| BASE-F18 | Instalar una app | hecho |
+| BASE-F19 | Saber qué más viene con una app | hecho |
 | BASE-F20 | Intentar usar una app que necesita suscripción | hecho |
 | BASE-F21 | Ver por qué no se ha podido activar una app y reintentarlo | parcial |
 | BASE-F22 | Seguir la activación de una app mientras se navega | parcial |
-| BASE-F23 | Desactivar una app | parcial |
-| BASE-F24 | Activar una app | parcial |
-| BASE-F25 | Ver que una app se niega a desactivarse | parcial |
+| BASE-F23 | Desactivar una app | hecho |
+| BASE-F24 | Activar una app | hecho |
+| BASE-F25 | Ver que una app se niega a desactivarse | hecho |
 | BASE-F26 | Entender por qué una app no se abre | hecho |
 | BASE-F27 | Ver una app de pago bloqueada | hecho |
 | BASE-F28 | Ver cuánto de los límites del plan se está usando | hecho |
@@ -607,9 +609,9 @@ Estado: parcial — un enlace normal, sin el pase de un solo uso, solo en el nav
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Menú lateral
 Pasos:
-  1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Actualizar plan». Lo ve cualquier
+  1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Lo ve cualquier
      perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
-     sus iconos (escritorio), queda solo su icono, que dice «Actualizar plan» al pasar por encima.
+     sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com.
 Entra: el negocio en el que está.
 Sale: nada guardado en el hub.
@@ -715,7 +717,7 @@ Pasos:
      «Incluida en tu plan», «Contratada», «Incluida con» y la app que la trae (una de pago que viene con otra que
      el negocio tiene) o «De pago».
   2. El importe de una app «De pago» está en la Tienda de erplora.com; quien administra el negocio la abre desde
-     «Contratar en erplora.com» (BASE-F20).
+     «Mejorar plan» (BASE-F20).
   3. «De pago» reúne solo las apps que se contratan aparte: una gratis nunca sale ahí. Si ninguna se vende
      aparte: «Ninguna app se vende aparte: todas vienen con tu plan.».
 Entra: si cada app se contrata aparte y lo que el negocio tiene contratado en erplora.com.
@@ -725,22 +727,28 @@ Implicados: APPS-F01, APPS-F07
 
 ### BASE-F18 Instalar una app
 <!-- origen: old-hub:HUB_SHELL-F109 -->
-Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
-  1. Las apps gratis ya están en «Mis apps» y en el menú; una de pago aparece sola en los dos, sin recargar, en
-     cuanto se contrata en erplora.com (BASE-F20).
-  2. En «Añadir apps», quien administra activa una app que el negocio no usa: mientras se prepara, la fila dice
-     «Activando…»; después pasa a «Instalada» y la app sale en «Mis apps» y en el menú.
-Entra: la app elegida y lo que el negocio tiene contratado en erplora.com.
-Sale: la app en marcha en este negocio.
-Si falla: BASE-F21.
+  1. Las apps que el negocio usa ya están en «Mis apps» y en el menú; una de pago aparece sola en los dos, sin
+     recargar, en cuanto se contrata en erplora.com (BASE-F20).
+  2. En «Añadir apps», quien administra busca una app que el negocio no usa, «Desactivada», y pulsa «Activar». Si
+     necesita otras apps que están desactivadas, antes le pregunta nombrándolas (BASE-F19).
+  3. La app pasa a «Instalada» al momento y sale en «Mis apps» y, sin recargar, en el menú de todos los
+     dispositivos del negocio. El contador de arriba suma una: de «16 de 20 apps activadas» a «17 de 20 apps
+     activadas».
+Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en erplora.com.
+Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
+Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
+límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para quien administra en el
+navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar» (BASE-F20). Cualquier
+otro fallo sale en un aviso con el nombre de la app y el motivo, que se queda hasta cerrarlo.
 Implicados: APPS-F07
 
 ### BASE-F19 Saber qué más viene con una app
 <!-- origen: old-hub:HUB_SHELL-F110 -->
-Estado: parcial — Apps ya dice lo que trae cada app y con qué app viene una de pago; el aviso al encenderla, que nombra lo que se encendió con ella, llega con la activación de apps por negocio
+Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -748,11 +756,15 @@ Pasos:
      viene con «Clientes» e «Impuestos»): quien tiene una tiene también las que trae.
   2. Una app de pago que el negocio tiene porque la necesita otra que ha contratado dice en «Precio» «Incluida
      con» y el nombre de esa otra.
-  3. Al encender una app que necesita otras, el aviso nombra también las que se encendieron con ella.
-Entra: lo que necesita cada app.
-Sale: nada guardado.
+  3. Al pulsar «Activar» en una app que necesita otras que están desactivadas, antes pregunta y las nombra:
+     «¿Activar Reservas?» — «Reservas necesita Mesas: se activa con ella.».
+  4. Al confirmar con «Activar», el aviso nombra también las que se activaron con ella: «Reservas está activada.
+     También se ha activado: Mesas.». Las que llegan así no cuentan para el límite de apps del plan: solo cuenta
+     la que se eligió.
+Entra: lo que necesita cada app y cuáles están desactivadas.
+Sale: nada guardado al preguntar; al confirmar, la app y las que necesita en marcha (BASE-F18).
 Si falla: si una app de pago trae otra de pago que no se ha contratado, las dos se contratan juntas: hasta
-entonces, «Necesita suscripción».
+entonces, «Necesita suscripción». Con «Cancelar», no cambia nada.
 Implicados: ninguno
 
 ### BASE-F20 Intentar usar una app que necesita suscripción
@@ -763,7 +775,7 @@ Pantalla: Apps
 Pasos:
   1. Una app de pago que el negocio no tiene contratada sale en «Añadir apps» y en «De pago» con «Necesita
      suscripción», y no está en «Mis apps» ni en el menú.
-  2. Quien administra el negocio, en el navegador, ve a su lado «Contratar en erplora.com», que abre la Tienda de
+  2. Quien administra el negocio, en el navegador, ve a su lado «Mejorar plan», que abre la Tienda de
      erplora.com de este negocio en una pestaña nueva: allí ve el precio y la contrata.
   3. En cuanto erplora.com se lo dice al hub, la app pasa a «Instalada» y aparece en «Mis apps» y en el menú, sin
      recargar.
@@ -777,7 +789,7 @@ Implicados: APPS-F07
 
 ### BASE-F21 Ver por qué no se ha podido activar una app y reintentarlo
 <!-- origen: old-hub:HUB_SHELL-F112 -->
-Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Estado: parcial — hoy activar una app es inmediato y no se queda a medias, porque sus datos ya están preparados en cada negocio; prepararlos al activarla, el aviso de que no se ha podido y su «Reintentar» llegan en la fase 2, cuando cada negocio tenga sus datos aparte
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -791,7 +803,7 @@ Implicados: ninguno
 
 ### BASE-F22 Seguir la activación de una app mientras se navega
 <!-- origen: old-hub:HUB_SHELL-F113 -->
-Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Estado: parcial — hoy activar una app es inmediato y sale en el menú de todos los dispositivos del negocio sin recargar; falta el paso «Activando…» mientras se preparan sus datos, que llega en la fase 2, cuando cada negocio tenga sus datos aparte
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -805,45 +817,58 @@ Implicados: ninguno
 
 ### BASE-F23 Desactivar una app
 <!-- origen: old-hub:HUB_SHELL-F122 -->
-Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
-  1. En «Mis apps», quien administra desactiva una app.
-  2. Le pregunta, con el nombre de la app, y nombra las apps que se apagan con ella porque la necesitan.
-  3. Confirma: la app y las que la necesitan salen del menú y de «Mis apps». No se borra nada: al volver a
-     activarla queda como estaba.
-Entra: las apps del negocio y lo que necesita cada una.
-Sale: la app apagada en este negocio, con sus datos intactos.
-Si falla: BASE-F25.
+  1. En «Mis apps», quien administra pulsa «Desactivar» en la fila de una app.
+  2. Le pregunta siempre, con el nombre de la app: «¿Desactivar Reservas?» — «Sale del menú de todos en este
+     negocio. No se borra nada: al volver a activarla, tiene sus datos.». Si con ella se van otras que llegaron solo
+     por ella, las nombra: «Mesas se desactiva con ella: solo la necesitaba Reservas.».
+  3. Confirma con «Desactivar»: «Reservas está desactivada. También se ha desactivado: Mesas.». Las dos salen de
+     «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
+     está disponible (BASE-F26) y el contador de arriba resta una.
+  4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
+Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
+Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
+Si falla: si otra app en marcha la necesita, o la propia app se niega, no cambia nada (BASE-F25). Con «Cancelar»,
+tampoco.
 Implicados: VERIFACTU-F32
 
 ### BASE-F24 Activar una app
 <!-- origen: old-hub:HUB_SHELL-F123 -->
-Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
-  1. En «Añadir apps», quien administra vuelve a activar una app que apagó.
-  2. Le pregunta y nombra las apps que se encienden con ella porque las necesita; confirma y la app vuelve al menú
-     con los datos que tenía.
+  1. En «Añadir apps», quien administra pulsa «Activar» en una app que apagó, que sale «Desactivada».
+  2. Si necesita otras que también están desactivadas, antes le pregunta y las nombra (BASE-F19); si no, la activa
+     sin preguntar.
+  3. La app vuelve a «Mis apps» y al menú, sin recargar, con los datos que tenía: «Reservas está activada.» y, si
+     llegó con otras, «También se ha activado: Mesas.».
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
-Sale: la app en marcha en este negocio.
-Si falla: una app de pago sin contratar no se puede activar: BASE-F20.
+Sale: la app en marcha en este negocio, elegida por él.
+Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
+contratar no se puede activar (BASE-F20). Bajar de plan no apaga nada: con más apps elegidas que las del plan nuevo,
+todas siguen en marcha y solo no se puede activar otra hasta quedar por debajo.
 Implicados: ninguno
 
 ### BASE-F25 Ver que una app se niega a desactivarse
 <!-- origen: old-hub:HUB_SHELL-F125 -->
-Estado: parcial — en esta fase todas las apps de ERPlora vienen ya en marcha en cada negocio (las de pago, en cuanto se contratan): encender o apagar una app por negocio llega con la activación de apps
+Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
-  1. Quien administra intenta desactivar una app que otra en marcha necesita, o VeriFactu con registros que la
-     AEAT aún no ha aceptado.
-  2. El hub se niega, no cambia nada y dice por qué, con lo que hay que hacer antes.
-Entra: el motivo de la app que se niega.
+  1. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita (por ejemplo, «Mesas» mientras
+     «Reservas» está activada), o en una que se niega mientras tiene algo suyo a medias (VeriFactu, con registros
+     que la AEAT aún no ha aceptado: VERIFACTU-F32).
+  2. El hub no pregunta ni cambia nada: encima de la tabla sale «No se ha cambiado nada» con lo que hay que hacer
+     antes, «Desactiva antes Reservas.», o con el motivo de la propia app, en el idioma de quien lo pide.
+  3. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
+Entra: las apps en marcha que la necesitan, o el motivo de la app que se niega.
 Sale: nada.
-Si falla: sin motivo propio de la app, un aviso de que no se ha podido cambiar.
+Si falla: sin motivo propio de la app, el mismo aviso dice que no se ha podido cambiar, con el nombre de la app y lo
+que ha contestado el hub.
 Implicados: VERIFACTU-F32
 
 ### BASE-F26 Entender por qué una app no se abre
@@ -876,7 +901,7 @@ Pasos:
      ha contratado.
   2. Al abrir cualquier pantalla suya ve «Suscripción necesaria»: el nombre de la app y «está deshabilitada porque
      este negocio no tiene su suscripción. Tus datos están a salvo y vuelven en cuanto se contrate.», con «Ir a
-     Apps» y, para quien administra en el navegador, «Contratar en erplora.com».
+     Apps» y, para quien administra en el navegador, «Mejorar plan».
   3. La app sale del menú y de «Mis apps», y el hub no hace nada de lo que se le pida a esa app, venga de esta
      pantalla, de otro dispositivo, del asistente o de una integración.
   4. Si se contrata con la pantalla abierta, cambia al nombre de la app con «ya está lista» — «Ya se puede
@@ -1501,7 +1526,7 @@ Pasos:
      de ponerse al día.
   3. Su siguiente pantalla es **Acceso**, que arriba dice «Sesión abierta en otro dispositivo» — «Tu plan cubre un
      dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí,
-     o amplía los dispositivos de tu plan.» con «Actualizar plan».
+     o amplía los dispositivos de tu plan.» con «Mejorar plan».
   4. Puede volver a entrar (y cierra la del otro) o ir a ampliar el plan a erplora.com.
 Entra: los dispositivos que cubre el plan, que erplora.com le pasa al negocio.
 Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardado en cada uno para decírselo.
@@ -1900,7 +1925,7 @@ Pasos:
   1. En **Empleados › Personal**, encima de la tabla, cuántas plazas del plan están ocupadas: «{used} de {limit}
      plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas».
   2. Con todas ocupadas sale «Tu plan tiene todas las plazas ocupadas» y «Quita en erplora.com a alguien que ya no
-     trabaje aquí, o pasa a un plan con más plazas.»; en la web, con «Actualizar plan».
+     trabaje aquí, o pasa a un plan con más plazas.»; en la web, con «Mejorar plan».
   3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope.
 Entra: las personas del negocio y las plazas de su plan, como las manda erplora.com.
 Sale: nada guardado.
@@ -2464,13 +2489,13 @@ Pasos:
      noviembre.». Por debajo del 80 %, nada.
   3. La cuenta se mueve al terminar cada respuesta, sin recargar.
   4. Agotados, la respuesta es «Has usado todos los mensajes del asistente de este mes (300 de 300).» con «Se
-     renuevan el 1 de noviembre.», y no un fallo de conexión. El pie dice lo mismo, sin repetir «Mejorar el plan»:
+     renuevan el 1 de noviembre.», y no un fallo de conexión. El pie dice lo mismo, sin repetir «Mejorar plan»:
      «Has usado los 300 mensajes de este mes.» con «Se renuevan el 1 de noviembre.»; también al abrir el panel con
      el mes ya gastado.
-  5. Quien administra el negocio ve, en el navegador, «Mejorar el plan», que abre en otra pestaña la página del plan
+  5. Quien administra el negocio ve, en el navegador, «Mejorar plan», que abre en otra pestaña la página del plan
      en erplora.com; en la app instalada desde la tienda no sale. Quien no administra ve «Pídele a quien administra el
      negocio que mejore el plan.». No hay paquetes de mensajes: se amplía mejorando de plan.
-  6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar el plan» para quien
+  6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para quien
      administra; el panel se abre igual.
 Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.com.
 Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
@@ -2616,7 +2641,7 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
 - Navegador: el tablero se guarda en `localStorage["dashboard-hub"]` (la clave del viejo) y el uso de
   apps en `localStorage["hub-app-usage"]`. La pestaña «Actividad» es el hash `#actividad`.
 - Frontend en `base/frontend/` (rutas, catálogos `en`/`es` bajo `base`, componentes y su `lib/home.ts`);
-  la campana, «Actualizar plan» y la franja se enchufan en `frontend/main.ts` por `chrome` de
+  la campana, «Mejorar plan» y la franja se enchufan en `frontend/main.ts` por `chrome` de
   `createShell`. La ruta `/` de base (`base-home`) gana a la rejilla del shell (`home`).
 - Tests: `base/tests/test_home.py`, `test_queries_home.py`, `test_live.py`, `test_api.py`, `test_spa.py`;
   Vitest en `base/frontend/**`; e2e `tests/e2e/base-home.spec.ts` y `base-home-activity.spec.ts`.
@@ -2683,8 +2708,12 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, veto
   `can_disable` del `LiveAppConfig` → 409 `base.app_vetoed`, 402 `base.app_limit_reached` con `max_apps`/`enabled`;
   bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
-  (caché `base.apps_off:<host>`, olvidada al COMMIT). Falta el 202 «Activando…» (fase 2) y el veto de VeriFactu (su
-  carril); el carril `base` re-tría BASE-F18, F19 y F21–F25 (y FIX-BASE-APP-TURN-OFF-VETO) contra `main`.
+  (caché `base.apps_off:<host>`, olvidada al COMMIT). Falta el 202 «Activando…» (fase 2: BASE-F21, F22) y el veto de
+  VeriFactu (su carril, VERIFACTU-F32). El gancho `can_disable(ctx)` corre en `translation.override(ctx.language)`: un
+  `gettext` a secas ya responde en el idioma de quien pide (gh:hub#2595). En Apps, la negativa (409 o cualquier otro
+  fallo al cambiar) es un `InlineFeedback` `apps-refused` que se queda hasta cerrarlo o hasta el siguiente cambio,
+  nunca un toast (gh:hub#2594). Re-triados en FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS: F18, F19, F23–F25
+  `hecho` (e2e `tests/e2e/base-app-activation.spec.ts`, en español y en los 3 tamaños).
 
 - **Sistema (APP-BASE-7: BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
   `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña
