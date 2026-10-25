@@ -144,7 +144,7 @@ Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura
 ### Nueva factura manual
 Ventana con la «Serie» (las activas del año que emiten F1 o F2; de entrada, la predeterminada o FACT),
 el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
-líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en euros) y el
+líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en la moneda del negocio) y el
 tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
 Canarias o «IPSI %» en Ceuta y Melilla, que empiezan en el tipo general de su regla de Impuestos y vacíos
 si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. «Emitir
@@ -279,7 +279,7 @@ Pasos:
    cliente en Clientes: rellena nombre, NIF, dirección y país. Escribe o corrige «Cliente», «NIF
    cliente», «Dirección» y «Notas».
 3. Rellena cada línea: «Descripción», «Cant.» (1 de entrada; hasta tres decimales), «Precio» sin impuesto
-   y en euros, y el tipo, que lleva el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21
+   y en la moneda del negocio, y el tipo, que lleva el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21
    de entrada), «IGIC %» en Canarias o «IPSI %» en Ceuta y Melilla. Empieza en el tipo general de su regla
    de Impuestos (en Canarias, el de la regla de Canarias); si el territorio aún no tiene regla de su
    impuesto, está vacío: escríbelo tú. «+ Línea» añade otra, con el mismo tipo de entrada, y la cruz la
@@ -817,6 +817,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
   impuesto de las ventas del periodo, «Impuestos» si mezclan, y el del territorio solo sin ventas.
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
   los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae.
+- **Plataforma**: la moneda del negocio (`base.business.get`, la de su país), que guarda la factura que haces a mano.
 - **Impresión** (por nombre, sin requisito): `printing.job.create` con la página A4 de una factura para la
   impresora del sistema (F18), en un punto de guardado propio; sin Impresión encendida, sin impresora del
   sistema o si la rechaza, no se encola nada y la imprime el dispositivo.
@@ -846,6 +847,16 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 
 ## Para quien lo mantiene
 
+- **Moneda** (FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY, 2026-10-25): la factura hecha a mano guarda la moneda
+  del negocio, la de su país (`queries.business_currency`, que lee `base.business.get` como la plataforma: una API key
+  solo tiene el permiso de su operación); la nacida de una venta, la de la venta; una rectificativa, la de su original;
+  la de ERPlora (hub de plataforma), la que manda el SaaS en `currency` (EUR, su contrato). Decisión de mercado: un
+  negocio no español emite y guarda su moneda (Odoo, Business Central, Shopify, WooCommerce, Square, Toast, Lightspeed,
+  Holded y SumUp emiten en la moneda local del negocio; ninguno deja de emitir por el país). Un negocio español sigue
+  en euros, y lo que se manda a la AEAT no cambia (las mismas cifras). El campo `currency` ya no tiene valor por
+  defecto (`0005_currency_from_the_business`, sin migración de datos: lo emitido no se reescribe). Cada fila lleva
+  `currency_decimals` (los de `babel`), con los que las pantallas dividen sus céntimos: nunca los de Intl, que le da 0
+  al forinto. El documento A4 escribe los importes con esos decimales.
 - **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4; plan del bloque fiscal, tarea 4): el hub propio de
   ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
   coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal.py`

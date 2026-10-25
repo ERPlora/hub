@@ -128,7 +128,7 @@ solo en productos físicos), «Dar de baja stock» (además, solo en artículos 
 puede cambiar productos) y «Eliminar». Tocar la fila abre la ficha.
 
 El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
-SKU es la identidad del producto: no se edita»), Precio, «Coste (EUR)», «Stock inicial» (solo al
+SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
 crear), «Umbral stock bajo», «EAN-13», «Descripción», «Tipo» («Físico» o «Servicio», solo al
 crear), la casilla «Controlar stock de este artículo» con su nota, «Unidad de medida», «Categoría
 fiscal» («Elige una categoría fiscal») y «Categorías» (si hay alguna), y «Guardar» / «Guardar
@@ -145,7 +145,7 @@ el artículo controla su stock; con permiso para cambiar productos, «Marcar ago
 a la venta». Un fallo al imprimir o al marcar sale dentro de la ventana.
 
 ### Recepción
-Ventana «Recepción — <producto>»: «Stock actual», «Cantidad recibida», «Coste unitario (EUR)» y
+Ventana «Recepción — <producto>»: «Stock actual», «Cantidad recibida», «Coste unitario (<moneda>)» y
 «Registrar recepción». Un rechazo sale dentro de la ventana.
 
 ### Recuento
@@ -259,7 +259,7 @@ Pasos:
 1. En **Productos**, pulsa **+**: se abre el panel del formulario.
 2. Escribe Nombre, SKU y Precio. El precio admite «2,20», «1.234,56» o lo que se pegue de la
    pantalla; al salir del campo se reescribe en el formato del negocio. Son opcionales «Coste
-   (EUR)», «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».
+   (<moneda>)» (la del negocio: «Coste (PLN)» en Polonia), «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».
 3. Elige «Tipo» («Físico» o «Servicio»), la «Unidad de medida» («Unidad (ud)» de entrada) y la
    «Categoría fiscal». Cada categoría fiscal dice su tipo («Producto — general · 21 %», «… ·
    exento») y no hay ninguna elegida de antemano.
@@ -533,7 +533,7 @@ Pantalla: Recepción
 Pasos:
 1. En **Productos**, pulsa «Recibir stock» en la fila o en la ficha del producto.
 2. En «Recepción — <producto>» se ve el «Stock actual». Escribe la «Cantidad recibida» y, si
-   quieres, el «Coste unitario (EUR)».
+   quieres, el «Coste unitario (<moneda>)».
 3. Pulsa «Registrar recepción». La ventana se cierra y la fila enseña el stock nuevo.
 4. En **Movimientos** sale una línea «Recepción» con la cantidad en positivo y el saldo.
 Entra: el producto y el escalón de su unidad. Por el asistente o la API, una recepción puede llevar
@@ -1102,7 +1102,8 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   ensayo. Hasta 100 filas por llamada: el cliente parte el fichero (y con ello «Parar») y detecta los
   SKU repetidos entre trozos. La adivinanza de cabeceras y la ventana fiscal son de la página.
 - **Exportar**: CSV con los formatos CLDR del idioma de la petición (librería `babel`), `;` donde la
-  coma es el decimal (Excel en español) y BOM UTF-8. El Hub aún no tiene moneda configurada: euros.
+  coma es el decimal (Excel en español) y BOM UTF-8. Los importes van en la moneda del negocio (`base.business.get`, la de su país) y con sus decimales;
+  la importación acepta su código y su símbolo alrededor de la cifra («PLN12.50», «12,50 zł»), no los de otra.
 - **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
   agotado (`queries.ON_SALE`): es lo que da el filtro `is_active` de `inventory.product.list` (`false` da
@@ -1122,8 +1123,8 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   venta por cualquiera de los dos números. Migración `0004` solo añade columnas con `db_default` (expand).
 - **Etiqueta (INVENTORY-F25, 2026-10-21)**: `inventory.product.print_label` (permiso de ver productos) pide
   a Impresión `printing.job.create` por su nombre (sin `requires`): un `barcode_label` con `product_name`,
-  `barcode` (el SKU) y `price` en unidades de la moneda (euros mientras el Hub no tenga moneda; Impresión
-  le pone los decimales). Sin la cola (Impresión no instalada, apagada o sin `printing.print`) responde 409
+  `barcode` (el SKU) y `price` en unidades de la moneda del negocio (`currency`, con la que Impresión le pone
+  los decimales). Sin la cola (Impresión no instalada, apagada o sin `printing.print`) responde 409
   `inventory.label_queue_unavailable` y la ficha imprime desde el navegador; un SKU fuera del ASCII
   imprimible, 409 `inventory.sku_not_barcode`. La placa dibuja el Code 128 con JsBarcode (renderizador a
   objeto: las barras las pinta Vue, sin HTML) y la impresión del navegador es una hoja solo para papel

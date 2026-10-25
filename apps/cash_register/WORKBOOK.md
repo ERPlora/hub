@@ -54,7 +54,8 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   negativo, sin arqueo ciego, sin cierre automático). Se cambian en **Caja → Ajustes**.
 - **Cajones**: opcionales. Si el negocio tiene varios (barra y terraza), se dan de alta en **Caja →
   Ajustes → Cajones**; al abrir la sesión se elige uno. Con uno solo se elige solo.
-- **Moneda**: la del negocio (hoy, el euro). El arqueo enseña sus billetes y monedas.
+- **Moneda**: la del negocio, la de su país, con sus decimales: el euro en España, el esloti en Polonia. Todos los
+  importes de Caja van en ella, y el arqueo enseña sus billetes y monedas.
 - **Zona horaria**: la del negocio. En esta fase, la hora de Madrid (`Europe/Madrid`) para todos: de
   ella salen el día de negocio, el número de sesión y la hora del cierre automático.
 
@@ -628,6 +629,8 @@ momento en que se miran; las pantallas se refrescan con `sale.sale.completed`, `
   (KITCHEN-F31), en la ventana de cierre y en el resumen del cierre del asistente.
 - **Impresión** (sin requisito; solo si está encendida): lo que espera o falló en la cola, para la revisión
   del turno (PRINTING-F01), y la cola de recibos para el informe X o Z (PRINTING-F17).
+- **Plataforma**: la moneda del negocio y sus decimales (`base.business.get`, la de su país), para los importes,
+  el arqueo por billetes y monedas y el informe X o Z.
 - **Índices de Ventas para estas lecturas** (hecho, `sale/0005_cash_register_indexes`): parciales en
   `sale_sale(voided_at)` y `sale_refund(created_at)`, para que las lecturas por ventana de tiempo de
   anulaciones y devoluciones no recorran la tabla entera.
@@ -723,8 +726,12 @@ cajero del producto actual es un empleado.
   declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`), que corre el worker
   (`base/scheduler.py`, 2026-10-15), y
   `session.open` lo aplica antes de abrir.
-- **Monedas**: la del negocio es la de Ventas (`EUR` en esta fase); los decimales, de `babel`; los
-  billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas del producto actual).
+- **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6;
+  `queries.business_currency`, leída como la plataforma: una API key solo tiene el permiso de su operación); en
+  pantalla, `useBusinessMoney()` de `base`. Los decimales, de `babel` (los del servidor, nunca los de Intl: Intl le
+  da 0 al forinto y Babel 2). Mientras Ventas siga fijando `EUR` (su `FIX`), las cifras de las ventas salen con el
+  símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas del
+  producto actual).
   El total de un arqueo lo suma el servidor; un billete o moneda de otra moneda es 422.
 - **Zona horaria (fase 1)**: `Europe/Madrid` (`TIME_ZONE` del Hub) para todos los negocios: día de
   negocio, número de sesión y corte del cierre automático. Cuando el Hub guarde la zona de cada negocio,
