@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a4dd6384c7928735ff422de77997eb5c511f450a3b7c1c595de841e20cdd4199 -->
+<!-- generated from WORKBOOK.md sha256:7dc0461e1ca0a0133fed1e0d718185031528ea31e1bf0264730f3e2f97989aab -->
 
 ## What it is for and who it is for
 
@@ -507,7 +507,9 @@ In: the panels each app that is on declares; each one's data, asked for with the
 is looking.
 Out: nothing saved in the hub.
 If it fails: a panel without data says "No data"; one whose data cannot be read, "Unavailable", never an
-old or made-up figure. If the board cannot be read: "Could not load the panels" with "Retry".
+old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
+session closed without a count, shows a dash (—) and no bar, never a zero; a real zero does show as zero
+(€0.00). If the board cannot be read: "Could not load the panels" with "Retry".
 Involved: none
 
 ### BASE-F07 Customize the board of panels

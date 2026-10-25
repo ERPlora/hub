@@ -7,6 +7,7 @@
 // when each entry happened in the device's time (the Hub has no business zone in the browser): «4:23», «Ayer 18:10»,
 // «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06). An
 // amount is in the business's currency (BASE-G98: «zł» in a Polish business, «€» in a Spanish one), never a fixed euro.
+// A row without its value (a cash session closed without a count) says «—» with no bar, never a 0 (BASE-F06).
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
@@ -228,6 +229,7 @@ const chosenBar = computed(() => {
       >
         <span class="widget-bar-label">{{ bar.label }}</span><span class="widget-bar-text">{{ bar.text }}</span>
         <span
+          v-if="bar.value !== null"
           class="widget-bar-track"
           aria-hidden="true"
         ><span
@@ -298,6 +300,7 @@ const chosenBar = computed(() => {
           @focus="chosen = bar.key"
         >
           <span class="widget-chart-track"><span
+            v-if="bar.value !== null"
             class="widget-chart-bar"
             :style="{ height: percent(bar.share) }"
           /></span>
