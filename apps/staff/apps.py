@@ -141,7 +141,7 @@ class StaffConfig(LiveAppConfig):
         # Whole days first, then by name, with the type in the reader's language under each name.
         Widget(
             key="time_off_today",
-            title=_("Today's time off"),
+            title=_("Today’s time off"),
             icon="ion:calendar-outline",
             size="md",
             permission="staff.view_time_off",

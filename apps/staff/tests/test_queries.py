@@ -1098,7 +1098,7 @@ def test_who_is_away_today_full_days_first_then_by_name():
 
 
 def test_who_is_away_today_says_each_type_in_the_callers_language():
-    """The Home's «Today's time off» paints the type under each name as the query gives it (STAFF-F20)."""
+    """The Home's «Today’s time off» paints the type under each name as the query gives it (STAFF-F20)."""
     day = today().isoformat()
     for first_name, leave_type in (("Ana", "vacation"), ("Bea", "sick"), ("Carla", "personal"), ("Dora", "training"), ("Eva", "other")):
         make_time_off(make_member(first_name), day, leave_type=leave_type, status=TimeOff.Status.APPROVED)

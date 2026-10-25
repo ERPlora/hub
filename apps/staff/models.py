@@ -303,7 +303,7 @@ class TimeOff(UUIDModel):
 
     @property
     def leave_type_label(self) -> str:
-        """The type in the language active now (the caller's): what the Home's «Today's time off» says."""
+        """The type in the language active now (the caller's): what the Home's «Today’s time off» says."""
         return str(self.get_leave_type_display())
 
 

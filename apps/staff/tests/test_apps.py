@@ -303,7 +303,7 @@ def test_the_panels_are_titled_in_english_and_in_spanish():
         english = [str(panel.title) for panel in staff().widgets]
     with translation.override("es"):
         spanish = [str(panel.title) for panel in staff().widgets]
-    assert english == ["Active staff", "On leave today", "Pending time off", "Today's time off", "Staff by role"]
+    assert english == ["Active staff", "On leave today", "Pending time off", "Today’s time off", "Staff by role"]
     assert spanish == ["Plantilla activa", "Ausentes hoy", "Ausencias pendientes", "Ausencias de hoy", "Empleados por rol"]
 
 

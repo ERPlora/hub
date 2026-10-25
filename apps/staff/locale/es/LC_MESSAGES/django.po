@@ -42,7 +42,7 @@ msgstr "Ausentes hoy"
 msgid "Pending time off"
 msgstr "Ausencias pendientes"
 
-msgid "Today's time off"
+msgid "Today’s time off"
 msgstr "Ausencias de hoy"
 
 msgid "Staff by role"
