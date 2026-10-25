@@ -369,3 +369,9 @@ msgstr "Horario habitual"
 #, python-format
 msgid "Permission “%(permission)s” is required."
 msgstr "Se necesita el permiso «%(permission)s»."
+
+msgid "Week"
+msgstr "Semana"
+
+msgid "Staff members"
+msgstr "Miembros del personal"
