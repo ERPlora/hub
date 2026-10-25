@@ -53,6 +53,15 @@ async function setup(locale: 'en' | 'es' = 'en') {
   return { ...m, call, show, panels, inDoc, allInDoc, stored, customize };
 }
 
+/** The shell's `widget-list` block (base/spa.py): the catalogue as the live query answered it when the page loaded. */
+function embed(list: { widgets: WidgetDef[] }): void {
+  const block = document.createElement('script');
+  block.id = 'widget-list';
+  block.type = 'application/json';
+  block.textContent = JSON.stringify(list);
+  document.body.append(block);
+}
+
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -60,6 +69,17 @@ afterEach(() => {
 });
 
 describe('WidgetBoard', () => {
+  it('paints the panels the shell embedded at once, before base.widget.list answers; the live answer wins', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the board learnt its panels from its first live stream, and
+    // the stream reopened for their data on every load of the Home (`net::ERR_ABORTED`).
+    embed({ widgets: CATALOGUE });
+    const s = await setup();
+    expect(s.panels()).toEqual(['a.one', 'b.three']);
+    expect(s.wrapper.find('[data-testid="widgets-loading"]').exists()).toBe(false);
+    await s.show([widget('a.one', { default: true })]);
+    expect(s.panels()).toEqual(['a.one']);
+  });
+
   it('follows base.widget.list and says it is loading until it arrives', async () => {
     const s = await setup();
     expect(s.client.stream.subscriptions('base.widget.list').map((sub) => sub.params)).toEqual([{}]);

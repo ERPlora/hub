@@ -34,7 +34,7 @@ export interface TurnBody {
 }
 
 export type TurnFrame =
-  | { type: 'executed'; call_id: string; name: string; app: string; kind: 'query' | 'command' | ''; outcome: 'ok' | 'error' | 'refused' | 'cancelled'; code: string }
+  | { type: 'executed'; call_id: string; name: string; app: string; app_name?: string; kind: 'query' | 'command' | ''; outcome: 'ok' | 'error' | 'refused' | 'cancelled'; code: string }
   | { type: 'confirm'; card: AssistantCard; call: PendingCall }
   | { type: 'text'; text: string }
   | { type: 'usage'; used: number; limit: number; resets_at: string | null; demo: boolean }

@@ -106,9 +106,10 @@ def test_the_close_waits_on_its_dangerous_card_naming_the_session_and_the_count(
         "CONFIRMAR",
         False,
     )
+    # In the person's language, Spanish here (FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH).
     assert [(field["name"], field["label"], field["kind"], field["value"]) for field in card["fields"]] == [
-        ("session", "Session", "text", session.number),
-        ("closing_balance", "Counted cash", "money", 25000),
+        ("session", "Sesión", "text", session.number),
+        ("closing_balance", "Efectivo contado", "money", 25000),
     ]
     assert plan["pending"] == [close]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN

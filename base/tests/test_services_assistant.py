@@ -90,7 +90,15 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
     assert (result["role"], result["tool_call_id"]) == ("tool", "c1")
     assert "Terraza" in result["content"]
     assert plan["executed"] == [
-        {"call_id": "c1", "name": "demo.item.list", "app": "demo", "kind": "query", "outcome": "ok", "code": ""}
+        {
+            "call_id": "c1",
+            "name": "demo.item.list",
+            "app": "demo",
+            "app_name": "Demo",
+            "kind": "query",
+            "outcome": "ok",
+            "code": "",
+        }
     ]
     assert (plan["confirm"], plan["pending"]) == (None, [])
 
@@ -165,6 +173,16 @@ def test_stop_cancels_this_write_and_the_rest_of_the_chain():
 
 
 # ── What the person may not do is not done (BASE-G118; gh:hub#11) ────────────────────────────────────────────────
+
+
+def test_the_receipt_names_where_it_happened_in_the_persons_language():
+    """The receipt under the answer says it as the card does: an app by its name, the platform by its screen («No se
+    hizo, cancelado: Cambiar en Ajustes»), never «Base» (FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH)."""
+    pin = call("base.access.settings_update", {"pin_length": 6})
+    plan = turn(pin, decision={"call_id": "c1", "accepted": False}, permissions={"base.view_home", "base.administer_hub"})
+    assert (plan["executed"][0]["outcome"], plan["executed"][0]["app_name"]) == ("cancelled", "Ajustes")
+    written = turn(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
+    assert written["executed"][0]["app_name"] == "Demo"
 
 
 def test_a_tool_that_does_not_exist_is_refused_with_its_own_name():

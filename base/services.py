@@ -2608,11 +2608,15 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         # What ran, or was refused, by its name: a write this person was not offered is named too (BASE-G118).
         op = assistant.operation_of(call.name, tools) or assistant.named(call.name)
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
+        with translation.override(ctx.language):
+            # Named as its card names it: an app by its name, the platform by its screen.
+            app_name = assistant.app_name(op) if op else ""
         executed.append(
             {
                 "call_id": call.call_id,
                 "name": op.name if op else call.name,
                 "app": op.app_label if op else "",
+                "app_name": app_name,
                 "kind": op.kind if op else "",
                 "outcome": outcome.outcome,
                 "code": outcome.code,

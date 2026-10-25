@@ -7,9 +7,11 @@ jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries thi
 Home, BASE-G127), where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
 plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1), those three only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
-``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). It goes only
-to a person with a session: the auth gate sends anyone else to the login, so their HTML names neither the business
-nor the hub's id.
+``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). ``widget-list`` carries
+``base.widget.list`` as its live query answers it to this person: the Home's board mounts its panels with it, so their
+data goes in the same live stream as the list instead of reopening it on every load (the live answer then wins). Both
+go only to a person with a session: the auth gate sends anyone else to the login, so their HTML names neither the
+business nor the hub's id.
 
 ``spa`` is the view ``base.middleware`` knows by identity; it dispatches. A visitor without a session who loads
 ``/`` of a hub with a published website gets that website (``base.public_home``), which never passes through
@@ -24,6 +26,7 @@ session or without and whatever it accepts. A crawler reads no HTML as the hub's
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_safe
+from live.errors import OperationError
 from live.ninja import run_operation_sync
 from live.spa import render_spa, spa_path_pattern
 
@@ -33,6 +36,7 @@ from base.models import SessionOwner
 
 SESSION_ME_ID = "session-me"
 HUB_HOME_ID = "hub-home"
+WIDGET_LIST_ID = "widget-list"
 #: A path whose last segment has an extension names a file, and no route of the SPA looks like one (its parameters
 #: are ids). It is the fallback rule of connect-history-api-fallback and of ASP.NET Core's ``{*path:nonfile}``. With a
 #: trailing slash too: else ``APPEND_SLASH`` would send ``/robots.txt`` to ``/robots.txt/``, and that to the shell.
@@ -49,6 +53,15 @@ def spa(request: HttpRequest) -> HttpResponse:
     if not request.user.is_authenticated and request.path_info == "/" and public_home.website_enabled(request):
         return public_home.respond(request)
     return _shell(request)
+
+
+def _widgets(request: HttpRequest) -> dict | None:
+    """``base.widget.list`` as its live query answers it to this person, or ``None`` when it refuses them (no Home for
+    them): then the board waits for the live answer, as it did before."""
+    try:
+        return run_operation_sync(request, queries.widget_list).model_dump(mode="json")
+    except OperationError:
+        return None
 
 
 def _shell(request: HttpRequest) -> HttpResponse:
@@ -71,6 +84,9 @@ def _shell(request: HttpRequest) -> HttpResponse:
             "access": way_in,
             "preferences": queries.appearance_of(request.user),
         }
+        widgets = _widgets(request)
+        if widgets is not None:
+            extra_json[WIDGET_LIST_ID] = widgets
     return render_spa(
         request,
         extra_json=extra_json,

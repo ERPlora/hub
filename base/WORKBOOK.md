@@ -500,7 +500,8 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
-  1. Bajo la lista está el tablero («Cargando widgets…» mientras llega).
+  1. Bajo la lista está el tablero, con sus paneles desde que se abre el Inicio («Cargando widgets…» solo mientras
+     no se sabe cuáles le tocan).
   2. Cada panel es una tarjeta con su título e icono: una cifra (con debajo lo que cuenta, si su app lo dice),
      una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en el
      idioma de quien mira.
@@ -2289,7 +2290,10 @@ Pasos:
   1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»).
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
      línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe sale en la moneda del negocio (nunca
-     en céntimos), un sí o un no como «Sí» o «No» y una lista por cuántos elementos lleva.
+     en céntimos), un sí o un no como «Sí» o «No» y una lista por cuántos elementos lleva. Todo sale en el idioma de
+     la persona, también el nombre de cada dato cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que
+     lo llama su app, nunca un nombre técnico. Una acción de la propia plataforma se nombra por la pantalla donde
+     se hace, por ejemplo «Cambiar en Ajustes» o «Borrar en Archivos».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
@@ -2309,8 +2313,8 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Tarjeta de confirmación del asistente
 Pasos:
   1. Una acción que su app marca como peligrosa no se confirma con un clic: la tarjeta dice, por ejemplo, «Borrar en
-     Servicios. Revisa cada dato antes de seguir.», pone cada dato en su línea y pide «Para confirmar, escribe
-     CONFIRMAR:».
+     Servicios. Revisa cada dato antes de seguir.», pone cada dato en su línea con su nombre en el idioma de la
+     persona y pide «Para confirmar, escribe CONFIRMAR:».
   2. Si la acción nombra los registros uno a uno, dice cuántos («Afecta a 3 registros.») y pide escribir ese número
      en lugar de la palabra.
   3. Si no los nombra (todos, o los que cumplen un filtro), no se hace desde el chat: no sale tarjeta, la respuesta dice «No puedo
@@ -2577,7 +2581,12 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   `SHOW_UNLISTED_MODULES` (por defecto, `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
   Una sola regla, `base.home.shown_modules`, para `base.session.me` y los ganchos del Inicio.
 - `base/spa.py` incrusta `hub-home` (`name` del registro y `plan_url` =
-  `SAAS_URL/store/plans?business=<id del hub>`).
+  `SAAS_URL/store/plans?business=<id del hub>`) y `widget-list`, `base.widget.list` tal como su consulta viva se lo
+  contesta a la persona (sin el permiso del Inicio no va): `WidgetBoard.vue` monta sus paneles con él, así que los
+  datos de los paneles van en el mismo flujo vivo que la lista y el Inicio abre un solo `/api/live` por carga
+  (antes lo reabría al llegar la lista, `net::ERR_ABORTED`, con cada consulta dos veces); manda la respuesta viva.
+  Lo comprueban `test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream` y
+  `tests/e2e/base-home.spec.ts` («one live stream»).
 - La SPA responde toda ruta sin URL propia en Django, salvo la que nombra un fichero (`base.spa.NOT_A_FILE`: el
   último segmento lleva extensión, con barra final o sin ella, como `/robots.txt`, `/favicon.ico` o
   `/wp-login.php`): esa no es ruta de la SPA (`spa_route` en `config/urls.py`) y recibe el 404 llano de Django, sin
@@ -2793,7 +2802,15 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   aprobar a un responsable (`approvals.label_of`), salvo las «Not an assistant tool» / «System only», las sin permiso,
   las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
   preguntas; `base.setup.status` y `base.business.get` siempre), la tarjeta (`card`: `ai={"risk": "high"}` pide
-  `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `base`, o el número de `ids`; sin `ids`, `blocked`), la
+  `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `base`, o el número de `ids`; sin `ids`, `blocked`; cada
+  dato con su nombre en el idioma de la persona, `_label`: el `title` del esquema si un catálogo lo traduce, o tal
+  cual en inglés; si no, el `verbose_name` del campo del mismo nombre en los modelos de su app, primero el de la
+  entidad de la operación; si no, el `title` por los catálogos. Un dato sin campo de modelo lleva
+  `title=gettext_noop(…)` y su `es` en el `.po` de su app, como los de Archivos, Plantillas y Personas en
+  `base/schemas.py`; lo comprueba `test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_name`;
+  la app de la tarjeta y del recibo, `app_name`: la de una app por su `verbose_name`, una acción de `base` por la
+  pantalla de su entidad, `BASE_SCREENS`, nunca «Base»; el recibo usa el `app_name` que manda el turno en
+  `executed`; lo comprueba `test_every_action_of_base_names_its_screen`), la
   comparación del servidor (`confirmed`, como `ConfirmDialog`: sin mayúsculas ni espacios de los extremos),
   `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
   puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report` y `/internal/speech/transcribe`, con
