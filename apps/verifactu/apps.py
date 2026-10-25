@@ -152,3 +152,10 @@ class VerifactuConfig(LiveAppConfig):
             "catch_up": "collapse",
         }
     ]
+
+    def can_disable(self, ctx) -> str | None:
+        """VERIFACTU-F32: the platform's ``base.app.disable`` asks before turning the app off: refused, with how many,
+        while a record is not in the AEAT yet (``queries.disable_refusal``), whose send would stop."""
+        from apps.verifactu import queries  # the models are not loaded yet when this module is
+
+        return queries.disable_refusal(ctx)
