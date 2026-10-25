@@ -15,7 +15,7 @@ import { computed, ref, watch } from 'vue';
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
-import { useCurrency } from '../lib/format';
+import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { readQuantity } from '../lib/quantity';
 import MoneyInput from './MoneyInput.vue';
@@ -58,7 +58,7 @@ const props = withDefaults(
 const open = defineModel<boolean>('open', { default: false });
 
 const { t, locale } = useT();
-const currency = useCurrency();
+const business = useBusinessMoney();
 const create = useCommand('inventory.product.create');
 const update = useCommand('inventory.product.update');
 
@@ -71,8 +71,8 @@ function fieldsOf(product: Product | null): Fields {
   return {
     name: product?.name ?? '',
     sku: product?.sku ?? '',
-    price: product ? moneyFieldText(product.price, locale.value, currency.value) : '',
-    cost: product ? moneyFieldText(product.cost, locale.value, currency.value) : '',
+    price: product ? moneyFieldText(product.price, locale.value, business.value) : '',
+    cost: product ? moneyFieldText(product.cost, locale.value, business.value) : '',
     initialStock: '',
     threshold: product ? quantityText(product.low_stock_threshold) : '',
     ean13: product?.ean13 ?? '',
@@ -129,8 +129,8 @@ const text = (value: unknown): string => (value === null || value === undefined 
 
 /** The fields read as the API takes them, or `null` when an amount or a quantity cannot be read. */
 function read() {
-  const price = parseMoney(form.value.price, currency.value);
-  const cost = parseMoney(form.value.cost, currency.value);
+  const price = parseMoney(form.value.price, business.value);
+  const cost = parseMoney(form.value.cost, business.value);
   const initial = readQuantity(form.value.initialStock);
   const threshold = readQuantity(form.value.threshold);
   if (!price.ok || !cost.ok || !initial.ok || !threshold.ok) return null;
@@ -233,7 +233,7 @@ async function save(): Promise<void> {
       <MoneyInput
         v-model="form.cost"
         testid="inventory-product-cost"
-        :label="currency ? $t('inventory.form.costIn', { currency }) : $t('inventory.form.cost')"
+        :label="business ? $t('inventory.form.costIn', { currency: business.currency }) : $t('inventory.form.cost')"
         :error-text="fields.cost"
         :show-error="tried"
       />

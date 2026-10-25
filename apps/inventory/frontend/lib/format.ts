@@ -1,38 +1,32 @@
 // How the inventory screens paint money, counts, quantities and rates (pages never format by hand),
-// always with the page language's own number format (Intl). Money is whole minor units of the business's
-// currency (`useCurrency`: its country's, as `base.business.get` says it); while it is unknown, a figure without
-// a symbol, never the euro by default. Quantities are exact decimals from the API («2.500», at most three
-// decimals): painted ungrouped and without trailing zeros, as the server's CSV writes them (queries.quantity_text).
-import { computed, type ComputedRef } from 'vue';
+// always with the page language's own number format (Intl). Money is whole minor units of the business's money
+// (`useBusinessMoney`: its country's currency and the decimals the server counts it in, never the browser's: Intl
+// gives the forint none); while it is unknown, a figure without a symbol, never the euro by default. Quantities are
+// exact decimals from the API («2.500», at most three decimals): painted ungrouped and without trailing zeros, as
+// the server's CSV writes them (queries.quantity_text).
+import type { Money } from '../../../../base/frontend/lib/home';
 
-import { useBusinessMoney } from '../../../../base/frontend/lib/money';
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 
-const NO_CURRENCY_DECIMALS = 2;
+const NO_MONEY_DECIMALS = 2;
 
 const formats = new Map<string, Intl.NumberFormat>();
 const decimalMarks = new Map<string, string>();
 
-/** The business's currency (ISO 4217) as `base.business.get` says it, its country's; `undefined` until it answers. */
-export function useCurrency(): ComputedRef<string | undefined> {
-  const business = useBusinessMoney();
-  return computed(() => business.value?.currency);
-}
+/** The decimals of `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
+export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
 
-function moneyFormat(locale: string, currency: string | undefined): Intl.NumberFormat {
-  const key = `${locale}|money|${currency ?? ''}`;
+function moneyFormat(locale: string, money: Money | undefined): Intl.NumberFormat {
+  const decimals = moneyDecimals(money);
+  const key = `${locale}|money|${money?.currency ?? ''}|${decimals}`;
   let found = formats.get(key);
   if (!found) {
-    const digits = { minimumFractionDigits: NO_CURRENCY_DECIMALS, maximumFractionDigits: NO_CURRENCY_DECIMALS };
-    found = new Intl.NumberFormat(locale, currency ? { style: 'currency', currency } : digits);
+    const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+    found = new Intl.NumberFormat(locale, money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits);
     formats.set(key, found);
   }
   return found;
-}
-
-/** The decimals of `currency` as CLDR knows them (2 in EUR, 0 in JPY): its minor unit; two while unknown. */
-export function currencyDecimals(currency?: string): number {
-  if (!currency) return NO_CURRENCY_DECIMALS;
-  return moneyFormat('en', currency).resolvedOptions().maximumFractionDigits ?? NO_CURRENCY_DECIMALS;
 }
 
 function numberFormat(locale: string, kind: 'count' | 'quantity' | 'percent'): Intl.NumberFormat {
@@ -60,10 +54,10 @@ export function decimalMark(locale: string): string {
   return found;
 }
 
-/** Whole minor units as money of `currency` in `locale` («2,20 €», «€2.20», «PLN 12.50», «¥1,210»; «12,50» while
- *  the currency is unknown). */
-export function formatMoney(cents: number, locale: string, currency?: string): string {
-  return moneyFormat(locale, currency).format(cents / 10 ** currencyDecimals(currency));
+/** Whole minor units as `money` in `locale` («2,20 €», «€2.20», «zł 12.50», «¥1,210»; «12,50» while the money is
+ *  unknown), with the symbol a till there writes. */
+export function formatMoney(cents: number, locale: string, money?: Money): string {
+  return moneyFormat(locale, money).format(cents / 10 ** moneyDecimals(money));
 }
 
 /** A count («12.345» products in Spanish). */

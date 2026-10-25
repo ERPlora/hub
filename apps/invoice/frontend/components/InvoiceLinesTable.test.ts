@@ -27,8 +27,8 @@ const line = (over: Partial<InvoiceLineOut> = {}): InvoiceLineOut => ({
   ...over,
 });
 
-async function setup(lines: InvoiceLineOut[], locale: 'en' | 'es' = 'en', taxes: string[] = ['vat'], currency = 'EUR') {
-  const m = await mountInvoice(InvoiceLinesTable, { props: { lines, taxes, currency }, locale });
+async function setup(lines: InvoiceLineOut[], locale: 'en' | 'es' = 'en', taxes: string[] = ['vat'], money = { currency: 'EUR', decimals: 2 }) {
+  const m = await mountInvoice(InvoiceLinesTable, { props: { lines, taxes, money }, locale });
   const cells = () => m.wrapper.findAll('[data-testid="invoice-line-row"]').map((row) => row.findAll('td').map((td) => plain(td.text())));
   return { ...m, cells };
 }
@@ -85,8 +85,8 @@ describe('InvoiceLinesTable', () => {
   });
 
   it('paints a line of an invoice in zlotys in zlotys (flow business-currency)', async () => {
-    const s = await setup([line()], 'en', ['vat'], 'PLN');
-    expect(s.cells()[0]).toContain('PLN 24.20');
+    const s = await setup([line()], 'en', ['vat'], { currency: 'PLN', decimals: 2 });
+    expect(s.cells()[0]).toContain('zł 24.20');
     expect(s.cells()[0].join(' ')).not.toContain('€');
   });
 });

@@ -8,7 +8,7 @@ import { IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import { useT } from '../composables/useT';
-import { formatMoney, useCurrency } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import { normaliseMoneyText, parseMoney } from '../lib/money';
 
 const props = withDefaults(
@@ -18,18 +18,18 @@ const props = withDefaults(
 const text = defineModel<string>({ required: true });
 
 const { t, locale } = useT();
-const currency = useCurrency();
+const business = useBusinessMoney();
 const left = ref(false);
 
 /** Why the text is not an amount, in the page language; `''` when it is one (or empty). */
 const readError = computed(() => {
-  const read = parseMoney(text.value, currency.value);
+  const read = parseMoney(text.value, business.value);
   if (read.ok) return '';
   if (read.reason === 'not_amount') return t('inventory.common.noAmount');
   return t('inventory.common.ambiguousAmount', {
     typed: text.value.trim(),
-    grouped: formatMoney(read.grouped, locale.value, currency.value),
-    decimal: formatMoney(read.decimal, locale.value, currency.value),
+    grouped: formatMoney(read.grouped, locale.value, business.value),
+    decimal: formatMoney(read.decimal, locale.value, business.value),
   });
 });
 
@@ -37,7 +37,7 @@ const message = computed(() => props.errorText || ((left.value || props.showErro
 
 function onBlur(): void {
   left.value = true;
-  const normalised = normaliseMoneyText(text.value, locale.value, currency.value);
+  const normalised = normaliseMoneyText(text.value, locale.value, business.value);
   if (normalised !== text.value) text.value = normalised;
 }
 </script>

@@ -3,8 +3,9 @@
 // (its code or its symbol) and spaces around are noise; with both marks the rightmost one is the decimal one; at
 // most the currency's decimals; never negative). One mark followed by three digits («1.250») can be 1.250 € or
 // 1,25 €: it is not guessed, the field says so. On leaving the field it is rewritten in the page format. The
-// currency is the business's (`useCurrency`); while it is unknown, two decimals and no symbol to take away.
-import { currencyDecimals, decimalMark } from './format';
+// money is the business's (`useBusinessMoney`, with the server's decimals); while it is unknown, two decimals and no
+// symbol to take away.
+import { decimalMark, type Money, moneyDecimals } from './format';
 
 export type MoneyRead =
   | { ok: true; cents: number | null }
@@ -45,11 +46,11 @@ function grouped(raw: string, mark: string, decimals: number): number | null {
   return cents(head + groups.join(''), '', decimals);
 }
 
-/** What a money field holds in the business's `currency`: cents (`null` when empty), or why it is not an amount. */
-export function parseMoney(text: string, currency?: string): MoneyRead {
-  const decimals = currencyDecimals(currency);
+/** What a money field holds in the business's `money`: cents (`null` when empty), or why it is not an amount. */
+export function parseMoney(text: string, money?: Money): MoneyRead {
+  const decimals = moneyDecimals(money);
   const spaced = text.replace(/[\s  ]/g, '');
-  const raw = currency ? spaced.replace(currencyMarks(currency), '') : spaced;
+  const raw = money ? spaced.replace(currencyMarks(money.currency), '') : spaced;
   if (raw === '') return { ok: true, cents: null };
   if (!/^[\d.,]+$/.test(raw) || !/^\d/.test(raw) || raw.replace(/\D/g, '').length > MAX_DIGITS) return NOT_AMOUNT;
   const fits = (fraction: string) => DIGITS.test(fraction) && fraction.length <= decimals;
@@ -81,10 +82,10 @@ export function parseMoney(text: string, currency?: string): MoneyRead {
   return asDecimal === null ? NOT_AMOUNT : { ok: true, cents: asDecimal };
 }
 
-/** Cents as the field shows them: the page's decimal mark, the decimals of `currency`, ungrouped; `''` for none. */
-export function moneyFieldText(value: number | null | undefined, locale: string, currency?: string): string {
+/** Cents as the field shows them: the page's decimal mark, the decimals of `money`, ungrouped; `''` for none. */
+export function moneyFieldText(value: number | null | undefined, locale: string, money?: Money): string {
   if (value === null || value === undefined) return '';
-  const decimals = currencyDecimals(currency);
+  const decimals = moneyDecimals(money);
   const scale = 10 ** decimals;
   const whole = Math.trunc(value / scale);
   if (!decimals) return `${whole}`;
@@ -93,7 +94,7 @@ export function moneyFieldText(value: number | null | undefined, locale: string,
 }
 
 /** The field once the person leaves it: the page format when readable, as typed when not. */
-export function normaliseMoneyText(text: string, locale: string, currency?: string): string {
-  const read = parseMoney(text, currency);
-  return read.ok && read.cents !== null ? moneyFieldText(read.cents, locale, currency) : text;
+export function normaliseMoneyText(text: string, locale: string, money?: Money): string {
+  const read = parseMoney(text, money);
+  return read.ok && read.cents !== null ? moneyFieldText(read.cents, locale, money) : text;
 }

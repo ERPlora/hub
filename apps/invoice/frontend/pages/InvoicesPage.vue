@@ -30,7 +30,7 @@ import RectifyModal from '../components/RectifyModal.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney } from '../lib/format';
+import { formatDate, formatMoney, moneyOf } from '../lib/format';
 import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
 import { filterQuery, filtersInUse, invalidAmounts, reversedDates } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
@@ -80,7 +80,7 @@ const columns = computed<DataTableColumn<InvoiceRowOut>[]>(() => [
     sortable: true,
     align: 'right',
     width: 'minmax(7rem, 8rem)',
-    format: (_, row) => formatMoney(row.total_amount, locale.value, row.currency),
+    format: (_, row) => formatMoney(row.total_amount, locale.value, moneyOf(row)),
     filter: { type: 'range', amount: true, keys: ['total_amount_from', 'total_amount_to'] },
   },
   {

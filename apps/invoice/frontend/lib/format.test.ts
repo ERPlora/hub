@@ -6,47 +6,53 @@ import { describe, expect, it } from 'vitest';
 
 import { centsFromAmount, formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, plain, typedRate } from './format';
 
+// An invoice's money: its currency and the decimals the server counts it in (`currency_decimals`).
+const EUR = { currency: 'EUR', decimals: 2 };
+const PLN = { currency: 'PLN', decimals: 2 };
+const JPY = { currency: 'JPY', decimals: 0 };
+const HUF = { currency: 'HUF', decimals: 2 };
+
 /** Intl puts a narrow no-break space before «€» and «%» in Spanish: compared as a plain space. */
 const spaced = (text: string) => plain(text);
 
 describe('formatUnitPrice', () => {
   it('writes a unit price (cents with two decimals) with two decimals, up to four when it has them', () => {
-    expect(plain(formatUnitPrice('1000.00', 'en', 'EUR'))).toBe('€10.00');
-    expect(plain(formatUnitPrice('82.64', 'en', 'EUR'))).toBe('€0.8264');
-    expect(plain(formatUnitPrice('41.30', 'es', 'EUR'))).toBe('0,413 €');
-    expect(plain(formatUnitPrice(1250, 'es', 'EUR'))).toBe('12,50 €');
-    expect(formatUnitPrice(null, 'en', 'EUR')).toBe('—');
+    expect(plain(formatUnitPrice('1000.00', 'en', EUR))).toBe('€10.00');
+    expect(plain(formatUnitPrice('82.64', 'en', EUR))).toBe('€0.8264');
+    expect(plain(formatUnitPrice('41.30', 'es', EUR))).toBe('0,413 €');
+    expect(plain(formatUnitPrice(1250, 'es', EUR))).toBe('12,50 €');
+    expect(formatUnitPrice(null, 'en', EUR)).toBe('—');
   });
 
   it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
-    expect(plain(formatUnitPrice('123456.00', 'es', 'EUR'))).toBe('1.234,56 €');
-    expect(plain(formatUnitPrice('123456.78', 'es', 'EUR'))).toBe('1.234,5678 €');
-    expect(plain(formatUnitPrice('1234567.00', 'es', 'EUR'))).toBe('12.345,67 €');
-    expect(plain(formatUnitPrice('123456.78', 'en', 'EUR'))).toBe('€1,234.5678');
+    expect(plain(formatUnitPrice('123456.00', 'es', EUR))).toBe('1.234,56 €');
+    expect(plain(formatUnitPrice('123456.78', 'es', EUR))).toBe('1.234,5678 €');
+    expect(plain(formatUnitPrice('1234567.00', 'es', EUR))).toBe('12.345,67 €');
+    expect(plain(formatUnitPrice('123456.78', 'en', EUR))).toBe('€1,234.5678');
   });
 });
 
 describe('formatMoney', () => {
   it('paints cents as euros in the page language, a rectifying amount with its sign', () => {
-    expect(formatMoney(123456, 'en', 'EUR')).toBe('€1,234.56');
-    expect(formatMoney(0, 'en', 'EUR')).toBe('€0.00');
-    expect(formatMoney(-350, 'en', 'EUR')).toBe('-€3.50');
-    expect(spaced(formatMoney(-1210, 'es', 'EUR'))).toBe('-12,10 €');
+    expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
+    expect(formatMoney(0, 'en', EUR)).toBe('€0.00');
+    expect(formatMoney(-350, 'en', EUR)).toBe('-€3.50');
+    expect(spaced(formatMoney(-1210, 'es', EUR))).toBe('-12,10 €');
   });
 
   it('groups the thousands from four digits on, in Spanish too (hub#1090)', () => {
     // Spanish CLDR only groups from five digits on (minimumGroupingDigits 2): «1234,56 €» beside
     // «12.345,67 €», and unlike Carts, Price lists and Payments, which paint «1.234,56 €».
-    expect(spaced(formatMoney(123456, 'es', 'EUR'))).toBe('1.234,56 €');
-    expect(spaced(formatMoney(1234567, 'es', 'EUR'))).toBe('12.345,67 €');
-    expect(spaced(formatMoney(-123456, 'es', 'EUR'))).toBe('-1.234,56 €');
-    expect(formatMoney(1234567, 'en', 'EUR')).toBe('€12,345.67');
+    expect(spaced(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
+    expect(spaced(formatMoney(1234567, 'es', EUR))).toBe('12.345,67 €');
+    expect(spaced(formatMoney(-123456, 'es', EUR))).toBe('-1.234,56 €');
+    expect(formatMoney(1234567, 'en', EUR)).toBe('€12,345.67');
   });
 
   it('a missing amount is a dash, never «NaN», and a broken language falls back to English', () => {
-    expect(formatMoney(null, 'en', 'EUR')).toBe('—');
-    expect(formatMoney(undefined, 'es', 'EUR')).toBe('—');
-    expect(formatMoney(100, 'not a tag!', 'EUR')).toBe('€1.00');
+    expect(formatMoney(null, 'en', EUR)).toBe('—');
+    expect(formatMoney(undefined, 'es', EUR)).toBe('—');
+    expect(formatMoney(100, 'not a tag!', EUR)).toBe('€1.00');
   });
 });
 
@@ -109,11 +115,13 @@ describe('centsFromAmount', () => {
 
 describe('money of the invoice’s currency (flow business-currency)', () => {
   it('writes an invoice of a business in Poland in zlotys, and the yen without decimals', () => {
-    expect(plain(formatMoney(12100, 'en', 'PLN'))).toBe('PLN 121.00');
-    expect(plain(formatMoney(12100, 'pl', 'PLN'))).toBe('121,00 zł');
-    expect(plain(formatMoney(12100, 'en', 'JPY'))).toBe('¥12,100');
-    expect(plain(formatUnitPrice('82.64', 'en', 'PLN'))).toBe('PLN 0.8264');
-    expect(plain(formatUnitPrice('5000.00', 'en', 'JPY'))).toBe('¥5,000');
+    expect(plain(formatMoney(12100, 'en', PLN))).toBe('zł 121.00');
+    expect(plain(formatMoney(12100, 'pl', PLN))).toBe('121,00 zł');
+    expect(plain(formatMoney(12100, 'en', JPY))).toBe('¥12,100');
+    expect(plain(formatUnitPrice('82.64', 'en', PLN))).toBe('zł 0.8264');
+    // The forint keeps the two decimals the server counts it in (the browser's Intl gives it none).
+    expect(plain(formatMoney(123450, 'en', HUF))).toBe('Ft 1,234.50');
+    expect(plain(formatUnitPrice('5000.00', 'en', JPY))).toBe('¥5,000');
   });
 
   it('without a currency a figure has no symbol, never the euro', () => {

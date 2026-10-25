@@ -15,7 +15,7 @@ import { computed, ref, watch } from 'vue';
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
-import { formatQuantity, formatSignedQuantity, useCurrency } from '../lib/format';
+import { formatQuantity, formatSignedQuantity, useBusinessMoney } from '../lib/format';
 import { parseMoney } from '../lib/money';
 import { quantityDifference, readQuantity } from '../lib/quantity';
 import MoneyInput from './MoneyInput.vue';
@@ -28,7 +28,7 @@ const props = defineProps<{ kind: StockAction; product: Product | null; units: r
 const open = defineModel<boolean>('open', { default: false });
 
 const { t, locale } = useT();
-const currency = useCurrency();
+const business = useBusinessMoney();
 const receive = useCommand('inventory.stock.receive');
 const count = useCommand('inventory.stock.count');
 const writeOff = useCommand('inventory.stock.write_off');
@@ -90,7 +90,7 @@ async function save(): Promise<void> {
   tried.value = true;
   const product = props.product;
   const quantity = read.value;
-  const unitCost = parseMoney(cost.value, currency.value);
+  const unitCost = parseMoney(cost.value, business.value);
   if (!product || !ready.value || !quantity.ok || quantity.value === null || !unitCost.ok) return;
   try {
     if (props.kind === 'receive') {
@@ -152,7 +152,7 @@ async function save(): Promise<void> {
         v-if="kind === 'receive'"
         v-model="cost"
         testid="inventory-stock-cost"
-        :label="currency ? $t('inventory.stock.receiveCostIn', { currency }) : $t('inventory.stock.receiveCost')"
+        :label="business ? $t('inventory.stock.receiveCostIn', { currency: business.currency }) : $t('inventory.stock.receiveCost')"
         :error-text="fields.unit_cost"
         :show-error="tried"
       />

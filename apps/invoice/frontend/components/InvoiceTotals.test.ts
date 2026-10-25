@@ -27,6 +27,7 @@ const INVOICE = {
   tax_amount: 524,
   total_amount: 6524,
   currency: 'EUR',
+  currency_decimals: 2,
 };
 
 async function setup(locale: 'en' | 'es' = 'en', invoice = INVOICE) {
@@ -54,8 +55,8 @@ describe('InvoiceTotals', () => {
   });
 
   it('an invoice of a business in Poland is in zlotys (flow business-currency)', async () => {
-    const s = await setup('en', { ...INVOICE, currency: 'PLN' });
-    expect(s.taxes()[0]).toMatch(/\(PLN [\d.,]+\) = PLN [\d.,]+$/);
-    expect(plain(s.find('invoice-detail-total').text())).toMatch(/PLN 65\.24$/);
+    const s = await setup('en', { ...INVOICE, currency: 'PLN', currency_decimals: 2 });
+    expect(s.taxes()[0]).toMatch(/\(zł [\d.,]+\) = zł [\d.,]+$/);
+    expect(plain(s.find('invoice-detail-total').text())).toMatch(/zł 65\.24$/);
   });
 });

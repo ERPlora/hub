@@ -9,7 +9,7 @@
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, formatPercent, formatQuantity, formatUnitPrice } from '../lib/format';
+import { formatMoney, formatPercent, formatQuantity, formatUnitPrice, type Money } from '../lib/format';
 import { rateHeader } from '../lib/invoice';
 import type { InvoiceLineOut } from '../operations';
 
@@ -17,8 +17,8 @@ const props = defineProps<{
   lines: readonly InvoiceLineOut[];
   /** The taxes of the invoice's breakdown (`vat`, `igic`, `ipsi`…): they name the rate's column. */
   taxes: readonly string[];
-  /** The invoice's currency (the business's when it was issued). */
-  currency: string;
+  /** The invoice's money: its currency (the business's when it was issued) and its decimals. */
+  money: Money;
 }>();
 
 const t = useT();
@@ -42,19 +42,19 @@ const headers = computed(() => [
 const rows = computed(() =>
   props.lines.map((line) => {
     const surcharge = Number(line.surcharge_rate) > 0 ? ` + ${formatPercent(line.surcharge_rate, locale.value)}` : '';
-    const discount = line.discount_amount ? formatMoney(line.discount_amount, locale.value, props.currency) : '';
+    const discount = line.discount_amount ? formatMoney(line.discount_amount, locale.value, props.money) : '';
     return {
       id: line.id,
       cells: [
         String(line.position),
         line.description,
         formatQuantity(line.quantity, locale.value),
-        formatUnitPrice(line.unit_price, locale.value, props.currency),
+        formatUnitPrice(line.unit_price, locale.value, props.money),
         ...(discounted.value ? [discount] : []),
         `${formatPercent(line.tax_rate, locale.value)}${surcharge}`,
-        formatMoney(line.base_amount, locale.value, props.currency),
-        formatMoney(line.tax_amount, locale.value, props.currency),
-        formatMoney(line.total_amount, locale.value, props.currency),
+        formatMoney(line.base_amount, locale.value, props.money),
+        formatMoney(line.tax_amount, locale.value, props.money),
+        formatMoney(line.total_amount, locale.value, props.money),
       ],
     };
   }),

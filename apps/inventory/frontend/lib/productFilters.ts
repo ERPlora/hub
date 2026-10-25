@@ -5,6 +5,7 @@
 import type { DataTableFilters } from '@erplora/ui/components';
 import type { InputOf } from '@erplora/ui/sdk';
 
+import type { Money } from './format';
 import { type MoneyRead, parseMoney } from './money';
 import { readQuantity } from './quantity';
 
@@ -24,10 +25,10 @@ export interface UnreadableEnd {
 }
 
 /** The ends typed that cannot be read, in the panel's order. */
-export function unreadableEnds(values: DataTableFilters, currency?: string): UnreadableEnd[] {
+export function unreadableEnds(values: DataTableFilters, money?: Money): UnreadableEnd[] {
   const out: UnreadableEnd[] = [];
   for (const name of MONEY_ENDS) {
-    const read = parseMoney(values[name] ?? '', currency);
+    const read = parseMoney(values[name] ?? '', money);
     if (!read.ok) out.push({ name, problem: read });
   }
   for (const name of QUANTITY_ENDS) if (!readQuantity(values[name] ?? '').ok) out.push({ name, problem: 'not_quantity' });
@@ -35,14 +36,14 @@ export function unreadableEnds(values: DataTableFilters, currency?: string): Unr
 }
 
 /** The filters as `inventory.product.list` (and its export) takes them. */
-export function filterParams(values: DataTableFilters, currency?: string): Partial<ProductListIn> {
+export function filterParams(values: DataTableFilters, money?: Money): Partial<ProductListIn> {
   const out: Partial<ProductListIn> = {};
   const name = values.name?.trim();
   const sku = values.sku?.trim();
   if (name) out.name = name;
   if (sku) out.sku = sku;
   for (const end of MONEY_ENDS) {
-    const read = parseMoney(values[end] ?? '', currency);
+    const read = parseMoney(values[end] ?? '', money);
     if (read.ok && read.cents !== null) out[end] = read.cents;
   }
   for (const end of QUANTITY_ENDS) {
@@ -54,6 +55,6 @@ export function filterParams(values: DataTableFilters, currency?: string): Parti
 }
 
 /** The filters that really apply (an end it cannot read does not). */
-export function filtersInUse(values: DataTableFilters, currency?: string): number {
-  return Object.keys(filterParams(values, currency)).length;
+export function filtersInUse(values: DataTableFilters, money?: Money): number {
+  return Object.keys(filterParams(values, money)).length;
 }

@@ -44,6 +44,7 @@ const row = (number: string, over: Partial<InvoiceRowOut> = {}): InvoiceRowOut =
   tax_amount: 210,
   total_amount: 1210,
   currency: 'EUR',
+  currency_decimals: 2,
   status: 'issued',
   source_type: 'manual',
   rectifies_id: null,
