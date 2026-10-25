@@ -1842,6 +1842,7 @@
       "lat": "Lat",
       "leased_until": "Leased until",
       "leave_type": "Leave type",
+      "leave_type_label": "Leave type, as text",
       "ledger_purchases": "Ledger purchases",
       "ledger_spent": "Ledger spent",
       "legal_name": "Legal name",
