@@ -21,10 +21,11 @@ from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any
 
+from django.apps import apps as django_apps
 from django.utils import timezone, translation
 from django.utils.translation import gettext
 from live.context import Scope
-from live.errors import OperationError
+from live.errors import AppInactive, OperationError
 from live.meta import module_configs
 
 from base import registry
@@ -89,14 +90,45 @@ def blocked_apps(scope: Scope) -> frozenset[str]:
 @contextmanager
 def operation_database(op, ctx) -> Iterator[str]:
     """``LIVE["operation_database"]``: an operation of an app blocked on its business answers 402 before it opens a
-    transaction; any other goes on to the database of the tenancy (``base.tenancy.context.operation_database``), where
-    a manager's pass for it is spent in its transaction (``base.approval_spend``, APP-BASE-5)."""
+    transaction, and one of an app the business turned off (``base.activation``) 404 ``app_inactive``, read in the
+    database of the tenancy (``base.tenancy.context.operation_database``); any other goes on to that database, where a
+    manager's pass for it is spent in its transaction (``base.approval_spend``, APP-BASE-5)."""
     if op.app_label in blocked_apps(ctx.scope):
-        raise EntitlementBlocked(_refusal(op.app_label, ctx.language))
+        raise refused(op.app_label, ctx.language)
+    from base import activation
     from base.approval_spend import spending
 
-    with tenancy.operation_database(op, ctx) as alias, spending(op, ctx, alias) as spent_on:
-        yield spent_on
+    with tenancy.operation_database(op, ctx) as alias:
+        if _is_module(op.app_label) and op.app_label in activation.off_apps(ctx.scope):
+            raise AppInactive(_turned_off(op.app_label, ctx.language))
+        with spending(op, ctx, alias) as spent_on:
+            yield spent_on
+
+
+def refused(label: str, language: str) -> EntitlementBlocked:
+    """The 402 of ``label``, a paid module this business has no right to, said in ``language``."""
+    return EntitlementBlocked(_refusal(label, language))
+
+
+def _is_module(label: str) -> bool:
+    """Whether ``label`` is a module (an app a business turns on and off): one look-up in Django's registry, fixed
+    since the start, on every operation (base's own never ask the cache)."""
+    config = _config(label)
+    return config is not None and getattr(config, "kind", None) == "app"
+
+
+def _config(label: str) -> Any:
+    try:
+        return django_apps.get_app_config(label)
+    except LookupError:
+        return None
+
+
+def _turned_off(label: str, language: str) -> str:
+    config = _config(label)
+    with translation.override(language):
+        name = str(config.verbose_name) if config is not None else label
+        return gettext("%(app)s is turned off in this business.") % {"app": name}
 
 
 def requires_of(label: str, configs: Iterable[Any] | None = None) -> frozenset[str]:

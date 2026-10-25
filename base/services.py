@@ -759,7 +759,13 @@ def _apply_members(hub: Hub, members: list) -> None:
         _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host__in=[hub.slug, ""]))
 
 
+#: The app whose block (and the business's status) travels in the photo (``verifactu``).
+VERIFACTU_APP = "verifactu"
+
+
 def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
+    # base.relay imports this module: asked when the photo comes, not when this module loads.
+    from base import relay
     from base.tenancy.context import use_hub
 
     sync = get_operation("verifactu.config.sync")
@@ -772,8 +778,11 @@ def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
             f"The verifactu block is out of contract: {invalid}", code="internal.payload_invalid"
         ) from None
     # The hub's own operation, in its database: the same transaction while it shares control's (phase 1, S1–S4).
+    # Off in the business (base.activation), its block waits: turning VeriFactu on applies the photo kept then.
+    scope = Scope("host", hub.slug)
     with use_hub(hub):
-        sync(system_context(Scope("host", hub.slug)), payload)
+        if VERIFACTU_APP in relay.active_apps(scope):
+            sync(system_context(scope), payload)
 
 
 #: The app whose number's state travels in the photo (``whatsapp``) and whose doors erplora.com calls.
@@ -786,17 +795,52 @@ def _sync_whatsapp(hub: Hub, data: HubStateIn) -> None:
     from base.tenancy.context import use_hub
 
     scope = Scope("host", hub.slug)
-    if WHATSAPP_APP not in relay.active_apps(scope):
-        return
-    sync = get_operation("whatsapp_inbox.channel.sync")
-    try:
-        payload = sync.input.model_validate({**data.whatsapp, "version": data.version})
-    except pydantic.ValidationError as invalid:
-        raise InvalidPayload(
-            f"The whatsapp block is out of contract: {invalid}", code="internal.payload_invalid"
-        ) from None
+    # Which apps are on is the business's (its database): asked inside it. Off, the block is not read: it waits for
+    # the app (turning it on applies the photo kept then).
     with use_hub(hub):
+        if WHATSAPP_APP not in relay.active_apps(scope):
+            return
+        sync = get_operation("whatsapp_inbox.channel.sync")
+        try:
+            payload = sync.input.model_validate({**data.whatsapp, "version": data.version})
+        except pydantic.ValidationError as invalid:
+            raise InvalidPayload(
+                f"The whatsapp block is out of contract: {invalid}", code="internal.payload_invalid"
+            ) from None
         sync(system_context(scope), payload)
+
+
+def _sync_photo_blocks(hub: Hub, labels: Iterable[str]) -> None:
+    """Apply the blocks of the SaaS's last photo kept (``Hub.state``) that belong to ``labels``, just turned on: what
+    came while they were off waited for them. Each sync ignores a version it already has."""
+    photo = hub.state if isinstance(hub.state, dict) else {}
+    if not photo or not hub.state_version:
+        return
+    labels = set(labels)
+    data = HubStateIn.model_validate(
+        {
+            "id": hub.id,
+            "version": hub.state_version,
+            "status": photo.get("status"),
+            "verifactu": photo.get("verifactu"),
+            "whatsapp": photo.get("whatsapp"),
+            "photo": photo,
+        }
+    )
+    syncs = [
+        (VERIFACTU_APP, _sync_verifactu, data.verifactu is not None or data.status is not None),
+        (WHATSAPP_APP, _sync_whatsapp, data.whatsapp is not None),
+    ]
+    for label, sync, carried in syncs:
+        if label not in labels or not carried:
+            continue
+        try:
+            # Refused before it writes anything (its block is read first); a sync that writes is an operation, whose
+            # own transaction is undone if it fails.
+            sync(hub, data)
+        except InvalidPayload as refused:
+            # The block the photo kept is one the app refuses: it waits for the next photo; the app is on all the same.
+            logger.warning("base.app.photo_block_refused %s of hub %s: %s", label, hub.slug, refused.message)
 
 
 @operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut)
@@ -2701,3 +2745,222 @@ def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> 
         raise _gateway_failure(
             "base.assistant_transcribe_failed", gettext("The audio could not be transcribed: try again.")
         ) from None
+
+
+# ── Apps turned on and off by the business, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25) ────────────
+# The rules are base.activation's; here, their rows (base.AppActivation) under a lock of the business's rows, so two
+# people at once never both pass the limit, and the events. Turning an app off never drops its tables.
+from typing import Any  # noqa: E402
+
+from live.meta import module_configs  # noqa: E402
+from live.operations import on_commit as after_commit  # noqa: E402
+
+from base import activation, entitlement, home  # noqa: E402
+from base.models import AppActivation  # noqa: E402
+from base.schemas import AppChangeIn, AppChangeOut  # noqa: E402
+
+
+class AppLimitReached(OperationError):
+    """Turning on one more app the business chooses, at its plan's limit (``plan.max_apps``): 402, with the limit and
+    the chosen apps on, for the screen's notice and its «Upgrade plan»."""
+
+    status = 402
+    code = "base.app_limit_reached"
+
+    def __init__(self, message: str, *, max_apps: int, enabled: int) -> None:
+        super().__init__(message)
+        self.max_apps, self.enabled = max_apps, enabled
+
+    def envelope(self) -> dict:
+        envelope = super().envelope()
+        envelope["error"].update(max_apps=self.max_apps, enabled=self.enabled)
+        return envelope
+
+
+class AppRequired(Conflict):
+    """Turning off an app another app on needs: 409, with those apps (they go off first)."""
+
+    def __init__(self, message: str, *, required_by: list[str]) -> None:
+        super().__init__(message, code="base.app_required")
+        self.required_by = list(required_by)
+
+    def envelope(self) -> dict:
+        envelope = super().envelope()
+        envelope["error"]["required_by"] = list(self.required_by)
+        return envelope
+
+
+class AppVetoed(Conflict):
+    """An app refused to go off (its ``can_disable``): 409, with its reason as the message and its id."""
+
+    def __init__(self, message: str, *, app: str) -> None:
+        super().__init__(message, code="base.app_vetoed")
+        self.app = app
+
+    def envelope(self) -> dict:
+        envelope = super().envelope()
+        envelope["error"]["app"] = self.app
+        return envelope
+
+
+def _business_hub(ctx: OperationContext) -> Hub | None:
+    return Hub.objects.filter(slug=ctx.scope.key).first()
+
+
+def _business_module(ctx: OperationContext, label: str, hub: Hub | None) -> Any:
+    """The module ``label`` as this business shows it; 404 for any other id (the platform, or one it never shows)."""
+    for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo)):
+        if config.label == label:
+            return config
+    raise NotFound(gettext("No app has this id."))
+
+
+def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.Activation]:
+    """Every module's state in the business, its rows locked until the COMMIT: a business on its baseline writes it
+    down first (another doing it at the same time leaves its rows: ON CONFLICT DO NOTHING). The rows are read again
+    once locked, a new statement, which sees what another committed meanwhile."""
+    host = ctx.scope.key
+    rows = AppActivation.objects.filter(host=host)
+    if not rows.exists():
+        AppActivation.objects.bulk_create(
+            [
+                AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
+                for label, row in activation.baseline(graph).items()
+            ],
+            ignore_conflicts=True,
+        )
+    list(rows.select_for_update().order_by("app").values_list("id", flat=True))
+    return activation.effective(queries.app_activations(host), graph)
+
+
+def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
+    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business."""
+    after_commit(partial(activation.forget, host))
+    now = timezone.now()
+    existing = set(AppActivation.objects.filter(host=host, app__in=list(changes)).values_list("app", flat=True))
+    for label, row in changes.items():
+        if label in existing:
+            AppActivation.objects.filter(host=host, app=label).update(state=row.state, chosen=row.chosen, changed_at=now)
+    AppActivation.objects.bulk_create(
+        AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
+        for label, row in changes.items()
+        if label not in existing
+    )
+
+
+def _named(ctx: OperationContext, labels: Iterable[str]) -> list[dict[str, str]]:
+    names = {config.label: config.verbose_name for config in module_configs()}
+    with translation.override(ctx.language):
+        return [{"id": label, "name": str(names.get(label, label))} for label in labels]
+
+
+def _names_said(ctx: OperationContext, labels: list[str]) -> str:
+    """«A», «A and B», «A, B and C», in the language of who asks."""
+    with translation.override(ctx.language):
+        names = [item["name"] for item in _named(ctx, labels)]
+        if len(names) == 1:
+            return names[0]
+        return gettext("%(first)s and %(last)s") % {"first": ", ".join(names[:-1]), "last": names[-1]}
+
+
+def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]]) -> dict:
+    return {"app": label, "state": row.state, "chosen": row.on and row.chosen, "along": along}
+
+
+@operation(
+    "base.app.enable",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=AppChangeIn,
+    output=AppChangeOut,
+    ai={
+        "description": "Turns on one of this business's apps (by its id in base.app.list), with the apps it needs, "
+        "which come along: it shows in the menu and can be used, with the data it had. Refused when the plan's "
+        "limit of apps is reached (turn one off, or upgrade the plan on erplora.com) or a paid app is not subscribed.",
+        "risk": "normal",
+    },
+)
+def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
+    """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
+    paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
+    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this)."""
+    with activation.changing(ctx.scope.key):
+        return _enable(ctx, data)
+
+
+def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
+    hub = _business_hub(ctx)
+    _business_module(ctx, data.app, hub)
+    graph = activation.module_graph()
+    blocked = entitlement.blocked_apps(ctx.scope)
+    for label in [data.app, *sorted(activation.needs([data.app], graph))]:
+        if label in blocked:
+            raise entitlement.refused(label, ctx.language)
+    if not activation.enabling(data.app, activation.states_of(ctx.scope), graph):
+        return _app_answer(data.app, activation.Activation(activation.ON, True), [])
+    current = _locked_states(ctx, graph)
+    changes = activation.enabling(data.app, current, graph)
+    if changes.get(data.app, current[data.app]).chosen and not (current[data.app].on and current[data.app].chosen):
+        limit = queries.app_limit(hub)
+        shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
+        enabled = activation.chosen_on(current, among=shown)
+        if limit is not None and enabled >= limit:
+            with translation.override(ctx.language):
+                message = ngettext(
+                    "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off.",
+                    "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off.",
+                    limit,
+                ) % {"count": limit}
+            raise AppLimitReached(message, max_apps=limit, enabled=enabled)
+    _write_states(ctx.scope.key, changes)
+    if hub is not None and not hub.is_demo:
+        _sync_photo_blocks(hub, changes)
+    along = [label for label in changes if label != data.app]
+    record_event(ctx, events.APP_ENABLED, {"app": data.app, "along": along})
+    return _app_answer(data.app, activation.Activation(activation.ON, True), _named(ctx, along))
+
+
+@operation(
+    "base.app.disable",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=AppChangeIn,
+    output=AppChangeOut,
+    ai={
+        "description": "Turns off one of this business's apps (by its id in base.app.list): it leaves everyone's menu "
+        "and its screens stop opening; the apps that came along only with it go off too. Nothing is deleted: turned "
+        "on again, it has its data. Refused while another app on needs it, or when the app itself says why not yet.",
+        "risk": "high",
+    },
+)
+def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
+    """BASE-F23/F25: the app off, and what came along only with it. 409 ``base.app_required`` while an app on needs
+    it (naming the ones to turn off first); 409 ``base.app_vetoed`` when it, or one that would go off with it, refuses
+    (``can_disable``, FIX-BASE-APP-TURN-OFF-VETO). Its tables are never dropped."""
+    with activation.changing(ctx.scope.key):
+        return _disable(ctx, data)
+
+
+def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
+    _business_module(ctx, data.app, _business_hub(ctx))
+    graph = activation.module_graph()
+    if not activation.states_of(ctx.scope)[data.app].on:
+        return _app_answer(data.app, activation.OFF_ROW, [])
+    current = _locked_states(ctx, graph)
+    if not current[data.app].on:
+        return _app_answer(data.app, activation.OFF_ROW, [])
+    needed = activation.required_by(data.app, current, graph)
+    if needed:
+        # The ones to turn off: those chosen (what came along goes off with them).
+        first = [label for label in needed if current[label].chosen] or needed
+        with translation.override(ctx.language):
+            message = gettext("Turn off %(apps)s first.") % {"apps": _names_said(ctx, first)}
+        raise AppRequired(message, required_by=needed)
+    changes = activation.disabling(data.app, current, graph)
+    vetoed = activation.veto(list(changes), ctx=ctx)
+    if vetoed is not None:
+        raise AppVetoed(vetoed[1], app=vetoed[0])
+    _write_states(ctx.scope.key, changes)
+    along = [label for label in changes if label != data.app]
+    record_event(ctx, events.APP_DISABLED, {"app": data.app, "along": along})
+    return _app_answer(data.app, activation.OFF_ROW, _named(ctx, along))

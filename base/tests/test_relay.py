@@ -301,6 +301,7 @@ def test_reverting_the_migration_gives_back_only_the_events_it_held_back(worker_
 # ── Only the apps that are on (trap 4) ────────────────────────────────────────────────────────
 
 
+@pytest.mark.django_db  # which apps are on is the business's: its rows (base.activation)
 def test_listeners_of_an_event():
     def event(name: str) -> OutboxEvent:
         return OutboxEvent(scope_kind="host", scope_key="a", name=name)
@@ -312,8 +313,9 @@ def test_listeners_of_an_event():
     assert relay.listeners(event("demo.item.created")) == ["flow"]
 
 
-def test_phase_1_has_every_installed_app_on():
-    # base.session.me lists every module as «on»: phase 1 applies no rights yet.
+@pytest.mark.django_db
+def test_a_business_that_never_turned_an_app_off_has_every_installed_app_on():
+    # base.session.me lists every module as «on»: no right is missing and nothing was turned off (base.activation).
     assert relay.active_apps(A) == frozenset(config.label for config in all_live_app_configs())
 
 

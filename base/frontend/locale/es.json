@@ -97,7 +97,7 @@
       "configure": "Configurar"
     },
     "plan": {
-      "upgrade": "Actualizar plan"
+      "upgrade": "Mejorar plan"
     },
     "userMenu": {
       "account": "Mi cuenta",
@@ -129,7 +129,8 @@
       "state": {
         "on": "Activa",
         "installed": "Instalada",
-        "blocked": "Necesita suscripción"
+        "blocked": "Necesita suscripción",
+        "off": "Desactivada"
       },
       "right": {
         "free": "Gratis",
@@ -139,7 +140,7 @@
         "missing": "De pago"
       },
       "open": "Abrir",
-      "buy": "Contratar en erplora.com",
+      "buy": "Mejorar plan",
       "buyWhere": "Se contrata en erplora.com, desde tu cuenta de ERPlora.",
       "entity": {
         "one": "app",
@@ -155,7 +156,38 @@
         "all": "No hay apps que enseñar.",
         "paid": "Ninguna app se vende aparte: todas vienen con tu plan."
       },
-      "noResults": "No hay apps que coincidan con tu búsqueda."
+      "noResults": "No hay apps que coincidan con tu búsqueda.",
+      "toggle": {
+        "on": "Activar",
+        "off": "Desactivar"
+      },
+      "turnedOn": "{app} está activada.",
+      "turnedOff": "{app} está desactivada.",
+      "alsoOn": "También se ha activado: {apps}.",
+      "alsoOff": "También se ha desactivado: {apps}.",
+      "confirmOn": {
+        "title": "¿Activar {app}?",
+        "message": "{app} necesita {apps}: se activa con ella. | {app} necesita {apps}: se activan con ella.",
+        "confirm": "Activar",
+        "cancel": "Cancelar"
+      },
+      "confirmOff": {
+        "title": "¿Desactivar {app}?",
+        "message": "Sale del menú de todos en este negocio. No se borra nada: al volver a activarla, tiene sus datos.",
+        "along": "{apps} se desactiva con ella: solo la necesitaba {app}. | {apps} se desactivan con ella: solo las necesitaba {app}.",
+        "confirm": "Desactivar",
+        "cancel": "Cancelar"
+      },
+      "offFirst": "Desactiva antes {apps}.",
+      "changeFailed": "No se ha podido cambiar {app}: {reason}",
+      "limit": {
+        "heading": "El límite de apps de tu plan",
+        "body": "Has llegado al límite de {max} app de tu plan. Mejora el plan o desactiva una. | Has llegado al límite de {max} apps de tu plan. Mejora el plan o desactiva una."
+      },
+      "counter": {
+        "limited": "{enabled} de {max} apps activadas",
+        "unlimited": "1 app activada · Sin límite | {enabled} apps activadas · Sin límite"
+      }
     },
     "appBlocked": {
       "checking": "Comprobando por qué no se abre esta app…",
@@ -243,7 +275,7 @@
         "failed": "Falló",
         "empty": "Nada que copiar",
         "discarded": "Descartado",
-        "inactive": "App apagada",
+        "inactive": "App desactivada",
         "unknown": "No está en este negocio",
         "notSelected": "No elegida"
       },
@@ -275,7 +307,7 @@
         "backup": "Copia de seguridad",
         "template": "Plantilla",
         "appsHint": "Elige qué apps cargar. Lo que ya tienes en tu negocio se queda como está.",
-        "appOff": "Esta app está apagada en tu negocio: no se cargará nada suyo.",
+        "appOff": "Esta app está desactivada en tu negocio: no se cargará nada suyo.",
         "appUnknown": "Este negocio no tiene esta app: no se cargará nada suyo.",
         "personal": "Datos personales: solo se cargan desde una copia de seguridad.",
         "dropped": "Nunca se carga aquí",
@@ -532,7 +564,7 @@
         "ended": "Caducó o se cerró. Vuelve a entrar.",
         "deviceLimitTitle": "Sesión abierta en otro dispositivo",
         "deviceLimit": "Tu plan cubre un dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí, o amplía los dispositivos de tu plan.",
-        "upgrade": "Actualizar plan"
+        "upgrade": "Mejorar plan"
       }
     },
     "pinSetup": {
@@ -1092,7 +1124,7 @@
       "goTo": "Ir a {name}",
       "retry": "Reintentar",
       "signIn": "Volver a entrar",
-      "upgrade": "Mejorar el plan",
+      "upgrade": "Mejorar plan",
       "askOwner": "Pídele a quien administra el negocio que mejore el plan.",
       "usage": "Te quedan {left} de {limit} mensajes este mes.",
       "usageSpent": "Has usado los {limit} mensajes de este mes.",
@@ -1197,7 +1229,8 @@
           "id": "Registro",
           "ids": "Registros",
           "title": "Título",
-          "category": "Categoría"
+          "category": "Categoría",
+          "app": "App"
         }
       },
       "report": {

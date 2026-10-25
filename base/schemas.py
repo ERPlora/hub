@@ -43,7 +43,8 @@ class MenuGroup(Schema):
 
 class AppState(Schema):
     label: str
-    # Phase 1: every installed app is "on"; activation per hub comes in phase 2.
+    # "off": no right to it (base.entitlement) or turned off by the business (base.activation); "activating" is
+    # phase 2's, while its tables are made.
     state: Literal["on", "activating", "off"]
 
 
@@ -336,11 +337,14 @@ class AppOut(Schema):
     #: Where its right comes from: ``free``, ``plan``, ``purchase``, ``required`` (with an app that needs it) or
     #: ``missing``.
     right: Literal["free", "plan", "purchase", "required", "missing"]
-    #: ``on``, or ``blocked`` while the business has no right to it (phase 2 adds turned off, activating, failed).
-    state: Literal["on", "blocked"]
+    #: ``on``, ``off`` (the business turned it off, or never on), or ``blocked`` while the business has no right to
+    #: it (phase 2 adds activating and failed).
+    state: Literal["on", "off", "blocked"]
+    #: The business turned it on itself (what the plan's limit counts); what came along with another app is not.
+    chosen: bool
     #: The first screen of its menu this person may open; ``None``: «Open» is not offered.
     path: str | None
-    #: What it needs, transitively (it comes along with it), and the apps that need it.
+    #: What it needs, transitively (it comes along with it), and the apps on that need it (they go off first).
     requires: list[str]
     required_by: list[str]
 
@@ -349,6 +353,33 @@ class AppListOut(Schema):
     apps: list[AppOut]
     #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
     store_url: str
+    #: erplora.com's plans of this business, where a higher limit is bought.
+    plan_url: str
+    #: How many apps the plan lets the business choose (``plan.max_apps`` of the SaaS's photo); ``None``: no limit.
+    max_apps: int | None
+    #: How many it chose and are on: what the limit counts (what came along with them does not).
+    enabled: int
+
+
+class AppChangeIn(Schema):
+    """``base.app.enable`` and ``base.app.disable``: one app of the business, by its id."""
+
+    app: str = Field(max_length=100, description="The app's id, as base.app.list gives it (e.g. «task»).")
+
+
+class AppNameOut(Schema):
+    id: str
+    name: str
+
+
+class AppChangeOut(Schema):
+    """The app as it is now, and the apps that went on (or off) with it."""
+
+    app: str
+    state: Literal["on", "off"]
+    chosen: bool
+    #: Turned on with it because it needs them, or off with it because nothing else needs them any more; by name.
+    along: list[AppNameOut]
 
 
 class PlanUsageIn(Schema):

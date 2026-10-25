@@ -9,6 +9,7 @@ from live.meta import module_configs
 
 from base import live as base_live
 from base.events import (
+    APP_EVENTS,
     BLUEPRINT_IMPORTED,
     FAILED_EVENT_CREATED,
     FAILED_EVENT_DISCARDED,
@@ -45,20 +46,22 @@ def test_the_three_queries_and_their_events():
         if name.startswith("base.") and not name.startswith(WAY_IN + PEOPLE)
     }
     assert on == {
-        "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED, *DATA}),
-        "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED, *DATA}),
+        # An app turned on or off by the business (PLAN-HUB §9) brings its hooks to the Home or takes them away.
+        "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED, *DATA, *APP_EVENTS}),
+        "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED, *DATA, *APP_EVENTS}),
         # The failed events the relay gives up on, resent or discarded change the bell's row (APP-BASE-7).
-        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA, *FAILED_EVENTS}),
-        "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED}),
-        # Apps (APP-BASE-4): the photo gives or takes the right to a paid module.
-        "base.app.list": [HUB_STATE_APPLIED],
+        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA, *FAILED_EVENTS, *APP_EVENTS}),
+        "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED, *APP_EVENTS}),
+        # Apps (APP-BASE-4): the photo gives or takes the right to a paid module; the business turns them on and off.
+        "base.app.list": sorted({HUB_STATE_APPLIED, *APP_EVENTS}),
         "base.plan.usage": [HUB_STATE_APPLIED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
         "base.import.list": sorted(DATA),
         # Business settings (APP-BASE-6): the SaaS registers the business again when it changes on erplora.com.
         "base.business.get": [HUB_REGISTERED],
-        # System (APP-BASE-7): the failed events, and the photo (it turns the app they were for on or off).
-        "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
+        # System (APP-BASE-7): the failed events, and the photo or the business (they turn the app they were for on or
+        # off).
+        "base.failed_event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS, *APP_EVENTS}),
         # The status re-runs on the photo and on every reconnection (a deploy's new release shows by itself); the log
         # also when a failed event appears, is resent or discarded (its level changes).
         "base.system.status": [HUB_STATE_APPLIED],
@@ -71,7 +74,7 @@ def test_the_three_queries_and_their_events():
 def test_the_union_is_of_every_module_whatever_the_setting():
     """Declarations are fixed from the start: the demo's events are followed even where its hooks are hidden."""
     assert "demo.item.created" in base_live.events_of("setup")
-    assert base_live.events_of("bell") == sorted({*declared("bell"), HUB_STATE_APPLIED})
+    assert base_live.events_of("bell") == sorted({*declared("bell"), HUB_STATE_APPLIED, *APP_EVENTS})
 
 
 def test_a_new_demo_item_re_runs_the_list_and_the_bell_but_not_the_panels():

@@ -1,10 +1,12 @@
 // The gate of an app's screens (BASE-G132, G134; the old hub's entitlement and activation gates of
 // `router/index.ts`, which the shell's router leaves to the project): a route of an app that `base.session.me` gives
-// `off` — a paid app the business has no right to (`base.entitlement`); phase 2 adds turned off and activating —
+// `off` — a paid app the business has no right to (`base.entitlement`) or one it turned off (`base.activation`);
+// phase 2 adds activating —
 // mounts base's «why it does not open» (AppBlockedPage) in the same address, as the shell's web-only gate mounts
-// NotInAppPage: a redirect would lose where the link pointed. The server refuses the app's operations anyway (402):
-// this only spares the person a screen of errors. An app the session does not list (this person may not see it) is
-// left to its own screens, which say so; nothing is decided before the session arrives.
+// NotInAppPage: a redirect would lose where the link pointed. The server refuses the app's operations anyway (402, or
+// 404 `app_inactive` when it is off): this only spares the person a screen of errors. An app the session does not
+// list (this person may not see it) is left to its own screens, which say so; nothing is decided before the session
+// arrives.
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Ref } from 'vue';
 import type { RouteLocationNormalized, RouteLocationRaw, RouteRecordRaw } from 'vue-router';

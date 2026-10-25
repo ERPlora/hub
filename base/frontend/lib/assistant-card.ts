@@ -49,6 +49,7 @@ export function actionKey(action: string): string {
 const FIELDS = [
   'name', 'price', 'amount', 'note', 'notes', 'status', 'email', 'phone', 'quantity', 'qty', 'description',
   'duration_minutes', 'date', 'time', 'starts_at', 'ends_at', 'customer_id', 'reason', 'id', 'ids', 'title', 'category',
+  'app',
 ];
 
 export function fieldLabelKey(name: string): string | null {

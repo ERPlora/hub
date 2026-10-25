@@ -2676,9 +2676,15 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema (APP-BASE-7)» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
   de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
   en la misma dirección, como `NotInAppPage` del shell, y se comprueba también la primera dirección antes de montar).
-  «Contratar en erplora.com» solo con `base.administer_hub` y `useSurface().isWeb`. e2e: `tests/e2e/base-apps.spec.ts`.
-- Fase 1: no hay activación por negocio (`AppActivation`, `base.app.*`, 202 «Activando…», 409 `base.app_required`,
-  el veto de VeriFactu): BASE-F18, F19 (su aviso), F21–F25 quedan `parcial` hasta la fase 2 (FIX-BASE-APP-TURN-OFF-VETO).
+  «Mejorar plan» (antes «Contratar en erplora.com») solo con `base.administer_hub` y `useSurface().isWeb`. e2e:
+  `tests/e2e/base-apps.spec.ts` y `tests/e2e/base-app-activation.spec.ts`.
+- Activación por negocio y tope del plan (hub#256, PLAN-HUB §9): `base.AppActivation` (por `host`; un negocio sin
+  filas tiene todo encendido y solo sus raíces elegidas, `base/activation.py`), `base.app.enable`/`base.app.disable`
+  (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, veto
+  `can_disable` del `LiveAppConfig` → 409 `base.app_vetoed`, 402 `base.app_limit_reached` con `max_apps`/`enabled`;
+  bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
+  (caché `base.apps_off:<host>`, olvidada al COMMIT). Falta el 202 «Activando…» (fase 2) y el veto de VeriFactu (su
+  carril); el carril `base` re-tría BASE-F18, F19 y F21–F25 (y FIX-BASE-APP-TURN-OFF-VETO) contra `main`.
 
 - **Sistema (APP-BASE-7: BASE-F39…F47).** Pestañas por hash en `base/frontend/lib/system.ts` (`#resources`, `#plan`,
   `#updates`, `#events`, `#logs`; `#logs` solo con `base.administer_hub`, `#backups` → `/settings#data`, la pestaña

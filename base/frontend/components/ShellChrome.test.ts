@@ -1,6 +1,7 @@
 // base's pieces of the shell's chrome (APP-BASE-1, APP-BASE-9): at the end of the topbar, the assistant's sparkles
 // then the bell, as in the old hub — on a phone (under 768 px) folded into one «More options», as the old hub did so
-// that they never push the centred title; beside the pane, the device's notices and the assistant's panel.
+// that they never push the centred title; beside the pane, the device's notices, the assistant's panel and the
+// business's apps followed live (AppsFollower).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BellCounter } from '../operations';
@@ -35,6 +36,12 @@ describe('the chrome of base', () => {
     const { wrapper } = await mountBase(BackgroundChrome);
     expect(wrapper.find('[data-testid="device-notices"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="assistant-panel"]').exists()).toBe(true);
+  });
+
+  it('beside the pane, the business’s apps followed live: the menu follows an app turned on or off (PLAN-HUB §9)', async () => {
+    const m = await mountBase(BackgroundChrome);
+    await m.live();
+    expect(m.client.stream.subscriptions('base.app.list').map((sub) => sub.params)).toEqual([{}]);
   });
 });
 

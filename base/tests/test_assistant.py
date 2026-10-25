@@ -32,6 +32,7 @@ def ctx(permissions=MANAGER, *, actor="ana", language="en", scope=A):
 # ── Tools: what the assistant may use for this person (BASE-G118; gh:hub#11) ─────────────────────────────────────
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_a_tool_is_named_without_dots_and_read_back_from_its_name():
     assert assistant.tool_name("cash_register.session.close") == "cash_register__session__close"
     tools = assistant.catalog(ctx({"*"}))
@@ -39,6 +40,7 @@ def test_a_tool_is_named_without_dots_and_read_back_from_its_name():
     assert assistant.operation_of("demo__item__nothing", tools) is None
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
     names = set(assistant.catalog(ctx(EMPLOYEE)))
     assert "demo.item.list" in names
@@ -47,6 +49,7 @@ def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
     assert "base.access.settings_update" not in names
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(
     "name, why",
     [
@@ -60,11 +63,13 @@ def test_what_is_not_a_tool_is_never_offered_even_to_who_may_do_everything(name,
     assert name not in assistant.catalog(ctx({"*"})), why
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_an_app_the_business_has_no_right_to_offers_no_tool(monkeypatch):
     monkeypatch.setattr(entitlement, "blocked_apps", lambda scope: frozenset({"demo"}))
     assert not [name for name in assistant.catalog(ctx({"*"})) if name.startswith("demo.")]
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_assistants_own_operations_are_not_its_tools():
     assert not [name for name in assistant.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
 
@@ -72,12 +77,14 @@ def test_the_assistants_own_operations_are_not_its_tools():
 # ── By relevance: a turn offers the tools of what was asked, never the whole catalogue (PLAN §30) ─────────────────
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_a_turn_offers_at_most_its_share_of_the_catalogue():
     tools = assistant.catalog(ctx({"*"}))
     assert len(tools) > assistant.MAX_TOOLS
     assert len(assistant.relevant(tools, ["hola"], "es")) <= assistant.MAX_TOOLS
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_app_named_in_the_persons_own_language_comes_first():
     tools = assistant.catalog(ctx({"*"}))
     offered = assistant.relevant(tools, ["¿Cuántos clientes tengo este mes?"], "es")
@@ -87,12 +94,14 @@ def test_the_app_named_in_the_persons_own_language_comes_first():
     assert "customer.customer.list" in first
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_what_the_person_asks_to_do_ranks_the_operation_that_does_it():
     tools = assistant.catalog(ctx({"*"}))
     offered = [op.name for op in assistant.relevant(tools, ["crea un servicio Corte caballero a 15 €"], "es")]
     assert "service.service.create" in offered
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
     """gh:hub#1044: asked «what version of ERPlora do I have?», the old assistant said there was none."""
     tools = assistant.catalog(ctx({"base.view_home", "base.administer_hub"}))
@@ -101,6 +110,7 @@ def test_the_version_of_erplora_is_at_hand_for_who_runs_the_business():
     assert "base.system.status" not in assistant.catalog(ctx(EMPLOYEE))
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_checklist_read_is_always_at_hand():
     tools = assistant.catalog(ctx({"*"}))
     assert "base.setup.status" in [op.name for op in assistant.relevant(tools, ["zzz"], "es")]

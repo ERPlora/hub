@@ -22,10 +22,11 @@ from live.meta import Category, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import operation
 
-from base import access, blueprint, business, entitlement, files, home, system
+from base import access, activation, blueprint, business, entitlement, files, home, system
 from base.auth import saas_url
 from base.models import (
     AccessSettings,
+    AppActivation,
     Credential,
     EventDelivery,
     Hub,
@@ -106,14 +107,15 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
 
     Menu and apps list modules only (``home.shown_modules``: the reference app only in development, the tests
     or a demo's hub): a platform app such as ``base`` is always on and never shows. A module its business has no
-    right to (``base.entitlement``) is ``off`` and has no menu: the shell's gate tells why its screens do not open. ``demo`` says when the demo
-    ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing else, which
+    right to (``base.entitlement``) or turned off (``base.activation``) is ``off`` and has no menu: the shell's gate
+    tells why its screens do not open. ``demo`` says when the demo ends, on a demo's hub only. No permission: an anonymous visitor gets ``user: None`` and nothing else, which
     tells the SPA to send it to the login.
     """
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
     demo = _demo_hub(ctx)
-    blocked = entitlement.blocked_apps(ctx.scope)
+    # Not on: a paid module without its right, or one the business turned off (base.activation).
+    blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
     with translation.override(ctx.language):
         visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
@@ -306,14 +308,26 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
 @operation("base.app.list", kind="query", permission=VIEW_HOME, input=AppListIn, output=AppListOut)
 def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     """The Apps screen: every module the scope shows, from its own config in this process (PLAN §20.4.1; never the
-    SaaS's catalog), with where its right comes from and its state (``base.entitlement``), the first screen this
-    person may open, what it needs (it comes along with it) and what needs it, and erplora.com's Store of this
-    business, where a paid one is bought. Phase 1 has every module the business has a right to on."""
+    SaaS's catalog), with where its right comes from and its state (``base.entitlement``: ``blocked`` without it;
+    else ``on`` or ``off`` as the business turned it, ``base.activation``), whether the business chose it, the first
+    screen this person may open, what it needs (it comes along with it) and the apps on that need it (they go off
+    first); and the plan's limit of chosen apps against the chosen ones on (PLAN-HUB §9), erplora.com's Store and its
+    plans of this business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
-    configs = home.shown_modules(demo_hub=bool(hub and hub.is_demo))
+    demo = bool(hub and hub.is_demo)
+    configs = home.shown_modules(demo_hub=demo)
+    shown = {config.label for config in configs}
     blocked = entitlement.blocked_apps(ctx.scope)
     rights = entitlement.entitlements(None if hub is None or hub.is_demo else hub.state, now=timezone.now())
+    graph = activation.module_graph()
+    current = activation.states_of(ctx.scope)
     needs = {config.label: entitlement.requires_of(config.label) for config in configs}
+
+    def state(label: str) -> str:
+        if label in blocked:
+            return "blocked"
+        return "on" if current[label].on else "off"
+
     with translation.override(ctx.language):
         return {
             "apps": [
@@ -325,16 +339,39 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                     "category_label": str(Category(config.category).label),
                     "summary": str(config.summary),
                     "premium": bool(config.premium),
-                    "right": entitlement.FREE if hub is not None and hub.is_demo else rights[config.label],
-                    "state": "blocked" if config.label in blocked else "on",
-                    "path": None if config.label in blocked else _first_screen(ctx, config),
+                    "right": entitlement.FREE if demo else rights[config.label],
+                    "state": state(config.label),
+                    "chosen": current[config.label].on and current[config.label].chosen,
+                    "path": _first_screen(ctx, config) if state(config.label) == "on" else None,
                     "requires": sorted(needs[config.label]),
-                    "required_by": sorted(label for label, required in needs.items() if config.label in required),
+                    "required_by": [
+                        label for label in activation.required_by(config.label, current, graph) if label in shown
+                    ],
                 }
                 for config in configs
             ],
             "store_url": saas_url(f"/store/modules?business={hub.id}") if hub is not None else "",
+            "plan_url": saas_url(f"/store/plans?business={hub.id}") if hub is not None and not demo else "",
+            "max_apps": app_limit(hub),
+            "enabled": activation.chosen_on(current, among=shown),
         }
+
+
+def app_limit(hub: Hub | None) -> int | None:
+    """The plan's limit of apps the business chooses (``plan.max_apps`` of its last photo); ``None``: no limit (none
+    on a demo, which has no plan, nor on a host without its row)."""
+    if hub is None or hub.is_demo:
+        return None
+    return activation.plan_limit(hub.state)
+
+
+def app_activations(host: str) -> dict[str, activation.Activation]:
+    """The rows of ``host``'s business (``base.activation.states_of`` reads them): empty while it never changed
+    anything."""
+    return {
+        app: activation.Activation(state, chosen)
+        for app, state, chosen in AppActivation.objects.filter(host=host).values_list("app", "state", "chosen")
+    }
 
 
 def _shell_icon(config: Any) -> str:
@@ -1250,9 +1287,10 @@ def api_key_out(key: ApiKey) -> dict[str, Any]:
 
 
 def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
-    """The modules this business has (not blocked by its plan) that publish operations (``expose_api``), each with
-    whether it publishes queries (a key may read it) and commands (write), by name in who asks's language."""
-    blocked = entitlement.blocked_apps(ctx.scope)
+    """The modules this business has on (not blocked by its plan, not turned off) that publish operations
+    (``expose_api``), each with whether it publishes queries (a key may read it) and commands (write), by name in who
+    asks's language."""
+    blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
     published: dict[str, set[str]] = {}
     for op in operation_registry.values():
         if op.expose_api:
