@@ -248,6 +248,67 @@ describe('rowsOf / widgetView (BASE-G166)', () => {
   });
 });
 
+// BASE-F06 — a value a row does not have (Cash register's «Recent discrepancies»: a session closed without a count has
+// no difference) painted as «0,00 €», a discrepancy of zero that never was. As Square, Toast, Shopify, Lightspeed or
+// Odoo say a cell without a value: «—» and no bar; the row stays, so the session is still in sight. A real 0 is a 0.
+describe('a value the row does not have (BASE-F06): «—», never a made-up 0', () => {
+  const discrepancies = widget('cash_register.recent_sessions', {
+    kind: 'bar-list',
+    map: { label: 'number', value: 'difference' },
+    options: { valueFormat: 'currency' },
+  });
+  const barsOf = (rows: Record<string, unknown>[], locale = 'es') => {
+    const view = widgetView(discrepancies, { rows }, locale, { money: EUR });
+    if (view.kind !== 'bar-list') throw new Error(`expected a bar-list, got ${view.kind}`);
+    return view.bars;
+  };
+
+  it('a bar-list row without its value says «—» with no share, and a real 0 is still «0,00 €»', () => {
+    const bars = barsOf([
+      { number: 'CS-3', difference: 250 },
+      { number: 'CS-2', difference: null },
+      { number: 'CS-1', difference: 0 },
+    ]);
+    expect(bars).toEqual([
+      { label: 'CS-3', value: 250, text: '2,50 €', share: 1 },
+      { label: 'CS-2', value: null, text: '—', share: 0 },
+      { label: 'CS-1', value: 0, text: '0,00 €', share: 0 },
+    ]);
+  });
+
+  it('absent or blank is no value either; a value that is no number is still left out', () => {
+    const bars = barsOf([{ number: 'CS-4' }, { number: 'CS-3', difference: '' }, { number: 'CS-2', difference: ' ' }, { number: 'CS-1', difference: 'n/a' }]);
+    expect(bars.map((bar) => [bar.label, bar.value, bar.text])).toEqual([
+      ['CS-4', null, '—'],
+      ['CS-3', null, '—'],
+      ['CS-2', null, '—'],
+    ]);
+  });
+
+  it('only rows without a value: still the rows, never «No data» nor a list of zeros', () => {
+    expect(barsOf([{ number: 'CS-1', difference: null }], 'en')).toEqual([{ label: 'CS-1', value: null, text: '—', share: 0 }]);
+  });
+
+  it('a day of a chart without its value says «—», and the other days keep their share', () => {
+    const chart = widget('sale.last_7_days', { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } });
+    const view = widgetView(chart, { rows: [{ day: '2026-10-22', total: null }, { day: '2026-10-23', total: 500 }] }, 'es', { money: EUR });
+    expect(view).toMatchObject({
+      kind: 'chart',
+      bars: [
+        { key: '2026-10-22', value: null, text: '—', share: 0 },
+        { key: '2026-10-23', value: 500, text: '5,00 €', share: 1 },
+      ],
+    });
+  });
+
+  it('a sparkline skips a point without its value and never says «null» as its figure', () => {
+    const spark = widget('s.days', { kind: 'sparkline', map: { series: 'n', value: 'today' } });
+    expect(widgetView(spark, [{ n: 1, today: null }, { n: null }, { n: 3 }], 'en')).toEqual({ kind: 'sparkline', series: [1, 3], value: undefined });
+    const last = widget('s.days', { kind: 'sparkline', map: { series: 'n' } });
+    expect(widgetView(last, [{ n: 1 }, { n: 0 }, { n: null }], 'en')).toEqual({ kind: 'sparkline', series: [1, 0], value: '0' });
+  });
+});
+
 // BASE-F06 — a chart of business days (Sales' «Sales, last 7 days»): the old hub's gh:hub#2392 painted each day
 // as `2026-10-17` and no amount at all.
 describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {

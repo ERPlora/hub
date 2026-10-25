@@ -517,8 +517,10 @@ Entra: los paneles que declara cada app encendida; los datos de cada uno, pedido
 quien mira.
 Sale: nada guardado en el hub.
 Si falla: un panel sin datos dice «Sin datos»; uno cuyos datos no se pueden leer, «No disponible», nunca
-una cifra vieja o inventada. Si no se puede leer el tablero: «No se han podido cargar los paneles» con
-«Reintentar».
+una cifra vieja o inventada. Una fila de una lista con barras (o un día de un gráfico) que no tiene cifra,
+como una sesión de caja cerrada sin recuento, sale con una raya (—) y sin barra, nunca como un cero; un cero
+de verdad sí sale como cero (0,00 €). Si no se puede leer el tablero: «No se han podido cargar los paneles»
+con «Reintentar».
 Implicados: ninguno
 
 ### BASE-F07 Personalizar el tablero de paneles
