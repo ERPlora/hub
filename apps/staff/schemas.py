@@ -15,6 +15,7 @@ from uuid import UUID
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     AfterValidator,
@@ -375,6 +376,7 @@ class BulkCreateIn(Schema):
     members: list[BulkMemberIn] = Field(
         min_length=1,
         max_length=MAX_BULK,
+        title=gettext_noop("Staff members"),
         description="The people to add, 1 to 100 rows; each one is born active.",
     )
 
@@ -701,6 +703,8 @@ def _a_week(value: list[DayIn]) -> list[DayIn]:
 
 Week = Annotated[list[DayIn], AfterValidator(_a_week)]
 D_DAYS = "The week: one entry per weekday, at least one working day; a weekday not sent is a day off."
+#: How the schedule form names the week (the assistant's card names the datum by it).
+WEEK = gettext_noop("Week")
 
 
 def _valid_range(value: dt.date | None, info: ValidationInfo) -> dt.date | None:
@@ -723,7 +727,7 @@ class ScheduleIn(Schema):
     effective_until: dt.date | None = Field(
         None, description="Last day it applies (YYYY-MM-DD); empty = no end."
     )
-    days: Week = Field(description=D_DAYS)
+    days: Week = Field(title=WEEK, description=D_DAYS)
     member_id: UUID | None = Field(None, description=D_MEMBER_ID)
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
@@ -751,7 +755,7 @@ class ScheduleUpdateIn(Schema):
     effective_until: dt.date | None = Field(
         None, description="Last day it applies; null = no end."
     )
-    days: Week = Field(description=D_DAYS)
+    days: Week = Field(title=WEEK, description=D_DAYS)
 
     _valid_range = field_validator("effective_until")(_valid_range)
 
