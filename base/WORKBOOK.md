@@ -116,6 +116,7 @@ Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps
 tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y nombre), «Categoría» y
 «Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con». «Abrir» en la fila de una
 app que la persona puede abrir.
+«De pago» y «Precio» solo salen si alguna app se contrata aparte; hoy ninguna: todas van en todos los planes.
 
 ### La pantalla de una app que no se abre
 En la misma dirección de la pantalla de la app, el motivo: «Suscripción necesaria» o «Esta app no está
@@ -717,7 +718,8 @@ Pasos:
   2. El importe de una app «De pago» está en la Tienda de erplora.com; quien administra el negocio la abre desde
      «Contratar en erplora.com» (BASE-F20).
   3. «De pago» reúne solo las apps que se contratan aparte: una gratis nunca sale ahí. Si ninguna se vende
-     aparte: «Ninguna app se vende aparte: todas vienen con tu plan.».
+     aparte (hoy, todas van en todos los planes), no hay «De pago» ni «Precio», y un enlace a «De pago» abre
+     «Añadir apps».
 Entra: si cada app se contrata aparte y lo que el negocio tiene contratado en erplora.com.
 Sale: nada guardado. El hub no cobra ni enseña importes: el precio y la compra son de erplora.com.
 Si falla: sin la lista, como en «Mis apps» (BASE-F14).
