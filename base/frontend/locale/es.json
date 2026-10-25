@@ -178,6 +178,7 @@
         "confirm": "Desactivar",
         "cancel": "Cancelar"
       },
+      "refused": "No se ha cambiado nada",
       "offFirst": "Desactiva antes {apps}.",
       "changeFailed": "No se ha podido cambiar {app}: {reason}",
       "limit": {
