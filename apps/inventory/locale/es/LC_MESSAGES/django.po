@@ -420,3 +420,31 @@ msgstr "devolución vista"
 
 msgid "refunds seen"
 msgstr "devoluciones vistas"
+
+# How the assistant's card names the data of inventory's writes (titles of the schemas).
+msgid "Categories"
+msgstr "Categorías"
+
+msgid "File rows"
+msgstr "Filas del fichero"
+
+msgid "Tax rate"
+msgstr "Tipo de IVA / Impuesto"
+
+msgid "Sold out"
+msgstr "Agotado"
+
+msgid "Initial stock"
+msgstr "Stock inicial"
+
+msgid "Check only"
+msgstr "Solo revisar"
+
+msgid "Counted stock"
+msgstr "Stock contado"
+
+msgid "Sale lines"
+msgstr "Líneas de la venta"
+
+msgid "Returned lines"
+msgstr "Líneas devueltas"
