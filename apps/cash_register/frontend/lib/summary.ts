@@ -13,10 +13,16 @@ export interface SummaryItem {
 }
 
 /** The figures of `session` in the reader's language; `date` writes a date and time. */
-export function summaryItems(session: SessionOut, t: Translate, locale: string, date: (iso: string | null) => string): SummaryItem[] {
+export function summaryItems(
+  session: SessionOut,
+  t: Translate,
+  locale: string,
+  date: (iso: string | null) => string,
+  currency?: string,
+): SummaryItem[] {
   const s = session.summary;
   const closed = session.status === 'closed';
-  const money = (cents: number | null) => formatMoney(cents, locale);
+  const money = (cents: number | null) => formatMoney(cents, locale, currency);
   const item = (key: string, value: string): SummaryItem => ({ key, label: t(`cash_register.summary.${key}`), value });
   const closedBy = !closed
     ? '—'
@@ -43,7 +49,7 @@ export function summaryItems(session: SessionOut, t: Translate, locale: string, 
     item('gifts', money(s.total_gifts)),
     item('expected', money(s.expected_cash)),
     item('counted', closed ? money(s.counted) : '—'),
-    item('difference', closed ? formatSignedMoney(s.difference, locale) : '—'),
+    item('difference', closed ? formatSignedMoney(s.difference, locale, currency) : '—'),
   );
   if (session.opening_notes) items.push(item('openingNotes', session.opening_notes));
   if (session.closing_notes) items.push(item('closingNotes', session.closing_notes));

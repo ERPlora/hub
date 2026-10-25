@@ -33,7 +33,7 @@ import OpenSessionModal from '../components/OpenSessionModal.vue';
 import UnassignedModal from '../components/UnassignedModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, formatSignedMoney } from '../lib/money';
+import { formatMoney, formatSignedMoney, useCurrency } from '../lib/money';
 import { AMOUNT_RANGES, filterParams, filtersInUse, SESSION_STATUSES, unreadableAmounts } from '../lib/sessionFilters';
 import type { CountType, SessionRow } from '../operations';
 import { cashRegisterTabs } from '../tabs';
@@ -46,18 +46,19 @@ const canCount = can('cash_register.add_count');
 const canClose = can('cash_register.close_session');
 const t = useT();
 const locale = useLocale();
+const currency = useCurrency();
 const router = useRouter();
 
 const current = useLive('cash_register.session.current', {});
-/** The table's filters (its funnel), as typed: the amounts in euros. A filter not in use is absent. */
+/** The table's filters (its funnel), as typed: the amounts in the business's money. A filter not in use is absent. */
 const filters = ref<DataTableFilters>({});
 const table = useServerTable('cash_register.session.list', {
   sort: 'opened_at',
   dir: 'desc',
   maxSearch: 24,
-  filters: () => filterParams(filters.value),
+  filters: () => filterParams(filters.value, currency.value),
   // Only the filters that really apply narrow the list (an amount it cannot read does not).
-  narrowed: () => filtersInUse(filters.value) > 0,
+  narrowed: () => filtersInUse(filters.value, currency.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 
@@ -66,7 +67,7 @@ const blocked = computed(() => (error.value?.code === 'app_inactive' || error.va
 /** What the server refused (a 422 of the list) and the amounts it cannot read, under each filter: the rows stay. */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...(error.value?.fields ?? {}),
-  ...Object.fromEntries(unreadableAmounts(filters.value).map((name) => [name, t('cash_register.filters.amountInvalid')])),
+  ...Object.fromEntries(unreadableAmounts(filters.value, currency.value).map((name) => [name, t('cash_register.filters.amountInvalid')])),
 }));
 const tableError = computed(() =>
   status.value === 'error' && !Object.keys(error.value?.fields ?? {}).length ? (error.value?.message ?? t('cash_register.sessions.loadError')) : undefined,
@@ -84,7 +85,7 @@ const unassignedCount = computed(() => current.data.value?.unassigned_count ?? 0
 const unassignedCash = computed(() => current.data.value?.unassigned_cash ?? 0);
 
 // ── Columns ──────────────────────────────────────────────────────────────────────────────────────
-const money = (cents: number | null): string => formatMoney(cents, locale.value);
+const money = (cents: number | null): string => formatMoney(cents, locale.value, currency.value);
 /** An amount column's filter: from–to, typed in euros (`AMOUNT_RANGES`). */
 const amountFilter = (range: keyof typeof AMOUNT_RANGES) => ({ type: 'range' as const, amount: true, keys: AMOUNT_RANGES[range] });
 
@@ -134,7 +135,7 @@ const columns = computed<DataTableColumn<SessionRow>[]>(() => [
     label: t('cash_register.sessions.columns.difference'),
     sortable: true,
     align: 'right',
-    format: (_, row) => formatSignedMoney(row.difference, locale.value),
+    format: (_, row) => formatSignedMoney(row.difference, locale.value, currency.value),
     filter: amountFilter('difference'),
   },
 ]);
@@ -229,7 +230,7 @@ function onCounted(count: { type: CountType; total: number }): void {
       data-testid="cash-register-unassigned"
       :heading="$t('cash_register.sessions.unassigned.heading')"
     >
-      {{ $t('cash_register.sessions.unassigned.body', { count: unassignedCount, cash: formatMoney(unassignedCash, locale) }, unassignedCount) }}
+      {{ $t('cash_register.sessions.unassigned.body', { count: unassignedCount, cash: formatMoney(unassignedCash, locale, currency) }, unassignedCount) }}
       <template #actions>
         <ion-button
           size="small"

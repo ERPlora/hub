@@ -5,7 +5,7 @@
 import type { DataTableFilters } from '@erplora/ui/components';
 
 import type { SessionListIn, SessionStatus } from '../operations';
-import { readMoney } from './money';
+import { currencyDecimals, readMoney } from './money';
 
 export const SESSION_STATUSES: readonly SessionStatus[] = ['open', 'closed'];
 
@@ -23,35 +23,36 @@ const AMOUNT_FILTERS: readonly AmountFilter[] = Object.values(AMOUNT_RANGES).fla
 
 const filled = (text: string | undefined): text is string => (text ?? '').trim() !== '';
 
-/** An amount filter as cents; `undefined` when it is no amount (a minus only for the difference). */
-function cents(name: AmountFilter, text: string): number | undefined {
+/** An amount filter as cents of the business's `currency`; `undefined` when it is no amount (a minus only for the
+ *  difference). */
+function cents(name: AmountFilter, text: string, currency?: string): number | undefined {
   const trimmed = text.trim();
   const negative = name.startsWith('difference') && /^[-−]/.test(trimmed);
-  const read = readMoney(negative ? trimmed.slice(1) : trimmed);
+  const read = readMoney(negative ? trimmed.slice(1) : trimmed, currencyDecimals(currency), currency);
   if (!read.ok || read.cents === null) return undefined;
   return negative ? -read.cents : read.cents;
 }
 
 /** The amounts typed that are not amounts: the table says it under each. */
-export function unreadableAmounts(values: DataTableFilters): string[] {
-  return AMOUNT_FILTERS.filter((name) => filled(values[name]) && cents(name, values[name]) === undefined);
+export function unreadableAmounts(values: DataTableFilters, currency?: string): string[] {
+  return AMOUNT_FILTERS.filter((name) => filled(values[name]) && cents(name, values[name], currency) === undefined);
 }
 
 /** The filters as `cash_register.session.list` takes them. */
-export function filterParams(values: DataTableFilters): Partial<SessionListIn> {
+export function filterParams(values: DataTableFilters, currency?: string): Partial<SessionListIn> {
   const out: Partial<SessionListIn> = {};
   if (SESSION_STATUSES.includes(values.status as SessionStatus)) out.status = values.status as SessionStatus;
   if (filled(values.number)) out.number = values.number.trim();
   for (const name of AMOUNT_FILTERS) {
     const text = values[name];
     if (!filled(text)) continue;
-    const amount = cents(name, text);
+    const amount = cents(name, text, currency);
     if (amount !== undefined) out[name] = amount;
   }
   return out;
 }
 
 /** The filters that really apply (an amount it cannot read does not). */
-export function filtersInUse(values: DataTableFilters): number {
-  return Object.keys(filterParams(values)).length;
+export function filtersInUse(values: DataTableFilters, currency?: string): number {
+  return Object.keys(filterParams(values, currency)).length;
 }

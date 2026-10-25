@@ -16,6 +16,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
@@ -63,8 +64,31 @@ export const EMPLOYEE: SessionMe = {
   ],
 };
 
+/** The business of the hub (`base.business.get`): one in Spain, in euros, unless a test says another
+ *  (flow business-currency: the money of every screen is the business's). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
 export interface MountOptions {
   props?: Record<string, unknown>;
+  /** What `base.business.get` answers when the stream opens; `null`: it never answers (the currency unknown). */
+  business?: Business | null;
   path?: string;
   locale?: 'en' | 'es';
   session?: SessionMe;
@@ -101,8 +125,13 @@ export async function mountCash(component: Component, options: MountOptions = {}
     },
   });
 
-  /** Opens the stream; returns the call to push frames into. */
-  const live = (): Promise<StreamCall> => harness.goLive();
+  /** Opens the stream and answers the business, if a piece follows it; returns the call to push frames into. */
+  const live = async (): Promise<StreamCall> => {
+    const call = await harness.goLive();
+    const answer = options.business === undefined ? business() : options.business;
+    if (answer && harness.client.stream.subscriptions('base.business.get').length) await result('base.business.get', answer);
+    return call;
+  };
 
   /** The params of every live subscription to `op`. */
   const params = (op: OpName): Params[] => harness.client.stream.subscriptions(op).map((s) => s.params as Params);

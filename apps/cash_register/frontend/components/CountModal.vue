@@ -52,7 +52,7 @@ const decimals = computed(() => table.value?.decimals ?? 2);
 /** What each note or coin reads as: money of the business («50,00 €»). */
 const faceLabel = (face: string): string => formatFace(face, locale.value, table.value?.currency);
 
-const typedRead = computed(() => readMoney(typedTotal.value, decimals.value));
+const typedRead = computed(() => readMoney(typedTotal.value, decimals.value, table.value?.currency));
 const typedError = computed(() => moneyRefusal(typedRead.value, t, locale.value, table.value?.currency));
 
 /** The total counted, in minor units; `null` while a typed total is not an amount yet. */

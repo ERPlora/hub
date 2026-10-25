@@ -16,7 +16,7 @@ import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, readMoney } from '../lib/money';
+import { currencyDecimals, formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, readMoney, useCurrency } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import MoneyField from './MoneyField.vue';
 import ShiftReview from './ShiftReview.vue';
@@ -26,6 +26,7 @@ const emit = defineEmits<{ closed: []; cancel: [] }>();
 
 const t = useT();
 const locale = useLocale();
+const currency = useCurrency();
 const detail = useLive('cash_register.session.get', () => ({ session_id: props.session.id }));
 const counts = useLive('cash_register.count.list', () => ({ session_id: props.session.id, limit: 20 }));
 const checks = useLive('sale.order.list', { status: 'open', limit: 20 });
@@ -44,7 +45,7 @@ watch(
   () => counts.data.value?.rows,
   (rows) => {
     const last = rows?.find((count) => count.type === 'closing');
-    if (last && !touched.value) counted.value = moneyFieldText(last.total, locale.value);
+    if (last && !touched.value) counted.value = moneyFieldText(last.total, locale.value, currencyDecimals(currency.value));
   },
   { immediate: true },
 );
@@ -55,7 +56,7 @@ function type(value: string): void {
 }
 
 const expected = computed(() => detail.data.value?.summary.expected_cash ?? null);
-const read = computed(() => readMoney(counted.value));
+const read = computed(() => readMoney(counted.value, currencyDecimals(currency.value), currency.value));
 const difference = computed(() => (expected.value !== null && read.value.ok && read.value.cents !== null ? read.value.cents - expected.value : null));
 
 /** A reading of the review: answered, refused (the review is incomplete), off in this hub (nothing pending)
@@ -91,7 +92,7 @@ const countedError = computed(() => countedRefusal.value ?? error.value?.fields?
 
 async function confirm(): Promise<void> {
   const value = read.value;
-  countedRefusal.value = value.ok ? (value.cents === null ? t('cash_register.close.countedRequired') : null) : moneyRefusal(value, t, locale.value);
+  countedRefusal.value = value.ok ? (value.cents === null ? t('cash_register.close.countedRequired') : null) : moneyRefusal(value, t, locale.value, currency.value);
   if (!value.ok || value.cents === null) return;
   if (pending.value && !acknowledged.value) {
     acknowledged.value = true;
@@ -106,9 +107,9 @@ async function confirm(): Promise<void> {
   void toastSuccess(
     t('cash_register.close.done', {
       number: closed.number,
-      expected: formatMoney(closed.expected_balance, locale.value),
-      counted: formatMoney(closed.closing_balance, locale.value),
-      difference: formatSignedMoney(closed.difference, locale.value),
+      expected: formatMoney(closed.expected_balance, locale.value, currency.value),
+      counted: formatMoney(closed.closing_balance, locale.value, currency.value),
+      difference: formatSignedMoney(closed.difference, locale.value, currency.value),
     }),
   );
   emit('closed');
@@ -130,11 +131,11 @@ defineExpose({ confirm });
     >
       <div>
         <dt>{{ $t('cash_register.close.expected') }}</dt>
-        <dd>{{ formatMoney(expected, locale) }}</dd>
+        <dd>{{ formatMoney(expected, locale, currency) }}</dd>
       </div>
       <div>
         <dt>{{ $t('cash_register.close.difference') }}</dt>
-        <dd>{{ formatSignedMoney(difference, locale) }}</dd>
+        <dd>{{ formatSignedMoney(difference, locale, currency) }}</dd>
       </div>
     </dl>
     <MoneyField

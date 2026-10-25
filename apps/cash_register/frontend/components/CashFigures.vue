@@ -18,7 +18,7 @@ const current = useLive('cash_register.session.current', {});
 const recent = useLive('cash_register.session.list', { status: 'closed', sort: 'closed_at', dir: 'desc', limit: 8 });
 const currency = useLive('cash_register.currency.get', {});
 
-const code = computed(() => currency.data.value?.currency ?? 'EUR');
+const code = computed(() => currency.data.value?.currency);
 const failed = computed(() => !!(current.error.value || recent.error.value || currency.error.value));
 const loading = computed(() => !failed.value && (!current.data.value || !recent.data.value || !currency.data.value));
 
