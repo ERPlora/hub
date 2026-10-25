@@ -159,7 +159,7 @@ export type WidgetView =
   | { kind: 'kpi'; value: string; label: string | undefined }
   | { kind: 'stat'; value: string; label: string | undefined; severity: string }
   | { kind: 'sparkline'; series: number[]; value: string | undefined }
-  | { kind: 'bar-list'; bars: { label: string; value: number; text: string; share: number }[] }
+  | { kind: 'bar-list'; bars: { label: string; value: number | null; text: string; share: number }[] }
   | { kind: 'timeline'; entries: TimelineEntry[] }
   | { kind: 'chart'; bars: ChartBar[] };
 
@@ -174,25 +174,39 @@ export interface TimelineEntry {
 }
 
 /** A bar of a chart: `key` is its row's label as the server sent it; `label` goes under the bar and `detail` says
- *  it whole (a day: «vie» and «vie, 23 oct»). */
+ *  it whole (a day: «vie» and «vie, 23 oct»); `value` is `null` when its row has none (`text` is then «—»). */
 export interface ChartBar {
   key: string;
   label: string;
   detail: string;
-  value: number;
+  value: number | null;
   text: string;
   share: number;
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const numeric = (value: unknown): number => (typeof value === 'number' ? value : Number(value));
+/** A value the row does not have — none, absent or blank (a cash session closed without a count has no difference). */
+const missing = (value: unknown): boolean => value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
 
+/** What a panel says for a value a row does not have, as Square, Shopify or Odoo leave an empty cell: never a 0. */
+const NO_VALUE = '—';
+
+/** The bars of a bar-list or a chart: a row without its value stays, as «—» with no share (BASE-F06); one whose value is
+ *  no number is left out. */
 function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined) {
   const read = rows
-    .map((row) => ({ label: text(row[widget.map.label]), value: numeric(row[widget.map.value]) }))
-    .filter((bar) => bar.label !== '' && Number.isFinite(bar.value));
-  const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => bar.value), 0);
-  return read.map((bar) => ({ ...bar, text: formatValue(bar.value, format, locale, money), share: max > 0 ? bar.value / max : 0 }));
+    .map((row) => {
+      const value = row[widget.map.value];
+      return { label: text(row[widget.map.label]), value: missing(value) ? null : numeric(value) };
+    })
+    .filter((bar) => bar.label !== '' && (bar.value === null || Number.isFinite(bar.value)));
+  const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => bar.value ?? 0), 0);
+  return read.map((bar) =>
+    bar.value === null
+      ? { ...bar, text: NO_VALUE, share: 0 }
+      : { ...bar, text: formatValue(bar.value, format, locale, money), share: max > 0 ? bar.value / max : 0 },
+  );
 }
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -345,10 +359,15 @@ export function widgetView(widget: WidgetDef, result: unknown, locale: string, m
       return { kind: 'stat', value: shown, label: text(first?.[widget.map.label ?? '']) || label, severity };
     }
     case 'sparkline': {
-      const series = rows.map((row) => numeric(row[widget.map.series])).filter(Number.isFinite);
+      // A point without its value is skipped, never drawn as a 0.
+      const series = rows
+        .map((row) => row[widget.map.series])
+        .filter((value) => !missing(value))
+        .map(numeric)
+        .filter(Number.isFinite);
       if (series.length === 0) return { kind: 'empty' };
       const last = widget.map.value ? first?.[widget.map.value] : series.at(-1);
-      return { kind: 'sparkline', series, value: last === undefined ? undefined : formatValue(last, format, locale, money) };
+      return { kind: 'sparkline', series, value: missing(last) ? undefined : formatValue(last, format, locale, money) };
     }
     case 'bar-list': {
       const read = bars(widget, rows, locale, widget.options.valueFormat ?? format, money);

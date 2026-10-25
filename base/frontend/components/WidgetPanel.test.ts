@@ -120,6 +120,21 @@ describe('WidgetPanel', () => {
     expect(bars[1].get('.widget-bar-fill').attributes('style')).toContain('width: 25%');
   });
 
+  // BASE-F06: Cash register's «Recent discrepancies» painted a session closed without a count as «0,00 €». A row
+  // without its value says «—» and has no bar (an empty track would read as a zero); a real 0 keeps both.
+  it('paints a bar-list row without its value as «—» with no bar, and a real 0 as an amount on its track', async () => {
+    const m = await panel({ kind: 'bar-list', map: { label: 'number', value: 'difference' }, options: { valueFormat: 'currency' } }, 'es');
+    const call = await m.live();
+    await m.result(call, 'base.business.get', business());
+    await m.result(call, 'demo.item.stats', { rows: [{ number: 'CS-2', difference: null }, { number: 'CS-1', difference: 0 }] });
+    const [uncounted, even] = m.wrapper.findAll('[data-testid="widget-bar"]');
+    expect(uncounted.get('.widget-bar-text').text()).toBe('—');
+    expect(uncounted.find('.widget-bar-track').exists()).toBe(false);
+    expect(even.get('.widget-bar-text').text()).toBe('0,00 €');
+    expect(even.get('.widget-bar-fill').attributes('style')).toContain('width: 0%');
+    expect(m.wrapper.text()).not.toContain('null');
+  });
+
   it('paints a timeline as one entry per row', async () => {
     const m = await panel({ kind: 'timeline', map: { title: 'who', time: 'at' } });
     const call = await m.live();
@@ -208,6 +223,19 @@ describe('WidgetPanel', () => {
       await m.result(call, 'demo.item.stats', { rows: [{ day: '2026-10-24', total: 300 }] }, 3);
       expect(bars(m.wrapper).map((bar) => bar.text())).toEqual(['sáb']);
       expect(readout(m.wrapper)).toEqual(['sáb, 24 oct', '3,00\u00a0€']);
+    });
+
+    it('a day without its value says «—» and has no bar, never a bar of 0', async () => {
+      const m = await panel(chart, 'es');
+      const call = await m.live();
+      await m.result(call, 'base.business.get', business());
+      await m.result(call, 'demo.item.stats', { rows: [{ day: '2026-10-22', total: null }, { day: '2026-10-23', total: 500 }] });
+      const [missing, friday] = m.wrapper.findAll('[data-testid="widget-chart-bar"]');
+      expect(missing.attributes('aria-label')).toBe('jue, 22 oct: —');
+      expect(missing.find('.widget-chart-bar').exists()).toBe(false);
+      expect(friday.find('.widget-chart-bar').exists()).toBe(true);
+      await missing.trigger('click');
+      expect(readout(m.wrapper)).toEqual(['jue, 22 oct', '—']);
     });
   });
 
