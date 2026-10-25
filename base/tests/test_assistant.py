@@ -202,6 +202,28 @@ def test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_nam
     assert labels(moved) == ["Archivo o carpeta", "Mover a"]
 
 
+def test_an_action_of_the_platform_is_named_by_its_screen_never_base():
+    """FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: «Cambiar en Base» named the platform by its internal name.
+    An action of base goes by the screen where the person does it (Shopify's Sidekick, Business Central's Copilot:
+    the page, never the platform's name); one of an app, by the app."""
+    pin = get("base.access.settings_update")
+    assert assistant.card(pin, {"pin_length": 6}, "es")["app_name"] == "Ajustes"
+    assert assistant.card(pin, {"pin_length": 6}, "en")["app_name"] == "Settings"
+    assert assistant.card(get("base.file.delete"), {"path": "x"}, "es")["app_name"] == "Archivos"
+    assert assistant.card(get("base.person.pin_remove"), {"person": "x"}, "es")["app_name"] == "Empleados"
+    assert assistant.card(get("base.profile.update"), {"first_name": "x"}, "es")["app_name"] == "Mi perfil"
+    assert assistant.card(get("base.failed_event.discard"), {"id": "x"}, "es")["app_name"] == "Sistema"
+    assert assistant.card(get("demo.item.create"), {"name": "x"}, "es")["app_name"] == "Demo"
+
+
+def test_every_action_of_base_names_its_screen():
+    """Every tool of base, and what is never done from the chat (its receipt still names it), has its screen: a new
+    entity of base without one fails here."""
+    actions = {op.name for op in registry.values() if op.app_label == "base" and assistant.is_tool(op)}
+    actions |= set(assistant.NOT_FROM_CHAT)
+    assert sorted(name for name in actions if name.split(".")[1] not in assistant.BASE_SCREENS) == []
+
+
 def test_a_dangerous_write_asks_to_type_a_word_in_the_persons_language():
     assert assistant.card(get("demo.item.delete"), {"id": "x"}, "es")["confirm_word"] == "CONFIRMAR"
     assert assistant.card(get("demo.item.delete"), {"id": "x"}, "en")["confirm_word"] == "CONFIRM"

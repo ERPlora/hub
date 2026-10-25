@@ -365,9 +365,10 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
 });
 
 // FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: a datum the screen does not name itself went by its English
-// title, in Spanish too («Pin Length: 6»). Cancelled: nothing changes, so nothing to clean but the language cookie's
-// context, closed at the end.
-test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, also one the screen does not name itself', async ({ browser }) => {
+// title, in Spanish too («Pin Length: 6»), and an action of the platform by its internal name («Cambiar en Base»; the
+// receipt, «en base»): now by the screen where the person does it. Cancelled: nothing changes, so nothing to clean
+// but the language cookie's context, closed at the end.
+test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, also one the screen does not name itself, and the platform by its screen', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH';
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -382,13 +383,14 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
   await ask(page, 'E2E-ASK base__access__settings_update {"pin_inactivity_minutes":10,"pin_length":6}', { settle: false });
   await expect(card(page)).toBeVisible();
   await expect(card(page)).toContainText('¿Ejecutar esta acción?');
-  await expect(card(page)).toContainText('Revisa cada dato antes de seguir.');
-  await expect(card(page)).toContainText('Volver a pedir tras (minutos): 10');
-  await expect(card(page)).toContainText('Dígitos del PIN: 6');
   await expect(card(page)).not.toContainText('Pin Length');
   await expect(card(page)).not.toContainText('Pin Inactivity Minutes');
+  await expect(card(page)).not.toContainText('Base');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Cambiar en Ajustes. Revisa cada dato antes de seguir.');
+    await expect(card(page)).toContainText('Volver a pedir tras (minutos): 10');
+    await expect(card(page)).toContainText('Dígitos del PIN: 6');
     await confirmationReady(page);
     await untilStill(page);
     expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
@@ -397,6 +399,7 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, cancelado: Cambiar en Ajustes');
   expect((await api(context, A, 'GET', '/access/settings')).data).toEqual(before.data);
   await context.close();
 });

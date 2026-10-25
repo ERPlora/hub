@@ -131,7 +131,7 @@ describe('several things in a row (BASE-G115, G119)', () => {
     const { post, bodies } = hub(
       [{ type: 'confirm', card: CARD, call: CREATE }, done({ append: [asked(CREATE)], pending: [CREATE], continuation: 'tok' })],
       [
-        { type: 'executed', call_id: 'c1', name: 'demo.item.create', app: 'demo', kind: 'command', outcome: 'ok', code: '' },
+        { type: 'executed', call_id: 'c1', name: 'demo.item.create', app: 'demo', app_name: 'Demo', kind: 'command', outcome: 'ok', code: '' },
         { type: 'text', text: 'He creado Mesa 4.' },
         done({ append: [{ role: 'tool', tool_call_id: 'c1', content: '{"id":"x"}' }, { role: 'assistant', content: 'He creado Mesa 4.' }] }),
       ],
@@ -143,7 +143,8 @@ describe('several things in a row (BASE-G115, G119)', () => {
     const answer = assistant.state.thread.bubbles.at(-1)!;
     expect(answer.text).toBe('He creado Mesa 4.');
     expect(answer.notices).toEqual([]);
-    expect(answer.executed).toEqual([{ name: 'demo.item.create', app: 'demo', outcome: 'ok' }]);
+    // Where it happened, as the server names it for the receipt (the platform by its screen).
+    expect(answer.executed).toEqual([{ name: 'demo.item.create', app: 'demo', app_name: 'Demo', outcome: 'ok' }]);
     expect(assistant.state.confirm).toBeNull();
     expect(assistant.state.busy).toBe(false);
   });

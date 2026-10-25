@@ -78,6 +78,14 @@ describe('AssistantMessage', () => {
     wrapper.unmount();
   });
 
+  it('a receipt names where it happened as the server says it: the platform by its screen, never «base»', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the menu has no section «base», so the receipt said «en base».
+    const executed = [{ name: 'base.access.settings_update', app: 'base', app_name: 'Ajustes', outcome: 'cancelled' }];
+    const { wrapper } = await mountBubble(answer({ text: 'No lo he hecho.', executed }));
+    expect(wrapper.find('[data-testid="assistant-receipt"]').text()).toBe('No se hizo, cancelado: Cambiar en Ajustes');
+    wrapper.unmount();
+  });
+
   it('a failure before any word: no empty bubble, the failure in its place (BASE-G124)', async () => {
     const { wrapper } = await mountBubble(answer({ error: 'assistant.unavailable' }));
     expect(wrapper.find('[data-testid="assistant-answer"]').exists()).toBe(true);

@@ -1333,6 +1333,10 @@ class AssistantExecutedOut(Schema):
     call_id: str
     name: str = Field(description="The operation («demo.item.create»), or the tool's name when there was none.")
     app: str
+    app_name: str = Field(
+        description="Where it happened, in the person's language, as its card says it: the app's name, or the "
+        "platform's screen («Settings»); empty when there was no operation."
+    )
     kind: Literal["query", "command", ""]
     outcome: Literal["ok", "error", "refused", "cancelled"]
     code: str

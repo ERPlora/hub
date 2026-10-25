@@ -11,6 +11,8 @@ export interface Executed {
   kind: 'query' | 'command' | '';
   outcome: 'ok' | 'error' | 'refused' | 'cancelled';
   app?: string;
+  /** Where it happened, as the server names it in the person's language (the platform by its screen). */
+  app_name?: string;
 }
 
 export type GroundingNotice = 'claimed_change' | 'unread_id' | 'unknown_screen';

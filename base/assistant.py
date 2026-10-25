@@ -296,7 +296,6 @@ def card(op: Operation, arguments: dict, language: str) -> dict:
             count = len(ids)
         else:
             blocked = True
-    config = active_apps_label(op.app_label)
     with translation.override(language):
         fields = [
             # The title of the property itself: a ``$ref``'s own is its schema class's name.
@@ -305,11 +304,11 @@ def card(op: Operation, arguments: dict, language: str) -> dict:
             if name in arguments
         ]
         word = str(count) if count else str(CONFIRM_WORD)
-        app_name = str(config.verbose_name) if config is not None else op.app_label
+        app = app_name(op)
     return {
         "operation": op.name,
         "app": op.app_label,
-        "app_name": app_name,
+        "app_name": app,
         "action": op.name.rsplit(".", 1)[-1],
         "risk": level,
         "fields": fields,
@@ -321,6 +320,50 @@ def card(op: Operation, arguments: dict, language: str) -> dict:
 
 def active_apps_label(label: str) -> LiveAppConfig | None:
     return next((config for config in all_live_app_configs() if config.label == label), None)
+
+
+# The screens of the platform, as its menu and the assistant's instructions name them.
+HOME = pgettext_lazy("base", "Home")
+EMPLOYEES = pgettext_lazy("base", "Employees")
+SETTINGS = pgettext_lazy("base", "Settings")
+PROFILE = pgettext_lazy("base", "My profile")
+SYSTEM = pgettext_lazy("base", "System")
+FILES = pgettext_lazy("base", "Files")
+
+#: Where a person does each thing of the platform on their own, by the entity of its operation: a card or a receipt
+#: names an action of base by that screen, never by the platform's internal name, «Base» (as Shopify's Sidekick and
+#: Business Central's Copilot name the page of an action, and WooCommerce's assistant its area). Every tool of base and
+#: what is never done from the chat has its entity here (``test_every_action_of_base_names_its_screen``).
+BASE_SCREENS = {
+    "access": SETTINGS,
+    "api_doc": SETTINGS,
+    "api_key": EMPLOYEES,
+    "approval": EMPLOYEES,
+    "blueprint": SETTINGS,
+    "business": SETTINGS,
+    "dataset": SETTINGS,
+    "device": SETTINGS,
+    "event": SYSTEM,
+    "failed_event": SYSTEM,
+    "file": FILES,
+    "hub": SETTINGS,
+    "import": SETTINGS,
+    "location": SETTINGS,
+    "person": EMPLOYEES,
+    "profile": PROFILE,
+    "role": EMPLOYEES,
+    "setup": HOME,
+    "system": SYSTEM,
+}
+
+
+def app_name(op: Operation) -> str:
+    """Where ``op`` happens, as the person knows it, in the active language: its app by its name; one of the platform,
+    the screen where they would do it themselves (``BASE_SCREENS``; another, the Home)."""
+    if op.app_label == "base":
+        return str(BASE_SCREENS.get(op.name.split(".")[1], HOME))
+    config = active_apps_label(op.app_label)
+    return str(config.verbose_name) if config is not None else op.app_label
 
 
 def confirmed(card_: dict, typed: str) -> bool:

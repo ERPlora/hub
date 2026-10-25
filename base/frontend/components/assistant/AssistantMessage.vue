@@ -69,7 +69,8 @@ const receipts = computed(() =>
     outcome: row.outcome,
     text: t(`base.assistant.receipts.${row.outcome}`, {
       action: t(actionKey(row.name.split('.').at(-1) ?? '')),
-      app: props.appNameOf(row.app),
+      // As the server names it (the platform by its screen); a receipt kept from before it did, by the menu.
+      app: row.app_name || props.appNameOf(row.app),
     }),
   })),
 );
