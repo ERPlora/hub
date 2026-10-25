@@ -46,7 +46,7 @@ def saas(settings):
 def events(name: str) -> list[dict]:
     return [
         event.payload
-        for event in OutboxEvent.objects.filter(name=name).order_by("created_at")
+        for event in OutboxEvent.objects.filter(name=name).order_by("created_at", "id")
     ]
 
 

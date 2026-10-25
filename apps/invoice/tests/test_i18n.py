@@ -9,6 +9,7 @@ import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
+from live.operations import registry
 
 from apps.invoice import platform, queries, schemas, services
 from apps.invoice.models import (
@@ -115,9 +116,24 @@ def visible_texts() -> set[str]:
         ]
     template = TEMPLATE.read_text(encoding="utf-8")
     with translation.override("en"):
-        return {str(text) for text in lazies} | set(
-            re.findall(r'{% translate "([^"]+)" %}', template)
+        return (
+            {str(text) for text in lazies}
+            | set(re.findall(r'{% translate "([^"]+)" %}', template))
+            | schema_titles()
         )
+
+
+def schema_titles() -> set[str]:
+    """The titles invoice's operations give their input data (``gettext_noop``): the assistant's card names each datum
+    by them, so each one needs its Spanish. A title pydantic makes up from the field is not one."""
+    titles = set()
+    for op in registry.values():
+        if op.app_label == "invoice":
+            for name, prop in op.input.model_json_schema().get("properties", {}).items():
+                title = prop.get("title")
+                if title and title != name.title().replace("_", " "):
+                    titles.add(title)
+    return titles
 
 
 def test_every_entry_has_a_spanish_translation():

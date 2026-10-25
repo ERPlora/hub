@@ -280,6 +280,15 @@ msgstr "Pide las líneas de una sesión (su id o su número) o las que no cayero
 msgid "Count the drawer: give its notes and coins or its total."
 msgstr "Cuenta el cajón: indica los billetes y monedas o el total."
 
+msgid "Drawer"
+msgstr "Cajón"
+
+msgid "Counted cash"
+msgstr "Efectivo contado"
+
+msgid "Closing notes"
+msgstr "Notas de cierre"
+
 msgid "There is already an open cash session. Close it before opening another one."
 msgstr "Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra."
 

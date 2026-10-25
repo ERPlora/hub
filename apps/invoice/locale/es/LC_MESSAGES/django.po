@@ -880,3 +880,15 @@ msgstr "El hub de plataforma no tiene emisor: ejecuta create_platform_hub."
 #: queries.py
 msgid "VeriFactu does not answer in the platform hub."
 msgstr "VeriFactu no responde en el hub de plataforma."
+
+msgid "Sale"
+msgstr "Venta"
+
+msgid "Next number"
+msgstr "Siguiente número"
+
+msgid "Lines"
+msgstr "Líneas"
+
+msgid "Type of rectifying invoice"
+msgstr "Tipo de rectificativa"
