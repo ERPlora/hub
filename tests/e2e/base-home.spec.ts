@@ -308,3 +308,182 @@ test.describe('BASE-F06 — a panel row without its value', () => {
     });
   }
 });
+
+// BASE-F06 — a bar-list with negatives (FIX-HUB-BASE-HOME-BAR-LIST-NEGATIVE-FULL-BAR-NO-SIGN-COLOUR): «Descuadres
+// recientes» painted a drawer 0,40 € short with a bar as long as one 5,50 € over (a negative width, which the browser
+// drops) and no sign. The owner of `a`, in Spanish, adds the panel from «Personalizar panel»: each bar is as long as the
+// size of its difference against the biggest of the list; only the shortfall is red, its amount with the sign, and the
+// surplus keeps the panel's colour (a surplus is a discrepancy too, never painted as «good»: rv-hub-264). Cash
+// register's settings row is parked for the block and put back after it; the sessions it opens are deleted, with their
+// movements and counts.
+test.describe('BASE-F06 — a bar-list with negatives', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  const KEY = 'FIX-HUB-BASE-HOME-BAR-LIST-NEGATIVE-FULL-BAR-NO-SIGN-COLOUR';
+  const RECENT = 'cash_register.recent_sessions';
+  const PARKED = 'e2e_fix_base_home_negative_parked';
+  const NOTE = `E2E ${KEY} ${Date.now()}`;
+  /** The sessions this block opened: the only ones its cleanup deletes. */
+  const mine: string[] = [];
+  const numbers = { short: '', over: '' };
+  const said = { short: '', over: '' };
+
+  interface Session {
+    id: string;
+    number: string;
+    expected_balance: number | null;
+    difference: number | null;
+  }
+
+  test.beforeAll(async ({ browser }) => {
+    psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from cash_register_settings`].join('; '));
+    const context = await browser.newContext({ baseURL: A });
+    try {
+      const page = await context.newPage();
+      await login(page, A, '/cash_register/sessions');
+      const settings = await api(context, A, 'POST', '/cash_register/settings', { enable_cash_register: true, require_blind_count: false });
+      expect(settings.status).toBe(200);
+      // One drawer open per business: a shift an earlier run left open is closed first, as Cash register's specs do.
+      const left = (await api<{ session: Session | null }>(context, A, 'GET', '/cash_register/sessions/current')).data.session;
+      if (left) {
+        const closed = await api(context, A, 'POST', '/cash_register/sessions/close', {
+          session_id: left.id,
+          closing_balance: Math.max(left.expected_balance ?? 0, 0),
+          closing_notes: 'e2e: left open by an earlier run',
+        });
+        expect(closed.status).toBe(200);
+      }
+      // 40 cents short first, then 5.50 over: the panel lists the last closed first.
+      for (const [kind, off] of [['short', -40], ['over', 550]] as const) {
+        const opened = await api<Session>(context, A, 'POST', '/cash_register/sessions/open', { opening_balance: 10000, opening_notes: NOTE });
+        expect(opened.status).toBe(201);
+        mine.push(opened.data.id);
+        numbers[kind] = opened.data.number;
+        const closed = await api<Session>(context, A, 'POST', '/cash_register/sessions/close', {
+          session_id: opened.data.id,
+          closing_balance: (opened.data.expected_balance ?? 10000) + off,
+        });
+        expect(closed.status, `${kind} session closed`).toBe(200);
+        expect(closed.data.difference, `${kind}: its difference as the server keeps it`).toBe(off);
+      }
+      const currency = await api<{ currency: string; decimals: number }>(context, A, 'GET', '/cash_register/currency');
+      expect(currency.status).toBe(200);
+      const { currency: code, decimals } = currency.data;
+      const format = new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency: code,
+        currencyDisplay: 'narrowSymbol',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+      said.short = format.format(-0.4);
+      said.over = format.format(5.5);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test.afterAll(() => {
+    const ids = mine.map((id) => `'${id}'`).join(',');
+    if (ids) {
+      psql(`delete from cash_register_count where session_id in (${ids})`);
+      psql(`delete from cash_register_movement where session_id in (${ids})`);
+      psql(`delete from cash_register_session where id in (${ids})`);
+    }
+    psql(['delete from cash_register_settings', `insert into cash_register_settings select * from ${PARKED}`, `drop table ${PARKED}`].join('; '));
+  });
+
+  for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+    test(`BASE-F06 — «Descuadres recientes» measures each bar by its size, only the shortfall red, at ${label}`, async ({ browser }) => {
+      const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+      try {
+        const page = await context.newPage();
+        await login(page, A, '/');
+        await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+        await page.goto(`${A}/`);
+        await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+
+        await testid(page, 'widgets-customize').click();
+        const picker = page.locator('ion-modal[data-testid="widgets-picker"]:not(.overlay-hidden)');
+        await picker.locator(`[data-testid="widgets-add-${RECENT}"]`).click();
+        await picker.locator('[data-testid="widgets-close"]').click();
+        await expect(picker).toHaveCount(0);
+
+        const panel = testid(page, 'widget-board').locator(`[data-testid="widget"][data-key="${RECENT}"]`);
+        await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Descuadres recientes');
+        await expect(panel).toHaveAttribute('aria-busy', 'false');
+        const bar = (number: string) =>
+          panel.locator('[data-testid="widget-bar"]').filter({ has: page.locator('.widget-bar-label').getByText(number, { exact: true }) });
+        const short = bar(numbers.short);
+        const over = bar(numbers.over);
+        // The sign is written, never only painted.
+        await expect(short.locator('.widget-bar-text')).toHaveText(said.short);
+        await expect(over.locator('.widget-bar-text')).toHaveText(said.over);
+        await expect(short.locator('.widget-bar-fill')).toHaveClass(/\bwidget-bar-fill--negative\b/);
+        await expect(over.locator('.widget-bar-fill')).toHaveClass('widget-bar-fill');
+
+        // Each bar's share of its track is the size of its difference against the biggest size the panel lists.
+        const listed = await api<{ rows: Session[] }>(context, A, 'GET', '/cash_register/sessions?status=closed&sort=closed_at&dir=desc&limit=8');
+        expect(listed.status).toBe(200);
+        const biggest = Math.max(...listed.data.rows.map((session) => Math.abs(session.difference ?? 0)));
+        const share = (row: typeof short) =>
+          row.evaluate((element) => {
+            const fill = element.querySelector('.widget-bar-fill')?.getBoundingClientRect().width ?? NaN;
+            const track = element.querySelector('.widget-bar-track')?.getBoundingClientRect().width ?? NaN;
+            return fill / track;
+          });
+        expect(await share(short), 'the shortfall: 40 against the biggest size').toBeCloseTo(40 / biggest, 2);
+        expect(await share(over), 'the surplus: 550 against the biggest size').toBeCloseTo(550 / biggest, 2);
+        expect(await share(short)).toBeLessThan(await share(over));
+
+        // Red is the theme's danger (its AA contrast mode included); every other bar keeps the panel's primary colour.
+        const painted = await panel.evaluate((element) => {
+          const colour = (selector: string) => getComputedStyle(element.querySelector(selector) as Element).backgroundColor;
+          const probe = (variable: string) => {
+            const span = document.createElement('span');
+            span.style.background = `var(${variable})`;
+            element.append(span);
+            const found = getComputedStyle(span).backgroundColor;
+            span.remove();
+            return found;
+          };
+          // A chart's bar takes the same colours through the panel's own stylesheet: its plain rule (the primary colour)
+          // must not win over the negative's. No chart has negatives today, so the bar is built with the panel's scope.
+          const scope = [...element.attributes].find((attribute) => attribute.name.startsWith('data-v-'))?.name;
+          const chartBar = (negative: boolean) => {
+            const span = document.createElement('span');
+            span.className = negative ? 'widget-chart-bar widget-chart-bar--negative' : 'widget-chart-bar';
+            if (scope) span.setAttribute(scope, '');
+            element.append(span);
+            const found = getComputedStyle(span).backgroundColor;
+            span.remove();
+            return found;
+          };
+          return {
+            negative: colour('.widget-bar-fill--negative'),
+            positive: colour('.widget-bar-fill:not(.widget-bar-fill--negative)'),
+            chartNegative: chartBar(true),
+            chartPlain: chartBar(false),
+            danger: probe('--ion-color-danger'),
+            primary: probe('--ion-color-primary'),
+          };
+        });
+        expect(painted.negative, 'the shortfall').toBe(painted.danger);
+        expect(painted.positive, 'the surplus keeps the panel colour').toBe(painted.primary);
+        expect(painted.negative).not.toBe(painted.positive);
+        expect(painted.chartNegative, 'a chart day below zero').toBe(painted.danger);
+        expect(painted.chartPlain, 'any other chart day keeps its colour').toBe(painted.primary);
+        // The owner's Spanish session with the panel on, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
+        if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+
+        await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+        await untilStill(page);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+        await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      } finally {
+        await context.close();
+      }
+    });
+  }
+});

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7dc0461e1ca0a0133fed1e0d718185031528ea31e1bf0264730f3e2f97989aab -->
+<!-- generated from WORKBOOK.md sha256:659c80c78927bcd8cc4198f39dd1bef7875bc8dc0e8ff09120839af5cf6ca0bf -->
 
 ## What it is for and who it is for
 
@@ -494,9 +494,13 @@ Steps:
      it is not known which ones are theirs).
   2. Each panel is a card with its title and icon: a figure (with what it counts under it, if its app says
      so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the language
-     of whoever is looking.
+     of whoever is looking. In a list with bars, each bar measures how big its figure is against the biggest
+     one of the list, whatever its sign; a negative figure, such as a cash discrepancy where money was missing
+     or a product with stock below zero, shows in red and with its sign (-€0.40), and the others keep the
+     panel's colour.
   3. In a chart of days, each bar has its weekday under it (or its date, if it spans more than a week) and
-     above them show the day and its amount: the last bar's until you tap another.
+     above them show the day and its amount: the last bar's until you tap another. A day below zero has its
+     bar as tall as its figure, in red; the others keep their colour.
   4. In a timeline, each entry says when it happened, in the device's time: only the time if it was today
      (9:15 AM); if it was yesterday, Yesterday in front (Yesterday 6:10 PM); if not, the short date with the
      time (Oct 20, 6:10 PM), with the year if it is another. Holding the pointer over it shows the whole
