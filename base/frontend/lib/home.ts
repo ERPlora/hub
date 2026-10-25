@@ -154,12 +154,25 @@ export function formatValue(value: unknown, format: unknown, locale: string, mon
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);
 }
 
+/** The side of zero a bar is on, painted only in a list that has negatives (a cash discrepancy: short or over). */
+export type BarSign = 'negative' | 'positive';
+
+/** A bar of a bar-list: `share` is the size of its value against the biggest size of the list (0–1, either sign);
+ *  `sign` is set only when the list has negatives, and never on a 0 or a row without its value. */
+export interface Bar {
+  label: string;
+  value: number | null;
+  text: string;
+  share: number;
+  sign?: BarSign;
+}
+
 export type WidgetView =
   | { kind: 'empty' }
   | { kind: 'kpi'; value: string; label: string | undefined }
   | { kind: 'stat'; value: string; label: string | undefined; severity: string }
   | { kind: 'sparkline'; series: number[]; value: string | undefined }
-  | { kind: 'bar-list'; bars: { label: string; value: number | null; text: string; share: number }[] }
+  | { kind: 'bar-list'; bars: Bar[] }
   | { kind: 'timeline'; entries: TimelineEntry[] }
   | { kind: 'chart'; bars: ChartBar[] };
 
@@ -175,13 +188,9 @@ export interface TimelineEntry {
 
 /** A bar of a chart: `key` is its row's label as the server sent it; `label` goes under the bar and `detail` says
  *  it whole (a day: «vie» and «vie, 23 oct»); `value` is `null` when its row has none (`text` is then «—»). */
-export interface ChartBar {
+export interface ChartBar extends Bar {
   key: string;
-  label: string;
   detail: string;
-  value: number | null;
-  text: string;
-  share: number;
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
@@ -193,20 +202,22 @@ const missing = (value: unknown): boolean => value === null || value === undefin
 const NO_VALUE = '—';
 
 /** The bars of a bar-list or a chart: a row without its value stays, as «—» with no share (BASE-F06); one whose value is
- *  no number is left out. */
-function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined) {
+ *  no number is left out. A bar measures the size of its value against the biggest size, so a shortfall of 0,40 € is
+ *  a short bar beside a surplus of 5,50 €, and a list with negatives says each bar's sign (BASE-F06). */
+function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined): Bar[] {
   const read = rows
     .map((row) => {
       const value = row[widget.map.value];
       return { label: text(row[widget.map.label]), value: missing(value) ? null : numeric(value) };
     })
     .filter((bar) => bar.label !== '' && (bar.value === null || Number.isFinite(bar.value)));
-  const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => bar.value ?? 0), 0);
-  return read.map((bar) =>
-    bar.value === null
-      ? { ...bar, text: NO_VALUE, share: 0 }
-      : { ...bar, text: formatValue(bar.value, format, locale, money), share: max > 0 ? bar.value / max : 0 },
-  );
+  const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => Math.abs(bar.value ?? 0)), 0);
+  const signed = read.some((bar) => bar.value !== null && bar.value < 0);
+  return read.map((bar): Bar => {
+    if (bar.value === null) return { ...bar, text: NO_VALUE, share: 0 };
+    const shown = { ...bar, text: formatValue(bar.value, format, locale, money), share: max > 0 ? Math.abs(bar.value) / max : 0 };
+    return signed && bar.value !== 0 ? { ...shown, sign: bar.value < 0 ? 'negative' : 'positive' } : shown;
+  });
 }
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;

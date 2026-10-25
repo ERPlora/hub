@@ -7,7 +7,9 @@
 // when each entry happened in the device's time (the Hub has no business zone in the browser): «4:23», «Ayer 18:10»,
 // «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06). An
 // amount is in the business's currency (BASE-G98: «zł» in a Polish business, «€» in a Spanish one), never a fixed euro.
-// A row without its value (a cash session closed without a count) says «—» with no bar, never a 0 (BASE-F06).
+// A row without its value (a cash session closed without a count) says «—» with no bar, never a 0 (BASE-F06). A bar is
+// as long as the size of its value; in a list with negatives it is red below zero and green above, its amount with the
+// sign (BASE-F06: a drawer 0,40 € short beside one 5,50 € over).
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
@@ -234,6 +236,7 @@ const chosenBar = computed(() => {
           aria-hidden="true"
         ><span
           class="widget-bar-fill"
+          :class="bar.sign && `widget-bar-fill--${bar.sign}`"
           :style="{ width: percent(bar.share) }"
         /></span>
       </li>
@@ -302,6 +305,7 @@ const chosenBar = computed(() => {
           <span class="widget-chart-track"><span
             v-if="bar.value !== null"
             class="widget-chart-bar"
+            :class="bar.sign && `widget-chart-bar--${bar.sign}`"
             :style="{ height: percent(bar.share) }"
           /></span>
           <span class="widget-chart-label">{{ bar.label }}</span>
@@ -411,6 +415,17 @@ const chosenBar = computed(() => {
   height: 100%;
   border-radius: 3px;
   background: var(--ion-color-primary);
+}
+
+/* A list with negatives (a cash discrepancy): red short, green over; the amount beside it says the sign too. */
+.widget-bar-fill--negative,
+.widget-chart-bar--negative {
+  background: var(--ion-color-danger);
+}
+
+.widget-bar-fill--positive,
+.widget-chart-bar--positive {
+  background: var(--ion-color-success);
 }
 
 .widget-timeline li {
