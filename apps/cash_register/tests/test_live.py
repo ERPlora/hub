@@ -35,6 +35,7 @@ def test_every_reading_is_live():
         "cash_register.session.list",
         "cash_register.session.current",
         "cash_register.session.get",
+        "cash_register.session.closing_summary",
         "cash_register.movement.list",
         "cash_register.count.list",
         "cash_register.currency.get",
@@ -91,6 +92,23 @@ def test_opening_and_closing_re_run_the_sessions_and_the_unassigned_lines():
             "cash_register.session.get",
             "cash_register.movement.list",
         } <= live_registry.affected([event])
+
+
+def test_the_close_summary_re_runs_with_everything_that_changes_its_figures():
+    # The cash it reads: the shift (sales, movements, opening and closing), the settings (blind count, count
+    # required) and the drawer's name. What it reads of Sales, Kitchen and Printing is read when it runs.
+    for event in (*E_SHIFT, events.SETTINGS_UPDATED, events.REGISTER_UPDATED):
+        assert "cash_register.session.closing_summary" in live_registry.affected([event]), event
+
+
+E_SHIFT = (
+    events.SESSION_OPENED,
+    events.SESSION_CLOSED,
+    events.MOVEMENT_ADDED,
+    events.SALE_COMPLETED,
+    events.SALE_VOIDED,
+    events.SALE_REFUNDED,
+)
 
 
 def test_the_drawers_re_run_their_list_and_the_sessions_that_name_them():

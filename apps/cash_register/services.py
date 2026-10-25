@@ -37,7 +37,6 @@ from apps.cash_register.models import (
 )
 from apps.cash_register.queries import (
     actor,
-    auto_close_due_at,
     business_currency,
     count_row,
     count_total,
@@ -49,12 +48,13 @@ from apps.cash_register.queries import (
     hides_expected,
     last_cut_off,
     line_row,
-    named_or_open,
     normalized_count,
     register_row,
+    require_count,
     sale_lines,
     session_detail,
     session_row,
+    session_to_close,
     settings_row,
     stored_line,
 )
@@ -80,13 +80,9 @@ from apps.cash_register.schemas import (
 SESSION_ALREADY_OPEN = _(
     "There is already an open cash session. Close it before opening another one."
 )
-SESSION_NOT_OPEN = _(
-    "That cash session is closed: a closed session takes no new movements."
-)
 OPENING_BALANCE_REQUIRED = _(
     "This business requires an opening float: give the cash the drawer starts with."
 )
-CLOSING_BALANCE_REQUIRED = _("Give the counted cash to close the session.")
 NEGATIVE_BALANCE = _(
     "This cash-out would leave the drawer below zero and a negative balance is not allowed."
 )
@@ -111,9 +107,6 @@ REPORT_LINES = (
     ("total_cash_out", pgettext_lazy("cash report", "Cash out"), -1),
     ("total_gifts", pgettext_lazy("cash report", "Comps"), 1),
     ("expected_cash", pgettext_lazy("cash report", "Expected"), 1),
-)
-AUTO_CLOSE_DUE = _(
-    "Session %(number)s was due to close by itself at %(time)s: open a new session (this one closes then)."
 )
 
 
@@ -407,20 +400,8 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
 
 
 def _open_for_writing(session_id, number) -> Session:
-    """The session named (or the open one), locked, still open and not past its daily cut-off: a
-    forgotten session is closed as of its cut (by the next opening or the scheduled task), so nothing
-    written after the cut may land in it."""
-    session = named_or_open(session_id, number, lock=True)
-    if not session.is_open:
-        raise Conflict(str(SESSION_NOT_OPEN), code="cash_register.session_not_open")
-    cut = auto_close_due_at(session, current_settings(), timezone.now())
-    if cut is not None:
-        raise Conflict(
-            str(AUTO_CLOSE_DUE)
-            % {"number": session.number, "time": f"{timezone.localtime(cut):%H:%M}"},
-            code="cash_register.session_auto_close_due",
-        )
-    return session
+    """The session named (or the open one), locked, still open and not past its daily cut-off."""
+    return session_to_close(session_id, number, lock=True)
 
 
 @operation(
@@ -433,19 +414,16 @@ def _open_for_writing(session_id, number) -> Session:
     ai={
         "description": "Close a cash session (the open one unless its number is said) with the cash counted in the drawer, "
         "in cents, and closing notes: the expected cash, the counted one and their difference (negative = short) are "
-        "frozen for good. The count is required unless the settings say otherwise. A closed session is never reopened.",
+        "frozen for good. The count is required unless the settings say otherwise. A closed session is never reopened. "
+        "Read cash_register.session.closing_summary first with the same count, tell the person its summary, then close "
+        "naming the session by the number it gave.",
         "risk": "high",
     },
 )
 def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
     session = _open_for_writing(data.session_id, data.session)
     settings = current_settings()
-    if data.closing_balance is None and settings.require_closing_balance:
-        raise Conflict(
-            str(CLOSING_BALANCE_REQUIRED),
-            code="cash_register.closing_balance_required",
-            fields={"closing_balance": str(CLOSING_BALANCE_REQUIRED)},
-        )
+    require_count(data.closing_balance, settings)
     now = timezone.now()
     _close(
         ctx,

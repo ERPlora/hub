@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0eb0aea2d23c7a360f774d057e08b0156f43a6e53f0cd9b4cb18d5a95eeca3a6 -->
+<!-- generated from WORKBOOK.md sha256:a8a8990ab4affb59aa720bec12ae05f1e889ee09d3a7e34a3ea9b89cb45ee394 -->
 
 ## What it is for and who it is for
 
@@ -287,7 +287,9 @@ Steps:
    movements only the cash in and out recorded by hand: neither the sales, nor the voids, nor the refunds,
    so there is nothing to add up the expected cash with (Square and Lightspeed hide the expected cash the
    same way in the blind close). The manager, the owner and the administrator see everything: the table,
-   the detail, the list and the close window.
+   the detail, the list and the close window. Nor does the assistant tell it to whoever may not see it:
+   the close's summary (F09) reaches them without expected nor difference, and the assistant does not know
+   them.
 3. The cashier counts (F06) and closes (F09) without seeing the expected cash.
 4. On closing, expected, counted and difference appear for everyone.
 In: the "Blind count" setting and the permission to see the expected cash (manager, owner and
@@ -325,14 +327,24 @@ Vertical: common
 Actor: employee, manager, administrator, assistant
 Screen: Cash register
 Steps:
-1. In the row of the open session, tap "Close" (or arrive from a "Closing" count, F06).
+1. In the row of the open session, tap "Close" (or arrive from a "Closing" count, F06); or ask the
+   assistant ("close the drawer with 250 € counted") and go on at step 5.
 2. Type or check the "Counted cash" (it comes from the last closing count of that session; never from an
    opening one); if you may see the expected cash, "Expected in the drawer" and "Difference" show while
    you type. Add "Closing notes" if you want.
 3. Tap "Close session" (twice if the shift review warned, F08).
 4. "Session S-… closed · expected … · counted … · difference …" shows; the row becomes "Closed" with the
    three amounts fixed for good and "Open session" turns on again.
-In: the counted cash and the notes.
+5. With the assistant, before closing anything it shows you the close's summary: the session's number,
+   the counted cash and, if you may see the expected cash, the expected cash and the difference (with the
+   blind count it does not tell them to whoever may not see them: the assistant does not know them
+   either, F07), and whatever the shift review finds still open (F08).
+6. Then "Run this action?" shows with "Close in Cash register. Check each datum before going on.", the
+   session and the counted cash: type "CONFIRM" and tap "Run it". That very session closes, in your name
+   and with the three amounts, just as from the screen.
+7. If you tap "Cancel", nothing closes: the session stays open and the assistant says so ("Not done,
+   cancelled: Close in Cash register").
+In: the counted cash and the notes, typed in the window or said to the assistant.
 Out: the closed session with expected (float + cash sales and cash in − cash out, refunds and voids in
 cash; what is charged or recorded by card, transfer or other does not count), counted and difference
 (counted − expected: positive is over, negative is short), in the name of whoever closes (announces:
@@ -341,9 +353,12 @@ happens afterwards (a void of a sale from yesterday) goes to the open shift, nev
 If it fails: "Type the counted cash to close the session." with the field empty (the screen always asks
 for it; the required count setting enforces it on the assistant and the API too); if another device
 closed it before, "That cash session is closed: a closed session takes no new movements." (two closes at
-once: one closes, the other gets this notice). A session closed by mistake is not reopened: another one
-is opened with the real cash as its float.
-Involved: CASH_REGISTER-F06, F08
+once: one closes, the other gets this notice). To the assistant, if the count is required and you do not
+say how much you counted, it asks for it with that same notice and no confirmation shows; if the
+summary's session is closed on another device before you confirm, no other one closes: the closed drawer
+notice shows. A session closed by mistake is not reopened: another one is opened with the real cash as
+its float.
+Involved: CASH_REGISTER-F06, F07, F08
 
 ### CASH_REGISTER-F10 Close by itself the drawer forgotten at the end of the day
 Status: done — the close is applied when opening the next session, and the Hub makes the pass every 5
@@ -526,6 +541,7 @@ register", "record a cash out of €20"); a drawer, by its name.
 | A session (by id or number) with its summary: sales by payment method, refunds, cash in, cash out, comps, expected, counted and difference | view sessions | F11, F16 | `cash_register.session.get` |
 | The movements of a session (or the sale lines in no shift), with search, filters and pages; with the blind count, to whoever cannot see the expected cash, only those recorded by hand in the open session | view movements | F07, F11, F17 | `cash_register.movement.list` |
 | The counts of a session, with pages | view counts | F06, F09, F11 | `cash_register.count.list` |
+| The close's summary of a session (the open one if none is said) with the counted cash: its number, the counted cash and, if whoever asks may see it, the expected cash and the difference, and what the shift review finds open; it closes nothing | close | F08, F09 | `cash_register.session.closing_summary` |
 | The business's currency, its decimals and its notes and coins | view sessions | F06, F12 | `cash_register.currency.get` |
 
 All of them can be followed live.
@@ -567,7 +583,7 @@ moment they are looked at; the screens refresh with `sale.sale.completed`, `sale
 - **Sales & POS** (requirement): the charges, the voids (the voided sale and when) and the refunds, read
   from Sales; the open checks for the shift review.
 - **Kitchen** (no requirement; only if it is on): the kitchen tickets in progress for the shift review
-  (KITCHEN-F31).
+  (KITCHEN-F31), in the close window and in the assistant's close summary.
 - **Printing** (no requirement; only if it is on): what waits or failed in the queue, for the shift review
   (PRINTING-F01), and the receipt queue for the X or Z report (PRINTING-F17).
 - **Indexes of Sales for these readings** (done, `sale/0005_cash_register_indexes`): partial ones on

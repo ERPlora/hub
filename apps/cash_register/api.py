@@ -9,6 +9,7 @@ from ninja import Query, Router
 
 from apps.cash_register import queries, services
 from apps.cash_register.schemas import (
+    ClosingSummaryIn,
     CountAddIn,
     CountListIn,
     MovementAddIn,
@@ -73,6 +74,11 @@ async def session_current(request):
 @bind(router, "cash_register.session.get", "/cash_register/sessions/detail")
 async def session_get(request, params: Query[SessionGetIn]):
     return await run_operation(request, queries.get_session, params)
+
+
+@bind(router, "cash_register.session.closing_summary", "/cash_register/sessions/closing_summary")
+async def session_closing_summary(request, params: Query[ClosingSummaryIn]):
+    return await run_operation(request, queries.closing_summary, params)
 
 
 @bind(router, "cash_register.session.open", "/cash_register/sessions/open", status=201)

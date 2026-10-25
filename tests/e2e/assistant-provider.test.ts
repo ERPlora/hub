@@ -6,7 +6,7 @@ import { request } from 'node:http';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { answerTo, CLAIM_ANSWER, DICTATION, FORMAT_ANSWER, GREETING, type Provider, startProvider } from './assistant-provider';
+import { answerTo, CLAIM_ANSWER, closeCashSummary, DICTATION, FORMAT_ANSWER, GREETING, type Provider, startProvider } from './assistant-provider';
 
 type Frame = { choices: { delta: { content?: string; tool_calls?: { function: { name?: string; arguments?: string } }[] }; finish_reason: string | null }[] };
 
@@ -51,6 +51,64 @@ describe('answerTo', () => {
     expect(toolOf(answerTo(read).frames)).toEqual({ name: 'demo__item__create', arguments: '{"name":"Mesa 7"}' });
     const written = [...read, asked('demo__item__create'), { role: 'tool', content: '{"id": "1"}' }];
     expect(textOf(answerTo(written).frames)).toBe('Hecho.');
+  });
+
+  it('closing the drawer (CASH_REGISTER-F09): the summary first, then its words and the close of that session, then the outcome', () => {
+    const question = user('E2E-CLOSE-CASH 25000');
+    const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
+    expect(toolOf(answerTo([question]).frames)).toEqual({
+      name: 'cash_register__session__closing_summary',
+      arguments: '{"closing_balance":25000}',
+    });
+    const summary = {
+      number: 'S-261024-0001',
+      closing_balance: 25000,
+      expected_balance: 23000,
+      difference: 2000,
+      expected_hidden: false,
+      pending: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
+    };
+    const read = [question, asked('cash_register__session__closing_summary'), { role: 'tool', content: JSON.stringify(summary) }];
+    const close = answerTo(read);
+    // The summary is said before the card, in the same answer that asks for the close of exactly that session.
+    expect(textOf(close.frames)).toBe(closeCashSummary(summary));
+    expect(toolOf(close.frames)).toEqual({
+      name: 'cash_register__session__close',
+      arguments: '{"session":"S-261024-0001","closing_balance":25000}',
+    });
+    expect(finish(close.frames)).toEqual(['tool_calls']);
+    const closed = [...read, asked('cash_register__session__close'), { role: 'tool', content: '{"status": "closed"}' }];
+    expect(textOf(answerTo(closed).frames)).toBe('Hecho.');
+    // Asked again in the same conversation (after a «Cancel»): the summary again, read now, never the old one.
+    const again = [...closed, { role: 'assistant', content: 'Hecho.' }, question];
+    expect(toolOf(answerTo(again).frames).name).toBe('cash_register__session__closing_summary');
+    const readAgain = [...again, asked('cash_register__session__closing_summary'), { role: 'tool', content: JSON.stringify({ ...summary, number: 'S-261024-0002' }) }];
+    expect(toolOf(answerTo(readAgain).frames).arguments).toBe('{"session":"S-261024-0002","closing_balance":25000}');
+    // A summary refused (the count required and not said, no open session): it is said, and nothing is asked for.
+    const refused = [question, asked('cash_register__session__closing_summary'), { role: 'tool', content: '{"error": {"code": "cash_register.no_open_session"}}' }];
+    expect(toolOf(answerTo(refused).frames).name).toBe('');
+    expect(textOf(answerTo(refused).frames)).toBe('No lo he hecho.');
+  });
+
+  it('the close summary as the model says it: the expected and the difference only when they came, and what is pending', () => {
+    const base = { number: 'S-1', closing_balance: 25000, pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
+    expect(closeCashSummary({ ...base, expected_balance: 23000, difference: 2000, expected_hidden: false })).toBe(
+      'Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Esperado: 230.00 €\n- Diferencia: +20.00 €',
+    );
+    expect(closeCashSummary({ ...base, expected_balance: 23000, difference: -500, expected_hidden: false })).toContain('- Diferencia: -5.00 €');
+    const blind = closeCashSummary({ ...base, expected_balance: null, difference: null, expected_hidden: true });
+    expect(blind).toBe('Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Arqueo ciego: el cierre lo comparará al confirmar.');
+    const pending = closeCashSummary({
+      ...base,
+      expected_balance: null,
+      difference: null,
+      expected_hidden: true,
+      pending: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 1, unserved_labels: ['Terraza 2'], prints: 3, print_usages: ['receipt'], incomplete: true },
+    });
+    expect(pending).toContain('- Cuentas abiertas: 2 (Mesa 4 · Mesa 7)');
+    expect(pending).toContain('- Comandas sin servir: 1 (Terraza 2)');
+    expect(pending).toContain('- Impresiones sin salir: 3');
+    expect(pending).toContain('- No se ha podido comprobar todo lo pendiente.');
   });
 
   it('reads the question from a message with attachments', () => {

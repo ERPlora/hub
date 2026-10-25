@@ -21,6 +21,7 @@ ROUTES = {
     ("GET", "/cash_register/sessions", "cash_register.session.list"),
     ("GET", "/cash_register/sessions/current", "cash_register.session.current"),
     ("GET", "/cash_register/sessions/detail", "cash_register.session.get"),
+    ("GET", "/cash_register/sessions/closing_summary", "cash_register.session.closing_summary"),
     ("POST", "/cash_register/sessions/open", "cash_register.session.open"),
     ("POST", "/cash_register/sessions/close", "cash_register.session.close"),
     ("POST", "/cash_register/sessions/auto_close", "cash_register.session.auto_close"),
@@ -67,6 +68,18 @@ def test_every_route_is_bound_to_its_operation():
 
 def test_the_api_keeps_parity():
     assert ensure_api_parity(api) == []
+
+
+def test_the_spas_route_map_names_every_cash_register_route():
+    from django.conf import settings
+
+    spa = json.loads((settings.BASE_DIR / "frontend" / "generated" / "operations.json").read_text())
+    mine = {
+        (route["method"].upper(), route["path"].removeprefix("/api"), op)
+        for op, route in spa.items()
+        if op.startswith("cash_register.")
+    }
+    assert mine == ROUTES
 
 
 def test_every_operation_has_a_route_and_is_open_to_api_keys():
@@ -124,6 +137,18 @@ def test_an_employee_opens_records_counts_and_closes_over_http(employee_client):
         == 1
     )
     assert get(employee_client, "/cash_register/sessions").json()["total"] == 1
+
+
+@pytest.mark.django_db
+def test_the_close_summary_is_read_over_http_before_closing(employee_client):
+    session = post(employee_client, "/cash_register/sessions/open", {"opening_balance": 10000}).json()
+    seen = get(employee_client, "/cash_register/sessions/closing_summary", closing_balance=9500)
+    assert seen.status_code == 200
+    assert (seen.json()["number"], seen.json()["closing_balance"], seen.json()["difference"]) == (session["number"], 9500, -500)
+    asked = get(employee_client, "/cash_register/sessions/closing_summary")
+    assert asked.status_code == 409
+    assert asked.json()["error"]["code"] == "cash_register.closing_balance_required"
+    assert get(employee_client, "/cash_register/sessions/current").json()["session"]["status"] == "open"
 
 
 @pytest.mark.django_db
