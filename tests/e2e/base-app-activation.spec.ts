@@ -10,14 +10,16 @@
 // `FIX-HUB-BASE-APP-ACTIVATION-<flow>-<width>`: «Activar» an app the business does not use (BASE-F18); «Desactivar»
 // Reservations names Tables, which came along only with it, and «Activar» brings both back, naming it (BASE-F19,
 // BASE-F23, BASE-F24); Tables while Reservations needs it is refused with what to turn off first, in a notice that
-// stays until it is closed (BASE-F25, hub#2594). No app defines a veto of its own yet (VeriFactu's comes in its lane):
-// the 409 `base.app_vetoed` and its reason are proven in `base/tests/test_app_activation.py` and `AppsPage.test.ts`.
+// stays until it is closed (BASE-F25, hub#2594); and VeriFactu, with a ticket whose record is not in the AEAT yet,
+// refuses with its own reason (BASE-F25, VERIFACTU-F32). That ticket is issued through Invoicing's API and deleted
+// after the run with its record (`cleanInvoices`), the numbering given back.
 // flow: BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
 import { createHmac } from 'node:crypto';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, hostPage, login, psql, shot, shown, untilStill } from './helpers';
+import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = {
@@ -66,9 +68,12 @@ test.beforeAll(() => {
       `create table ${BACKUP} as select id, state, state_version from base_hub where id = '${hubId}'`,
     ].join('; '),
   );
+  snapshotSeries();
 });
 
 test.afterAll(() => {
+  // The ticket BASE-F25 issued, with its VeriFactu record, and the numbering as the run found it.
+  cleanInvoices();
   baseline();
   psql(
     [
@@ -351,6 +356,48 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // Closed, it goes; nothing else changed.
       await refused.locator('button.close').click();
       await expect(refused).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-F25 — «Desactivar» VeriFactu with a record still to send to the AEAT is refused with its reason, at ${width}`, async ({ browser }) => {
+    await pushPhoto(GRATIS);
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    try {
+      // A ticket issued through Invoicing: VeriFactu seals its record, «Pending» until the AEAT answers (never here).
+      if (issuedIds.size === 0) {
+        await ensureIssuer(context);
+        const issued = await api<{ id: string; verifactu_status: string | null }>(context, A, 'POST', '/invoice/invoices', {
+          series_code: 'TICKET',
+          lines: [{ description: 'e2e BASE-F25 veto', quantity: '1', unit_price: 1000, tax_rate: '21' }],
+        });
+        expect(issued.status, 'Invoicing issues the ticket').toBe(201);
+        expect(issued.data.verifactu_status, 'its record is sealed, still to send').toBe('sealed');
+        issuedIds.add(issued.data.id);
+      }
+
+      await search(page, 'VeriFactu');
+      await testid(page, 'apps-row-verifactu-toggle').click();
+      const askOff = page.locator('.ep-confirm-dialog').last();
+      await expect(askOff).toContainText('¿Desactivar VeriFactu?');
+      await askOff.getByRole('button', { name: 'Desactivar' }).click();
+
+      // VeriFactu's own reason, in Spanish, in the notice that stays; nothing changed.
+      const refused = testid(page, 'apps-refused');
+      await expect(refused).toContainText('No se ha cambiado nada');
+      await expect(refused).toContainText(
+        /VeriFactu aún tiene (1 registro|\d+ registros) por enviar a la AEAT\. Espera a que se envíe?n? o arréglalos? antes de desactivarla\./,
+      );
+      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+      expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(['none', 'none']);
+      expect(await menuApps(page)).toEqual(expect.arrayContaining(['VeriFactu', 'Facturación']));
+      await snap(page, 'vetoed', width);
+      await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F25-veto-${width}`) });
     } finally {
       await context.close();
     }

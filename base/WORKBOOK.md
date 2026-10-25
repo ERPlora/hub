@@ -864,8 +864,10 @@ Pasos:
   1. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita (por ejemplo, «Mesas» mientras
      «Reservas» está activada), o en una que se niega mientras tiene algo suyo a medias (VeriFactu, con registros
      que la AEAT aún no ha aceptado: VERIFACTU-F32).
-  2. El hub no pregunta ni cambia nada: encima de la tabla sale «No se ha cambiado nada» con lo que hay que hacer
-     antes, «Desactiva antes Reservas.», o con el motivo de la propia app, en el idioma de quien lo pide.
+  2. El hub no cambia nada: encima de la tabla sale «No se ha cambiado nada» con lo que hay que hacer antes,
+     «Desactiva antes Reservas.» (sin preguntar), o, tras confirmar, con el motivo de la propia app en el idioma de
+     quien lo pide: «VeriFactu aún tiene 1 registro por enviar a la AEAT. Espera a que se envíe o arréglalo antes de
+     desactivarla.».
   3. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
 Entra: las apps en marcha que la necesitan, o el motivo de la app que se niega.
 Sale: nada.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:19d0ba01c6cd99639bd4644466295d47a41b354d2fef859bf511a09d19314dd0 -->
+<!-- generated from WORKBOOK.md sha256:2c159c164b929279649f4460beda2cadf172a3ef9b4b2310ee11d4f9e9704030 -->
 
 ## What it is for and who it is for
 
@@ -840,8 +840,10 @@ Steps:
   1. Whoever runs the business presses "Turn off" on an app another running one needs (for instance, "Tables"
      while "Reservations" is on), or on one that refuses while it has something of its own halfway (VeriFactu,
      with records the AEAT has not accepted yet: VERIFACTU-F32).
-  2. The hub neither asks nor changes anything: above the table "Nothing was changed" shows with what has to be
-     done first, "Turn off Reservations first.", or with the app's own reason, in the language of who asks.
+  2. The hub changes nothing: above the table "Nothing was changed" shows with what has to be done first, "Turn
+     off Reservations first." (without asking), or, after confirming, with the app's own reason in the language of
+     who asks: "VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or fix it before turning it
+     off.".
   3. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
 In: the running apps that need it, or the reason of the app that refuses.
 Out: nothing.
