@@ -135,6 +135,24 @@ async function signedInSpanish(browser: Browser, viewport: { width: number; heig
 /** The toast that says `text` (one at a time: a new one closes the one on screen). */
 const toast = (page: Page, text: string) => page.locator('ion-toast').filter({ hasText: text }).last();
 
+/** The app names on screen that do not fit their cell and are cut without «…» (a long name such as «Ventas / TPV»
+ *  or «Facturación» in a narrow column): each one is whole, or ends in an ellipsis. */
+async function namesCutShort(page: Page): Promise<string[]> {
+  return shown(page)
+    .locator('[data-testid="apps-row"] .apps-name')
+    .evaluateAll((names) =>
+      names.flatMap((box) => {
+        const text = box.lastElementChild as HTMLElement | null;
+        const cell = box.closest('[role="cell"]') as HTMLElement | null;
+        if (!text || !cell || !text.textContent?.trim()) return [];
+        const edge = cell.getBoundingClientRect().right - parseFloat(getComputedStyle(cell).paddingRight) + 1;
+        const ellipsis = getComputedStyle(text).textOverflow === 'ellipsis' && text.scrollWidth > text.clientWidth;
+        const inside = text.getBoundingClientRect().right <= edge;
+        return inside && (ellipsis || text.scrollWidth <= text.clientWidth + 1) ? [] : [text.textContent.trim()];
+      }),
+    );
+}
+
 /** `a`'s row of `app` as `state:chosen`, or `none`. */
 const stored = (app: string) =>
   psql(`select coalesce((select state || ':' || chosen from base_appactivation where host = 'a' and app = '${app}'), 'none')`);
@@ -242,6 +260,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       expect(off, 'Automations off before the flow').toMatchObject({ status: 200, data: { app: 'flow', state: 'off' } });
       await page.reload();
       await expect(testid(page, 'apps-counter')).toHaveText('16 de 20 apps activadas');
+      await expect(shown(page).locator('[data-testid="apps-row"]').first()).toBeVisible();
+      expect(await namesCutShort(page), `every name whole or ending in «…» at ${width}`).toEqual([]);
       expect(await menuApps(page)).not.toContain('Automatizaciones');
       await search(page, 'Automatizaciones');
       await expect(appRow(page, 'flow').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');

@@ -374,7 +374,10 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
               class="apps-icon"
               :name="(row as AppRow).icon"
             />
-            <span>{{ (row as AppRow).name }}</span>
+            <span
+              class="apps-name-text"
+              :title="(row as AppRow).name"
+            >{{ (row as AppRow).name }}</span>
           </span>
         </template>
         <template #price="{ row }">
@@ -422,6 +425,15 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
   gap: 8px;
   min-width: 0;
   font-weight: 600;
+}
+
+/* A long name in a narrow column («Ventas / TPV», «Facturación» at 834) ends in «…», never cut mid-letter; the whole
+   name on hover. */
+.apps-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .apps-icon {
