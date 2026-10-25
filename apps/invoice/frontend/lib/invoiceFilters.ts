@@ -5,7 +5,7 @@
 import type { DataTableFilters } from '@erplora/ui/components';
 
 import type { InvoiceListIn, InvoiceSource, InvoiceStatus, InvoiceType } from '../operations';
-import { centsFromEuros } from './format';
+import { centsFromAmount } from './format';
 import { SOURCE_CODES, STATUS_CODES, TYPE_CODES } from './invoice';
 
 const AMOUNTS = ['total_amount_from', 'total_amount_to'] as const;
@@ -14,7 +14,7 @@ const typed = (values: DataTableFilters, key: string): string => (values[key] ??
 
 /** The amount filters typed that are not amounts. */
 export function invalidAmounts(values: DataTableFilters): string[] {
-  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromEuros(values[key]) === undefined);
+  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromAmount(values[key]) === undefined);
 }
 
 /** «Issued until» is a day before «Issued from»: neither is sent. */
@@ -39,7 +39,7 @@ export function filterQuery(values: DataTableFilters): Partial<InvoiceListIn> {
     if (to) query.issue_date_to = to;
   }
   for (const key of AMOUNTS) {
-    const cents = centsFromEuros(values[key]);
+    const cents = centsFromAmount(values[key]);
     if (cents !== undefined) query[key] = cents;
   }
   return query;

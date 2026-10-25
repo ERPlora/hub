@@ -271,6 +271,7 @@ function onSubstituted(full: InvoiceOut): void {
         <InvoiceLinesTable
           :lines="invoice.lines"
           :taxes="invoice.tax_breakdown.map((entry) => entry.tax)"
+          :currency="invoice.currency"
         />
         <InvoiceTotals :invoice="invoice" />
         <InlineFeedback

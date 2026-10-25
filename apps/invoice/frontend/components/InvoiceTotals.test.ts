@@ -26,10 +26,11 @@ const INVOICE = {
   base_amount: 6000,
   tax_amount: 524,
   total_amount: 6524,
+  currency: 'EUR',
 };
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountInvoice(InvoiceTotals, { props: { invoice: INVOICE }, locale });
+async function setup(locale: 'en' | 'es' = 'en', invoice = INVOICE) {
+  const m = await mountInvoice(InvoiceTotals, { props: { invoice }, locale });
   const taxes = () =>
     m.wrapper
       .findAll('[data-testid="invoice-detail-tax"]')
@@ -50,5 +51,11 @@ describe('InvoiceTotals', () => {
     const s = await setup('es');
     expect(s.taxes()[0]).toBe('IVA 21 % (20,00 €) = 4,20 €');
     expect(plain(s.find('invoice-detail-taxes').text())).toBe('Impuestos: 5,24 €');
+  });
+
+  it('an invoice of a business in Poland is in zlotys (flow business-currency)', async () => {
+    const s = await setup('en', { ...INVOICE, currency: 'PLN' });
+    expect(s.taxes()[0]).toMatch(/\(PLN [\d.,]+\) = PLN [\d.,]+$/);
+    expect(plain(s.find('invoice-detail-total').text())).toMatch(/PLN 65\.24$/);
   });
 });

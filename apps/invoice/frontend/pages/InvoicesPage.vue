@@ -80,7 +80,7 @@ const columns = computed<DataTableColumn<InvoiceRowOut>[]>(() => [
     sortable: true,
     align: 'right',
     width: 'minmax(7rem, 8rem)',
-    format: (_, row) => formatMoney(row.total_amount, locale.value),
+    format: (_, row) => formatMoney(row.total_amount, locale.value, row.currency),
     filter: { type: 'range', amount: true, keys: ['total_amount_from', 'total_amount_to'] },
   },
   {

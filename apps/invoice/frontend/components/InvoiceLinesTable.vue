@@ -17,6 +17,8 @@ const props = defineProps<{
   lines: readonly InvoiceLineOut[];
   /** The taxes of the invoice's breakdown (`vat`, `igic`, `ipsi`…): they name the rate's column. */
   taxes: readonly string[];
+  /** The invoice's currency (the business's when it was issued). */
+  currency: string;
 }>();
 
 const t = useT();
@@ -40,19 +42,19 @@ const headers = computed(() => [
 const rows = computed(() =>
   props.lines.map((line) => {
     const surcharge = Number(line.surcharge_rate) > 0 ? ` + ${formatPercent(line.surcharge_rate, locale.value)}` : '';
-    const discount = line.discount_amount ? formatMoney(line.discount_amount, locale.value) : '';
+    const discount = line.discount_amount ? formatMoney(line.discount_amount, locale.value, props.currency) : '';
     return {
       id: line.id,
       cells: [
         String(line.position),
         line.description,
         formatQuantity(line.quantity, locale.value),
-        formatUnitPrice(line.unit_price, locale.value),
+        formatUnitPrice(line.unit_price, locale.value, props.currency),
         ...(discounted.value ? [discount] : []),
         `${formatPercent(line.tax_rate, locale.value)}${surcharge}`,
-        formatMoney(line.base_amount, locale.value),
-        formatMoney(line.tax_amount, locale.value),
-        formatMoney(line.total_amount, locale.value),
+        formatMoney(line.base_amount, locale.value, props.currency),
+        formatMoney(line.tax_amount, locale.value, props.currency),
+        formatMoney(line.total_amount, locale.value, props.currency),
       ],
     };
   }),

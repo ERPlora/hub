@@ -27,7 +27,7 @@ const props = withDefaults(
 
 const t = useT();
 const locale = useLocale();
-const money = (cents: number) => formatMoney(cents, locale.value);
+const money = (cents: number) => formatMoney(cents, locale.value, props.invoice.currency);
 
 const title = computed(() => {
   const type = props.invoice.invoice_type;
@@ -48,7 +48,7 @@ const lines = computed(() =>
     id: line.id,
     description: line.description,
     quantity: formatQuantity(line.quantity, locale.value),
-    price: formatUnitPrice(line.unit_price, locale.value),
+    price: formatUnitPrice(line.unit_price, locale.value, props.invoice.currency),
     discount: line.discount_amount ? money(line.discount_amount) : '',
     rate: formatPercent(line.tax_rate, locale.value),
     amount: money(line.base_amount),
