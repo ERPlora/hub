@@ -1026,6 +1026,7 @@ datos de quien lo provocó.
 | Impuestos | Crear una categoría fiscal o aprender un texto desde la importación | F09 | `tax.category.create`, `tax.alias.create` |
 | Ventas | El número del tique o la factura de una venta, para la Referencia de un movimiento | F16 | `sale.sale.get` |
 | Impresión | Mandar la etiqueta a la impresora con la función «Etiqueta» | F25 | `printing.job.create` |
+| Plataforma | La moneda del negocio (la de su país), para escribir los precios y costes del CSV, leerlos al importar y ponerla en la etiqueta | F09, F11, F25 | `base.business.get` |
 
 Inventario no usa nada más de otras apps: el número de una venta le llega en su aviso, y el de su tique o
 factura se lo da Ventas, no Facturación.

@@ -10,7 +10,7 @@ in the reader's language.
 
 from decimal import Decimal
 
-from babel.numbers import format_currency, format_decimal, format_percent
+from babel.numbers import format_currency, format_decimal, format_percent, get_currency_precision
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum, Window
 from django.db.models.functions import Coalesce, Lag
 from django.template.loader import render_to_string
@@ -18,7 +18,7 @@ from django.utils import timezone, translation
 from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import AppInactive, NotFound
 from live.operations import UnknownOperation, operation
 from live.operations import get as get_operation
@@ -434,16 +434,21 @@ def by_source(ctx: OperationContext, params: BySourceIn) -> dict:
 # ── The printable document ──────────────────────────────────────────────────────────────────────
 
 
+def _units(cents: int | Decimal, currency: str) -> Decimal:
+    """Minor units as units of ``currency``: 12100 is 121.00 €, and ¥12,100 (the yen has no cents)."""
+    return Decimal(cents).scaleb(-get_currency_precision(currency))
+
+
 def _money(cents: int, currency: str, language: str) -> str:
-    return format_currency(Decimal(cents) / 100, currency, locale=language)
+    return format_currency(_units(cents, currency), currency, locale=language)
 
 
 def _unit_price(cents: Decimal, currency: str, language: str) -> str:
-    """A unit price: two decimals, up to four when the price without VAT has them (0.8264 €)."""
-    euros = (Decimal(cents) / 100).normalize()
-    if -euros.as_tuple().exponent <= 2:
-        return format_currency(euros, currency, locale=language)
-    return format_currency(euros, currency, locale=language, decimal_quantization=False)
+    """A unit price: the currency's decimals, up to two more when the price without VAT has them (0.8264 €)."""
+    units = _units(cents, currency).normalize()
+    if -units.as_tuple().exponent <= get_currency_precision(currency):
+        return format_currency(units, currency, locale=language)
+    return format_currency(units, currency, locale=language, decimal_quantization=False)
 
 
 def _percent(rate, language: str) -> str:
@@ -781,6 +786,20 @@ def allocations(ctx: OperationContext, params: AllocationsIn) -> dict:
     return _page(
         documents.order_by("series_code", "year", "sequence", "id"), params, _allocation
     )
+
+
+# ── The business's currency ─────────────────────────────────────────────────────────────────────
+
+#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
+BUSINESS = "base.business.get"
+
+
+def business_currency(ctx: OperationContext) -> str:
+    """The currency of ``ctx``'s business (ISO 4217), the one a document issued now keeps, as ``base.business.get``
+    reads it. Read as the platform: an API key holds only the permission of the operation it opened, and every person
+    of the hub may see it anyway."""
+    business = get_operation(BUSINESS)
+    return business(system_context(ctx.scope), business.input()).currency
 
 
 # ── The issuer ──────────────────────────────────────────────────────────────────────────────────

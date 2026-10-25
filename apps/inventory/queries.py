@@ -11,7 +11,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from babel import Locale
-from babel.numbers import format_currency, format_decimal, get_decimal_symbol
+from babel.numbers import format_currency, format_decimal, get_currency_precision, get_decimal_symbol
 from django.conf import settings
 from django.core.exceptions import EmptyResultSet
 from django.db.models import (
@@ -34,9 +34,9 @@ from django.db.models import (
 from django.db.models.functions import Cast, Coalesce, NullIf
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import get, operation
 
 from apps.inventory.models import (
     UNIT_SPECS,
@@ -101,8 +101,8 @@ YES, NO = _("Yes"), _("No")
 CSV_CONTENT_TYPE = "text/csv"
 # Excel reads a CSV as UTF-8 only with it.
 BOM = "\ufeff"
-# The Hub has no currency setting yet: every ERPlora business invoices in euros (VeriFactu, Spain).
-CURRENCY = "EUR"
+#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
+BUSINESS = "base.business.get"
 #: What a spreadsheet runs as a formula at the start of a cell (=HYPERLINK, @SUM…): a text cell that
 #: starts so gets an apostrophe in front, which the import takes back (services.EXPORT_GUARD).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
@@ -115,6 +115,14 @@ ON_SALE = Q(is_active=True, is_sold_out=False)
 
 
 # Shared by services.py, inside the command's own transaction
+
+
+def business_currency(ctx: OperationContext) -> str:
+    """The currency of ``ctx``'s business (ISO 4217): the one its prices and costs are in, as ``base.business.get``
+    reads it. Read as the platform: an API key holds only the permission of the operation it opened, and every person
+    of the hub may see it anyway."""
+    business = get(BUSINESS)
+    return business(system_context(ctx.scope), business.input()).currency
 
 
 def current_settings() -> Settings:
@@ -633,12 +641,13 @@ def config_row(settings: Settings) -> dict:
 )
 def export_products(ctx: OperationContext, params: ProductFiltersIn) -> dict:
     products = filter_products(_products(current_settings()), params)
+    currency = business_currency(ctx)
     rows = [
         [
             _text_cell(product.name),
             _text_cell(product.sku),
-            _money(product.price),
-            _money(product.cost),
+            _money(product.price, currency),
+            _money(product.cost, currency),
             quantity_text(product.stock),
             quantity_text(product.low_stock_threshold),
             _text_cell(product.ean13 or ""),
@@ -866,10 +875,11 @@ def _locale() -> Locale:
     return Locale.parse(translation.get_language() or settings.LANGUAGE_CODE, sep="-")
 
 
-def _money(cents: int) -> str:
-    """«2,20 €» in Spanish, «€2.20» in English (CLDR), ungrouped so that the import reads it back."""
+def _money(cents: int, currency: str) -> str:
+    """«2,20 €» in Spanish, «€2.20» in English (CLDR), in the business's ``currency`` with its decimals, ungrouped so
+    that the import reads it back."""
     return format_currency(
-        Decimal(cents) / 100, CURRENCY, locale=_locale(), group_separator=False
+        Decimal(cents).scaleb(-get_currency_precision(currency)), currency, locale=_locale(), group_separator=False
     )
 
 

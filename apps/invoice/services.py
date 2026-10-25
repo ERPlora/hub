@@ -39,6 +39,7 @@ from apps.invoice.models import (
     Issuer,
 )
 from apps.invoice.queries import (
+    business_currency,
     VERIFACTU_BY_INVOICE,
     document_of_sale,
     find_invoice,
@@ -392,6 +393,7 @@ def _issue(
     issuer: dict,
     operation_date: dt.date,
     source_type: str,
+    currency: str,
     status: str = Invoice.Status.ISSUED,
     paid_at: dt.datetime | None = None,
     numbered: tuple[int, str] | None = None,
@@ -419,6 +421,7 @@ def _issue(
         tax_amount=tax,
         total_amount=base + tax,
         tax_breakdown=entries,
+        currency=currency,
         source_type=source_type,
         status=status,
         paid_at=paid_at,
@@ -745,6 +748,7 @@ def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
         issuer=_issuer_copy(issuer),
         operation_date=today,
         source_type=Invoice.Source.MANUAL,
+        currency=business_currency(ctx),
         notes=data.notes,
         description=_operation_text(item.description for item in data.lines),
     )

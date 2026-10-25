@@ -20,7 +20,7 @@ from django.db.models import Exists, F, OuterRef, Q, Sum
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError
 from live.operations import UnknownOperation, operation
 from live.operations import get as operation_named
@@ -45,7 +45,6 @@ from apps.cash_register.schemas import (
     SettingsOut,
 )
 from apps.sale.models import RefundPayment, Sale, SalePayment
-from apps.sale.queries import CURRENCY
 
 VIEW_EXPECTED = "cash_register.view_expected_totals"
 CASH = "cash"
@@ -159,9 +158,15 @@ def actor(ctx: OperationContext) -> str:
 # ── Money ────────────────────────────────────────────────────────────────────────────────────────
 
 
-def business_currency() -> str:
-    """The business's currency: the one sale charges in (``EUR`` until the Hub keeps its own)."""
-    return CURRENCY
+#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
+BUSINESS = "base.business.get"
+
+
+def business_currency(ctx: OperationContext) -> str:
+    """The currency of ``ctx``'s business (ISO 4217), as ``base.business.get`` reads it. Read as the platform: an API
+    key holds only the permission of the operation it opened, and every person of the hub may see it anyway."""
+    business = operation_named(BUSINESS)
+    return business(system_context(ctx.scope), business.input()).currency
 
 
 def currency_decimals(currency: str) -> int:
@@ -1132,7 +1137,7 @@ def list_counts(ctx: OperationContext, params: CountListIn) -> dict:
     },
 )
 def get_currency(ctx: OperationContext, params: EmptyIn) -> dict:
-    currency = business_currency()
+    currency = business_currency(ctx)
     table = DENOMINATIONS.get(currency, {})
     with translation.override(ctx.language):
         return {
