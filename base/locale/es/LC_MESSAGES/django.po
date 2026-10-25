@@ -1860,3 +1860,35 @@ msgid_plural "You have reached the %(count)s-app limit of your plan. Upgrade you
 msgstr[0] "Has llegado al límite de %(count)s app de tu plan. Mejora el plan o desactiva una."
 msgstr[1] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."
 msgstr[2] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."
+
+#: base/schemas.py
+msgid "Template"
+msgstr "Plantilla"
+
+#: base/schemas.py
+msgid "File"
+msgstr "Archivo"
+
+#: base/schemas.py
+msgid "Apps to load"
+msgstr "Apps que se cargan"
+
+#: base/schemas.py
+msgid "Person"
+msgstr "Persona"
+
+#: base/schemas.py
+msgid "Folder"
+msgstr "Carpeta"
+
+#: base/schemas.py
+msgid "In folder"
+msgstr "En la carpeta"
+
+#: base/schemas.py
+msgid "File or folder"
+msgstr "Archivo o carpeta"
+
+#: base/schemas.py
+msgid "Move to"
+msgstr "Mover a"

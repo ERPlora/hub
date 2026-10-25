@@ -49,9 +49,9 @@ describe('cash register routes.ts', () => {
     expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
   });
 
-  it('has a page for every menu entry of apps.py', () => {
+  it('has a page for every path apps.py names: its menu and where the Home\'s «Your cash drawer» leads', () => {
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/cash_register\/[a-z_]+)"/g)].map((m) => m[1]);
+    const paths = [...new Set([...appsPy.matchAll(/"(\/cash_register\/[a-z_]+)"/g)].map((m) => m[1]))];
     expect(paths).toEqual(['/cash_register/sessions', '/cash_register/settings']);
     for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });

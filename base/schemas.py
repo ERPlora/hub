@@ -10,6 +10,7 @@ import datetime as dt
 from typing import Any, Literal
 from uuid import UUID
 
+from django.utils.translation import gettext_noop
 from ninja import Schema
 from pydantic import Field
 
@@ -454,8 +455,15 @@ class BlueprintListOut(Schema):
 class BlueprintSourceIn(Schema):
     """A template of the catalogue or a .blueprint.zip of the person, exactly one of them."""
 
-    template: str = Field("", max_length=80, description="«<vertical>.<language>» of the catalogue.")
-    file_base64: str = Field("", max_length=FILE_BASE64_MAX, description="A .blueprint.zip in base64 (5 MB at most).")
+    template: str = Field(
+        "", max_length=80, title=gettext_noop("Template"), description="«<vertical>.<language>» of the catalogue."
+    )
+    file_base64: str = Field(
+        "",
+        max_length=FILE_BASE64_MAX,
+        title=gettext_noop("File"),
+        description="A .blueprint.zip in base64 (5 MB at most).",
+    )
 
 
 class BlueprintDatasetOut(BlueprintPartOut):
@@ -484,7 +492,10 @@ class BlueprintSummaryOut(Schema):
 
 class BlueprintImportIn(BlueprintSourceIn):
     apps: list[str] | None = Field(
-        None, max_length=200, description="The apps to load; none = every app of the blueprint."
+        None,
+        max_length=200,
+        title=gettext_noop("Apps to load"),
+        description="The apps to load; none = every app of the blueprint.",
     )
     retry_of: UUID | None = Field(
         None, description="A load that did not go in whole: load again what did not, from the same template."
@@ -958,7 +969,12 @@ class PersonListOut(Schema):
 
 
 class PersonIn(Schema):
-    person: str = Field(min_length=1, max_length=150, description="The ``id`` of a person of ``base.person.list``.")
+    person: str = Field(
+        min_length=1,
+        max_length=150,
+        title=gettext_noop("Person"),
+        description="The ``id`` of a person of ``base.person.list``.",
+    )
 
 
 class PersonMayOut(Schema):
@@ -1169,10 +1185,20 @@ class ApiDocSettingsUpdateIn(Schema):
 #: How the Files screen shows a file: «image», «pdf», «text», «table» (CSV, TSV), «json», «audio», «video», or «»
 #: when it does not (it is downloaded).
 FilePreview = Literal["image", "pdf", "text", "table", "json", "audio", "video", ""]
-#: A path under the business's files: names joined by «/» («Facturas/2026/marzo.pdf»); empty is the root.
-FILE_PATH = Field(
-    default="", max_length=1000, description="A path in the business's files, «Facturas/2026»; empty: the root."
-)
+
+
+def file_path(title: str | None = None) -> Any:
+    """A path under the business's files: names joined by «/» («Facturas/2026/marzo.pdf»); empty is the root.
+    ``title`` names it on the assistant's card."""
+    return Field(
+        default="",
+        max_length=1000,
+        title=title,
+        description="A path in the business's files, «Facturas/2026»; empty: the root.",
+    )
+
+
+FILE_PATH = file_path()
 #: An upload in base64: 25 MB of file is 34 952 536 characters.
 FILE_UPLOAD_BASE64_MAX = 34_952_536
 
@@ -1246,9 +1272,11 @@ class FileOut(Schema):
 
 
 class FileUploadIn(Schema):
-    folder: str = FILE_PATH
+    folder: str = file_path(gettext_noop("Folder"))
     name: str = Field(max_length=1000, description="The file's name, «marzo.pdf»; a taken one becomes «marzo (1).pdf».")
-    content_base64: str = Field(max_length=FILE_UPLOAD_BASE64_MAX, description="The file, in base64; 25 MB at most.")
+    content_base64: str = Field(
+        max_length=FILE_UPLOAD_BASE64_MAX, title=gettext_noop("File"), description="The file, in base64; 25 MB at most."
+    )
 
 
 class FileSavedOut(Schema):
@@ -1259,7 +1287,7 @@ class FileSavedOut(Schema):
 
 
 class FileFolderCreateIn(Schema):
-    parent: str = FILE_PATH
+    parent: str = file_path(gettext_noop("In folder"))
     name: str = Field(max_length=1000, description="The new folder's name, «Facturas»; 100 characters at most.")
 
 
@@ -1269,17 +1297,27 @@ class FilePathOut(Schema):
 
 
 class FileRenameIn(Schema):
-    path: str = Field(max_length=1000, description="The file or folder to rename, «Facturas/marzo.pdf».")
+    path: str = Field(
+        max_length=1000,
+        title=gettext_noop("File or folder"),
+        description="The file or folder to rename, «Facturas/marzo.pdf».",
+    )
     name: str = Field(max_length=1000, description="Its new name (a name, never a path), «abril.pdf».")
 
 
 class FileMoveIn(Schema):
-    path: str = Field(max_length=1000, description="The file or folder to move, «marzo.pdf».")
-    to: str = FILE_PATH
+    path: str = Field(
+        max_length=1000, title=gettext_noop("File or folder"), description="The file or folder to move, «marzo.pdf»."
+    )
+    to: str = file_path(gettext_noop("Move to"))
 
 
 class FileDeleteIn(Schema):
-    path: str = Field(max_length=1000, description="The file or folder to delete, «Facturas/marzo.pdf».")
+    path: str = Field(
+        max_length=1000,
+        title=gettext_noop("File or folder"),
+        description="The file or folder to delete, «Facturas/marzo.pdf».",
+    )
 
 
 class FileDeletedOut(Schema):
@@ -1326,6 +1364,10 @@ class AssistantExecutedOut(Schema):
     call_id: str
     name: str = Field(description="The operation («demo.item.create»), or the tool's name when there was none.")
     app: str
+    app_name: str = Field(
+        description="Where it happened, in the person's language, as its card says it: the app's name, or the "
+        "platform's screen («Settings»); empty when there was no operation."
+    )
     kind: Literal["query", "command", ""]
     outcome: Literal["ok", "error", "refused", "cancelled"]
     code: str

@@ -430,6 +430,8 @@ export interface TimeOffOut {
   member_id: string;
   member_name: string;
   leave_type: LeaveType;
+  /** The type in the caller's language (the Home's «Today's time off»). */
+  leave_type_label: string;
   start_date: string;
   end_date: string;
   is_full_day: boolean;

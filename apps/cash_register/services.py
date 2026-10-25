@@ -113,16 +113,16 @@ REPORT_LINES = (
 # ── Settings ─────────────────────────────────────────────────────────────────────────────────────
 
 
-def _locked_settings(ctx: OperationContext) -> Settings:
-    """The business's settings row, locked; created with the factory values the first time."""
+def _locked_settings(ctx: OperationContext) -> tuple[Settings, bool]:
+    """The business's settings row, locked, and whether this save made it (with the factory values)."""
     settings = Settings.objects.select_for_update().first()
     if settings is not None:
-        return settings
+        return settings, False
     try:
         with transaction.atomic():
-            return Settings.objects.create(updated_by=actor(ctx))
+            return Settings.objects.create(updated_by=actor(ctx)), True
     except IntegrityError:
-        return Settings.objects.select_for_update().get()
+        return Settings.objects.select_for_update().get(), False
 
 
 @operation(
@@ -140,7 +140,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
     },
 )
 def update_settings(ctx: OperationContext, data: SettingsPatchIn) -> dict:
-    settings = _locked_settings(ctx)
+    settings, created = _locked_settings(ctx)
     sent = data.model_dump(exclude_unset=True, exclude_none=True)
     if "auto_close_time" in sent:
         sent["auto_close_time"] = dt.time.fromisoformat(sent["auto_close_time"])
@@ -154,6 +154,8 @@ def update_settings(ctx: OperationContext, data: SettingsPatchIn) -> dict:
             setattr(settings, field, value)
         settings.updated_by = actor(ctx)
         settings.save(update_fields=[*changes, "updated_by", "updated_at"])
+    # The first save is the business's decision even with the factory values: the row and its date are born.
+    if changes or created:
         record_event(ctx, events.SETTINGS_UPDATED, {"fields": sorted(changes)})
     return settings_row(settings)
 

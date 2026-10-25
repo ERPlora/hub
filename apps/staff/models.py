@@ -301,6 +301,21 @@ class TimeOff(UUIDModel):
     def __str__(self) -> str:
         return f"{self.member} {self.start_date}–{self.end_date}"
 
+    @property
+    def leave_type_label(self) -> str:
+        """The type in the language active now (the caller's): what the Home's «Today’s time off» says."""
+        return str(self.get_leave_type_display())
+
+
+def default_workday_start() -> dt.time:
+    """The field default as a callable: a fixed time trips ``fields.W161`` within 10 s of that hour (UTC)."""
+    return dt.time(9)
+
+
+def default_workday_end() -> dt.time:
+    """The field default as a callable: a fixed time trips ``fields.W161`` within 10 s of that hour (UTC)."""
+    return dt.time(18)
+
 
 class StaffSettings(UUIDModel):
     """The settings of the staff app: one row, created by the first save (until then, the defaults).
@@ -312,8 +327,12 @@ class StaffSettings(UUIDModel):
     """
 
     slot = models.PositiveSmallIntegerField(_("slot"), default=1, editable=False)
-    default_work_start = models.TimeField(_("working day starts"), default=dt.time(9))
-    default_work_end = models.TimeField(_("working day ends"), default=dt.time(18))
+    default_work_start = models.TimeField(
+        _("working day starts"), default=default_workday_start
+    )
+    default_work_end = models.TimeField(
+        _("working day ends"), default=default_workday_end
+    )
     default_break_duration = models.PositiveSmallIntegerField(
         _("break duration (minutes)"), default=60
     )

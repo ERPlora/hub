@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from apps.staff.models import Member, Role, Schedule, ScheduleDay, StaffSettings, TimeOff
 
@@ -408,6 +409,23 @@ def test_settings_defaults_are_the_old_modules():
         settings.notify_new_appointment,
         settings.notify_cancellation,
     ) == (True,) * 5
+
+
+@pytest.mark.parametrize(
+    "instant",
+    [
+        "2026-10-25T08:59:55+00:00",
+        "2026-10-25T09:00:05+00:00",
+        "2026-10-25T12:00:00+00:00",
+        "2026-10-25T17:59:55+00:00",
+        "2026-10-25T18:00:05+00:00",
+    ],
+)
+@pytest.mark.parametrize("field", ["default_work_start", "default_work_end"])
+def test_the_working_day_defaults_raise_no_check_warning_at_any_hour(monkeypatch, field, instant):
+    # Django warns fields.W161 when a fixed time default falls within 10 s of the current UTC time.
+    monkeypatch.setattr(timezone, "now", lambda: dt.datetime.fromisoformat(instant))
+    assert StaffSettings._meta.get_field(field).check() == []
 
 
 def test_there_is_one_settings_row():

@@ -33,6 +33,21 @@ msgstr "Ausencias"
 msgid "Schedules"
 msgstr "Horarios"
 
+msgid "Active staff"
+msgstr "Plantilla activa"
+
+msgid "On leave today"
+msgstr "Ausentes hoy"
+
+msgid "Pending time off"
+msgstr "Ausencias pendientes"
+
+msgid "Today’s time off"
+msgstr "Ausencias de hoy"
+
+msgid "Staff by role"
+msgstr "Empleados por rol"
+
 msgid "name"
 msgstr "nombre"
 
@@ -369,3 +384,9 @@ msgstr "Horario habitual"
 #, python-format
 msgid "Permission “%(permission)s” is required."
 msgstr "Se necesita el permiso «%(permission)s»."
+
+msgid "Week"
+msgstr "Semana"
+
+msgid "Staff members"
+msgstr "Miembros del personal"

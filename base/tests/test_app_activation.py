@@ -157,6 +157,14 @@ def test_the_states_are_named_in_spanish_as_the_screen_names_them():
 # ── Turning one on ──────────────────────────────────────────────────────────────────────────────────────────
 
 
+def test_the_assistants_card_names_the_apps_screen():
+    from base import assistant
+
+    for name in ("base.app.enable", "base.app.disable"):
+        assert assistant.card(get(name), {"app": "task"}, "es")["app_name"] == "Apps"
+        assert assistant.card(get(name), {"app": "task"}, "en")["app_name"] == "Apps"
+
+
 def test_the_commands_are_for_who_runs_the_business_and_told_to_the_assistant():
     for name in ("base.app.enable", "base.app.disable"):
         op = get(name)

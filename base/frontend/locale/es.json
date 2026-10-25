@@ -1229,7 +1229,8 @@
           "id": "Registro",
           "ids": "Registros",
           "title": "Título",
-          "category": "Categoría"
+          "category": "Categoría",
+          "app": "App"
         }
       },
       "report": {

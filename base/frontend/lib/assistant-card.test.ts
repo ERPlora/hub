@@ -60,6 +60,8 @@ describe('each datum', () => {
 
   it('a known datum is named in the person’s language; another by its own title', () => {
     expect(fieldLabelKey('price')).toBe('base.assistant.card.fields.price');
+    // The app a card turns on or off (base.app.enable/disable, PLAN-HUB §9): «App» in both languages.
+    expect(fieldLabelKey('app')).toBe('base.assistant.card.fields.app');
     expect(fieldLabelKey('tax_category_key')).toBeNull();
   });
 });

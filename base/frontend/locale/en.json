@@ -1229,7 +1229,8 @@
           "id": "Record",
           "ids": "Records",
           "title": "Title",
-          "category": "Category"
+          "category": "Category",
+          "app": "App"
         }
       },
       "report": {

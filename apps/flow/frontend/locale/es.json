@@ -1842,6 +1842,7 @@
       "lat": "Latitud",
       "leased_until": "Reservado hasta",
       "leave_type": "Tipo de ausencia",
+      "leave_type_label": "Tipo de ausencia, en texto",
       "ledger_purchases": "Compras registradas",
       "ledger_spent": "Gasto registrado",
       "legal_name": "Razón social",

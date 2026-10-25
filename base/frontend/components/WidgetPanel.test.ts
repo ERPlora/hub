@@ -120,6 +120,43 @@ describe('WidgetPanel', () => {
     expect(bars[1].get('.widget-bar-fill').attributes('style')).toContain('width: 25%');
   });
 
+  // BASE-F06: Cash register's «Recent discrepancies» painted a session closed without a count as «0,00 €». A row
+  // without its value says «—» and has no bar (an empty track would read as a zero); a real 0 keeps both.
+  it('paints a bar-list row without its value as «—» with no bar, and a real 0 as an amount on its track', async () => {
+    const m = await panel({ kind: 'bar-list', map: { label: 'number', value: 'difference' }, options: { valueFormat: 'currency' } }, 'es');
+    const call = await m.live();
+    await m.result(call, 'base.business.get', business());
+    await m.result(call, 'demo.item.stats', { rows: [{ number: 'CS-2', difference: null }, { number: 'CS-1', difference: 0 }] });
+    const [uncounted, even] = m.wrapper.findAll('[data-testid="widget-bar"]');
+    expect(uncounted.get('.widget-bar-text').text()).toBe('—');
+    expect(uncounted.find('.widget-bar-track').exists()).toBe(false);
+    expect(even.get('.widget-bar-text').text()).toBe('0,00 €');
+    expect(even.get('.widget-bar-fill').attributes('style')).toContain('width: 0%');
+    expect(m.wrapper.text()).not.toContain('null');
+  });
+
+  // BASE-F06: a drawer 0,40 € short painted with a bar as long as one 5,50 € over (its width was negative, which the
+  // browser drops) and no sign. The bar is as long as the size of its value; only a negative one is red, its amount with
+  // the sign, and every other bar keeps the panel's colour (rv-hub-264: a surplus is never painted as «good»).
+  it('paints a bar-list with negatives by size, only the shortfall red, with the sign in its text', async () => {
+    const m = await panel({ kind: 'bar-list', map: { label: 'number', value: 'difference' }, options: { valueFormat: 'currency' } }, 'es');
+    const call = await m.live();
+    await m.result(call, 'base.business.get', business());
+    await m.result(call, 'demo.item.stats', { rows: [{ number: 'CS-2', difference: 550 }, { number: 'CS-1', difference: -40 }] });
+    const [over, short] = m.wrapper.findAll('[data-testid="widget-bar"]');
+    expect(short.get('.widget-bar-text').text()).toBe('-0,40 €');
+    expect(short.get('.widget-bar-fill').attributes('style')).toContain('width: 7.3%');
+    expect(short.get('.widget-bar-fill').classes()).toContain('widget-bar-fill--negative');
+    expect(over.get('.widget-bar-fill').attributes('style')).toContain('width: 100%');
+    expect(over.get('.widget-bar-fill').classes()).toEqual(['widget-bar-fill']);
+
+    const plain = await panel({ kind: 'bar-list', map: { label: 'name', value: 'n' } });
+    const again = await plain.live();
+    await plain.result(again, 'demo.item.stats', { rows: [{ name: 'Café', n: 4 }, { name: 'Té', n: 1 }] });
+    const fills = plain.wrapper.findAll('.widget-bar-fill');
+    expect(fills.map((fill) => fill.classes())).toEqual([['widget-bar-fill'], ['widget-bar-fill']]);
+  });
+
   it('paints a timeline as one entry per row', async () => {
     const m = await panel({ kind: 'timeline', map: { title: 'who', time: 'at' } });
     const call = await m.live();
@@ -182,6 +219,8 @@ describe('WidgetPanel', () => {
       expect(found.map((bar) => bar.attributes('aria-pressed'))).toEqual(['false', 'false', 'true']);
       expect(readout(m.wrapper)).toEqual(['vie, 23 oct', '5,00\u00a0€']);
       expect(m.wrapper.text()).not.toContain('2026-10');
+      // No day below zero: the bars keep their one colour.
+      expect(m.wrapper.findAll('.widget-chart-bar').map((bar) => bar.classes())).toEqual([['widget-chart-bar'], ['widget-chart-bar'], ['widget-chart-bar']]);
     });
 
     it('a tapped or focused bar says its own day and amount', async () => {
@@ -208,6 +247,31 @@ describe('WidgetPanel', () => {
       await m.result(call, 'demo.item.stats', { rows: [{ day: '2026-10-24', total: 300 }] }, 3);
       expect(bars(m.wrapper).map((bar) => bar.text())).toEqual(['sáb']);
       expect(readout(m.wrapper)).toEqual(['sáb, 24 oct', '3,00\u00a0€']);
+    });
+
+    it('a day without its value says «—» and has no bar, never a bar of 0', async () => {
+      const m = await panel(chart, 'es');
+      const call = await m.live();
+      await m.result(call, 'base.business.get', business());
+      await m.result(call, 'demo.item.stats', { rows: [{ day: '2026-10-22', total: null }, { day: '2026-10-23', total: 500 }] });
+      const [missing, friday] = m.wrapper.findAll('[data-testid="widget-chart-bar"]');
+      expect(missing.attributes('aria-label')).toBe('jue, 22 oct: —');
+      expect(missing.find('.widget-chart-bar').exists()).toBe(false);
+      expect(friday.find('.widget-chart-bar').exists()).toBe(true);
+      await missing.trigger('click');
+      expect(readout(m.wrapper)).toEqual(['jue, 22 oct', '—']);
+    });
+
+    it('a day below zero has a bar as tall as its size, red, and its amount says the sign', async () => {
+      const m = await panel(chart, 'es');
+      const call = await m.live();
+      await m.result(call, 'base.business.get', business());
+      await m.result(call, 'demo.item.stats', { rows: [{ day: '2026-10-22', total: -200 }, { day: '2026-10-23', total: 500 }] });
+      const [refunds, friday] = m.wrapper.findAll('[data-testid="widget-chart-bar"]');
+      expect(refunds.attributes('aria-label')).toBe('jue, 22 oct: -2,00 €');
+      expect(refunds.get('.widget-chart-bar').attributes('style')).toContain('height: 40%');
+      expect(refunds.get('.widget-chart-bar').classes()).toContain('widget-chart-bar--negative');
+      expect(friday.get('.widget-chart-bar').classes()).toEqual(['widget-chart-bar']);
     });
   });
 

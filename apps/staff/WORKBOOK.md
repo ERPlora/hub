@@ -2,8 +2,7 @@
 Prefijo: STAFF
 Alcance MVP: transversal (lo usa sobre todo la peluquería; el restaurante lee su directorio)
 Estado de la app: completa (2026-10-22)
-Lo que no entra todavía: ver «Lo que queda fuera». Los paneles de Personal en el Inicio esperan a que el Inicio
-enseñe los paneles de las apps; mientras tanto salen dentro de Personal.
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `staff`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -133,18 +132,23 @@ en mitad del día.»: «Inicio de jornada (HH:MM)», «Fin de jornada (HH:MM)»,
 valores propuestos.
 
 ### Paneles del inicio
-El Inicio del Hub todavía no enseña los paneles de las apps. Mientras tanto, los cinco paneles del
-producto actual salen dentro de Personal: **Plantilla activa**, **Ausentes hoy** y **Ausencias
-pendientes** encima de la tabla de Personal, **Ausencias de hoy** encima de la de Ausencias y
-**Empleados por rol** en la columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
+El **Inicio** del Hub enseña los cinco paneles de Personal, agrupados como «Personal» en **Personalizar
+panel**. De serie salen «Plantilla activa» (cuántas personas están **Activas**), «Ausentes hoy» (personas
+distintas con una ausencia aprobada que cubre hoy) y «Ausencias de hoy» (quién falta hoy, de día entero
+primero y luego por nombre, con el tipo de ausencia debajo de cada nombre); «Ausencias pendientes» (cuántas
+solicitudes esperan respuesta) y «Empleados por rol» (una barra por rol con sus personas **Activas**, el rol
+con más primero y diez como mucho) se añaden desde **Personalizar panel**. Quien no ve las ausencias no
+tiene los tres de ausencias, y quien no ve el equipo, ni «Plantilla activa» ni «Empleados por rol». Cambian
+solos, sin recargar. Las mismas cifras siguen dentro de Personal: las tres encima de la tabla de Personal,
+«Ausencias de hoy» encima de la de Ausencias y la columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
 
 ## Estados de cada pantalla
 
 | Estado | Qué ve la persona |
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado; cada cifra enseña «…». |
-| Vacío | «Sin miembros del staff.», «Sin roles definidos.», «Sin solicitudes de ausencia.» o «Este miembro aún no tiene horarios.»; con búsqueda o filtro, «Sin resultados». «Ausencias de hoy» sin nadie: «Nadie falta hoy.». Comisiones sin nadie que pueda cobrarla: «Nadie del equipo puede cobrar comisión todavía.»; sin Ventas en el negocio, «Las comisiones salen de las ventas» y «Activa Ventas para ver lo que ha ganado cada profesional.», sin lista. |
-| Error | El aviso de la tabla con «Reintentar»; en Ajustes, «No se pudieron cargar los ajustes» con «Reintentar» y sin formulario. Las cifras dicen «No se pudieron cargar las cifras» y «Ausencias de hoy», «No se pudo cargar quién falta hoy», y la tabla sigue funcionando. Un rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila, encima de la tabla. |
+| Vacío | «Sin miembros del staff.», «Sin roles definidos.», «Sin solicitudes de ausencia.» o «Este miembro aún no tiene horarios.»; con búsqueda o filtro, «Sin resultados». «Ausencias de hoy» sin nadie: «Nadie falta hoy.»; en el **Inicio**, un panel sin nada que enseñar dice «Sin datos». Comisiones sin nadie que pueda cobrarla: «Nadie del equipo puede cobrar comisión todavía.»; sin Ventas en el negocio, «Las comisiones salen de las ventas» y «Activa Ventas para ver lo que ha ganado cada profesional.», sin lista. |
+| Error | El aviso de la tabla con «Reintentar»; en Ajustes, «No se pudieron cargar los ajustes» con «Reintentar» y sin formulario. Las cifras dicen «No se pudieron cargar las cifras» y «Ausencias de hoy», «No se pudo cargar quién falta hoy», y la tabla sigue funcionando; en el **Inicio**, el panel que no se puede leer dice «No disponible» y los demás siguen. Un rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila, encima de la tabla. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
@@ -480,17 +484,19 @@ Implicados: ninguno
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f05 qa:verticals/beauty/02-opening-and-daily-agenda fi:modules/staff#query-staff-time_off-today old:staff/workflow/ausencias.md#staff-f20 fi:modules/staff#widget-staff-time_off_today-timeline -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
-Pantalla: Ausencias y Personal
+Pantalla: Ausencias, Personal e Inicio
 Pasos:
 1. Abre **Ausencias**: encima de la tabla, «Ausencias de hoy» lista a quien tiene una ausencia
    **aprobada** que cubre hoy (en el día del negocio), de día entero primero y luego por nombre, con el
    tipo y, si es solo una parte del día, sus horas, y dice cuántas son.
 2. En **Personal**, la cifra «Ausentes hoy» cuenta las personas distintas que faltan hoy.
-3. Para el detalle, la tabla de **Ausencias** con sus filtros.
+3. En el **Inicio**, los paneles «Ausencias de hoy» y «Ausentes hoy» salen de serie: la misma lista, con
+   el tipo de ausencia debajo de cada nombre, y la misma cifra.
+4. Para el detalle, la tabla de **Ausencias** con sus filtros.
 Entra: las ausencias aprobadas y las fichas.
 Sale: solo lectura; sin el motivo. Cambia sola cuando se aprueba o se cancela una ausencia.
-Si falla: sin ausencias, «Nadie falta hoy.»; si no se puede leer, «No se pudo cargar quién falta hoy»
-en su sitio, y la tabla sigue funcionando.
+Si falla: sin ausencias, «Nadie falta hoy.» (en el **Inicio**, «Sin datos»); si no se puede leer, «No se
+pudo cargar quién falta hoy» en su sitio (en el **Inicio**, «No disponible»), y la tabla sigue funcionando.
 Implicados: ninguno
 
 ### STAFF-F21 Dar la tarifa y la comisión de cada profesional
@@ -548,7 +554,7 @@ Implicados: ninguno
 <!-- origen: fi:modules/staff#query-staff-members-stats old:staff/workflow/pago-y-ajustes.md#staff-f23 fi:modules/staff#widget-staff-headcount-kpi fi:modules/staff#widget-staff-on_leave_today-stat fi:modules/staff#widget-staff-pending_time_off-kpi fi:modules/staff#widget-staff-by_role-bar-list -->
 Estado: hecho (servidor y pantalla)
 Actor: todos
-Pantalla: Personal y Roles
+Pantalla: Personal, Roles e Inicio
 Pasos:
 1. Abre **Personal**: encima de la tabla salen tres cifras: «Plantilla activa» (cuántas personas
    están **Activas**), «Ausentes hoy» (personas distintas con una ausencia aprobada que cubre hoy) y
@@ -556,8 +562,10 @@ Pasos:
    para que la tabla se siga viendo debajo.
 2. Las cifras cambian solas, sin recargar, cuando alguien da de alta, desactiva o da de baja una ficha
    o pide, aprueba, rechaza o cancela una ausencia.
-3. «Miembros» de **Roles** da cuántas personas **Activas** lleva cada rol (el panel «Empleados por
-   rol» del producto actual).
+3. «Miembros» de **Roles** da cuántas personas **Activas** lleva cada rol.
+4. En el **Inicio**, «Plantilla activa» y «Ausentes hoy» salen de serie, y «Ausencias pendientes» y
+   «Empleados por rol» (una barra por rol, el que tiene más personas **Activas** primero y diez como
+   mucho) se añaden desde **Personalizar panel**; dan las mismas cifras y cambian igual, sin recargar.
 Entra: las fichas, los roles y las ausencias. Por el asistente o la API, las cifras dan además
 cuántas fichas hay y cuántas están **De baja** e **Inactivas**.
 Sale: solo lectura. Las fichas dadas de baja y sus ausencias no cuentan.
@@ -606,7 +614,7 @@ su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
 | La disponibilidad de una persona por días | ver | F16 | `staff.availability.for_member` |
 | Las ausencias, sin motivo, con filtros y orden | ver ausencias | F17–F19 | `staff.time_off.list` |
 | Una ausencia con su motivo, sus notas y quién la aprobó | ver el detalle de ausencias | F18 | `staff.time_off.detail` |
-| Quién falta hoy | ver ausencias | F20 | `staff.time_off.today` |
+| Quién falta hoy, con el tipo de cada ausencia en el idioma de quien pregunta | ver ausencias | F20 | `staff.time_off.today` |
 | Mis ausencias, con su motivo y sus notas | ver ausencias | F08 | `staff.time_off.mine` |
 | Los ajustes | ver | F22 | `staff.settings.get` |
 | Las cuentas activas con acceso al negocio, para «Usuario del Hub» (id y nombre, con búsqueda o por usuario: la cuenta de una ficha que ya no tiene acceso no sale y la pantalla dice «Sin acceso a este negocio») | dar de alta o editar | F03 | `staff.account.list` |
@@ -730,6 +738,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
   en editar una ficha, que puede cambiar la compensación, desactivar, dar de baja y eliminar un
   horario) y todo campo de entrada lleva `description`; las mismas descripciones salen en el OpenAPI.
+  La tarjeta de confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su
+  `es` en el catálogo: «Semana», «Miembros del personal») o, si no lo tiene, por el `verbose_name`
+  de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el nombre técnico y lo
+  para `tests/test_integration_assistant.py`.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17),
   para el staff de la plataforma; una escritura cruda del admin no deja aviso.
 - Borrar una ficha en el admin (`MemberAdmin.delete_model`, `delete_queryset` y, en POST,
@@ -758,10 +770,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - **Alta en lote (STAFF-F07)**: es del asistente y de la API, como en el producto actual; no tiene
   pantalla. Importar el equipo desde un fichero CSV (staff de services#152 del producto actual) no
   existía y no se porta: el alta a mano o por el asistente cubre a un equipo de peluquería o de sala.
-- **Los paneles de Personal en el Inicio**: `FIX-STAFF-SETUP-HOOKS` de la cola, BLOQUEADA hasta que se
-  mergee APP-BASE-1 (hub#168: `base.widget.list`). Son los `LiveAppConfig.widgets` del módulo viejo sobre
-  las cifras de STAFF-F23 y «Ausencias de hoy» (STAFF-F20) de hub#91; ni hechos ni simulados en el
-  Inicio. STAFF-G01…G05 siguen `hecho` como cifras de la propia Personal, que es donde salen hoy.
+- **El color de cada rol en «Empleados por rol»** del Inicio: el módulo viejo pintaba cada barra con el
+  color del rol (`map.color`), y el panel de barras de `base` (`base/frontend/lib/home.ts`) no lee colores;
+  es de `base`, fuera de esta app (línea `FIX:` de FIX-STAFF-SETUP-HOOKS). Las barras salen con el color del
+  Inicio.
 - **Borrar los ocho ajustes retirados** (STAFF-F22, hub#177): sus columnas (`min_advance_booking`,
   `max_daily_hours`, `overtime_threshold`, `show_staff_photos`, `show_staff_bio`, `allow_staff_selection`,
   `notify_new_appointment`, `notify_cancellation`) y el CHECK `staff_settings_ranges` siguen en
@@ -806,9 +818,17 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   `@erplora/ui/components` y buscan en el servidor (`frontend/lib/pickers.ts`; «Sin rol» y «Sin acceso
   al Hub» van primero mientras no se teclea, con `asCombo`).
 - Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
-  hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) son los paneles del Inicio viejo
-  (STAFF-G01…G05) dentro de la app, como las cifras de Clientes y «Fichados ahora» de Control horario;
+  hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) dan dentro de la app lo mismo que los
+  paneles del Inicio (STAFF-G01…G05), como las cifras de Clientes y «Fichados ahora» de Control horario;
   sus tarjetas rehacen el `ok-kpi` hasta que `@erplora/ui` tenga una (`UI-REQUESTS.md`).
+- Los paneles del Inicio son los `widgets` de `apps.py` (FIX-STAFF-SETUP-HOOKS; `base` los sirve en
+  `base.widget.list`): `headcount` (`kpi`), `on_leave_today` (`stat`) y `pending_time_off` (`kpi`) sobre
+  `staff.member.stats`, `time_off_today` (`timeline`) sobre `staff.time_off.today` y `by_role` (`bar-list`)
+  sobre `staff.role.list` (`sort=-member_count`, `limit=10`). Cada `refresh_on` es el `on=` de su consulta en
+  `live.py`, y cada campo de su `map` es uno que da la consulta (`tests/test_apps.py`): un `map` que no casa
+  no falla, deja el panel en blanco. El tipo de la ausencia viaja ya traducido en `leave_type_label` de
+  `TimeOffOut` (propiedad `TimeOff.leave_type_label`, en el idioma activo: el de la petición o el del stream).
+  Sin `setup` ni `bell`: el módulo viejo no los tenía.
 - El formulario de la ficha retira la lectura de una apertura anterior: cerrarlo mientras carga no
   deja el siguiente en «Cargando…».
 
@@ -862,8 +882,11 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - **Foto** de la ficha y **orden** de la ficha: no se portan; ninguna pantalla ni comando los escribía.
 - Las cifras ya no cuentan las ausencias pendientes de una ficha dada de baja.
 - **Los paneles del Inicio** (Plantilla activa, Ausentes hoy, Ausencias pendientes, Ausencias de hoy y
-  Empleados por rol) salen dentro de Personal mientras el Inicio no enseñe los paneles de las apps
-  (`FIX-STAFF-SETUP-HOOKS`, en «Lo que queda fuera»).
+  Empleados por rol) salen en el Inicio, como en el producto actual, y además dentro de Personal. «Ausentes
+  hoy» y «Ausencias pendientes» dicen su nombre una sola vez (gh:hub#1105); «Ausencias de hoy» pone el tipo
+  traducido debajo de cada nombre en lugar del código; «Empleados por rol» pone primero el rol con más
+  personas y aún no pinta el color del rol (en «Lo que queda fuera»). Los iconos del avión y del reloj de
+  arena no están en el Hub (`UI-REQUESTS.md`).
 - **Comisiones** (nuevo): el producto actual no tenía pantalla que cruzara lo vendido con la comisión
   (STAFF-F21 «parcial»); el cierre por profesional lo componía cada uno. Ahora Personal da lo ganado por
   cada profesional en un periodo, con lo devuelto restado a quien lo vendió, como el informe de comisiones

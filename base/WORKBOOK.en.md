@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:65c4fdb90ebc4f700de197caac7be10d4d3d5d48e0154381113dd31be32277be -->
+<!-- generated from WORKBOOK.md sha256:659c80c78927bcd8cc4198f39dd1bef7875bc8dc0e8ff09120839af5cf6ca0bf -->
 
 ## What it is for and who it is for
 
@@ -490,12 +490,17 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
-  1. Under the list is the board ("Loading widgets…" while it comes).
+  1. Under the list is the board, with its panels from the moment the Home opens ("Loading widgets…" only while
+     it is not known which ones are theirs).
   2. Each panel is a card with its title and icon: a figure (with what it counts under it, if its app says
      so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the language
-     of whoever is looking.
+     of whoever is looking. In a list with bars, each bar measures how big its figure is against the biggest
+     one of the list, whatever its sign; a negative figure, such as a cash discrepancy where money was missing
+     or a product with stock below zero, shows in red and with its sign (-€0.40), and the others keep the
+     panel's colour.
   3. In a chart of days, each bar has its weekday under it (or its date, if it spans more than a week) and
-     above them show the day and its amount: the last bar's until you tap another.
+     above them show the day and its amount: the last bar's until you tap another. A day below zero has its
+     bar as tall as its figure, in red; the others keep their colour.
   4. In a timeline, each entry says when it happened, in the device's time: only the time if it was today
      (9:15 AM); if it was yesterday, Yesterday in front (Yesterday 6:10 PM); if not, the short date with the
      time (Oct 20, 6:10 PM), with the year if it is another. Holding the pointer over it shows the whole
@@ -506,7 +511,9 @@ In: the panels each app that is on declares; each one's data, asked for with the
 is looking.
 Out: nothing saved in the hub.
 If it fails: a panel without data says "No data"; one whose data cannot be read, "Unavailable", never an
-old or made-up figure. If the board cannot be read: "Could not load the panels" with "Retry".
+old or made-up figure. A row of a list with bars (or a day of a chart) that has no figure, such as a cash
+session closed without a count, shows a dash (—) and no bar, never a zero; a real zero does show as zero
+(€0.00). If the board cannot be read: "Could not load the panels" with "Retry".
 Involved: none
 
 ### BASE-F07 Customize the board of panels
@@ -2173,7 +2180,10 @@ Steps:
   1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes").
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one
      line, for example "Create in Services: Haircut · €15.00 · 30". An amount shows in the business's currency (never
-     in cents), a yes or a no as "Yes" or "No" and a list by how many items it carries.
+     in cents), a yes or a no as "Yes" or "No" and a list by how many items it carries. Everything shows in the
+     person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the same one its
+     app calls it by, never a technical name. An action of the platform itself is named by the screen where it is
+     done, for example "Change in Settings" or "Delete in Files".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
@@ -2193,8 +2203,8 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
 Steps:
   1. An action its app marks as dangerous is not confirmed with one click: the card says, for example, "Delete in
-     Services. Check each datum before going on.", puts each datum on its own line and asks "To confirm, type
-     CONFIRM:".
+     Services. Check each datum before going on.", puts each datum on its own line with its name in the person's
+     language and asks "To confirm, type CONFIRM:".
   2. If the action names the records one by one, it says how many ("It acts on 3 records.") and asks to type that
      number instead of the word.
   3. If it does not name them (all of them, or those matching a filter), it is not done from the chat: no card shows, the answer reads "I

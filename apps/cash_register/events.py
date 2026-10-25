@@ -38,6 +38,17 @@ SALE_VOIDED = "sale.sale.voided"
 SALE_REFUNDED = "sale.sale.refunded"
 SALE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED]
 
+#: What re-runs the sessions and their figures, and with them the Home's panels: an opening, a close, a movement and
+#: Sales' lines; the settings (the blind count decides who reads the expected) and a drawer's name, shown on its sessions.
+SESSION_EVENTS = [
+    SESSION_OPENED,
+    SESSION_CLOSED,
+    MOVEMENT_ADDED,
+    *SALE_EVENTS,
+    SETTINGS_UPDATED,
+    REGISTER_UPDATED,
+]
+
 #: Event of another app → the operation of this app that reacts to it: none (see above).
 REACTIONS: dict[str, str] = {}
 

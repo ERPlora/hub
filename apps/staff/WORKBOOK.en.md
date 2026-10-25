@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:769c6eef2f1f34440281168e7b6b4d2b96c40f625760b20fdb4a3e0ffb57e536 -->
+<!-- generated from WORKBOOK.md sha256:d019e54fed4d9dbac692a00ac55c060d6483b598582ea3373f4c1245c5ac0125 -->
 
 ## What it is for and who it is for
 
@@ -119,18 +119,23 @@ break in the middle of the day.": "Working day starts (HH:MM)", "Working day end
 duration (minutes)" and **Save**. While the business has never saved, the proposed values show.
 
 ### Home panels
-The Hub's Home does not show the apps' panels yet. Meanwhile, the five panels of the current product show
-inside Staff: **Active staff**, **On leave today** and **Pending time off** above the Staff table,
-**Today’s time off** above the Time Off one and **Employees by role** in the "Members" column of Roles
-(STAFF-F20 and STAFF-F23).
+The Hub's **Home** shows the five panels of Staff, grouped as "Staff" in **Customize panel**. By default
+"Active staff" (how many people are **Active**), "On leave today" (different people with approved time off
+that covers today) and "Today’s time off" (who is away today, full days first and then by name, with the
+type of time off under each name) show; "Pending time off" (how many requests are waiting for an answer) and
+"Staff by role" (a bar per role with its **Active** people, the role with the most first and ten at most)
+are added from **Customize panel**. Whoever does not see the time off does not get the three time-off ones,
+and whoever does not see the team, neither "Active staff" nor "Staff by role". They change by themselves,
+without reloading. The same figures stay inside Staff: the three above the Staff table, "Today’s time off"
+above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F23).
 
 ## States of each screen
 
 | State | What the person sees |
 |---|---|
 | Loading | "Loading…" while the first result arrives; each figure shows "…". |
-| Empty | "No staff members.", "No roles defined.", "No time-off requests." or "This member has no schedules yet."; with a search or a filter, "No results". "Today’s time off" with nobody: "Nobody is away today.". Commissions with nobody who can earn one: "No one on the team can earn a commission yet."; without Sales in the business, "Commissions come from the sales" and "Turn on Sales to see what each professional earned.", without a list. |
-| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working. A refusal of a form shows inside the form, without losing what was typed; that of a row action, above the table. |
+| Empty | "No staff members.", "No roles defined.", "No time-off requests." or "This member has no schedules yet."; with a search or a filter, "No results". "Today’s time off" with nobody: "Nobody is away today."; on the **Home**, a panel with nothing to show says "No data". Commissions with nobody who can earn one: "No one on the team can earn a commission yet."; without Sales in the business, "Commissions come from the sales" and "Turn on Sales to see what each professional earned.", without a list. |
+| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working; on the **Home**, the panel that cannot be read says "Unavailable" and the others go on. A refusal of a form shows inside the form, without losing what was typed; that of a row action, above the table. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". |
@@ -443,17 +448,19 @@ Involved: none
 ### STAFF-F20 See who is away today
 Status: done (server and screen)
 Actor: everyone
-Screen: Time Off and Staff
+Screen: Time Off, Staff and Home
 Steps:
 1. Open **Time Off**: above the table, "Today’s time off" lists whoever has **approved** time off that
    covers today (in the business's day), full days first and then by name, with the type and, if it is only
    part of the day, its hours, and says how many they are.
 2. In **Staff**, the "On leave today" figure counts the different people who are away today.
-3. For the detail, the **Time Off** table with its filters.
+3. On the **Home**, the "Today’s time off" and "On leave today" panels show by default: the same list, with
+   the type of time off under each name, and the same figure.
+4. For the detail, the **Time Off** table with its filters.
 In: the approved time off and the records.
 Out: read only; without the reason. It changes by itself when time off is approved or cancelled.
-If it fails: without time off, "Nobody is away today."; if it cannot be read, "Who is away today could not
-be loaded" in its place, and the table keeps working.
+If it fails: without time off, "Nobody is away today." (on the **Home**, "No data"); if it cannot be read, "Who
+is away today could not be loaded" in its place (on the **Home**, "Unavailable"), and the table keeps working.
 Involved: none
 
 ### STAFF-F21 Give each professional's rate and commission
@@ -508,7 +515,7 @@ Involved: none
 ### STAFF-F23 See the figures of the staff and by role
 Status: done (server and screen)
 Actor: everyone
-Screen: Staff and Roles
+Screen: Staff, Roles and Home
 Steps:
 1. Open **Staff**: above the table three figures show: "Active staff" (how many people are **Active**), "On
    leave today" (different people with approved time off that covers today) and "Pending time off" (how
@@ -516,8 +523,10 @@ Steps:
    still be seen below.
 2. The figures change by themselves, without reloading, when someone adds, deactivates or terminates a
    record or asks for, approves, rejects or cancels time off.
-3. "Members" of **Roles** gives how many **Active** people each role has (the "Employees by role" panel of
-   the current product).
+3. "Members" of **Roles** gives how many **Active** people each role has.
+4. On the **Home**, "Active staff" and "On leave today" show by default, and "Pending time off" and "Staff by
+   role" (a bar per role, the one with the most **Active** people first and ten at most) are added from
+   **Customize panel**; they give the same figures and change the same way, without reloading.
 In: the records, the roles and the time off. Through the assistant or the API, the figures also give how
 many records there are and how many are **On leave** and **Inactive**.
 Out: read only. The terminated records and their time off do not count.
@@ -565,7 +574,7 @@ by their name; if the name fits several, it says which ones and asks to choose
 | A person's availability by days | see | F16 | `staff.availability.for_member` |
 | The time off, without reason, with filters and sorting | see time off | F17–F19 | `staff.time_off.list` |
 | One time off with its reason, its notes and who approved it | see the time-off detail | F18 | `staff.time_off.detail` |
-| Who is away today | see time off | F20 | `staff.time_off.today` |
+| Who is away today, with the type of each time off in the language of whoever asks | see time off | F20 | `staff.time_off.today` |
 | My time off, with its reason and its notes | see time off | F08 | `staff.time_off.mine` |
 | The settings | see | F22 | `staff.settings.get` |
 | The active accounts with access to the business, for "Hub user" (id and name, with search or by user: the account of a record that no longer has access does not show and the screen says "No access to this business") | add or edit | F03 | `staff.account.list` |

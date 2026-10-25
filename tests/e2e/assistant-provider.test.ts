@@ -43,6 +43,18 @@ describe('answerTo', () => {
     expect(textOf(answerTo([user('x'), { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed"}}' }]).frames)).toBe('No lo he hecho.');
   });
 
+  it('any write the spec names, with its data as written (E2E-ASK): the tool call in fragments; then the outcome', () => {
+    const question = user('E2E-ASK base__access__settings_update {"pin_inactivity_minutes":10,"pin_length":6}');
+    const asked = answerTo([question]);
+    expect(toolOf(asked.frames)).toEqual({
+      name: 'base__access__settings_update',
+      arguments: '{"pin_inactivity_minutes":10,"pin_length":6}',
+    });
+    expect(finish(asked.frames)).toEqual(['tool_calls']);
+    const cancelled = [question, { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed"}}' }];
+    expect(textOf(answerTo(cancelled).frames)).toBe('No lo he hecho.');
+  });
+
   it('a chain: first a read, then a write, then the outcome (BASE-G119)', () => {
     const question = user('E2E-CHAIN Mesa 7');
     const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
