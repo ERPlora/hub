@@ -245,7 +245,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F29 | Continuar la cadena de otra aplicación (migración) | hecho |
 | VERIFACTU-F30 | Anular un registro enviado por error | hecho |
 | VERIFACTU-F31 | Vigilar los envíos desde las pantallas | hecho — también desde los cuatro paneles del Inicio |
-| VERIFACTU-F32 | Impedir apagar la app con registros sin enviar | parcial — apagar una app es de la plataforma y aún no existe; VeriFactu ya cuenta lo que no está en la AEAT |
+| VERIFACTU-F32 | Impedir apagar la app con registros sin enviar | hecho — `can_disable` de VeriFactu y 409 `base.app_vetoed` de `base.app.disable` (hub#267) |
 | VERIFACTU-F33 | Cesar la actividad | descartado — la baja censal es del negocio, fuera de ERPlora; un negocio dado de baja no abre (410) |
 | VERIFACTU-F34 | Renovar el certificado propio | hecho — en el Hub (subir el renovado sustituye al anterior) |
 | VERIFACTU-F35 | Preguntar a la AEAT si ya tiene un registro de la cola | hecho — en la ficha del registro, en el admin del Hub y por la API |
@@ -857,17 +857,21 @@ Implicados: ninguno
 
 ### VERIFACTU-F32 Impedir apagar la app con registros sin enviar
 <!-- origen: fi:modules/verifactu#query-verifactu-stats-compliance_summary old-hub:HUB-F314 old-hub:HUB-F316 old:verifactu/workflow/control.md#verifactu-f32 -->
-Estado: parcial — apagar una app es de la plataforma y aún no existe (en la fase 1 todas están encendidas, sin punto
-por el que una app se niegue); VeriFactu ya cuenta lo que no está en la AEAT (`verifactu.stats.compliance_summary`)
+Estado: hecho — la plataforma pregunta al apagar (`base.app.disable`, hub#256) y VeriFactu responde con su
+`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO)
 Actor: sistema
 Pantalla: Hub: Apps
 Pasos:
-1. Al apagar VeriFactu (o Facturación, que se la lleva), la plataforma pregunta a VeriFactu cuántos registros
-   no están en la AEAT.
-2. Si queda alguno, lo niega.
+1. Al apagar VeriFactu, la plataforma le pregunta cuántos registros no están todavía en la AEAT: los pendientes
+   (también los que esperan su reintento) y los enviados sin respuesta. Facturación no se puede apagar mientras
+   VeriFactu esté encendida, porque VeriFactu la necesita.
+2. Si queda alguno, lo niega y VeriFactu sigue encendida. Lo que la AEAT ya contestó (aceptado, aceptado con errores
+   o rechazado) no cuenta: un rechazo se subsana con un registro nuevo, que cuenta mientras no salga.
 Entra: la petición de apagar.
-Sale: nada si se niega.
-Si falla: «VeriFactu aún tiene {n} registro(s) que la AEAT no ha aceptado.».
+Sale: nada si se niega; la app apagada si no queda nada por enviar.
+Si falla: «VeriFactu aún tiene {n} registros por enviar a la AEAT. Espera a que se envíen o arréglalos antes de
+desactivarla.» (con uno: «VeriFactu aún tiene 1 registro por enviar a la AEAT. Espera a que se envíe o arréglalo
+antes de desactivarla.»).
 Implicados: ninguno
 
 ### VERIFACTU-F33 Cesar la actividad
@@ -940,7 +944,7 @@ factura** (`TICKET-2026-000012`) o por su secuencia; un emisor, por su NIF.
 | El registro vigente de una factura (QR, CSV, estado) | ver | F19 | `verifactu.record.by_invoice` |
 | La cola: los registros que aún no están en la AEAT | ver | F20–F22 | `verifactu.contingency.list` |
 | Los eventos de auditoría, con búsqueda por palabras y filtros | ver | F31 | `verifactu.event.list` |
-| Cuántos registros no están en la AEAT (y si se puede apagar) | ver | F31, F32 | `verifactu.stats.compliance_summary` |
+| Cuántos registros no están en la AEAT (y si se puede apagar) | ver | F31, F32 | `verifactu.stats.compliance_summary`; al apagar, `can_disable` |
 | Los registros por estado | ver | F31 | `verifactu.stats.records_by_status` |
 | El resumen de la cola | ver | F31 | `verifactu.stats.contingency_summary` |
 | Los últimos eventos | ver | F31 | `verifactu.stats.events_recent` |
@@ -1017,7 +1021,7 @@ sellado no añade nada (`already`).
 |---|---|---|
 | Facturación | Sellar el registro de cada documento dentro de su emisión | `verifactu.record.create` |
 | Ventas, Facturación, Impresión | Poner el QR y el estado fiscal en el tique y la factura | `verifactu.record.by_invoice` |
-| Plataforma (fase 2) | No apagar VeriFactu con registros sin enviar | `verifactu.stats.compliance_summary` |
+| Plataforma (`base.app.disable`) | No apagar VeriFactu con registros sin enviar | `can_disable` de `VerifactuConfig` (`queries.disable_refusal`) |
 
 ### Quién puede qué
 
