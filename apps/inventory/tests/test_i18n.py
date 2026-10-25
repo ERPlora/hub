@@ -11,6 +11,7 @@ from django.apps import apps
 from django.utils import translation
 
 from live.meta import Category as AppCategory
+from live.operations import registry
 
 from apps.inventory import queries, schemas, services
 from apps.inventory.models import Category, Product, ProductCategory, RefundStock, SaleStock, Settings, StockMovement, Unit
@@ -86,7 +87,20 @@ def visible_texts() -> set[str]:
     for choices in (Unit, Product.Type, StockMovement.Type, SaleStock.State):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {str(text) for text in lazies} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles inventory's operations give their input data (``gettext_noop``): the assistant's card names each
+    datum by them, so each one needs its Spanish. A title pydantic makes up from the field is not one."""
+    titles = set()
+    for op in registry.values():
+        if op.app_label == "inventory":
+            for name, prop in op.input.model_json_schema().get("properties", {}).items():
+                title = prop.get("title")
+                if title and title != name.title().replace("_", " "):
+                    titles.add(title)
+    return titles
 
 
 def test_every_entry_has_a_spanish_translation():
