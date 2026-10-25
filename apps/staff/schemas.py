@@ -991,6 +991,7 @@ class TimeOffOut(Schema):
     member_id: UUID
     member_name: str
     leave_type: LeaveType
+    leave_type_label: str = Field(description="The type in the caller's language (e.g. Vacation).")
     start_date: dt.date
     end_date: dt.date
     is_full_day: bool

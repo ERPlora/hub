@@ -5,7 +5,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
@@ -961,6 +961,7 @@ def test_time_off_most_recent_first_without_the_reason():
         "member_id": ana.id,
         "member_name": "Ana López",
         "leave_type": "sick",
+        "leave_type_label": "Sick leave",
         "start_date": dt.date(2026, 10, 12),
         "end_date": dt.date(2026, 10, 12),
         "is_full_day": False,
@@ -1094,6 +1095,19 @@ def test_who_is_away_today_full_days_first_then_by_name():
     page = run("staff.time_off.today", TodayIn(), "hub_employee")
 
     assert [row.id for row in page.rows] == [whole.id, week.id, morning.id]
+
+
+def test_who_is_away_today_says_each_type_in_the_callers_language():
+    """The Home's «Today's time off» paints the type under each name as the query gives it (STAFF-F20)."""
+    day = today().isoformat()
+    for first_name, leave_type in (("Ana", "vacation"), ("Bea", "sick"), ("Carla", "personal"), ("Dora", "training"), ("Eva", "other")):
+        make_time_off(make_member(first_name), day, leave_type=leave_type, status=TimeOff.Status.APPROVED)
+    with translation.override("en"):
+        english = [row.leave_type_label for row in run("staff.time_off.today", TodayIn()).rows]
+    with translation.override("es"):
+        spanish = [row.leave_type_label for row in run("staff.time_off.today", TodayIn()).rows]
+    assert english == ["Vacation", "Sick leave", "Personal", "Training", "Other"]
+    assert spanish == ["Vacaciones", "Baja por enfermedad", "Asuntos propios", "Formación", "Otros"]
 
 
 def test_today_is_the_business_day(frozen_now):

@@ -83,6 +83,7 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        *(widget.title for widget in config.widgets),
         *module_texts(queries),
         *module_texts(services),
         *module_texts(schemas),

@@ -746,11 +746,13 @@ def test_time_off_list_filters_and_sorts():
 
 
 def test_time_off_outputs():
+    # ``leave_type_label``: the type in the caller's words, which the Home's «Today's time off» says under each name.
     assert list(TimeOffOut.model_fields) == [
         "id",
         "member_id",
         "member_name",
         "leave_type",
+        "leave_type_label",
         "start_date",
         "end_date",
         "is_full_day",

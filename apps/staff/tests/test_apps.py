@@ -1,10 +1,16 @@
 """The staff app declares its module metadata, its menu entries, its permissions, what each role gets,
-and the assistant's contract of every operation (``ai`` and described input fields)."""
+the assistant's contract of every operation (``ai`` and described input fields) and its panels of the Home."""
+
+from pathlib import Path
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.conf import settings
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
 from live.operations import registry
 
+from apps.staff import events as E
 from apps.staff import queries, services  # noqa: F401  (importing them registers the operations)
 
 # The old module's permissions, one by one (module.json), plus asking for one's own time off.
@@ -188,3 +194,145 @@ def test_every_input_field_is_described_for_the_assistant():
         if not (field.description or "").strip()
     ]
     assert missing == []
+
+
+# The Home's panels (PLAN-HUB round 2026-10-21; FIX-STAFF-SETUP-HOOKS): the old module's module.json `widgets` (it had
+# no `setup` nor `bell`), on the queries Staff's own figures already read (STAFF-F20, STAFF-F23).
+
+PANELS = ["headcount", "on_leave_today", "pending_time_off", "time_off_today", "by_role"]
+#: What re-runs each query, as live.py says it: the panel follows the screen that reads the same figures.
+FIGURES = [*E.MEMBER_ALL, *E.TIME_OFF_ALL]
+AWAY_TODAY = [E.TIME_OFF_APPROVED, E.TIME_OFF_CANCELLED, E.MEMBER_UPDATED, E.MEMBER_TERMINATED]
+BY_ROLE = [*E.ROLE_ALL, *E.MEMBER_ALL]
+
+
+def test_the_homes_panels_are_the_old_modules_five():
+    """The head count, who is away today and today's time off on by default; the requests to answer and the people by
+    role to add. Who sees the team reads the head count and the roles; who sees the time off, the rest."""
+    panels = staff().widgets
+    assert all(isinstance(panel, Widget) for panel in panels)
+    assert [
+        (
+            panel.key,
+            panel.kind,
+            panel.component,
+            panel.operation,
+            panel.size,
+            panel.default,
+            panel.permission,
+            dict(panel.params),
+            dict(panel.map),
+            dict(panel.options),
+        )
+        for panel in panels
+    ] == [
+        ("headcount", "kpi", None, "staff.member.stats", "sm", True, "staff.view", {}, {"value": "active"}, {"format": "number"}),
+        (
+            "on_leave_today",
+            "stat",
+            None,
+            "staff.member.stats",
+            "sm",
+            True,
+            "staff.view_time_off",
+            {},
+            {"value": "absent_today"},
+            {"format": "number"},
+        ),
+        (
+            "pending_time_off",
+            "kpi",
+            None,
+            "staff.member.stats",
+            "sm",
+            False,
+            "staff.view_time_off",
+            {},
+            {"value": "pending_time_off"},
+            {"format": "number"},
+        ),
+        (
+            "time_off_today",
+            "timeline",
+            None,
+            "staff.time_off.today",
+            "md",
+            True,
+            "staff.view_time_off",
+            {},
+            {"title": "member_name", "description": "leave_type_label"},
+            {},
+        ),
+        (
+            "by_role",
+            "bar-list",
+            None,
+            "staff.role.list",
+            "md",
+            False,
+            "staff.view",
+            {"sort": "-member_count", "limit": 10},
+            {"label": "name", "value": "member_count"},
+            {"valueFormat": "number"},
+        ),
+    ]
+    # Every business with Staff on (the old sectors were all of them), grouped under the app's own name.
+    assert all(not panel.verticals and not panel.category for panel in panels)
+
+
+def test_each_panel_maps_fields_its_query_gives_and_takes_its_params():
+    """A map that names no field of the query leaves the panel blank without an error (the maintenance note of
+    STAFF-F23): every field it reads is one the query's output has."""
+    for panel in staff().widgets:
+        output = registry[panel.operation].output.model_fields
+        if "rows" in output:
+            output = output["rows"].annotation.__args__[0].model_fields
+        assert set(panel.map.values()) <= set(output), panel.key
+        registry[panel.operation].input.model_validate(dict(panel.params))
+
+
+def test_a_kpi_says_its_name_once():
+    # gh:hub#1105: the old KPIs painted their header twice (the title and options.label with its icon).
+    for panel in staff().widgets:
+        if panel.kind in {"kpi", "stat"}:
+            assert not {"label", "icon"} & set(panel.options), panel.key
+
+
+def test_the_panels_are_titled_in_english_and_in_spanish():
+    with translation.override("en"):
+        english = [str(panel.title) for panel in staff().widgets]
+    with translation.override("es"):
+        spanish = [str(panel.title) for panel in staff().widgets]
+    assert english == ["Active staff", "On leave today", "Pending time off", "Today's time off", "Staff by role"]
+    assert spanish == ["Plantilla activa", "Ausentes hoy", "Ausencias pendientes", "Ausencias de hoy", "Empleados por rol"]
+
+
+def test_each_panel_is_refreshed_by_the_events_that_re_run_its_query():
+    panels = {panel.key: panel for panel in staff().widgets}
+    assert list(panels) == PANELS
+    expected = {
+        "headcount": FIGURES,
+        "on_leave_today": FIGURES,
+        "pending_time_off": FIGURES,
+        "time_off_today": AWAY_TODAY,
+        "by_role": BY_ROLE,
+    }
+    for key, panel in panels.items():
+        assert list(panel.refresh_on) == expected[key], key
+        assert live_registry.is_subscribable(panel.operation), key
+        assert set(panel.refresh_on) == set(live_registry.subscribable[panel.operation]), key
+
+
+def test_the_panels_icons_are_registered_in_the_shell():
+    # The old airplane and hourglass are not registered: UI-REQUESTS.md asks for them.
+    icons = [panel.icon for panel in staff().widgets]
+    assert icons == ["ion:people-outline", "ion:log-out-outline", "ion:time-outline", "ion:calendar-outline", "ion:shield-outline"]
+    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    for icon in icons:
+        assert f"'{icon.removeprefix('ion:')}':" in shell, icon
+
+
+def test_staff_has_no_setup_steps_nor_bell_counters():
+    # The old module declared none (its module.json has no `setup` nor `bell`).
+    assert staff().setup == []
+    assert staff().bell == []
