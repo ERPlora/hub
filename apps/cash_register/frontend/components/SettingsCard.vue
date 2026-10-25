@@ -67,7 +67,11 @@ const changes = computed<SettingsPatchIn>(() => {
     Object.entries(edits.value).filter(([key, value]) => value !== current[key as keyof SettingsFields]),
   ) as SettingsPatchIn;
 });
-const canSave = computed(() => props.editable && Object.keys(changes.value).length > 0 && !update.pending.value);
+/** Never saved: the factory values apply, and saving them as they come is the business's decision («Your cash drawer»). */
+const neverSaved = computed(() => server.value?.updated_at === null);
+const canSave = computed(
+  () => props.editable && (Object.keys(changes.value).length > 0 || neverSaved.value) && !update.pending.value,
+);
 const saveError = computed(() => refusal(update.error.value, t('cash_register.settings.saveError')));
 
 async function save(): Promise<void> {
@@ -157,28 +161,29 @@ const failed = computed(() => !server.value && status.value === 'error');
                 @ion-change="set(field.key, !!$event.detail.checked)"
               />
             </ion-item>
-            <ion-item lines="none">
-              <ion-select
-                data-testid="cash-register-setting-auto_close_time"
-                :label="$t('cash_register.settings.fields.auto_close_time.label')"
-                label-placement="stacked"
-                fill="outline"
-                mode="md"
-                interface="popover"
-                :value="valueOf('auto_close_time')"
-                :disabled="!editable"
-                @ion-change="set('auto_close_time', String($event.detail.value))"
-              >
-                <ion-select-option
-                  v-for="hour in HOURS"
-                  :key="hour"
-                  :value="hour"
-                >
-                  {{ hour }}
-                </ion-select-option>
-              </ion-select>
-            </ion-item>
           </ion-list>
+          <!-- Outside the list's items: an ion-item clips the outline's stacked label, which sits on its top border. -->
+          <div class="cash-settings__fields">
+            <ion-select
+              data-testid="cash-register-setting-auto_close_time"
+              :label="$t('cash_register.settings.fields.auto_close_time.label')"
+              label-placement="stacked"
+              fill="outline"
+              mode="md"
+              interface="popover"
+              :value="valueOf('auto_close_time')"
+              :disabled="!editable"
+              @ion-change="set('auto_close_time', String($event.detail.value))"
+            >
+              <ion-select-option
+                v-for="hour in HOURS"
+                :key="hour"
+                :value="hour"
+              >
+                {{ hour }}
+              </ion-select-option>
+            </ion-select>
+          </div>
         </ion-card-content>
       </ion-card>
 
@@ -248,6 +253,9 @@ const failed = computed(() => !server.value && status.value === 'error');
 }
 .cash-settings__content {
   padding: 0;
+}
+.cash-settings__fields {
+  padding: 0.75rem 1rem;
 }
 .cash-settings__read-only {
   margin: 0;

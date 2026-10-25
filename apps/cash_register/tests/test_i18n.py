@@ -65,6 +65,9 @@ def visible_texts() -> set[str]:
         config.description,
         *(nav.label for nav in config.navigation),
     ]
+    # The Home's step and panels (gh:cash_register#123: the old picker spoke Spanish to an English reader).
+    lazies += [text for step in config.setup for text in (step.title, step.description)]
+    lazies += [panel.title for panel in config.widgets]
     for module in (queries, services, schemas, models):
         lazies += [
             value for value in vars(module).values() if isinstance(value, Promise)
