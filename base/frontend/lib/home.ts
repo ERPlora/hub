@@ -154,17 +154,14 @@ export function formatValue(value: unknown, format: unknown, locale: string, mon
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);
 }
 
-/** The side of zero a bar is on, painted only in a list that has negatives (a cash discrepancy: short or over). */
-export type BarSign = 'negative' | 'positive';
-
 /** A bar of a bar-list: `share` is the size of its value against the biggest size of the list (0–1, either sign);
- *  `sign` is set only when the list has negatives, and never on a 0 or a row without its value. */
+ *  `negative` marks a value below zero, the only one painted apart (red, as a report marks it); any other bar has none. */
 export interface Bar {
   label: string;
   value: number | null;
   text: string;
   share: number;
-  sign?: BarSign;
+  negative?: true;
 }
 
 export type WidgetView =
@@ -203,7 +200,7 @@ const NO_VALUE = '—';
 
 /** The bars of a bar-list or a chart: a row without its value stays, as «—» with no share (BASE-F06); one whose value is
  *  no number is left out. A bar measures the size of its value against the biggest size, so a shortfall of 0,40 € is
- *  a short bar beside a surplus of 5,50 €, and a list with negatives says each bar's sign (BASE-F06). */
+ *  a short bar beside a surplus of 5,50 €, and only a value below zero is marked `negative` (BASE-F06). */
 function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined): Bar[] {
   const read = rows
     .map((row) => {
@@ -212,11 +209,10 @@ function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, m
     })
     .filter((bar) => bar.label !== '' && (bar.value === null || Number.isFinite(bar.value)));
   const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => Math.abs(bar.value ?? 0)), 0);
-  const signed = read.some((bar) => bar.value !== null && bar.value < 0);
   return read.map((bar): Bar => {
     if (bar.value === null) return { ...bar, text: NO_VALUE, share: 0 };
     const shown = { ...bar, text: formatValue(bar.value, format, locale, money), share: max > 0 ? Math.abs(bar.value) / max : 0 };
-    return signed && bar.value !== 0 ? { ...shown, sign: bar.value < 0 ? 'negative' : 'positive' } : shown;
+    return bar.value < 0 ? { ...shown, negative: true } : shown;
   });
 }
 

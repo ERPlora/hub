@@ -311,9 +311,11 @@ describe('a value the row does not have (BASE-F06): «—», never a made-up 0',
 
 // BASE-F06 — a bar-list with negatives (Cash register's «Recent discrepancies»: a drawer 0,40 € short and one 5,50 €
 // over) painted the shortfall as long as the biggest bar: its share was -0.0727, a width the browser drops (the old
-// hub's outfitkit#244 drew none at all). As Square, Toast or Lightspeed paint a short drawer: the bar measures the size
-// of the value against the biggest size, and the sign is painted (red short, green over) and written («-0,40 €»).
-describe('a bar-list with negatives (BASE-F06): the bar measures the size, the sign is painted', () => {
+// hub's outfitkit#244 drew none at all). The bar measures the size of the value against the biggest size; as a report
+// says it (Excel, QuickBooks, Square), only a negative figure is marked — red, with its sign in the text («-0,40 €») —
+// and every other bar keeps the panel's colour: a surplus is a discrepancy too, and a product with 1 left beside one
+// at -1 is still low on stock (rv-hub-264), so neither is ever painted as «good».
+describe('a bar-list with negatives (BASE-F06): the bar measures the size, only a negative is marked', () => {
   const discrepancies = widget('cash_register.recent_sessions', {
     kind: 'bar-list',
     map: { label: 'number', value: 'difference' },
@@ -325,16 +327,28 @@ describe('a bar-list with negatives (BASE-F06): the bar measures the size, the s
     return view.bars;
   };
 
-  it('-0,40 € and +5,50 € have shares 0,0727 and 1, the shortfall negative and the surplus positive', () => {
+  it('-0,40 € and +5,50 € have shares 0,0727 and 1, and only the shortfall is marked negative', () => {
     const bars = barsOf([
       { number: 'CS-2', difference: 550 },
       { number: 'CS-1', difference: -40 },
     ]);
-    expect(bars).toEqual([
-      { label: 'CS-2', value: 550, text: '5,50 €', share: 1, sign: 'positive' },
-      { label: 'CS-1', value: -40, text: '-0,40 €', share: 40 / 550, sign: 'negative' },
+    expect(bars).toStrictEqual([
+      { label: 'CS-2', value: 550, text: '5,50 €', share: 1 },
+      { label: 'CS-1', value: -40, text: '-0,40 €', share: 40 / 550, negative: true },
     ]);
     expect(bars[1].share).toBeCloseTo(0.0727, 4);
+  });
+
+  it('a stock list with -1 and 1 marks only the -1: the 1 is low stock as well, never painted as «good»', () => {
+    const bars = barsOf([{ name: 'Té', stock: -1 }, { name: 'Café', stock: 1 }], {
+      key: 'inventory.low_stock_products',
+      map: { label: 'name', value: 'stock' },
+      options: { valueFormat: 'number' },
+    });
+    expect(bars).toStrictEqual([
+      { label: 'Té', value: -1, text: '-1', share: 1, negative: true },
+      { label: 'Café', value: 1, text: '1', share: 1 },
+    ]);
   });
 
   it('the biggest size fills the bar whatever its sign: a shortfall bigger than any surplus', () => {
@@ -342,52 +356,54 @@ describe('a bar-list with negatives (BASE-F06): the bar measures the size, the s
       { number: 'CS-2', difference: 1235 },
       { number: 'CS-1', difference: -123456 },
     ]);
-    expect(bars.map((bar) => [bar.share, bar.sign])).toEqual([
-      [1235 / 123456, 'positive'],
-      [1, 'negative'],
+    expect(bars.map((bar) => [bar.share, bar.negative])).toEqual([
+      [1235 / 123456, undefined],
+      [1, true],
     ]);
     expect(bars.every((bar) => bar.share >= 0 && bar.share <= 1)).toBe(true);
   });
 
   it('a declared `options.max` still caps the scale, by size', () => {
     const bars = barsOf([{ number: 'CS-1', difference: -250 }], { options: { valueFormat: 'currency', max: 1000 } });
-    expect(bars).toEqual([{ label: 'CS-1', value: -250, text: '-2,50 €', share: 0.25, sign: 'negative' }]);
+    expect(bars).toStrictEqual([{ label: 'CS-1', value: -250, text: '-2,50 €', share: 0.25, negative: true }]);
   });
 
-  it('an even drawer (0) and one without a count («—») have no sign among negatives', () => {
+  it('an even drawer (0) and one without a count («—») are not marked among negatives', () => {
     const bars = barsOf([
       { number: 'CS-3', difference: -40 },
       { number: 'CS-2', difference: 0 },
       { number: 'CS-1', difference: null },
     ]);
-    expect(bars.map((bar) => [bar.text, bar.share, bar.sign])).toEqual([
-      ['-0,40 €', 1, 'negative'],
-      ['0,00 €', 0, undefined],
-      ['—', 0, undefined],
+    expect(bars.map((bar) => [bar.text, bar.share, 'negative' in bar])).toEqual([
+      ['-0,40 €', 1, true],
+      ['0,00 €', 0, false],
+      ['—', 0, false],
     ]);
   });
 
-  it('a list with no negatives paints as before: no sign, so no colour', () => {
+  it('a list with no negatives paints as before: nothing marked', () => {
     const bars = barsOf([
       { number: 'CS-2', difference: 550 },
       { number: 'CS-1', difference: 40 },
     ]);
-    expect(bars.map((bar) => [bar.share, bar.sign])).toEqual([
-      [1, undefined],
-      [40 / 550, undefined],
+    expect(bars.map((bar) => [bar.share, 'negative' in bar])).toEqual([
+      [1, false],
+      [40 / 550, false],
     ]);
   });
 
-  it('a chart day below zero (refunds over sales) is measured by its size and painted negative, never a stub', () => {
+  it('a chart day below zero (refunds over sales) is measured by its size and marked negative, never a stub', () => {
     const chart = widget('sale.last_7_days', { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } });
     const view = widgetView(chart, { rows: [{ day: '2026-10-22', total: -200 }, { day: '2026-10-23', total: 500 }] }, 'es', { money: EUR });
     expect(view).toMatchObject({
       kind: 'chart',
       bars: [
-        { key: '2026-10-22', value: -200, text: '-2,00 €', share: 0.4, sign: 'negative' },
-        { key: '2026-10-23', value: 500, text: '5,00 €', share: 1, sign: 'positive' },
+        { key: '2026-10-22', value: -200, text: '-2,00 €', share: 0.4, negative: true },
+        { key: '2026-10-23', value: 500, text: '5,00 €', share: 1 },
       ],
     });
+    if (view.kind !== 'chart') throw new Error(`expected a chart, got ${view.kind}`);
+    expect('negative' in view.bars[1]).toBe(false);
   });
 });
 

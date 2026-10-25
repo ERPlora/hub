@@ -8,8 +8,8 @@
 // «20 oct, 18:10», re-read each minute so a Home left open past midnight moves today's to yesterday (BASE-F06). An
 // amount is in the business's currency (BASE-G98: «zł» in a Polish business, «€» in a Spanish one), never a fixed euro.
 // A row without its value (a cash session closed without a count) says «—» with no bar, never a 0 (BASE-F06). A bar is
-// as long as the size of its value; in a list with negatives it is red below zero and green above, its amount with the
-// sign (BASE-F06: a drawer 0,40 € short beside one 5,50 € over).
+// as long as the size of its value; only one below zero is red, its amount with the sign, and every other bar keeps the
+// panel's colour (BASE-F06: a drawer 0,40 € short beside one 5,50 € over, which is a discrepancy too).
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
@@ -236,7 +236,7 @@ const chosenBar = computed(() => {
           aria-hidden="true"
         ><span
           class="widget-bar-fill"
-          :class="bar.sign && `widget-bar-fill--${bar.sign}`"
+          :class="{ 'widget-bar-fill--negative': bar.negative }"
           :style="{ width: percent(bar.share) }"
         /></span>
       </li>
@@ -305,7 +305,7 @@ const chosenBar = computed(() => {
           <span class="widget-chart-track"><span
             v-if="bar.value !== null"
             class="widget-chart-bar"
-            :class="bar.sign && `widget-chart-bar--${bar.sign}`"
+            :class="{ 'widget-chart-bar--negative': bar.negative }"
             :style="{ height: percent(bar.share) }"
           /></span>
           <span class="widget-chart-label">{{ bar.label }}</span>
@@ -494,16 +494,12 @@ const chosenBar = computed(() => {
   opacity: 1;
 }
 
-/* A list with negatives (a cash discrepancy): red short, green over; the amount beside it says the sign too. After
-   `.widget-bar-fill` and `.widget-chart-bar`, which weigh the same: the later rule wins. */
+/* A value below zero (a drawer short, a stock oversold): red, as a report marks it; the amount beside it says the sign
+   too, and every other bar keeps the panel's colour. After `.widget-bar-fill` and `.widget-chart-bar`, which weigh the
+   same: the later rule wins. */
 .widget-bar-fill--negative,
 .widget-chart-bar--negative {
   background: var(--ion-color-danger);
-}
-
-.widget-bar-fill--positive,
-.widget-chart-bar--positive {
-  background: var(--ion-color-success);
 }
 
 .widget-chart-col[aria-pressed='true'] .widget-chart-label {

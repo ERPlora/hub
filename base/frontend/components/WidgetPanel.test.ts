@@ -136,9 +136,9 @@ describe('WidgetPanel', () => {
   });
 
   // BASE-F06: a drawer 0,40 € short painted with a bar as long as one 5,50 € over (its width was negative, which the
-  // browser drops) and no sign. The bar is as long as the size of its value, red when short and green when over, and
-  // the amount still says the sign; a list with no negatives keeps its bars as they were.
-  it('paints a bar-list with negatives by size, the shortfall red and the surplus green, with the sign in its text', async () => {
+  // browser drops) and no sign. The bar is as long as the size of its value; only a negative one is red, its amount with
+  // the sign, and every other bar keeps the panel's colour (rv-hub-264: a surplus is never painted as «good»).
+  it('paints a bar-list with negatives by size, only the shortfall red, with the sign in its text', async () => {
     const m = await panel({ kind: 'bar-list', map: { label: 'number', value: 'difference' }, options: { valueFormat: 'currency' } }, 'es');
     const call = await m.live();
     await m.result(call, 'base.business.get', business());
@@ -148,7 +148,7 @@ describe('WidgetPanel', () => {
     expect(short.get('.widget-bar-fill').attributes('style')).toContain('width: 7.3%');
     expect(short.get('.widget-bar-fill').classes()).toContain('widget-bar-fill--negative');
     expect(over.get('.widget-bar-fill').attributes('style')).toContain('width: 100%');
-    expect(over.get('.widget-bar-fill').classes()).toContain('widget-bar-fill--positive');
+    expect(over.get('.widget-bar-fill').classes()).toEqual(['widget-bar-fill']);
 
     const plain = await panel({ kind: 'bar-list', map: { label: 'name', value: 'n' } });
     const again = await plain.live();
@@ -271,7 +271,7 @@ describe('WidgetPanel', () => {
       expect(refunds.attributes('aria-label')).toBe('jue, 22 oct: -2,00 €');
       expect(refunds.get('.widget-chart-bar').attributes('style')).toContain('height: 40%');
       expect(refunds.get('.widget-chart-bar').classes()).toContain('widget-chart-bar--negative');
-      expect(friday.get('.widget-chart-bar').classes()).toContain('widget-chart-bar--positive');
+      expect(friday.get('.widget-chart-bar').classes()).toEqual(['widget-chart-bar']);
     });
   });
 

@@ -505,11 +505,12 @@ Pasos:
   2. Cada panel es una tarjeta con su título e icono: una cifra (con debajo lo que cuenta, si su app lo dice),
      una lista con barras, una cronología, un gráfico o un trozo de la pantalla de su app, con sus textos en el
      idioma de quien mira. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
-     de la lista, sea del signo que sea; si la lista tiene cifras negativas, como los descuadres de caja, las
-     negativas salen en rojo y con su signo (-0,40 €) y las positivas en verde.
+     de la lista, sea del signo que sea; una cifra negativa, como un descuadre de caja en el que faltó dinero o
+     un producto con existencias por debajo de cero, sale en rojo y con su signo (-0,40 €), y las demás
+     conservan el color del panel.
   3. En un gráfico de días, cada barra lleva debajo su día de la semana (o su fecha, si abarca más de una
      semana) y encima salen el día y su importe: los de la última barra hasta que tocas otra. Un día por debajo
-     de cero tiene su barra tan alta como su cifra, en rojo, y los demás en verde.
+     de cero tiene su barra tan alta como su cifra, en rojo; los demás conservan su color.
   4. En una cronología, cada entrada dice cuándo pasó, en la hora del dispositivo: solo la hora si fue hoy
      (9:15); si fue ayer, Ayer delante (Ayer 18:10); si no, la fecha corta con la hora (20 oct, 18:10), con
      el año si es de otro. Al dejar el puntero encima sale la fecha entera. Con el Inicio abierto, lo de hoy

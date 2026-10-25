@@ -312,9 +312,10 @@ test.describe('BASE-F06 — a panel row without its value', () => {
 // BASE-F06 — a bar-list with negatives (FIX-HUB-BASE-HOME-BAR-LIST-NEGATIVE-FULL-BAR-NO-SIGN-COLOUR): «Descuadres
 // recientes» painted a drawer 0,40 € short with a bar as long as one 5,50 € over (a negative width, which the browser
 // drops) and no sign. The owner of `a`, in Spanish, adds the panel from «Personalizar panel»: each bar is as long as the
-// size of its difference against the biggest of the list, the shortfall red and the surplus green, its amount with the
-// sign. Cash register's settings row is parked for the block and put back after it; the sessions it opens are deleted,
-// with their movements and counts.
+// size of its difference against the biggest of the list; only the shortfall is red, its amount with the sign, and the
+// surplus keeps the panel's colour (a surplus is a discrepancy too, never painted as «good»: rv-hub-264). Cash
+// register's settings row is parked for the block and put back after it; the sessions it opens are deleted, with their
+// movements and counts.
 test.describe('BASE-F06 — a bar-list with negatives', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -393,7 +394,7 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
   });
 
   for (const [label, viewport] of Object.entries(VIEWPORTS)) {
-    test(`BASE-F06 — «Descuadres recientes» measures each bar by its size, the shortfall red and the surplus green, at ${label}`, async ({ browser }) => {
+    test(`BASE-F06 — «Descuadres recientes» measures each bar by its size, only the shortfall red, at ${label}`, async ({ browser }) => {
       const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
       try {
         const page = await context.newPage();
@@ -419,7 +420,7 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
         await expect(short.locator('.widget-bar-text')).toHaveText(said.short);
         await expect(over.locator('.widget-bar-text')).toHaveText(said.over);
         await expect(short.locator('.widget-bar-fill')).toHaveClass(/\bwidget-bar-fill--negative\b/);
-        await expect(over.locator('.widget-bar-fill')).toHaveClass(/\bwidget-bar-fill--positive\b/);
+        await expect(over.locator('.widget-bar-fill')).toHaveClass('widget-bar-fill');
 
         // Each bar's share of its track is the size of its difference against the biggest size the panel lists.
         const listed = await api<{ rows: Session[] }>(context, A, 'GET', '/cash_register/sessions?status=closed&sort=closed_at&dir=desc&limit=8');
@@ -435,7 +436,7 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
         expect(await share(over), 'the surplus: 550 against the biggest size').toBeCloseTo(550 / biggest, 2);
         expect(await share(short)).toBeLessThan(await share(over));
 
-        // Red and green are the theme's danger and success (its AA contrast mode included), not the panel's own colours.
+        // Red is the theme's danger (its AA contrast mode included); every other bar keeps the panel's primary colour.
         const painted = await panel.evaluate((element) => {
           const colour = (selector: string) => getComputedStyle(element.querySelector(selector) as Element).backgroundColor;
           const probe = (variable: string) => {
@@ -447,11 +448,11 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
             return found;
           };
           // A chart's bar takes the same colours through the panel's own stylesheet: its plain rule (the primary colour)
-          // must not win over the sign's. No chart has negatives today, so the bar is built with the panel's scope.
+          // must not win over the negative's. No chart has negatives today, so the bar is built with the panel's scope.
           const scope = [...element.attributes].find((attribute) => attribute.name.startsWith('data-v-'))?.name;
-          const chartBar = (sign: string) => {
+          const chartBar = (negative: boolean) => {
             const span = document.createElement('span');
-            span.className = sign ? `widget-chart-bar widget-chart-bar--${sign}` : 'widget-chart-bar';
+            span.className = negative ? 'widget-chart-bar widget-chart-bar--negative' : 'widget-chart-bar';
             if (scope) span.setAttribute(scope, '');
             element.append(span);
             const found = getComputedStyle(span).backgroundColor;
@@ -460,21 +461,18 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
           };
           return {
             negative: colour('.widget-bar-fill--negative'),
-            positive: colour('.widget-bar-fill--positive'),
-            chartNegative: chartBar('negative'),
-            chartPositive: chartBar('positive'),
-            chartPlain: chartBar(''),
+            positive: colour('.widget-bar-fill:not(.widget-bar-fill--negative)'),
+            chartNegative: chartBar(true),
+            chartPlain: chartBar(false),
             danger: probe('--ion-color-danger'),
-            success: probe('--ion-color-success'),
             primary: probe('--ion-color-primary'),
           };
         });
-        expect(painted.negative).toBe(painted.danger);
-        expect(painted.positive).toBe(painted.success);
+        expect(painted.negative, 'the shortfall').toBe(painted.danger);
+        expect(painted.positive, 'the surplus keeps the panel colour').toBe(painted.primary);
         expect(painted.negative).not.toBe(painted.positive);
         expect(painted.chartNegative, 'a chart day below zero').toBe(painted.danger);
-        expect(painted.chartPositive, 'a chart day above zero beside one below').toBe(painted.success);
-        expect(painted.chartPlain, 'a chart with no negatives keeps its colour').toBe(painted.primary);
+        expect(painted.chartPlain, 'any other chart day keeps its colour').toBe(painted.primary);
         // The owner's Spanish session with the panel on, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
         if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
