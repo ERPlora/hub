@@ -31,7 +31,7 @@ from apps.appointment.tests.conftest import ctx_for as appointment_ctx
 from apps.customer.models import Customer
 from apps.flow.models import FlowRun
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import B, NOW, card, connect, ctx_for, receive, run, system, template
 from base import catalog, worker
 from base.catalog import RegisterResult
@@ -97,7 +97,10 @@ def confirm(appointment, scope=None) -> None:
 
 
 def outbound() -> list[Message]:
-    return list(Message.objects.filter(direction="outbound").select_related("conversation").order_by("created_at"))
+    """The outbound messages in the order they were made: under a frozen clock they share ``created_at``, so the
+    UUIDv7 key breaks the tie (Postgres returns tied rows in any order)."""
+    rows = Message.objects.filter(direction="outbound").select_related("conversation")
+    return list(rows.order_by("created_at", "id"))
 
 
 def test_confirming_tells_the_customer_once_in_her_conversation_through_erplora(tick, door):
@@ -207,7 +210,9 @@ def act(name: str, reservation_id, scope=None, **data) -> None:
 
 
 def table_runs() -> list[FlowRun]:
-    return list(FlowRun.objects.filter(event_name="reservation.reservation.status_changed").order_by("started_at"))
+    """The table's runs in the order they started; the key breaks the tie of the frozen clock, as in ``outbound``."""
+    rows = FlowRun.objects.filter(event_name="reservation.reservation.status_changed")
+    return list(rows.order_by("started_at", "id"))
 
 
 def test_confirming_a_reservation_tells_the_guest_once_in_her_conversation(restaurant_clock, tick, door):
@@ -339,6 +344,23 @@ def test_a_guest_of_another_country_with_the_same_digits_is_never_taken_for_the_
         (ANA, True),
     ]
     assert [json.loads(call.request.content)["to"] for call in door.calls] == ["+33600111222", ANA]
+
+
+def test_the_notices_are_listed_in_the_order_they_were_made_when_the_frozen_clock_ties_them(restaurant_clock):
+    # The restaurant's clock is frozen, so every notice shares its ``created_at``: the UUIDv7 key breaks the tie, never
+    # the table's physical order, where a notice changed after it left (its status) moves behind the later ones.
+    receive()
+    conversation = Conversation.objects.get()
+    first, second = (
+        Message.objects.create(
+            conversation=conversation, direction="outbound", origin="hub", status="sending", body=body, sent_at=NOW
+        )
+        for body in ("first", "second")
+    )
+    first.status = "sent"
+    first.save(update_fields=["status"])
+    assert first.created_at == second.created_at == NOW
+    assert [row.body for row in outbound()] == ["first", "second"]
 
 
 def test_without_a_phone_on_the_reservation_it_stops_before_it_looks(restaurant_clock, tick, door):

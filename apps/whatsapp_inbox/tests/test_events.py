@@ -19,7 +19,7 @@ pytestmark = pytest.mark.django_db
 def delivered(name: str):
     """Hand the last ``name`` event Customers recorded to the inbox, as the relay will."""
     payload = (
-        OutboxEvent.objects.filter(name=name).order_by("-created_at").first().payload
+        OutboxEvent.objects.filter(name=name).order_by("-created_at", "-id").first().payload
     )
     return events.react(A, name, payload)
 
