@@ -1146,3 +1146,20 @@ msgstr "Registros por estado"
 #: apps/verifactu/apps.py
 msgid "Recent AEAT events"
 msgstr "Eventos AEAT recientes"
+
+#: apps/verifactu/queries.py
+msgid ""
+"VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or "
+"fix it before turning it off."
+msgstr ""
+"VeriFactu aún tiene 1 registro por enviar a la AEAT. Espera a que se envíe o "
+"arréglalo antes de desactivarla."
+
+#: apps/verifactu/queries.py
+#, python-format
+msgid ""
+"VeriFactu still has %(count)s records to send to the AEAT. Wait until they "
+"are sent or fix them before turning it off."
+msgstr ""
+"VeriFactu aún tiene %(count)s registros por enviar a la AEAT. Espera a que se "
+"envíen o arréglalos antes de desactivarla."

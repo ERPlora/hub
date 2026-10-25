@@ -14,7 +14,7 @@ from uuid import UUID
 
 from django.conf import settings
 from django.db.models import Case, Count, Q, QuerySet, When
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import NotFound, OperationError
@@ -749,6 +749,28 @@ def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummar
         total=sum(counts.values()),
         environment=config_row().environment,
     )
+
+
+#: Why VeriFactu refuses to go off while its queue holds records (VERIFACTU-F32): one, or how many.
+STILL_TO_SEND_ONE = _(
+    "VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or fix it before turning it off."
+)
+STILL_TO_SEND = _(
+    "VeriFactu still has %(count)s records to send to the AEAT. Wait until they are sent or fix them before turning "
+    "it off."
+)
+
+
+def disable_refusal(ctx: OperationContext) -> str | None:
+    """VERIFACTU-F32: why the app may not go off yet, in ``ctx``'s language, or ``None``. While a record is not in the
+    AEAT (``Record.UNSENT``: pending, its retry waiting included, or sent without an answer) turning it off would stop
+    its send; what the AEAT answered is out of the queue (a rejected one is corrected with a new record, which counts
+    again). Read in the hub of the active context, inside ``base.app.disable``'s transaction."""
+    count = Record.objects.filter(status__in=Record.UNSENT).count()
+    if not count:
+        return None
+    with translation.override(ctx.language):
+        return str(STILL_TO_SEND_ONE) if count == 1 else str(STILL_TO_SEND) % {"count": count}
 
 
 @operation(
