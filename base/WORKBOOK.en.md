@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:779518f51f5941514a69c17257673780561fa9d0193ff50041f44e5d4d41920b -->
+<!-- generated from WORKBOOK.md sha256:a4dd6384c7928735ff422de77997eb5c511f450a3b7c1c595de841e20cdd4199 -->
 
 ## What it is for and who it is for
 
@@ -490,7 +490,8 @@ Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
-  1. Under the list is the board ("Loading widgets…" while it comes).
+  1. Under the list is the board, with its panels from the moment the Home opens ("Loading widgets…" only while
+     it is not known which ones are theirs).
   2. Each panel is a card with its title and icon: a figure (with what it counts under it, if its app says
      so), a list with bars, a timeline, a chart or a piece of its app's screen, with its texts in the language
      of whoever is looking.
@@ -2175,7 +2176,8 @@ Steps:
      line, for example "Create in Services: Haircut · €15.00 · 30". An amount shows in the business's currency (never
      in cents), a yes or a no as "Yes" or "No" and a list by how many items it carries. Everything shows in the
      person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the same one its
-     app calls it by, never a technical name.
+     app calls it by, never a technical name. An action of the platform itself is named by the screen where it is
+     done, for example "Change in Settings" or "Delete in Files".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something

@@ -26,7 +26,7 @@ import {
 import { computed, ref } from 'vue';
 
 import type { WidgetDef } from '../operations';
-import { activeWidgetKeys, BOARD_STORAGE_KEY } from '../lib/home';
+import { activeWidgetKeys, BOARD_STORAGE_KEY, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import WidgetPanel from './WidgetPanel.vue';
 
@@ -45,14 +45,17 @@ function readChoice(): string[] | null {
 const choice = ref<string[] | null>(readChoice());
 const picking = ref(false);
 
-const catalogue = computed<WidgetDef[]>(() => data.value?.widgets ?? []);
+/** The catalogue the shell embedded when the page loaded (`widget-list`, base/spa.py): the panels mount with the board,
+ *  so their data goes in the same live stream as the list instead of reopening it. The live answer wins. */
+const embedded = readJsonBlock<{ widgets: WidgetDef[] }>('widget-list')?.widgets ?? null;
+const catalogue = computed<WidgetDef[]>(() => data.value?.widgets ?? embedded ?? []);
 const byKey = computed(() => new Map(catalogue.value.map((widget) => [widget.key, widget])));
 const active = computed(() =>
   activeWidgetKeys(choice.value, catalogue.value).map((key) => byKey.value.get(key) as WidgetDef),
 );
 const available = computed(() => catalogue.value.filter((widget) => !active.value.includes(widget)));
-const loading = computed(() => data.value === undefined && status.value !== 'error');
-const failed = computed(() => data.value === undefined && status.value === 'error');
+const loading = computed(() => data.value === undefined && embedded === null && status.value !== 'error');
+const failed = computed(() => data.value === undefined && embedded === null && status.value === 'error');
 
 /** Keeps the choice; a browser that refuses to store (private mode, full) keeps it until the page closes. */
 function choose(keys: string[]): void {

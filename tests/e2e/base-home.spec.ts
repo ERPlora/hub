@@ -161,3 +161,28 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await context.close();
   });
 }
+
+// FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the board learnt its panels from its first live stream and
+// reopened it for their data on every load of the Home (`net::ERR_ABORTED`, and every query run twice). The shell
+// now carries the person's panels (`widget-list`): one stream carries the board and its panels' data.
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  test(`BASE-F06 BASE-F08 — the Home opens one live stream, with its panels' data in it, at ${label}`, async ({ browser }) => {
+    const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
+    const isLive = (url: string) => new URL(url).pathname === '/api/live';
+    const opened: string[] = [];
+    const cut: string[] = [];
+    page.on('request', (request) => {
+      if (isLive(request.url())) opened.push(request.url());
+    });
+    page.on('requestfailed', (request) => {
+      if (isLive(request.url())) cut.push(request.failure()?.errorText ?? 'failed');
+    });
+    await page.reload();
+    // The panel's figure only comes through a stream that carries the panel: by then any reopening has happened.
+    const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
+    await expect(panel.locator('[data-testid="widget-value"]')).toHaveText(/\d/);
+    expect(cut).toEqual([]);
+    expect(opened).toHaveLength(1);
+    await context.close();
+  });
+}

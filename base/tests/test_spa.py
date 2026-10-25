@@ -139,6 +139,17 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
     }
 
 
+def test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream(client, make_user):
+    """FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the Home's board learnt its panels from its first live
+    stream and reopened it for their data on every load (``net::ERR_ABORTED``). The shell carries ``base.widget.list``
+    as its live query answers it to this person (``widget-list``), so the board subscribes everything at once."""
+    client.force_login(make_user("ana", host="a", role="hub_admin"))
+    _, embedded = json_block(client.get("/", HTTP_HOST="a.localhost:8000"), "widget-list")
+    live = client.get("/api/home/widgets", HTTP_HOST="a.localhost:8000").json()
+    assert embedded == live
+    assert embedded["widgets"]
+
+
 def test_a_visitor_without_a_session_learns_nothing_of_the_hub(client):
     # The shell's auth gate sends a visitor without a session to the login, so the HTML carries no `hub-home`:
     # neither the business's name nor the hub's id (the one in the plan's address on erplora.com).
@@ -150,6 +161,7 @@ def test_a_visitor_without_a_session_learns_nothing_of_the_hub(client):
     html = response.content.decode()
     assert response.status_code == 200
     assert 'id="hub-home"' not in html
+    assert 'id="widget-list"' not in html
     assert "Bar Secreto" not in html
     assert str(hub.id) not in html
 
