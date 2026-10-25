@@ -116,6 +116,16 @@ describe('SettingsCard', () => {
     expect(s.find('cash-register-settings-heading').text()).toBe('Caja');
   });
 
+  it('the auto-close hour sits outside the list items, so its outline label is never cut', async () => {
+    // An ion-item clips what pokes out of it: the md outline's stacked label, which sits on the top border, lost its
+    // upper half («Hora del cierre automático», FIX-CASH_REGISTER-SETUP-HOOKS). Printing's settings do the same.
+    const s = await setup();
+    await s.result(OP, FACTORY);
+    const hour = s.field('auto_close_time');
+    expect(prop(hour, 'fill')).toBe('outline');
+    expect(hour?.closest('ion-item')).toBeNull();
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup(true, 'es');
     await s.result(OP, FACTORY);

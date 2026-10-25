@@ -161,28 +161,29 @@ const failed = computed(() => !server.value && status.value === 'error');
                 @ion-change="set(field.key, !!$event.detail.checked)"
               />
             </ion-item>
-            <ion-item lines="none">
-              <ion-select
-                data-testid="cash-register-setting-auto_close_time"
-                :label="$t('cash_register.settings.fields.auto_close_time.label')"
-                label-placement="stacked"
-                fill="outline"
-                mode="md"
-                interface="popover"
-                :value="valueOf('auto_close_time')"
-                :disabled="!editable"
-                @ion-change="set('auto_close_time', String($event.detail.value))"
-              >
-                <ion-select-option
-                  v-for="hour in HOURS"
-                  :key="hour"
-                  :value="hour"
-                >
-                  {{ hour }}
-                </ion-select-option>
-              </ion-select>
-            </ion-item>
           </ion-list>
+          <!-- Outside the list's items: an ion-item clips the outline's stacked label, which sits on its top border. -->
+          <div class="cash-settings__fields">
+            <ion-select
+              data-testid="cash-register-setting-auto_close_time"
+              :label="$t('cash_register.settings.fields.auto_close_time.label')"
+              label-placement="stacked"
+              fill="outline"
+              mode="md"
+              interface="popover"
+              :value="valueOf('auto_close_time')"
+              :disabled="!editable"
+              @ion-change="set('auto_close_time', String($event.detail.value))"
+            >
+              <ion-select-option
+                v-for="hour in HOURS"
+                :key="hour"
+                :value="hour"
+              >
+                {{ hour }}
+              </ion-select-option>
+            </ion-select>
+          </div>
         </ion-card-content>
       </ion-card>
 
@@ -252,6 +253,9 @@ const failed = computed(() => !server.value && status.value === 'error');
 }
 .cash-settings__content {
   padding: 0;
+}
+.cash-settings__fields {
+  padding: 0.75rem 1rem;
 }
 .cash-settings__read-only {
   margin: 0;
