@@ -1811,12 +1811,12 @@ msgstr "%(first)s y %(last)s"
 #: base/services.py
 #, python-format
 msgid "Turn off %(apps)s first."
-msgstr "Apaga antes %(apps)s."
+msgstr "Desactiva antes %(apps)s."
 
 #: base/services.py
 #, python-format
 msgid "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off."
 msgid_plural "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off."
-msgstr[0] "Has llegado al límite de %(count)s app de tu plan. Mejora el plan o apaga una."
-msgstr[1] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o apaga una."
-msgstr[2] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o apaga una."
+msgstr[0] "Has llegado al límite de %(count)s app de tu plan. Mejora el plan o desactiva una."
+msgstr[1] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."
+msgstr[2] "Has llegado al límite de %(count)s apps de tu plan. Mejora el plan o desactiva una."

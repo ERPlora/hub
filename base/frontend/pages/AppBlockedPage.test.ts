@@ -69,7 +69,10 @@ describe('AppBlockedPage', () => {
     expect(card.text()).toContain('Subscription needed');
     expect(card.text()).toContain('Stock is disabled because this business does not have its subscription');
     expect(card.text()).toContain('Your data is safe');
-    expect(m.wrapper.find('[data-testid="app-blocked-buy"]').attributes()).toMatchObject({ href: STORE, target: '_blank' });
+    const buy = m.wrapper.find('[data-testid="app-blocked-buy"]');
+    expect(buy.attributes()).toMatchObject({ href: STORE, target: '_blank' });
+    // PLAN §32, point 2: every app comes with a plan, so the way to it is a better plan.
+    expect(buy.text()).toBe('Upgrade plan');
     await m.wrapper.find('[data-testid="app-blocked-to-apps"]').trigger('click');
     await flush();
     expect(m.router.currentRoute.value.fullPath).toBe('/apps#all');
@@ -96,6 +99,12 @@ describe('AppBlockedPage', () => {
     expect(reopen.text()).toContain('Open Stock');
     expect(reopen.element.tagName).toBe('A');
     expect(reopen.attributes('href')).toBe('/stock/items');
+  });
+
+  it('«Mejorar plan» in Spanish', async () => {
+    const m = await open('/stock/items', { locale: 'es' });
+    await m.result(m.call, 'base.app.list', LIST);
+    expect(m.wrapper.find('[data-testid="app-blocked-buy"]').text()).toBe('Mejorar plan');
   });
 
   it('an app the business does not have says so, in Spanish too, and leads to Apps (BASE-G132)', async () => {

@@ -2749,6 +2749,7 @@ def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> 
 from typing import Any  # noqa: E402
 
 from live.meta import module_configs  # noqa: E402
+from live.operations import on_commit as after_commit  # noqa: E402
 
 from base import activation, entitlement, home  # noqa: E402
 from base.models import AppActivation  # noqa: E402
@@ -2829,6 +2830,8 @@ def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.A
 
 
 def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
+    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business."""
+    after_commit(partial(activation.forget, host))
     now = timezone.now()
     existing = set(AppActivation.objects.filter(host=host, app__in=list(changes)).values_list("app", flat=True))
     for label, row in changes.items():
@@ -2877,6 +2880,11 @@ def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
     paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
     limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this)."""
+    with activation.changing(ctx.scope.key):
+        return _enable(ctx, data)
+
+
+def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     hub = _business_hub(ctx)
     _business_module(ctx, data.app, hub)
     graph = activation.module_graph()
@@ -2925,6 +2933,11 @@ def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F23/F25: the app off, and what came along only with it. 409 ``base.app_required`` while an app on needs
     it (naming the ones to turn off first); 409 ``base.app_vetoed`` when it, or one that would go off with it, refuses
     (``can_disable``, FIX-BASE-APP-TURN-OFF-VETO). Its tables are never dropped."""
+    with activation.changing(ctx.scope.key):
+        return _disable(ctx, data)
+
+
+def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     _business_module(ctx, data.app, _business_hub(ctx))
     graph = activation.module_graph()
     if not activation.states_of(ctx.scope)[data.app].on:

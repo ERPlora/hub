@@ -278,7 +278,7 @@ def test_the_limit_is_said_in_the_language_of_who_asks():
     set_rows(task="on*", website="on*")
     with pytest.raises(OperationError) as refused:
         enable("flow", context=ctx(language="es"))
-    assert refused.value.message == "Has llegado al límite de 2 apps de tu plan. Mejora el plan o apaga una."
+    assert refused.value.message == "Has llegado al límite de 2 apps de tu plan. Mejora el plan o desactiva una."
 
 
 @pytest.mark.django_db
@@ -391,7 +391,7 @@ def test_the_409_is_said_in_the_language_of_who_asks():
     set_rows(task="on*", staff="on")
     with pytest.raises(Conflict) as refused:
         disable("staff", context=ctx(language="es"))
-    assert refused.value.message == "Apaga antes Tareas."
+    assert refused.value.message == "Desactiva antes Tareas."
 
 
 @pytest.mark.django_db
@@ -492,12 +492,13 @@ def test_a_paid_app_without_its_right_is_402_before_it_is_off(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_the_relay_the_home_and_the_assistant_leave_out_an_app_off():
+def test_the_relay_the_home_and_the_assistant_leave_out_an_app_off(django_capture_on_commit_callbacks):
     from base import assistant
 
     set_rows(task="on*", staff="on")
     assert "task" in relay.active_apps(A)
-    disable("task")
+    with django_capture_on_commit_callbacks(execute=True):  # its COMMIT forgets the cache
+        disable("task")
     assert "task" not in relay.active_apps(A) and "staff" not in relay.active_apps(A)
     assert "base" in relay.active_apps(A)
     assert "task" in relay.active_apps(B)
@@ -506,13 +507,14 @@ def test_the_relay_the_home_and_the_assistant_leave_out_an_app_off():
 
 
 @pytest.mark.django_db
-def test_the_menu_and_the_session_leave_out_an_app_off():
+def test_the_menu_and_the_session_leave_out_an_app_off(django_capture_on_commit_callbacks):
     set_rows(task="on*", staff="on", customer="on*")
     me = get("base.session.me")
     before = me(ctx(), me.input()).model_dump(mode="json")
     assert {"task", "staff", "customer"} <= {group["id"] for group in before["menu"]}
 
-    disable("task")
+    with django_capture_on_commit_callbacks(execute=True):  # its COMMIT forgets the cache
+        disable("task")
 
     after = me(ctx(), me.input()).model_dump(mode="json")
     assert {group["id"] for group in after["menu"]} & {"task", "staff"} == set()
@@ -524,12 +526,13 @@ def test_the_menu_and_the_session_leave_out_an_app_off():
 
 
 @pytest.mark.django_db
-def test_an_api_key_cannot_be_given_an_app_off():
+def test_an_api_key_cannot_be_given_an_app_off(django_capture_on_commit_callbacks):
     from base import queries
 
     set_rows(task="on*", staff="on", customer="on*")
     assert "task" in {app["id"] for app in queries.api_apps(ctx())}
-    disable("task")
+    with django_capture_on_commit_callbacks(execute=True):  # its COMMIT forgets the cache
+        disable("task")
     assert "task" not in {app["id"] for app in queries.api_apps(ctx())}
 
 
@@ -668,6 +671,111 @@ def test_a_whatsapp_block_out_of_contract_while_it_is_off_never_stops_turning_it
     assert enable("whatsapp_inbox")["state"] == "on"
     assert not Channel.objects.filter(version=8).exists()
     assert "base.app.photo_block_refused" in caplog.text
+
+
+# ── The gate's cache: one read per business, forgotten at the COMMIT of a change ───────────────────────────
+
+
+def task_list_as(scope=A):
+    op = get("task.task.list")
+    return op(ctx(scope=scope), op.input())
+
+
+def activation_reads(captured):
+    return [query["sql"] for query in captured.captured_queries if "base_appactivation" in query["sql"]]
+
+
+@pytest.mark.django_db
+def test_with_the_cache_warm_the_operations_read_no_row():
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    set_rows(task="on*", staff="on")
+    task_list_as()  # the first one reads the rows once
+
+    with CaptureQueriesContext(connection) as captured:
+        for _ in range(3):
+            task_list_as()
+            assert "task" in relay.active_apps(A)
+            get("base.session.me")(ctx(), get("base.session.me").input())
+
+    assert activation_reads(captured) == []
+
+
+@pytest.mark.django_db
+def test_each_business_has_its_own_entry():
+    from django.core.cache import cache
+
+    set_rows("a", staff="on*")
+    with pytest.raises(AppInactive):
+        task_list_as(A)
+    task_list_as(B)
+
+    assert "task" in cache.get(activation.OFF_APPS_CACHE + "a")
+    assert cache.get(activation.OFF_APPS_CACHE + "b") == []
+
+
+def test_turned_off_and_committed_the_next_operation_is_refused_at_once(transactional_db):
+    task_list_as()  # warm: on
+
+    disable("task")
+    with pytest.raises(AppInactive):
+        task_list_as()
+
+    enable("task")
+    assert task_list_as().model_dump()["rows"] == []
+
+
+@pytest.mark.django_db
+def test_the_commit_forgets_what_another_process_cached_meanwhile(django_capture_on_commit_callbacks):
+    from django.core.cache import cache
+
+    set_rows(task="on*", staff="on")
+    with django_capture_on_commit_callbacks() as callbacks:
+        disable("task")
+    # Before the COMMIT another process read the rows as they were, and kept them.
+    cache.set(activation.OFF_APPS_CACHE + "a", [], 60)
+
+    for callback in callbacks:
+        callback()
+
+    with pytest.raises(AppInactive):
+        task_list_as()
+
+
+@pytest.mark.django_db
+def test_inside_a_change_nothing_is_kept_before_its_commit(client, registered_a):
+    """What a change reads of its own rows (the photo's block it applies, the gate of that sync) is not committed yet:
+    it is never kept, or a rollback would leave the cache saying what never happened."""
+    from django.core.cache import cache
+
+    set_rows(staff="on*")
+    put_photo(client, registered_a, 3, status="active", verifactu={"representation": {"status": "approved", "updated_at": "2026-10-15T10:00:00Z", "reason": ""}})
+    cache.delete(activation.OFF_APPS_CACHE + "a")
+
+    enable("verifactu")
+
+    assert cache.get(activation.OFF_APPS_CACHE + "a") is None
+
+
+@pytest.mark.django_db
+def test_without_the_cache_the_gate_reads_the_rows(monkeypatch, caplog):
+    class Unreachable:
+        def __getattr__(self, name):
+            def fail(*args, **kwargs):
+                raise ConnectionError("Valkey is down")
+
+            return fail
+
+    monkeypatch.setattr(activation, "cache", Unreachable())
+    set_rows(staff="on*")
+
+    with pytest.raises(AppInactive):
+        task_list_as(A)
+    task_list_as(B)
+    enable("task")
+    assert task_list_as(A).model_dump()["rows"] == []
+    assert "base.activation.cache_unavailable" in caplog.text
 
 
 # ── Over HTTP ───────────────────────────────────────────────────────────────────────────────────────────────

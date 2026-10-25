@@ -21,6 +21,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any
 
+from django.apps import apps as django_apps
 from django.utils import timezone, translation
 from django.utils.translation import gettext
 from live.context import Scope
@@ -98,7 +99,7 @@ def operation_database(op, ctx) -> Iterator[str]:
     from base.approval_spend import spending
 
     with tenancy.operation_database(op, ctx) as alias:
-        if op.app_label in _module_labels() and op.app_label in activation.off_apps(ctx.scope):
+        if _is_module(op.app_label) and op.app_label in activation.off_apps(ctx.scope):
             raise AppInactive(_turned_off(op.app_label, ctx.language))
         with spending(op, ctx, alias) as spent_on:
             yield spent_on
@@ -109,14 +110,25 @@ def refused(label: str, language: str) -> EntitlementBlocked:
     return EntitlementBlocked(_refusal(label, language))
 
 
-def _module_labels() -> frozenset[str]:
-    return frozenset(config.label for config in module_configs())
+def _is_module(label: str) -> bool:
+    """Whether ``label`` is a module (an app a business turns on and off): one look-up in Django's registry, fixed
+    since the start, on every operation (base's own never ask the cache)."""
+    config = _config(label)
+    return config is not None and getattr(config, "kind", None) == "app"
+
+
+def _config(label: str) -> Any:
+    try:
+        return django_apps.get_app_config(label)
+    except LookupError:
+        return None
 
 
 def _turned_off(label: str, language: str) -> str:
-    names = {config.label: config.verbose_name for config in module_configs()}
+    config = _config(label)
     with translation.override(language):
-        return gettext("%(app)s is turned off in this business.") % {"app": str(names.get(label, label))}
+        name = str(config.verbose_name) if config is not None else label
+        return gettext("%(app)s is turned off in this business.") % {"app": name}
 
 
 def requires_of(label: str, configs: Iterable[Any] | None = None) -> frozenset[str]:

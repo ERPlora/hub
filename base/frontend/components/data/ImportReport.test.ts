@@ -67,7 +67,7 @@ describe('ImportReport', () => {
     expect(pills(m)).toEqual([
       ['inventory', 'Aplicado en parte'],
       ['table', 'Ya lo tenías'],
-      ['kitchen', 'App apagada'],
+      ['kitchen', 'App desactivada'],
       ['weird', 'Falló'],
     ]);
     expect(m.wrapper.get('[data-id="weird"]').text()).toContain('exploded');

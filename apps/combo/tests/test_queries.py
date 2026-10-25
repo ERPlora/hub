@@ -201,6 +201,7 @@ def test_a_menu_is_read_with_its_tree_in_as_many_queries_however_big(name):
             run(name, data)
         return len(read)
 
+    queries(1, 1)  # the business's first read also fills what base keeps per business (its apps off, PLAN-HUB §9)
     assert queries(3, 3) == queries(1, 1)
 
 

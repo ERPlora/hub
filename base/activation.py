@@ -22,18 +22,33 @@ What is off is also out of everything that asks which apps are on (``base.relay.
 not list it. Its tables are never dropped: turned on again, it has its data.
 """
 
-from collections.abc import Iterable, Mapping
+import logging
+from collections.abc import Iterable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
+from django.core.cache import cache
 from live.context import Scope
 from live.meta import module_configs
 
 from base.tenancy.context import HUB_SCOPE_KIND
 
+logger = logging.getLogger(__name__)
+
 ON = "on"
 OFF = "off"
 STATES = (ON, OFF)
+
+#: The modules off in a business, kept in Django's cache (Valkey in production, only as a cache) per host: the gate
+#: of every operation of a module, the relay and the menu ask it, and the rows are read once per business. A change
+#: forgets it at its COMMIT (:func:`forget`), so every process sees it at once; the timeout is only a safety net.
+OFF_APPS_CACHE = "base.apps_off:"
+OFF_APPS_TTL = 60
+
+#: The hosts whose rows the running change wrote and has not committed yet: what it reads of them is never kept.
+_changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", default=frozenset())
 
 #: ``{label: what it requires}``, a module's direct ``requires`` (acyclic: ``live.checks``).
 Graph = Mapping[str, Iterable[str]]
@@ -181,5 +196,50 @@ def states_of(scope: Scope) -> dict[str, Activation]:
 
 
 def off_apps(scope: Scope) -> frozenset[str]:
-    """The modules off in ``scope``'s business: what ``base.relay.active_apps`` and the operations leave out."""
-    return frozenset(label for label, row in states_of(scope).items() if not row.on)
+    """The modules off in ``scope``'s business: what ``base.relay.active_apps`` and the operations leave out.
+
+    From the cache when it has them; else read from the rows and kept, unless the running change wrote them (not
+    committed yet). A cache that does not answer is logged and the rows are read: never a guess."""
+    if scope.kind != HUB_SCOPE_KIND:
+        return frozenset()
+    key = OFF_APPS_CACHE + scope.key
+    changing = scope.key in _changing.get()
+    if not changing:
+        kept = _cached(key)
+        if kept is not None:
+            return frozenset(kept)
+    off = frozenset(label for label, row in states_of(scope).items() if not row.on)
+    if not changing:
+        try:
+            cache.set(key, sorted(off), OFF_APPS_TTL)
+        except Exception:
+            logger.exception("base.activation.cache_unavailable: the apps off of %s were read and not kept.", scope.key)
+    return off
+
+
+@contextmanager
+def changing(host: str) -> Iterator[None]:
+    """Around a change of ``host``'s rows (``base.app.enable``/``disable``): what it reads of them is not kept."""
+    token = _changing.set(_changing.get() | {host})
+    try:
+        yield
+    finally:
+        _changing.reset(token)
+
+
+def forget(host: str) -> None:
+    """Drop ``host``'s apps off from the cache: after the COMMIT of a change, the next read sees it, in every process.
+    A cache that does not answer is logged; what it kept ends with its timeout."""
+    try:
+        cache.delete(OFF_APPS_CACHE + host)
+    except Exception:
+        logger.exception("base.activation.cache_unavailable: the apps off of %s could not be forgotten.", host)
+
+
+def _cached(key: str) -> list[str] | None:
+    try:
+        kept = cache.get(key)
+    except Exception:
+        logger.exception("base.activation.cache_unavailable: the apps off are read from the rows.")
+        return None
+    return kept if isinstance(kept, list) else None

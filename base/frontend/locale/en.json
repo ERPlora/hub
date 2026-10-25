@@ -140,7 +140,7 @@
         "missing": "Paid"
       },
       "open": "Open",
-      "buy": "Subscribe on erplora.com",
+      "buy": "Upgrade plan",
       "buyWhere": "Subscribed to on erplora.com, from your ERPlora account.",
       "entity": {
         "one": "app",
@@ -182,8 +182,7 @@
       "changeFailed": "{app} could not be changed: {reason}",
       "limit": {
         "heading": "Your plan’s app limit",
-        "body": "You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off. | You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off.",
-        "upgrade": "Upgrade plan"
+        "body": "You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off. | You have reached the {max}-app limit of your plan. Upgrade your plan or turn one off."
       },
       "counter": {
         "limited": "{enabled} of {max} apps turned on",

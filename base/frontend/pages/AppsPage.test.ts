@@ -166,7 +166,7 @@ describe('AppsPage', () => {
     await m.result(m.call, 'base.app.list', LIST);
     const buy = m.wrapper.find('[data-testid="apps-row"][data-id="stock"] [data-testid="apps-buy"]');
     expect(buy.attributes()).toMatchObject({ href: STORE, target: '_blank', rel: 'noopener' });
-    expect(buy.text()).toBe('Subscribe on erplora.com');
+    expect(buy.text()).toBe('Upgrade plan');
     expect(m.wrapper.find('[data-testid="apps-row"][data-id="tax"] [data-testid="apps-buy"]').exists()).toBe(false);
   });
 
@@ -291,7 +291,7 @@ describe('AppsPage', () => {
       await m.result(m.call, 'base.app.list', APPS);
       await m.wrapper.find('[data-testid="apps-row-task-toggle"]').trigger('click');
       await flush();
-      expect(vi.mocked(toastError).mock.calls[0][0]).toBe('Apaga antes Sales.');
+      expect(vi.mocked(toastError).mock.calls[0][0]).toBe('Desactiva antes Sales.');
       expect(sessionChanged).not.toHaveBeenCalled();
     });
 
@@ -359,7 +359,7 @@ describe('AppsPage', () => {
       await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
       await flush();
       const notice = m.wrapper.find('[data-testid="apps-limit"]');
-      expect(notice.text()).toContain('Has llegado al límite de 20 apps de tu plan. Mejora el plan o apaga una.');
+      expect(notice.text()).toContain('Has llegado al límite de 20 apps de tu plan. Mejora el plan o desactiva una.');
       expect(notice.find('[data-testid="apps-limit-upgrade"]').exists()).toBe(false);
     });
 

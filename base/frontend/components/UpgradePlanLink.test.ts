@@ -25,7 +25,7 @@ describe('UpgradePlanLink', () => {
     embed({ name: 'Bar', plan_url: PLAN_URL });
     const m = await mountBase(UpgradePlanLink, { locale: 'es' });
     const link = m.wrapper.get('a[data-testid="upgrade-plan"]');
-    expect(link.text()).toBe('Actualizar plan');
+    expect(link.text()).toBe('Mejorar plan');
     expect([link.attributes('href'), link.attributes('target'), link.attributes('rel')]).toEqual([
       PLAN_URL,
       '_blank',
@@ -38,8 +38,8 @@ describe('UpgradePlanLink', () => {
     const m = await mountBase(UpgradePlanLink, { locale: 'es' });
     const link = m.wrapper.get('a[data-testid="upgrade-plan"]');
     // polish.css hides `.nav-label` on `ion-split-pane.rail`: the text goes, the icon stays.
-    expect(link.get('.nav-label').text()).toBe('Actualizar plan');
-    expect([link.attributes('title'), link.attributes('aria-label')]).toEqual(['Actualizar plan', 'Actualizar plan']);
+    expect(link.get('.nav-label').text()).toBe('Mejorar plan');
+    expect([link.attributes('title'), link.attributes('aria-label')]).toEqual(['Mejorar plan', 'Mejorar plan']);
   });
 
   it('paints nothing without the block (never a button that does nothing)', async () => {

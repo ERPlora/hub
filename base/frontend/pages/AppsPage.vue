@@ -303,7 +303,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
             :href="planUrl"
             target="_blank"
             rel="noopener"
-          >{{ t('base.appsPage.limit.upgrade') }}</a>
+          >{{ t('base.plan.upgrade') }}</a>
         </template>
       </InlineFeedback>
       <InlineFeedback
