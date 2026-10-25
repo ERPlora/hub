@@ -11,6 +11,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
@@ -30,6 +31,8 @@ ONE_LIST = _(
     "Ask for the lines of one session (its id or number) or for the unassigned ones, one of the two."
 )
 COUNT_SOMETHING = _("Count the drawer: give its notes and coins or its total.")
+#: How «Open session» and the drawers of the settings name a drawer (the assistant's card names the datum by it).
+DRAWER = gettext_noop("Drawer")
 
 
 def _text(max_length: int, min_length: int = 0) -> type[str]:
@@ -163,7 +166,7 @@ class RegisterIn(Closed):
 class RegisterUpdateIn(Closed):
     register_id: UUID | None = Field(None, description="The drawer's id.")
     register_name: Name | None = Field(
-        None, description="Its name, when the id is not known."
+        None, title=DRAWER, description="Its name, when the id is not known."
     )
     name: Name | None = Field(None, description="Its new name.")
     is_active: bool | None = Field(
@@ -343,6 +346,7 @@ class SessionOpenIn(Closed):
     register_id: UUID | None = Field(None, description="The drawer's id.")
     register_name: Name | None = Field(
         None,
+        title=DRAWER,
         description="The drawer's name; with a single active drawer it is chosen alone.",
     )
     opening_balance: Cents | None = Field(
@@ -355,10 +359,10 @@ class SessionCloseIn(SessionRefIn):
     # The titles name each datum on the assistant's card, as the screen's «Close session» does.
     closing_balance: Cents | None = Field(
         None,
-        title="Counted cash",
+        title=gettext_noop("Counted cash"),
         description="The counted cash, in cents (required when the settings ask for the count).",
     )
-    closing_notes: Notes = Field("", title="Closing notes", description="Notes of the closing.")
+    closing_notes: Notes = Field("", title=gettext_noop("Closing notes"), description="Notes of the closing.")
 
 
 class ClosingSummaryIn(SessionRefIn):
