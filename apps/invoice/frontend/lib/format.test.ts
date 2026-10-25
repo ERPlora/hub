@@ -4,7 +4,7 @@
 // hand.
 import { describe, expect, it } from 'vitest';
 
-import { centsFromAmount, formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, plain, typedRate } from './format';
+import { centsFromAmount, formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, moneyOf, plain, typedRate } from './format';
 
 // An invoice's money: its currency and the decimals the server counts it in (`currency_decimals`).
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -122,6 +122,12 @@ describe('money of the invoice’s currency (flow business-currency)', () => {
     // The forint keeps the two decimals the server counts it in (the browser's Intl gives it none).
     expect(plain(formatMoney(123450, 'en', HUF))).toBe('Ft 1,234.50');
     expect(plain(formatUnitPrice('5000.00', 'en', JPY))).toBe('¥5,000');
+  });
+
+  it('takes each invoice’s money from the invoice: its currency and the decimals the server counted it in', () => {
+    expect(moneyOf({ currency: 'JPY', currency_decimals: 0 })).toEqual(JPY);
+    expect(plain(formatMoney(12100, 'en', moneyOf({ currency: 'JPY', currency_decimals: 0 })))).toBe('¥12,100');
+    expect(plain(formatMoney(123450, 'en', moneyOf({ currency: 'HUF', currency_decimals: 2 })))).toBe('Ft 1,234.50');
   });
 
   it('without a currency a figure has no symbol, never the euro', () => {
