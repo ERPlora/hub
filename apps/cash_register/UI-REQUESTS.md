@@ -39,7 +39,9 @@ Al registrarlos, cambiar `frontend/pages/SessionsPage.vue` (acciones), `frontend
 - **Qué**: la lista de barras horizontales con su etiqueta y su valor del panel «Sesiones recientes» del
   producto actual, con color por signo (falta en rojo, sobra en verde).
 - **Hoy**: `frontend/components/CashFigures.vue` («Descuadres recientes»: las barras con su propio CSS, ancho
-  proporcional al mayor descuadre de las ocho).
+  proporcional al mayor descuadre de las ocho). El panel «Descuadres recientes» del Inicio lo pinta el
+  `bar-list` de `base` (`base/frontend/components/WidgetPanel.vue`), sin color por signo: cuando llegue el
+  componente, también ese.
 
 ## Ventana de solo lectura (`FormModal` sin envío)
 
