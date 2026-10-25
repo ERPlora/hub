@@ -30,6 +30,11 @@ NUMBER_WIDTH = 4
 AUTO_CLOSE_TIME = dt.time(4, 0)
 
 
+def default_auto_close_time() -> dt.time:
+    """The field default as a callable: a fixed time trips ``fields.W161`` within 10 s of that hour (UTC)."""
+    return AUTO_CLOSE_TIME
+
+
 def session_number(day: dt.date, sequence: int) -> str:
     """``S-AAMMDD-NNNN``: four digits as a minimum width, never a ceiling."""
     return f"S-{day:%y%m%d}-{sequence:0{NUMBER_WIDTH}d}"
@@ -51,7 +56,9 @@ class Settings(UUIDModel):
     )
     require_blind_count = models.BooleanField(_("blind count"), default=False)
     auto_close_enabled = models.BooleanField(_("daily auto-close"), default=False)
-    auto_close_time = models.TimeField(_("auto-close time"), default=AUTO_CLOSE_TIME)
+    auto_close_time = models.TimeField(
+        _("auto-close time"), default=default_auto_close_time
+    )
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
     updated_by = models.CharField(
         _("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
