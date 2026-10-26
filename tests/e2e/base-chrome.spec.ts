@@ -171,8 +171,8 @@ test('the user menu opens «My account» and «Report a problem» on erplora.com
   await login(page, A, '/');
   const trigger = page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name');
   const entries = [
-    { id: 'account', label: 'My account', address: `${STACK.saas}/account` },
-    { id: 'report', label: 'Report a problem', address: `${STACK.saas}/report-a-problem` },
+    { id: 'account', label: 'My account', address: `${STACK.saas}/dashboard/account` },
+    { id: 'report', label: 'Report a problem', address: `${STACK.saas}/dashboard/report-a-problem` },
   ];
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -203,7 +203,7 @@ test('the user menu opens «My account» and «Report a problem» on erplora.com
     if (vp.width === 1440) {
       // Tapped, the page opens in a tab of its own and the hub stays where it was.
       const [tab] = await Promise.all([page.waitForEvent('popup'), page.locator('ion-popover [data-testid="user-menu-report"]').click()]);
-      await tab.waitForURL(`${STACK.saas}/report-a-problem`);
+      await tab.waitForURL(`${STACK.saas}/dashboard/report-a-problem`);
       await tab.close();
       await expect(page).toHaveURL(`${A}/`);
     } else {

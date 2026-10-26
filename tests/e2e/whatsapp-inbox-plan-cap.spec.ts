@@ -113,7 +113,7 @@ test.describe('a plan without WhatsApp messages', () => {
     await expect(notIncluded(page)).not.toContainText('next month');
     const upgrade = shown(page).locator('[data-testid=whatsapp-inbox-upgrade]');
     await expect(upgrade).toHaveText('Upgrade plan');
-    await expect(upgrade).toHaveAttribute('href', `${SAAS}/store/plans`);
+    await expect(upgrade).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
     await expect(upgrade).toHaveAttribute('target', '_blank');
 
     // What the customer writes arrives through erplora.com as always: the cap only limits what is sent.
@@ -127,7 +127,7 @@ test.describe('a plan without WhatsApp messages', () => {
     await expect(blocked).toContainText('Your plan does not include WhatsApp messages: nothing can be sent.');
     await expect(blocked).toHaveAttribute('data-code', 'cap_reached');
     await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-send]')).toHaveJSProperty('disabled', true);
-    await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-upgrade]')).toHaveAttribute('href', `${SAAS}/store/plans`);
+    await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-upgrade]')).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
 
     for (const viewport of FLOW_VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -145,7 +145,7 @@ test.describe('a plan without WhatsApp messages', () => {
     const month = shown(page).locator('[data-testid=whatsapp-inbox-settings-month]');
     await expect(month).toContainText('Your plan does not include WhatsApp messages.');
     await expect(month).not.toContainText('No limit');
-    await expect(shown(page).locator('[data-testid=whatsapp-inbox-settings-upgrade]')).toHaveAttribute('href', `${SAAS}/store/plans`);
+    await expect(shown(page).locator('[data-testid=whatsapp-inbox-settings-upgrade]')).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
     for (const viewport of FLOW_VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await month.scrollIntoViewIfNeeded();
@@ -204,7 +204,7 @@ test.describe('the month spent', () => {
     await expect(month).not.toContainText('Your plan does not include WhatsApp messages.');
     const upgrade = shown(page).locator('[data-testid=whatsapp-inbox-settings-upgrade]');
     await expect(upgrade).toHaveText('Upgrade plan');
-    await expect(upgrade).toHaveAttribute('href', `${SAAS}/store/plans`);
+    await expect(upgrade).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
     for (const viewport of FLOW_VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await month.scrollIntoViewIfNeeded();
