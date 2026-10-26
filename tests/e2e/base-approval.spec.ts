@@ -232,7 +232,7 @@ test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog,
   const { page } = cashier;
   const sale = tickets.get(WRONG)!;
   const spentBefore = spentVoids();
-  const dialog = await openOnThePad(page, sale, VIEWPORTS[2]);
+  const dialog = await openOnThePad(page, sale, VIEWPORTS[0]);
   // A mark on this page's window: a reload would take it away.
   await page.evaluate(() => Object.assign(window, { approvalE2ePage: 'same' }));
   const wrong = OWNER_PIN.split('').reverse().join('');
@@ -243,6 +243,15 @@ test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog,
   );
   expect(await page.evaluate(() => (window as { approvalE2ePage?: string }).approvalE2ePage), 'the page was reloaded').toBe('same');
   await expect(page.locator('ion-modal[data-testid=sale-void]')).toBeVisible();
+  // The refusal on the pad at a phone, a tablet and a desk (one wrong attempt: each counts against the person), with
+  // the whole pad still in view under it.
+  for (const viewport of VIEWPORTS.slice(0, 3)) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await untilStill(page);
+    await expect(dialog.getByTestId('pinpad-error')).toBeVisible();
+    await expectWholePad(page, dialog, `${viewport.width}x${viewport.height} with the refusal`);
+    await page.screenshot({ path: shot(`FIX-SAAS-PANEL-UNDER-DASHBOARD-PREFIX-approval-refused-${viewport.label}`) });
+  }
   expect(spentVoids()).toBe(spentBefore);
   expect((await api<{ status: string }>(owner.context, A, 'GET', `/sale/sales/detail?sale_id=${sale.id}`)).data.status).not.toBe('voided');
 
