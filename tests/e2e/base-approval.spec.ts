@@ -28,6 +28,8 @@ const VIEWPORTS = [
 ];
 /** A desk shorter than the dialog with its whole pad (a laptop's browser with its bars). */
 const SHORT = { label: 'short', width: 1280, height: 600 };
+/** The ticket of the wrong PIN. */
+const WRONG = 'wrong';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -76,8 +78,8 @@ test.beforeAll(async ({ browser }) => {
   ownerName = await usernameOf(context);
   await drawerOff(context);
   await createProduct(context, { name: 'E2E Base approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
-  for (const viewport of [...VIEWPORTS, SHORT]) {
-    tickets.set(viewport.label, await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] }));
+  for (const label of [...VIEWPORTS.map((viewport) => viewport.label), SHORT.label, WRONG]) {
+    tickets.set(label, await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] }));
   }
   // The cashier enters while nobody of the business has a PIN: the way in is erplora.com's, as every spec's.
   const till = await browser.newContext({ baseURL: A });
@@ -217,6 +219,33 @@ test('BASE-F84: on a screen too short for the whole pad, the dialog stays on scr
       return zero !== null && zero.y + zero.height <= frame.y + frame.height + 0.5;
     })
     .toBe(true);
+  await dialog.getByTestId('approval-cancel').click();
+  await expect(dialog).toBeHidden();
+  const modal = page.locator('ion-modal[data-testid=sale-void]');
+  await modal.locator('[data-testid=sale-void-cancel]').click();
+  await expect(modal).toBeHidden();
+});
+
+test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog, and the till stays where it was', async () => {
+  // The Hub answers the wrong PIN with a 401 (`base.approval_refused`): the dialog says so, the page is not reloaded
+  // (the SDK took every 401 for a session that ended, FIX-SAAS-PANEL-UNDER-DASHBOARD-PREFIX).
+  const { page } = cashier;
+  const sale = tickets.get(WRONG)!;
+  const spentBefore = spentVoids();
+  const dialog = await openOnThePad(page, sale, VIEWPORTS[2]);
+  // A mark on this page's window: a reload would take it away.
+  await page.evaluate(() => Object.assign(window, { approvalE2ePage: 'same' }));
+  const wrong = OWNER_PIN.split('').reverse().join('');
+  for (const digit of wrong) await dialog.getByTestId(`pinpad-key-${digit}`).click();
+
+  await expect(dialog.getByTestId('pin-door-error')).toHaveText(
+    /^(Those details do not approve this\. Check the name and the PIN, and try again\.|Esos datos no aprueban esto\. Revisa el nombre y el PIN, y vuelve a intentarlo\.)$/,
+  );
+  expect(await page.evaluate(() => (window as { approvalE2ePage?: string }).approvalE2ePage), 'the page was reloaded').toBe('same');
+  await expect(page.locator('ion-modal[data-testid=sale-void]')).toBeVisible();
+  expect(spentVoids()).toBe(spentBefore);
+  expect((await api<{ status: string }>(owner.context, A, 'GET', `/sale/sales/detail?sale_id=${sale.id}`)).data.status).not.toBe('voided');
+
   await dialog.getByTestId('approval-cancel').click();
   await expect(dialog).toBeHidden();
   const modal = page.locator('ion-modal[data-testid=sale-void]');
