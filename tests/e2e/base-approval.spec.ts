@@ -238,7 +238,7 @@ test('BASE-F84: a wrong PIN says those details do not approve it, in the dialog,
   const wrong = OWNER_PIN.split('').reverse().join('');
   for (const digit of wrong) await dialog.getByTestId(`pinpad-key-${digit}`).click();
 
-  await expect(dialog.getByTestId('pin-door-error')).toHaveText(
+  await expect(dialog.getByTestId('pinpad-error')).toHaveText(
     /^(Those details do not approve this\. Check the name and the PIN, and try again\.|Esos datos no aprueban esto\. Revisa el nombre y el PIN, y vuelve a intentarlo\.)$/,
   );
   expect(await page.evaluate(() => (window as { approvalE2ePage?: string }).approvalE2ePage), 'the page was reloaded').toBe('same');
