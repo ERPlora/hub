@@ -25,8 +25,8 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``) but the 8 S2 moves first.
 (f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
     import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
-    it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo but the submodules of
-    ``packages/``.
+    it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo, and the helpers of its
+    ``tests`` folders, but the submodules of ``packages/``.
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -569,15 +569,17 @@ def clock_at_import(source: str) -> list[tuple[int, str]]:
 
 
 def suite_files(root: Path) -> list[PurePosixPath]:
-    """Every ``test_*.py`` and ``conftest.py`` under ``root`` (relative to it), outside ``SUITE_SKIPS`` and hidden
-    folders."""
+    """Every ``test_*.py`` and ``conftest.py`` under ``root`` (relative to it), and every ``.py`` of a ``tests`` folder
+    (``factories.py``, ``fake_gateway.py``: the tests import them, so they run at the collection too), outside
+    ``SUITE_SKIPS`` and hidden folders."""
     files = []
     for folder, folders, names in root.walk():
         folders[:] = [name for name in folders if name not in SUITE_SKIPS and not name.startswith(".")]
+        in_tests = "tests" in folder.relative_to(root).parts
         files += [
             PurePosixPath((folder / name).relative_to(root).as_posix())
             for name in names
-            if name == "conftest.py" or (name.startswith("test_") and name.endswith(".py"))
+            if name.endswith(".py") and (in_tests or name == "conftest.py" or name.startswith("test_"))
         ]
     return sorted(files)
 
@@ -1097,12 +1099,15 @@ def test_the_suite_walk_reads_every_test_module_and_conftest_but_the_submodules(
 
     files = suite_files(tmp_path)
 
+    # A helper of a tests folder (``factories.py``) is imported with the tests that import it, at the collection.
     assert files == [
         PurePosixPath("apps/demo/tests/conftest.py"),
+        PurePosixPath("apps/demo/tests/factories.py"),
         PurePosixPath("apps/demo/tests/test_report.py"),
         PurePosixPath("conftest.py"),
     ]
     assert _offenders(lambda path: clock_at_import((tmp_path / path).read_text()), files) == [
+        "apps/demo/tests/factories.py:1 localdate()",
         "apps/demo/tests/test_report.py:1 localdate()",
         "conftest.py:2 now()",
     ]
@@ -1113,11 +1118,12 @@ def test_the_suite_walk_reads_every_test_module_and_conftest_but_the_submodules(
 
 def test_no_test_reads_the_clock_at_import():
     files = suite_files(HUB_DIR)
-    # A walk gone blind would let the check pass: it reaches the root conftest, a module's tests and this very file,
-    # and never a submodule.
+    # A walk gone blind would let the check pass: it reaches the root conftest, a module's tests, a helper of a tests
+    # folder and this very file, and never a submodule.
     assert {
         PurePosixPath("conftest.py"),
         PurePosixPath("apps/sale/tests/conftest.py"),
+        PurePosixPath("base/tests/fake_gateway.py"),
         PurePosixPath("tests/test_guardrails.py"),
     } <= set(files)
     assert not [path for path in files if path.parts[0] == "packages"]
