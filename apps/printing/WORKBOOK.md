@@ -725,7 +725,10 @@ unidades de la moneda (12.50), con `decimals` si no son 2, y las fechas, ya escr
 
 Si el documento no trae `locale`, Impresión pone el idioma de quien lo pide; si no trae `decimals`
 (salvo en `generic`, que imprime todas sus claves), los de la moneda (`currency`, ISO 4217; sin ella,
-EUR). Un valor que no es JSON (un `Decimal`, una fecha) es 422, nunca un error del servidor.
+la del negocio, la de su país que lee `base.business.get`, y en el hub de ERPlora la del país emisor;
+nunca un euro fijo): un tique en yenes sale sin decimales y uno en dinares tunecinos, con tres. Los
+decimales los pone el servidor (CLDR), nunca el navegador (`tests/test_business_currency.py`, hub#2129).
+Un valor que no es JSON (un `Decimal`, una fecha) es 422, nunca un error del servidor.
 
 Campos del documento que lee la impresora (los demás se ignoran):
 
