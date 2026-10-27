@@ -9,6 +9,7 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from live.operations import registry
 
 from apps.printing import documents, models, queries, schemas, services
 
@@ -51,7 +52,8 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows: menu, store, admin, choices and messages."""
+    """The English source of every lazy text the app shows: menu, store, admin, choices, messages and the titles
+    of its schemas."""
     config = apps.get_app_config("printing")
     lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
     for module in (queries, services, schemas, models, documents):
@@ -77,7 +79,20 @@ def visible_texts() -> set[str]:
     with translation.override("en"):
         texts = {str(text) for text in lazies}
     texts |= set(re.findall(r'{% translate "([^"]+)" %}', TEMPLATE.read_text()))
-    return texts
+    return texts | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles printing's operations give their input data (``gettext_noop``): the assistant's card names each
+    datum by them, so each one needs its Spanish. Only the ones printing wrote: pydantic leaves ``title`` empty
+    otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "printing"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():

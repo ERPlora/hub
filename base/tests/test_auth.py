@@ -244,7 +244,7 @@ class TestInternalUrl:
         settings.SAAS_URL, settings.SAAS_INTERNAL_URL = PUBLIC, f"{INTERNAL}/"
         assert auth.login_url("a", "/demo/items", state="s1") == f"{PUBLIC}/hub-login/?hub=a&next=/demo/items&state=s1"
         assert auth.admin_hubs_url("invalid_code") == f"{PUBLIC}/admin/accounts/hubs/?error=invalid_code"
-        assert auth.saas_url("/accounts/logout/") == f"{PUBLIC}/accounts/logout/"
+        assert auth.saas_url("/logout") == f"{PUBLIC}/logout"
 
 
 class _SaasHandler(BaseHTTPRequestHandler):
