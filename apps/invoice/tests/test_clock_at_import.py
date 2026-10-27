@@ -11,7 +11,7 @@ default values. The body of a function or of a lambda runs with the test, so it 
 import ast
 from pathlib import Path
 
-CLOCK_CALLS = frozenset({"localdate", "now", "today", "utcnow"})
+CLOCK_CALLS = frozenset({"localdate", "localtime", "now", "today", "utcnow"})
 TESTS_DIR = Path(__file__).resolve().parent
 
 
@@ -57,8 +57,9 @@ def test_the_scanner_sees_the_clock_read_at_import():
         "def test_a(day): ...\n"
         "async def test_b(at=dt.datetime.utcnow()): ...\n"
         "ASK = {'content': f'FACT-{timezone.localdate().year}'}\n"
+        "OPENING = timezone.localtime().replace(hour=9)\n"
     )
-    assert clock_at_import(source) == [1, 2, 4, 5, 7, 8]
+    assert clock_at_import(source) == [1, 2, 4, 5, 7, 8, 9]
 
 
 def test_the_scanner_lets_a_test_read_the_clock_when_it_runs():
