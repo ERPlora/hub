@@ -5,7 +5,7 @@
 // newest first in a server-side DataTable — Session, Opened on, Status, Opening, Expected (live while open,
 // empty when a blind count hides it from this person), Counted, Difference with its sign — with search by
 // number, the filters behind the table's funnel (Session, Status and the four amounts on their columns,
-// the amounts typed in euros), table or cards and 50 a page. «Detail» on every row (the row opens it too) and, on
+// the amounts typed in the business's money), table or cards and 50 a page. «Detail» on every row (the row opens it too) and, on
 // the open session, «Movement», «Count» and «Close», each by its permission; a closing count opens the
 // close. The cash charged with no session open is said, with its list. Above the table, the drawer's figures
 // (CASH_REGISTER-F12: the open session's expected cash and the recent discrepancies). Every action comes back
@@ -86,7 +86,7 @@ const unassignedCash = computed(() => current.data.value?.unassigned_cash ?? 0);
 
 // ── Columns ──────────────────────────────────────────────────────────────────────────────────────
 const money = (cents: number | null): string => formatMoney(cents, locale.value, business.value);
-/** An amount column's filter: from–to, typed in euros (`AMOUNT_RANGES`). */
+/** An amount column's filter: from–to, typed in the business's money (`AMOUNT_RANGES`). */
 const amountFilter = (range: keyof typeof AMOUNT_RANGES) => ({ type: 'range' as const, amount: true, keys: AMOUNT_RANGES[range] });
 
 const columns = computed<DataTableColumn<SessionRow>[]>(() => [

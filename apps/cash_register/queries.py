@@ -20,7 +20,7 @@ from django.db.models import Exists, F, OuterRef, Q, Sum
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
+from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError
 from live.operations import UnknownOperation, operation
 from live.operations import get as operation_named
@@ -45,6 +45,7 @@ from apps.cash_register.schemas import (
     SettingsOut,
 )
 from apps.sale.models import RefundPayment, Sale, SalePayment
+from apps.sale.queries import business_currency
 
 VIEW_EXPECTED = "cash_register.view_expected_totals"
 CASH = "cash"
@@ -158,15 +159,9 @@ def actor(ctx: OperationContext) -> str:
 # ── Money ────────────────────────────────────────────────────────────────────────────────────────
 
 
-#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
-BUSINESS = "base.business.get"
-
-
-def business_currency(ctx: OperationContext) -> str:
-    """The currency of ``ctx``'s business (ISO 4217), as ``base.business.get`` reads it. Read as the platform: an API
-    key holds only the permission of the operation it opened, and every person of the hub may see it anyway."""
-    business = operation_named(BUSINESS)
-    return business(system_context(ctx.scope), business.input()).currency
+# The business's currency (``business_currency``) is Sales' own, imported above: the one each sale charged now keeps
+# (its country's, from ``base.business.get``; on ERPlora's own hub, its issuer's country's), so the drawer always adds
+# up and paints its sales in their currency.
 
 
 def currency_decimals(currency: str) -> int:

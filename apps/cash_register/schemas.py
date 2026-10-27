@@ -17,7 +17,8 @@ from pydantic import ConfigDict, StringConstraints, model_validator
 
 T = TypeVar("T")
 
-#: Ninety-nine billion euros in cents: far above any drawer, inside a bigint.
+#: Just under ten trillion minor units of the business's currency (ninety-nine billion with two decimals): far above
+#: any drawer, inside a bigint.
 MAX_CENTS = 9_999_999_999_999
 #: Pieces of one note or coin in a count: more than any drawer holds.
 MAX_PIECES = 100_000
