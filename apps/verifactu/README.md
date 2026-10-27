@@ -37,7 +37,7 @@ registro nuevo. Solo para negocios de España (Canarias, Ceuta y Melilla incluid
 
 | Qué | Valor |
 |---|---|
-| `LiveAppConfig` | `kind = "app"`, icono `lucide:shield-check` (`ion:shield-checkmark-outline` ya está registrado en `@erplora/ui`: ver `UI-REQUESTS.md`), categoría `sales`, gratuita (`premium = False`) |
+| `LiveAppConfig` | `kind = "app"`, icono `ion:shield-checkmark-outline` (el escudo del módulo actual; también en Recuperación, el paso y el panel «Pendientes VeriFactu» del Inicio), categoría `sales`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` |
 | `requires` | `["invoice"]`: sin facturas no hay nada que registrar; Facturación no se apaga mientras VeriFactu esté encendida |
 | Usa de otras apps | la factura emitida de Facturación (su fila, por id) y su `invoice.invoice.create` para la factura de prueba; el país del negocio (`base.business.get`) y si es una demo (`base.operations.is_demo_hub`), de `base`; el estado del otorgamiento y de la cuenta llega en la foto del SaaS (`verifactu.config.sync`) |
