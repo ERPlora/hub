@@ -1363,7 +1363,9 @@ Pasos:
   1. La persona no hace nada: cuando la pantalla tiene un error que nadie recogió (también al pintar una parte de la
      pantalla o en una espera que falló sin tratar), se apunta solo.
   2. Se envía al hub sin ventana, sin captura y sin preguntar, aunque la pestaña se esté cerrando.
-  3. Un error idéntico no se vuelve a enviar en 30 segundos, y se recuerdan como mucho 50 distintos.
+  3. Un error idéntico no se vuelve a enviar en 30 segundos, y se recuerdan como mucho 50 distintos. Un aviso del
+     propio navegador que no es un error de la pantalla, el de que dejó parte del dibujo para el momento siguiente, no
+     se envía: no rompe nada y ninguna app lo puede arreglar.
   4. El hub lo deja en su registro de errores con el negocio, la persona y la pantalla donde pasó.
 Entra: el mensaje del error, su traza y la pantalla, solo con sesión.
 Sale: una línea en el registro de errores del hub; en el navegador no se guarda nada.
@@ -2809,7 +2811,11 @@ Implicados: ACCOUNTS-F38
   `base/tests/test_services_system.py`, `test_relay.py`, `test_live.py`.
 - Informe de errores de la pantalla: `base/frontend/lib/error-report.ts` (`error`, `unhandledrejection` y
   `app.config.errorHandler`; `navigator.sendBeacon`, el mismo error una vez cada 30 s, 50 recordados), instalado en
-  `frontend/main.ts`. `POST /api/error-report` (`base/error_report.py`, fuera de ninja: un beacon no lleva CSRF) exige
+  `frontend/main.ts`. No envía los avisos del navegador de `BROWSER_NOTICES` («ResizeObserver loop completed with
+  undelivered notifications.» y la forma vieja «ResizeObserver loop limit exceeded»): solo un `error` de `window` sin
+  `Error` detrás (traza vacía) con el mensaje entero, como `ignoreErrors` de Sentry o las reglas de TrackJS; otro mensaje
+  que nombre ResizeObserver, o las mismas palabras lanzadas por la app, sí se envían (`error-report.test.ts`, «the
+  browser notices that are no error»). `POST /api/error-report` (`base/error_report.py`, fuera de ninja: un beacon no lleva CSRF) exige
   sesión, 30 por minuto y persona (`base.rate_limited`), cuerpo ≤ 16 KB y JSON, y escribe una línea `frontend.error
   {json}` en ERROR del logger `base.error_report` (host, usuario, pantalla, mensaje y traza recortados); el logging
   va a la consola y de ahí a CloudWatch (`config/settings.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,

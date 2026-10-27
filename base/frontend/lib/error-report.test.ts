@@ -98,6 +98,51 @@ describe('createErrorReporter', () => {
   });
 });
 
+// BASE-F47: the browser's own «ResizeObserver loop» notice is no error of the screen: the browser says it held some size
+// notifications for the next frame, nothing broke and no app can fix it. Every error reporter drops it on the client
+// (Sentry's `ignoreErrors`, TrackJS's ignore rules…), by its whole message; anything else that names ResizeObserver,
+// or the same words thrown by the app itself, is a real error and still goes.
+describe('createErrorReporter: the browser notices that are no error', () => {
+  const notice = (message: string) => ({ kind: 'error' as const, message, stack: '', component: '' });
+
+  it('drops the browser\'s «ResizeObserver loop» notice, in its current and its old words', () => {
+    const d = deps();
+    const reporter = createErrorReporter(d);
+
+    expect(reporter.report(notice('ResizeObserver loop completed with undelivered notifications.'))).toBe(false);
+    expect(reporter.report(notice('ResizeObserver loop limit exceeded'))).toBe(false);
+
+    expect(d.sent).toEqual([]);
+  });
+
+  it('still sends an error that only mentions ResizeObserver, or carries the notice inside other words', () => {
+    const d = deps();
+    const reporter = createErrorReporter(d);
+
+    reporter.report(notice('Uncaught ReferenceError: ResizeObserver is not defined'));
+    reporter.report(notice('ResizeObserver loop completed with undelivered notifications. Chart failed to draw'));
+    reporter.report(notice('resizeobserver loop limit exceeded'));
+
+    expect(d.sent.map((sent) => sent.body.message)).toEqual([
+      'Uncaught ReferenceError: ResizeObserver is not defined',
+      'ResizeObserver loop completed with undelivered notifications. Chart failed to draw',
+      'resizeobserver loop limit exceeded',
+    ]);
+  });
+
+  it('still sends the same words when the app threw them (an Error with its stack) or a promise rejected with them', () => {
+    const d = deps();
+    const reporter = createErrorReporter(d);
+    const message = 'ResizeObserver loop limit exceeded';
+
+    reporter.report({ kind: 'error', message, stack: 'Error: ResizeObserver loop limit exceeded\n    at Chart', component: '' });
+    reporter.report({ kind: 'unhandledrejection', message, stack: '', component: '' });
+    reporter.report({ kind: 'vue', message, stack: '', component: 'Agenda' });
+
+    expect(d.sent.map((sent) => sent.body.kind)).toEqual(['error', 'unhandledrejection', 'vue']);
+  });
+});
+
 describe('installErrorReport', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -121,6 +166,16 @@ describe('installErrorReport', () => {
     expect(d.sent.map((s) => [s.body.kind, s.body.message, s.body.stack])).toEqual([
       ['error', 'Uncaught TypeError: x is undefined', error.stack],
     ]);
+  });
+
+  it('does not report the browser\'s «ResizeObserver loop» notice (a window error with no Error behind it)', () => {
+    const { d, target } = setup();
+
+    target.dispatchEvent(
+      Object.assign(new Event('error'), { message: 'ResizeObserver loop completed with undelivered notifications.', error: null }),
+    );
+
+    expect(d.sent).toEqual([]);
   });
 
   it('reports a promise rejected without a handler, an Error or anything else', () => {

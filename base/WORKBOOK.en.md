@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5d3a651de9db15e45bd59d213c0bc364d123324288e18554cae20d45f5d2c342 -->
+<!-- generated from WORKBOOK.md sha256:429bb5f6d1adc825930a95e185a52bdce77783fa6646af117ac4b7c2c562b5d0 -->
 
 ## What it is for and who it is for
 
@@ -1308,7 +1308,9 @@ Steps:
   1. The person does nothing: when the screen has an error nobody caught (also while drawing a part of the
      screen, or in a wait that failed untreated), it is noted by itself.
   2. It is sent to the hub with no window, no capture and no question, even while the tab is closing.
-  3. An identical error is not sent again within 30 seconds, and at most 50 different ones are remembered.
+  3. An identical error is not sent again within 30 seconds, and at most 50 different ones are remembered. A notice
+     from the browser itself that is no error of the screen, the one saying it left part of the drawing for the next
+     moment, is not sent: it breaks nothing and no app can fix it.
   4. The hub leaves it in its error log with the business, the person and the screen where it happened.
 In: the error's message, its trace and the screen, only with a session.
 Out: one line in the hub's error log; nothing is kept in the browser.
