@@ -300,7 +300,7 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(18);
   });
 
-  it('binds the twenty-one routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
+  it('binds the twenty-two routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'invoice.invoice.list': { method: 'get', path: '/api/invoice/invoices' },
       'invoice.invoice.get': { method: 'get', path: '/api/invoice/invoices/detail' },
@@ -312,6 +312,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.invoice.create_from_sale': { method: 'post', path: '/api/invoice/invoices/from_sale' },
       'invoice.invoice.substitute': { method: 'post', path: '/api/invoice/invoices/substitute' },
       'invoice.invoice.mark_paid': { method: 'post', path: '/api/invoice/invoices/mark_paid' },
+      'invoice.invoice.rectification_preview': { method: 'get', path: '/api/invoice/invoices/rectification_preview' },
       'invoice.invoice.rectify': { method: 'post', path: '/api/invoice/invoices/rectify' },
       'invoice.invoice.rectify_from_refund': { method: 'post', path: '/api/invoice/invoices/rectify_from_refund' },
       'invoice.invoice.rectify_from_void': { method: 'post', path: '/api/invoice/invoices/rectify_from_void' },
@@ -325,7 +326,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.issuer.get': { method: 'get', path: '/api/invoice/issuer' },
       'invoice.issuer.update': { method: 'post', path: '/api/invoice/issuer' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(22);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(23);
   });
 
   it('names every operation <app>.<entity>.<action> and keeps every route under /api/', () => {

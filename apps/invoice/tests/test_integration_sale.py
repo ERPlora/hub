@@ -321,6 +321,47 @@ def test_a_partial_refund_rectifies_by_differences_and_two_add_up_to_the_cent(
         )
 
 
+def test_after_a_partial_refund_the_preview_rectifies_what_is_left_of_the_ticket_as_r5(
+    issuer, shelf, charge
+):
+    # INVOICE-F08 asked to the assistant: its preview, on a ticket a partial refund already rectified by differences.
+    sale = charge("inv-0031", [{"product": "SHA"}, {"product": "MNU"}])
+    ticket = deliver("sale.sale.completed").invoice
+    refund(sale, 1000, reason="Late")
+    left = ticket.total_amount - 1000
+    seen = run(
+        "invoice.invoice.rectification_preview",
+        {"number": ticket.number, "reason": "Wrong price", "rectification_type": "R1"},
+    )
+    assert (seen.invoice_type, seen.whole, seen.next_number) == (
+        "R5",
+        False,
+        f"RECT-{TODAY.year}-000002",
+    )
+    assert (seen.original.total_amount, seen.original.remaining, seen.total_amount) == (
+        ticket.total_amount,
+        left,
+        -left,
+    )
+    # What is left, one line per key at its own rate, named by the reason.
+    assert {line.tax_rate for line in seen.lines} == {Decimal("21.00"), Decimal("10.00")}
+    assert {(line.description, line.quantity) for line in seen.lines} == {("Wrong price", Decimal("-1"))}
+    assert sum(line.total_amount for line in seen.lines) == -left
+    rect = run(
+        "invoice.invoice.rectify", {"number": ticket.number, "reason": "Wrong price"}
+    ).invoice
+    assert (rect.number, rect.invoice_type, rect.base_amount, rect.tax_amount, rect.total_amount) == (
+        seen.next_number,
+        "R5",
+        seen.base_amount,
+        seen.tax_amount,
+        seen.total_amount,
+    )
+    assert sorted((line.tax_rate, line.base_amount, line.total_amount) for line in rect.lines) == sorted(
+        (line.tax_rate, line.base_amount, line.total_amount) for line in seen.lines
+    )
+
+
 def test_a_refund_of_returned_articles_rectifies_only_their_keys(issuer, shelf, charge):
     # 12.10 at 21 % and 11.00 at 10 %: the shampoo comes back, so only the 21 % is rectified.
     sale = charge("inv-0021", [{"product": "SHA"}, {"product": "MNU"}])

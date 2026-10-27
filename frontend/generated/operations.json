@@ -1195,6 +1195,10 @@
     "method": "post",
     "path": "/api/invoice/invoices/mark_paid"
   },
+  "invoice.invoice.rectification_preview": {
+    "method": "get",
+    "path": "/api/invoice/invoices/rectification_preview"
+  },
   "invoice.invoice.rectify": {
     "method": "post",
     "path": "/api/invoice/invoices/rectify"

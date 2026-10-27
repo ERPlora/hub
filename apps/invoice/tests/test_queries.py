@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 from django.utils import timezone
-from live.errors import NotFound, PermissionDenied
+from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import ctx_for, run
@@ -315,6 +315,121 @@ def test_the_next_number_previewed_is_the_one_the_emission_writes(issuer):
     assert (again.next_number, again.format_locked) == (f"VFT{TODAY.year}-A-0002", True)
     # Peeking spends nothing.
     assert InvoiceSeries.objects.get(pk=series.id).current_number == 1
+
+
+# The preview of a rectification (INVOICE-F08: what the assistant says before the card of a rectification)
+
+
+def preview(ctx=None, **data):
+    return run("invoice.invoice.rectification_preview", data, ctx)
+
+
+def test_the_preview_is_the_rectifying_invoice_that_would_be_born_and_takes_no_number(
+    issuer,
+):
+    original = manual(
+        lines=[
+            {"description": "Course", "quantity": "2", "unit_price": 5000, "tax_rate": "21"},
+            {"description": "Book", "quantity": "1", "unit_price": 2000, "tax_rate": "4"},
+        ]
+    )
+    seen = preview(number=original.number, reason="The price was wrong")
+    told = seen.original
+    assert (told.invoice_id, told.number, told.issue_date, told.customer_name) == (
+        original.id,
+        original.number,
+        TODAY,
+        "Talleres Pérez SL",
+    )
+    assert (told.total_amount, told.remaining) == (14180, 14180)
+    assert (
+        seen.invoice_type,
+        seen.reason,
+        seen.series_code,
+        seen.next_number,
+        seen.issue_date,
+        seen.whole,
+    ) == ("R1", "The price was wrong", "RECT", f"RECT-{TODAY.year}-000001", TODAY, True)
+    assert (seen.base_amount, seen.tax_amount, seen.total_amount, seen.currency) == (
+        -12000,
+        -2180,
+        -14180,
+        "EUR",
+    )
+    assert [
+        (line.description, line.quantity, line.tax_rate, line.base_amount, line.total_amount)
+        for line in seen.lines
+    ] == [
+        ("Course", Decimal("-2.000"), Decimal("21.00"), -10000, -12100),
+        ("Book", Decimal("-1.000"), Decimal("4.00"), -2000, -2080),
+    ]
+    # Numbering is never optimistic: reading it creates no series, spends no number and leaves the original as it was.
+    assert not InvoiceSeries.objects.filter(code="RECT").exists()
+    assert Invoice.objects.get(pk=original.id).status == "issued"
+    # What it said is what rectifying that invoice writes.
+    rect = run(
+        "invoice.invoice.rectify", {"number": told.number, "reason": seen.reason}
+    ).invoice
+    assert (rect.number, rect.invoice_type, rect.base_amount, rect.tax_amount, rect.total_amount) == (
+        seen.next_number,
+        "R1",
+        -12000,
+        -2180,
+        -14180,
+    )
+    assert [(line.description, line.quantity, line.total_amount) for line in rect.lines] == [
+        (line.description, line.quantity, line.total_amount) for line in seen.lines
+    ]
+
+
+def test_the_number_previewed_is_the_next_of_the_series_the_rectification_will_take(
+    issuer,
+):
+    # Last year's rectifying series has its own format: this year's is born from it when the first one is issued.
+    run(
+        "invoice.series.create",
+        {"code": "RECT", "invoice_type": "R1", "year": TODAY.year - 1, "format": "R{year}-{seq:04d}"},
+    )
+    first, second = manual(), manual()
+    seen = preview(number=first.number, reason="x")
+    assert seen.next_number == f"R{TODAY.year}-0001"
+    assert not InvoiceSeries.objects.filter(code="RECT", year=TODAY.year).exists()
+    assert run("invoice.invoice.rectify", {"number": first.number, "reason": "x"}).invoice.number == seen.next_number
+    # Read twice, it says the same next number and spends none.
+    again = [preview(number=second.number, reason="y").next_number for _ in range(2)]
+    assert again == [f"R{TODAY.year}-0002"] * 2
+    assert InvoiceSeries.objects.get(code="RECT", year=TODAY.year).current_number == 1
+
+
+def test_the_preview_says_the_type_chosen_and_a_ticket_is_always_r5(issuer):
+    assert preview(number=manual().number, reason="x").invoice_type == "R1"
+    assert preview(number=manual().number, reason="x", rectification_type="R4").invoice_type == "R4"
+    assert preview(number=ticket().number, reason="x", rectification_type="R2").invoice_type == "R5"
+
+
+def test_what_cannot_be_rectified_the_preview_says_why_and_spends_nothing(issuer):
+    original = manual()
+    rect = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
+    simplified = ticket()
+    run("invoice.invoice.substitute", {"number": simplified.number, **RECIPIENT})
+    for number, code in (
+        (rect.number, "invoice.cannot_rectify_rectification"),
+        (original.number, "invoice.already_cancelled"),
+        (simplified.number, "invoice.substituted"),
+    ):
+        with pytest.raises(Conflict) as refused:
+            preview(number=number, reason="again")
+        assert refused.value.code == code
+    with pytest.raises(NotFound):
+        preview(number="NOPE-1", reason="x")
+    assert InvoiceSeries.objects.get(code="RECT", year=TODAY.year).current_number == 1
+
+
+def test_only_who_may_rectify_reads_the_preview(issuer):
+    number = manual().number
+    with pytest.raises(PermissionDenied):
+        preview(ctx_for("hub_employee"), number=number, reason="x")
+    assert preview(ctx_for("hub_manager"), number=number, reason="x").original.number == number
 
 
 # The numbering (INVOICE-F14, F15)
