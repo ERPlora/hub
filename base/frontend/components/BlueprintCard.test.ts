@@ -107,6 +107,13 @@ describe('BlueprintCard', () => {
     expect(m.router.currentRoute.value.fullPath).toBe('/settings#data');
   });
 
+  it('promises to turn the template\'s apps on, never that they are on already (round 2026-10-27)', async () => {
+    const m = await card(() => Response.json(load()));
+    expect(m.wrapper.get('[data-testid="blueprint-card"]').text()).toContain(
+      'Choose the one most like yours: we turn on its apps and load its catalogue in one go.',
+    );
+  });
+
   it('a template that could not be opened says nothing changed, why, and tries again', async () => {
     const m = await card(() => Response.json({ error: { code: 'base.blueprint_source', message: 'It is not in the catalogue.' } }, { status: 422 }));
     await m.wrapper.get('[data-testid="blueprint-card-use-hair_salon.es"]').trigger('click');

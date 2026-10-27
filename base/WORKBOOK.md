@@ -991,21 +991,26 @@ Pasos:
   1. Tras elegir una plantilla o un fichero sale «Revisa lo que trae»: «Nombre», «Tipo» («Plantilla» o
      «Copia de seguridad»), «Idioma» y «País» por su nombre, cuántas «Apps» y, si es un fichero, cuándo se
      hizo («Creado»).
-  2. Debajo, una casilla por app con lo que trae (cada parte y sus filas). Vienen marcadas las que están encendidas
-     en el negocio; una app apagada dice «Esta app está apagada en tu negocio: no se cargará nada suyo.» y una
-     que este negocio no tiene, «Este negocio no tiene esta app: no se cargará nada suyo.». Los clientes de
+  2. Debajo, una casilla por app con lo que trae (cada parte y sus filas). Vienen marcadas las que están activadas
+     en el negocio y las que la carga activa: una app de la plantilla o del fichero que está desactivada dice
+     «Está desactivada en tu negocio: se activará al cargarla.». Una app que solo nombran sus datos, o que el
+     plan no incluye, dice «Esta app está desactivada en tu negocio: no se cargará nada suyo.» y una que este
+     negocio no tiene, «Este negocio no tiene esta app: no se cargará nada suyo.». Los clientes de
      una plantilla se quedan fuera: «Datos personales: solo se cargan desde una copia de seguridad.». Lo que
      el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí».
   3. Desmarca las apps que no quiera y pulsa «Importar» («Importando…»), o «Elegir otro» para volver.
   4. Al terminar sale el informe (BASE-F32). Lo que ya había en el negocio se queda como estaba: no se
      duplica ni se sobrescribe.
 Entra: la plantilla o el fichero y las apps marcadas.
-Sale: en cada app marcada, lo que trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus
-categorías, productos, servicios, zonas, mesas y, desde una copia de seguridad, clientes), y el informe
-guardado (`base.blueprint.imported`).
+Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar, con las que necesitan y dentro
+del tope de apps del plan, como si se activaran en Apps (`base.app.enabled`); en cada app marcada, lo que
+trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus categorías, productos, servicios,
+zonas, mesas y, desde una copia de seguridad, clientes), y el informe guardado (`base.blueprint.imported`).
 Si falla: «La importación falló: {reason}» y se queda en la revisión; sin ninguna app marcada, «Elige al
-menos una app.» y no se puede importar; si ninguna de sus apps está encendida, «Nada de este fichero puede
-cargarse en tu negocio: ninguna de sus apps está encendida.».
+menos una app.» y no se puede importar; si ninguna de sus apps se puede activar aquí, «Nada de este fichero
+puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una app que no se pudo activar (el
+tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
+por qué; el resto se carga.
 Implicados: INVENTORY-F12
 
 ### BASE-F32 Leer el informe de la importación
@@ -1146,12 +1151,14 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Inicio · Resumen
 Pasos:
-  1. Mientras el negocio no tiene nada de lo que trae una plantilla, quien lo administra ve arriba «Empieza
-     con un negocio como el tuyo» («Elige el que más se parezca al tuyo y te dejamos tus apps listas con su
-     catálogo de una vez. Después tendrás que poner tus propios datos.»): hasta cuatro plantillas, una por
+  1. Mientras el negocio no tiene nada de lo que trae una plantilla (un negocio nace con todas las apps
+     desactivadas), quien lo administra ve arriba «Empieza con un negocio como el tuyo» («Elige el que más se
+     parezca al tuyo: activamos sus apps y cargamos su catálogo de una vez. Después tendrás que poner tus
+     propios datos.»): hasta cuatro plantillas, una por
      tipo de negocio y en su idioma si la hay (primero las de su país), con su descripción y «Usar esta»; «Ver todas las plantillas» abre «Datos y
      copias» y «Ahora no» cierra la tarjeta en este dispositivo.
-  2. Pulsa «Usar esta»: «Preparando «{name}»…» mientras se carga, sin pantallas intermedias.
+  2. Pulsa «Usar esta»: «Preparando «{name}»…» mientras se activan sus apps y se carga, sin pantallas
+     intermedias.
   3. En la misma tarjeta, «Ya tienes tus apps y tu catálogo» («Lo que queda es lo que solo puedes contestar
      tú: los datos de tu negocio. Los tienes en la lista de abajo.») con «Continuar», que la cierra.
   4. Sin recargar, el Inicio se pone al día: «Termina de configurar tu negocio» cuenta como hechos los pasos

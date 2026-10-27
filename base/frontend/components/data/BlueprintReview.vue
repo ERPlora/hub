@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // «Review what it brings» (BASE-G105; the old hub's ImportPanel review): what a template or a file is — name, type,
 // language and country by name, how many apps, when a file was made —, one box per app with what it brings, ticked
-// when the app is on here; an app off or that this hub does not have, and personal data in a template, say they stay
+// when the app is on here or the load turns it on (`turns_on`: an app the blueprint lists that is off, round
+// 2026-10-27, says so); an app left off or that this hub does not have, and personal data in a template, say they stay
 // out. What this hub never loads (people, fiscal data…) is listed. «Import» emits the apps ticked, in the file's order;
 // the page imports them and passes back `pending` and the reason it failed.
 import { InlineFeedback } from '@erplora/ui/components';
@@ -20,7 +21,10 @@ const emit = defineEmits<{ import: [apps: string[]]; back: [] }>();
 
 const { t, locale } = useBaseI18n();
 
-const onHere = computed(() => props.summary.apps.filter((app) => app.status === 'on').map((app) => app.id));
+/** The statuses of an app that loads: on here, or turned on by the load first. */
+const LOADS = new Set(['on', 'turns_on']);
+const loads = (status: string): boolean => LOADS.has(status);
+const onHere = computed(() => props.summary.apps.filter((app) => loads(app.status)).map((app) => app.id));
 const ticked = ref(new Set<string>());
 watch(onHere, (ids) => (ticked.value = new Set(ids)), { immediate: true });
 
@@ -52,6 +56,7 @@ const created = computed(() => {
 });
 
 function appNote(status: string): string {
+  if (status === 'turns_on') return t('base.data.review.appTurnsOn');
   if (status === 'inactive') return t('base.data.review.appOff');
   if (status === 'unknown') return t('base.data.review.appUnknown');
   return '';
@@ -108,8 +113,8 @@ function appNote(status: string): string {
         :data-id="app.id"
       >
         <ion-checkbox
-          :checked="app.status === 'on' && ticked.has(app.id)"
-          :disabled="app.status !== 'on' || pending"
+          :checked="loads(app.status) && ticked.has(app.id)"
+          :disabled="!loads(app.status) || pending"
           label-placement="end"
           justify="start"
           @ion-change="tick(app.id, $event.detail.checked)"

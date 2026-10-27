@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // «Import report» (BASE-G106; the old hub's ImportPanel report) and the last import that did not go in whole
 // (BASE-G107, `unfinished`): how it went, app by app and part by part, in words and tone — a status this screen does
-// not know is «Failed» with its own text, never a success —, what went wrong, what was left out on purpose, and
+// not know is «Failed» with its own text, never a success —, what went wrong (an app of the blueprint the load could
+// not turn on says why: the plan's limit, no right to it), what was left out on purpose, and
 // «Retry what is missing» when the server says it can; when it cannot because the file came by hand or the template's
 // version is gone, the button stays off with why. «See the templates» and «Go to Home» leave the report.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
@@ -85,6 +86,13 @@ function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; la
       >
         <div class="data-row-main">
           <span class="data-row-name">{{ app.label }}</span>
+          <p
+            v-if="app.reason"
+            class="data-row-detail"
+            data-testid="report-app-reason"
+          >
+            {{ app.reason }}
+          </p>
           <p
             v-if="pill(app.status).raw"
             class="data-row-detail"
