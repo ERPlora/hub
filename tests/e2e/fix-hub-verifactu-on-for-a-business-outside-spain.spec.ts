@@ -2,7 +2,8 @@
 // VeriFactu is only for businesses in Spain. erplora.com registers `a`'s business in Poland (`PUT /internal/hubs/{id}`,
 // signed the way the SaaS sends it): with VeriFactu on, an invoice is issued without a record («unavailable») and its
 // detail shows no «VeriFactu receipt»; a ticket sealed while the business was in Spain stays unsent, its invoice shows
-// no receipt either, and its record says why it does not leave; VeriFactu › Settings says why it cannot go live. In
+// no receipt either, and its record says why it does not leave (never «it goes out by itself», nothing to send);
+// VeriFactu › Settings says why it cannot go live. In
 // 390, 834 and 1440, with the captures `<KEY>-<width>` (the invoice), `<KEY>-record-<width>` and
 // `<KEY>-settings-<width>`. Back in Spain an invoice is sealed and shows its receipt (`<KEY>-es-1440`). What the run
 // creates is deleted after it and `a`'s registration put back. Nothing is sent: no local server has the gateway.
@@ -144,6 +145,9 @@ test(`${KEY}: VERIFACTU-F01 a business in Poland issues its invoices without a V
     await page.goto(`${A}/verifactu/records/${waiting}`);
     const why = shown(page).locator('[data-testid=verifactu-record-waiting]');
     await expect(why).toContainText(NOT_IN_SPAIN);
+    // It never goes out: no «it goes out by itself», and nothing to send.
+    await expect(why).not.toContainText('It goes out by itself');
+    await expect(shown(page).locator('[data-testid=verifactu-record-transmit]')).toHaveCount(0);
     await untilStill(page);
     await page.screenshot({ path: shot(`${KEY}-record-${size.name}`), fullPage: true });
 
