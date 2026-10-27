@@ -502,6 +502,22 @@ class DeviceListIn(PageIn):
     pass
 
 
+class CoverageIn(Closed):
+    usage: Usage = Field(description="The function: receipt, kitchen, bar or label.")
+
+
+class CoverageOut(Schema):
+    usage: Usage = Field(description="The function asked about.")
+    covered: bool = Field(
+        description="A device set up here (not retired) reaches an active printer of this function on receipt paper: "
+        "its papers come out, whether that device is on right now or not."
+    )
+    count: int = Field(
+        description="Its jobs waiting that no device set up here can print: their printer is reached by none, or they "
+        "wait for a printer of their function and paper that no device reaches."
+    )
+
+
 class DeviceGetIn(Closed):
     device: DeviceName = Field(description="The device's own id, as its hello says it (base's /ws/print).")
 

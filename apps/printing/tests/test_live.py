@@ -28,6 +28,8 @@ def test_every_reading_is_live():
         "printing.job.list",
         "printing.job.summary",
         "printing.device.list",
+        # The Home's «Set up your printer» and the bell's «Nothing is printing», through base's own queries.
+        "printing.device.coverage",
     }
 
 

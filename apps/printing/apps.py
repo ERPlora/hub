@@ -3,7 +3,17 @@ settings (receipt at checkout, drawer, copies, the printer of each function) and
 apps fill by name and the device next to the printer drains (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import BellCounter, Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+
+from apps.printing.events import COVERAGE_EVENTS, UNATTENDED_EVENTS
+
+#: The bell's row of each function, named as Printing names it (the old row showed its internal key, HUB_SHELL-F63).
+NOTHING_PRINTING = {
+    "receipt": _("Nothing is printing “Receipt”"),
+    "kitchen": _("Nothing is printing “Kitchen”"),
+    "bar": _("Nothing is printing “Bar”"),
+    "label": _("Nothing is printing “Label”"),
+}
 
 
 class PrintingConfig(LiveAppConfig):
@@ -43,6 +53,40 @@ class PrintingConfig(LiveAppConfig):
         "hub_manager": ["printing.view_settings", "printing.manage_settings", "printing.print"],
         "hub_employee": ["printing.view_settings", "printing.print"],
     }
+    # The Home's hooks (PLAN-HUB round 2026-10-21): the old hub's core item «Set up your printer» (setup_status.rs, order
+    # 70, recommended: without a printer the business still sells, hub#1731), done once a device set up here reaches
+    # an active receipt printer (the old «registered for the receipt station», live or not, hub#1948); and its bell row
+    # «Nothing is printing “…”» (HUB_SHELL-F63, hub#987), one per function, for everybody with Printing: whoever
+    # stands at the counter can switch the till back on. The old module had none of its own, nor panels.
+    setup = [
+        SetupStep(
+            key="printer",
+            operation="printing.device.coverage",
+            params={"usage": "receipt"},
+            configured_when=[SetupCheck(field="covered", truthy=True)],
+            title=_("Set up your printer"),
+            description=_("Register the device that prints your customers' receipts, so the first sale comes out on paper."),
+            icon="lucide:receipt",
+            route="/printing/devices",
+            permission="printing.manage_settings",
+            order=70,
+            required=False,
+            refresh_on=COVERAGE_EVENTS,
+        )
+    ]
+    bell = [
+        BellCounter(
+            key=f"stalled_{usage}",
+            operation="printing.device.coverage",
+            params={"usage": usage},
+            route="/printing/printers",
+            label=label,
+            icon="lucide:receipt",
+            permission="printing.view_settings",
+            refresh_on=UNATTENDED_EVENTS,
+        )
+        for usage, label in NOTHING_PRINTING.items()
+    ]
     # PRINTING-F20: the queue forgets the jobs that ended (printed, cancelled, failed) over 30 days ago,
     # once an hour, as the platform (cron in UTC).
     scheduled_tasks = [

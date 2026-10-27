@@ -23,6 +23,8 @@ from apps.printing.models import PrintDevice, Printer, PrintJob, Settings, Usage
 from base.business import currency_of
 from base.operations import is_platform_hub
 from apps.printing.schemas import (
+    CoverageIn,
+    CoverageOut,
     DeviceGetIn,
     DeviceGetOut,
     DeviceListIn,
@@ -526,3 +528,43 @@ def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
     if device is None or device.retired_at is not None:
         return {"device": None, "retired": device is not None}
     return {"device": device_row(device, key), "retired": False}
+
+
+@operation(
+    "printing.device.coverage",
+    kind="query",
+    permission="printing.view_settings",
+    input=CoverageIn,
+    output=CoverageOut,
+    expose_api=True,
+    ai={
+        "description": "Whether a function (receipt, kitchen, bar, label) has a device set up to print it, and how many of "
+        "its jobs wait that no device set up here can print. «Is anybody printing the kitchen orders?»"
+    },
+)
+def device_coverage(ctx: OperationContext, params: CoverageIn) -> dict:
+    """The Home's «Set up your printer» (``covered`` of the receipts) and the bell's «Nothing is printing» (``count``).
+
+    A device set up here prints the active printers it reaches: the jobs of those printers, and the jobs of a function
+    no printer took yet on the paper of one of them (``printing.job.claim``). Set up is enough, as the old hub's
+    registration for a station: a device off right now is not a step undone. Only waiting jobs count: one a device has
+    is that device's, and one that ended waits for nobody.
+    """
+    reached = Printer.objects.filter(is_active=True, devices__in=active_devices())
+    mine = reached.filter(usage=params.usage)
+    paper = {
+        PrintJob.Format.RECEIPT: mine.exclude(kind=Printer.Kind.SYSTEM).exists(),
+        PrintJob.Format.A4: mine.filter(kind=Printer.Kind.SYSTEM).exists(),
+    }
+    takeable = Q(printer__in=reached)
+    for paper_format, any_reached in paper.items():
+        if any_reached:
+            takeable |= Q(printer__isnull=True, format=paper_format)
+    jobs = PrintJob.objects.filter(PENDING, usage=params.usage).aggregate(
+        waiting=Count("id"), takeable=Count("id", filter=takeable)
+    )
+    return {
+        "usage": params.usage,
+        "covered": paper[PrintJob.Format.RECEIPT],
+        "count": jobs["waiting"] - jobs["takeable"],
+    }

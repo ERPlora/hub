@@ -50,6 +50,17 @@ DEVICE_EVENTS = [DEVICE_REGISTERED, DEVICE_UPDATED, DEVICE_RETIRED]
 #: Every change of the queue: what re-runs the screens that show it.
 JOB_EVENTS = [JOB_QUEUED, JOB_CLAIMED, JOB_PRINTED, JOB_FAILED, JOB_RETRIED, JOB_CANCELLED, JOB_PRUNED]
 
+#: What changes whether a device set up here reaches an active printer of a function (the Home's «Set up your
+#: printer»): a device set up (also by printing from it), changed or retired, and a printer switched off or on, or
+#: moved to another function or connection. Never a printer just added: no device reaches it yet.
+COVERAGE_EVENTS = [PRINTER_UPDATED, *DEVICE_EVENTS]
+#: What changes how many jobs of a function wait that no device set up here can print (the bell's «Nothing is
+#: printing»): a job queued (new, retried, back from a device that did not answer, moved off a printer), one failed
+#: back to the queue, one cancelled, and what changes who reaches their printers. Never a claim alone (it only takes
+#: what a device already reaches; setting a device up by printing records its own event), a print, a final failure
+#: of a job a device had, a retry (it records ``queued`` too) nor a prune (it forgets ended jobs only).
+UNATTENDED_EVENTS = [JOB_QUEUED, JOB_FAILED, JOB_CANCELLED, *COVERAGE_EVENTS]
+
 #: Event of another app → the operation of this app that reacts to it: none (see above).
 REACTIONS: dict[str, str] = {}
 
