@@ -655,6 +655,14 @@ export interface AssistantUsage {
   demo: boolean;
 }
 
+/** `base.SupportReportIn` («Report a problem» of the user menu, BASE-F108). */
+export interface SupportReportInput {
+  subject: string;
+  description: string;
+  /** The hub's screen the person was on. */
+  page?: string | null;
+}
+
 /** `base.AssistantReportIn`. */
 export interface AssistantReportInput {
   message_id: string;
@@ -763,5 +771,7 @@ declare module '@erplora/ui/sdk' {
       input: { audio: string; mime_type: string; language?: string };
       output: { text: string; language: string };
     };
+    // «Report a problem» of the user menu (BASE-F108): erplora.com answers the address support writes back to.
+    'base.support.report': { input: SupportReportInput; output: { reply_to: string } };
   }
 }

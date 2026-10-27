@@ -330,6 +330,9 @@ INTERNAL_SHARED_SECRET = (
 # During a rotation of the shared secret, the one a call of the SaaS may still be signed with (base.internal; the
 # SaaS's accounts/signing.py has the same steps); empty otherwise.
 INTERNAL_SHARED_SECRET_PREVIOUS = config("INTERNAL_SHARED_SECRET_PREVIOUS", default="")
+#: Where «Report a problem» tells the person to write when erplora.com could not take the report (BASE-F108): the
+#: SaaS's own support mailbox.
+SUPPORT_EMAIL = config("SUPPORT_EMAIL", default="support@erplora.com")
 # How far an internal call's X-Erplora-Timestamp may be from now (both ways), as in the SaaS.
 INTERNAL_SIGNATURE_MAX_AGE_SECONDS = 300
 # The demo hubs (plan 2026-10-17, §1.11), which the SaaS's /demo/ asks for: how many may be live at once (503

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:29e7f6c9c97b54c1d71259753792d7dca50020faf4217a15c4cfabfe687d5048 -->
+<!-- generated from WORKBOOK.md sha256:76ecdc9395ddf445839522cae2d4a6d76c05a71b3023584420042b7a05b71ff7 -->
 
 ## What it is for and who it is for
 
@@ -94,9 +94,9 @@ erplora.com, in a new tab. Only in the browser: the installed app does not have 
 ### The user menu
 It opens by tapping the person, at the top of the side menu. First "Profile" and, on a shared till of a business
 that asks for a PIN, "Switch user"; then, only if they entered with the account (never in a PIN session), "My
-account" and "Report a problem", which open those pages on erplora.com (in a new tab; in the installed app, in
-the device's browser); last "Theme" (light, dark or the system's) and "Sign out". The erplora.com ones also show
-in the installed app: neither sells anything.
+account", which opens that page on erplora.com (in a new tab; in the installed app, in the device's browser), and
+"Report a problem", which opens a form in a window without leaving the hub (BASE-F108); last "Theme" (light, dark
+or the system's) and "Sign out". Both also show in the installed app: neither sells anything.
 
 ### The "You cannot issue invoices yet" strip
 Over any screen while a step that stops invoicing is missing: "No ticket or invoice can be issued until
@@ -404,6 +404,7 @@ On the Employees screens and the API documentation:
 | BASE-F105 | Report a bad answer | done |
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 | BASE-F107 | Pass the master QA of the Hub | done |
+| BASE-F108 | Report a problem to support | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -1298,7 +1299,7 @@ In: the error's message, its trace and the screen, only with a session.
 Out: one line in the hub's error log; nothing is kept in the browser.
 If it fails: nothing visible happens: the sending is not retried and makes no other report. With no session, or
 with more than 30 reports a minute from the same person, the hub does not note it. To tell something by hand,
-"Report a problem" in the user menu.
+"Report a problem" in the user menu (BASE-F108).
 Involved: none
 
 ### BASE-F48 Open Settings and move through its tabs
@@ -2467,3 +2468,25 @@ Out: every screen of the platform seen and checked in both languages and the thr
 If it fails: what fails on a screen is a failure of the app that has it and is fixed there; if erplora.com does not
 have the business types or the test assistant yet, the QA does not start and says which is missing.
 Involved: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48, BASE-F92
+
+### BASE-F108 Report a problem to support
+Status: done
+Actor: owner, administrator, manager, employee (whoever entered with their erplora.com account)
+Screen: The user menu
+Steps:
+  1. In the user menu, "Report a problem". It only shows if they entered with the account: never in a PIN session
+     on a shared till, which has no account to answer to.
+  2. "Report a problem" opens in a window, without leaving the hub: "Tell us what went wrong. We will reply by
+     email.", with "Subject" and "What happened?" ("Describe the steps and what you expected to happen") and, below,
+     "Your account, your businesses, the page you came from and your browser go with your report.".
+  3. "Send report" waits until both are written; while it is sent, the window neither closes nor sends it twice.
+  4. "Report sent" shows, with the email support will answer to, and "Close".
+  5. "Cancel" or closing the window sends nothing, and what was written is still there if it opens again.
+In: the subject and what happened.
+Out: a mail to erplora.com's support mailbox with the subject, the text and, below, the account, its businesses, this
+business, the screen they were on and their browser; support answers to the account's email (ACCOUNTS-F38). The hub
+keeps nothing.
+If it fails: after five reports in an hour (the hub's and erplora.com's together), "Too many attempts. Please try
+again in a few minutes."; if erplora.com does not answer or cannot send it, a notice with the support address to
+write to directly. In both cases what was written stays and can be sent again.
+Involved: ACCOUNTS-F38

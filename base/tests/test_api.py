@@ -127,6 +127,7 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/assistant/usage", "base.assistant.usage"),
         ("POST", "/api/assistant/report", "base.assistant.report"),
         ("POST", "/api/assistant/transcribe", "base.assistant.transcribe"),
+        ("POST", "/api/support/report", "base.support.report"),
     } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS}
 
 

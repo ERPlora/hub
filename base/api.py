@@ -435,6 +435,7 @@ async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
 
 from base import assistant  # noqa: E402 - the assistant's block keeps its imports with it
 from base.schemas import AssistantReportIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
+from base.schemas import SupportReportIn  # noqa: E402
 
 #: A turn's body: the conversation and the attachments of its last question, in base64 (the gateway takes 32 MB).
 MAX_ASSISTANT_TURN_BODY = 32 * 1024 * 1024
@@ -459,6 +460,11 @@ async def assistant_usage(request):
 @bind(router, "base.assistant.report", "/assistant/report")
 async def assistant_report(request, data: AssistantReportIn):
     return await run_operation(request, services.assistant_report, data)
+
+
+@bind(router, "base.support.report", "/support/report")
+async def support_report(request, data: SupportReportIn):
+    return await run_operation(request, services.support_report, data)
 
 
 @bind(router, "base.assistant.transcribe", "/assistant/transcribe")

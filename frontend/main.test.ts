@@ -33,6 +33,7 @@ import { approvalPass } from '../base/frontend/lib/approval';
 
 import { sessionChanged } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE } from '../base/frontend/lib/app-gate';
+import { openReportProblem, reportProblemOpen } from '../base/frontend/lib/report-problem';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
 type Main = typeof import('./main');
@@ -229,14 +230,14 @@ describe('main.ts', () => {
     expect(shellOptions().userMenu).toEqual({ logout: main.signOut });
   });
 
-  // PLAN-SAAS §1.1: «Report a problem» is the SaaS's form (saas `/report-a-problem`), and the account lives there
-  // too: the Hub links both, in a new tab, from the addresses base/spa.py embeds (never written here).
-  it("gives the user menu «My account» and «Report a problem» on erplora.com, then the Hub's sign out", async () => {
+  // PLAN-SAAS §1.1: the account lives on erplora.com, which the Hub links in a new tab from the address base/spa.py
+  // embeds (never written here); «Report a problem» is the Hub's own dialog (BASE-F108), offered with it: only a
+  // session opened with the account has an account for support to answer to.
+  it("gives the user menu «My account» on erplora.com and «Report a problem» in the Hub, then the Hub's sign out", async () => {
     const home = {
       name: 'Bar A',
       plan_url: 'https://erplora.com/store/plans?business=h1',
       account_url: 'https://erplora.com/account',
-      report_url: 'https://erplora.com/report-a-problem',
     };
     document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
     fakeShell();
@@ -246,10 +247,23 @@ describe('main.ts', () => {
         // APP-BASE-3 (BASE-G125): «Profile», the person's own page in this hub, first.
         { id: 'profile', labelKey: 'base.userMenu.profile', icon: 'ion:person-circle-outline', to: '/profile' },
         { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
-        { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
+        { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', run: openReportProblem },
       ],
       logout: main.signOut,
     });
+  });
+
+  it('«Report a problem» opens the dialog in the Hub, never an address of erplora.com', async () => {
+    const home = { name: 'Bar A', plan_url: '', account_url: 'https://erplora.com/account' };
+    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
+    fakeShell();
+    await main.boot({});
+    const report = shellOptions().userMenu?.items?.find((item) => item.id === 'report');
+    expect(report).not.toHaveProperty('href');
+    expect(reportProblemOpen.value).toBe(false);
+    report?.run?.();
+    expect(reportProblemOpen.value).toBe(true);
+    reportProblemOpen.value = false;
   });
 
   // APP-BASE-3 (BASE-G60, gh:hub#2506): a PIN session on a shared till has «Switch user» and never erplora.com's pages.
@@ -258,7 +272,6 @@ describe('main.ts', () => {
       name: 'Bar A',
       plan_url: '',
       account_url: '',
-      report_url: '',
       access: { credential: 'pin', switch_user: true, idle_minutes: null },
     };
     document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify(home)}</script>`);
