@@ -49,6 +49,10 @@ MEMBER_CREATED = staff_events.MEMBER_CREATED
 MEMBER_UPDATED = staff_events.MEMBER_UPDATED
 MEMBER_TERMINATED = staff_events.MEMBER_TERMINATED
 
+#: What re-runs who is in now (the list in Records and the Home's «Clocked in now»): every change of a working day,
+#: a rename (the list's names) and a termination (a terminated person is nobody who is in).
+WHO_IS_IN = [*PRESENCE, MEMBER_UPDATED, MEMBER_TERMINATED]
+
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {
     MEMBER_TERMINATED: "attendance.record.close_for_terminated",

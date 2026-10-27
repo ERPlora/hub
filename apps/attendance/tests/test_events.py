@@ -56,6 +56,9 @@ def test_the_groups():
         events.RECORD_FLAGGED,
     ]
     assert events.RECORD_ALL == events.PRESENCE
+    # Who is in now as Records lists it and the Home counts it: a rename repaints a name, a terminated person is nobody
+    # who is in.
+    assert events.WHO_IS_IN == [*events.PRESENCE, events.MEMBER_UPDATED, events.MEMBER_TERMINATED]
 
 
 def test_the_staff_events_it_follows_are_staffs():

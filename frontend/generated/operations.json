@@ -1455,6 +1455,10 @@
     "method": "get",
     "path": "/api/attendance/presence"
   },
+  "attendance.presence.count": {
+    "method": "get",
+    "path": "/api/attendance/presence/count"
+  },
   "attendance.person.list": {
     "method": "get",
     "path": "/api/attendance/people"

@@ -45,6 +45,7 @@ from apps.attendance.schemas import (
     ExportOut,
     PersonListIn,
     PersonPage,
+    PresenceCountOut,
     PresenceListIn,
     PresencePage,
     RecordDetailOut,
@@ -606,6 +607,15 @@ def list_corrections(ctx: OperationContext, params: CorrectionListIn) -> dict:
     return _page(rows, trails.count(), params)
 
 
+def present_records() -> QuerySet:
+    """Who is in: an open day within the review hours (a forgotten one is not), of a record that is not
+    terminated (its person no longer works here)."""
+    limit = timezone.now() - dt.timedelta(hours=review_hours())
+    return Record.objects.filter(status=Record.Status.OPEN, clock_in_at__gte=limit).exclude(
+        member__status=Member.Status.TERMINATED
+    )
+
+
 @operation(
     "attendance.presence.list",
     kind="query",
@@ -619,14 +629,7 @@ def list_corrections(ctx: OperationContext, params: CorrectionListIn) -> dict:
     },
 )
 def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
-    # Who is in: an open day within the review hours (a forgotten one is not), of a record that is not
-    # terminated (its person no longer works here).
-    limit = timezone.now() - dt.timedelta(hours=review_hours())
-    records = annotated(
-        Record.objects.filter(status=Record.Status.OPEN, clock_in_at__gte=limit).exclude(
-            member__status=Member.Status.TERMINATED
-        )
-    )
+    records = annotated(present_records())
     if params.search:
         records = records.filter(member_name__icontains=params.search)
     records = records.order_by("member_name", "id")
@@ -642,6 +645,22 @@ def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
         for r in records[params.offset : params.offset + params.limit]
     ]
     return _page(rows, records.count(), params)
+
+
+@operation(
+    "attendance.presence.count",
+    kind="query",
+    permission=VIEW_ALL,
+    input=EmptyIn,
+    output=PresenceCountOut,
+    expose_api=True,
+    ai={
+        "description": "How many people are clocked in right now («how many are in?»), the Home's «Clocked in "
+        "now». A day waiting for review does not count; for who they are, attendance.presence.list."
+    },
+)
+def count_presence(ctx: OperationContext, params: EmptyIn) -> dict:
+    return {"count": present_records().count()}
 
 
 @operation(
