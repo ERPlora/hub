@@ -201,6 +201,38 @@ test(`${KEY}: a business in Poland counts, invoices and prices in złoty in 390,
   }
 });
 
+test(`${KEY}: in Poland the price of a manual invoice is typed with its «zł» and the invoice is in złoty (flow business-currency)`, async ({ page }) => {
+  await registerIn('PL');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/invoice/invoices');
+  const customer = `e2e Kowalski ${RUN}`;
+  await shown(page).locator('[data-testid=invoice-list-add]').click();
+  const create = dialog(page, 'invoice-create');
+  await expect(create).toBeVisible();
+  await create.locator('[data-testid=invoice-recipient-name] input').fill(customer);
+  await create.locator('[data-testid=invoice-recipient-tax-id] input').fill('B12345674');
+  await create.locator('[data-testid=invoice-recipient-address] input').fill('Calle Luna 3, 28004 Madrid');
+  await create.locator('[data-testid=invoice-line-1-description] input').fill(`e2e Course ${RUN}`);
+  await create.locator('[data-testid=invoice-line-1-quantity] input').fill('2');
+  // What a till in Poland writes: the figure with its «zł», read in the business's money (never «not an amount»).
+  await create.locator('[data-testid=invoice-line-1-price] input').fill('12,50 zł');
+  await create.locator('[data-testid=invoice-line-1-tax-rate] input').fill('21');
+  await create.locator('[data-testid=invoice-create-submit]').click();
+  await expect(create).toBeHidden();
+  const found = await api<{ rows: { id: string; currency: string; total_amount: number }[] }>(
+    page.context(),
+    A,
+    'GET',
+    `/invoice/invoices?search=${encodeURIComponent(customer)}&limit=10`,
+  );
+  expect(found.data.rows, `one invoice for ${customer}`).toHaveLength(1);
+  issuedIds.add(found.data.rows[0].id);
+  // 2 × 12.50 zł + 21 % = 30.25 zł.
+  expect([found.data.rows[0].currency, found.data.rows[0].total_amount]).toEqual(['PLN', 3025]);
+  const listed = shown(page).locator('[data-testid=invoice-list-row]', { hasText: customer }).first();
+  await expect(listed).toContainText(/zł\s?30[.,]25|30[.,]25\s?zł/);
+});
+
 test(`${KEY}: back in Spain the same screens are in euros, and the invoice issued in Poland keeps its złoty (flow business-currency)`, async ({ page, context }) => {
   await registerIn('ES');
   await page.setViewportSize({ width: 1440, height: 900 });
