@@ -11,6 +11,7 @@ from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     BeforeValidator,
@@ -688,10 +689,18 @@ class ChainValidateIn(IssuerIn):
 
 class AeatQueryIn(IssuerIn):
     year: int | None = Field(
-        None, ge=2024, le=2999, description="Year (this one by default)."
+        None,
+        ge=2024,
+        le=2999,
+        title=gettext_noop("Year"),
+        description="Year (this one by default).",
     )
     month: int | None = Field(
-        None, ge=1, le=12, description="Month, 1 to 12 (this one by default)."
+        None,
+        ge=1,
+        le=12,
+        title=gettext_noop("Month"),
+        description="Month, 1 to 12 (this one by default).",
     )
 
 
@@ -719,7 +728,8 @@ class CertificateUploadIn(Schema):
     """The business's own certificate (VERIFACTU-F02): kept sealed in the hub's database, never shown again."""
 
     p12_base64: SecretStr = Field(
-        description="The .p12/.pfx file of the certificate, in base64 (at most 1 MB)."
+        title=gettext_noop("Business certificate (.p12 / .pfx)"),
+        description="The .p12/.pfx file of the certificate, in base64 (at most 1 MB).",
     )
     password: SecretStr = Field(SecretStr(""), description="The certificate's password.")
 
@@ -774,27 +784,34 @@ class RepresentationSubmitIn(Schema):
 
     signer_tax_id: _text(16) = Field(
         "",
+        title=gettext_noop("ID number of the person signing"),
         description="Tax ID (DNI or NIE) of whoever signs; for a self-employed business, left empty: its own.",
     )
     signer_name: _text(200) = Field(
         "",
+        title=gettext_noop("Full name of the person signing"),
         description="Full name of whoever signs; for a self-employed business, left empty: its own.",
     )
     signer_document_type: Literal["dni", "nie"] = Field(
-        description="The signer's identity document: dni or nie."
+        title=gettext_noop("Identity document"),
+        description="The signer's identity document: dni or nie.",
     )
     signed_model_base64: SecretStr = Field(
-        description="The official model, signed by hand and scanned or with AutoFirma: a PDF in base64."
+        title=gettext_noop("Signed model"),
+        description="The official model, signed by hand and scanned or with AutoFirma: a PDF in base64.",
     )
     id_copy_base64: SecretStr = Field(
-        description="Copy of the signer's identity document: a PDF in base64."
+        title=gettext_noop("Copy of the identity document"),
+        description="Copy of the signer's identity document: a PDF in base64.",
     )
     signature_sample_base64: SecretStr = Field(
         SecretStr(""),
+        title=gettext_noop("Signature sample"),
         description="A sheet with the signer's handwritten signature, required with a NIE: a PDF in base64.",
     )
     representation_proof_base64: SecretStr = Field(
         SecretStr(""),
+        title=gettext_noop("Proof of representation"),
         description="The document that names who may sign for a company, required for one: a PDF in base64.",
     )
 

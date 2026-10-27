@@ -1175,3 +1175,43 @@ msgid ""
 msgstr ""
 "este negocio no está en España: VeriFactu solo es para negocios de España, "
 "así que no se envía nada a la AEAT"
+
+#: apps/verifactu/schemas.py
+msgid "Year"
+msgstr "Año"
+
+#: apps/verifactu/schemas.py
+msgid "Month"
+msgstr "Mes"
+
+#: apps/verifactu/schemas.py
+msgid "Business certificate (.p12 / .pfx)"
+msgstr "Certificado del negocio (.p12 / .pfx)"
+
+#: apps/verifactu/schemas.py
+msgid "ID number of the person signing"
+msgstr "NIF/NIE de quien firma"
+
+#: apps/verifactu/schemas.py
+msgid "Full name of the person signing"
+msgstr "Nombre y apellidos de quien firma"
+
+#: apps/verifactu/schemas.py
+msgid "Identity document"
+msgstr "Documento de identidad"
+
+#: apps/verifactu/schemas.py
+msgid "Signed model"
+msgstr "Modelo firmado"
+
+#: apps/verifactu/schemas.py
+msgid "Copy of the identity document"
+msgstr "Copia del documento de identidad"
+
+#: apps/verifactu/schemas.py
+msgid "Signature sample"
+msgstr "Muestra de firma"
+
+#: apps/verifactu/schemas.py
+msgid "Proof of representation"
+msgstr "Justificante de representación"
