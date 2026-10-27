@@ -97,7 +97,9 @@
       "configure": "Configurar"
     },
     "plan": {
-      "upgrade": "Mejorar plan"
+      "upgrade": "Mejorar plan",
+      "manage": "Gestionar en erplora.com",
+      "manageShort": "erplora.com"
     },
     "userMenu": {
       "account": "Mi cuenta",

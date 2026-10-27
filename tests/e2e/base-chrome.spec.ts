@@ -2,13 +2,15 @@
 // - «Upgrade plan» at the foot of the side menu (BASE-F11): lined up with the QR above it and inside the menu, and on
 //   the rail (≥992 px, the menu folded to its icons) only its icon, still named, inside the 68 px;
 // - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height;
-// - the user menu's «My account» and «Report a problem» (PLAN-SAAS §1.1): erplora.com's pages, in a new tab.
+// - the user menu's «My account» and «Report a problem» (PLAN-SAAS §1.1): erplora.com's pages, in a new tab;
+// - «erplora.com» of the bar (BASE-F11): this business on erplora.com's panel, in a new tab, for who runs it; on a
+//   phone, the first row of «More options». An employee's bar has none.
 // No module of main declares a ⛔ step yet (Invoicing's comes with its own task), so the strip's test serves the page
 // a `base.setup.status` with one pending: the live stream is answered by the test, every other query stays loading.
 // flow: BASE-F01 BASE-F11
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 
-import { A, decodeSubs, login, shot, shown, untilStill } from './helpers';
+import { A, decodeSubs, EMPLOYEE, login, psql, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = [
@@ -210,4 +212,59 @@ test('the user menu opens «My account» and «Report a problem» on erplora.com
       await page.keyboard.press('Escape');
     }
   }
+});
+
+test('BASE-F11 — «erplora.com» in the bar opens the business on erplora.com in a new tab; an employee has none', async ({ page, browser }) => {
+  await login(page, A, '/');
+  // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  const hubId = psql("SELECT id FROM base_hub WHERE slug = 'a'");
+  const address = `${STACK.saas}/dashboard/businesses/${hubId}`;
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${A}/`);
+    await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
+    await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
+    let link: Locator;
+    if (vp.width < 768) {
+      // On a phone it folds into «More options», with the assistant and the bell, as in the old hub.
+      await expect(shown(page).getByTestId('topbar-manage')).toHaveCount(0);
+      const presented = page.evaluate(
+        () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
+      );
+      await shown(page).getByTestId('topbar-chrome-more').click();
+      await presented;
+      const row = page.locator('ion-popover [data-testid="topbar-chrome-more-manage"]');
+      await expect(row).toContainText('Manage on erplora.com');
+      link = row.locator('a.item-native');
+    } else {
+      const button = shown(page).getByTestId('topbar-manage');
+      await expect(button).toContainText('erplora.com');
+      await expect(button).toHaveAttribute('title', 'Manage on erplora.com');
+      // ion-button paints its own link from them, in its shadow root.
+      link = button.locator('a.button-native');
+    }
+    await expect(link).toHaveAttribute('href', address);
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(link).toHaveAttribute('rel', 'noopener');
+    await untilStill(page);
+    await page.screenshot({ path: shot(`FIX-HUB-BASE-MANAGE-ON-ERPLORA-LINK-${vp.label}`) });
+    if (vp.width === 1440) {
+      // Tapped, the panel opens in a tab of its own and the hub stays where it was.
+      const [tab] = await Promise.all([page.waitForEvent('popup'), shown(page).getByTestId('topbar-manage').click()]);
+      await tab.waitForURL((url) => url.href.startsWith(address));
+      await tab.close();
+      await expect(page).toHaveURL(`${A}/`);
+    } else if (vp.width < 768) {
+      await page.keyboard.press('Escape');
+    }
+  }
+
+  // An employee does not run the business: their bar has the assistant and the bell, and no «erplora.com».
+  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
+  const employee = await context.newPage();
+  await login(employee, A, '/', EMPLOYEE);
+  await expect(shown(employee).getByTestId('assistant-button')).toBeVisible();
+  await expect(shown(employee).getByTestId('topbar-manage')).toHaveCount(0);
+  await context.close();
 });

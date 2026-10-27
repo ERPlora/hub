@@ -187,6 +187,8 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
   await login(page, origin, '/profile', owner.credentials);
   const profile = shown(page);
   await expect(profile.getByTestId('profile-summary')).toBeVisible();
+  // BASE-F11: entered with the account, the owner's bar has «erplora.com» (with a badge, BASE-G56, it has none).
+  await expect(profile.getByTestId('topbar-manage')).toBeVisible();
   await fill(profile.getByTestId('profile-first-name'), 'Ana');
   await fill(profile.getByTestId('profile-last-name'), 'López');
   await profile.getByTestId('profile-save').click();
@@ -371,6 +373,9 @@ test('BASE-G56: a badge that opens nothing says so; the owner’s badge enters a
   await till.keyboard.press('Enter');
   await expect(till).toHaveURL(/\/$/);
   expect(await whoIsIn(till, origin)).toBe('Ana López');
+  // BASE-F11 (gh:hub#2506): a badge on a till is the shift's, not the owner's erplora.com account: no «erplora.com».
+  await expect(shown(till).getByTestId('assistant-button')).toBeVisible();
+  await expect(shown(till).getByTestId('topbar-manage')).toHaveCount(0);
 });
 
 test('BASE-G60: «Switch user» over the sale in progress: whoever takes over enters with their PIN and the sale stays', async () => {
