@@ -13,11 +13,12 @@ import json
 import psycopg
 import pytest
 from live.context import OperationContext
+from live.errors import Conflict
 from live.live_registry import live_registry
 from live.operations import get
 from live.outbox import channel_for
 
-from apps.invoice.models import InvoiceSeries
+from apps.invoice.models import InvoiceSeries, Issuer
 from apps.invoice.tests.conftest import A, B, ISSUER, ctx_for, run
 from base.schemas import SetupStatusIn
 
@@ -78,6 +79,17 @@ def test_the_issuer_saved_ticks_it_and_the_wall_comes_down():
     status = document(ctx_for("hub_owner"))
     assert {item["key"]: item for item in status["items"]}[IDENTITY]["state"] == "done"
     assert status["blocking_pending"] == 0
+
+
+@pytest.mark.django_db
+def test_an_issuer_without_its_address_is_still_the_wall_as_issuing_refuses_it():
+    # Half an identity is not one (an older row, or one whose address was cleared): the step reads what issuing reads.
+    run("invoice.issuer.update", ISSUER)
+    Issuer.objects.update(address="")
+    assert steps(ctx_for())[IDENTITY]["state"] == "pending"
+    with pytest.raises(Conflict) as refused:
+        ticket()
+    assert refused.value.code == "invoice.issuer_missing"
 
 
 @pytest.mark.django_db
