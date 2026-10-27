@@ -93,7 +93,7 @@
     },
     "blocking": {
       "title": "Todavía no puedes facturar",
-      "body": "No se podrá emitir ningún ticket ni factura hasta que configures esto:",
+      "body": "No se podrá emitir ningún tique ni factura hasta que configures esto:",
       "configure": "Configurar"
     },
     "plan": {

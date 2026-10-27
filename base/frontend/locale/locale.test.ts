@@ -35,6 +35,13 @@ function vueFiles(dir: string): string[] {
   });
 }
 
+/** The Spanish word for the sales receipt is «tique» (RAE; the one Sales, Invoicing and the plans use): the keys of a
+ * catalogue whose visible Spanish still says the anglicism «ticket»/«tickets». Keys (`tickets`, `settingsTickets`) are a
+ * published i18n contract, not text, and never count. */
+function anglicisedReceipts(catalogue: Catalogue): string[] {
+  return [...flatten(catalogue)].filter(([, message]) => /\btickets?\b/i.test(message)).map(([key]) => key);
+}
+
 const EN = flatten(en as Catalogue);
 const ES = flatten(es as Catalogue);
 
@@ -58,6 +65,21 @@ describe('base catalogues (en source + es)', () => {
       expect(placeholders(spanish), key).toEqual(placeholders(message));
       expect(spanish.split('|').length, key).toBe(message.split('|').length);
     }
+  });
+
+  it('say «tique» in Spanish, never «ticket» (FIX-HUB-BASE-BLOCKING-STRIP-SAYS-TICKET-WHERE-INVOICING-SAYS-TIQUE)', () => {
+    expect(anglicisedReceipts(es as Catalogue)).toEqual([]);
+  });
+
+  it('the «ticket» guardrail catches the word in a message and leaves keys and «tique» alone', () => {
+    const sample: Catalogue = {
+      base: {
+        tickets: 'Impresión',
+        settingsTickets: { printers: 'Impresoras y tique', hint: 'Configura los tiques' },
+        blocking: { body: 'No se podrá emitir ningún Ticket ni factura', other: 'Imprime los tickets' },
+      },
+    };
+    expect(anglicisedReceipts(sample)).toEqual(['base.blocking.body', 'base.blocking.other']);
   });
 
   it("cover every key base's pages and components use", () => {
