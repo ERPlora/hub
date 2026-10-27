@@ -308,7 +308,8 @@
       "heading": "Todavía no puedes facturar",
       "message": "No se podrá emitir ningún tique ni factura hasta que configures esto:",
       "item": "Los datos de tu negocio",
-      "setUp": "Configurar"
+      "setUp": "Configurar",
+      "delegated": "Esto lo tiene que configurar un administrador."
     },
     "paper": {
       "invoice": "Factura",

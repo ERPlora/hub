@@ -97,7 +97,8 @@ columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cl
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
 último emitido sale arriba. Mientras el emisor no está configurado, arriba sale «Todavía no puedes
 facturar» («No se podrá emitir ningún tique ni factura hasta que configures esto:», «Los datos de tu
-negocio» y «Configurar», que abre **Emisor**). Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
+negocio» y «Configurar», que abre **Emisor**; a quien no puede cambiar el emisor, en lugar de «Configurar», «Esto lo
+tiene que configurar un administrador.»). Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
 que están «Emitida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
 están canceladas ni sustituidas). El botón **+** abre «Nueva factura manual» (INVOICE-F03); sin permiso
 de emitir no aparece, ni tampoco «Marcar pagada». La lista se pone al día sola cuando se emite, se
@@ -693,7 +694,8 @@ Pasos:
    emitir una factura.». Lo ven todos; «Configurar» solo quien puede cambiar el emisor, y a los demás les dice
    «Esto lo tiene que configurar un administrador.».
 2. Pulsa «Configurar» en ese paso, abre **Facturación → Emisor**, o pulsa «Configurar» en el aviso «Todavía no
-   puedes facturar» que sale arriba en **Facturas** y **Series** mientras no hay emisor.
+   puedes facturar» que sale arriba en **Facturas** y **Series** mientras no hay emisor (a quien no puede cambiar
+   el emisor, ese aviso también le dice «Esto lo tiene que configurar un administrador.», sin «Configurar»).
 3. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
    (España de entrada).
 4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso de **Facturas** y **Series** desaparece y el paso del
