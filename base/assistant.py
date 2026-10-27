@@ -331,6 +331,8 @@ PROFILE = pgettext_lazy("base", "My profile")
 SYSTEM = pgettext_lazy("base", "System")
 FILES = pgettext_lazy("base", "Files")
 APPS = pgettext_lazy("base", "Apps")
+#: The user menu's «Report a problem» (BASE-F108), a dialog of its own.
+REPORT_A_PROBLEM = pgettext_lazy("base", "Report a problem")
 
 #: Where a person does each thing of the platform on their own, by the entity of its operation: a card or a receipt
 #: names an action of base by that screen, never by the platform's internal name, «Base» (as Shopify's Sidekick and
@@ -356,6 +358,7 @@ BASE_SCREENS = {
     "profile": PROFILE,
     "role": EMPLOYEES,
     "setup": HOME,
+    "support": REPORT_A_PROBLEM,
     "system": SYSTEM,
 }
 

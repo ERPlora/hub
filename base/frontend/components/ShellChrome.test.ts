@@ -37,7 +37,7 @@ function embedHome(manageUrl: string): void {
   const block = document.createElement('script');
   block.id = 'hub-home';
   block.type = 'application/json';
-  block.textContent = JSON.stringify({ name: 'Bar', plan_url: '', account_url: '', report_url: '', manage_url: manageUrl });
+  block.textContent = JSON.stringify({ name: 'Bar', plan_url: '', account_url: '', manage_url: manageUrl });
   document.body.append(block);
 }
 

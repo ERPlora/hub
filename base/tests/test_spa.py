@@ -118,7 +118,8 @@ def test_the_shell_paints_every_palette_of_the_ui_and_the_default_for_any_other(
 @pytest.mark.parametrize("slug", ["a", "b"])
 def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_saas(client, settings, make_user, slug):
     # BASE-G127: the Home is headed by the business's name; BASE-G169: «Upgrade plan» opens its plan on erplora.com.
-    # APP-BASE-1 (PLAN-SAAS §1.1): the user menu's «My account» and «Report a problem» open the SaaS's own pages.
+    # APP-BASE-1 (PLAN-SAAS §1.1): the user menu's «My account» opens the SaaS's own page; «Report a problem» is the
+    # hub's own dialog (BASE-F108), so no address of the SaaS's page goes in the HTML.
     from base.models import Hub
 
     Hub.objects.filter(slug=slug).update(name=f"Bar {slug.upper()}")
@@ -130,7 +131,6 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
         "name": f"Bar {slug.upper()}",
         "plan_url": f"{saas}/dashboard/store/plans?business={hub.id}",
         "account_url": f"{saas}/dashboard/account",
-        "report_url": f"{saas}/dashboard/report-a-problem",
         # APP-BASE-5: «Members» of the business on erplora.com, where people are invited and given a role.
         "members_url": f"{saas}/dashboard/businesses/{hub.id}/members",
         # BASE-F11: «erplora.com» of the bar, not an employee's (test_the_bar_s_way_to_erplora_com_is_for_who_runs_the_business).
