@@ -152,8 +152,12 @@ describe('answerTo', () => {
       arguments: '{"number":"FACT-2026-000003","reason":"el precio estaba mal"}',
     });
     expect(finish(rectify.frames)).toEqual(['tool_calls']);
-    const done = [...read, asked('invoice__invoice__rectify'), { role: 'tool', content: '{"issued": true}' }];
+    // Issued: its result names the original, now cancelled — that is the rectification done, not a refusal.
+    const issued = { issued: true, invoice: { number: 'RECT-2026-000001', status: 'issued', rectifies: { number: 'FACT-2026-000003', status: 'cancelled' } } };
+    const done = [...read, asked('invoice__invoice__rectify'), { role: 'tool', content: JSON.stringify(issued) }];
     expect(textOf(answerTo(done).frames)).toBe('Hecho.');
+    const notConfirmed = [...read, asked('invoice__invoice__rectify'), { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed"}}' }];
+    expect(textOf(answerTo(notConfirmed).frames)).toBe('No lo he hecho.');
     // Asked again in the same conversation (after a «Cancel»): the preview again, read now.
     const again = [...done, { role: 'assistant', content: 'Hecho.' }, question];
     expect(toolOf(answerTo(again).frames).name).toBe('invoice__invoice__rectification_preview');

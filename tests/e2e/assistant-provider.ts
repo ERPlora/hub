@@ -184,6 +184,9 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
       if (preview.error) return text(`No se puede rectificar: ${preview.error.message ?? ''}`);
       return call('invoice__invoice__rectify', { number: preview.original.number, reason }, rectifyPreview(preview));
     }
+    // The rectification's own result names the original, now «cancelled»: only an error is a refusal.
+    const outcome = JSON.parse(textOf(results.at(-1)!.content) || '{}') as { error?: unknown };
+    return text(outcome.error ? 'No lo he hecho.' : 'Hecho.');
   }
   if (last?.role === 'tool') {
     const result = textOf(last.content);
