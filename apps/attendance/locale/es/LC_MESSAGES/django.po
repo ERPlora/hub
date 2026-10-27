@@ -193,6 +193,15 @@ msgstr "La salida tiene que ser posterior a la entrada."
 msgid "Send both the latitude and the longitude, or neither."
 msgstr "Envía la latitud y la longitud, o ninguna de las dos."
 
+msgid "Latitude"
+msgstr "Latitud"
+
+msgid "Longitude"
+msgstr "Longitud"
+
+msgid "Accuracy (m)"
+msgstr "Precisión (m)"
+
 msgid "The end date cannot be before the start date."
 msgstr "La fecha de fin no puede ser anterior a la de inicio."
 
