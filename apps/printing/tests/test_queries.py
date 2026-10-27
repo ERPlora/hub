@@ -326,3 +326,12 @@ def test_the_summary_by_function_counts_what_no_device_set_up_here_can_print():
     assert unattended() == {"receipt": 1, "kitchen": 0, "bar": 0, "label": 0}
     reaches(till)
     assert unattended()["receipt"] == 0
+
+
+def test_a_job_waiting_without_a_printer_is_only_taken_by_a_device_of_its_own_function():
+    # A kitchen order with no kitchen printer waits for one: the device of the receipts never takes it.
+    reaches(printer("Till"))
+    enqueue(usage="kitchen", job_key="kitchen:1")
+    assert PrintJob.objects.get().printer_id is None
+    summary = {row.usage: row.unattended for row in run("printing.job.summary").usages}
+    assert (summary["receipt"], summary["kitchen"]) == (0, 1)
