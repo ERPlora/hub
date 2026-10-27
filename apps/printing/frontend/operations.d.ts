@@ -206,6 +206,8 @@ export interface UsageSummary {
   oldest_pending_at: string | null;
   sent: number;
   failed: number;
+  /** Its jobs waiting that no device set up here can print. */
+  unattended: number;
 }
 
 export interface JobSummaryOut {

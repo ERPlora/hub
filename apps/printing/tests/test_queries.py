@@ -312,3 +312,17 @@ def test_whoever_sees_the_printers_reads_it_and_nobody_else():
     assert coverage(ctx=ctx_for("hub_employee")) == (False, 0)
     with pytest.raises(PermissionDenied):
         run("printing.device.coverage", {"usage": "receipt"}, ctx=ctx_for("nobody"))
+
+
+def test_the_summary_by_function_counts_what_no_device_set_up_here_can_print():
+    # The bell's «Nothing is printing “…”» leads to the printers' summary: each function says it too, so the card
+    # never says «Ready» while its paper waits for nobody.
+    till = printer("Till")
+    enqueue()
+
+    def unattended() -> dict:
+        return {row.usage: row.unattended for row in run("printing.job.summary").usages}
+
+    assert unattended() == {"receipt": 1, "kitchen": 0, "bar": 0, "label": 0}
+    reaches(till)
+    assert unattended()["receipt"] == 0

@@ -92,9 +92,11 @@ di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este o
 
 - **Cola de impresión**: una tarjeta por cada función que tenga alguna impresora o trabajos
   esperando (un negocio nuevo no ve ninguna), con su nombre («Recibo», «Cocina», «Barra»,
-  «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Con errores»), «En cola: N · el más
+  «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Sin dispositivo», «Con errores»), «En cola: N · el más
   antiguo lleva 3 min» o «Nada en cola», los fallidos («Fallidos: N») y por qué impresora sale ahora:
-  «Imprime en: Caja.» (la elegida en los ajustes o, si no, la primera activa con esa función). Una
+  «Imprime en: Caja.» (la elegida en los ajustes o, si no, la primera activa con esa función). Si
+  tiene trabajos en cola que ningún dispositivo dado de alta puede sacar, sale «Sin dispositivo» con
+  «Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.». Una
   función con trabajos esperando más de un minuto y sin ninguna impresora activa saca el aviso naranja
   «3 trabajos de impresión de Cocina llevan 3 min esperando. Ninguna impresora activa tiene esta
   función: añade una abajo o dale esta función a una de ellas.» («1 trabajo … lleva …» si es uno). Con
@@ -216,7 +218,9 @@ Pasos:
 2. Si una función tiene trabajos en cola que ningún dispositivo dado de alta puede sacar (ninguno llega a
    su impresora, o esperan impresora y ninguno llega a una de su función), la campana de todos los que
    ven Impresión enseña una fila por función: «Nadie está imprimiendo «Recibo»» (o «Cocina», «Barra»,
-   «Etiqueta») con cuántos esperan. Tocarla abre **Impresión → Impresoras**.
+   «Etiqueta») con cuántos esperan. Tocarla abre **Impresión → Impresoras**, donde la tarjeta de esa
+   función dice «Sin dispositivo» y «Ningún dispositivo dado de alta lo imprime: dalo de alta en
+   Dispositivos.» (o «En cola, sin impresora» si no tiene ninguna impresora activa).
 3. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora y cuál
    la imprime, cuánto espera y desde cuándo.
 4. Abre **Impresión → Cola** para ver cada trabajo con su estado, sus intentos y su último error.
@@ -456,8 +460,9 @@ Entra: el nombre del producto, su SKU (el código de barras) y su precio en la m
 Sale: un trabajo en la cola de Etiqueta. Cada pulsación saca una etiqueta.
 Si falla: sin impresora con la función «Etiqueta», la etiqueta **espera** en la cola (nunca sale por la
 impresora de tiques) y la tarjeta «Etiqueta» lo dice: «En cola, sin impresora» y «En cola: N». En cuanto
-una impresora tiene esa función, la tarjeta pasa a «Listo», la nombra («Imprime en: …») y su dispositivo
-saca las etiquetas que esperaban, de la más antigua a la más nueva.
+una impresora tiene esa función, la tarjeta la nombra («Imprime en: …») y pasa a «Listo» si un dispositivo
+dado de alta llega a ella (si no, «Sin dispositivo»); ese dispositivo saca las etiquetas que esperaban, de la
+más antigua a la más nueva.
 Implicados: INVENTORY-F25, PRINTING-F01, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F13 Abrir el cajón al cobrar
@@ -648,7 +653,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | El dispositivo dado de alta con un identificador, con sus impresoras (para el canal del dispositivo, al conectarse; sin ruta ni asistente) | imprimir | F18 | `printing.device.get` |
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
-| El resumen de la cola por función, con la impresora por la que sale cada una | ver | F01 | `printing.job.summary` |
+| El resumen de la cola por función, con la impresora por la que sale cada una y cuántos trabajos no puede sacar ningún dispositivo dado de alta | ver | F01 | `printing.job.summary` |
 | Si una función tiene un dispositivo dado de alta que la imprime y cuántos de sus trabajos en cola no puede sacar ninguno (el paso del Inicio y la campana) | ver | F01 | `printing.device.coverage` |
 
 ### Lo que ofrece: acciones (cambian datos)

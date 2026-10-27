@@ -81,3 +81,9 @@ def test_the_settings_re_run_what_shows_the_chosen_printers():
         "printing.printer.status",
         "printing.job.summary",
     }
+
+
+def test_the_summary_by_function_re_runs_when_a_device_is_set_up_changed_or_retired():
+    # Its «no device prints it» moves with the devices (FIX-PRINTING-SETUP-HOOKS).
+    for event in events.DEVICE_EVENTS:
+        assert "printing.job.summary" in live_registry.affected([event]), event

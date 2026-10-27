@@ -377,6 +377,10 @@ class UsageSummary(Schema):
     oldest_pending_at: datetime | None = Field(description="When the oldest of them was queued.")
     sent: int = Field(description="Its jobs a device has and has not confirmed.")
     failed: int = Field(description="Its failed jobs.")
+    unattended: int = Field(
+        description="Its jobs waiting that no device set up here can print (no device reaches their printer, or a "
+        "printer of their function and paper)."
+    )
 
 
 class JobSummaryOut(Schema):
