@@ -9,7 +9,7 @@ import { computed } from 'vue';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { initials, tileGradient } from './till';
 
 const props = defineProps<{ service: ServiceSaleOut }>();
@@ -17,13 +17,14 @@ const emit = defineEmits<{ pick: [service: ServiceSaleOut] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const taxName = useTaxName();
 
 const blocked = computed(() => props.service.needs_tax_setup);
 const label = computed(() => (blocked.value ? `${props.service.name} · ${t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value })}` : undefined));
 const thumbStyle = computed(() => ({ background: tileGradient(props.service.name) }));
 const price = computed(() => {
-  const money = formatMoney(props.service.price, locale.value);
+  const money = formatMoney(props.service.price, locale.value, business.value);
   const type = props.service.pricing_type;
   return type === 'fixed' ? money : t(`sale.pos.servicePrice.${type}`, { price: money });
 });

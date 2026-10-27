@@ -20,6 +20,7 @@ async function setup(props: Record<string, unknown> = {}) {
     props: { open: true, service: COLOUR, pending: false, error: null, ...props },
     locale: 'es',
   });
+  await m.live();
   await settle();
   return m;
 }

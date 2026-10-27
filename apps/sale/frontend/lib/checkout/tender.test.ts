@@ -19,37 +19,47 @@ import {
 const CASH: TenderMethod = { id: 'm-cash', display_name: 'Cash', type: 'cash', requires_change: true };
 const CARD: TenderMethod = { id: 'm-card', display_name: 'Card', type: 'card', requires_change: false };
 
+/** The keys pressed one after the other on a keypad of `decimals` (two: euros). */
+const type = (keys: string[], decimals = 2): string => keys.reduce((typed, key) => pushKey(typed, key, decimals), '');
+
 const leg = (method: TenderMethod, amount: number, tendered = amount, id = `${method.id}-${amount}`): Leg => ({ id, method, amount, tendered });
 
 describe('the keypad', () => {
   it('appends digits and clears with C', () => {
-    expect(['1', '2', '5'].reduce(pushKey, '')).toBe('125');
-    expect(pushKey('125', 'C')).toBe('');
+    expect(type(['1', '2', '5'])).toBe('125');
+    expect(pushKey('125', 'C', 2)).toBe('');
   });
 
   it('takes one separator and two decimals at most (euros)', () => {
-    expect(['1', '2', '.', '5', '0', '7'].reduce(pushKey, '')).toBe('12.50');
-    expect(['1', '.', '.', '5'].reduce(pushKey, '')).toBe('1.5');
-    expect(pushKey('', '.')).toBe('0.');
+    expect(type(['1', '2', '.', '5', '0', '7'])).toBe('12.50');
+    expect(type(['1', '.', '.', '5'])).toBe('1.5');
+    expect(pushKey('', '.', 2)).toBe('0.');
   });
 
   it('stops at nine characters', () => {
-    expect(['1', '2', '3', '4', '5', '6', '7', '8', '9', '1'].reduce(pushKey, '')).toBe('123456789');
+    expect(type(['1', '2', '3', '4', '5', '6', '7', '8', '9', '1'])).toBe('123456789');
   });
 
   it('reads what it typed as cents, without float rounding', () => {
-    expect(typedCents('')).toBe(0);
-    expect(typedCents('12')).toBe(1200);
-    expect(typedCents('12.5')).toBe(1250);
-    expect(typedCents('12.05')).toBe(1205);
-    expect(typedCents('0.')).toBe(0);
-    expect(typedCents('19.99')).toBe(1999);
+    expect(typedCents('', 2)).toBe(0);
+    expect(typedCents('12', 2)).toBe(1200);
+    expect(typedCents('12.5', 2)).toBe(1250);
+    expect(typedCents('12.05', 2)).toBe(1205);
+    expect(typedCents('0.', 2)).toBe(0);
+    expect(typedCents('19.99', 2)).toBe(1999);
   });
 
   it('writes cents back as the text it reads (a leg brought back to the keypad)', () => {
-    expect(centsToTyped(1250)).toBe('12.50');
-    expect(centsToTyped(5)).toBe('0.05');
-    expect(typedCents(centsToTyped(123456))).toBe(123456);
+    expect(centsToTyped(1250, 2)).toBe('12.50');
+    expect(centsToTyped(5, 2)).toBe('0.05');
+    expect(typedCents(centsToTyped(123456, 2), 2)).toBe(123456);
+  });
+
+  it('types the business’s currency with its decimals: the yen has no separator and no cents (flow business-currency)', () => {
+    expect(type(['1', '0', '.', '0', '0'], 0)).toBe('1000');
+    expect(typedCents('1000', 0)).toBe(1000);
+    expect(centsToTyped(1000, 0)).toBe('1000');
+    expect(typedCents(centsToTyped(5003, 0), 0)).toBe(5003);
   });
 });
 

@@ -2,7 +2,8 @@
 // the change and the `payments` of `sale.sale.complete`. Only the arithmetic of what the person types
 // lives here: the amount to charge is the server's preview (`sale.checkout.preview`), and the server
 // re-checks every leg (`sale.payments_do_not_match_total`, `sale.insufficient_tendered`). Money is whole
-// cents; the keypad types euros with '.' as its separator, whatever the page's language shows.
+// cents (minor units); the keypad types the business's currency with its decimals (none in JPY) and '.' as its
+// separator, whatever the page's language shows.
 import type { PaymentIn, PaymentMethodOut } from '../../operations';
 
 /** What the tender needs of a payment method. */
@@ -16,29 +17,32 @@ export interface Leg {
   tendered: number;
 }
 
-const DECIMALS = 2;
 const MAX_TYPED = 9;
 
-/** The keypad: digits, one '.' and two decimals at most, nine characters; 'C' clears. */
-export function pushKey(typed: string, key: string): string {
+/** The keypad: digits, one '.' and the currency's `decimals` at most (none: no '.'), nine characters; 'C' clears. */
+export function pushKey(typed: string, key: string, decimals: number): string {
   if (key === 'C') return '';
-  if (key === '.') return typed.includes('.') ? typed : `${typed || '0'}.`.slice(0, MAX_TYPED);
+  if (key === '.') return typed.includes('.') || decimals === 0 ? typed : `${typed || '0'}.`.slice(0, MAX_TYPED);
   const dot = typed.indexOf('.');
-  if (dot >= 0 && typed.length - dot - 1 >= DECIMALS) return typed;
+  if (dot >= 0 && typed.length - dot - 1 >= decimals) return typed;
   return `${typed}${key}`.slice(0, MAX_TYPED);
 }
 
-/** The keypad's text as cents, from its digits (no float rounding); nothing typed is 0. */
-export function typedCents(typed: string): number {
+/** The keypad's text as minor units of a currency of `decimals`, from its digits (no float rounding); nothing
+ *  typed is 0. */
+export function typedCents(typed: string, decimals: number): number {
   const [whole = '', fraction = ''] = typed.split('.');
-  const digits = `${whole || '0'}${fraction.padEnd(DECIMALS, '0').slice(0, DECIMALS)}`;
+  const digits = `${whole || '0'}${fraction.padEnd(decimals, '0').slice(0, decimals)}`;
   return /^\d+$/.test(digits) ? Number.parseInt(digits, 10) : 0;
 }
 
-/** Cents back to the text the keypad reads (1250 → «12.50»): a leg brought back to be edited. */
-export function centsToTyped(cents: number): string {
-  const digits = String(Math.max(0, Math.round(cents))).padStart(DECIMALS + 1, '0');
-  return `${digits.slice(0, -DECIMALS)}.${digits.slice(-DECIMALS)}`;
+/** Minor units back to the text the keypad reads (1250 → «12.50»; 1000 yen → «1000»): a leg brought back to be
+ *  edited. */
+export function centsToTyped(cents: number, decimals: number): string {
+  const whole = String(Math.max(0, Math.round(cents)));
+  if (decimals === 0) return whole;
+  const digits = whole.padStart(decimals + 1, '0');
+  return `${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`;
 }
 
 /** Cash asks what was handed over and gives change; any other method charges the exact amount. */

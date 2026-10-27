@@ -17,6 +17,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import taxEn from '../../../tax/frontend/locale/en.json';
 import taxEs from '../../../tax/frontend/locale/es.json';
@@ -62,8 +63,38 @@ export const EMPLOYEE: SessionMe = {
   permissions: ['sale.view_sale', 'sale.add_sale', 'sale.take_payment', 'sale.view_paymentmethod', ...READS],
 };
 
+/** The business of the hub (`base.business.get`): one in Spain, in euros, unless a test says another
+ *  (flow business-currency: the till's money is the business's). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+export const JAPANESE: Partial<Business> = {
+  country: 'JP',
+  country_name: 'Japan',
+  currency: 'JPY',
+  currency_label: 'JPY · Japanese Yen',
+  currency_decimals: 0,
+};
+
 export interface MountOptions {
   props?: Record<string, unknown>;
+  /** What `base.business.get` answers when the stream opens; `null`: it never answers (the currency unknown). */
+  business?: Business | null;
   path?: string;
   locale?: 'en' | 'es';
   session?: SessionMe;
@@ -107,8 +138,22 @@ export async function mountSale(component: Component, options: MountOptions = {}
     },
   });
 
-  /** Opens the stream; returns the call to push frames into. */
-  const live = (): Promise<StreamCall> => harness.goLive();
+  /** The business answers once a piece follows it (on opening the stream, or on reopening it when a piece of the
+   *  till appears later): it is the platform's, not what a test of the sale app looks at. */
+  let businessAnswered = false;
+  async function answerBusiness(): Promise<void> {
+    const answer = options.business === undefined ? business() : options.business;
+    if (businessAnswered || !answer || !harness.client.stream.subscriptions('base.business.get').length) return;
+    businessAnswered = true;
+    await result('base.business.get', answer);
+  }
+
+  /** Opens the stream and answers the business, if a piece follows it; returns the call to push frames into. */
+  const live = async (): Promise<StreamCall> => {
+    const call = await harness.goLive();
+    await answerBusiness();
+    return call;
+  };
 
   /** The params of every live subscription to `op`. */
   const params = (op: OpName): Params[] => harness.client.stream.subscriptions(op).map((s) => s.params as Params);
@@ -131,6 +176,7 @@ export async function mountSale(component: Component, options: MountOptions = {}
   /** The SDK reopens the stream 150 ms after the subscriptions change: results come on the new one. */
   async function reopen(): Promise<void> {
     await harness.clock.advance(150);
+    await answerBusiness();
   }
 
   /** The API calls made so far (the stream aside). */

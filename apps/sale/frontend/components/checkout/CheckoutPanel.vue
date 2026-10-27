@@ -23,7 +23,7 @@ import { type ChargeBlock, chargeBlock } from '../../lib/checkout/blocks';
 import { chargeableMethods } from '../../lib/checkout/methods';
 import { recipientComplete, recipientFrom, recipientPayload } from '../../lib/checkout/recipient';
 import { recipientIssue } from '../../lib/checkout/taxId';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import type { DocumentType, PaymentMethodOut, PreviewIn, SaleOut } from '../../operations';
 import CheckoutFoot from './CheckoutFoot.vue';
 import CheckoutSide from './CheckoutSide.vue';
@@ -59,9 +59,10 @@ const DRAWER_PATH = '/cash_register/sessions';
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const router = useRouter();
 const session = useSession();
-const money = (cents: number | null | undefined): string => formatMoney(cents, locale.value);
+const money = (cents: number | null | undefined): string => formatMoney(cents, locale.value, business.value);
 
 // ── What the server says ──────────────────────────────────────────────────────────────────────
 const partial = computed(() => lineIds.value.length > 0);
@@ -106,7 +107,7 @@ const partialText = computed(() => {
 });
 
 // ── What the person chooses and types ─────────────────────────────────────────────────────────
-const tender = useTender({ total, methods, cashLimit, operationTotal });
+const tender = useTender({ total, methods, cashLimit, operationTotal, decimals: () => moneyDecimals(business.value) });
 
 const recipient = ref(recipientFrom(props.customer));
 const complete = computed(() => recipientComplete(recipient.value));

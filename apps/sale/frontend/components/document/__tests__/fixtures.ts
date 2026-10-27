@@ -24,6 +24,7 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
     appointment_id: null,
     tax_included: true,
     currency: 'EUR',
+    currency_decimals: 2,
     subtotal: 1124,
     tax_total: 126,
     discount_percent: '0.00',

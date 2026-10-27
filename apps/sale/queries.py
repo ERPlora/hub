@@ -2107,6 +2107,8 @@ def refund_options(ctx: OperationContext, params: SaleRefIn) -> dict:
             "sale_id": sale.id,
             "number": sale.number,
             "status": sale.status,
+            "currency": sale.currency,
+            "currency_decimals": currency_decimals(sale.currency),
             "total": sale.total,
             "refunded_total": sale.refunded_total,
             "refundable_total": sale.refundable_total,

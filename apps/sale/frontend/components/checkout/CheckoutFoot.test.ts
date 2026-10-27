@@ -21,6 +21,7 @@ const BASE = { total: 4250, method: CASH, split: false, block: null, busy: false
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountSale(CheckoutFoot, { props: { ...BASE, ...props }, locale });
+  await m.live();
   const confirm = () => m.find('sale-checkout-confirm').element as Button;
   const label = () => plain(confirm().textContent ?? '').trim();
   const reason = () => m.find('sale-checkout-block-reason');

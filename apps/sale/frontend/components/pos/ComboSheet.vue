@@ -12,7 +12,7 @@ import { computed, shallowRef, watch } from 'vue';
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { useLocale, useT } from '../../composables/useT';
 import { comboChoices, comboShort, comboTotal } from '../../lib/comboChoice';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { choose, type Choice, initialChoice, unchoose } from '../../lib/modifierChoice';
 import type { ComboChoiceIn } from '../../operations';
 import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue';
@@ -24,6 +24,7 @@ const emit = defineEmits<{ add: [choices: ComboChoiceIn[]] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 const groups = computed(() => props.combo?.groups ?? []);
 const choice = shallowRef<Choice>(initialChoice([]));
@@ -43,7 +44,7 @@ const sections = computed<SectionGroup[]>(() =>
   groups.value.map((group) => ({ ...group, options: group.options.map((option) => ({ ...option, label: option.product_name })) })),
 );
 const short = computed(() => comboShort(groups.value, choice.value));
-const total = computed(() => (props.combo ? formatMoney(comboTotal(props.combo, choice.value), locale.value) : ''));
+const total = computed(() => (props.combo ? formatMoney(comboTotal(props.combo, choice.value), locale.value, business.value) : ''));
 
 function tap(group: SectionGroup, optionId: string): void {
   choice.value = choose(choice.value, group, optionId);

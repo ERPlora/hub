@@ -54,7 +54,7 @@
       "noProducts": "Sin productos.",
       "loadMore": "Cargar más",
       "openPrice": "Precio libre",
-      "openPriceTag": "+ €",
+      "openPriceTag": "+ {sign}",
       "notSellableBadge": "Falta el {tax}",
       "notSellableNoTaxCategory": "No se puede vender: sin categoría fiscal. Falta configurar el {tax}.",
       "soldOutBadge": "Agotado",

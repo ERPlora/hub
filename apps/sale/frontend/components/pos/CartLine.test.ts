@@ -11,10 +11,12 @@ import CartLine from './CartLine.vue';
 import QtyStepper from './QtyStepper.vue';
 
 async function setup(over: Parameters<typeof line>[0] = {}, props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  return mountSale(CartLine, {
+  const mounted = await mountSale(CartLine, {
     props: { line: line(over), markable: true, marked: false, staffName: null, allowDiscounts: true, ...props },
     locale,
   });
+  await mounted.live();
+  return mounted;
 }
 
 describe('CartLine: what it shows', () => {

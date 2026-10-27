@@ -190,3 +190,12 @@ def test_the_receipt_prints_in_the_currency_of_its_sale_even_after_the_business_
     receipt, copy = jobs()
     assert (receipt.document["decimals"], receipt.document["total"]) == (0, 300.0)
     assert (copy.document["decimals"], copy.document["total"]) == (0, 300.0)
+
+
+def test_what_a_sale_can_give_back_is_said_in_its_own_currency(coffee):
+    # The refund screen paints what each tender has left with the sale's money, whatever the business's is now.
+    business_in("JP")
+    sale = charge()
+    business_in("ES")
+    options = run("sale.refund.options", {"sale_id": str(sale.id)})
+    assert (options.currency, options.currency_decimals, options.refundable_total) == ("JPY", 0, 300)

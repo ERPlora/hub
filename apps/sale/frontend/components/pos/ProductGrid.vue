@@ -9,6 +9,8 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonSpinner } from '@ionic/vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
+import { useLocale } from '../../composables/useT';
+import { currencySign, useBusinessMoney } from '../../lib/format';
 import ProductTile from './ProductTile.vue';
 
 defineProps<{
@@ -19,6 +21,9 @@ defineProps<{
   emptyText?: string;
 }>();
 const emit = defineEmits<{ pick: [product: ProductOut]; openPrice: []; loadMore: [] }>();
+
+const locale = useLocale();
+const business = useBusinessMoney();
 </script>
 
 <template>
@@ -59,7 +64,7 @@ const emit = defineEmits<{ pick: [product: ProductOut]; openPrice: []; loadMore:
       </span>
       <span class="pos-open__info">
         <span class="pos-tile__name">{{ $t('sale.pos.openPrice') }}</span>
-        <span class="pos-tile__price">{{ $t('sale.pos.openPriceTag') }}</span>
+        <span class="pos-tile__price">{{ $t('sale.pos.openPriceTag', { sign: currencySign(locale, business) || '¤' }) }}</span>
       </span>
     </button>
     <button

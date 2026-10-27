@@ -10,10 +10,12 @@ import ProductGrid from './ProductGrid.vue';
 const PRODUCTS = [product({ id: 'p1', name: 'Coffee' }), product({ id: 'p2', name: 'Tea' })];
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  return mountSale(ProductGrid, {
+  const mounted = await mountSale(ProductGrid, {
     props: { products: PRODUCTS, loading: false, hasMore: false, ...props },
     locale,
   });
+  await mounted.live();
+  return mounted;
 }
 
 describe('ProductGrid', () => {

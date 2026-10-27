@@ -9,7 +9,7 @@
 //     the money goes instead (`to_method_id`);
 //   - nothing marked proposes all that is left;
 //   - a line a voucher paid (SALE-F32) is worth 0: marking it gives its session back, also with no money.
-import { centsFromEuros } from '../../lib/format';
+import { centsFromAmount, type Money, moneyDecimals } from '../../lib/format';
 import type { AllocationIn, LineOption, RefundLineIn, TenderOption } from '../../operations';
 
 /** Units picked per line, in thousandths of a unit (quantities carry up to 3 decimals). */
@@ -88,22 +88,26 @@ export function proposal(tenders: readonly TenderOption[], lines: readonly LineO
   return splitByRemaining(marked ? pickedAmount(lines, picked) : refundableTotal(tenders), tenders);
 }
 
-/** Cents as the person edits them: the reader's decimal separator, no grouping (it reads back the same). */
-export function amountInput(cents: number, locale: string): string {
-  const digits = String(Math.max(0, Math.round(cents))).padStart(3, '0');
+/** Cents (minor units of the sale's `money`) as the person edits them: the reader's decimal separator, no grouping
+ *  (it reads back the same); a currency without decimals, the bare figure. */
+export function amountInput(cents: number, locale: string, money?: Money): string {
+  const decimals = moneyDecimals(money);
+  const whole = String(Math.max(0, Math.round(cents)));
+  if (decimals === 0) return whole;
+  const digits = whole.padStart(decimals + 1, '0');
   let separator = '.';
   try {
     separator = new Intl.NumberFormat(locale).formatToParts(1.1).find((part) => part.type === 'decimal')?.value ?? '.';
   } catch (error) {
     if (!(error instanceof RangeError)) throw error;
   }
-  return `${digits.slice(0, -2)}${separator}${digits.slice(-2)}`;
+  return `${digits.slice(0, -decimals)}${separator}${digits.slice(-decimals)}`;
 }
 
-/** What was typed, in cents: blank is 0; anything that is not an amount is `NaN`. */
-export function parseAmount(text: string): number {
+/** What was typed, in minor units of the sale's `money`: blank is 0; anything that is not an amount is `NaN`. */
+export function parseAmount(text: string, money?: Money): number {
   if (!text.trim()) return 0;
-  return centsFromEuros(text) ?? Number.NaN;
+  return centsFromAmount(text, money) ?? Number.NaN;
 }
 
 /** The lines a voucher paid that are marked: each gives its session back. */

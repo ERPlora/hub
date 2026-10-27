@@ -54,7 +54,7 @@
       "noProducts": "No products.",
       "loadMore": "Load more",
       "openPrice": "Open price",
-      "openPriceTag": "+ €",
+      "openPriceTag": "+ {sign}",
       "notSellableBadge": "{tax} missing",
       "notSellableNoTaxCategory": "Cannot be sold: no tax category. {tax} needs to be set up.",
       "soldOutBadge": "Sold out",

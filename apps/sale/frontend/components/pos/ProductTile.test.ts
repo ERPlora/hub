@@ -11,6 +11,7 @@ import ProductTile from './ProductTile.vue';
 describe('ProductTile', () => {
   it('paints the initials over the name’s colour, the name and the price in the reader’s language; never the SKU', async () => {
     const m = await mountSale(ProductTile, { props: { product: product() }, locale: 'es' });
+    await m.live();
     const tile = m.find('pos-product-p1');
     expect(tile.find('.pos-tile__thumb').text()).toBe('CC');
     expect(tile.find('.pos-tile__thumb').attributes('style')).toMatch(/linear-gradient/);

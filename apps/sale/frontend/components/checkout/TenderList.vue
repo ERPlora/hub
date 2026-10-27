@@ -7,7 +7,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { useLocale, useT } from '../../composables/useT';
 import { methodIcon } from '../../lib/checkout/methods';
 import type { Leg } from '../../lib/checkout/tender';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 defineProps<{ legs: readonly Leg[] }>();
 
@@ -15,8 +15,9 @@ const emit = defineEmits<{ edit: [id: string]; remove: [id: string] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
-const money = (cents: number): string => formatMoney(cents, locale.value);
+const money = (cents: number): string => formatMoney(cents, locale.value, business.value);
 const named = (leg: Leg) => ({ name: leg.method.display_name, amount: money(leg.amount) });
 </script>
 

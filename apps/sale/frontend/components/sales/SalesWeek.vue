@@ -8,16 +8,17 @@ import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const locale = useLocale();
+const business = useBusinessMoney();
 const { data, error } = useLive('sale.sale.last_7_days', {});
 
 /** «mié 14»: the weekday and the day of the month, in the reader's language (a business day is a date). */
 const dayLabel = (iso: string) =>
   new Intl.DateTimeFormat(locale.value, { weekday: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
 const days = computed(() =>
-  (error.value ? [] : (data.value?.rows ?? [])).map((row) => ({ day: row.day, label: dayLabel(row.day), total: formatMoney(row.total, locale.value) })),
+  (error.value ? [] : (data.value?.rows ?? [])).map((row) => ({ day: row.day, label: dayLabel(row.day), total: formatMoney(row.total, locale.value, business.value) })),
 );
 </script>
 

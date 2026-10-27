@@ -16,7 +16,7 @@ import { computed, onBeforeUnmount, shallowRef } from 'vue';
 import { useLiveWindows } from '../../composables/useLiveWindows';
 import { useLocale, useT } from '../../composables/useT';
 import { throughManager } from '../../lib/approval';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import type { OrderRow } from '../../operations';
 import { refusal } from '../../lib/refusal';
 import { shortTime } from './till';
@@ -33,6 +33,7 @@ const ARM_MS = 3000;
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const session = useSession();
 const client = useLiveClient();
 const canVoid = computed(() => session.can('sale.void_sale'));
@@ -75,7 +76,7 @@ async function remove(row: OrderRow): Promise<void> {
 
 const meta = (row: OrderRow) => {
   const time = shortTime(row.created_at, locale.value);
-  return row.label ? `${time} · ${formatMoney(row.provisional_total, locale.value)}` : time;
+  return row.label ? `${time} · ${formatMoney(row.provisional_total, locale.value, business.value)}` : time;
 };
 </script>
 
@@ -132,7 +133,7 @@ const meta = (row: OrderRow) => {
         :data-testid="`pos-parked-${row.id}`"
         @click="emit('resume', row)"
       >
-        <span class="pos-checks__name">{{ row.label || formatMoney(row.provisional_total, locale) }}</span>
+        <span class="pos-checks__name">{{ row.label || formatMoney(row.provisional_total, locale, business) }}</span>
         <span class="pos-checks__meta">{{ meta(row) }}</span>
       </button>
       <ion-button

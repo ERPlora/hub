@@ -53,6 +53,8 @@ const row = (id: string, over: Partial<SaleRow> = {}): SaleRow => ({
   id,
   number: `20261014-000${id.slice(1)}`,
   business_day: '2026-10-14',
+  currency: 'EUR',
+  currency_decimals: 2,
   created_at: '2026-10-14T10:05:00Z',
   status: 'completed',
   document_type: 'ticket',

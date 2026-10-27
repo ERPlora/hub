@@ -52,6 +52,7 @@ async function setup(props: Record<string, unknown> = {}) {
     props: { open: true, product: product({ id: 'p1', name: 'Hamburguesa', price: 800 }), groups: GROUPS, pending: false, error: null, ...props },
     locale: 'es',
   });
+  await m.live();
   await settle();
   return m;
 }

@@ -11,7 +11,7 @@ import CartFooter from './CartFooter.vue';
 const disabled = (el: Element) => (el as HTMLElement & { disabled?: boolean }).disabled === true;
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  return mountSale(CartFooter, {
+  const mounted = await mountSale(CartFooter, {
     props: {
       hasLines: true,
       total: 1250,
@@ -24,6 +24,8 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     },
     locale,
   });
+  await mounted.live();
+  return mounted;
 }
 
 describe('CartFooter', () => {

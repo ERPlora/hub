@@ -36,7 +36,7 @@ import { useBusinessDay } from '../components/sales/useBusinessDay';
 import VoidSaleModal from '../components/sales/VoidSaleModal.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, type Money, moneyOf, useBusinessMoney } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import { filterQuery, filtersInUse, hasDateRange, invalidAmounts, paymentMethodSearch, reversedDates, SALE_STATUSES } from '../lib/salesFilters';
 import type { SaleListIn, SaleRow } from '../operations';
@@ -54,6 +54,8 @@ const canReports = computed(() => session.can('sale.view_reports'));
 const canIssue = computed(() => session.can('sale.take_payment'));
 const t = useT();
 const locale = useLocale();
+/** «Total» is typed in the business's currency; each row is painted in its own sale's (flow business-currency). */
+const business = useBusinessMoney();
 const client = useLiveClient();
 
 // ── The period: from the hub's business day; a date range of the filters replaces it ────────────
@@ -65,7 +67,7 @@ const filters = ref<DataTableFilters>({});
 
 const bounds = computed<DayBounds>(() => {
   if (!hasDateRange(filters.value)) return periodBounds(period.value, day.today.value);
-  const { date_from, date_to } = filterQuery(filters.value);
+  const { date_from, date_to } = filterQuery(filters.value, business.value);
   return { ...(date_from ? { date_from } : {}), ...(date_to ? { date_to } : {}) };
 });
 /** The chip lit: none while a date range of the filters rules. */
@@ -87,9 +89,9 @@ const table = useServerTable('sale.sale.list', {
   sort: 'created_at',
   dir: 'desc',
   maxSearch: 200,
-  filters: (): Partial<SaleListIn> => ({ ...filterQuery(filters.value), ...bounds.value }),
+  filters: (): Partial<SaleListIn> => ({ ...filterQuery(filters.value, business.value), ...bounds.value }),
   // Only the filters that really apply narrow the list (an amount it cannot read does not).
-  narrowed: () => filtersInUse(filters.value) > 0,
+  narrowed: () => filtersInUse(filters.value, business.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 
@@ -101,13 +103,13 @@ const tableError = computed(() => (status.value === 'error' && !Object.keys(refu
 /** Under each filter: what it cannot read or a reversed range, else what the server refused. */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...refusedFilters.value,
-  ...Object.fromEntries(invalidAmounts(filters.value).map((key) => [key, t('sale.sales.filters.amountInvalid')])),
+  ...Object.fromEntries(invalidAmounts(filters.value, business.value).map((key) => [key, t('sale.sales.filters.amountInvalid')])),
   ...(reversedDates(filters.value) ? { date_to: t('sale.sales.filters.dateOrder') } : {}),
 }));
 
 // ── Columns ──────────────────────────────────────────────────────────────────────────────────────
 const dash = (value: unknown): string => (value === null || value === undefined || value === '' ? '—' : String(value));
-const money = (cents: number): string => formatMoney(cents, locale.value);
+const money = (cents: number, of: Money | undefined): string => formatMoney(cents, locale.value, of);
 
 /** «Payment» searches the business's methods on the server: there may be more than a list holds. */
 const findPaymentMethods = paymentMethodSearch(client);
@@ -137,14 +139,14 @@ const columns = computed<DataTableColumn<SaleRow>[]>(() => [
     label: t('sale.sales.columns.total'),
     sortable: true,
     align: 'right',
-    format: (_, row) => money(row.total),
+    format: (_, row) => money(row.total, moneyOf(row)),
     filter: { type: 'range', amount: true, keys: ['total_min', 'total_max'] },
   },
 ]);
 
 /** A completed sale part of whose money already went back: what is still left to refund. */
 const leftToRefund = (row: SaleRow): string | null =>
-  row.status === 'completed' && row.refunded_total > 0 && row.refundable_total > 0 ? t('sale.sales.status.leftToRefund', { amount: money(row.refundable_total) }) : null;
+  row.status === 'completed' && row.refunded_total > 0 && row.refundable_total > 0 ? t('sale.sales.status.leftToRefund', { amount: money(row.refundable_total, moneyOf(row)) }) : null;
 
 // ── Row actions ──────────────────────────────────────────────────────────────────────────────────
 /** Void: a completed ticket without any refund — also one of no money, a voucher's session (a full

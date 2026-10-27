@@ -15,7 +15,7 @@ import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';
 
 withDefaults(defineProps<{ withServices?: boolean }>(), { withServices: false });
@@ -23,6 +23,7 @@ const emit = defineEmits<{ pick: [product: ProductOut]; pickService: [service: S
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const taxName = useTaxName();
 const term = shallowRef('');
 const { data, status, error } = useLive('inventory.product.list', () => ({
@@ -121,7 +122,7 @@ onMounted(() => void bar.value?.$el.setFocus?.());
               :class="{ 'pos-search__warn': item.is_sold_out || item.needs_tax_setup }"
             >{{ note(item) }}</span>
           </span>
-          <span class="pos-search__price">{{ formatMoney(item.price, locale) }}</span>
+          <span class="pos-search__price">{{ formatMoney(item.price, locale, business) }}</span>
         </button>
       </ion-item>
     </ion-list>

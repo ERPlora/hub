@@ -65,6 +65,8 @@ const options = (over: Partial<RefundOptionsOut> = {}): RefundOptionsOut => ({
   sale_id: 's1',
   number: '20261014-0007',
   status: 'completed',
+  currency: 'EUR',
+  currency_decimals: 2,
   total: 1500,
   refunded_total: 0,
   refundable_total: 1500,

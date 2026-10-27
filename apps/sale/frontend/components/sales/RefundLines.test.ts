@@ -32,8 +32,11 @@ const LINES = [
   line('d', { name: 'Queso', unit: 'kg', quantity: '0.532', left: '0.532', line_total: 950 }),
 ];
 
+/** The sale's own money, as `sale.refund.options` sends it (flow business-currency). */
+const EUR = { currency: 'EUR', decimals: 2 };
+
 async function setup(picked: Record<string, number> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(RefundLines, { props: { lines: LINES, picked }, locale });
+  const m = await mountSale(RefundLines, { props: { lines: LINES, picked, money: EUR }, locale });
   const emitted = () => (m.wrapper.emitted('update:picked') ?? []).map(([value]) => value);
   const check = (id: string) => m.find(`refund-line-check-${id}`);
   /** Ticks or unticks a box, as `ion-checkbox` does (`ionChange` with `checked`). */
@@ -103,10 +106,10 @@ describe('RefundLines: a line paid with a voucher (SALE-F32)', () => {
   const covered = line('v', { name: 'Corte', line_total: 0, paid_by_voucher: true, voucher_name: 'Bono 5 cortes' });
 
   it('says which voucher paid it instead of its amount, and marked, that the session goes back', async () => {
-    const m = await mountSale(RefundLines, { props: { lines: [covered], picked: {} }, locale: 'es' });
+    const m = await mountSale(RefundLines, { props: { lines: [covered], picked: {}, money: EUR }, locale: 'es' });
     expect(m.find('refund-line-amount-v').text()).toBe('Ya pagado · Bono 5 cortes');
     expect(m.find('refund-line-session-v').exists()).toBe(false);
-    const marked = await mountSale(RefundLines, { props: { lines: [covered], picked: { v: 1000 } }, locale: 'es' });
+    const marked = await mountSale(RefundLines, { props: { lines: [covered], picked: { v: 1000 }, money: EUR }, locale: 'es' });
     expect(marked.find('refund-line-session-v').text()).toBe('La sesión vuelve a Bono 5 cortes.');
   });
 });

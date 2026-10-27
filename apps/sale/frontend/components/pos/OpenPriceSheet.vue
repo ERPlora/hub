@@ -9,7 +9,7 @@ import { computed, shallowRef, watch } from 'vue';
 import type { OpenLineIn } from '../../operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
-import { centsFromEuros, formatMoney } from '../../lib/format';
+import { centsFromAmount, formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
@@ -19,6 +19,7 @@ const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ add: [line: Pick<OpenLineIn, 'unit_price' | 'department_id' | 'tax_category_key'>] }>();
 
 const locale = useLocale();
+const business = useBusinessMoney();
 const taxName = useTaxName();
 const typed = shallowRef('');
 const choice = shallowRef<OpenPriceChoice | null>(null);
@@ -29,8 +30,8 @@ watch(open, (isOpen) => {
   choice.value = null;
 });
 
-const cents = computed(() => centsFromEuros(typed.value.replace(/\.$/, '')) ?? 0);
-const amount = computed(() => formatMoney(cents.value, locale.value));
+const cents = computed(() => centsFromAmount(typed.value.replace(/\.$/, ''), business.value) ?? 0);
+const amount = computed(() => formatMoney(cents.value, locale.value, business.value));
 const ready = computed(() => cents.value > 0 && !!choice.value);
 
 function add(): void {
@@ -55,7 +56,10 @@ function add(): void {
         {{ amount }}
       </p>
     </template>
-    <PosNumpad v-model="typed" />
+    <PosNumpad
+      v-model="typed"
+      :decimals="moneyDecimals(business)"
+    />
     <p
       class="pos-sheet-label"
       data-testid="pos-open-price-department-label"

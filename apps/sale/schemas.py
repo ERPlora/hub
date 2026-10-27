@@ -1448,6 +1448,8 @@ class RefundOptionsOut(Schema):
     sale_id: UUID = Field(description="The sale.")
     number: str = Field(description="Its number.")
     status: SaleStatus = Field(description="Its status.")
+    currency: str = Field(description="ISO 4217 currency it was charged in: what goes back goes in it.")
+    currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
     total: int = Field(description="Its total.")
     refunded_total: int = Field(description="Refunded so far.")
     refundable_total: int = Field(description="Still refundable.")
