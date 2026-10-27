@@ -1215,3 +1215,11 @@ msgstr "Muestra de firma"
 #: apps/verifactu/schemas.py
 msgid "Proof of representation"
 msgstr "Justificante de representación"
+
+#: apps/verifactu/schemas.py
+msgid "Certificate password"
+msgstr "Contraseña del certificado"
+
+#: apps/verifactu/schemas.py
+msgid "Invoice number"
+msgstr "Número de factura"

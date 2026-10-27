@@ -7,8 +7,11 @@ import json
 from pathlib import Path
 
 from django.apps import apps
+from django.utils import translation
+from django.utils.text import capfirst
 from live.operations import get, registry
 
+from apps.verifactu.models import Record
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
@@ -76,9 +79,24 @@ def test_the_card_names_the_signed_authorisation_as_its_form_does():
 
 
 def test_the_card_names_the_certificate_as_its_screen_does():
+    """The file and its password, as «Mi certificado» names them: never a bare «Contraseña» from another catalog."""
     upload = get("verifactu.certificate.upload")
-    assert labels(assistant.card(upload, {"p12_base64": "x"}, "es")) == [SCREENS["config"]["certTitle"]]
-    assert labels(assistant.card(upload, {"p12_base64": "x"}, "en")) == [SCREENS_EN["config"]["certTitle"]]
+    arguments = {"p12_base64": "x", "password": "x"}
+    for language, screens in (("es", SCREENS), ("en", SCREENS_EN)):
+        config = screens["config"]
+        assert labels(assistant.card(upload, arguments, language)) == [config["certTitle"], config["password"]]
+
+
+def test_the_card_names_the_invoice_of_a_record_as_the_records_do():
+    """The invoice a record is sealed for, by its id or its number: the number as every other write and the records
+    name it («Número de factura»), never a bare «Número»."""
+    create = get("verifactu.record.create")
+    for language in ("es", "en"):
+        with translation.override(language):
+            invoice_number = capfirst(str(Record._meta.get_field("invoice_number").verbose_name))
+        card = assistant.card(create, {"invoice_id": "x", "number": "F-1"}, language)
+        assert labels(card) == [{"es": "Factura", "en": "Invoice"}[language], invoice_number]
+    assert invoice_number == "Invoice number"
 
 
 def test_the_card_names_the_month_asked_of_the_aeat():

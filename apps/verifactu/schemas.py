@@ -644,7 +644,9 @@ class RecordCreateIn(Schema):
 
     invoice_id: UUID | None = Field(None, description="Id of the issued invoice.")
     number: OptionalText(60) = Field(
-        None, description="Number of the issued invoice, instead of its id."
+        None,
+        title=gettext_noop("Invoice number"),
+        description="Number of the issued invoice, instead of its id.",
     )
 
     @model_validator(mode="after")
@@ -731,7 +733,11 @@ class CertificateUploadIn(Schema):
         title=gettext_noop("Business certificate (.p12 / .pfx)"),
         description="The .p12/.pfx file of the certificate, in base64 (at most 1 MB).",
     )
-    password: SecretStr = Field(SecretStr(""), description="The certificate's password.")
+    password: SecretStr = Field(
+        SecretStr(""),
+        title=gettext_noop("Certificate password"),
+        description="The certificate's password.",
+    )
 
     @field_validator("p12_base64")
     @classmethod
