@@ -8,6 +8,7 @@ from live.context import OperationContext, Scope
 from live.meta import Nav, module_configs
 from live.operations import get
 
+from base.models import AppActivation
 from base.schemas import SessionMeIn, SessionMeOut
 
 pytestmark = pytest.mark.django_db
@@ -79,7 +80,7 @@ class FakeApp:
 
 
 @pytest.fixture
-def two_apps(monkeypatch):
+def two_apps(monkeypatch, every_app_on):
     """Two modules with a menu, one without, and a platform app (which never shows)."""
     apps = [
         FakeApp("demo", "Demo", ["demo.view", "demo.manage"], [Nav("demo", "Demo", "ion:flask-outline", "/demo/items")]),
@@ -93,6 +94,9 @@ def two_apps(monkeypatch):
     ]
     # Patched at the source, so the stand-ins go through the real module_configs() filter.
     monkeypatch.setattr("live.meta.all_live_app_configs", lambda: apps)
+    # ``a`` with every one of them on, as the suite's local hubs have every real module on (the root conftest).
+    AppActivation.objects.filter(host="a").delete()
+    every_app_on("a")
     return apps
 
 
@@ -159,7 +163,7 @@ def test_a_module_out_of_the_store_stays_out_of_a_customers_menu_and_apps(make_u
     assert "demo" not in [app["label"] for app in me["apps"]]
 
 
-def test_a_module_out_of_the_store_shows_on_a_demos_hub_and_with_the_setting_on(make_user, settings):
+def test_a_module_out_of_the_store_shows_on_a_demos_hub_and_with_the_setting_on(make_user, settings, every_app_on):
     """A demo's hub lists it whatever the setting says; development, the tests and the e2e list it everywhere."""
     from django.utils import timezone
 
@@ -167,6 +171,7 @@ def test_a_module_out_of_the_store_shows_on_a_demos_hub_and_with_the_setting_on(
 
     settings.SHOW_UNLISTED_MODULES = False
     demo = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="ready", expires_at=timezone.now())
+    every_app_on(demo.slug)  # a demo is born with every app off (round 2026-10-27): this one turned them on
     on_demo = OperationContext(
         scope=Scope("host", demo.slug), actor=make_user(), permissions=frozenset({"demo.view"}), language="en"
     )

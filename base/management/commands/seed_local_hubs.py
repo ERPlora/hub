@@ -1,4 +1,6 @@
-"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry (plan 2026-10-17, §1.3).
+"""``manage.py seed_local_hubs``: the local hubs ``a`` and ``b``, ready in the registry (plan 2026-10-17, §1.3), with
+every app on and its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off);
+the apps of a local hub that already turned some on or off stay as they are.
 
 The host gate (``base.middleware``) answers 404 to a slug without a row in the registry (``base.Hub``), so a
 developer's database needs ``a`` and ``b`` (``a.localhost:8000``, ``b.localhost:8000``) once, after ``migrate``.

@@ -366,9 +366,10 @@ def test_only_who_manages_the_website_uploads(hub_files):
         upload(png_bytes(), ctx=ctx_for("hub_manager"))
 
 
-def test_a_scope_that_is_no_hub_has_nowhere_to_keep_images(hub_files):
+def test_a_scope_that_is_no_hub_has_nowhere_to_keep_images(hub_files, every_app_on):
     from live.context import Scope
 
+    every_app_on("nohub")  # the website on, so the upload reaches its own check of the registry
     with pytest.raises(NotFound):
         upload(png_bytes(), ctx=ctx_for(scope=Scope("host", "nohub")))
 

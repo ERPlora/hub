@@ -176,8 +176,11 @@ class TestReportReady:
 
 class TestStateApply:
     @pytest.fixture
-    def hub(self):
-        return Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+    def hub(self, every_app_on):
+        """``acme`` with VeriFactu on (a new business is born with every app off, round 2026-10-27)."""
+        hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+        every_app_on("acme")
+        return hub
 
     def apply(self, version, **photo):
         body = {"hub_id": str(HUB_ID), "slug": "acme", "version": version, **photo}

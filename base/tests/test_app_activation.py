@@ -29,6 +29,9 @@ from base.tenancy import inventory
 
 A = Scope("host", "a")
 B = Scope("host", "b")
+#: Businesses a test registers: born with every app off (round 2026-10-27), unlike the suite's ``a`` and ``b``.
+C = Scope("host", "c")
+D = Scope("host", "d")
 ADMIN = "base.administer_hub"
 HOME = "base.view_home"
 
@@ -106,10 +109,10 @@ def test_an_activation_lives_in_the_hubs_database():
 
 @pytest.mark.django_db
 def test_a_hub_has_one_row_per_app():
-    AppActivation.objects.create(host="a", app="task", state=ON, chosen=True)
-    AppActivation.objects.create(host="b", app="task", state=OFF, chosen=False)
+    AppActivation.objects.create(host="c", app="task", state=ON, chosen=True)
+    AppActivation.objects.create(host="d", app="task", state=OFF, chosen=False)
     with pytest.raises(IntegrityError), transaction.atomic():
-        AppActivation.objects.create(host="a", app="task", state=OFF, chosen=False)
+        AppActivation.objects.create(host="c", app="task", state=OFF, chosen=False)
 
 
 @pytest.mark.django_db
@@ -119,8 +122,22 @@ def test_a_state_is_on_or_off():
 
 
 @pytest.mark.django_db
-def test_a_business_that_never_changed_anything_has_every_app_on_and_writes_nothing():
-    """The existing hubs (and every new one in phase 1): every app on, the roots chosen (PLAN §32, point 2)."""
+def test_a_business_that_never_changed_anything_has_every_app_off_and_writes_nothing():
+    """Round 2026-10-27: a hub is born with every app off; reading its apps writes nothing."""
+    Hub.objects.create(slug="c", status="ready")
+    document = app_list(C)
+    assert {app["id"]: (app["state"], app["chosen"]) for app in document["apps"]} == {
+        label: ("off", False) for label in activation.module_graph()
+    }
+    assert (document["max_apps"], document["enabled"]) == (None, 0)
+    assert relay.active_apps(C).isdisjoint(activation.module_graph())
+    assert rows("c") == {}
+
+
+@pytest.mark.django_db
+def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
+    """What the migration base.0017 wrote for the hubs of before round 2026-10-27 (as the suite's ``a``): every app
+    on, the roots chosen (PLAN §32, point 2)."""
     document = app_list()
     graph = activation.module_graph()
     roots = activation.roots(graph, graph)
@@ -128,7 +145,83 @@ def test_a_business_that_never_changed_anything_has_every_app_on_and_writes_noth
         label: ("on", label in roots) for label in graph
     }
     assert (document["max_apps"], document["enabled"]) == (None, 17)
-    assert not AppActivation.objects.exists()
+
+
+@pytest.mark.django_db
+def test_erploras_own_hub_and_the_workers_scope_have_every_app_on(settings):
+    """Phase 1 runs every app's scheduled tasks on the worker's scope (``WORKER_SCOPE_SLUG``) over the tables every
+    hub shares, and ERPlora's own hub (``PLATFORM_HUB_SLUG``) issues ERPlora's invoices with Invoicing and VeriFactu:
+    neither is a business that chooses its apps, so neither is born with them off (round 2026-10-27)."""
+    settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG = "erplora", "worker-scope"
+    graph = activation.module_graph()
+    for slug in ("erplora", "worker-scope"):
+        scope = Scope("host", slug)
+        assert activation.off_apps(scope) == frozenset()
+        assert activation.states_of(scope) == activation.every_on(graph)
+        assert {"invoice", "verifactu", "whatsapp_inbox"} <= relay.active_apps(scope)
+    assert activation.off_apps(Scope("host", "c")) == frozenset(graph)
+
+
+# ── How a hub is born (round 2026-10-27) ──────────────────────────────────────────────────────────────────────
+
+
+def modules_on(scope):
+    return set(relay.active_apps(scope)) & set(activation.module_graph())
+
+
+@pytest.mark.django_db
+def test_a_business_the_saas_registers_is_born_with_every_app_off():
+    from live.context import system_context
+
+    from base import registry
+    from base.schemas import HubRegistryIn
+
+    get("base.hub.register")(
+        system_context(registry.REGISTRY_SCOPE),
+        HubRegistryIn(id="0199c4b0-0000-7000-8000-0000000000c1", slug="nuevo", name="Nuevo", country="ES",
+                      timezone="Europe/Madrid", language="es", vertical="restaurant"),
+    )
+
+    assert Hub.objects.get(slug="nuevo").status == "ready"
+    assert modules_on(Scope("host", "nuevo")) == set()
+    assert rows("nuevo") == {}
+
+
+@pytest.mark.django_db
+def test_a_demo_is_born_with_every_app_off():
+    import hashlib
+
+    from live.context import system_context
+
+    from base import registry
+    from base.schemas import DemoCreateIn
+
+    demo = get("base.demo.create")(
+        system_context(registry.REGISTRY_SCOPE),
+        DemoCreateIn(session_key=hashlib.sha256(b"a browser").hexdigest(), vertical="restaurant", language="es"),
+    )
+
+    assert modules_on(Scope("host", demo.slug)) == set()
+    assert rows(demo.slug) == {}
+
+
+@pytest.mark.django_db
+def test_the_local_hubs_are_seeded_with_every_app_on_and_keep_what_they_chose():
+    """``seed_local_hubs`` leaves the developer's hubs as every hub of before round 2026-10-27: every app on, the
+    roots chosen; a local hub that already changed its apps keeps them."""
+    from live.context import system_context
+
+    from base import registry
+    from base.schemas import HubSeedLocalIn
+
+    set_rows("b", task="on*", staff="on")
+    seed = get("base.hub.seed_local")
+
+    seed(system_context(registry.REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c", "b"]))
+
+    graph = activation.module_graph()
+    assert rows("c") == activation.every_on(graph)
+    assert modules_on(Scope("host", "b")) == {"task", "staff"}
 
 
 def test_the_hubs_admin_shows_the_rows_and_changes_none(rf):
@@ -212,27 +305,31 @@ def test_one_already_on_and_chosen_changes_nothing_and_records_nothing():
 
 @pytest.mark.django_db
 def test_the_first_change_writes_down_every_app_of_the_business():
-    """A business on the baseline gets its rows the first time it changes something: every app as it was, and the
-    change. Another business keeps its own baseline."""
-    disable("task")
+    """A business on the baseline (born, every app off) gets its rows the first time it changes something: every app
+    as it was, off, and the change; so a second change at the same time has rows to lock (the plan's limit). Another
+    business keeps its own baseline."""
+    Hub.objects.create(slug="c", status="ready")
+    Hub.objects.create(slug="d", status="ready")
 
-    graph = activation.module_graph()
-    roots = activation.roots(graph, graph)
-    expected = {label: Activation(ON, label in roots) for label in graph}
-    expected["task"] = Activation(OFF, False)
-    assert rows("a") == expected
-    assert rows("b") == {}
-    assert by_id(app_list(B))["task"]["state"] == "on"
+    enable("task", context=ctx(scope=C))
+
+    expected = {label: Activation(OFF, False) for label in activation.module_graph()}
+    expected["task"] = Activation(ON, True)
+    expected["staff"] = Activation(ON, False)  # what Tasks needs comes along, not chosen
+    assert rows("c") == expected
+    assert rows("d") == {}
+    assert by_id(app_list(D))["task"]["state"] == "off"
 
 
 @pytest.mark.django_db
 def test_an_unknown_app_or_the_platform_is_not_found():
+    before = rows()
     for label in ("nope", "base", "live"):
         with pytest.raises(NotFound):
             enable(label)
         with pytest.raises(NotFound):
             disable(label)
-    assert not AppActivation.objects.exists()
+    assert rows() == before
 
 
 @pytest.mark.django_db

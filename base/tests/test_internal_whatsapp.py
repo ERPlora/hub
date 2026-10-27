@@ -43,13 +43,18 @@ def secret(settings):
 
 
 @pytest.fixture
-def acme(db):
-    return Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+def acme(db, every_app_on):
+    """A business with WhatsApp on (a new one is born with every app off, round 2026-10-27)."""
+    hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+    every_app_on("acme")
+    return hub
 
 
 @pytest.fixture
-def other(db):
-    return Hub.objects.create(id="0199c4b0-0000-7000-8000-000000000002", slug="other", status="ready")
+def other(db, every_app_on):
+    hub = Hub.objects.create(id="0199c4b0-0000-7000-8000-000000000002", slug="other", status="ready")
+    every_app_on("other")
+    return hub
 
 
 def message(wa_id: str = "wamid.1", hub: str = "acme", **fields) -> dict:

@@ -49,11 +49,13 @@ LOCAL_HUBS = ("a", "b")
 
 @pytest.fixture(autouse=True)
 def local_hubs(request):
-    """The local hubs ``a`` and ``b``, ready, in the registry (``base.Hub``) of every test that uses the database.
+    """The local hubs ``a`` and ``b``, ready, in the registry (``base.Hub``) of every test that uses the database, with
+    every app on (``base.activation.every_on``), as the developer's database has them after ``seed_local_hubs``.
 
-    The host gate (``base.middleware``) answers 404 to a slug without a row, so a test on ``a.localhost`` needs it,
-    as the developer's database has it after ``seed_local_hubs``. A test without the database gets nothing (and a
-    test without it that asks ``a.localhost`` for a hub's page fails: it must say ``django_db``).
+    The host gate (``base.middleware``) answers 404 to a slug without a row, so a test on ``a.localhost`` needs it.
+    A hub is born with every app off (round 2026-10-27): a test of a new hub creates its own row, and one about how a
+    hub is born clears ``a``'s rows. A test without the database gets nothing (and a test without it that asks
+    ``a.localhost`` for a hub's page fails: it must say ``django_db``).
     """
     marked = request.node.get_closest_marker("django_db") is not None
     if not (marked or {"db", "transactional_db"} & set(request.fixturenames)):
@@ -63,6 +65,28 @@ def local_hubs(request):
 
     for slug in LOCAL_HUBS:
         Hub.objects.get_or_create(slug=slug, defaults={"status": Hub.Status.READY})
+        _every_app_on(slug)
+
+
+def _every_app_on(slug):
+    """Write down every app on in the business ``slug``, its roots chosen, unless it has rows already: what the
+    migration ``base.0017`` left every hub of before round 2026-10-27, and ``seed_local_hubs`` the local ones."""
+    from base import activation
+    from base.models import AppActivation
+
+    if AppActivation.objects.filter(host=slug).exists():
+        return
+    every_on = activation.every_on(activation.module_graph())
+    AppActivation.objects.bulk_create(
+        AppActivation(host=slug, app=app, state=row.state, chosen=row.chosen) for app, row in every_on.items()
+    )
+
+
+@pytest.fixture
+def every_app_on():
+    """``every_app_on(slug)``: a business the test creates, with every app on as a hub of before round 2026-10-27
+    (a new one is born with every app off). Writes the rows, no event: it was so before the test."""
+    return _every_app_on
 
 
 @pytest.fixture
@@ -120,13 +144,20 @@ def hub_databases(django_db_setup, django_db_blocker):
 
 
 def _hub_with_its_database(request, hub_id, slug, db_name):
-    """The row in control of a hub whose database the session made; the test names it in its ``django_db``
-    (``databases=hubs.HUB_DATABASES``), whose transaction rolls both back. A ``transaction=True`` test commits in
-    the hub's database: its rows are deleted after it."""
+    """The row in control of a hub whose database the session made, with every app on in it (``every_app_on``); the
+    test names it in its ``django_db`` (``databases=hubs.HUB_DATABASES``), whose transaction rolls both back. A
+    ``transaction=True`` test commits in the hub's database: its rows are deleted after it."""
+    from base.tenancy import identity
+    from base.tenancy.context import use_hub
     from base.tenancy.tests import hubs
     from control.models import Hub
 
     hub = Hub.objects.create(id=hub_id, slug=slug, status=Hub.Status.READY, db_name=db_name)
+    verified = set(identity._verified)
+    with use_hub(hub):
+        _every_app_on(slug)
+    # Its identity is read when the test opens the hub, as before this write (test_identity counts that read).
+    identity._verified.intersection_update(verified)
     yield hub
     marker = request.node.get_closest_marker("django_db")
     if marker is not None and marker.kwargs.get("transaction"):

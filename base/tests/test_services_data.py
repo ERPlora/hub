@@ -17,8 +17,9 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
-from base import blueprint, services
-from base.models import Hub, ImportBatch, Membership
+from base import activation, blueprint, events as base_events, relay, services
+from base.catalog import template_apps
+from base.models import AppActivation, Hub, ImportBatch, Membership
 from base.permissions import permissions_for
 
 pytestmark = pytest.mark.django_db
@@ -55,7 +56,7 @@ def events(name):
     return list(OutboxEvent.objects.filter(name=name, scope_key="a").values_list("payload", flat=True))
 
 
-def a_file(purpose="template", data=None):
+def a_file(purpose="template", data=None, apps=("table",)):
     bundle = blueprint.Bundle(
         manifest=blueprint.manifest(
             name="Bar Pepe",
@@ -64,7 +65,7 @@ def a_file(purpose="template", data=None):
             purpose=purpose,
             created_at="2026-10-24T10:00:00+00:00",
             vertical="restaurant",
-            apps=["table"],
+            apps=list(apps),
         ),
         data=data or {"table.zone": [{"name": "Patio", "description": "", "color": "warning", "sort_order": 1}]},
     )
@@ -323,3 +324,147 @@ def test_a_reset_without_the_exact_name_or_a_section_removes_nothing(owner, own_
 def test_who_does_not_run_the_hub_cannot_reset(manager, own_database):
     with pytest.raises(PermissionDenied):
         call(manager, "base.hub.reset", dry_run=True)
+
+
+# ── A business born with every app off (round 2026-10-27): the blueprint turns its apps on, then loads ──────────────
+
+C = Scope("host", "c")
+
+
+@pytest.fixture
+def born():
+    """A business as it is born: ready in the registry, every app off (no row), and its owner."""
+    Hub.objects.create(slug="c", status=Hub.Status.READY)
+    user = get_user_model().objects.create_user(username="carla", password="pw")
+    Membership.objects.create(user=user, host="c", role=Membership.Role.OWNER)
+    return OperationContext(scope=C, actor=user, permissions=permissions_for(user, C), language="es")
+
+
+def modules_on(scope=C):
+    return set(relay.active_apps(scope)) & set(activation.module_graph())
+
+
+def chosen(host="c"):
+    return set(AppActivation.objects.filter(host=host, state="on", chosen=True).values_list("app", flat=True))
+
+
+def enabled_events(host="c"):
+    return sorted(
+        OutboxEvent.objects.filter(name=base_events.APP_ENABLED, scope_key=host).values_list("payload__app", flat=True)
+    )
+
+
+@pytest.fixture
+def load(django_capture_on_commit_callbacks):
+    """``base.blueprint.import`` as a request runs it: what runs after its COMMIT (the cache of the apps off forgotten)
+    runs too, so what the test reads next sees the apps it turned on."""
+
+    def run(ctx, **data):
+        with django_capture_on_commit_callbacks(execute=True):
+            return call(ctx, "base.blueprint.import", **data)
+
+    return run
+
+
+def with_max_apps(slug, max_apps):
+    Hub.objects.filter(slug=slug).update(
+        state={"plan": {"slug": "free", "max_users": 0, "max_devices": 0, "max_apps": max_apps}}, state_version=1
+    )
+
+
+def test_a_template_turns_on_its_apps_and_then_loads_them(born, load):
+    assert modules_on() == set()
+    apps = template_apps("restaurant")
+    roots = activation.roots(apps, activation.module_graph())
+
+    loaded = load(born, template="restaurant.es")
+
+    assert modules_on() == set(apps)
+    # Only its roots are chosen (what the plan's limit counts); what they need came along, as base.app.enable does.
+    assert chosen() == roots and len(roots) == 13
+    assert enabled_events() == sorted(roots)
+    assert (loaded.status, loaded.rows) == ("complete", 34)
+    assert total(born, "inventory.product.list") == 16
+    assert total(born, "table.table.list") == 10
+    assert all(app.reason == "" for app in loaded.report.apps)
+
+
+def test_only_the_apps_chosen_are_turned_on(born, load):
+    loaded = load(born, template="restaurant.es", apps=["table"])
+
+    assert modules_on() == {"table"} | activation.needs(["table"], activation.module_graph())
+    assert chosen() == {"table"}
+    assert "inventory" not in modules_on()
+    assert total(born, "table.table.list") == 10
+    assert {app.id: app.status for app in loaded.report.apps}["inventory"] == "not_selected"
+
+
+def test_an_app_beyond_the_plans_limit_stays_off_says_why_and_the_rest_loads(born, load):
+    with_max_apps("c", 1)
+    file = a_file(
+        apps=("inventory", "table"),
+        data={
+            "inventory.category": [{"name": "Bebidas", "description": ""}],
+            "table.zone": [{"name": "Patio", "description": "", "color": "warning", "sort_order": 1}],
+        },
+    )
+
+    loaded = load(born, file_base64=file)
+
+    assert chosen() == {"inventory"}
+    assert "table" not in modules_on()
+    with pytest.raises(services.AppLimitReached) as refused:
+        call(born, "base.app.enable", app="table")
+    report = {app.id: app for app in loaded.report.apps}
+    assert (report["inventory"].status, report["inventory"].reason) == ("applied", "")
+    assert (report["table"].status, report["table"].reason) == ("inactive", refused.value.message)
+    assert report["table"].reason.strip()
+    assert loaded.status == "partial"
+    assert [row.name for row in call(born, "inventory.category.list", limit=10).rows] == ["Bebidas"]
+
+
+def test_a_paid_app_without_its_right_stays_off_and_says_why(born, load, monkeypatch):
+    from django.apps import apps as django_apps
+
+    from base import entitlement
+
+    monkeypatch.setattr(django_apps.get_app_config("table"), "premium", True)
+
+    loaded = load(born, template="restaurant.es")
+
+    table = next(app for app in loaded.report.apps if app.id == "table")
+    assert (table.status, table.reason) == ("inactive", entitlement.refused("table", "es").message)
+    assert "table" not in modules_on()
+    assert total(born, "inventory.product.list") == 16
+
+
+def test_a_backup_turns_on_its_apps_too(born, load):
+    backup = a_file(
+        purpose="backup",
+        apps=("customer",),
+        data={"customer.customer": [{"name": "Lucía Pérez", "email": "lucia@example.com", "phone": ""}]},
+    )
+
+    loaded = load(born, file_base64=backup)
+
+    assert modules_on() == {"customer"}
+    assert chosen() == {"customer"}
+    assert loaded.status == "complete"
+    assert total(born, "customer.customer.list") == 1
+
+
+def test_the_apps_just_turned_on_load_though_the_cache_still_had_them_off(born, load):
+    """The apps off are cached per business (``base.activation``); the load reads what it turned on, never the cache."""
+    assert "inventory" in activation.off_apps(C)  # kept in the cache now
+
+    load(born, template="restaurant.es")
+
+    assert total(born, "inventory.product.list") == 16
+
+
+def test_an_app_already_on_is_left_as_it_is(owner, load):
+    """``a`` has every app on: the load turns nothing on and records no change."""
+    load(owner, template="restaurant.es")
+
+    assert enabled_events("a") == []
+    assert total(owner, "inventory.product.list") == 16

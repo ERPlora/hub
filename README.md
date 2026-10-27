@@ -147,8 +147,8 @@ del cliente, la ronda enviada abre su comanda en cocina, etc. Cada app lo recibe
 la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó (su aviso vivo sale por el
 canal de ese hub). Una reacción que falla se deshace y reintenta a los 2, 4, 8… s (una hora como mucho); al octavo
 intento queda `dead` con su error, en el log y en la fila. Los eventos que una reacción anota se reparten un nivel
-más abajo, y pasado el 16 no se entregan. En la fase 1 todas las apps instaladas están encendidas; una app que se
-enciende después no recibe lo anterior. Lo anotado antes de la migración `base/0006_event_delivery` (el atraso desde
+más abajo, y pasado el 16 no se entregan. Un negocio nace con todas las apps apagadas (ronda 2026-10-27; los
+hubs de antes las conservan encendidas, migración `base/0017`); una app que se enciende después no recibe lo anterior. Lo anotado antes de la migración `base/0006_event_delivery` (el atraso desde
 el primer despliegue) se da por repartido sin aplicarse.
 
 ## `/ws/print`: el canal del dispositivo que imprime

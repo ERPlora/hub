@@ -82,11 +82,14 @@ def code(answer) -> str:
 
 @pytest.fixture(autouse=True)
 def registered(request):
-    """The business of ``HUB_ID`` in the registry (``acme``), for the tests that use the database."""
+    """The business of ``HUB_ID`` in the registry (``acme``), with VeriFactu on (every app, as a hub of before round
+    2026-10-27: a new one is born with every app off), for the tests that use the database."""
     if "db" not in request.fixturenames:
         return None
     request.getfixturevalue("db")
-    return Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+    hub = Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+    request.getfixturevalue("every_app_on")("acme")
+    return hub
 
 
 # The signature
