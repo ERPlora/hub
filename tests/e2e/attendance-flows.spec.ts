@@ -183,8 +183,12 @@ for (const vp of VIEWPORTS) {
       await expect(recordRow(page, beaDay.id)).toContainText(`${bea} Clock`);
       await expect(recordRow(page, cidDay.id)).toContainText(`${cid} Clock`);
       if (vp.width >= 834) {
-        // The list fits its box: nothing slides under the pinned actions.
-        await expect(view.locator('[data-testid=attendance-records] .data-table__scroll--overflow')).toHaveCount(0);
+        // The list fits its box: nothing slides under the pinned actions. The list is the DataTable that
+        // holds the days' rows: its `testid` only prefixes its hooks, and `[data-testid=attendance-records]`
+        // is the page's notices, so a probe under it never met the list and always passed.
+        const scroll = view.locator('.data-table', { has: page.locator('[data-testid=attendance-records-row]') }).locator('.data-table__scroll');
+        await expect(scroll, `the list of days at ${vp.label}`).toHaveCount(1);
+        await expect(scroll, `the list of days fits its box at ${vp.label}`).not.toHaveClass(/(^|\s)data-table__scroll--overflow(\s|$)/);
         // In the list, each person's whole name is read, never cut to «E2EAtt834B…».
         for (const id of [beaDay.id, cidDay.id]) {
           const name = recordRow(page, id).locator('[role=cell]').nth(1).locator('.data-table__text');
@@ -214,6 +218,7 @@ for (const vp of VIEWPORTS) {
         }
       }
       await snap(page, 'F07', vp.label);
+      await page.screenshot({ path: shot(`FIX-HUB-E2E-ATTENDANCE-OVERFLOW-PROBE-DEAD-${vp.label}`) });
       const search = view.locator('[data-testid=attendance-records-search] input');
       await search.fill(cid);
       await expect(recordRow(page, beaDay.id)).toHaveCount(0);
