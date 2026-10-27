@@ -11,7 +11,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, moneyRefusal, readMoney } from '../lib/money';
+import { moneyDecimals, formatMoney, moneyRefusal, readMoney, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import type { ManualType } from '../operations';
 import MoneyField from './MoneyField.vue';
@@ -22,6 +22,7 @@ const open = defineModel<boolean>('open', { required: true });
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const command = useCommand('cash_register.movement.add');
 
 const type = shallowRef<ManualType>('in');
@@ -48,8 +49,8 @@ const amountError = computed(() => amountRefusal.value ?? error.value?.fields?.a
 async function confirm(): Promise<void> {
   const session = props.session;
   if (!session) return;
-  const read = readMoney(amount.value);
-  amountRefusal.value = read.ok && !read.cents ? t('cash_register.money.zero') : moneyRefusal(read, t, locale.value);
+  const read = readMoney(amount.value, moneyDecimals(business.value), business.value?.currency);
+  amountRefusal.value = read.ok && !read.cents ? t('cash_register.money.zero') : moneyRefusal(read, t, locale.value, business.value);
   if (!read.ok || !read.cents) return;
   const cents = read.cents;
   try {
@@ -58,7 +59,7 @@ async function confirm(): Promise<void> {
     return; // The window shows `command.error`.
   }
   const key = type.value === 'in' ? 'cash_register.movement.doneIn' : 'cash_register.movement.doneOut';
-  void toastSuccess(t(key, { amount: formatMoney(cents, locale.value) }));
+  void toastSuccess(t(key, { amount: formatMoney(cents, locale.value, business.value) }));
   open.value = false;
 }
 </script>

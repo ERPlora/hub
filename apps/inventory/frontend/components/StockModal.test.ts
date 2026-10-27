@@ -28,6 +28,7 @@ async function setup(kind: 'receive' | 'count' | 'write_off', props: Record<stri
     locale,
     attach: true,
   });
+  await m.live();
   await flush();
   const el = (id: string) => document.querySelector<Control>(`[data-testid="${id}"]`);
   async function type(id: string, value: string) {

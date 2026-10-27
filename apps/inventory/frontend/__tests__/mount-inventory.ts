@@ -23,6 +23,7 @@ import {
   type ApiCall,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -69,8 +70,31 @@ export const EMPLOYEE: SessionMe = {
   permissions: ['inventory.view_product', 'inventory.view_category', 'inventory.view_stock', 'tax.view'],
 };
 
+/** The business of the hub (`base.business.get`): one in Spain, in euros, unless a test says another
+ *  (flow business-currency: the money of every screen is the business's). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
 export interface MountOptions {
   props?: Record<string, unknown>;
+  /** What `base.business.get` answers when the stream opens; `null`: it never answers (the currency unknown). */
+  business?: Business | null;
   path?: string;
   locale?: 'en' | 'es';
   session?: SessionMe;
@@ -235,8 +259,13 @@ export async function mountInventory(component: Component, options: MountOptions
       stubs: options.stubs,
     },
   });
-  /** Opens the stream; returns the call to push frames into. */
-  const live = (): Promise<StreamCall> => harness.goLive();
+  /** Opens the stream and answers the business, if a piece follows it; returns the call to push frames into. */
+  const live = async (): Promise<StreamCall> => {
+    const call = await harness.goLive();
+    const answer = options.business === undefined ? business() : options.business;
+    if (answer && harness.client.stream.subscriptions('base.business.get').length) await result(call, 'base.business.get', answer);
+    return call;
+  };
   /** Pushes a result for the `index`-th subscription of `op` and lets Vue render it. */
   async function result(call: StreamCall, op: OpName, data: unknown, rev = 1, index = 0): Promise<void> {
     call.push(resultFrame(subId(harness.client, op, index), data, rev));

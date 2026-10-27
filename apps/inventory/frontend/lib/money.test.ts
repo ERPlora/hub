@@ -22,10 +22,24 @@ describe('parseMoney', () => {
   });
 
   it('reads what is pasted from the screen: the euro sign or code and the spaces around', () => {
-    expect(parseMoney('2,20 €')).toEqual({ ok: true, cents: 220 });
-    expect(parseMoney('€2.20')).toEqual({ ok: true, cents: 220 });
-    expect(parseMoney(' 1.234,56 € ')).toEqual({ ok: true, cents: 123456 });
-    expect(parseMoney('3 EUR')).toEqual({ ok: true, cents: 300 });
+    expect(parseMoney('2,20 €', { currency: 'EUR', decimals: 2 })).toEqual({ ok: true, cents: 220 });
+    expect(parseMoney('€2.20', { currency: 'EUR', decimals: 2 })).toEqual({ ok: true, cents: 220 });
+    expect(parseMoney(' 1.234,56 € ', { currency: 'EUR', decimals: 2 })).toEqual({ ok: true, cents: 123456 });
+    expect(parseMoney('3 EUR', { currency: 'EUR', decimals: 2 })).toEqual({ ok: true, cents: 300 });
+  });
+
+  // flow business-currency: the business's currency around the figure is noise; another one is not.
+  it('reads the zloty a business in Poland pastes, and not the euro', () => {
+    expect(parseMoney('12,50 zł', { currency: 'PLN', decimals: 2 })).toEqual({ ok: true, cents: 1250 });
+    expect(parseMoney('PLN 12.50', { currency: 'PLN', decimals: 2 })).toEqual({ ok: true, cents: 1250 });
+    expect(parseMoney('12,50 €', { currency: 'PLN', decimals: 2 })).toEqual({ ok: false, reason: 'not_amount' });
+    expect(parseMoney('12,50 €')).toEqual({ ok: false, reason: 'not_amount' });
+  });
+
+  it('reads the yen without decimals: a mark only groups', () => {
+    expect(parseMoney('1.250', { currency: 'JPY', decimals: 0 })).toEqual({ ok: true, cents: 1250 });
+    expect(parseMoney('¥1,210', { currency: 'JPY', decimals: 0 })).toEqual({ ok: true, cents: 1210 });
+    expect(parseMoney('12,5', { currency: 'JPY', decimals: 0 })).toEqual({ ok: false, reason: 'not_amount' });
   });
 
   it('a repeated single mark groups thousands', () => {
@@ -66,10 +80,18 @@ describe('moneyFieldText', () => {
 
 describe('normaliseMoneyText', () => {
   it('rewrites a readable amount in the page format and leaves anything else as typed', () => {
-    expect(normaliseMoneyText('2.2', 'es')).toBe('2,20');
-    expect(normaliseMoneyText('1.234,5 €', 'en')).toBe('1234.50');
-    expect(normaliseMoneyText('1.250', 'es')).toBe('1.250');
-    expect(normaliseMoneyText('abc', 'es')).toBe('abc');
-    expect(normaliseMoneyText('', 'es')).toBe('');
+    expect(normaliseMoneyText('2.2', 'es', { currency: 'EUR', decimals: 2 })).toBe('2,20');
+    expect(normaliseMoneyText('1.234,5 €', 'en', { currency: 'EUR', decimals: 2 })).toBe('1234.50');
+    expect(normaliseMoneyText('1.250', 'es', { currency: 'EUR', decimals: 2 })).toBe('1.250');
+    expect(normaliseMoneyText('abc', 'es', { currency: 'EUR', decimals: 2 })).toBe('abc');
+    expect(normaliseMoneyText('', 'es', { currency: 'EUR', decimals: 2 })).toBe('');
+  });
+});
+
+describe('moneyFieldText of other currencies', () => {
+  it('writes the decimals of the business’s currency, none for the yen', () => {
+    expect(moneyFieldText(1250, 'es', { currency: 'PLN', decimals: 2 })).toBe('12,50');
+    expect(moneyFieldText(1210, 'en', { currency: 'JPY', decimals: 0 })).toBe('1210');
+    expect(normaliseMoneyText('1.210', 'en', { currency: 'JPY', decimals: 0 })).toBe('1210');
   });
 });

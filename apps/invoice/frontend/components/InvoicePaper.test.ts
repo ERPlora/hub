@@ -28,6 +28,8 @@ const INVOICE = {
   base_amount: 2000,
   tax_amount: 420,
   total_amount: 2420,
+  currency: 'EUR',
+  currency_decimals: 2,
   tax_breakdown: [{ tax: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate: '21.00', surcharge_rate: '0.00', base: 2000, quota: 420, surcharge_quota: 0 }],
   lines: [{ id: 'l1', position: 1, description: 'Course', quantity: '2.000', unit_price: '1000.00', discount_amount: 0, tax_rate: '21.00', surcharge_rate: '0.00', tax_category_key: '', base_amount: 2000, tax_amount: 420, total_amount: 2420, product_id: null }],
 } as unknown as InvoiceOut;

@@ -13,7 +13,7 @@ import { IonToggle } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { type ApiCall, EMPLOYEE, errorFrame, flush, type MountOptions, mountInventory, ok, page, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
+import { business, EMPLOYEE, errorFrame, flush, mountInventory, ok, page, POLISH, product, refusal, subId, UNITS, type ApiCall, type MountOptions } from '../__tests__/mount-inventory';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
 import ProductDetailModal from '../components/ProductDetailModal.vue';
@@ -99,7 +99,7 @@ describe('ProductsPage: the list', () => {
       ['stock', 'Stock', true],
       ['status', 'Status', false],
     ]);
-    expect(s.rows()[0].text()).toContain(formatMoney(220, 'en'));
+    expect(s.rows()[0].text()).toContain(formatMoney(220, 'en', { currency: 'EUR', decimals: 2 }));
     // The stock has its own hook, exact: a SKU may contain the same figure.
     expect(s.wrapper.findAll('[data-testid="inventory-product-stock"]').map((c) => c.text())).toEqual(['5', '—', '5']);
   });
@@ -223,7 +223,7 @@ describe('ProductsPage: the list', () => {
     await s.filter({ price_min: 'doce', price_max: '1.250', stock_min: 'x' });
     expect(s.prop('filterErrors')).toEqual({
       price_min: 'This is not an amount. Type a figure, for example 12.50.',
-      price_max: `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en')} or ${formatMoney(125, 'en')}. Write the decimals so there is no doubt.`,
+      price_max: `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en', { currency: 'EUR', decimals: 2 })} or ${formatMoney(125, 'en', { currency: 'EUR', decimals: 2 })}. Write the decimals so there is no doubt.`,
       stock_min: 'This is not a quantity. Type a figure with up to three decimals, for example 2.5.',
     });
     expect(s.params('inventory.product.list')).toEqual([{ sort: 'name', limit: 50, offset: 0 }]);
@@ -487,5 +487,12 @@ describe('ProductsPage: the list fills the page (FIX-DATATABLE-HUB)', () => {
   it('AppPage `fill` and its DataTable `fill`, only stacks between them: from the topbar to the tabbar', async () => {
     const s = await setup();
     expect(listFillProblems(s.wrapper)).toEqual([]);
+  });
+
+  it('a business in Poland reads its prices in zlotys (flow business-currency)', async () => {
+    const s = await setup({ business: business(POLISH) });
+    await s.show(LIST);
+    expect(s.rows()[0].text()).toContain(formatMoney(220, 'en', { currency: 'PLN', decimals: 2 }));
+    expect(s.rows()[0].text()).not.toContain('€');
   });
 });

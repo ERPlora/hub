@@ -88,7 +88,7 @@ describe('DashboardPage', () => {
       ['In stock', '9', '/inventory/products'],
       ['Out of stock', '3', '/inventory/products'],
       ['Low stock', '4', '/inventory/products'],
-      ['Inventory value', formatMoney(123456, 'en'), null],
+      ['Inventory value', formatMoney(123456, 'en', { currency: 'EUR', decimals: 2 }), null],
     ]);
     expect(s.wrapper.findAllComponents(KpiTile).at(-1)!.props('note')).toBe('at cost');
     expect(s.testid('inventory-dashboard-without-cost').exists()).toBe(false);
@@ -196,7 +196,7 @@ describe('DashboardPage', () => {
     await s.summary({ ...SUMMARY, products_without_cost: 3 });
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Inventario');
     expect(s.kpis().map((k) => k[0])).toEqual(['Productos seguidos', 'En stock', 'Agotados', 'Stock bajo', 'Valor de existencias']);
-    expect(s.kpis()[4][1]).toBe(formatMoney(123456, 'es'));
+    expect(s.kpis()[4][1]).toBe(formatMoney(123456, 'es', { currency: 'EUR', decimals: 2 }));
     expect(s.testid('inventory-dashboard-without-cost').text()).toBe('3 productos sin coste registrado: el valor mostrado es parcial');
     await s.lowStock(page([], 0, 5));
     expect(s.prop('emptyMessage')).toBe('Sin productos en stock bajo.');

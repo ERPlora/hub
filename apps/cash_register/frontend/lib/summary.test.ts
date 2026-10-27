@@ -49,11 +49,11 @@ const session = (over: Partial<SessionOut> = {}): SessionOut => ({
   ...over,
 });
 
-const read = (s: SessionOut) => Object.fromEntries(summaryItems(s, t, 'en', date).map((item) => [item.key, plain(item.value)]));
+const read = (s: SessionOut) => Object.fromEntries(summaryItems(s, t, 'en', date, { currency: 'EUR', decimals: 2 }).map((item) => [item.key, plain(item.value)]));
 
 describe('summaryItems', () => {
   it('a closed session: who and when, every figure, the difference with its sign and the notes written', () => {
-    const items = summaryItems(session(), t, 'en', date);
+    const items = summaryItems(session(), t, 'en', date, { currency: 'EUR', decimals: 2 });
     expect(items.map((item) => item.key)).toEqual([
       'status',
       'register',
@@ -108,7 +108,7 @@ describe('summaryItems', () => {
       total_gifts: null,
       expected_cash: null,
     };
-    const keys = summaryItems(blind, t, 'en', date).map((item) => item.key);
+    const keys = summaryItems(blind, t, 'en', date, { currency: 'EUR', decimals: 2 }).map((item) => item.key);
     expect(keys).not.toContain('cashSales');
     expect(read(blind)).toMatchObject({ opening: '€100.00', sales: '—', refunds: '—', cashIn: '—', cashOut: '—', gifts: '—', expected: '—' });
   });

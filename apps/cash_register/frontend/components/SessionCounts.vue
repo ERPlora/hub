@@ -7,13 +7,14 @@ import { computed } from 'vue';
 
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/money';
+import { formatMoney, useBusinessMoney } from '../lib/money';
 import type { CountOut } from '../operations';
 
 const props = defineProps<{ sessionId: string }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 const table = useServerTable('cash_register.count.list', {
   sort: 'counted_at',
@@ -29,7 +30,7 @@ const when = (row: CountOut): string => formatDateTime(row.counted_at, locale.va
 const columns = computed<DataTableColumn<CountOut>[]>(() => [
   { key: 'counted_at', label: t('cash_register.counts.columns.when'), sortable: true, width: 'minmax(9.5rem,1fr)', format: (_, row) => when(row) },
   { key: 'type', label: t('cash_register.counts.columns.type'), sortable: true, format: (_, row) => t(`cash_register.countTypes.${row.type}`) },
-  { key: 'total', label: t('cash_register.counts.columns.total'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.total, locale.value) },
+  { key: 'total', label: t('cash_register.counts.columns.total'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.total, locale.value, business.value) },
   { key: 'notes', label: t('cash_register.counts.columns.notes'), priority: 'low', format: (_, row) => row.notes || '—' },
 ]);
 </script>

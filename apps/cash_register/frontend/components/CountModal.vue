@@ -50,10 +50,10 @@ const hasTable = computed(() => !!table.value && table.value.bills.length + tabl
 const decimals = computed(() => table.value?.decimals ?? 2);
 
 /** What each note or coin reads as: money of the business («50,00 €»). */
-const faceLabel = (face: string): string => formatFace(face, locale.value, table.value?.currency);
+const faceLabel = (face: string): string => formatFace(face, locale.value, table.value);
 
-const typedRead = computed(() => readMoney(typedTotal.value, decimals.value));
-const typedError = computed(() => moneyRefusal(typedRead.value, t, locale.value, table.value?.currency));
+const typedRead = computed(() => readMoney(typedTotal.value, decimals.value, table.value?.currency));
+const typedError = computed(() => moneyRefusal(typedRead.value, t, locale.value, table.value));
 
 /** The total counted, in minor units; `null` while a typed total is not an amount yet. */
 const total = computed<number | null>(() => {
@@ -87,7 +87,7 @@ async function confirm(): Promise<void> {
   } catch {
     return; // The window shows `command.error`.
   }
-  void toastSuccess(t('cash_register.count.done', { total: formatMoney(sent, locale.value, table.value?.currency) }));
+  void toastSuccess(t('cash_register.count.done', { total: formatMoney(sent, locale.value, table.value) }));
   open.value = false;
   emit('counted', { type: kind, total: sent });
 }
@@ -175,7 +175,7 @@ async function confirm(): Promise<void> {
           class="cash-count__total"
           data-testid="cash-register-count-total"
         >
-          {{ $t('cash_register.count.total', { total: formatMoney(total, locale, table.currency) }) }}
+          {{ $t('cash_register.count.total', { total: formatMoney(total, locale, table) }) }}
         </p>
       </template>
       <template v-else>

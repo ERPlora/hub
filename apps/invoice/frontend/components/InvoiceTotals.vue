@@ -6,15 +6,15 @@
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, moneyOf } from '../lib/format';
 import { taxRows } from '../lib/invoice';
 import type { InvoiceOut } from '../operations';
 
-const props = defineProps<{ invoice: Pick<InvoiceOut, 'tax_breakdown' | 'base_amount' | 'tax_amount' | 'total_amount'> }>();
+const props = defineProps<{ invoice: Pick<InvoiceOut, 'tax_breakdown' | 'base_amount' | 'tax_amount' | 'total_amount' | 'currency' | 'currency_decimals'> }>();
 
 const t = useT();
 const locale = useLocale();
-const money = (cents: number) => formatMoney(cents, locale.value);
+const money = (cents: number) => formatMoney(cents, locale.value, moneyOf(props.invoice));
 
 const taxes = computed(() => taxRows(props.invoice.tax_breakdown, t, locale.value));
 </script>

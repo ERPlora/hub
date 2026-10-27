@@ -527,7 +527,7 @@ def add_movement(ctx: OperationContext, data: MovementAddIn) -> dict:
 )
 def add_count(ctx: OperationContext, data: CountAddIn) -> dict:
     session = _open_for_writing(data.session_id, data.session)
-    currency = business_currency()
+    currency = business_currency(ctx)
     sent = data.denominations.model_dump() if data.denominations is not None else {}
     denominations = normalized_count(sent, currency) if sent else {}
     total = (
@@ -565,7 +565,7 @@ def _units(cents: int, scale: Decimal, sign: int = 1) -> float:
 def _report(ctx: OperationContext, session: Session, report: str) -> dict:
     """The ``cash_session_report`` the receipt printer paints: the session, who, the float and the expected
     cash at the close (or now), and the detail's figures as its lines, in the language of who prints."""
-    scale = Decimal(10) ** currency_decimals(business_currency())
+    scale = Decimal(10) ** currency_decimals(business_currency(ctx))
     with translation.override(ctx.language):
         figures = session_detail(ctx, session)["summary"]
         lines = [
@@ -626,7 +626,7 @@ def print_session(ctx: OperationContext, data: SessionGetIn) -> dict:
         "document_type": "cash_session_report",
         "document": _report(ctx, session, report),
         "usage": "receipt",
-        "currency": business_currency(),
+        "currency": business_currency(ctx),
         "source_app": "cash_register",
         "source_ref": session.number,
     }

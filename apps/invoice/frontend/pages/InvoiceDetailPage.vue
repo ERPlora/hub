@@ -31,7 +31,7 @@ import SubstituteModal from '../components/SubstituteModal.vue';
 import VerifactuReceipt from '../components/VerifactuReceipt.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate } from '../lib/format';
+import { formatDate, moneyOf } from '../lib/format';
 import { documentNote, missingTaxId, statusTone } from '../lib/invoice';
 import type { InvoiceLinkOut, InvoiceOut } from '../operations';
 
@@ -271,6 +271,7 @@ function onSubstituted(full: InvoiceOut): void {
         <InvoiceLinesTable
           :lines="invoice.lines"
           :taxes="invoice.tax_breakdown.map((entry) => entry.tax)"
+          :money="moneyOf(invoice)"
         />
         <InvoiceTotals :invoice="invoice" />
         <InlineFeedback

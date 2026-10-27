@@ -12,7 +12,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, moneyFieldText, moneyRefusal, readMoney } from '../lib/money';
+import { moneyDecimals, formatMoney, moneyFieldText, moneyRefusal, readMoney, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import MoneyField from './MoneyField.vue';
 
@@ -23,6 +23,7 @@ const emit = defineEmits<{ opened: [] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const registers = useLive('cash_register.register.list', { is_active: true, limit: 100 });
 const command = useCommand('cash_register.session.open');
 
@@ -53,11 +54,11 @@ watch(drawers, (now) => {
 
 const error = computed<FormModalError | null>(() => refusal(command.error.value, t('cash_register.open.failed')));
 const balanceError = computed(() => balanceRefusal.value ?? error.value?.fields?.opening_balance ?? null);
-const unassigned = computed(() => (props.unassignedCash > 0 ? formatMoney(props.unassignedCash, locale.value) : ''));
+const unassigned = computed(() => (props.unassignedCash > 0 ? formatMoney(props.unassignedCash, locale.value, business.value) : ''));
 
 async function confirm(): Promise<void> {
-  const read = readMoney(balance.value);
-  balanceRefusal.value = moneyRefusal(read, t, locale.value);
+  const read = readMoney(balance.value, moneyDecimals(business.value), business.value?.currency);
+  balanceRefusal.value = moneyRefusal(read, t, locale.value, business.value);
   if (!read.ok) return;
   try {
     await command.run({
@@ -119,7 +120,7 @@ async function confirm(): Promise<void> {
         v-model="balance"
         testid="cash-register-open-balance"
         :label="$t('cash_register.open.balance')"
-        :placeholder="moneyFieldText(0, locale)"
+        :placeholder="moneyFieldText(0, locale, moneyDecimals(business))"
         :error="balanceError"
       />
       <ion-input

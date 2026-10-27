@@ -748,6 +748,7 @@ class InvoiceRowOut(Schema):
     tax_amount: int
     total_amount: int
     currency: str
+    currency_decimals: int = Field(description="The decimals of its currency (2 in EUR, 0 in JPY): its amounts' minor unit.")
     status: str
     source_type: str
     rectifies_id: UUID | None

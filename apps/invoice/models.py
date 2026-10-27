@@ -274,7 +274,8 @@ class Invoice(UUIDModel):
     tax_breakdown = models.JSONField(
         _("tax breakdown"), default=list, blank=True, encoder=DjangoJSONEncoder
     )
-    currency = models.CharField(_("currency"), max_length=3, default="EUR")
+    # The business's currency when it was issued (its country's; a sale's, its own): never rewritten afterwards.
+    currency = models.CharField(_("currency"), max_length=3)
     source_type = models.CharField(
         _("source"), max_length=16, choices=Source.choices, default=Source.MANUAL
     )

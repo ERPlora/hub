@@ -1573,6 +1573,7 @@
       "crossing": "Crossing",
       "csv": "CSV",
       "currency": "Currency",
+      "currency_decimals": "Currency decimals",
       "current_number": "Current number",
       "current_quantity": "Current quantity",
       "current_time": "Current time",

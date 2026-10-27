@@ -24,6 +24,7 @@ const SESSION = { id: 's1', number: 'S-261014-0001' };
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountCash(MovementModal, { props: { open: true, session: SESSION }, locale });
+  await m.live();
   const submit = () => click(m.inDoc('cash-register-movement-submit'));
   return { ...m, submit };
 }

@@ -1,5 +1,5 @@
 // How the inventory screens paint money, counts, quantities and tax rates, all with the page
-// language's own number format (Intl): euros from cents, counts grouped as the language groups them,
+// language's own number format (Intl): money of the business from cents, counts grouped as the language groups them,
 // quantities exact and ungrouped without trailing zeros (as the server's CSV writes them: 2,5 · 3 ·
 // 0,532), a movement's quantity with its sign, and a rate as the language writes a percentage.
 import { describe, expect, it } from 'vitest';
@@ -8,10 +8,24 @@ import { formatCount, formatMoney, formatPercent, formatQuantity, formatShortDat
 
 describe('formatMoney', () => {
   it('paints whole cents as euros in the page language', () => {
-    expect(formatMoney(220, 'es')).toMatch(/^2,20\s€$/);
-    expect(formatMoney(123456, 'es')).toMatch(/^1\.?234,56\s€$/);
-    expect(formatMoney(220, 'en')).toBe('€2.20');
-    expect(formatMoney(0, 'en')).toBe('€0.00');
+    expect(formatMoney(220, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^2,20\s€$/);
+    expect(formatMoney(123456, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^1\.?234,56\s€$/);
+    expect(formatMoney(220, 'en', { currency: 'EUR', decimals: 2 })).toBe('€2.20');
+    expect(formatMoney(0, 'en', { currency: 'EUR', decimals: 2 })).toBe('€0.00');
+  });
+
+  // flow business-currency: the business's currency, its country's; never the euro by default.
+  it('paints money in the currency it is given: zlotys in Poland, yen without decimals', () => {
+    expect(formatMoney(1250, 'en', { currency: 'PLN', decimals: 2 })).toMatch(/^zł\s12\.50$/);
+    // The forint keeps the two decimals the server counts it in (the browser's Intl gives it none).
+    expect(formatMoney(123450, 'en', { currency: 'HUF', decimals: 2 })).toMatch(/^Ft\s1,234\.50$/);
+    expect(formatMoney(1250, 'pl', { currency: 'PLN', decimals: 2 })).toMatch(/^12,50\szł$/);
+    expect(formatMoney(1210, 'en', { currency: 'JPY', decimals: 0 })).toBe('¥1,210');
+  });
+
+  it('until the business’s currency is known a figure has no symbol, never the euro', () => {
+    expect(formatMoney(1250, 'es')).toBe('12,50');
+    expect(formatMoney(1250, 'en')).toBe('12.50');
   });
 });
 

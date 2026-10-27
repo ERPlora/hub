@@ -9,6 +9,7 @@ import ClosingReport from './ClosingReport.vue';
 describe('ClosingReport', () => {
   it('a closed session prints its Z, with its number and figures', async () => {
     const m = await mountCash(ClosingReport, { props: { session: SESSION } });
+    await m.live();
     const paper = words(m.find('cash-register-report').element);
     expect(m.find('cash-register-report-title').text()).toBe('Cash closing (Z)');
     expect(paper).toContain('S-261014-0001');
@@ -18,11 +19,13 @@ describe('ClosingReport', () => {
 
   it('says the time it is printed at', async () => {
     const m = await mountCash(ClosingReport, { props: { session: SESSION, printedAt: new Date(2026, 9, 14, 21, 45) } });
+    await m.live();
     expect(words(m.find('cash-register-report').element)).toMatch(/Printed Oct 14, 2026, 9:45\sPM/);
   });
 
   it('an open session prints a partial X report, in Spanish too', async () => {
     const m = await mountCash(ClosingReport, { props: { session: { ...SESSION, status: 'open' } }, locale: 'es' });
+    await m.live();
     expect(m.find('cash-register-report-title').text()).toBe('Informe parcial (X)');
   });
 });

@@ -107,6 +107,8 @@ export interface InvoiceRowOut {
   tax_amount: number;
   total_amount: number;
   currency: string;
+  /** The decimals of its currency as the server counts them (2 in EUR, 0 in JPY): its amounts' minor unit. */
+  currency_decimals: number;
   status: InvoiceStatus;
   source_type: InvoiceSource;
   rectifies_id: string | null;

@@ -6,6 +6,7 @@ import { formatDateTime } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
+import { useBusinessMoney } from '../lib/money';
 import { summaryItems } from '../lib/summary';
 import type { SessionOut } from '../operations';
 
@@ -13,7 +14,8 @@ const props = defineProps<{ session: SessionOut }>();
 
 const t = useT();
 const locale = useLocale();
-const items = computed(() => summaryItems(props.session, t, locale.value, (iso) => formatDateTime(iso, locale.value)));
+const business = useBusinessMoney();
+const items = computed(() => summaryItems(props.session, t, locale.value, (iso) => formatDateTime(iso, locale.value), business.value));
 </script>
 
 <template>

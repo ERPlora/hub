@@ -9,10 +9,16 @@ every check runs first, so a refusal leaves no trace.
 
 import re
 from collections import defaultdict
+from contextlib import suppress
 from decimal import Decimal
+from functools import cache
 from uuid import UUID
 
+from babel import Locale, UnknownLocaleError
+from babel.core import get_global
+from babel.languages import get_official_languages
 from babel.numbers import get_currency_precision
+from django.conf import settings as django_settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -40,6 +46,7 @@ from apps.inventory.models import (
 )
 from apps.inventory.queries import (
     FORMULA_STARTS,
+    business_currency,
     config_row,
     current_settings,
     find_category,
@@ -116,17 +123,13 @@ ROW_NAME_MISSING = _("The name is missing")
 #: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
 SYSTEM = "inventory.system"
 THOUSANDTHS = Decimal("0.001")
-#: The Hub has no currency of its own yet: euros (the export says so too).
-CURRENCY = "EUR"
 #: A quantity holds at most 12 whole digits (DecimalField 15, 3).
 MAX_QUANTITY = Decimal(10) ** (QUANTITY["max_digits"] - QUANTITY["decimal_places"])
 #: What the export put in front of a cell a spreadsheet would run (queries.FORMULA_STARTS).
 EXPORT_GUARD = tuple(f"'{start}" for start in FORMULA_STARTS)
-# A cell of a CSV: digits with at most two (money) or three (quantities) decimals, after normalizing.
-_AMOUNT_RE = re.compile(r"^\d+(\.\d{1,2})?$")
+# A cell of a CSV: digits with decimals (at most the currency's for money, three for quantities), after normalizing.
+_AMOUNT_RE = re.compile(r"^\d+(\.\d+)?$")
 _QUANTITY_RE = re.compile(r"^\d+(\.\d{1,3})?$")
-# What a pasted amount may carry around its digits: the euro sign or code and (no-break) spaces.
-_AMOUNT_NOISE = re.compile(r"[€\s  ]|EUR", re.IGNORECASE)
 _PRODUCT_CONSTRAINTS = {
     "inventory_product_live_sku_unique": ("sku", SKU_TAKEN, "inventory.sku_taken"),
     "inventory_product_live_ean13_unique": ("ean13", EAN13_TAKEN, "inventory.ean13_taken"),
@@ -218,6 +221,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
     categories; their stock leaves an «initial» movement. The rehearsal (``dry_run``) writes nothing.
     """
     settings = current_settings()
+    currency = business_currency(ctx)
     rows = data.rows
     skus = [_unguarded(row.sku.strip()) for row in rows]
     live_skus = set(Product.objects.filter(is_deleted=False, sku__in=skus).values_list("sku", flat=True))
@@ -244,7 +248,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
         if sku in live_skus:
             report.append(_row(row.line, sku, "skipped"))
             continue
-        outcome = _check_product_row(row, name, sku, settings, tax_categories)
+        outcome = _check_product_row(row, name, sku, settings, tax_categories, currency)
         if isinstance(outcome, str):
             report.append(_row(row.line, sku, "failed", reason=outcome))
             continue
@@ -384,6 +388,7 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
     """INVENTORY-F25: Printing's queue takes the label (PRINTING-F12); a person who cannot reach it gets
     ``inventory.label_queue_unavailable`` and nothing queued, so the screen prints from the browser."""
     product = find_product(data.id, data.product)
+    currency = business_currency(ctx)
     # Code 128, the code the label printer draws, carries the printable ASCII only.
     if not all(" " <= char <= "~" for char in product.sku):
         raise Conflict(str(SKU_NOT_BARCODE), code="inventory.sku_not_barcode")
@@ -397,9 +402,9 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
                     "document": {
                         "product_name": product.name,
                         "barcode": product.sku,
-                        "price": float(Decimal(product.price).scaleb(-get_currency_precision(CURRENCY))),
+                        "price": float(Decimal(product.price).scaleb(-get_currency_precision(currency))),
                     },
-                    "currency": CURRENCY,
+                    "currency": currency,
                     "source_app": "inventory",
                     "source_ref": product.sku,
                 }
@@ -1087,12 +1092,15 @@ def _refund_result(note: RefundStock, *, applied: bool, movements: int) -> dict:
 # Imports
 
 
-def _check_product_row(row, name: str, sku: str, settings: Settings, tax_categories: dict) -> dict | str:
-    """The fields of a new product from one CSV row (its name and SKU already read), or why it cannot be."""
+def _check_product_row(
+    row, name: str, sku: str, settings: Settings, tax_categories: dict, currency: str
+) -> dict | str:
+    """The fields of a new product from one CSV row (its name and SKU already read, its amounts in the business's
+    ``currency``), or why it cannot be."""
     ean13 = _unguarded(row.ean13.strip())
     if len(name) > 200 or len(sku) > 64 or len(ean13) > 13:
         return str(ROW_TOO_LONG)
-    price, cost = parse_amount(row.price), parse_amount(row.cost)
+    price, cost = parse_amount(row.price, currency), parse_amount(row.cost, currency)
     if price is None or cost is None:
         return str(ROW_PRICE_NOT_NUMERIC)
     if max(price, cost) > MAX_CENTS:
@@ -1135,19 +1143,36 @@ def _unguarded(text: str) -> str:
     return text[1:] if text.startswith(EXPORT_GUARD) else text
 
 
-def parse_amount(text: str) -> int | None:
-    """Cents of an amount as a CSV or a person writes it, or ``None`` if it is not one (empty = 0).
+def parse_amount(text: str, currency: str) -> int | None:
+    """Minor units of an amount of ``currency`` as a CSV or a person writes it, or ``None`` if it is not one (empty = 0).
 
-    2,20 · 2.20 · 1.234,56 · 1,234.56 · 12,50 € · €2.20: with both separators, the rightmost one is the
-    decimal one; with only commas, the comma is; never more than two decimals, never negative.
+    2,20 · 2.20 · 1.234,56 · 1,234.56 · 12,50 € · €2.20 · PLN12.50 · 12,50 zł: with both separators, the rightmost one
+    is the decimal one; with only commas, the comma is; never more decimals than the currency's, never negative.
     """
-    raw = _AMOUNT_NOISE.sub("", text)
+    raw = _amount_noise(currency).sub("", text)
     if not raw:
         return 0
+    decimals = get_currency_precision(currency)
     normalized = _decimal_point(raw)
-    if normalized is None or not _AMOUNT_RE.match(normalized):
+    if normalized is None or not _AMOUNT_RE.match(normalized) or len(normalized.partition(".")[2]) > decimals:
         return None
-    return int(Decimal(normalized) * 100)
+    return int(Decimal(normalized).scaleb(decimals))
+
+
+@cache
+def _amount_noise(currency: str) -> re.Pattern:
+    """What a pasted amount of ``currency`` may carry around its digits: (no-break) spaces, its code and its symbol in
+    the app's languages and in those of the countries that pay in it («PLN», «zł»; «EUR», «€»)."""
+    languages = {code for code, _name in django_settings.LANGUAGES}
+    for territory, usages in get_global("territory_currencies").items():
+        if any(usage[0] == currency for usage in usages):
+            languages.update(get_official_languages(territory, de_facto=True))
+    marks = {currency}
+    for language in languages:
+        with suppress(UnknownLocaleError, ValueError):
+            marks.add(Locale.parse(language).currency_symbols.get(currency, currency))
+    written = "|".join(re.escape(mark) for mark in sorted(marks, key=len, reverse=True))
+    return re.compile(rf"[\s\u00a0\u202f]|{written}", re.IGNORECASE)
 
 
 def parse_quantity(text: str) -> Decimal | None:

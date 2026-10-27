@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e261a9f766c6bf8c5dbe4e523d3731751d530c5307d90dfcb38007230084b10b -->
+<!-- generated from WORKBOOK.md sha256:d7314dd7e192e065d50dd6adea5886b2356536d7f6d626774d48a8e80988dd58 -->
 
 ## What it is for and who it is for
 
@@ -46,7 +46,8 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   blind count, no auto-close). They are changed in **Cash register → Settings**.
 - **Drawers**: optional. If the business has several (bar and terrace), they are added in **Cash register →
   Settings → Drawers**; when opening the session one is chosen. With only one, it is chosen by itself.
-- **Currency**: the business's (today, the euro). The count shows its notes and coins.
+- **Currency**: the business's, its country's, with its decimals: the euro in Spain, the zloty in Poland. Every
+  amount of Cash register is in it, and the count shows its notes and coins.
 - **Time zone**: the business's. In this phase, Madrid time (`Europe/Madrid`) for everyone: the business
   day, the session number and the auto-close time come from it.
 
@@ -605,6 +606,8 @@ moment they are looked at; the screens refresh with `sale.sale.completed`, `sale
   (KITCHEN-F31), in the close window and in the assistant's close summary.
 - **Printing** (no requirement; only if it is on): what waits or failed in the queue, for the shift review
   (PRINTING-F01), and the receipt queue for the X or Z report (PRINTING-F17).
+- **Platform**: the business's currency and its decimals (`base.business.get`, its country's), for the amounts,
+  the count by notes and coins and the X or Z report.
 - **Indexes of Sales for these readings** (done, `sale/0005_cash_register_indexes`): partial ones on
   `sale_sale(voided_at)` and `sale_refund(created_at)`, so that the readings of voids and refunds by time
   window do not go through the whole table.

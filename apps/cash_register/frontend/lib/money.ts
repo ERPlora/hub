@@ -2,9 +2,17 @@
 // language and types it as she reads it. Until `@erplora/ui/components/format` has a money formatter
 // (UI-REQUESTS.md), this is the one place the app turns cents into text (`Intl.NumberFormat`) and what is
 // typed into cents. Every money field goes through `readMoney`: empty, an amount, or why it is not one.
+// The money is the business's (`useBusinessMoney`: its country's currency and the decimals the server counts it
+// in): the screens pass it, and until it is known an amount is a figure with two decimals and no symbol, never the
+// euro by default. Its decimals come from the server, never from the browser's Intl (which gives none to the forint).
 
-const CURRENCY = 'EUR';
+import type { Money } from '../../../../base/frontend/lib/home';
+
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
 const FALLBACK_LOCALE = 'en';
+const NO_MONEY_DECIMALS = 2;
 
 const cache = new Map<string, Intl.NumberFormat>();
 
@@ -25,36 +33,36 @@ function formatter(locale: string, key: string, options: Intl.NumberFormatOption
 
 const missing = (value: unknown): boolean => value === null || value === undefined || Number.isNaN(Number(value));
 
-/** The decimals of `currency` as CLDR knows them (2 in EUR, 0 in JPY, 3 in KWD): its minor unit. */
-export function currencyDecimals(currency: string = CURRENCY): number {
-  return formatter(FALLBACK_LOCALE, `money-${currency}`, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+/** The decimals of `money` (2 in EUR and HUF, 0 in JPY, 3 in KWD): its minor unit; two while unknown. */
+export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
+
+/** `money`'s currency with `decimals` and the symbol a till there writes («zł», «€»), or a bare figure without it. */
+function moneyOptions(money: Money | undefined, decimals: number): Intl.NumberFormatOptions {
+  const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+  return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
 }
 
-/** Minor units as money of `currency` in `locale` («150,50 €», «€150.50», «¥5,003»); nothing is «—». */
-export function formatMoney(cents: number | null | undefined, locale: string, currency = CURRENCY): string {
+/** Minor units as `money` in `locale` («150,50 €», «€150.50», «¥5,003»; «150,50» while the money is unknown);
+ *  nothing is «—». */
+export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   if (missing(cents)) return '—';
-  return formatter(locale, `money-${currency}`, { style: 'currency', currency }).format((cents as number) / 10 ** currencyDecimals(currency));
+  const decimals = moneyDecimals(money);
+  return formatter(locale, `money-${money?.currency ?? ''}-${decimals}`, moneyOptions(money, decimals)).format((cents as number) / 10 ** decimals);
 }
 
-/** A note or coin of the count as money of `currency` («500 €», «0,50 €»): a whole face value without decimals
- *  (the old count, Square and Lightspeed), a coin of cents with the currency's own. */
-export function formatFace(face: string, locale: string, currency = CURRENCY): string {
+/** A note or coin of the count as `money` («500 €», «0,50 €»): a whole face value without decimals (the old count,
+ *  Square and Lightspeed), a coin of cents with the currency's own. */
+export function formatFace(face: string, locale: string, money?: Money): string {
   const value = Number(face);
-  const whole = Number.isInteger(value);
-  const decimals = whole ? 0 : currencyDecimals(currency);
-  return formatter(locale, `face-${currency}-${decimals}`, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
+  const decimals = Number.isInteger(value) ? 0 : moneyDecimals(money);
+  return formatter(locale, `face-${money?.currency ?? ''}-${decimals}`, moneyOptions(money, decimals)).format(value);
 }
 
 /** A difference with its sign: «+5,10 €» over, «-4,90 €» short, zero without sign. */
-export function formatSignedMoney(cents: number | null | undefined, locale: string, currency = CURRENCY): string {
+export function formatSignedMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   if (missing(cents)) return '—';
-  const money = formatMoney(cents, locale, currency);
-  return (cents as number) > 0 ? `+${money}` : money;
+  const written = formatMoney(cents, locale, money);
+  return (cents as number) > 0 ? `+${written}` : written;
 }
 
 /** Minor units as a money field holds them: ungrouped, with the reader's decimal sign («1250,50»). */
@@ -86,11 +94,27 @@ function minor(whole: string, fraction: string, decimals: number): number {
   return Number(whole) * 10 ** decimals + Number(kept || '0') + up;
 }
 
+/** How `currency` may be written around an amount: its code, its symbol and its narrow symbol («PLN», «zł»). */
+function currencyMarks(currency: string): string[] {
+  const marks = (['code', 'symbol', 'narrowSymbol'] as const).map(
+    (display) =>
+      formatter(FALLBACK_LOCALE, `mark-${currency}-${display}`, { style: 'currency', currency, currencyDisplay: display })
+        .formatToParts(1)
+        .find((part) => part.type === 'currency')?.value ?? currency,
+  );
+  return [...new Set(marks)].sort((a, b) => b.length - a.length);
+}
+
 /** What a person typed in a money field, read once for every field of the app, in minor units of a
- *  currency of `decimals` (2 in EUR). Empty is no amount; «1.250» in euros reads two ways and says so. */
-export function readMoney(raw: string | number | null | undefined, decimals = 2): MoneyRead {
+ *  currency of `decimals` (2 in EUR). Empty is no amount; «1.250» in euros reads two ways and says so. The
+ *  business's `currency` written before or after the figure («150,50 zł») is no part of it. */
+export function readMoney(raw: string | number | null | undefined, decimals = 2, currency?: string): MoneyRead {
   const typed = String(raw ?? '').trim();
-  const text = typed.replace(/[\s\u00a0\u202f]/g, '').replace(/€$/, '');
+  let text = typed.replace(/[\s\u00a0\u202f]/g, '');
+  for (const mark of currency ? currencyMarks(currency) : []) {
+    if (text.toUpperCase().endsWith(mark.toUpperCase())) text = text.slice(0, -mark.length);
+    else if (text.toUpperCase().startsWith(mark.toUpperCase())) text = text.slice(mark.length);
+  }
   if (text === '') return { ok: true, cents: null };
   if (/^[-\u2212]/.test(text)) return { ok: false, reason: 'negative' };
   if (WHOLE.test(text)) return { ok: true, cents: minor(text, '', decimals) };
@@ -124,14 +148,14 @@ export function moneyRefusal(
   read: MoneyRead,
   t: (key: string, named?: Record<string, unknown>) => string,
   locale: string,
-  currency = CURRENCY,
+  money?: Money,
 ): string | null {
   if (read.ok) return null;
   if (read.reason === 'ambiguous') {
     return t('cash_register.money.ambiguous', {
       typed: read.typed,
-      grouped: formatMoney(read.grouped, locale, currency),
-      decimal: formatMoney(read.decimal, locale, currency),
+      grouped: formatMoney(read.grouped, locale, money),
+      decimal: formatMoney(read.decimal, locale, money),
     });
   }
   return t(`cash_register.money.${read.reason}`);
