@@ -209,6 +209,18 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.field('auto_close_after_hours').errorText).toBe('Too many');
   });
 
+  // The banner up top keeps only the save's errors (the location's go under its button): a failed save still says so.
+  it('a failed save says so in the banner up top, not under «Use my current location»', async () => {
+    const s = await setup();
+    s.answerBy({ '/api/attendance/settings': [500, { error: { code: 'error', message: 'Boom' } }] });
+    await ionValue(s.field('auto_close_after_hours'), '20', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect(s.find('attendance-settings-error').text()).toBe('Boom');
+    expect(s.find('attendance-settings-location-error').exists()).toBe(false);
+    expect(s.field('auto_close_after_hours').value).toBe('20');
+  });
+
   it('an employee reads them, read-only, without Save', async () => {
     const s = await setup({ session: EMPLOYEE, data: { ...DEFAULTS, require_location: true, workplace_lat: 40.4, workplace_lng: -3.7, workplace_set: true } });
     expect(s.find('attendance-settings-read-only').text()).toContain('Only a manager or an administrator can change these settings.');
