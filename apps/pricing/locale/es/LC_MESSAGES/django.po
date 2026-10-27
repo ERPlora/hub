@@ -257,3 +257,10 @@ msgstr "La tarifa general va en la divisa del negocio (%(currency)s), la que cob
 
 msgid "At most %(count)s tiers."
 msgstr "Como mucho %(count)s tramos."
+
+# How the assistant's card names the data of pricing's writes (titles of the schemas).
+msgid "Customer group"
+msgstr "Grupo de clientes"
+
+msgid "Discount rule"
+msgstr "Regla de descuento"
