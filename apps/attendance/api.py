@@ -90,6 +90,11 @@ async def presence_list(request, params: Query[PresenceListIn]):
     return await run_operation(request, queries.list_presence, params)
 
 
+@bind(router, "attendance.presence.count", "/attendance/presence/count")
+async def presence_count(request):
+    return await run_operation(request, queries.count_presence)
+
+
 @bind(router, "attendance.person.list", "/attendance/people")
 async def person_list(request, params: Query[PersonListIn]):
     return await run_operation(request, queries.list_people, params)

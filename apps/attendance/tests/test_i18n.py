@@ -76,6 +76,7 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        *(panel.title for panel in config.widgets),
         *module_texts(queries),
         *module_texts(services),
         *module_texts(schemas),
@@ -135,6 +136,7 @@ def test_spanish_texts_are_the_old_modules():
         config = apps.get_app_config("attendance")
         assert str(config.verbose_name) == "Control horario"
         assert [str(nav.label) for nav in config.navigation] == ["Fichar", "Registros"]
+        assert [str(panel.title) for panel in config.widgets] == ["Fichados ahora"]
         assert [str(label) for label in Record.Status.labels] == ["Abierta", "Cerrada", "Por revisar"]
         assert str(services.ALREADY_IN) == "Ya tienes una jornada abierta: ficha la salida antes de volver a entrar."
         assert str(services.OVERLAP) == "Estas horas se solapan con otra jornada de esta persona."

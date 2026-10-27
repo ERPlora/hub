@@ -7,7 +7,7 @@ import { ConfirmDialog, DataTable } from '@erplora/ui/components';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { NOW, row, SETTINGS } from '../__tests__/kitchen';
+import { business, NOW, POLISH, row, SETTINGS } from '../__tests__/kitchen';
 import { EMPLOYEE, flush, ionValue, type MountOptions, mountKitchen, page, settle } from '../__tests__/mount-kitchen';
 import TicketDetailModal from '../components/TicketDetailModal.vue';
 import TicketFormModal from '../components/TicketFormModal.vue';
@@ -30,8 +30,9 @@ async function setup(options: MountOptions = {}) {
   await m.live();
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const show = async (rows: TicketRowOut[]) => {
+  const show = async (rows: TicketRowOut[], owner = business()) => {
     await m.result('kitchen.settings.get', SETTINGS);
+    await m.result('base.business.get', owner);
     await m.result(OP, page(rows));
   };
   const actionsFor = (r: TicketRowOut) =>
@@ -69,6 +70,23 @@ describe('TicketsPage', () => {
     const text = s.wrapper.text();
     for (const words of ['20261014-0013', 'Table 9', 'Dine in', 'Ready', '€24.50']) expect(text, words).toContain(words);
     expect(s.prop('searchPlaceholder')).toBe('Search ticket or destination…');
+  });
+
+  it('the Total is in the business’s currency: a business in Poland reads zlotys, never euros', async () => {
+    const s = await setup();
+    await s.show([READY], business(POLISH));
+    const total = s.prop<Array<{ key: string; format: (v: unknown, r: TicketRowOut) => string }>>('columns').find((c) => c.key === 'total')!;
+    expect(total.format(READY.total, READY)).toBe('zł\u00a024.50');
+    expect(s.wrapper.text()).toContain('zł\u00a024.50');
+    expect(s.wrapper.text()).not.toContain('€');
+  });
+
+  it('until the business answers, the Total is a figure without a symbol, never in euros', async () => {
+    const s = await setup();
+    await s.result('kitchen.settings.get', SETTINGS);
+    await s.result(OP, page([READY]));
+    expect(s.wrapper.text()).toContain('24.50');
+    expect(s.wrapper.text()).not.toContain('€');
   });
 
   it('searches and filters on the server', async () => {

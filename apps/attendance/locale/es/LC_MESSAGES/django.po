@@ -32,6 +32,9 @@ msgctxt "attendance menu"
 msgid "Records"
 msgstr "Registros"
 
+msgid "Clocked in now"
+msgstr "Fichados ahora"
+
 msgctxt "working day status"
 msgid "Open"
 msgstr "Abierta"

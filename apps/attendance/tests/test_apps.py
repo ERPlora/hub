@@ -2,11 +2,16 @@
 gets, its scheduled task and the assistant's contract of every operation (``ai`` and described input
 fields)."""
 
+from pathlib import Path
+
 from django.apps import apps
 from django.conf import settings
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
 from live.operations import registry
 
+from apps.attendance import events as E
 from apps.attendance import queries, services  # noqa: F401  (importing them registers the operations)
 
 # The old module's four permissions (module.json), plus clocking someone else (ATTENDANCE-F12).
@@ -24,6 +29,7 @@ QUERIES = {
     "attendance.record.export",
     "attendance.correction.list",
     "attendance.presence.list",
+    "attendance.presence.count",
     "attendance.person.list",
     "attendance.settings.get",
 }
@@ -139,3 +145,87 @@ def test_every_input_field_is_described():
     for name, op in ops.items():
         for field_name, field in op.input.model_fields.items():
             assert (field.description or "").strip(), f"{name}.{field_name}"
+
+
+# The Home's panel (PLAN-HUB round 2026-10-21; FIX-ATTENDANCE-SETUP-HOOKS): the old module's module.json `widgets`, one
+# KPI (it had no `setup` nor `bell`), on the count of «Clocked in now» (ATTENDANCE-F11).
+
+
+def test_the_homes_panel_is_the_old_modules_one():
+    """«Clocked in now» on by default, to whoever sees the whole team, in every business (the old sectors were all)."""
+    panels = attendance().widgets
+    assert all(isinstance(panel, Widget) for panel in panels)
+    assert [
+        (
+            panel.key,
+            panel.kind,
+            panel.component,
+            panel.operation,
+            panel.size,
+            panel.default,
+            panel.permission,
+            dict(panel.params),
+            dict(panel.map),
+            dict(panel.options),
+        )
+        for panel in panels
+    ] == [
+        (
+            "clocked_in_now",
+            "kpi",
+            None,
+            "attendance.presence.count",
+            "sm",
+            True,
+            "attendance.view_all",
+            {},
+            {"value": "count"},
+            {"format": "number"},
+        ),
+    ]
+    assert all(not panel.verticals and not panel.category for panel in panels)
+
+
+def test_the_panel_maps_a_field_its_query_gives_and_takes_its_params():
+    """A map that names no field of the query leaves the panel blank without an error."""
+    for panel in attendance().widgets:
+        output = registry[panel.operation].output.model_fields
+        assert set(panel.map.values()) <= set(output), panel.key
+        registry[panel.operation].input.model_validate(dict(panel.params))
+
+
+def test_a_kpi_says_its_name_once():
+    # gh:hub#1105: the old KPIs painted their header twice (the title and options.label with its icon).
+    for panel in attendance().widgets:
+        assert not {"label", "icon"} & set(panel.options), panel.key
+
+
+def test_the_panel_is_titled_in_english_and_in_spanish():
+    with translation.override("en"):
+        assert [str(panel.title) for panel in attendance().widgets] == ["Clocked in now"]
+    with translation.override("es"):
+        assert [str(panel.title) for panel in attendance().widgets] == ["Fichados ahora"]
+
+
+def test_the_panel_is_refreshed_by_the_events_that_re_run_its_query():
+    """The events attendance emits today (`attendance.record.clocked_in`…), never the old module's
+    (`attendance.clocked_in`, `attendance.clocked_out`), as «Clocked in now» in Records follows them."""
+    (panel,) = attendance().widgets
+    assert list(panel.refresh_on) == [*E.PRESENCE, E.MEMBER_UPDATED, E.MEMBER_TERMINATED]
+    assert live_registry.is_subscribable(panel.operation)
+    assert set(panel.refresh_on) == set(live_registry.subscribable[panel.operation])
+    assert set(panel.refresh_on) == set(live_registry.subscribable["attendance.presence.list"])
+
+
+def test_the_panels_icon_is_registered_in_the_shell():
+    icons = [panel.icon for panel in attendance().widgets]
+    assert icons == ["ion:time-outline"]
+    shell = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    for icon in icons:
+        assert f"'{icon.removeprefix('ion:')}':" in shell, icon
+
+
+def test_attendance_has_no_setup_steps_nor_bell_counters():
+    # The old module declared none (its module.json has no `setup` nor `bell`).
+    assert attendance().setup == []
+    assert attendance().bell == []

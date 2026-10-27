@@ -126,7 +126,7 @@ bien. Se actualiza sola con cada cambio, sin recargar.
 Menú **Cocina → Comandas**. Tabla de todas las comandas, la más nueva primero, 50 por página (otro
 tamaño se elige al pie):
 Comanda (número completo `AAAAMMDD-NNNN`), Destino (la etiqueta), Tipo, Prioridad, Estado, Platos y
-Total; buscador «Buscar comanda o destino…» (por número y etiqueta), filtros por Tipo, Prioridad y
+Total (en la moneda del negocio, la de su país); buscador «Buscar comanda o destino…» (por número y etiqueta), filtros por Tipo, Prioridad y
 Estado (cada uno, una lista con sus palabras: «En sala», «Urgente», «Por preparar»…), y vista tabla o
 tarjetas. Acciones por fila, solo icono: «Lanzar», «Lista», «Servida»,
 «Recuperar» y «Cancelar» (en el menú «⋮», con confirmación y motivo opcional); solo salen las que el
@@ -982,6 +982,10 @@ que no tiene ningún papel: solo el sistema (`*`).
   siempre (eliminarla exige que no tenga platos por hacer ni enrutado, F03).
 - **Zona horaria**: fase 1, la del negocio es `settings.TIME_ZONE` (Europe/Madrid): día del número y
   horas del Historial.
+- **Moneda**: el Total de Comandas va en la moneda del negocio (`useBusinessMoney` de `base`, la de
+  `base.business.get`) con los decimales del servidor, nunca los de `Intl` (el forint) ni un euro por defecto:
+  mientras el negocio no contesta, una cifra sin símbolo. El `total` del servidor ya va en unidades menores de la
+  moneda de la venta (FIX-HUB-KITCHEN-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja en hub#273).
 - Toda lista pagina (`limit` ≤ 100) con desempate por `id`; el tablero tiene un tope de 200 comandas en
   marcha (`truncated`).
 

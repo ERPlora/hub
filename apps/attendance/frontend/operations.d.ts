@@ -164,6 +164,11 @@ export interface PresenceOut {
   source: Source;
 }
 
+/** How many are clocked in now: the Home's «Clocked in now» (ATTENDANCE-F11). */
+export interface PresenceCountOut {
+  count: number;
+}
+
 export interface PersonOut {
   id: string;
   name: string;
@@ -201,6 +206,7 @@ declare module '@erplora/ui/sdk' {
     'attendance.break.end': { input: BreakIn; output: RecordOut };
     'attendance.correction.list': { input: CorrectionListIn; output: Page<CorrectionOut> };
     'attendance.presence.list': { input: SearchListIn; output: Page<PresenceOut> };
+    'attendance.presence.count': { input: NoInput; output: PresenceCountOut };
     'attendance.person.list': { input: SearchListIn; output: Page<PersonOut> };
     'attendance.settings.get': { input: NoInput; output: SettingsOut };
     'attendance.settings.update': { input: SettingsIn; output: SettingsOut };

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2fa82fb3e28dc5433911736fecac2ff3fdfd9dddd0bc2c70d167072389791131 -->
+<!-- generated from WORKBOOK.md sha256:14e3cbef1df0103a0654cac051108df43495153c9d3e70d37b35c678d18acbae -->
 
 ## What it is for and who it is for
 
@@ -115,8 +115,8 @@ reloading.
 ### Tickets
 Menu **Kitchen → Tickets**. Table of all the tickets, newest first, 50 per page (another size is chosen
 at the bottom):
-Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes and Total;
-search box "Search ticket or destination…" (by number and label), filters by Type, Priority and Status
+Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes and Total
+(in the business's currency, its country's); search box "Search ticket or destination…" (by number and label), filters by Type, Priority and Status
 (each one a list with its words: "Dine in", "Rush", "To prepare"…), and table or card view. Actions per
 row, icon only: "Fire", "Ready", "Served", "Recall" and "Cancel" (in the "⋮" menu, with confirmation and an
 optional reason); only the ones the profile can do show up, and the ones the state does not allow are

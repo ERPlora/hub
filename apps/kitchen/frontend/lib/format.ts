@@ -1,6 +1,16 @@
 // How the kitchen paints numbers and moments: the card's clock and its border, quantities, money and the
-// History's moments in the business's zone. Pure functions: the pages pass the language and the zone.
+// History's moments in the business's zone. Pure functions: the pages pass the language, the zone and the money.
+// The money is the business's (`useBusinessMoney`, the platform's: its country's currency and the decimals the server
+// counts it in); until it is known an amount is a figure without a symbol, never the euro by default. Its decimals come
+// from the server, never from the browser's Intl (which gives none to the forint).
+import type { Money } from '../../../../base/frontend/lib/home';
 import type { SettingsOut } from '../operations';
+
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+/** The decimals of an amount while the business's currency is unknown. */
+const NO_MONEY_DECIMALS = 2;
 
 export type Semaphore = 'ok' | 'warning' | 'critical' | 'off';
 
@@ -27,9 +37,12 @@ export function formatQuantity(quantity: string | number, locale: string): strin
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(Number(quantity));
 }
 
-/** Cents as euros, in the reader's language. */
-export function formatMoney(cents: number, locale: string): string {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(cents / 100);
+/** Minor units as `money` in the reader's language («24,50 zł», «€24.50», «¥2,450»); «24,50» while it is unknown. */
+export function formatMoney(cents: number, locale: string, money?: Money): string {
+  const decimals = money?.decimals ?? NO_MONEY_DECIMALS;
+  const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+  const options: Intl.NumberFormatOptions = money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
+  return new Intl.NumberFormat(locale, options).format(cents / 10 ** decimals);
 }
 
 /** A moment, short date and time, in the business's zone; empty for none. */
