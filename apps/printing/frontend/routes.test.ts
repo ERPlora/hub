@@ -47,10 +47,10 @@ describe('printing routes.ts', () => {
     expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
   });
 
-  it('has a page for every menu entry of apps.py', () => {
+  it('has a page for every route apps.py names: its menu and where the Home sends (its step, its bell)', () => {
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/printing\/[a-z_]+)"/g)].map((m) => m[1]);
-    expect(paths).toEqual(['/printing/printers', '/printing/devices', '/printing/jobs', '/printing/settings']);
+    const paths = [...new Set([...appsPy.matchAll(/"(\/printing\/[a-z_]+)"/g)].map((m) => m[1]))];
+    expect(paths.sort()).toEqual(['/printing/devices', '/printing/jobs', '/printing/printers', '/printing/settings']);
     for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });
 });

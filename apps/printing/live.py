@@ -17,6 +17,9 @@ live("printing.printer.list", on=PRINTERS)
 live("printing.printer.get", on=PRINTERS)
 live("printing.printer.status", on=[*PRINTERS, E.SETTINGS_UPDATED])
 live("printing.job.list", on=[*E.JOB_EVENTS, E.PRINTER_UPDATED])
-live("printing.job.summary", on=[*PRINTERS, E.SETTINGS_UPDATED])
+# Its «no device prints it» moves with the devices too.
+live("printing.job.summary", on=[*PRINTERS, E.SETTINGS_UPDATED, *E.DEVICE_EVENTS])
 # A claim stamps the device's last news; a printer renamed or deactivated shows in the rows of its devices.
 live("printing.device.list", on=[*E.DEVICE_EVENTS, E.JOB_CLAIMED, E.PRINTER_UPDATED])
+# The Home's step and the bell's rows (base re-runs its own queries on the same events, from apps.py).
+live("printing.device.coverage", on=E.UNATTENDED_EVENTS)

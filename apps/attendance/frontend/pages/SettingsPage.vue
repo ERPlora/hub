@@ -1,14 +1,15 @@
 <script setup lang="ts">
 // Time clock → Settings (WORKBOOK «Pantallas · Ajustes»; ATTENDANCE-F04), the old `erp-attendance-settings`:
 // whether a personal device must share its location and be within a radius of the workplace to clock in,
-// the radius, the workplace (typed, or read from this device with «Use my current location») and after how
-// many hours a forgotten day is flagged for review. The values come live (`attendance.settings.get`: the
-// defaults until the business saves): a change saved elsewhere repaints every field the person has not
-// touched. «Save» sends only what changed (`attendance.settings.update`); what the screen can judge it
-// judges first and the server's 422 goes under each field. Whoever may not save reads them.
+// the radius, the workplace (typed, or read from this device with «Use my current location»; what fails is said
+// under that button, and a denied location says where to allow it: the browser, or the device's settings inside
+// the installed app) and after how many hours a forgotten day is flagged for review. The values come live
+// (`attendance.settings.get`: the defaults until the business saves): a change saved elsewhere repaints every
+// field the person has not touched. «Save» sends only what changed (`attendance.settings.update`); what the
+// screen can judge it judges first and the server's 422 goes under each field. Whoever may not save reads them.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
+import { AppPage, HubIcon, nativeBridge, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
@@ -163,7 +164,8 @@ async function useMyLocation(): Promise<void> {
     accuracy.value = Math.round(position.accuracy_m);
   } catch (failure) {
     const code = failure instanceof GeoError ? failure.code : 'unavailable';
-    problem.value = t(GEO_KEYS[code]);
+    // The installed app has no browser bar: there the location is allowed again in the device's settings.
+    problem.value = code === 'denied' && nativeBridge() ? t('attendance.settings.locationDeniedInApp') : t(GEO_KEYS[code]);
   } finally {
     locating.value = false;
   }
@@ -227,11 +229,11 @@ async function useMyLocation(): Promise<void> {
           {{ $t('attendance.settings.readOnly') }}
         </InlineFeedback>
         <InlineFeedback
-          v-if="problem || saveError"
+          v-if="saveError"
           tone="danger"
           data-testid="attendance-settings-error"
         >
-          {{ problem || saveError?.message }}
+          {{ saveError.message }}
         </InlineFeedback>
         <InlineFeedback
           v-if="saved"
@@ -340,6 +342,15 @@ async function useMyLocation(): Promise<void> {
               data-testid="attendance-settings-accuracy"
             >{{ $t('attendance.settings.accuracy', { accuracy }) }}</span>
           </div>
+          <!-- Under the button that read it: on a phone the banner up top is out of sight from here. -->
+          <InlineFeedback
+            v-if="problem"
+            class="attendance-settings__location-error"
+            tone="danger"
+            data-testid="attendance-settings-location-error"
+          >
+            {{ problem }}
+          </InlineFeedback>
         </section>
         <InlineFeedback
           v-if="workplaceMissing"
@@ -427,6 +438,9 @@ async function useMyLocation(): Promise<void> {
   align-items: center;
   gap: 12px;
   margin-top: 10px;
+}
+.attendance-settings__location-error {
+  margin-top: 12px;
 }
 .attendance-settings__actions {
   display: flex;

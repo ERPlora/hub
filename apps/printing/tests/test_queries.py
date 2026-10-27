@@ -208,3 +208,130 @@ def test_the_devices_by_name_with_the_printers_each_one_reaches():
     assert run("printing.device.list", {"limit": 1, "offset": 1}).rows[0].name == "Counter"
     with pytest.raises(PermissionDenied):
         run("printing.device.list", ctx=ctx_for("nobody"))
+
+
+# ── Who prints each function: the Home's «Set up your printer» and the bell's «Nothing is printing» ───────────────
+# A device set up here (not retired) prints the active printers it reaches: the jobs of those printers, and the jobs of
+# a function no printer took yet on the paper of one of them (``printing.job.claim``). A job no such device can take
+# waits for ever: that is what the bell counts (old-hub:HUB_SHELL-F63, gh:hub#800).
+
+
+def reaches(*printers, name: str = "Counter", retired: bool = False):
+    from apps.printing.models import PrintDevice
+
+    device = PrintDevice.objects.create(
+        name=name, key=PrintDevice.key_of(name), retired_at=timezone.now() if retired else None
+    )
+    device.printers.add(*(p.id for p in printers))
+    return device
+
+
+def coverage(usage: str = "receipt", ctx=None):
+    out = run("printing.device.coverage", {"usage": usage}, ctx=ctx)
+    assert out.usage == usage
+    return out.configured, out.count
+
+
+def test_a_business_without_printers_has_nobody_printing_and_nothing_waiting():
+    assert coverage() == (False, 0)
+
+
+def test_a_receipt_printer_no_device_reaches_prints_nothing_and_its_receipts_wait_for_nobody():
+    printer("Till")
+    enqueue()
+    enqueue(job_key="sale:2")
+    assert coverage() == (False, 2)
+
+
+def test_a_device_set_up_with_the_receipt_printer_prints_the_receipts_even_if_it_never_asked_yet():
+    # The old hub's «registered for the station, live or not» (hub#1948): a till off overnight is not a step undone.
+    reaches(printer("Till"))
+    enqueue()
+    assert coverage() == (True, 0)
+
+
+def test_a_retired_device_an_inactive_printer_or_another_functions_printer_print_no_receipt():
+    till = printer("Till")
+    reaches(till, retired=True)
+    reaches(printer("Kitchen", usage="kitchen", address="10.0.0.2"), name="Kitchen tablet")
+    enqueue()
+    assert coverage() == (False, 1)
+    assert coverage("kitchen") == (True, 0)
+
+    reaches(till, name="New till")
+    run("printing.printer.update", {"printer_id": str(till.id), "is_active": False})
+    assert coverage()[0] is False
+
+
+def test_the_computers_own_printer_prints_a4_pages_not_the_receipt():
+    # Sales' receipt goes on receipt paper (the thermal printer); the computer's printer takes the A4 pages only.
+    reaches(printer("Office", kind="system", address=""))
+    assert coverage() == (False, 0)
+
+
+def test_a_job_waits_for_nobody_when_its_own_printer_is_reached_by_no_device():
+    # The device asks for the jobs of its printers: one sent to the other receipt printer is not its own.
+    till, spare = printer("Till"), printer("Spare", address="10.0.0.9")
+    reaches(till)
+    enqueue(printer=str(spare.id))
+    enqueue(printer=str(till.id), job_key="sale:2")
+    assert coverage() == (True, 1)
+
+
+def test_a_job_without_a_printer_waits_for_nobody_until_a_device_reaches_one_of_its_function_and_paper():
+    till = printer("Till", is_active=False)
+    reaches(till)
+    enqueue()
+    assert PrintJob.objects.get().printer_id is None
+    assert coverage() == (False, 1)
+    run("printing.printer.update", {"printer_id": str(till.id), "is_active": True})
+    assert coverage() == (True, 0)
+
+
+def test_only_waiting_jobs_count_never_one_a_device_has_or_that_ended():
+    printer("Till")
+    for status in ("sent", "done", "failed", "cancelled"):
+        PrintJob.objects.filter(pk=enqueue(job_key=f"sale:{status}").job.id).update(status=status)
+    assert coverage() == (False, 0)
+
+
+def test_each_function_counts_its_own_jobs():
+    printer("Till")
+    printer("Kitchen", usage="kitchen", address="10.0.0.2")
+    enqueue()
+    enqueue("kitchen_order", {"order_number": "12", "table": "4", "items": [ITEM]}, job_key="kitchen:12")
+    assert (coverage("receipt"), coverage("kitchen"), coverage("bar"), coverage("label")) == (
+        (False, 1),
+        (False, 1),
+        (False, 0),
+        (False, 0),
+    )
+
+
+def test_whoever_sees_the_printers_reads_it_and_nobody_else():
+    assert coverage(ctx=ctx_for("hub_employee")) == (False, 0)
+    with pytest.raises(PermissionDenied):
+        run("printing.device.coverage", {"usage": "receipt"}, ctx=ctx_for("nobody"))
+
+
+def test_the_summary_by_function_counts_what_no_device_set_up_here_can_print():
+    # The bell's «Nothing is printing “…”» leads to the printers' summary: each function says it too, so the card
+    # never says «Ready» while its paper waits for nobody.
+    till = printer("Till")
+    enqueue()
+
+    def unattended() -> dict:
+        return {row.usage: row.unattended for row in run("printing.job.summary").usages}
+
+    assert unattended() == {"receipt": 1, "kitchen": 0, "bar": 0, "label": 0}
+    reaches(till)
+    assert unattended()["receipt"] == 0
+
+
+def test_a_job_waiting_without_a_printer_is_only_taken_by_a_device_of_its_own_function():
+    # A kitchen order with no kitchen printer waits for one: the device of the receipts never takes it.
+    reaches(printer("Till"))
+    enqueue(usage="kitchen", job_key="kitchen:1")
+    assert PrintJob.objects.get().printer_id is None
+    summary = {row.usage: row.unattended for row in run("printing.job.summary").usages}
+    assert (summary["receipt"], summary["kitchen"]) == (0, 1)

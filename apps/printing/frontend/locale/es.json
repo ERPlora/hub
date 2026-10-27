@@ -192,6 +192,8 @@
       "allClear": "Todo al día: no hay nada en cola.",
       "ready": "Listo",
       "stalled": "En cola, sin impresora",
+      "noDevice": "Sin dispositivo",
+      "noDeviceHint": "Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.",
       "failing": "Con errores",
       "waiting": "En cola: {n}",
       "oldest": "el más antiguo lleva {age}",

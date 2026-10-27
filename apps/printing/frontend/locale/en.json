@@ -192,6 +192,8 @@
       "allClear": "All clear: nothing is waiting in the queue.",
       "ready": "Ready",
       "stalled": "Waiting, no printer",
+      "noDevice": "No device",
+      "noDeviceHint": "No device set up here prints it: set one up in Devices.",
       "failing": "With errors",
       "waiting": "Waiting: {n}",
       "oldest": "the oldest has waited {age}",

@@ -23,6 +23,24 @@ msgstr "Tus impresoras de tiques, cocina y etiquetas, y la cola de impresión qu
 msgid "Printing keeps the business's printers: their name, how they are connected (network, USB, Bluetooth or the computer's own printer), their paper and what each one prints — receipts, kitchen and bar orders or barcode labels. The till, the cash register and the inventory send their papers to the print queue, and the ERPlora app on the device next to the printer prints them. Test a printer, choose whether the receipt prints and the drawer opens at checkout, and retry or cancel a job that did not come out."
 msgstr "Impresión guarda las impresoras del negocio: su nombre, cómo están conectadas (red, USB, Bluetooth o la impresora del propio ordenador), su papel y qué imprime cada una: tiques, comandas de cocina y barra o etiquetas de código de barras. El TPV, la caja y el inventario mandan sus papeles a la cola de impresión, y la app de ERPlora del dispositivo que está junto a la impresora los imprime. Prueba una impresora, decide si el tique se imprime y el cajón se abre al cobrar, y reintenta o cancela un trabajo que no salió."
 
+msgid "Nothing is printing “Receipt”"
+msgstr "Nadie está imprimiendo «Recibo»"
+
+msgid "Nothing is printing “Kitchen”"
+msgstr "Nadie está imprimiendo «Cocina»"
+
+msgid "Nothing is printing “Bar”"
+msgstr "Nadie está imprimiendo «Barra»"
+
+msgid "Nothing is printing “Label”"
+msgstr "Nadie está imprimiendo «Etiqueta»"
+
+msgid "Set up your printer"
+msgstr "Configura la impresora"
+
+msgid "Register the device that prints your customers' receipts, so the first sale comes out on paper."
+msgstr "Da de alta el dispositivo que imprime los tiques de tus clientes, para que la primera venta salga en papel."
+
 msgid "Printers"
 msgstr "Impresoras"
 

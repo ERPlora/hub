@@ -206,6 +206,8 @@ export interface UsageSummary {
   oldest_pending_at: string | null;
   sent: number;
   failed: number;
+  /** Its jobs waiting that no device set up here can print. */
+  unattended: number;
 }
 
 export interface JobSummaryOut {
@@ -253,6 +255,15 @@ export interface DevicePrinterOut {
   name: string;
   usage: Usage;
   is_active: boolean;
+}
+
+/** Who prints a function: the Home's «Set up your printer» (`configured`, receipts) and the bell's «Nothing is printing». */
+export interface CoverageOut {
+  usage: Usage;
+  /** A device set up here reaches an active printer of the function on receipt paper. */
+  configured: boolean;
+  /** Its jobs waiting that no device set up here can print. */
+  count: number;
 }
 
 /** A device set up to print. Its own id (X-Device-Id) is never sent back: it proves the device. */
@@ -305,5 +316,6 @@ declare module '@erplora/ui/sdk' {
     'printing.device.register': { input: DeviceRegisterIn; output: DeviceOut };
     'printing.device.update': { input: DeviceUpdateIn; output: DeviceOut };
     'printing.device.retire': { input: DeviceRefIn; output: DeviceOut };
+    'printing.device.coverage': { input: { usage: Usage }; output: CoverageOut };
   }
 }

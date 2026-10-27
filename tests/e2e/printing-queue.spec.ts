@@ -290,7 +290,9 @@ test('PRINTING-F12: the label asked from the product sheet waits in the Â«LabelÂ
       await expect(shown(p).locator('[data-testid=printing-summary-card-label]')).toContainText(/(Waiting, no printer|En cola, sin impresora)/);
     });
 
-    // A label printer arrives: the card turns ready and names it, and the device next to it takes the label.
+    // A label printer arrives: the card names it and, until a device set up here reaches it, says nobody prints it
+    // (FIX-PRINTING-SETUP-HOOKS); the device next to it, set up by printing from it, takes the label and the card
+    // turns ready.
     const labels = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
       name: `e2e Labels ${RUN}`,
       kind: 'network',
@@ -298,10 +300,11 @@ test('PRINTING-F12: the label asked from the product sheet waits in the Â«LabelÂ
       usage: 'label',
     });
     expect(labels.status).toBe(201);
-    await expect(card).toContainText(/(Ready|Listo)/);
     await expect(card).toContainText(`e2e Labels ${RUN}`);
+    await expect(card).toContainText(/(No device|Sin dispositivo)/);
     // The oldest label goes first: one another run left waiting comes out before this one.
     expect((await claimUntil(context, labels.data.id, mine))?.id).toBe(mine);
+    await expect(card).toContainText(/(Ready|Listo)/);
     expect(psql(`select concat_ws(' ', document->>'product_name', document->>'barcode', document->>'price') from printing_printjob where id = '${mine}'`)).toBe(
       `E2E Label ${RUN} ${LABEL_SKU} 12.1`,
     );

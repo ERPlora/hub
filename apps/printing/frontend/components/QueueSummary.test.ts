@@ -19,6 +19,7 @@ const usage = (name: UsageSummary['usage'], more: Partial<UsageSummary> = {}): U
   oldest_pending_at: null,
   sent: 0,
   failed: 0,
+  unattended: 0,
   ...more,
 });
 
@@ -111,5 +112,20 @@ describe('QueueSummary by the clock', () => {
     await flush();
     expect(words(s.find('printing-summary-alert-label').element)).toContain('1 print job for Label has been waiting 1 min.');
     expect(words(s.find('printing-summary-card-label').element)).toContain('the oldest has waited 1 min');
+  });
+
+  it('a role whose jobs no device set up here can print says so, not «Ready», and where to fix it', async () => {
+    // The bell's «Nothing is printing “Receipt”» leads here (PRINTING-F01): the card says why.
+    const s = await setup('es');
+    await s.result(OP, summary(usage('receipt', { printers: 1, prints_on: 'Caja', pending: 1, oldest_pending_at: ago(0), unattended: 1 })));
+    const card = words(s.find('printing-summary-card-receipt').element);
+    expect(card).toMatch(/^Recibo Sin dispositivo /);
+    expect(card).not.toContain('Listo');
+    expect(s.find('printing-summary-no-device-receipt').text()).toBe(
+      'Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.',
+    );
+    await s.result(OP, summary(usage('receipt', { printers: 1, prints_on: 'Caja', pending: 1, oldest_pending_at: ago(0) })));
+    expect(words(s.find('printing-summary-card-receipt').element)).toMatch(/^Recibo Listo /);
+    expect(s.wrapper.find('[data-testid="printing-summary-no-device-receipt"]').exists()).toBe(false);
   });
 });

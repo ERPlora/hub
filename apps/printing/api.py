@@ -11,6 +11,7 @@ from ninja import Query, Router
 
 from apps.printing import queries, services
 from apps.printing.schemas import (
+    CoverageIn,
     DeviceListIn,
     DeviceRefIn,
     DeviceRegisterIn,
@@ -142,3 +143,8 @@ async def device_update(request, data: DeviceUpdateIn):
 @bind(router, "printing.device.retire", "/printing/devices/retire")
 async def device_retire(request, data: DeviceRefIn):
     return await run_operation(request, services.retire_device, data)
+
+
+@bind(router, "printing.device.coverage", "/printing/devices/coverage")
+async def device_coverage(request, params: Query[CoverageIn]):
+    return await run_operation(request, queries.device_coverage, params)
