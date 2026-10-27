@@ -193,7 +193,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const { context, page } = await signedIn(browser, viewport, '/apps');
     try {
       const listed = await api<{ apps: { id: string; path: string | null }[] }>(context, A, 'GET', '/apps');
-      const tasksScreen = listed.data.apps.find((app) => app.id === 'task')?.path;
+      const tasksScreen = listed.data.apps.find((app) => app.id === 'task')?.path ?? '';
       expect(tasksScreen, 'Tasks has a screen for the owner').toBeTruthy();
 
       // The baseline: every app on, the roots chosen (17 with the reference app of development) of Gratis's 20.
