@@ -34,6 +34,10 @@ describe('the VeriFactu tabbar', () => {
     expect(tabsIn('es').map((t) => t.label)).toEqual(['Registros', 'Contingencia', 'Eventos', 'Recuperación', 'Configuración', 'Ajustes']);
   });
 
+  it('wears the old module’s shield on Recovery, now that the shell has it (ui#34)', () => {
+    expect(VERIFACTU_TABS.find((tab) => tab.id === 'recovery')?.icon).toBe('ion:shield-checkmark-outline');
+  });
+
   it('gives every tab a registered icon', () => {
     for (const tab of VERIFACTU_TABS) expect(resolveIcon(tab.icon), tab.icon).toBeTruthy();
   });

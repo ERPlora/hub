@@ -76,7 +76,7 @@ def test_the_owner_has_the_step_pending_until_erplora_may_file_in_production(iss
         "required": True,
         "actionable": True,
         "route": "/verifactu/config",
-        "icon": "lucide:shield-check",
+        "icon": "ion:shield-checkmark-outline",
     }
     assert step["title"] == "Set up VeriFactu"
     # Under review is not ready yet: only the approval opens ERPlora's way to production.
