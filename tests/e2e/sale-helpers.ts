@@ -23,6 +23,9 @@ export interface SaleOut {
   id: string;
   number: string;
   status: string;
+  /** The currency it was charged in (the business's then) and its decimals. */
+  currency: string;
+  currency_decimals: number;
   total: number;
   subtotal: number;
   tax_total: number;
