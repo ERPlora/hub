@@ -308,7 +308,8 @@
       "heading": "You cannot invoice yet",
       "message": "No ticket or invoice can be issued until you set this up:",
       "item": "The business’s details",
-      "setUp": "Set up"
+      "setUp": "Set up",
+      "delegated": "An administrator has to set this up."
     },
     "paper": {
       "invoice": "Invoice",

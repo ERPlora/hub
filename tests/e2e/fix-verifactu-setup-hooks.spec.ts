@@ -126,6 +126,14 @@ async function spanishOwner(
 
 const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
 const row = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
+
+/** «Ver todo» when the fold keeps the step out of sight: on a phone it shows 2 rows, and a hub without its tax details
+ *  has «Los datos de tu negocio» (⛔, before VeriFactu's) pending too (FIX-INVOICE-SETUP-HOOKS). */
+async function unfolded(page: Page): Promise<void> {
+  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
+  const toggle = card(page).locator('[data-testid="setup-toggle"]');
+  if ((await row(page).count()) === 0 && (await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
+}
 const panel = (page: Page, key: string): Locator =>
   shown(page).locator(`[data-testid="widget-board"] [data-testid="widget"][data-key="${key}"]`);
 
@@ -170,6 +178,7 @@ for (const size of SIZES) {
     await erploraWith('none');
     const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height }, PANELS);
     try {
+      await unfolded(page);
       await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Importante');
       const titles = ['Pendientes VeriFactu', 'Cola de contingencia', 'Registros por estado', 'Eventos AEAT recientes'];
       for (const [index, key] of PANELS.entries()) {

@@ -7,12 +7,14 @@ más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
 - `ion:document-text-outline` — icono del módulo y pestaña/menú **Facturas** (el del producto actual).
   Hoy: `ion:receipt-outline` (`apps.py` `icon` y `navigation`, `frontend/tabs.ts`).
-- `ion:bookmark-outline` — pestaña y menú **Series** (el del producto actual). Hoy: `ion:layers-outline`.
-- `ion:business-outline` — pestaña y menú **Emisor** (nuevo). Hoy: `ion:storefront-outline`.
+- `ion:bookmark-outline` — pestaña y menú **Series** (el del producto actual) y el paso «Tu numeración de
+  facturas» del Inicio (el del módulo viejo). Hoy: `ion:layers-outline`.
+- `ion:business-outline` — pestaña y menú **Emisor** (nuevo) y el paso «Los datos de tu negocio» del Inicio (el
+  del hub viejo). Hoy: `ion:storefront-outline`.
 - `ion:print-outline` — botón «Imprimir / PDF» de la ficha (el del producto actual). Hoy:
   `ion:download-outline`.
 
-Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts`, sus tests
+Al registrarlos, cambiar a la vez `apps.py` (`icon`, `navigation` y `setup`), `frontend/tabs.ts`, sus tests
 (`tests/test_apps.py`, `frontend/tabs.test.ts`) y `pnpm gen:app-icons`.
 
 ## Formateadores de dinero, porcentaje, cantidad y día en `@erplora/ui/components/format`
