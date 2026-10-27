@@ -223,7 +223,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | Error | El aviso con «Reintentar»; un rechazo de una acción sale dentro de su hoja o ventana, junto a su campo. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
-| Hablando (Vender) | La tecla «Hablar», roja, dice «Parar» y debajo sale «Escuchando…»; al parar, «Transcribiendo…». Un aviso dice lo que falla: sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.»; con el micrófono denegado, «El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.»; demasiado larga, «La grabación es demasiado larga: di algo más corto.»; si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.»; sin conexión, «Sin conexión: para hablar con el asistente hace falta internet.». |
+| Hablando (Vender) | La tecla «Hablar», roja, dice «Parar» y debajo sale «Escuchando…»; al parar, «Transcribiendo…». Un aviso dice lo que falla: sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.»; con el micrófono denegado, «El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.» (en la app instalada, que no tiene navegador, «El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.»); demasiado larga, «La grabación es demasiado larga: di algo más corto.»; si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.»; sin conexión, «Sin conexión: para hablar con el asistente hace falta internet.». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». Lo que un responsable puede aprobar con su PIN (anular y devolver una venta, anular una línea enviada, eliminar una cuenta con algo pedido, el precio libre y los descuentos por encima del máximo) sí aparece y, al pulsarlo, pide «Hace falta una aprobación». |
 
 ## Flujos
@@ -1658,10 +1658,14 @@ administrador y responsable, los mismos que anulan y devuelven).
   (`recordVoice`, `canDictate`, `base64Of` e iconos de `base/frontend/lib/`, la operación
   `base.assistant.transcribe` y `useAssistant()`: el texto va a `state.draft` y `setOpen(true)` abre el
   panel). Se ve con `base.view_home` (el permiso de `base.assistant.transcribe` y del botón del asistente) y
-  un navegador que graba; sin conexión, `aria-disabled` con su motivo. El TPV pasa a la disposición del
+  un navegador que graba; sin conexión, `aria-disabled` con su motivo. Con el micrófono denegado, `nativeBridge()` de
+  `@erplora/ui/shell` elige el aviso: en la app instalada, `sale.pos.speak.deniedInApp` (los ajustes del dispositivo),
+  como el compositor del asistente (BASE-F94). El TPV pasa a la disposición del
   móvil también cuando su propia caja mide menos de 700 px (`NARROW_TILL` de `PosPage.vue`): el panel
   acoplado desde 768 px dejaba la columna del catálogo en unos 90 px en una tableta de 834. Tests:
-  `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y la e2e `tests/e2e/sale-speak.spec.ts`.
+  `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y las e2e `tests/e2e/sale-speak.spec.ts` y
+  `tests/e2e/sale-speak-microphone.spec.ts` (el micrófono denegado: Chrome lo bloquea con una opción de
+  lanzamiento, así que va en un fichero propio).
 
 ### Decisiones de plataforma
 

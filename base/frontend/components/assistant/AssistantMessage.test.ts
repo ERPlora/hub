@@ -78,6 +78,27 @@ describe('AssistantMessage', () => {
     wrapper.unmount();
   });
 
+  it('a receipt names the action by its own verb, in Spanish and in English, never «Do this»', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: «Hecho: Hacer esto en Facturación».
+    const executed = [
+      { name: 'invoice.invoice.rectify', app: 'invoice', app_name: 'Facturación', outcome: 'ok' },
+      { name: 'invoice.invoice.mark_paid', app: 'invoice', app_name: 'Facturación', outcome: 'cancelled' },
+    ];
+    const es = await mountBubble(answer({ text: 'Hecho.', executed }));
+    expect(es.wrapper.findAll('[data-testid="assistant-receipt"]').map((row) => row.text())).toEqual([
+      'Hecho: Rectificar en Facturación',
+      'No se hizo, cancelado: Registrar el cobro en Facturación',
+    ]);
+    es.wrapper.unmount();
+    const english = executed.map((row) => ({ ...row, app_name: 'Invoicing' }));
+    const en = await mountBubble(answer({ text: 'Done.', executed: english }), {}, 'en');
+    expect(en.wrapper.findAll('[data-testid="assistant-receipt"]').map((row) => row.text())).toEqual([
+      'Done: Rectify in Invoicing',
+      'Not done, cancelled: Record the payment in Invoicing',
+    ]);
+    en.wrapper.unmount();
+  });
+
   it('a receipt names where it happened as the server says it: the platform by its screen, never «base»', async () => {
     // FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the menu has no section «base», so the receipt said «en base».
     const executed = [{ name: 'base.access.settings_update', app: 'base', app_name: 'Ajustes', outcome: 'cancelled' }];

@@ -39,6 +39,7 @@
         "transcribing": "Transcribiendo…",
         "offline": "Sin conexión: para hablar con el asistente hace falta internet.",
         "denied": "El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.",
+        "deniedInApp": "El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.",
         "empty": "No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.",
         "tooLong": "La grabación es demasiado larga: di algo más corto.",
         "failed": "No se ha podido transcribir el audio. Inténtalo de nuevo."

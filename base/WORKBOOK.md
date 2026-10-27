@@ -2355,12 +2355,13 @@ Pasos:
      en céntimos), un sí o un no como «Sí» o «No» y una lista por cuántos elementos lleva. Todo sale en el idioma de
      la persona, también el nombre de cada dato cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que
      lo llama su app, nunca un nombre técnico. Una acción de la propia plataforma se nombra por la pantalla donde
-     se hace, por ejemplo «Cambiar en Ajustes» o «Borrar en Archivos».
+     se hace, por ejemplo «Cambiar en Ajustes» o «Borrar en Archivos». Cada acción sale con su propio verbo, nunca
+     con uno genérico: rectificar una factura dice «Rectificar en Facturación».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
-  5. Bajo la respuesta queda el recibo de cada acción del turno: «Hecho: Crear en Servicios», o «No se hizo,
-     cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …».
+  5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
+     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …».
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio.
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
@@ -2918,7 +2919,11 @@ Implicados: ACCOUNTS-F38
   `base/schemas.py`; lo comprueba `test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_name`;
   la app de la tarjeta y del recibo, `app_name`: la de una app por su `verbose_name`, una acción de `base` por la
   pantalla de su entidad, `BASE_SCREENS`, nunca «Base»; el recibo usa el `app_name` que manda el turno en
-  `executed`; lo comprueba `test_every_action_of_base_names_its_screen`), la
+  `executed`; lo comprueba `test_every_action_of_base_names_its_screen`; la acción de la tarjeta y del recibo, el
+  último trozo del nombre de la operación (`action`), por su verbo en `base.assistant.card.actions` de los catálogos
+  `en` y `es` de `base` (`actionKey` de `lib/assistant-card.ts`, por clave exacta; sin clave, «Do this»): una app con
+  una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
+  `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`), la
   comparación del servidor (`confirmed`, como `ConfirmDialog`: sin mayúsculas ni espacios de los extremos),
   `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
   puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report` y `/internal/speech/transcribe`, con
