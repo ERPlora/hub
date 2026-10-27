@@ -10,7 +10,7 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
-from django.utils import translation
+from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
@@ -65,6 +65,14 @@ def english():
     """Each test starts in English: a request of an earlier test may have left another language."""
     with translation.override("en"):
         yield
+
+
+@pytest.fixture
+def today():
+    """The business day the test runs on, taken when it runs as the operations take it: a date taken at import
+    is the day of the collection, and a run that crosses New Year's Eve would expect the numbers of the year
+    before (``test_clock_at_import.py``)."""
+    return timezone.localdate()
 
 
 @pytest.fixture
