@@ -583,7 +583,7 @@ def test_the_list_says_each_apps_state_whether_chosen_and_which_apps_on_need_it(
     assert apps_["task"]["required_by"] == []  # nothing on needs it
     assert (document["max_apps"], document["enabled"]) == (20, 1)
     hub = Hub.objects.get(slug="a")
-    assert document["plan_url"] == f"http://localhost:8001/store/plans?business={hub.id}"
+    assert document["plan_url"] == f"http://localhost:8001/dashboard/store/plans?business={hub.id}"
 
 
 @pytest.mark.django_db

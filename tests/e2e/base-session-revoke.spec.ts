@@ -99,7 +99,7 @@ async function joins(owner: Person, person: Person, business: Business): Promise
 /** The owner's panel: the business's «Team», on screen. */
 async function team(owner: Person, business: Business): Promise<Page> {
   const panel = owner.page;
-  await panel.goto(`${SAAS}/businesses/${business.id}/members`);
+  await panel.goto(`${SAAS}/dashboard/businesses/${business.id}/members`);
   await expect(panel.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)').last().getByTestId('members-row').first()).toBeVisible();
   return panel;
 }

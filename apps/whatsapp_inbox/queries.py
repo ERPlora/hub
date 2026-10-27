@@ -45,6 +45,7 @@ from apps.whatsapp_inbox.schemas import (
     TemplateListIn,
     TemplatePage,
 )
+from base.auth import SAAS_PANEL_PATH
 from base.models import Membership
 
 CONVERSATION_NOT_FOUND = _("That conversation does not exist in this business.")
@@ -59,7 +60,7 @@ CONVERSATION_AMBIGUOUS_CODE = "whatsapp_inbox.conversation_ambiguous"
 #: What a phone typed in the search box may hold besides digits.
 _PHONE_TEXT = re.compile(r"^[\d\s+().\-/]+$")
 #: erplora.com's plans (its Store), where the owner upgrades for more WhatsApp messages (ADR-0474: no packs).
-PLANS_PATH = "/store/plans"
+PLANS_PATH = f"{SAAS_PANEL_PATH}/store/plans"
 
 
 def business_country(ctx: OperationContext | None = None) -> str:

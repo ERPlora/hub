@@ -23,7 +23,7 @@ from live.models import OutboxEvent
 from live.operations import operation
 
 from base import access, activation, blueprint, business, entitlement, files, home, system
-from base.auth import saas_url
+from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models import (
     AccessSettings,
     AppActivation,
@@ -350,8 +350,8 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                 }
                 for config in configs
             ],
-            "store_url": saas_url(f"/store/modules?business={hub.id}") if hub is not None else "",
-            "plan_url": saas_url(f"/store/plans?business={hub.id}") if hub is not None and not demo else "",
+            "store_url": saas_url(f"{SAAS_PANEL_PATH}/store/modules?business={hub.id}") if hub is not None else "",
+            "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if hub is not None and not demo else "",
             "max_apps": app_limit(hub),
             "enabled": activation.chosen_on(current, among=shown),
         }
@@ -601,7 +601,7 @@ def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
         "currency_label": business.currency_label(currency, ctx.language),
         "currency_decimals": business.currency_decimals(currency),
         "demo": hub.is_demo,
-        "settings_url": "" if hub.is_demo else saas_url(f"/businesses/{hub.id}/settings"),
+        "settings_url": "" if hub.is_demo else saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/settings"),
     }
 
 
@@ -890,7 +890,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
         "people": faces,
         "wait": wait,
         # BASE-G57's «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
-        "plan_url": saas_url("/store/plans"),
+        "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans"),
     }
 
 

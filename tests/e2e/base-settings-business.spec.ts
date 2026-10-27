@@ -167,7 +167,7 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
     owner.context.waitForEvent('page'),
     shown(page).getByTestId('business-change').click(),
   ]);
-  await expect(popup).toHaveURL(`${SAAS}/businesses/${business.id}/settings`);
+  await expect(popup).toHaveURL(`${SAAS}/dashboard/businesses/${business.id}/settings`);
   await popup.close();
 
   // «Fiscal data»: Invoicing's issuer, where the invoices take it from.

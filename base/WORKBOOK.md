@@ -2616,7 +2616,7 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   `SHOW_UNLISTED_MODULES` (por defecto, `DEBUG`) o en un hub de demo (`Hub.is_demo`); nunca en el de un cliente.
   Una sola regla, `base.home.shown_modules`, para `base.session.me` y los ganchos del Inicio.
 - `base/spa.py` incrusta `hub-home` (`name` del registro y `plan_url` =
-  `SAAS_URL/store/plans?business=<id del hub>`) y `widget-list`, `base.widget.list` tal como su consulta viva se lo
+  `SAAS_URL/dashboard/store/plans?business=<id del hub>`) y `widget-list`, `base.widget.list` tal como su consulta viva se lo
   contesta a la persona (sin el permiso del Inicio no va): `WidgetBoard.vue` monta sus paneles con él, así que los
   datos de los paneles van en el mismo flujo vivo que la lista y el Inicio abre un solo `/api/live` por carga
   (antes lo reabría al llegar la lista, `net::ERR_ABORTED`, con cada consulta dos veces); manda la respuesta viva.
@@ -2696,7 +2696,7 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   entrada del menú si la persona ve la app), `icon` (el de la primera entrada del menú, el que pinta el shell, como el
   lanzador y «Mis apps»: el `icon` del módulo es el de la Tienda, horneado aparte, y `HubIcon` rechaza un nombre no
   registrado, que dejaba la pantalla en blanco), `requires` (cierre) y `required_by`, y `store_url` =
-  `SAAS_URL/store/modules?business=<id del hub>`. La foto se aplica como la plataforma (`/internal`): tras su COMMIT,
+  `SAAS_URL/dashboard/store/modules?business=<id del hub>`. La foto se aplica como la plataforma (`/internal`): tras su COMMIT,
   `base.hub.state_apply` avisa también al canal del propio negocio (`base/tests/test_hub_state_wake.py`), que es
   donde escuchan las consultas vivas que la siguen. `base.plan.usage` (`GET /api/system/plan`, `base.administer_hub`,
   viva con la foto): `plan.max_users`/`max_devices` de la foto (0 = sin tope) frente a las `Membership` activas del
@@ -2756,7 +2756,7 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
 - **Ajustes del negocio (APP-BASE-6: BASE-F48…F51).** `base.business.get` (`GET /api/business`, `base.view_home`,
   viva con `base.hub.registered`): la fila del registro del ámbito, la que manda el SaaS por `PUT /internal/hubs/{id}`
   (nombre, país, zona e idioma, HUBS-F15), con la moneda del país (`base/business.py`: CLDR por Babel; sin país,
-  `EUR`), los nombres en el idioma de la persona y `settings_url` = `SAAS_URL/businesses/<id>/settings` (vacío en una
+  `EUR`), los nombres en el idioma de la persona y `settings_url` = `SAAS_URL/dashboard/businesses/<id>/settings` (vacío en una
   demo). El registro se aplica como la plataforma: tras su COMMIT, `base.hub.register` avisa también al canal del
   propio negocio (`base/tests/test_business_live.py`). El Hub no guarda ni cambia nada de esto y no hay almacén
   clave/valor de ajustes: el `hub_settings` del runtime viejo se repartió entre sus dueños (país, zona e idioma en el
