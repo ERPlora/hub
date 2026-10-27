@@ -41,6 +41,8 @@ def test_each_query_and_its_events():
         "attendance.correction.list": ["attendance.record.corrected"],
         # ATTENDANCE-F11: who is in now follows every clocking, break, correction and flag.
         "attendance.presence.list": [*RECORD, "staff.member.updated", "staff.member.terminated"],
+        # The Home's «Clocked in now» counts what that list shows, so it follows the same events.
+        "attendance.presence.count": [*RECORD, "staff.member.updated", "staff.member.terminated"],
         "attendance.person.list": [
             "attendance.record.clocked_in",
             "staff.member.created",
@@ -60,6 +62,7 @@ def test_clocking_in_re_runs_the_clock_the_records_and_who_is_in():
         "attendance.record.current",
         "attendance.record.list",
         "attendance.presence.list",
+        "attendance.presence.count",
     }
     assert "attendance.settings.get" not in live_registry.affected([events.CLOCKED_IN])
 

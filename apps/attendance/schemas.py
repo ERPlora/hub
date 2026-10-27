@@ -357,6 +357,12 @@ class PresenceOut(Schema):
     source: Source
 
 
+class PresenceCountOut(Schema):
+    count: int = Field(
+        description="How many people are clocked in right now, on a break too; a day waiting for review does not count."
+    )
+
+
 class PersonOut(Schema):
     id: UUID
     name: str

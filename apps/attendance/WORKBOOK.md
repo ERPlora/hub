@@ -1,7 +1,7 @@
 # Workbook — Control horario (app)
 Prefijo: ATTENDANCE
 Alcance MVP: transversal (lo necesitan la peluquería y el restaurante: todo negocio con empleados)
-Estado de la app: hecha (servidor y páginas); el panel de Inicio y el modo del dispositivo esperan a la
+Estado de la app: hecha (servidor, páginas y panel del Inicio); el modo del dispositivo espera a la
 plataforma (ver «Lo que queda fuera»)
 
 > Manual de usuario y especificación de la app `attendance`. Se escribe **antes** que el código: no se
@@ -75,6 +75,11 @@ quiénes, desde qué hora y si están en pausa. Arriba, «Exportar CSV». En una
 «Ubicación» y «Pausas (min)» ceden su sitio primero (siguen en las tarjetas y en «Columnas»); el nombre
 de cada persona y su estado se leen enteros.
 
+### Panel del Inicio
+El **Inicio** del Hub enseña el panel «Fichados ahora» de serie, agrupado como «Control horario» en
+**Personalizar panel**: el número de personas que tienen ahora la jornada abierta, el mismo que dice «Fichados
+ahora» encima de Registros. Solo lo tiene quien ve las jornadas de todo el equipo; un empleado no.
+
 ### Ajustes
 La pestaña «Ajustes» de la app. «Pedir la ubicación al fichar desde un dispositivo personal», «Radio
 permitido», «Ubicación del lugar de trabajo» (Latitud, Longitud y «Usar mi ubicación actual») y
@@ -89,6 +94,7 @@ en solo lectura con «Solo un responsable o un administrador puede cambiar estos
 | Registros | «Cargando jornadas…» | «No hay jornadas en este mes» (o «Nada coincide con los filtros») | «No se han podido cargar las jornadas.» y «Reintentar» |
 | Historial | «Cargando historial…» | «Esta jornada no se ha corregido nunca.» | «No se ha podido cargar el historial.» |
 | Ajustes | indicador de carga | — | el aviso y «Reintentar» |
+| Panel «Fichados ahora» del Inicio | una barra gris en el sitio del número | «0» si no hay nadie dentro | «No disponible» en el panel; los demás siguen |
 
 En las tres páginas: «Reconectando…» mientras el directo se recupera (lo pintado se queda), «Esta app
 no está activa en este negocio» si se apaga y «No tienes permiso» si el papel no llega.
@@ -107,7 +113,7 @@ no está activa en este negocio» si se apaga y «No tienes permiso» si el pape
 | ATTENDANCE-F08 | Corregir una jornada mal fichada, con su motivo | común | hecho |
 | ATTENDANCE-F09 | Ver quién cambió una jornada, cuándo y por qué | común | hecho |
 | ATTENDANCE-F10 | Sacar el mes en CSV para la gestoría o la Inspección | común | hecho |
-| ATTENDANCE-F11 | Ver quién está fichado ahora | común | hecho (en Registros; el panel de Inicio espera al Hub) |
+| ATTENDANCE-F11 | Ver quién está fichado ahora | común | hecho (servidor, pantalla y panel del Inicio) |
 | ATTENDANCE-F12 | Fichar la entrada o la salida de otra persona | común | hecho (asistente y API) |
 | ATTENDANCE-F13 | Cerrar la jornada abierta de quien se da de baja | común | hecho (reacción por el relay del outbox) |
 
@@ -331,19 +337,22 @@ Implicados: ATTENDANCE-F06, ATTENDANCE-F07
 
 ### ATTENDANCE-F11 Ver quién está fichado ahora
 <!-- origen: old:attendance/WORKFLOW.md#attendance-f11 -->
-Estado: hecho (en Registros; el panel de Inicio espera al Hub)
+Estado: hecho (servidor, pantalla y panel del Inicio)
 Actor: propietario, administrador, responsable
-Pantalla: Registros («Fichados ahora»)
+Pantalla: Registros («Fichados ahora») e Inicio
 Pasos:
 1. Abre «Registros». Encima de la tabla, «Fichados ahora» dice cuántas personas tienen la jornada
    abierta y quiénes, desde qué hora y si están en pausa.
-2. Cambia solo en cuanto alguien ficha la entrada o la salida, empieza o termina una pausa, o se
-   corrige una jornada.
-3. Una jornada «Por revisar» (o ya olvidada) no cuenta: nadie sabe si esa persona sigue dentro. Una
-   ficha dada de baja tampoco (su jornada abierta se cierra sola, ATTENDANCE-F13).
+2. En el **Inicio**, el panel «Fichados ahora» sale de serie con el mismo número.
+3. Los dos cambian solos en cuanto alguien ficha la entrada o la salida, empieza o termina una pausa, o
+   se corrige una jornada.
+4. Una jornada «Por revisar» (o ya olvidada) no cuenta: nadie sabe si esa persona sigue dentro. Una
+   ficha dada de baja tampoco (su jornada abierta se cierra sola, ATTENDANCE-F13). Quien está en pausa
+   sí cuenta.
 Entra: las jornadas abiertas (ATTENDANCE-F01, ATTENDANCE-F08).
 Sale: nada; solo lee.
-Si falla: el aviso de error en su lugar, sin tapar la tabla.
+Si falla: el aviso de error en su lugar, sin tapar la tabla; en el **Inicio**, el panel dice «No
+disponible» y los demás siguen.
 Implicados: ATTENDANCE-F01, ATTENDANCE-F02, ATTENDANCE-F08
 
 ### ATTENDANCE-F12 Fichar la entrada o la salida de otra persona
@@ -396,6 +405,7 @@ y la API, con las mismas reglas y los mismos permisos. Una persona se nombra por
 | El CSV de las jornadas del filtro (el empleado, solo las suyas) | fichar | F10 | `attendance.record.export` |
 | El historial de correcciones de una jornada (o de todas), del más reciente al más antiguo; el empleado, de las suyas | fichar | F09 | `attendance.correction.list` |
 | Quién está fichado ahora (cuántos y quiénes), con búsqueda | ver el equipo | F11 | `attendance.presence.list` |
+| Cuántos están fichados ahora (el panel «Fichados ahora» del Inicio) | ver el equipo | F11 | `attendance.presence.count` |
 | Las personas que se pueden filtrar (fichas de Personal, también las dadas de baja con jornadas), con búsqueda | ver el equipo | F07 | `attendance.person.list` |
 | Los ajustes | fichar | F03, F04 | `attendance.settings.get` |
 
@@ -495,6 +505,13 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   `tests/test_relay.py` la pasa por un tick del bucle real (`base.worker.run`), con la pausa en curso,
   la segunda entrega que no cambia nada y dos negocios (el aviso de la corrección solo se oye en el
   suyo); `tests/test_integration_staff.py` la prueba contra Personal real llamándola directamente.
+- **Panel del Inicio** (ronda PLAN-HUB 2026-10-21): `widgets` de `apps.py`, el único del módulo viejo
+  (`attendance.clocked_in_now`, KPI, `sm`, de serie, con `attendance.view_all`; sin `setup` ni `bell`, que el
+  viejo no tenía), sobre `attendance.presence.count` (`map` `value` → `count`). El recuento y la lista de
+  Registros comparten la regla (`queries.present_records`: abierta, dentro de las horas de revisión y de una
+  ficha no dada de baja) y los eventos (`events.WHO_IS_IN`, el `refresh_on` del panel y el `live()` de las dos).
+  `tests/test_integration_home.py` lo pasa por `base.widget.list` real, con dos negocios, y la e2e
+  `tests/e2e/fix-attendance-setup-hooks.spec.ts`, por el Inicio del dueño en 390, 834 y 1440.
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
   en corregir) y todo campo de entrada lleva `description`.
 - **Admin de Django** (ronda 12, PLAN §17): ajustes con CRUD completo; jornadas, pausas y correcciones
@@ -507,8 +524,6 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 
 ## Lo que queda fuera
 
-- **Panel «Fichados ahora» en el Inicio** (ATTENDANCE-F11): el Hub aún no tiene paneles en el Inicio;
-  la consulta (`attendance.presence.list`) ya está, se sigue en vivo y se ve en Registros.
 - **Modo del dispositivo** (ATTENDANCE-F03): es de la plataforma (fase 2). Hasta entonces todo
   dispositivo ficha como el compartido y «Pedir la ubicación…» queda desactivado en Ajustes.
 - **Suprimir las jornadas pasados los cuatro años** (y con ellas su posición): se conservan; la
@@ -566,7 +581,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 | `attendance.records.mine` + `records.list` | `attendance.record.list` | El servidor limita al empleado |
 | `attendance.records.get` + `breaks.list` | `attendance.record.detail` | Con sus pausas |
 | `attendance.corrections.list` | `attendance.correction.list` | También para el empleado, de lo suyo |
-| `attendance.presence.count` | `attendance.presence.list` | Cuántos y quiénes |
+| `attendance.presence.count` | `attendance.presence.count` (el panel del Inicio) y `attendance.presence.list` (Registros) | Cuántos; y cuántos y quiénes |
 | `hub.users.list` (nombres del filtro) | `attendance.person.list` | Fichas de Personal, también las dadas de baja con jornadas |
 | CSV en la pantalla (`csv.ts`) | `attendance.record.export` | En el servidor, misma cabecera |
 | — | `attendance.record.close_for_terminated` | Nuevo (F13) |
@@ -578,7 +593,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 | `erp-attendance-clock` | `frontend/pages/ClockPage.vue` (`/attendance/clock`) |
 | `erp-attendance-records` (tabla, «Corregir», «Historial», «Exportar CSV») | `frontend/pages/RecordsPage.vue` (`/attendance/records`), `components/CorrectionModal.vue`, `components/HistoryModal.vue` |
 | `erp-attendance-settings` | `frontend/pages/SettingsPage.vue` (`/attendance/settings`) |
-| Widget «Fichados ahora» del Inicio | `components/PresenceCard.vue`, encima de Registros |
+| Widget «Fichados ahora» del Inicio | El panel `attendance.clocked_in_now` del Inicio (`widgets` de `apps.py`), y `components/PresenceCard.vue` encima de Registros |
 | `ui/lib/geo.ts`, `device-mode.ts`, `duration.ts`, `records/zone.ts`, `minutes.ts`, `csv.ts`, `overlap.ts` | `lib/geo.ts`, `lib/device.ts`, `lib/time.ts`; los minutos, el CSV y el solape, en el servidor |
 
 ### Casos de las baterías
@@ -612,7 +627,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - **Lecturas juntadas**: `records.mine_open` + `records.mine` + `breaks.mine` (lo que pinta Fichar) son
   `attendance.record.current`; `records.mine` y `records.list` son `attendance.record.list` (el
   servidor limita al empleado a lo suyo); `records.get` + `breaks.*` son `attendance.record.detail`;
-  `presence.count` es `attendance.presence.list` (cuántos y quiénes).
+  `presence.count` sigue como `attendance.presence.count` (el panel del Inicio) y quiénes son, en
+  `attendance.presence.list`.
 - **Rechazos con su motivo**: el único `attendance.clock_in_rejected` y el único
   `attendance.record_not_found` de antes se separan en `attendance.already_clocked_in`,
   `attendance.outside_radius`, `attendance.location_required`, `attendance.workplace_not_set`,

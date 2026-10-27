@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// ATTENDANCE-F11: «Clocked in now», the old Home panel, above the team's records (the Hub's Home has no
-// panels yet): how many people have their day open and who, since when and whether they are on a break.
+// ATTENDANCE-F11: «Clocked in now» above the team's records: how many people have their day open and who,
+// since when and whether they are on a break; the Home's panel of the same name counts them (apps.py `widgets`).
 // Live (`attendance.presence.list`); a day waiting for review does not count (the server leaves it out).
 import { StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';

@@ -26,13 +26,6 @@ Al registrarlos: cambiar el `icon` de `apps.py` (y `pnpm gen:app-icons`) y los `
   petición de `apps/staff/UI-REQUESTS.md` («Fecha y hora en el orden del idioma del negocio»), con un
   `DateTimeField` (`v-model` `YYYY-MM-DDTHH:MM`, en la hora del negocio).
 
-### Paneles del Inicio
-
-- **Para qué:** el panel «Fichados ahora» (ATTENDANCE-F11) era un widget del Inicio del hub viejo. El
-  Inicio del Hub es hoy la rejilla de apps; cuando tenga paneles, el de esta app lee
-  `attendance.presence.list` (ya en vivo). Mientras tanto se ve encima de Registros
-  (`frontend/components/PresenceCard.vue`).
-
 ## De la plataforma (no de `@erplora/ui`)
 
 - **Modo del dispositivo** (compartido / personal): lo decide `base` con el PIN y el dispositivo de

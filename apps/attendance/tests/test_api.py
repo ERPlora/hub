@@ -27,6 +27,7 @@ ROUTES = {
     ("POST", "/attendance/breaks/end", "attendance.break.end"),
     ("GET", "/attendance/corrections", "attendance.correction.list"),
     ("GET", "/attendance/presence", "attendance.presence.list"),
+    ("GET", "/attendance/presence/count", "attendance.presence.count"),
     ("GET", "/attendance/people", "attendance.person.list"),
     ("GET", "/attendance/settings", "attendance.settings.get"),
     ("POST", "/attendance/settings", "attendance.settings.update"),
@@ -140,6 +141,7 @@ def test_an_employee_neither_corrects_nor_sees_the_team_nor_saves_settings(ana, 
     )
     for response in (
         get(client, "/attendance/presence"),
+        get(client, "/attendance/presence/count"),
         get(client, "/attendance/people"),
         post(
             client,

@@ -3,7 +3,9 @@ breaks, corrections with a mandatory reason and their trail, and the month in CS
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, LiveAppConfig, Nav, Widget
+
+from apps.attendance.events import WHO_IS_IN
 
 
 class AttendanceConfig(LiveAppConfig):
@@ -63,6 +65,24 @@ class AttendanceConfig(LiveAppConfig):
             "ion:list-outline",
             "/attendance/records",
         ),
+    ]
+    # The Home's panel (PLAN-HUB round 2026-10-21): the old module's one `widgets` (it had no `setup` nor `bell`),
+    # «Clocked in now» (ATTENDANCE-F11), on the count of what Records lists, in every business. A KPI says its name
+    # once, in its title (gh:hub#1105).
+    widgets = [
+        Widget(
+            key="clocked_in_now",
+            title=_("Clocked in now"),
+            icon="ion:time-outline",
+            size="sm",
+            permission="attendance.view_all",
+            default=True,
+            refresh_on=WHO_IS_IN,
+            kind="kpi",
+            operation="attendance.presence.count",
+            map={"value": "count"},
+            options={"format": "number"},
+        )
     ]
     # ATTENDANCE-F05: the worker runs it as the system every quarter of an hour (cron in UTC; phase 1 on
     # its one scope, phase 2 on every hub); clocking in applies it to the person too, so a forgotten day

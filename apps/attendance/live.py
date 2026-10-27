@@ -1,8 +1,8 @@
 """Live queries of the attendance app and the events that re-run them after the COMMIT.
 
-Who is in now (``attendance.presence.list``) is live: it follows every clocking, break, correction and
-flag. Staff's events repaint the names (a rename) and unlink the clock of a terminated person. The CSV
-export is a one-shot read: not subscribable.
+Who is in now (``attendance.presence.list``, and its count for the Home's panel) is live: it follows every
+clocking, break, correction and flag. Staff's events repaint the names (a rename) and unlink the clock of a
+terminated person. The CSV export is a one-shot read: not subscribable.
 """
 
 from live.live_registry import live
@@ -15,6 +15,7 @@ from apps.attendance.events import (
     RECORD_ALL,
     RECORD_CORRECTED,
     SETTINGS_UPDATED,
+    WHO_IS_IN,
 )
 
 # A record newly linked to the account (created) lets the clock work at once; a termination unlinks it.
@@ -22,8 +23,9 @@ live("attendance.record.current", on=[*RECORD_ALL, MEMBER_CREATED, MEMBER_UPDATE
 live("attendance.record.list", on=[*RECORD_ALL, MEMBER_UPDATED])
 live("attendance.record.detail", on=[*RECORD_ALL, MEMBER_UPDATED])
 live("attendance.correction.list", on=[RECORD_CORRECTED])
-# A terminated record is nobody who is in.
-live("attendance.presence.list", on=[*RECORD_ALL, MEMBER_UPDATED, MEMBER_TERMINATED])
+# A terminated record is nobody who is in; the Home's «Clocked in now» counts what the list shows.
+live("attendance.presence.list", on=WHO_IS_IN)
+live("attendance.presence.count", on=WHO_IS_IN)
 # The «Person» filter: who exists in Staff, and whoever left but has days (a first clock-in adds none
 # new, but a person terminated after it keeps showing).
 live(
