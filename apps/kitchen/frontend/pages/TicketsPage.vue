@@ -25,7 +25,7 @@ import TicketFormModal from '../components/TicketFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatDateTime, formatMoney } from '../lib/format';
+import { formatDateTime, formatMoney, useBusinessMoney } from '../lib/format';
 import type { OrderType, Priority, TicketListIn, TicketRowOut, TicketStatus } from '../operations';
 import { kitchenTabs } from '../tabs';
 
@@ -45,6 +45,8 @@ const canCancel = computed(() => session.can('kitchen.cancel_ticket'));
 
 const { data: settings } = useLive('kitchen.settings.get', {});
 const timezone = computed(() => settings.value?.timezone ?? 'Europe/Madrid');
+// The Total in the business's currency (its country's, with the server's decimals); a bare figure until it answers.
+const money = useBusinessMoney();
 
 const table = useServerTable({ sort: '-received_at' });
 const filters = ref<DataTableFilters>({});
@@ -92,7 +94,7 @@ const columns = computed<DataTableColumn<TicketRowOut>[]>(() => [
     filter: { type: 'select', options: options(STATUSES, 'kitchen.status') },
   },
   { key: 'items_count', label: t('kitchen.tickets.columns.items'), align: 'right' },
-  { key: 'total', label: t('kitchen.tickets.columns.total'), sortable: true, align: 'right', format: (_, r) => formatMoney(r.total, locale.value) },
+  { key: 'total', label: t('kitchen.tickets.columns.total'), sortable: true, align: 'right', format: (_, r) => formatMoney(r.total, locale.value, money.value) },
   {
     key: 'received_at',
     label: t('kitchen.tickets.columns.received'),

@@ -1,4 +1,5 @@
 // Fixtures of the kitchen app's frontend tests: what the server answers, as schemas.py shapes it.
+import type { Business } from '../../../../base/frontend/operations';
 import type { BoardOut, ItemOut, LogOut, RouteOut, SettingsOut, StationOut, TicketOut, TicketRowOut } from '../operations';
 
 export const SETTINGS: SettingsOut = {
@@ -14,6 +15,27 @@ export const SETTINGS: SettingsOut = {
   default_order_type: 'dine_in',
   timezone: 'Europe/Madrid',
 };
+
+/** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another
+ *  (the money the kitchen paints is the business's). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
 
 /** 13:00 in Madrid (11:00 UTC) on 2026-10-14: the tests' «now». */
 export const NOW = new Date('2026-10-14T11:00:00Z');
