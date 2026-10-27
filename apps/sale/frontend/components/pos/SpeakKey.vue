@@ -7,7 +7,7 @@
 // and a write still asks its card. Nothing is sent by itself. A refused microphone, an empty or too long dictation and
 // a failure are a toast. The recorder, the icons and the assistant are base's: the dictation of its composer.
 import { useLiveClient } from '@erplora/ui/sdk';
-import { toast, useSession } from '@erplora/ui/shell';
+import { nativeBridge, toast, useSession } from '@erplora/ui/shell';
 import { IonIcon, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 
@@ -102,7 +102,8 @@ async function press(): Promise<void> {
     recording.value = started;
   } catch (error) {
     const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
-    if (denied) return warn(t('sale.pos.speak.denied'));
+    // The installed app has no browser bar: there the microphone is allowed again in the device's settings.
+    if (denied) return warn(nativeBridge() ? t('sale.pos.speak.deniedInApp') : t('sale.pos.speak.denied'));
     console.error('sale: the microphone did not start', error);
     void toast(t('sale.pos.speak.failed'), 'danger');
   } finally {
