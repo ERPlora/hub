@@ -6,11 +6,16 @@
 // until a label printer is added and its device takes it (PRINTING-F12, INVENTORY-F25).
 // Screenshots of both pages, and of each flow, in the three viewports. What is made here is deleted, and the
 // settings put back, after it.
+// FIX-HUB-E2E-PRINTING-QUEUE-CLAIM-LEAKS-ACROSS-RUNS: on a database other runs used, the job goes to this run's
+// printer by its id (a kitchen printer the settings still name, left by a run cut short, took it), the claims get
+// past the older jobs waiting for any kitchen printer, each test finds or makes this run's kitchen printer (a
+// failure restarts the worker with a new `RUN`), and the cleanup also runs before, so a run whose `afterAll` never
+// ran leaves the next one clean.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { createProduct, dialog, fill, pick, productsReady, rowAction as productAction, searchProducts } from './inventory-helpers';
-import { claim, FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
+import { claim, fail, FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
@@ -32,11 +37,15 @@ interface Job {
   cancel_reason: string;
 }
 
-test.afterAll(() => {
+/**
+ * Deletes what this file makes, also what a run of it cut short left (its labels by their SKU's prefix), and puts
+ * the settings back when this run read them. Before and after the file.
+ */
+function cleanUp(): void {
   switchLabelPrintersBackOn();
-  psql(`delete from printing_printjob where source_app = 'inventory' and reference = '${LABEL_SKU}'`);
-  psql(`delete from inventory_stockmovement where product_id in (select id from inventory_product where sku = '${LABEL_SKU}')`);
-  psql(`delete from inventory_product where sku = '${LABEL_SKU}'`);
+  psql(`delete from printing_printjob where source_app = 'inventory' and reference like 'E2E-F12-%'`);
+  psql(`delete from inventory_stockmovement where product_id in (select id from inventory_product where sku like 'E2E-F12-%')`);
+  psql(`delete from inventory_product where sku like 'E2E-F12-%'`);
   psql(`delete from printing_printjob where reference like 'e2e%' or printer_id in (select id from printing_printer where name like 'e2e %')`);
   if (before && before.updated_at === null) psql('delete from printing_settings');
   else if (before) {
@@ -50,7 +59,41 @@ test.afterAll(() => {
   }
   forgetDevices('e2e %', { ids: [DEVICE] });
   psql(`delete from printing_printer where name like 'e2e %'`);
-});
+}
+
+test.beforeAll(cleanUp);
+test.afterAll(cleanUp);
+
+/**
+ * This run's kitchen printer (PRINTING-F06, F18), made by the first test that asks for it: each test stands on its
+ * own, also after a failure restarts the worker (a new `RUN`, so a new printer).
+ */
+async function kitchenPrinter(context: BrowserContext): Promise<string> {
+  const found = await api<{ rows: { id: string; name: string }[] }>(context, A, 'GET', `/printing/printers?search=${encodeURIComponent(KITCHEN)}`);
+  expect(found.status).toBe(200);
+  const mine = found.data.rows.find((printer) => printer.name === KITCHEN);
+  if (mine) return mine.id;
+  const created = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
+    name: KITCHEN,
+    kind: 'network',
+    address: '10.0.0.77',
+    usage: 'kitchen',
+  });
+  expect(created.status).toBe(201);
+  return created.data.id;
+}
+
+/**
+ * Claims for `printerId`, as the queue's device, until the job `jobId` comes out, and returns the last one that did.
+ * The oldest job goes first (PRINTING-F18): one another run or another spec left waiting for any printer of the
+ * same function comes out before this run's. Each one taken stays sent to this run's printer, and goes with it.
+ */
+async function claimUntil(context: BrowserContext, printerId: string, jobId: string): Promise<{ id: string; attempts: number } | null> {
+  const waiting = Number(psql(`select count(*) from printing_printjob where status = 'pending'`));
+  let taken: { id: string; attempts: number } | null = null;
+  for (let turn = 0; turn < waiting && taken?.id !== jobId; turn += 1) taken = await claim(context, printerId, DEVICE);
+  return taken;
+}
 
 async function jobsReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=printing-jobs-row], [data-testid=printing-jobs-empty]').first().waitFor({ state: 'visible' });
@@ -120,33 +163,21 @@ async function rowAction(page: Page, id: string, action: string): Promise<void> 
 
 test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelled with its reason', async ({ page, context }) => {
   await login(page, A, '/printing/jobs');
-  const created = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
-    name: KITCHEN,
-    kind: 'network',
-    address: '10.0.0.77',
-    usage: 'kitchen',
-  });
-  expect(created.status).toBe(201);
+  const kitchen = await kitchenPrinter(context);
   const queued = await api<{ job: { id: string } }>(context, A, 'POST', '/printing/jobs', {
     document_type: 'kitchen_order',
     document: { order_number: 7, table: '4', items: [{ name: 'Paella', quantity: 2 }] },
     source_ref: REF,
     job_key: `e2e-${RUN}`,
+    printer: kitchen,
   });
   expect(queued.status).toBe(201);
   // The device's side (base's /ws/print, by the API): five hand-outs, five failures.
   for (let attempt = 1; attempt <= 5; attempt += 1) {
-    const claim = await api<{ job: { id: string } | null }>(context, A, 'POST', '/printing/jobs/claim', {
-      printers: [created.data.id],
-      device: DEVICE,
-    });
-    expect(claim.data.job?.id).toBe(queued.data.job.id);
-    await api(context, A, 'POST', '/printing/jobs/fail', {
-      job_id: queued.data.job.id,
-      error: 'printer unreachable',
-      device: DEVICE,
-      attempt,
-    });
+    const taken = await claimUntil(context, kitchen, queued.data.job.id);
+    expect(taken?.id).toBe(queued.data.job.id);
+    expect(taken?.attempts).toBe(attempt);
+    if (taken) await fail(context, taken, 'printer unreachable', DEVICE);
   }
   expect((await jobByRef(context)).status).toBe('failed');
 
@@ -180,6 +211,7 @@ test('PRINTING-F18, F14: a job that fails five times is sent back, then cancelle
 test('PRINTING-F06: the owner opens the drawer at checkout and chooses the kitchen’s printer', async ({ page, context }) => {
   await login(page, A, '/printing/settings');
   before = (await api<Record<string, unknown>>(context, A, 'GET', '/printing/settings')).data;
+  const kitchen = await kitchenPrinter(context);
   await settingsReady(page);
   await shots(page, 'printing-settings', settingsReady);
   await shown(page).locator('[data-testid=printing-setting-open_drawer_on_sale]').click();
@@ -190,8 +222,7 @@ test('PRINTING-F06: the owner opens the drawer at checkout and chooses the kitch
   await expect
     .poll(async () => (await api<{ open_drawer_on_sale: boolean; kitchen_printer_id: string | null }>(context, A, 'GET', '/printing/settings')).data)
     .toMatchObject({ open_drawer_on_sale: !before?.open_drawer_on_sale });
-  const kitchen = await api<{ rows: { id: string; name: string }[] }>(context, A, 'GET', `/printing/printers?search=${encodeURIComponent(KITCHEN)}`);
-  expect((await api<{ kitchen_printer_id: string | null }>(context, A, 'GET', '/printing/settings')).data.kitchen_printer_id).toBe(kitchen.data.rows[0].id);
+  expect((await api<{ kitchen_printer_id: string | null }>(context, A, 'GET', '/printing/settings')).data.kitchen_printer_id).toBe(kitchen);
   await flowShots(page, 'PRINTING-F06', settingsReady);
 });
 
@@ -270,10 +301,7 @@ test('PRINTING-F12: the label asked from the product sheet waits in the «Label�
     await expect(card).toContainText(/(Ready|Listo)/);
     await expect(card).toContainText(`e2e Labels ${RUN}`);
     // The oldest label goes first: one another run left waiting comes out before this one.
-    const waiting = Number(psql(`select count(*) from printing_printjob where usage = 'label' and status = 'pending'`));
-    let taken: string | undefined;
-    for (let turn = 0; turn < waiting && taken !== mine; turn += 1) taken = (await claim(context, labels.data.id, DEVICE))?.id;
-    expect(taken).toBe(mine);
+    expect((await claimUntil(context, labels.data.id, mine))?.id).toBe(mine);
     expect(psql(`select concat_ws(' ', document->>'product_name', document->>'barcode', document->>'price') from printing_printjob where id = '${mine}'`)).toBe(
       `E2E Label ${RUN} ${LABEL_SKU} 12.1`,
     );
