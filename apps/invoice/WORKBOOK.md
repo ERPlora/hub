@@ -398,14 +398,25 @@ Actor: responsable, administrador, asistente
 Pantalla: Rectificar
 Pasos:
 1. En **Facturas** (fila) o en la ficha, pulsa «Rectificar» en una factura que no sea rectificativa ni
-   esté cancelada o sustituida.
+   esté cancelada o sustituida; o pídeselo al asistente («rectifica la factura FACT-2026-000003 porque el
+   precio estaba mal») y sigue en el paso 4.
 2. Elige el «Tipo de rectificativa» (R1 de entrada: error fundado en derecho y art. 80 Uno, Dos y Seis
    LIVA; R2 concurso; R3 deudas incobrables; R4 resto; un tique siempre R5), escribe el «Motivo» y pulsa
    «Emitir rectificativa» (un segundo clic no emite otra).
 3. La ventana dice «Rectificativa {número} emitida. {original} queda cancelada.». Al cerrarla, la
    original sale «Cancelada» y la lista tiene una «Rectificativa» nueva fechada hoy, con los importes y
    las líneas de la original en negativo y la nota «Rectifica la factura {número}. Motivo: {motivo}».
-Entra: la factura elegida, el tipo y el motivo. La fecha la pone el servidor: el día del negocio.
+4. Con el asistente, antes de emitir nada te enseña la rectificativa que va a nacer: la factura que
+   rectifica (número, fecha y cliente), el tipo (R1 de entrada, R5 si es un tique), el motivo, el
+   siguiente número de la serie «RECT» del año (no queda reservado: lo toma al emitirse), la fecha de
+   hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura ya tenía rectificativas
+   por diferencias, también lo que queda por rectificar de ella.
+5. Después sale «¿Ejecutar esta acción?» con el «Número» de la factura y el «Motivo»: escribe
+   «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa, a tu nombre, igual que desde la
+   ventana: en **Facturas** la original sale «Cancelada» y hay una «Rectificativa» nueva fechada hoy.
+6. Si pulsas «Cancelar», no se emite nada: la factura sigue «Emitida» y el asistente dice que no se hizo.
+Entra: la factura elegida, el tipo y el motivo, en la ventana o dichos al asistente. La fecha la pone el
+servidor: el día del negocio.
 Sale: la rectificativa numerada en la serie «RECT» del año, con el emisor y el cliente de la original,
 su desglose en negativo y sus líneas en negativo (la cantidad lleva el signo; el precio no); la
 original pasa a «Cancelada» (avisa `invoice.invoice.issued` y `invoice.invoice.rectified`). No mueve
@@ -416,7 +427,10 @@ factura rectificativa lleva la fecha del día en que se emite…» y no se emite
 rectificativa o una cancelada, la ventana solo dice por qué. Sobre un tique sustituido, «Este tique ya
 se sustituyó por una factura completa: rectifica la factura completa.». Dos rectificaciones a la vez
 de la misma factura: la segunda espera a la primera y se rechaza sin gastar número. Sin permiso no
-aparece la acción.
+aparece la acción. Al asistente, sobre una rectificativa, una cancelada o un tique sustituido te dice
+por qué con esos mismos avisos y no sale la confirmación; si otra rectificativa se emite entre la vista
+previa y tu confirmación, la tuya toma el número siguiente; si otro dispositivo rectifica esa factura
+antes de que confirmes, no se emite otra: sale «La factura ya está cancelada.».
 Implicados: SALE-F31
 
 ### INVOICE-F09 La rectificativa al devolver una venta entera
@@ -732,6 +746,7 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | Una factura con sus líneas, desglose y enlaces, por su id o su número | ver | F17 | `invoice.invoice.get` |
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
+| La rectificativa que emitiría rectificar una factura, sin emitirla ni gastar número (lo que el asistente enseña antes de su confirmación) | rectificar | F08 | `invoice.invoice.rectification_preview` |
 | El tipo con que empieza una línea tecleada: el general del territorio, de su propia regla en Impuestos (vacío sin ella) | emitir | F03 | `invoice.invoice.line_defaults` |
 | Las series, con búsqueda, filtros y páginas | ver | F12, F13 | `invoice.series.list` |
 | El siguiente número de una serie, sin gastarlo | ver | F13 | `invoice.series.peek_next` |
