@@ -48,6 +48,8 @@ export interface HubHome {
   report_url: string;
   /** «Members» of this business on erplora.com, where people are invited, given a role and removed (APP-BASE-5). */
   members_url?: string;
+  /** This business on erplora.com's panel (the bar's «erplora.com», BASE-F11); empty for who may not open it. */
+  manage_url?: string;
 }
 
 // ── «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164) ────────────────────────────────────
