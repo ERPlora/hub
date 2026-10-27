@@ -133,10 +133,46 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
         "report_url": f"{saas}/dashboard/report-a-problem",
         # APP-BASE-5: «Members» of the business on erplora.com, where people are invited and given a role.
         "members_url": f"{saas}/dashboard/businesses/{hub.id}/members",
+        # BASE-F11: «erplora.com» of the bar, not an employee's (test_the_bar_s_way_to_erplora_com_is_for_who_runs_the_business).
+        "manage_url": "",
         # APP-BASE-3: the session's way in (base/tests/test_access_spa.py).
         "access": {"credential": "account", "switch_user": False, "idle_minutes": None},
         "preferences": {"theme_mode": "", "palette": ""},
     }
+
+
+@pytest.mark.parametrize(
+    ("role", "offered"), [("hub_owner", True), ("hub_admin", True), ("hub_manager", True), ("hub_employee", False)]
+)
+def test_the_bar_s_way_to_erplora_com_is_for_who_runs_the_business(client, settings, make_user, role, offered):
+    # BASE-F11 (gh:hub#364): «erplora.com» of the bar opens this business on erplora.com's panel, for the owner, an
+    # administrator and a manager (``base.open_management``); an employee's bar has none (an empty address).
+    from base.models import Hub
+
+    hub = Hub.objects.get(slug="a")
+    client.force_login(make_user("ana", host="a", role=role))
+    _, home = json_block(client.get("/demo/items", HTTP_HOST="a.localhost:8000"), "hub-home")
+    expected = f"{settings.SAAS_URL.rstrip('/')}/dashboard/businesses/{hub.id}"
+    assert home["manage_url"] == (expected if offered else "")
+
+
+def test_the_bar_s_way_to_erplora_com_names_the_business_of_this_hub(client, settings, make_user):
+    # Two hubs: each one's bar opens its own business, never the other's.
+    from base.models import Hub
+
+    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    _, home_a = json_block(client.get("/demo/items", HTTP_HOST="a.localhost:8000"), "hub-home")
+    _, home_b = json_block(client.get("/demo/items", HTTP_HOST="b.localhost:8000"), "hub-home")
+    hub_a = Hub.objects.get(slug="a")
+    assert home_a["manage_url"].endswith(f"/dashboard/businesses/{hub_a.id}")
+    assert home_b["manage_url"] == ""
+
+
+def test_the_platform_s_superuser_gets_the_way_to_erplora_com_too(client, superuser):
+    # ``*`` grants every permission, the new one included (live.context.OperationContext.has).
+    client.force_login(superuser)
+    _, home = json_block(client.get("/demo/items", HTTP_HOST="a.localhost:8000"), "hub-home")
+    assert "/dashboard/businesses/" in home["manage_url"]
 
 
 def test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream(client, make_user):
