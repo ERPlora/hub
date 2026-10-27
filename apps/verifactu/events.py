@@ -7,7 +7,7 @@ Reaction: an issued invoice (``invoice.invoice.issued``, Invoicing's notice of e
 sealed as a registration record by ``verifactu.record.create``, run as the system in its own transaction when
 the worker's outbox relay (``base/relay.py``) delivers it. It is the backup: Invoicing asks by name inside its own
 transaction (WORKBOOK «Contrato con Facturación»), and the operation is idempotent (one registration per invoice
-and environment).
+and environment). A business outside Spain has no reaction: VeriFactu is only for Spain.
 """
 
 from typing import Any
@@ -61,9 +61,12 @@ REACTIONS = {INVOICE_ISSUED: "verifactu.record.create"}
 
 
 def react(scope: Scope, name: str, payload: dict[str, Any]):
-    """Run this app's reaction to the event ``name`` of ``scope`` as the system; ``None`` if it has none."""
+    """Run this app's reaction to the event ``name`` of ``scope`` as the system; ``None`` if it has none, or when the
+    business is outside Spain, where VeriFactu seals nothing (delivered, never a failed delivery retried)."""
+    from apps.verifactu.queries import outside_spain  # the models are not loaded yet when this module is
+
     operation_name = REACTIONS.get(name)
-    if operation_name is None:
+    if operation_name is None or outside_spain(scope):
         return None
     reaction = get(operation_name)
     return reaction(system_context(scope), reaction.input.model_validate(payload))

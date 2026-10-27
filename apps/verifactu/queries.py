@@ -16,8 +16,9 @@ from django.conf import settings
 from django.db.models import Case, Count, Q, QuerySet, When
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, Scope
-from live.errors import NotFound, OperationError
+from live.context import OperationContext, Scope, system_context
+from live.errors import AppInactive, NotFound, OperationError
+from live.operations import get as get_operation
 from live.operations import operation
 
 from apps.invoice.models import Invoice, Issuer
@@ -78,9 +79,49 @@ ATTEMPT_FAILURES = ("unreachable", "refused", "unknown", "aeat_fault", "xml_inva
 EXPIRY_WARNING_DAYS = 30
 RECORD_EVENTS_SHOWN = 20
 VIEW = "verifactu.view_record"
+#: VeriFactu binds the taxpayers of Spain alone (RD 1007/2023, Orden HAC/1177/2024); the Canary Islands, Ceuta and
+#: Melilla are regions of ES (the tax territory of PLAN-HUB, round 2026-10-17), not other countries.
+SPAIN = "ES"
+#: The wait of every record of a business outside Spain: none of them is ever sent.
+OUTSIDE_SPAIN = "outside_spain"
+ONLY_IN_SPAIN = _("VeriFactu is only for businesses in Spain.")
+#: What tells the business's country: this hub's registry, as erplora.com wrote it, never asking erplora.com.
+BUSINESS = "base.business.get"
 
 
 # ── Shared reads ────────────────────────────────────────────────────────────────────────────────
+
+
+def business_country(scope: Scope | None) -> str:
+    """The country erplora.com registered for ``scope``'s business (ISO 3166-1 alpha-2), as ``base.business.get`` reads
+    it, as the platform (an API key holds only the permission of the operation it opened). ERPlora's own hub has no
+    business on erplora.com in phase 1: its issuer's country. ``""`` when there is none: a demo, or a scope that is no
+    business's (no registry row), both in ERPlora's market, Spain."""
+    if scope is None:
+        return ""
+    if platform.is_platform_hub(scope):
+        return settings.PLATFORM_ISSUER_COUNTRY
+    business = get_operation(BUSINESS)
+    try:
+        return business(system_context(scope), business.input()).country
+    except NotFound:
+        return ""
+
+
+def outside_spain(scope: Scope | None) -> bool:
+    """Whether ``scope``'s business was registered in a country other than Spain: VeriFactu is not for it, so nothing
+    of it is sealed nor sent, as if the app were off (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)."""
+    country = business_country(scope).strip().upper()
+    return bool(country) and country != SPAIN
+
+
+def refuse_outside_spain(ctx: OperationContext) -> None:
+    """What seals a record or reaches the AEAT refuses a business outside Spain as an app that is off: 404
+    ``app_inactive`` with the reason, in ``ctx``'s language, before it reads or writes anything (so an invoice of
+    Invoicing is issued without a record, «unavailable», never undone)."""
+    if outside_spain(ctx.scope):
+        with translation.override(ctx.language):
+            raise AppInactive(str(ONLY_IN_SPAIN))
 
 
 def config_row() -> Config:
@@ -238,6 +279,8 @@ def live_problems(config: Config, scope: Scope) -> list[str]:
     apart. A demo never goes live, as in the old Hub; whether it is one, the platform says
     (``base.operations.is_demo_hub``)."""
     found = [] if production_open() else ["production_closed"]
+    if outside_spain(scope):
+        found.append(OUTSIDE_SPAIN)
     if not gateway.configured():
         found.append("gateway_unavailable")
     if platform.is_demo_hub(scope):
@@ -262,7 +305,10 @@ def system_for(ctx: OperationContext) -> producer.SystemInfo:
 
 
 def blockers(config: Config, environment: str, scope: Scope | None) -> list[str]:
-    """What keeps every record of ``environment`` from leaving now, as wait codes."""
+    """What keeps every record of ``environment`` from leaving now, as wait codes; outside Spain, that alone: nothing
+    else would ever let them leave."""
+    if outside_spain(scope):
+        return [OUTSIDE_SPAIN]
     found = []
     if not gateway.configured():
         found.append("gateway_unavailable")
@@ -632,6 +678,9 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
     },
 )
 def by_invoice(ctx: OperationContext, data: ByInvoiceIn) -> ByInvoiceOut:
+    # Outside Spain no record is ever sent: the invoice carries no VeriFactu receipt, as with the app off.
+    if outside_spain(ctx.scope):
+        return ByInvoiceOut(record=None)
     record = (
         Record.objects.filter(invoice_id=data.invoice_id)
         .order_by("-created_at", "-id")
@@ -765,7 +814,10 @@ def disable_refusal(ctx: OperationContext) -> str | None:
     """VERIFACTU-F32: why the app may not go off yet, in ``ctx``'s language, or ``None``. While a record is not in the
     AEAT (``Record.UNSENT``: pending, its retry waiting included, or sent without an answer) turning it off would stop
     its send; what the AEAT answered is out of the queue (a rejected one is corrected with a new record, which counts
-    again). Read in the hub of the active context, inside ``base.app.disable``'s transaction."""
+    again). Read in the hub of the active context, inside ``base.app.disable``'s transaction. Outside Spain no record
+    is ever sent, so turning it off stops nothing: never refused (the records are kept)."""
+    if outside_spain(ctx.scope):
+        return None
     count = Record.objects.filter(status__in=Record.UNSENT).count()
     if not count:
         return None

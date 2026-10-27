@@ -481,6 +481,9 @@ WAIT_REASONS = {
     "go_live_forbidden": _(
         "this is a demo business: it always files in the AEAT's test environment"
     ),
+    "outside_spain": _(
+        "this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT"
+    ),
     "hub_not_active": _(
         "your ERPlora account has a pending payment or is suspended"
     ),
