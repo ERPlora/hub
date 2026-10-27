@@ -902,7 +902,7 @@ Sale: nada si se niega; la app apagada si no queda nada por enviar.
 Si falla: «VeriFactu aún tiene {n} registros por enviar a la AEAT. Espera a que se envíen o arréglalos antes de
 desactivarla.» (con uno: «VeriFactu aún tiene 1 registro por enviar a la AEAT. Espera a que se envíe o arréglalo
 antes de desactivarla.»).
-Implicados: ninguno
+Implicados: BASE-F23, BASE-F25
 
 ### VERIFACTU-F33 Cesar la actividad
 <!-- origen: old-hub:HUB-F309 old:verifactu/workflow/control.md#verifactu-f33 -->
