@@ -53,9 +53,8 @@ def test_verifactu_is_a_free_module_of_the_sales_group_in_both_verticals():
     assert config in module_configs()
     assert config.category is Category.SALES
     assert config.premium is False
-    # Registered in the shell (packages/ui/src/shell/icons.ts); the old shield-checkmark-outline waits in
-    # apps/verifactu/UI-REQUESTS.md.
-    assert config.icon == "lucide:shield-check"
+    # The old module's shield, registered in the shell (packages/ui/src/shell/icons.ts, ui#34).
+    assert config.icon == "ion:shield-checkmark-outline"
     assert 0 < len(str(config.summary)) <= 120
     assert str(config.description)
     assert config.verticals == ["hair_salon", "restaurant"]
@@ -98,7 +97,7 @@ def test_navigation_is_the_six_tabs_of_the_old_module_with_registered_icons():
         ("records", "Records", "/verifactu/records", "ion:list-outline"),
         ("contingency", "Contingency", "/verifactu/contingency", "ion:warning-outline"),
         ("events", "Events", "/verifactu/events", "ion:time-outline"),
-        ("recovery", "Recovery", "/verifactu/recovery", "lucide:shield-check"),
+        ("recovery", "Recovery", "/verifactu/recovery", "ion:shield-checkmark-outline"),
         ("config", "Configuration", "/verifactu/config", "ion:key-outline"),
         ("settings", "Settings", "/verifactu/settings", "ion:settings-outline"),
     ]
@@ -234,7 +233,7 @@ def test_the_homes_step_is_the_old_set_up_verifactu_on_the_way_to_production():
         {},
         "/verifactu/config",
         "verifactu.configure",
-        "lucide:shield-check",
+        "ion:shield-checkmark-outline",
         [],
         None,
     )
@@ -406,13 +405,13 @@ def test_each_panel_is_refreshed_by_the_events_that_re_run_its_query():
 
 
 def test_the_hooks_icons_are_registered_in_the_shell():
-    # Registered icons only (an unregistered one paints nothing): the old `shield-checkmark-outline` and
-    # `stats-chart-outline` wait in UI-REQUESTS.md.
+    # Registered icons only (an unregistered one paints nothing): the old `shield-checkmark-outline` is registered (ui#34);
+    # `stats-chart-outline` waits in UI-REQUESTS.md.
     (step,) = verifactu().setup
     icons = [step.icon, *(panel.icon for panel in verifactu().widgets)]
     assert icons == [
-        "lucide:shield-check",
-        "lucide:shield-check",
+        "ion:shield-checkmark-outline",
+        "ion:shield-checkmark-outline",
         "ion:warning-outline",
         "ion:list-outline",
         "ion:time-outline",
