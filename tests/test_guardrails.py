@@ -23,6 +23,10 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     ``live.broker``; phase 1's shared database (``use_shared_database``) only where the list says, until S5; the
     tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
     ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``) but the 8 S2 moves first.
+(f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
+    import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
+    it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo but the submodules of
+    ``packages/``.
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -515,6 +519,69 @@ def fallback_touches(source: str) -> list[tuple[int, str]]:
     return sorted(found)
 
 
+# ── (f) The tests read the clock when they run ─────────────────────────────────────────────────
+
+#: What reads the clock: ``timezone.localdate()``, ``localtime()`` and ``now()``, ``date.today()`` and
+#: ``datetime.utcnow()``.
+CLOCK_CALLS = frozenset({"localdate", "localtime", "now", "today", "utcnow"})
+#: Folders the walk of the suite never enters, as ``pytest.ini``'s ``norecursedirs``: ``packages/`` holds the ``live``
+#: and ``ui`` submodules, each with its own CI; ``node_modules`` and the hidden ones (``.venv``) are not the Hub's code.
+SUITE_SKIPS = frozenset({"packages", "node_modules"})
+
+
+class _ClockAtImport(ast.NodeVisitor):
+    def __init__(self):
+        self.found: set[tuple[int, str]] = set()
+
+    def visit_Call(self, node: ast.Call):
+        name = _receiver_name(node.func)
+        if name in CLOCK_CALLS:
+            self.found.add((node.lineno, f"{name}()"))
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef):
+        # The body runs with the test; the decorators and the default values, at import.
+        for expr in (*node.decorator_list, *node.args.defaults, *node.args.kw_defaults):
+            if expr is not None:
+                self.visit(expr)
+
+    visit_AsyncFunctionDef = visit_FunctionDef
+
+    def visit_Lambda(self, node: ast.Lambda):
+        for expr in (*node.args.defaults, *node.args.kw_defaults):
+            if expr is not None:
+                self.visit(expr)
+
+
+def clock_at_import(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every read of the clock that runs when ``source`` is imported.
+
+    pytest imports every test module before it runs any, so a ``TODAY = timezone.localdate()`` at module level is the
+    day of the collection: a run that crosses midnight (Madrid) compares it with the day the operations take
+    (``timezone.localdate()`` when they run), and one that crosses New Year's Eve expects last year's numbers, and the
+    suite falls. A test asks for the ``today`` fixture, or reads the clock inside its body. What runs at import: the
+    bodies of modules and classes, decorators (``@pytest.mark.parametrize`` values included) and default values; the
+    body of a function or of a lambda runs with the test.
+    """
+    visitor = _ClockAtImport()
+    visitor.visit(ast.parse(source))
+    return sorted(visitor.found)
+
+
+def suite_files(root: Path) -> list[PurePosixPath]:
+    """Every ``test_*.py`` and ``conftest.py`` under ``root`` (relative to it), outside ``SUITE_SKIPS`` and hidden
+    folders."""
+    files = []
+    for folder, folders, names in root.walk():
+        folders[:] = [name for name in folders if name not in SUITE_SKIPS and not name.startswith(".")]
+        files += [
+            PurePosixPath((folder / name).relative_to(root).as_posix())
+            for name in names
+            if name == "conftest.py" or (name.startswith("test_") and name.endswith(".py"))
+        ]
+    return sorted(files)
+
+
 # ── Positive controls: each check sees what it must, and nothing else ──────────────────────────
 
 ORM_OFFENDER = """\
@@ -950,4 +1017,115 @@ def test_the_modules_run_after_the_commit_only_through_live():
         "A module runs after the COMMIT with live.operations.on_commit, on its operation's alias; a bare "
         "transaction.on_commit registers on default, outside the hub's transaction. PENDING_S2_ON_COMMIT lists the "
         f"8 calls S2 moves first (shrink an entry once moved, never add one): {{file: (found, listed)}} {problems}"
+    )
+
+
+# ── (f) The tests read the clock when they run: positive and negative controls ─────────────────
+
+CLOCK_OFFENDER = """\
+TODAY = timezone.localdate()
+DAY = dt.date.today().strftime('%Y%m%d')
+class TestSeries:
+    stamp = timezone.now()
+@pytest.mark.parametrize('day', [pytest.param(timezone.localdate(), id='today')])
+def test_a(day): ...
+async def test_b(at=dt.datetime.utcnow()): ...
+ASK = {'content': f'FACT-{timezone.localdate().year}'}
+OPENING = timezone.localtime().replace(hour=9)
+NUMBER = f'TSK-{timezone.localdate():%Y%m%d}'
+TICKET = f'TICKET-{timezone.localdate().year}-000001'
+def test_c(*, at=now()): ...
+LATER = lambda day=date.today(): day
+@pytest.mark.parametrize('at', [timezone.localtime()])
+class TestTill:
+    def test_d(self, at): ...
+"""
+CLOCK_LOOKALIKES = """\
+\"\"\"TODAY = timezone.localdate() at import is the day of the collection.\"\"\"
+def test_a():
+    today = timezone.localdate()
+async def test_b():
+    now = timezone.now()
+class TestSeries:
+    def test_c(self):
+        assert dt.date.today()
+    factory = staticmethod(lambda: timezone.localtime())
+later = lambda: timezone.localdate()
+def test_d(clock=lambda: dt.datetime.utcnow()): ...
+@pytest.fixture
+def today():
+    return timezone.localdate()
+"""
+
+
+def test_the_clock_scanner_sees_the_clock_read_at_import():
+    assert clock_at_import(CLOCK_OFFENDER) == [
+        (1, "localdate()"),
+        (2, "today()"),
+        (4, "now()"),
+        (5, "localdate()"),
+        (7, "utcnow()"),
+        (8, "localdate()"),
+        (9, "localtime()"),
+        (10, "localdate()"),
+        (11, "localdate()"),
+        (12, "now()"),
+        (13, "today()"),
+        (14, "localtime()"),
+    ]
+
+
+def test_the_clock_scanner_lets_a_test_read_the_clock_when_it_runs():
+    assert clock_at_import(CLOCK_LOOKALIKES) == []
+
+
+def test_the_suite_walk_reads_every_test_module_and_conftest_but_the_submodules(tmp_path):
+    reads_at_import = "TODAY = timezone.localdate()\n"
+    planted = {
+        "conftest.py": "import pytest\nNOW = timezone.now()\n",
+        "apps/demo/tests/test_report.py": reads_at_import,
+        "apps/demo/tests/conftest.py": "def today():\n    return timezone.localdate()\n",
+        "apps/demo/services.py": reads_at_import,
+        "apps/demo/tests/factories.py": reads_at_import,
+        "packages/live/tests/test_broker.py": reads_at_import,
+        ".venv/lib/site-packages/pkg/tests/test_pkg.py": reads_at_import,
+        "frontend/node_modules/pkg/test_pkg.py": reads_at_import,
+    }
+    for name, source in planted.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text(source)
+
+    files = suite_files(tmp_path)
+
+    assert files == [
+        PurePosixPath("apps/demo/tests/conftest.py"),
+        PurePosixPath("apps/demo/tests/test_report.py"),
+        PurePosixPath("conftest.py"),
+    ]
+    assert _offenders(lambda path: clock_at_import((tmp_path / path).read_text()), files) == [
+        "apps/demo/tests/test_report.py:1 localdate()",
+        "conftest.py:2 now()",
+    ]
+
+
+# ── (f) The tests read the clock when they run: the real tree ──────────────────────────────────
+
+
+def test_no_test_reads_the_clock_at_import():
+    files = suite_files(HUB_DIR)
+    # A walk gone blind would let the check pass: it reaches the root conftest, a module's tests and this very file,
+    # and never a submodule.
+    assert {
+        PurePosixPath("conftest.py"),
+        PurePosixPath("apps/sale/tests/conftest.py"),
+        PurePosixPath("tests/test_guardrails.py"),
+    } <= set(files)
+    assert not [path for path in files if path.parts[0] == "packages"]
+
+    offenders = _offenders(lambda path: clock_at_import((HUB_DIR / path).read_text()), files)
+
+    assert offenders == [], (
+        "pytest imports every test module before it runs any, so a date read at import is the day of the collection "
+        "and a run that crosses midnight or New Year's Eve compares it with the next one: ask for the `today` fixture, "
+        f"or read the clock inside the test: {offenders}"
     )

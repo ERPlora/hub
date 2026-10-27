@@ -47,7 +47,7 @@ def english():
 def today():
     """The business day the test runs on, taken when it runs as the operations take it: a date taken at import
     is the day of the collection, and a run that crosses midnight would compare it with the next one
-    (``test_clock_at_import.py``)."""
+    (``tests/test_guardrails.py``, ``clock_at_import``)."""
     return timezone.localdate()
 
 
