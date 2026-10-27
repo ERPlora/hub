@@ -22,7 +22,7 @@ from live.errors import InvalidPayload, NotFound, PermissionDenied
 from live.operations import get
 
 from base import blueprint
-from base.models import Hub, ImportBatch, Membership
+from base.models import AppActivation, Hub, ImportBatch, Membership
 from base.permissions import permissions_for
 
 pytestmark = pytest.mark.django_db
@@ -122,6 +122,25 @@ def test_an_empty_business_is_told_so_until_something_is_loaded(owner):
     assert call(owner, "base.blueprint.list").empty is False
 
 
+C = Scope("host", "c")
+
+
+@pytest.fixture
+def born():
+    """A business as it is born (round 2026-10-27): ready in the registry, every app off (no row), and its owner."""
+    Hub.objects.create(slug="c", status=Hub.Status.READY)
+    user = get_user_model().objects.create_user(username="carla", password="pw")
+    Membership.objects.create(user=user, host="c", role=Membership.Role.OWNER)
+    return OperationContext(scope=C, actor=user, permissions=permissions_for(user, C), language="es")
+
+
+def test_a_business_born_with_every_app_off_is_empty_for_the_homes_card(born):
+    """Nothing on, nothing to count: the Home offers a template to a business just born."""
+    listed = call(born, "base.blueprint.list")
+    assert listed.empty is True
+    assert listed.templates
+
+
 def test_who_does_not_run_the_hub_does_not_get_the_catalogue(manager):
     with pytest.raises(PermissionDenied):
         call(manager, "base.blueprint.list")
@@ -151,6 +170,14 @@ def test_inspecting_a_file_says_what_it_brings_and_what_never_travels(owner):
     assert [(part.key, part.travels) for part in customer.datasets] == [("customer.customer", False)]
     backup = call(owner, "base.blueprint.inspect", file_base64=a_file(purpose="backup"))
     assert [part.travels for app in backup.apps for part in app.datasets] == [True, True]
+
+
+def test_an_app_off_the_blueprint_lists_is_said_to_turn_on_and_one_it_does_not_list_stays_off(born):
+    """The load turns on the apps its manifest lists (round 2026-10-27); an app named only by its data is not."""
+    summary = call(born, "base.blueprint.inspect", file_base64=a_file(apps=("table",)))
+
+    assert {app.id: app.status for app in summary.apps} == {"table": "turns_on", "customer": "inactive"}
+    assert not AppActivation.objects.filter(host="c").exists()
 
 
 def test_an_app_the_hub_does_not_have_is_said(owner):

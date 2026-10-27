@@ -872,11 +872,15 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
 
 @operation("base.hub.seed_local", kind="command", permission=None, input=HubSeedLocalIn, output=HubSeedLocalOut)
 def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
-    """Leave the local hubs ``data.slugs`` ready in the registry, with an id of their own (``seed_local_hubs``).
+    """Leave the local hubs ``data.slugs`` ready in the registry, with an id of their own (``seed_local_hubs``), and
+    every app on, its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off).
 
     Local development only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears
-    nothing. Idempotent: a hub already ready stays as it is; one left cancelled is ready again.
+    nothing. Idempotent: a hub already ready stays as it is; one left cancelled is ready again; the apps of one that
+    already turned some on or off stay as they are.
     """
+    from base.tenancy.context import use_hub
+
     internal_only(ctx)
     now = timezone.now()
     hubs = []
@@ -884,6 +888,8 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
         hub, created = Hub.objects.select_for_update().get_or_create(
             slug=slug, defaults={"status": Hub.Status.READY, "ready_at": now}
         )
+        with use_hub(hub):
+            _every_app_on(slug)
         outcome = "created" if created else "already_ready"
         if not created and hub.status != Hub.Status.READY:
             hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.READY, now, None
@@ -1207,14 +1213,20 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     input=BlueprintImportIn,
     output=ImportOut,
     ai={
-        "description": "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: its menu "
-        "or services, its tables and the rest of its apps' data, app by app; what is already there is left as it was. "
-        "Returns the report of what went in. Never brings people, PINs or fiscal data.",
+        "description": "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on "
+        "its apps that are off (with the apps they need, within the plan's limit of apps), then loads its menu or "
+        "services, its tables and the rest of its apps' data, app by app; what is already there is left as it was. "
+        "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
+        "fiscal data.",
         "risk": "high",
     },
 )
 def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
-    """Load a template, a file or what a load left out (BASE-G103–G107) and keep its report and the rows it created."""
+    """Load a template, a file or what a load left out (BASE-G103–G107) and keep its report and the rows it created.
+
+    First it turns on the apps the blueprint lists that are off (round 2026-10-27: a hub is born with every app off),
+    each through ``base.app.enable`` and in this transaction; one refused (the plan's limit, no right to it) stays
+    off, loads nothing and its report says why. A backup turns on the apps it lists too."""
     with translation.override(ctx.language):
         retried = None
         if data.retry_of is not None:
@@ -1230,7 +1242,11 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
         else:
             bundle, seed = blueprint.open_source(data.template, data.file_base64)
             apps = list(dict.fromkeys(data.apps)) if data.apps is not None else []
-        applied = blueprint.apply(ctx, bundle, apps=set(apps) if apps else None)
+        # Round 2026-10-27: a hub is born with every app off. The apps the blueprint lists are turned on first, and
+        # what loads reads its rows, never the cache of the apps off kept before this change.
+        with activation.changing(ctx.scope.key):
+            refused = _turn_on_listed(ctx, bundle.manifest["apps"], set(apps))
+            applied = blueprint.apply(ctx, bundle, apps=set(apps) if apps else None, refused=refused)
         load = ImportBatch.objects.create(
             name=bundle.manifest["name"],
             source=ImportBatch.Source.CATALOG if seed else ImportBatch.Source.FILE,
@@ -2846,6 +2862,40 @@ def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
         for label, row in changes.items()
         if label not in existing
     )
+
+
+def _every_app_on(host: str) -> None:
+    """Write down every app on in ``host``'s business, its roots chosen (``base.activation.every_on``), unless it has
+    rows already: what the migration ``base.0017`` left every hub of before round 2026-10-27 (``seed_local_hubs``)."""
+    if AppActivation.objects.filter(host=host).exists():
+        return
+    after_commit(partial(activation.forget, host))
+    AppActivation.objects.bulk_create(
+        AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
+        for label, row in activation.every_on(activation.module_graph()).items()
+    )
+
+
+def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[str]) -> dict[str, str]:
+    """Before a blueprint loads, turn on the apps its manifest lists (only those ``selected``, when the person chose
+    some) that are off here, each through ``base.app.enable``: its plan's limit, its rights, what it needs along and
+    its event, as if the person turned it on in Apps. Their roots first, chosen, so what they need comes along and
+    does not count against the limit (as a vertical's template, ``base.activation.template``); then any listed app
+    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load."""
+    graph = activation.module_graph()
+    wanted = [app for app in dict.fromkeys(listed) if app in graph and (not selected or app in selected)]
+    roots = activation.roots(set(wanted) | activation.needs(wanted, graph), graph)
+    enable = get_operation("base.app.enable")
+    blocked = entitlement.blocked_apps(ctx.scope)
+    refused: dict[str, str] = {}
+    for app in [app for app in wanted if app in roots] + [app for app in wanted if app not in roots]:
+        if app not in blocked and activation.states_of(ctx.scope)[app].on:
+            continue
+        try:
+            enable(ctx, AppChangeIn(app=app))
+        except OperationError as refusal:
+            refused[app] = refusal.message
+    return refused
 
 
 def _named(ctx: OperationContext, labels: Iterable[str]) -> list[dict[str, str]]:

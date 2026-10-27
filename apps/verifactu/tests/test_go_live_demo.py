@@ -44,10 +44,13 @@ def ready_route(issuer):
 
 
 @pytest.fixture
-def demo():
-    return Hub.objects.create(
+def demo(every_app_on):
+    """A live demo that turned its apps on (a demo is born with every app off, round 2026-10-27)."""
+    hub = Hub.objects.create(
         slug=DEMO.key, is_demo=True, status="ready", expires_at=timezone.now() + dt.timedelta(hours=1)
     )
+    every_app_on(DEMO.key)
+    return hub
 
 
 @pytest.mark.usefixtures("opened", "ready_route", "demo")

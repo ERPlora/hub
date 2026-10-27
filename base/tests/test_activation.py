@@ -2,7 +2,8 @@
 
 A module is ``on`` or ``off`` in a hub, and ``chosen`` when the business turned it on itself; what the closure by
 ``requires`` brought along is not chosen and does not count against the plan's ``max_apps``. A hub that never turned
-anything on or off has every module on, its roots chosen (the modules on that no other module on needs).
+anything on or off has every module off (round 2026-10-27): a blueprint or the Apps screen turns on what it uses. The
+hubs of before it, and the developer's local hubs, have every module on, its roots chosen (:func:`every_on`).
 """
 
 import pytest
@@ -65,9 +66,17 @@ def test_a_vertical_template_counts_only_its_roots_as_chosen(vertical, modules, 
     assert all(row == Activation(OFF, False) for label, row in template.items() if label not in apps)
 
 
-def test_the_baseline_has_every_module_on_and_its_roots_chosen():
-    baseline = activation.baseline(GRAPH)
-    assert baseline == {
+def test_the_baseline_has_every_module_off_and_none_chosen():
+    """Round 2026-10-27: a hub is born with every app off; nothing is on until the business turns it on."""
+    assert activation.baseline(GRAPH) == {label: Activation(OFF, False) for label in GRAPH}
+    graph = activation.module_graph()
+    assert activation.baseline(graph) == {label: Activation(OFF, False) for label in graph}
+
+
+def test_every_on_has_every_module_on_and_its_roots_chosen():
+    """What the hubs of before round 2026-10-27 had without rows (the migration writes it down for them), and the
+    developer's local hubs ``a`` and ``b``: every module on, its roots chosen."""
+    assert activation.every_on(GRAPH) == {
         "tax": Activation(ON, False),
         "customer": Activation(ON, False),
         "sale": Activation(ON, False),
@@ -86,8 +95,9 @@ def test_the_graph_is_the_modules_and_their_requires():
 # ── What a hub has: its rows, or the baseline while it has none ──────────────────────────────────────────────────
 
 
-def test_a_hub_without_rows_has_the_baseline():
+def test_a_hub_without_rows_has_the_baseline_every_module_off():
     assert activation.effective({}, GRAPH) == activation.baseline(GRAPH)
+    assert not any(row.on for row in activation.effective({}, GRAPH).values())
 
 
 def test_a_hub_with_rows_has_them_and_a_module_without_its_row_is_off():

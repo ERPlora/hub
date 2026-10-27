@@ -248,8 +248,9 @@ def fresh_executor():
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.usefixtures("fresh_executor")
 class TestTheOpenApps:
-    async def test_the_stream_of_an_ended_session_ends_without_a_result(self, client):
+    async def test_the_stream_of_an_ended_session_ends_without_a_result(self, client, every_app_on):
         hub = await in_db(Hub.objects.create, id=ACME_ID, slug="acme", status="ready")
+        await in_db(every_app_on, "acme")  # the stream reads the demo app's items
         stream = await in_db(open_stream, ANA, hub)
         await executor.run_all(stream)
         assert b"event: result" in stream.queue.get_nowait()
@@ -262,8 +263,9 @@ class TestTheOpenApps:
         assert stream.queue.get_nowait() == BYE_FRAME
         assert stream.queue.empty()
 
-    async def test_the_stream_of_another_account_goes_on(self, client):
+    async def test_the_stream_of_another_account_goes_on(self, client, every_app_on):
         hub = await in_db(Hub.objects.create, id=ACME_ID, slug="acme", status="ready")
+        await in_db(every_app_on, "acme")
         stream = await in_db(open_stream, OLGA, hub)
         await executor.run_all(stream)
         stream.queue.get_nowait()

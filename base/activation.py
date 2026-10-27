@@ -6,10 +6,17 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 - A module (``kind = "app"``) is ``on`` or ``off`` in a hub (phase 2 adds ``activating``, while its tables are made).
   It is **chosen** when the business turned it on itself; what the closure by ``requires`` brought along with it is
   not, and goes off again with the last chosen module on that needs it (Odoo's «an app with its dependencies»).
-- **The baseline**: a hub that never turned anything on or off has every module on, as phase 1 always had, and only
-  its roots chosen (the modules on that no other module on needs): today 17 of 27. The first change writes it down
-  (``base.services``); from then on a module without its row is off (PLAN-DB: «``off`` o sin fila»). A vertical's
-  template turns on its modules the same way, its roots chosen (:func:`template`; 13 of 21 for the restaurant).
+- **The baseline** (round 2026-10-27): a hub is born with every module off, a demo too. The business turns on what it
+  uses, one by one in Apps or all of a blueprint's at once (``base.blueprint.import`` turns them on, then loads); a
+  module without its row is off (PLAN-DB: «``off`` o sin fila»). The first change writes every module down
+  (``base.services``), so two changes at once have rows to lock. A vertical's template turns on its modules with
+  their roots chosen (:func:`template`; 13 of 21 for the restaurant): the modules on that no other module on needs.
+- **Every module on** (:func:`every_on`): what a hub had without rows before that round, every module on and its roots
+  chosen (today 17 of 27). The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
+  and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope
+  that is no business's, ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active) and the
+  worker's scope (``WORKER_SCOPE_SLUG``), where phase 1 runs every app's scheduled tasks over the tables every hub
+  shares (:func:`is_platform`).
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
   business may *choose*; the ones brought along do not count. A photo with a lower limit than the chosen ones (a plan
   lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
@@ -30,6 +37,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
+from django.conf import settings
 from django.core.cache import cache
 from django.utils import translation
 from live.context import Scope
@@ -106,7 +114,12 @@ def template(apps: Iterable[str], graph: Graph) -> dict[str, Activation]:
 
 
 def baseline(graph: Graph) -> dict[str, Activation]:
-    """What a hub that never turned anything on or off has: every module on, its roots chosen."""
+    """What a hub that never turned anything on or off has: every module off, none chosen (round 2026-10-27)."""
+    return template((), graph)
+
+
+def every_on(graph: Graph) -> dict[str, Activation]:
+    """Every module on, its roots chosen: the hubs of before round 2026-10-27, the local hubs and the platform."""
     return template(graph, graph)
 
 
@@ -189,12 +202,18 @@ def veto(labels: Iterable[str], *, ctx: Any, configs: Iterable[Any] | None = Non
     return None
 
 
+def is_platform(scope: Scope) -> bool:
+    """A scope that is no business choosing its apps: no business's at all, ERPlora's own hub or the worker's (phase
+    1 runs every app's scheduled tasks there, over the tables every hub shares). Every module is on in it."""
+    return scope.kind != HUB_SCOPE_KIND or scope.key in {settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG}
+
+
 def states_of(scope: Scope) -> dict[str, Activation]:
-    """Every module's state in ``scope``'s business, read from its rows (``base.queries.app_activations``); a scope
-    that is no business's (the platform) has the baseline: nothing of it is ever off."""
+    """Every module's state in ``scope``'s business, read from its rows (``base.queries.app_activations``); the
+    platform (:func:`is_platform`) has every module on: nothing of it is ever off."""
     graph = module_graph()
-    if scope.kind != HUB_SCOPE_KIND:
-        return baseline(graph)
+    if is_platform(scope):
+        return every_on(graph)
     from base import queries  # base.queries imports this module
 
     return effective(queries.app_activations(scope.key), graph)
@@ -205,7 +224,7 @@ def off_apps(scope: Scope) -> frozenset[str]:
 
     From the cache when it has them; else read from the rows and kept, unless the running change wrote them (not
     committed yet). A cache that does not answer is logged and the rows are read: never a guess."""
-    if scope.kind != HUB_SCOPE_KIND:
+    if is_platform(scope):
         return frozenset()
     key = OFF_APPS_CACHE + scope.key
     changing = scope.key in _changing.get()
