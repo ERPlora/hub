@@ -15,6 +15,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { sessionChanged } from '../lib/access';
 import { cardOutcome, cardTemplates } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
 import type { Template } from '../operations';
@@ -64,6 +65,8 @@ async function use(template: Template): Promise<void> {
   try {
     const done = await client.api.call('base.blueprint.import', { template: template.key });
     outcome.value = cardOutcome(done);
+    // It turned the template's apps on: the menu and «My apps» are the session's, read it again.
+    sessionChanged();
   } catch (error) {
     const failure = error as ApiError;
     outcome.value =
