@@ -14,7 +14,7 @@ import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers'
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, shots, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let water: Product;
@@ -83,11 +83,6 @@ async function addBySearch(page: Page, product: Product): Promise<void> {
 
 const lineOf = (page: Page, name: string) =>
   shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).filter({ has: page.locator('[data-testid=pos-qty-plus], [data-testid$=-void]') });
-
-async function openCart(page: Page): Promise<void> {
-  const fab = shown(page).locator('[data-testid=pos-cart-fab]');
-  if (await fab.isVisible()) await fab.click();
-}
 
 test('SALE-F01: the owner sells two shirts in cash, gets the change and the ticket with its 21 % VAT', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -284,7 +279,7 @@ for (const viewport of SEARCH_VIEWPORTS) {
     await search.locator('[data-testid=pos-search-close]').click();
     await expect(search).toHaveCount(0);
 
-    await openCart(page);
+    await openTillCart(page);
     await shown(page).locator('[data-testid=pos-staff-chip]').click();
     await page.locator('[data-testid=pos-staff-me]:visible').waitFor({ state: 'visible' });
     await expect(page.getByRole('searchbox', { name: 'Buscar en el equipo…', exact: true })).toBeVisible();
@@ -303,7 +298,7 @@ test('the till on a phone: the cart is the drawer behind the button with its cou
   await expect(shown(page).locator('[data-testid=pos-cart-fab-count]')).toHaveText('1');
   await expect(shown(page).locator('[data-testid=pos-cart-fab-total]')).toContainText(/1[.,]10/);
   await page.screenshot({ path: shot('sale-pos-phone-catalog') });
-  await openCart(page);
+  await openTillCart(page);
   // The drawer slides in (.25 s): the screenshot waits until Charge is fully on screen.
   await expect(shown(page).locator('[data-testid=pos-charge]')).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: shot('sale-pos-phone-cart') });

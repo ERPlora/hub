@@ -11,7 +11,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, newestSaleOf, stamp } from './sale-helpers';
+import { cleanSales, newestSaleOf, openTillCart, stamp } from './sale-helpers';
 
 const RUN = stamp();
 const TAG = `E2E Me ${RUN}`;
@@ -64,8 +64,7 @@ async function tillReady(page: Page): Promise<void> {
 /** The check on screen: on a phone it is the drawer behind its button. */
 async function cartReady(page: Page): Promise<void> {
   await tillReady(page);
-  const fab = page.locator('[data-testid=pos-cart-fab]');
-  if (await fab.isVisible()) await fab.click();
+  await openTillCart(page);
   await shown(page).locator('[data-testid=pos-staff-chip]').waitFor({ state: 'visible' });
 }
 

@@ -9,7 +9,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, login, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const SIZES = [
@@ -65,8 +65,7 @@ async function addShirt(page: Page): Promise<void> {
 
 /** The total of the check, on the cart's foot (behind the button on a phone). */
 async function checkTotal(page: Page): Promise<string> {
-  const fab = shown(page).locator('[data-testid=pos-cart-fab]');
-  if (await fab.isVisible()) await fab.click();
+  await openTillCart(page);
   const total = shown(page).locator('[data-testid=pos-total]');
   await expect(total).toContainText(/12[.,]50/);
   return (await total.textContent()) ?? '';
