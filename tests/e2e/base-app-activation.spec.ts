@@ -208,10 +208,27 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).not.toContain('Tasks');
       await snap(page, 'off', width);
 
-      // Its screen says why it does not open, and its data is not touched (BASE-F26).
+      // Its screen says why it does not open, and its data is not touched (BASE-F26), opened from inside the Hub (the
+      // router, as a link of a notice would) and loaded cold (a bookmark), with no error of the page either way: the
+      // gate's page is mounted in Tasks' address, and the outlet looked it up by that address, found none and read
+      // `ionPageElement` of nothing (the page that was on screen stayed there, inside the Hub).
+      const errors: string[] = [];
+      page.on('pageerror', (error) => errors.push(String(error)));
+      await page.evaluate(
+        (path) =>
+          (
+            document.querySelector('#app') as unknown as {
+              __vue_app__: { config: { globalProperties: { $router: { push: (to: string) => Promise<unknown> } } } };
+            }
+          ).__vue_app__.config.globalProperties.$router.push(path),
+        tasksScreen,
+      );
+      await expect(testid(page, 'app-blocked-missing')).toBeVisible();
+      await expect.soft(page.locator('[data-testid="apps-counter"]'), 'Apps slid out').toBeHidden();
       await page.goto(`${A}${tasksScreen}`);
       await expect(testid(page, 'app-blocked-missing')).toBeVisible();
       await snap(page, 'blocked-screen', width);
+      expect(errors, 'no error of the page on the screen of an app turned off').toEqual([]);
 
       // BASE-F24 — «Add apps»: Tasks is there, «Off», with its name; «Turn on» brings it back to the menu.
       await page.goto(`${A}/apps#all`);
