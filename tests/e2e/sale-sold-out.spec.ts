@@ -8,7 +8,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, restoreDrawer, saleByKey, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, openTillCart, restoreDrawer, saleByKey, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let croquettes: Product;
@@ -46,11 +46,6 @@ const linesOf = (page: Page, product: Product): Locator => shown(page).locator('
 async function tillReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
   await tile(page, bread).waitFor({ state: 'visible' });
-}
-
-async function openCart(page: Page): Promise<void> {
-  const fab = shown(page).locator('[data-testid=pos-cart-fab]');
-  if (await fab.isVisible()) await fab.click();
 }
 
 test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap adds nothing and says why', async ({ page }) => {
@@ -104,7 +99,7 @@ test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap add
   // The article on sale still goes into the check.
   await page.setViewportSize({ width: 1440, height: 900 });
   await tile(page, bread).click();
-  await openCart(page);
+  await openTillCart(page);
   await expect(linesOf(page, bread).first()).toBeVisible();
   await expect(linesOf(page, croquettes)).toHaveCount(0);
 });

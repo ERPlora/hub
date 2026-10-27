@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, errorFrame, ionValue, MANAGER, mountSale, settle } from '../../__tests__/mount-sale';
+import { namesGiven } from '../../__tests__/searchbar-name';
 import { shortTime } from './till';
 import TablePicker from './TablePicker.vue';
 
@@ -16,6 +17,10 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../../__tests__/searchbar-name')).recordSearchbarName,
+}));
 
 const LIST = 'table.table.list';
 const FLOOR = 'table.floor.status';
@@ -280,5 +285,23 @@ describe('TablePicker: removing the table', () => {
     await click(m.find('pos-table-remove').element);
     expect(m.find('pos-table-error').text()).toBe('That check is not open.');
     expect(m.open.value).toBe(true);
+  });
+});
+
+describe('TablePicker: its search box', () => {
+  it('is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
+    const m = await setup({}, { locale: 'es' });
+    const bar = m.wrapper.find('ion-searchbar').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar mesa…');
+    await m.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search a table…');
+  });
+
+  it('a search box that comes back (the floor set up meanwhile) is named too', async () => {
+    const m = await setup({}, { locale: 'es' });
+    await m.result(FLOOR, { usable_tables: 0, zones: 0 });
+    expect(m.wrapper.find('ion-searchbar').exists()).toBe(false);
+    await m.result(FLOOR, FLOOR_SET, {}, 2);
+    expect(namesGiven(m.wrapper.find('ion-searchbar').element)).toEqual(['Buscar mesa…']);
   });
 });

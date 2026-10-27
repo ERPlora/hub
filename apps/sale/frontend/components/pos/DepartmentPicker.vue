@@ -11,18 +11,21 @@ export type OpenPriceChoice = { kind: 'department'; id: string } | { kind: 'tax'
 // departments». Mounted only while the sheet is open.
 import { useLive } from '@erplora/ui/sdk';
 import { IonSearchbar, IonSpinner } from '@ionic/vue';
-import { computed, shallowRef } from 'vue';
+import { computed, shallowRef, useTemplateRef } from 'vue';
 
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
-import { useLocale } from '../../composables/useT';
+import { useSearchbarName } from '../../composables/useSearchbarName';
+import { useLocale, useT } from '../../composables/useT';
 import { formatPercent } from '../../lib/format';
 import TaxCategoryPicker from '../TaxCategoryPicker.vue';
 
 const choice = defineModel<OpenPriceChoice | null>({ required: true });
 
+const t = useT();
 const locale = useLocale();
 const taxName = useTaxName();
 const term = shallowRef('');
+useSearchbarName(useTemplateRef('bar'), () => t('sale.pos.departmentSearch'));
 const { data, status, error } = useLive('sale.department.list', () => ({
   search: term.value,
   sort: 'sort_order' as const,
@@ -58,6 +61,7 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
     class="pos-choices"
   >
     <ion-searchbar
+      ref="bar"
       class="pos-choices__search"
       :placeholder="$t('sale.pos.departmentSearch')"
       :debounce="250"

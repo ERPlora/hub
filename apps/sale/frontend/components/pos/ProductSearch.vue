@@ -14,6 +14,7 @@ import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
+import { useSearchbarName } from '../../composables/useSearchbarName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';
@@ -49,6 +50,7 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
 
 const bar = useTemplateRef<{ $el: HTMLElement & { setFocus?: () => Promise<void> } }>('bar');
 onMounted(() => void bar.value?.$el.setFocus?.());
+useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
 </script>
 
 <template>

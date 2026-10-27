@@ -1,12 +1,18 @@
 // The till's product search (WORKBOOK «Vender»: the magnifier opens «Search product…», by name or SKU,
 // on the server, across the whole catalogue whatever the category): a floating panel over the grid
 // with the live answer; a tap adds the product (the page applies the same rules as a tile).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { click, errorFrame, ionValue, mountSale, taxSettings } from '../../__tests__/mount-sale';
+import { namesGiven } from '../../__tests__/searchbar-name';
 import { plain } from '../../lib/format';
 import { page, product, service } from './__tests__/fixtures';
 import ProductSearch from './ProductSearch.vue';
+
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../../__tests__/searchbar-name')).recordSearchbarName,
+}));
 
 const OP = 'inventory.product.list';
 
@@ -82,6 +88,14 @@ describe('ProductSearch', () => {
     m.net.lastStream().push(errorFrame(m.subId(OP), 'app_inactive'));
     await m.reopen();
     expect(m.find('pos-search-error').text()).toBe('msg app_inactive');
+  });
+
+  it('its search box is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
+    const m = await setup('es');
+    const bar = m.wrapper.find('ion-searchbar').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar producto…');
+    await m.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search product…');
   });
 
   it('closes with its button and with Escape', async () => {

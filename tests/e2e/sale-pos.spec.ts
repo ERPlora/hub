@@ -5,7 +5,8 @@
 // drawer behind the FAB; the employee charges and sees «Void» and «Refund» (each asks a manager's approval:
 // sale-approval.spec.ts) but never reads the figures. A marked
 // line is charged on its own (SALE-F22) with its ticket, and the rest closes the check; on full screen
-// the checkout sheet still opens and charges on top of the till.
+// the checkout sheet still opens and charges on top of the till. In Spanish its search boxes are named by
+// their hint, never Ionic's English «search text» (flow: sale-pos, FIX-HUB-SALE-SEARCHBARS-NAMED-IN-ENGLISH).
 // Screenshots of the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -13,7 +14,7 @@ import { A, EMPLOYEE, api, hostPage, login, psql, shot, shown } from './helpers'
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, shots, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let water: Product;
@@ -82,11 +83,6 @@ async function addBySearch(page: Page, product: Product): Promise<void> {
 
 const lineOf = (page: Page, name: string) =>
   shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).filter({ has: page.locator('[data-testid=pos-qty-plus], [data-testid$=-void]') });
-
-async function openCart(page: Page): Promise<void> {
-  const fab = shown(page).locator('[data-testid=pos-cart-fab]');
-  if (await fab.isVisible()) await fab.click();
-}
 
 test('SALE-F01: the owner sells two shirts in cash, gets the change and the ticket with its 21 % VAT', async ({ page, context }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -257,6 +253,41 @@ test('SALE-F07: a product without tax category is marked and never enters the ch
   await page.screenshot({ path: shot('sale-pos-untaxed') });
 });
 
+// flow: sale-pos — Ionic 8 names the field of an `ion-searchbar` «search text», in English, whatever its hint says, so a
+// screen reader read «search text» on the till's product search and on «Who is serving this check» (SALE-F16).
+const SEARCH_VIEWPORTS = [
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
+] as const;
+
+for (const viewport of SEARCH_VIEWPORTS) {
+  test(`sale-pos at ${viewport.label}: in Spanish the till's search boxes are named by their hint, never «search text»`, async ({ page, context }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await login(page, A, '/sale/pos');
+    await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    await page.goto(`${A}/sale/pos`);
+    await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    await tillReady(page);
+    await shown(page).locator('[data-testid=pos-search-trigger]').click();
+    const search = page.locator('[data-testid=pos-search]');
+    await expect(search.locator('input')).toHaveAttribute('placeholder', 'Buscar producto…');
+    await expect(search.locator('input')).toHaveAttribute('aria-label', 'Buscar producto…');
+    await expect(search.getByRole('searchbox', { name: 'Buscar producto…', exact: true })).toBeVisible();
+    await search.locator('.pos-search__list, [data-testid=pos-search-empty]').first().waitFor({ state: 'visible' });
+    await page.screenshot({ path: shot(`FIX-HUB-SALE-SEARCHBARS-NAMED-IN-ENGLISH-${viewport.label}`) });
+    await search.locator('[data-testid=pos-search-close]').click();
+    await expect(search).toHaveCount(0);
+
+    await openTillCart(page);
+    await shown(page).locator('[data-testid=pos-staff-chip]').click();
+    await page.locator('[data-testid=pos-staff-me]:visible').waitFor({ state: 'visible' });
+    await expect(page.getByRole('searchbox', { name: 'Buscar en el equipo…', exact: true })).toBeVisible();
+    await page.locator('[data-testid=pos-staff-cancel]:visible').click();
+    await expect(page.locator('[data-testid=pos-staff-me]:visible')).toHaveCount(0);
+  });
+}
+
 test('the till on a phone: the cart is the drawer behind the button with its count and total', async ({ page, context }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page, A, '/sale/pos');
@@ -267,7 +298,7 @@ test('the till on a phone: the cart is the drawer behind the button with its cou
   await expect(shown(page).locator('[data-testid=pos-cart-fab-count]')).toHaveText('1');
   await expect(shown(page).locator('[data-testid=pos-cart-fab-total]')).toContainText(/1[.,]10/);
   await page.screenshot({ path: shot('sale-pos-phone-catalog') });
-  await openCart(page);
+  await openTillCart(page);
   // The drawer slides in (.25 s): the screenshot waits until Charge is fully on screen.
   await expect(shown(page).locator('[data-testid=pos-charge]')).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: shot('sale-pos-phone-cart') });

@@ -126,13 +126,11 @@ export async function mountSale(component: Component, options: MountOptions = {}
   // The session is provided app-wide, as createShell does.
   const app = createApp({});
   provideSession(ref(options.session ?? MANAGER), ref('live'), { app });
+  const i18n = createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...taxEn, ...en }, es: { ...taxEs, ...es } } });
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [
-        router,
-        createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...taxEn, ...en }, es: { ...taxEs, ...es } } }),
-      ],
+      plugins: [router, i18n],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },
@@ -206,7 +204,13 @@ export async function mountSale(component: Component, options: MountOptions = {}
     return (found.exists() ? found.element : document.querySelector(selector)) as HTMLElement | null;
   };
 
-  return { ...harness, router, wrapper, live, params, subId, result, reopen, sent, answer, find, inDoc };
+  /** The person changes the app's language (the shell's selector): what is on screen follows it. */
+  async function setLocale(locale: 'en' | 'es'): Promise<void> {
+    i18n.global.locale.value = locale;
+    await flush();
+  }
+
+  return { ...harness, router, wrapper, live, params, subId, result, reopen, sent, answer, find, inDoc, setLocale };
 }
 
 /** Taxes' settings of a business whose territory declares `tax_kind` (`tax.settings.get`, what every sale

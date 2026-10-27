@@ -9,8 +9,9 @@
 // already says the team could not be loaded.
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonButton, IonSearchbar } from '@ionic/vue';
-import { computed, onMounted, shallowRef } from 'vue';
+import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
 
+import { useSearchbarName } from '../../composables/useSearchbarName';
 import { useT } from '../../composables/useT';
 import PosSheet from './PosSheet.vue';
 
@@ -20,6 +21,7 @@ const emit = defineEmits<{ choose: [choice: { id: string | null; name: string | 
 
 const t = useT();
 const term = shallowRef('');
+useSearchbarName(useTemplateRef('bar'), () => t('sale.pos.staffSearch'));
 const { data, status, error } = useLive('staff.member.list', () => ({
   status: 'active' as const,
   search: term.value,
@@ -81,6 +83,7 @@ function onInput(event: CustomEvent<{ value?: string | null }>): void {
         {{ meLabel }}
       </button>
       <ion-searchbar
+        ref="bar"
         :placeholder="$t('sale.pos.staffSearch')"
         :debounce="250"
         :maxlength="100"

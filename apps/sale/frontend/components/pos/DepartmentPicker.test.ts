@@ -1,14 +1,20 @@
 // «Section (VAT)» of the open price (SALE-F09, F35): the business's sections, each with the rate
 // it charges today, searched on the server; without sections, Taxes' categories through the app's one
 // tax-category picker (which says it when there is none either).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, errorFrame, ionValue, mountSale, taxSettings } from '../../__tests__/mount-sale';
+import { namesGiven } from '../../__tests__/searchbar-name';
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';
 import TaxCategoryPicker from '../TaxCategoryPicker.vue';
+
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../../__tests__/searchbar-name')).recordSearchbarName,
+}));
 
 const DEPARTMENTS = 'sale.department.list';
 
@@ -78,6 +84,14 @@ describe('DepartmentPicker', () => {
     await m.result(DEPARTMENTS, page([]));
     expect(m.wrapper.findComponent(TaxCategoryPicker).exists()).toBe(false);
     expect(m.find('pos-departments-none').text()).toBe('No section matches your search.');
+  });
+
+  it('its search box is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
+    const m = await setup('es');
+    const bar = m.wrapper.find('ion-searchbar').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar una sección…');
+    await m.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search a section…');
   });
 
   it('says it when the departments cannot be read', async () => {

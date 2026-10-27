@@ -10,7 +10,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, api, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
-import { cleanSales, drawerOff, newestSaleOf, restoreDrawer, shots, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp, VIEWPORTS } from './sale-helpers';
 
 const RUN = stamp();
 const SECTION = `e2e Fruit ${RUN}`;
@@ -67,8 +67,7 @@ async function tillReady(page: Page): Promise<void> {
 /** The check on screen: on a phone it is the drawer behind its button. */
 async function cartReady(page: Page): Promise<void> {
   await tillReady(page);
-  const fab = page.locator('[data-testid=pos-cart-fab]');
-  if (await fab.isVisible()) await fab.click();
+  await openTillCart(page);
   await shown(page).locator('[data-testid=pos-total]').waitFor({ state: 'visible' });
   await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
 }
@@ -99,6 +98,29 @@ async function checkOf(context: BrowserContext, label: string): Promise<{ id: st
   const res = await api<{ rows: { id: string; label: string; status: string }[] }>(context, A, 'GET', '/sale/orders?status=open&limit=100');
   return res.data.rows.find((row) => row.label === label);
 }
+
+// rv-hub-292: the till goes through 390 twice, and the first time its drawer was opened. The second time the open
+// drawer covers the cart button, and a spec that tapped it again waited for it until the test's time ran out: this is
+// what fails here when `openTillCart` taps whatever the drawer's state. The CPU runs 20 times slower, as on a busy
+// machine, but that does not make the other fault certain (reading the button before the till has laid itself out
+// for the new window, a frame after the resize): `sale-helpers.spec.ts` catches that one, with a till that is late on
+// purpose.
+test('the check is on screen at each size, whatever the size before, on a busy machine too', async ({ page }) => {
+  test.setTimeout(90_000);
+  await freshTill(page);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 20 });
+  try {
+    const [phone, tablet, desktop] = VIEWPORTS;
+    for (const size of [phone, tablet, desktop, phone, tablet]) {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await cartReady(page);
+      await expect(total(page), `the check at ${size.label}`).toBeInViewport();
+    }
+  } finally {
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  }
+});
 
 test('SALE-F09, F10: an open-price line by its section, and apples sold by weight', async ({ page, context }) => {
   await freshTill(page);

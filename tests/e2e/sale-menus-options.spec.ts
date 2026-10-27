@@ -8,7 +8,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-SMO-${RUN}`;
@@ -218,8 +218,7 @@ test('SALE-F20: «Current order» says what waits and sends it to the kitchen as
   await expect(send).toContainText('Send RUSH (1)');
   await shots(page, 'SALE-F20', async () => {
     // The phone keeps the check in a drawer: its button opens it.
-    const fab = page.locator('[data-testid=pos-cart-fab]');
-    if (await fab.isVisible()) await fab.click();
+    await openTillCart(page);
     await expect(shown(page).locator('[data-testid=pos-kitchen-send]')).toBeVisible();
     await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
     // The check's bar fits each width: «Assign customer» once sat on «Open checks» on a phone.

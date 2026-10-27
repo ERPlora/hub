@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, errorFrame, flush, ionValue, mountSale, taxSettings } from '../__tests__/mount-sale';
+import { namesGiven } from '../__tests__/searchbar-name';
 import { plain } from '../lib/format';
 import TaxCategoryPicker from './TaxCategoryPicker.vue';
 
@@ -15,6 +16,10 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../__tests__/searchbar-name')).recordSearchbarName,
+}));
 
 const OP = 'tax.category.list';
 type Control = HTMLElement & { label?: string; value?: unknown; placeholder?: string; fill?: string; readonly?: boolean; errorText?: string; disabled?: boolean };
@@ -201,6 +206,17 @@ describe('TaxCategoryPicker: the old notices', () => {
     await s.search('zzz');
     await s.result(OP, { rows: [], total: 0, limit: 50, offset: 0 });
     expect(s.text('tax-empty')).toBe('Ninguna categoría de IPSI coincide con tu búsqueda.');
+  });
+
+  it('its search box is named by its hint, with the territory’s tax, in the person’s language, never Ionic’s English «search text»', async () => {
+    const s = await setup({}, 'es');
+    await s.open();
+    const bar = s.inDoc('tax-search');
+    expect(namesGiven(bar).at(-1)).toBe('Buscar una categoría de IVA…');
+    await s.result('tax.settings.get', taxSettings('igic'));
+    expect(namesGiven(bar).at(-1)).toBe('Buscar una categoría de IGIC…');
+    await s.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search a IGIC category…');
   });
 
   it('speaks Spanish, with the rate as Spain writes it', async () => {

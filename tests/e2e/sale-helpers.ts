@@ -7,7 +7,7 @@
 // notes, check titles); its sales are found by their lines.
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, psql, shot } from './helpers';
+import { A, api, psql, shot, shown } from './helpers';
 import { cleanInvoices, issuedIds } from './invoice-helpers';
 
 export const VIEWPORTS = [
@@ -70,6 +70,43 @@ export async function newestSaleOf(context: BrowserContext, sku: string): Promis
     if (sale.lines.some((line) => line.sku === sku)) return sale;
   }
   throw new Error(`no recent sale sold ${sku}`);
+}
+
+/** When the till is a phone's: the catalogue alone and the check a drawer behind the cart button. The rule of
+ *  `apps/sale/frontend/pages/PosPage.vue` (`PHONE`, `NARROW_TILL`): this window, or a till narrower than that. */
+const TILL_PHONE = { media: '(max-width: 820px), (max-height: 500px)', narrowerThan: 700 };
+
+/**
+ * Whether the till on screen is a phone's, once it has laid itself out for the window. It does so a frame after a
+ * resize (its media query and its ResizeObserver): read straight after `setViewportSize`, the cart button is the
+ * previous size's, and a spec tapped a phone's button on its way out until its 3 minutes ran out (rv-hub-292).
+ */
+export async function tillIsPhone(page: Page): Promise<boolean> {
+  const till = shown(page).locator('[data-testid=pos-till]');
+  await till.waitFor({ state: 'visible' });
+  const settled = await page.waitForFunction(
+    ({ el, media, narrowerThan }) => {
+      const style = getComputedStyle(el);
+      const width = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const phone = matchMedia(media).matches || width < narrowerThan;
+      return el.classList.contains('pos-till--phone') === phone ? { phone } : null;
+    },
+    { el: await till.elementHandle(), ...TILL_PHONE },
+    { timeout: 10_000 },
+  );
+  return ((await settled.jsonValue()) as { phone: boolean }).phone;
+}
+
+/** The check on screen: on a phone it is the drawer behind the cart button, which this opens (once the till has laid
+ *  itself out for the window, and only if the drawer is not open already: open, it covers the button). Elsewhere the
+ *  check is beside the catalogue and there is nothing to open. */
+export async function openTillCart(page: Page): Promise<void> {
+  if (!(await tillIsPhone(page))) return;
+  const till = shown(page).locator('[data-testid=pos-till]');
+  if (!(await till.evaluate((el) => el.classList.contains('pos-till--cart-open')))) {
+    await till.locator('[data-testid=pos-cart-fab]').click();
+  }
+  await expect(till).toHaveClass(/pos-till--cart-open/);
 }
 
 /** Screenshots of the page in the three viewports, each once `ready` says it painted. */

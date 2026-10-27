@@ -43,7 +43,12 @@ Lo que piden Notas rápidas, Secciones y Ajustes (`frontend/components/backoffic
   tope de la búsqueda de cada lista (`maxSearch`).
 - **Selector con búsqueda en el servidor** (campo + `ion-modal` + `ion-searchbar` + lista) en
   `@erplora/ui/components`, el mismo que pide `tax` (`SearchSelect`): hoy «IVA que cobra» es
-  `components/backoffice/TaxCategoryPicker.vue`.
+  `components/TaxCategoryPicker.vue`.
+- **Nombre de un buscador suelto** (`useSearchbarName`) en `@erplora/ui/components`: Ionic 8 anuncia el campo
+  de todo `ion-searchbar` como «search text», en inglés; `@erplora/ui` ya trae `syncSearchbarInputName`, pero
+  cada pantalla tiene que volver a llamarlo al cambiar el idioma o el texto de ayuda y al crearse de nuevo el
+  buscador. Hoy ese `watch` lo lleva `sale` en `frontend/composables/useSearchbarName.ts` (TPV, mesas, equipo,
+  secciones, IVA y formas de pago); `customer` y `combo` necesitan el mismo.
 
 ## Ventas
 
