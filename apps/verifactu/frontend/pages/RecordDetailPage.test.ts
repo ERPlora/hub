@@ -114,6 +114,16 @@ describe('RecordDetailPage', () => {
     expect(notice.text()).toContain('It goes out by itself with the next pass');
   });
 
+  it('outside Spain it says why and never that it goes out by itself', async () => {
+    // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain, the record is never sent.
+    const why = 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT';
+    const s = await setup({ waiting: [{ code: 'outside_spain', message: why }], next_attempt_at: null, can_transmit: false });
+    const notice = s.find('verifactu-record-waiting');
+    expect(notice.text()).toContain(why);
+    expect(notice.text()).not.toContain('It goes out by itself');
+    expect(notice.text()).not.toContain('Next attempt');
+  });
+
   it('a rejected record says the AEAT’s code and what to do', async () => {
     const s = await setup({ status: 'rejected', waiting: [], aeat_code: '1189', aeat_message: 'Falta Destinatarios', can_transmit: false, can_correct: true, can_cancel: false });
     expect(s.find('verifactu-record-waiting').exists()).toBe(false);

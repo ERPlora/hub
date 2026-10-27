@@ -9,15 +9,13 @@ import datetime as dt
 from decimal import Decimal
 
 import pytest
-from django.utils import timezone
-from live.errors import NotFound, PermissionDenied
+from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import ctx_for, run
 
 pytestmark = pytest.mark.django_db
 
-TODAY = timezone.localdate()
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
     "customer_tax_id": "B12345674",
@@ -92,7 +90,7 @@ def test_the_search_finds_by_number_customer_name_or_tax_id(issuer):
     ]
 
 
-def test_the_filters_and_the_sort(issuer):
+def test_the_filters_and_the_sort(issuer, today):
     small, big = manual(price=1000), manual(price=90000)
     simplified = ticket()
     assert numbers(run("invoice.invoice.list", {"invoice_type": "F2"})) == [
@@ -116,13 +114,13 @@ def test_the_filters_and_the_sort(issuer):
     assert (
         run(
             "invoice.invoice.list",
-            {"issue_date_from": str(TODAY), "issue_date_to": str(TODAY)},
+            {"issue_date_from": str(today), "issue_date_to": str(today)},
         ).total
         == 3
     )
     assert (
         run(
-            "invoice.invoice.list", {"issue_date_to": str(TODAY - dt.timedelta(days=1))}
+            "invoice.invoice.list", {"issue_date_to": str(today - dt.timedelta(days=1))}
         ).total
         == 0
     )
@@ -187,11 +185,11 @@ def test_an_invoice_is_read_by_its_id_or_its_number_with_its_links(issuer):
 # The document of a sale (INVOICE-F20) is in test_integration_sale.py.
 
 
-def test_a_sale_without_its_invoice_answers_none(issuer):
+def test_a_sale_without_its_invoice_answers_none(issuer, today):
     from apps.sale.models import Sale
 
     sale = Sale.objects.create(
-        number="20261014-0099", business_day=TODAY, sequence=99, idempotency_key="k-99"
+        number="20261014-0099", business_day=today, sequence=99, idempotency_key="k-99"
     )
     answer = run("invoice.invoice.by_source", {"sale": sale.number})
     assert (answer.found, answer.invoice) == (False, None)
@@ -243,15 +241,15 @@ def test_the_document_says_what_it_is_and_what_it_rectifies(issuer):
 # Series (INVOICE-F12, F13)
 
 
-def test_a_series_locks_with_its_first_document_not_with_its_counter(issuer):
+def test_a_series_locks_with_its_first_document_not_with_its_counter(issuer, today):
     run(
         "invoice.series.create",
-        {"code": "SHOP", "invoice_type": "F1", "year": TODAY.year, "next_number": 7},
+        {"code": "SHOP", "invoice_type": "F1", "year": today.year, "next_number": 7},
     )
 
     def shop():
         rows = run("invoice.series.list", {"code": "SHOP"}).rows
-        peek = run("invoice.series.peek_next", {"code": "SHOP", "year": TODAY.year})
+        peek = run("invoice.series.peek_next", {"code": "SHOP", "year": today.year})
         return rows[0].current_number, rows[0].format_locked, peek.format_locked
 
     assert shop() == (6, False, False)
@@ -259,14 +257,14 @@ def test_a_series_locks_with_its_first_document_not_with_its_counter(issuer):
     assert shop() == (7, True, True)
 
 
-def test_the_series_list_says_each_ones_next_number(issuer):
+def test_the_series_list_says_each_ones_next_number(issuer, today):
     manual()
     run(
         "invoice.series.create",
         {
             "code": "SHOP",
             "invoice_type": "F1",
-            "year": TODAY.year,
+            "year": today.year,
             "format": "S{year}-{seq:03d}",
         },
     )
@@ -278,9 +276,9 @@ def test_the_series_list_says_each_ones_next_number(issuer):
         rows["FACT"].current_number,
         rows["FACT"].next_number,
         rows["FACT"].format_locked,
-    ) == (1, f"FACT-{TODAY.year}-000002", True)
+    ) == (1, f"FACT-{today.year}-000002", True)
     assert (rows["SHOP"].next_number, rows["SHOP"].format_locked) == (
-        f"S{TODAY.year}-001",
+        f"S{today.year}-001",
         False,
     )
     assert [row.code for row in run("invoice.series.list", {"search": "sho"}).rows] == [
@@ -294,38 +292,153 @@ def test_the_series_list_says_each_ones_next_number(issuer):
     ] == ["FACT", "SHOP"]
 
 
-def test_the_next_number_previewed_is_the_one_the_emission_writes(issuer):
+def test_the_next_number_previewed_is_the_one_the_emission_writes(issuer, today):
     series = run(
         "invoice.series.create",
         {
             "code": "FACT",
             "invoice_type": "F1",
-            "year": TODAY.year,
+            "year": today.year,
             "format": "VFT{year}-A-{seq:04d}",
         },
     )
     peek = run("invoice.series.peek_next", {"series_id": str(series.id)})
     assert (peek.next_sequence, peek.next_number, peek.format_locked) == (
         1,
-        f"VFT{TODAY.year}-A-0001",
+        f"VFT{today.year}-A-0001",
         False,
     )
     assert manual().number == peek.next_number
     again = run("invoice.series.peek_next", {"code": "fact"})
-    assert (again.next_number, again.format_locked) == (f"VFT{TODAY.year}-A-0002", True)
+    assert (again.next_number, again.format_locked) == (f"VFT{today.year}-A-0002", True)
     # Peeking spends nothing.
     assert InvoiceSeries.objects.get(pk=series.id).current_number == 1
+
+
+# The preview of a rectification (INVOICE-F08: what the assistant says before the card of a rectification)
+
+
+def preview(ctx=None, **data):
+    return run("invoice.invoice.rectification_preview", data, ctx)
+
+
+def test_the_preview_is_the_rectifying_invoice_that_would_be_born_and_takes_no_number(
+    issuer, today,
+):
+    original = manual(
+        lines=[
+            {"description": "Course", "quantity": "2", "unit_price": 5000, "tax_rate": "21"},
+            {"description": "Book", "quantity": "1", "unit_price": 2000, "tax_rate": "4"},
+        ]
+    )
+    seen = preview(number=original.number, reason="The price was wrong")
+    told = seen.original
+    assert (told.invoice_id, told.number, told.issue_date, told.customer_name) == (
+        original.id,
+        original.number,
+        today,
+        "Talleres Pérez SL",
+    )
+    assert (told.total_amount, told.remaining) == (14180, 14180)
+    assert (
+        seen.invoice_type,
+        seen.reason,
+        seen.series_code,
+        seen.next_number,
+        seen.issue_date,
+        seen.whole,
+    ) == ("R1", "The price was wrong", "RECT", f"RECT-{today.year}-000001", today, True)
+    assert (seen.base_amount, seen.tax_amount, seen.total_amount, seen.currency) == (
+        -12000,
+        -2180,
+        -14180,
+        "EUR",
+    )
+    assert [
+        (line.description, line.quantity, line.tax_rate, line.base_amount, line.total_amount)
+        for line in seen.lines
+    ] == [
+        ("Course", Decimal("-2.000"), Decimal("21.00"), -10000, -12100),
+        ("Book", Decimal("-1.000"), Decimal("4.00"), -2000, -2080),
+    ]
+    # Numbering is never optimistic: reading it creates no series, spends no number and leaves the original as it was.
+    assert not InvoiceSeries.objects.filter(code="RECT").exists()
+    assert Invoice.objects.get(pk=original.id).status == "issued"
+    # What it said is what rectifying that invoice writes.
+    rect = run(
+        "invoice.invoice.rectify", {"number": told.number, "reason": seen.reason}
+    ).invoice
+    assert (rect.number, rect.invoice_type, rect.base_amount, rect.tax_amount, rect.total_amount) == (
+        seen.next_number,
+        "R1",
+        -12000,
+        -2180,
+        -14180,
+    )
+    assert [(line.description, line.quantity, line.total_amount) for line in rect.lines] == [
+        (line.description, line.quantity, line.total_amount) for line in seen.lines
+    ]
+
+
+def test_the_number_previewed_is_the_next_of_the_series_the_rectification_will_take(
+    issuer, today,
+):
+    # Last year's rectifying series has its own format: this year's is born from it when the first one is issued.
+    run(
+        "invoice.series.create",
+        {"code": "RECT", "invoice_type": "R1", "year": today.year - 1, "format": "R{year}-{seq:04d}"},
+    )
+    first, second = manual(), manual()
+    seen = preview(number=first.number, reason="x")
+    assert seen.next_number == f"R{today.year}-0001"
+    assert not InvoiceSeries.objects.filter(code="RECT", year=today.year).exists()
+    assert run("invoice.invoice.rectify", {"number": first.number, "reason": "x"}).invoice.number == seen.next_number
+    # Read twice, it says the same next number and spends none.
+    again = [preview(number=second.number, reason="y").next_number for _ in range(2)]
+    assert again == [f"R{today.year}-0002"] * 2
+    assert InvoiceSeries.objects.get(code="RECT", year=today.year).current_number == 1
+
+
+def test_the_preview_says_the_type_chosen_and_a_ticket_is_always_r5(issuer):
+    assert preview(number=manual().number, reason="x").invoice_type == "R1"
+    assert preview(number=manual().number, reason="x", rectification_type="R4").invoice_type == "R4"
+    assert preview(number=ticket().number, reason="x", rectification_type="R2").invoice_type == "R5"
+
+
+def test_what_cannot_be_rectified_the_preview_says_why_and_spends_nothing(issuer, today):
+    original = manual()
+    rect = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
+    simplified = ticket()
+    run("invoice.invoice.substitute", {"number": simplified.number, **RECIPIENT})
+    for number, code in (
+        (rect.number, "invoice.cannot_rectify_rectification"),
+        (original.number, "invoice.already_cancelled"),
+        (simplified.number, "invoice.substituted"),
+    ):
+        with pytest.raises(Conflict) as refused:
+            preview(number=number, reason="again")
+        assert refused.value.code == code
+    with pytest.raises(NotFound):
+        preview(number="NOPE-1", reason="x")
+    assert InvoiceSeries.objects.get(code="RECT", year=today.year).current_number == 1
+
+
+def test_only_who_may_rectify_reads_the_preview(issuer):
+    number = manual().number
+    with pytest.raises(PermissionDenied):
+        preview(ctx_for("hub_employee"), number=number, reason="x")
+    assert preview(ctx_for("hub_manager"), number=number, reason="x").original.number == number
 
 
 # The numbering (INVOICE-F14, F15)
 
 
 def test_a_fresh_hub_is_not_set_up_and_the_ticket_series_alone_does_not_set_it_up(
-    issuer,
+    issuer, today,
 ):
     status = run("invoice.numbering.status", {})
     assert (status.fiscal_year, status.total_series, status.configured) == (
-        TODAY.year,
+        today.year,
         0,
         False,
     )
@@ -338,22 +451,22 @@ def test_a_fresh_hub_is_not_set_up_and_the_ticket_series_alone_does_not_set_it_u
     )
     run(
         "invoice.series.create",
-        {"code": "RECT", "invoice_type": "R1", "year": TODAY.year},
+        {"code": "RECT", "invoice_type": "R1", "year": today.year},
     )
     assert run("invoice.numbering.status", {}).configured is True
 
 
-def test_last_years_series_do_not_set_up_this_year(db):
+def test_last_years_series_do_not_set_up_this_year(db, today):
     run(
         "invoice.series.create",
-        {"code": "FACT", "invoice_type": "F1", "year": TODAY.year - 1},
+        {"code": "FACT", "invoice_type": "F1", "year": today.year - 1},
     )
     run(
         "invoice.series.create",
         {
             "code": "RECT",
             "invoice_type": "R1",
-            "year": TODAY.year - 1,
+            "year": today.year - 1,
             "is_default": True,
         },
     )
@@ -381,14 +494,14 @@ def test_a_correlative_numbering_has_no_gaps_and_its_book_names_each_document(is
     ] == [simplified.number]
 
 
-def test_a_gap_says_its_series_where_it_starts_and_how_many_are_missing(issuer):
+def test_a_gap_says_its_series_where_it_starts_and_how_many_are_missing(issuer, today):
     manual()
     manual()
-    series = InvoiceSeries.objects.get(code="FACT", year=TODAY.year)
+    series = InvoiceSeries.objects.get(code="FACT", year=today.year)
     # A hole that no operation can make (the number and the document are written together): planted.
     third = Invoice.objects.order_by("sequence").last()
     Invoice.objects.filter(pk=third.pk).update(
-        sequence=5, number=f"FACT-{TODAY.year}-000005"
+        sequence=5, number=f"FACT-{today.year}-000005"
     )
     series.current_number = 5
     series.save()
@@ -403,7 +516,7 @@ def test_a_gap_says_its_series_where_it_starts_and_how_many_are_missing(issuer):
             gap.missing_count,
         )
         for gap in gaps.rows
-    ] == [("FACT", TODAY.year, 1, 2, 5, 3)]
+    ] == [("FACT", today.year, 1, 2, 5, 3)]
 
 
 # The issuer (INVOICE-F21)

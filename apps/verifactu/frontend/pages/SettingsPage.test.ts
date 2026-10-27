@@ -194,6 +194,37 @@ describe('SettingsPage', () => {
     expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(false);
   });
 
+  // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain; outside it nothing that would lead
+  // to the AEAT is offered, with that one reason in sight.
+  const OUTSIDE_SPAIN = { code: 'outside_spain', message: 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT' };
+  const disabled = (s: Awaited<ReturnType<typeof setup>>, hook: string) =>
+    (s.find(`verifactu-settings-${hook}`).element as unknown as { disabled: boolean }).disabled;
+
+  it('outside Spain it says VeriFactu is only for Spain and offers nothing that leads to the AEAT', async () => {
+    const s = await setup({ live_blockers: [OUTSIDE_SPAIN], reasons: [OUTSIDE_SPAIN] });
+    expect(s.find('verifactu-settings-outside-spain').text()).toBe('VeriFactu is only for businesses in Spain.');
+    for (const hook of ['own', 'go-live', 'test', 'test-invoice']) expect(disabled(s, hook), hook).toBe(true);
+    // That one reason: not repeated in the list of what keeps it from going live.
+    expect(s.find('verifactu-settings-live-blockers').exists()).toBe(false);
+  });
+
+  it('outside Spain, in production, the waiting records give no other reason than that one', async () => {
+    const s = await setup({ environment: 'production', reasons: [OUTSIDE_SPAIN], live_blockers: [OUTSIDE_SPAIN] });
+    expect(s.find('verifactu-settings-outside-spain').exists()).toBe(true);
+    expect(s.find('verifactu-settings-waiting').exists()).toBe(false);
+  });
+
+  it('outside Spain it says so in Spanish', async () => {
+    const s = await setup({ live_blockers: [OUTSIDE_SPAIN] }, { locale: 'es' });
+    expect(s.find('verifactu-settings-outside-spain').text()).toBe('VeriFactu solo es para negocios de España.');
+  });
+
+  it('in Spain the switch and the live test are offered, with no word of it', async () => {
+    const s = await setup();
+    expect(s.find('verifactu-settings-outside-spain').exists()).toBe(false);
+    for (const hook of ['own', 'test', 'test-invoice']) expect(disabled(s, hook), hook).toBe(false);
+  });
+
   it('the employee only reads', async () => {
     const s = await setup({}, { session: EMPLOYEE });
     for (const hook of ['own', 'go-live', 'test', 'test-invoice']) expect(s.find(`verifactu-settings-${hook}`).exists(), hook).toBe(false);

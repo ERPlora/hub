@@ -163,10 +163,10 @@ def test_spanish_texts():
     with translation.override("es"):
         assert str(apps.get_app_config("invoice").verbose_name) == "Facturación"
         assert (
-            str(services.CANNOT_RECTIFY_RECTIFICATION)
+            str(queries.CANNOT_RECTIFY_RECTIFICATION)
             == "Una rectificativa no se puede rectificar."
         )
-        assert str(services.ALREADY_CANCELLED) == "La factura ya está cancelada."
+        assert str(queries.ALREADY_CANCELLED) == "La factura ya está cancelada."
         assert str(Invoice.Status.ISSUED.label) == "Emitida"
         assert str(queries.DOC_SIMPLIFIED) == "Factura simplificada"
 

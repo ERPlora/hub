@@ -5,7 +5,8 @@ paints the menu and decides on the login without a first round trip. ``spa-confi
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
 jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
 Home, BASE-G127), where its plan is changed on the SaaS (``/dashboard/store/plans?business=<hub id>``, the menu's «Upgrade
-plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1), those three only
+plan», BASE-G169), the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1) and this business on
+the SaaS's panel (``manage_url``, the bar's «erplora.com», BASE-F11; only with ``base.open_management``), those only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
 ``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). ``widget-list`` carries
 ``base.widget.list`` as its live query answers it to this person: the Home's board mounts its panels with it, so their
@@ -26,6 +27,7 @@ session or without and whatever it accepts. A crawler reads no HTML as the hub's
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_safe
+from live.context import get_builder
 from live.errors import OperationError
 from live.ninja import run_operation_sync
 from live.spa import render_spa, spa_path_pattern
@@ -37,6 +39,8 @@ from base.models import SessionOwner
 SESSION_ME_ID = "session-me"
 HUB_HOME_ID = "hub-home"
 WIDGET_LIST_ID = "widget-list"
+#: Who may open this business on erplora.com's panel from the bar (``base/apps.py``: owner, admin and manager).
+OPEN_MANAGEMENT = "base.open_management"
 #: A path whose last segment has an extension names a file, and no route of the SPA looks like one (its parameters
 #: are ids). It is the fallback rule of connect-history-api-fallback and of ASP.NET Core's ``{*path:nonfile}``. With a
 #: trailing slash too: else ``APPEND_SLASH`` would send ``/robots.txt`` to ``/robots.txt/``, and that to the shell.
@@ -64,6 +68,11 @@ def _widgets(request: HttpRequest) -> dict | None:
         return None
 
 
+def _may_manage(request: HttpRequest) -> bool:
+    """Whether this person may open the business on erplora.com's panel (their permissions, as an operation reads them)."""
+    return get_builder().from_request(request).has(OPEN_MANAGEMENT)
+
+
 def _shell(request: HttpRequest) -> HttpResponse:
     """The SPA's HTML (``render_spa``: never cached, with the CSRF cookie the SDK sends back)."""
     me = run_operation_sync(request, queries.session_me)
@@ -81,6 +90,8 @@ def _shell(request: HttpRequest) -> HttpResponse:
             "report_url": saas_url(f"{SAAS_PANEL_PATH}/report-a-problem") if account else "",
             # APP-BASE-5: «Members» of the business on erplora.com (HUBS-F24…F29), where people are invited.
             "members_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/members") if account else "",
+            # BASE-F11: the bar's «erplora.com», this business on the panel, for who runs it (gh:hub#364).
+            "manage_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}") if account and _may_manage(request) else "",
             "access": way_in,
             "preferences": queries.appearance_of(request.user),
         }

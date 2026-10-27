@@ -111,6 +111,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.create_from_sale",
         "invoice.invoice.substitute",
         "invoice.invoice.mark_paid",
+        "invoice.invoice.rectification_preview",
         "invoice.invoice.rectify",
         "invoice.invoice.rectify_from_refund",
         "invoice.invoice.rectify_from_void",

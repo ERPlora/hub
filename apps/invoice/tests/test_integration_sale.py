@@ -10,7 +10,6 @@ import re
 from decimal import Decimal
 
 import pytest
-from django.utils import timezone
 from live.errors import Conflict
 from live.models import OutboxEvent
 
@@ -23,7 +22,6 @@ from apps.verifactu.models import Record
 
 pytestmark = pytest.mark.django_db
 
-TODAY = timezone.localdate()
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
     "customer_tax_id": "B12345674",
@@ -68,7 +66,7 @@ def newest(name):
 
 
 def test_a_ticket_becomes_one_simplified_invoice_with_the_sales_money_to_the_cent(
-    issuer, shelf, charge
+    issuer, shelf, charge, today
 ):
     sale = charge(
         "inv-0001",
@@ -87,7 +85,7 @@ def test_a_ticket_becomes_one_simplified_invoice_with_the_sales_money_to_the_cen
         )
     assert (ticket.invoice_type, ticket.number, ticket.series_code) == (
         "F2",
-        f"TICKET-{TODAY.year}-000001",
+        f"TICKET-{today.year}-000001",
         "TICKET",
     )
     assert (ticket.status, ticket.source_type, ticket.sale_id, ticket.sale_number) == (
@@ -122,7 +120,7 @@ def test_a_ticket_becomes_one_simplified_invoice_with_the_sales_money_to_the_cen
 
 
 def test_the_same_charge_delivered_twice_is_one_document_and_one_number(
-    issuer, shelf, charge
+    issuer, shelf, charge, today
 ):
     charge("inv-0001")
     first = deliver("sale.sale.completed")
@@ -133,18 +131,18 @@ def test_the_same_charge_delivered_twice_is_one_document_and_one_number(
         first.invoice.id,
     )
     assert Invoice.objects.count() == 1
-    assert InvoiceSeries.objects.get(code="TICKET", year=TODAY.year).current_number == 1
+    assert InvoiceSeries.objects.get(code="TICKET", year=today.year).current_number == 1
 
 
 def test_a_sale_charged_as_an_invoice_is_a_full_invoice_with_the_customers_data(
-    issuer, shelf, charge
+    issuer, shelf, charge, today
 ):
     charge("inv-0002", [{"product": "SHA"}], document_type="invoice", **RECIPIENT)
     invoice = deliver("sale.sale.completed").invoice
     assert (invoice.invoice_type, invoice.series_code, invoice.number) == (
         "F1",
         "FACT",
-        f"FACT-{TODAY.year}-000001",
+        f"FACT-{today.year}-000001",
     )
     assert (
         invoice.customer_name,
@@ -319,6 +317,47 @@ def test_a_partial_refund_rectifies_by_differences_and_two_add_up_to_the_cent(
             + keys(second).get(key, (0, 0, 0))[1]
             == 0
         )
+
+
+def test_after_a_partial_refund_the_preview_rectifies_what_is_left_of_the_ticket_as_r5(
+    issuer, shelf, charge, today
+):
+    # INVOICE-F08 asked to the assistant: its preview, on a ticket a partial refund already rectified by differences.
+    sale = charge("inv-0031", [{"product": "SHA"}, {"product": "MNU"}])
+    ticket = deliver("sale.sale.completed").invoice
+    refund(sale, 1000, reason="Late")
+    left = ticket.total_amount - 1000
+    seen = run(
+        "invoice.invoice.rectification_preview",
+        {"number": ticket.number, "reason": "Wrong price", "rectification_type": "R1"},
+    )
+    assert (seen.invoice_type, seen.whole, seen.next_number) == (
+        "R5",
+        False,
+        f"RECT-{today.year}-000002",
+    )
+    assert (seen.original.total_amount, seen.original.remaining, seen.total_amount) == (
+        ticket.total_amount,
+        left,
+        -left,
+    )
+    # What is left, one line per key at its own rate, named by the reason.
+    assert {line.tax_rate for line in seen.lines} == {Decimal("21.00"), Decimal("10.00")}
+    assert {(line.description, line.quantity) for line in seen.lines} == {("Wrong price", Decimal("-1"))}
+    assert sum(line.total_amount for line in seen.lines) == -left
+    rect = run(
+        "invoice.invoice.rectify", {"number": ticket.number, "reason": "Wrong price"}
+    ).invoice
+    assert (rect.number, rect.invoice_type, rect.base_amount, rect.tax_amount, rect.total_amount) == (
+        seen.next_number,
+        "R5",
+        seen.base_amount,
+        seen.tax_amount,
+        seen.total_amount,
+    )
+    assert sorted((line.tax_rate, line.base_amount, line.total_amount) for line in rect.lines) == sorted(
+        (line.tax_rate, line.base_amount, line.total_amount) for line in seen.lines
+    )
 
 
 def test_a_refund_of_returned_articles_rectifies_only_their_keys(issuer, shelf, charge):
@@ -697,3 +736,45 @@ def test_a_sale_line_without_its_rule_keeps_the_tax_of_its_territory(product, ch
     assert [entry.tax for entry in ticket.tax_breakdown] == [tax]
     record = Record.objects.get(invoice_id=ticket.id)
     assert re.findall(r"<sum1:Impuesto>(\d+)</sum1:Impuesto>", record.xml) == [code]
+
+
+def test_the_preview_counts_the_surcharge_in_its_tax_as_the_rectification_does(
+    issuer, shelf, charge
+):
+    # INVOICE-F08 asked to the assistant, on a ticket under the equivalence surcharge: the preview's tax carries the
+    # surcharge's quota too, and the rectification writes the figures it said.
+    root = TaxRule.objects.get(
+        category__key="product.generic", country_code="ES", parent__isnull=True
+    )
+    run(
+        "tax.rule.create",
+        {
+            "country_code": "ES",
+            "tax_category_key": "product.generic",
+            "rate_pct": "5.2",
+            "tax_type": "surcharge",
+            "parent_id": str(root.id),
+            "component_label": "Recargo de equivalencia",
+        },
+    )
+    sale = charge("inv-0032", [{"product": "SHA"}])
+    ticket = deliver("sale.sale.completed").invoice
+    entry = ticket.tax_breakdown[0]
+    assert entry.surcharge_quota > 0
+    seen = run(
+        "invoice.invoice.rectification_preview",
+        {"number": ticket.number, "reason": "Wrong price"},
+    )
+    assert (seen.base_amount, seen.tax_amount, seen.total_amount) == (
+        -entry.base,
+        -(entry.quota + entry.surcharge_quota),
+        -sale.total,
+    )
+    rect = run(
+        "invoice.invoice.rectify", {"number": ticket.number, "reason": "Wrong price"}
+    ).invoice
+    assert (rect.base_amount, rect.tax_amount, rect.total_amount) == (
+        seen.base_amount,
+        seen.tax_amount,
+        seen.total_amount,
+    )

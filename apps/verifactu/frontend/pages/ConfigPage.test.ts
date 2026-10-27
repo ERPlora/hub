@@ -200,6 +200,30 @@ describe('ConfigPage', () => {
     expect(s.find('verifactu-config-cert-remove').exists()).toBe(false);
   });
 
+  // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain; outside it neither the authorisation
+  // for ERPlora nor an own certificate is offered, with that one reason in sight.
+  const OUTSIDE_SPAIN = { code: 'outside_spain', message: 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT' };
+
+  it('outside Spain it says VeriFactu is only for Spain and offers neither the authorisation nor a certificate', async () => {
+    const s = await setup({ live_blockers: [OUTSIDE_SPAIN] });
+    expect(s.find('verifactu-config-outside-spain').text()).toBe('VeriFactu is only for businesses in Spain.');
+    // That one reason: no authorisation to sign («Not signed… until you sign it») nor the account's sync.
+    expect(s.find('verifactu-config-grant').exists()).toBe(false);
+    expect(s.find('verifactu-config-not-synced').exists()).toBe(false);
+    expect(s.find('verifactu-grant-form').exists()).toBe(false);
+    await click(s.find('verifactu-config-tab-own').element);
+    expect(s.find('verifactu-config-cert').exists()).toBe(true);
+    expect(s.find('verifactu-config-cert-form').exists()).toBe(false);
+  });
+
+  it('in Spain it says nothing of it and offers both', async () => {
+    const s = await setup();
+    expect(s.find('verifactu-config-outside-spain').exists()).toBe(false);
+    expect(s.find('verifactu-grant-form').exists()).toBe(true);
+    await click(s.find('verifactu-config-tab-own').element);
+    expect(s.find('verifactu-config-cert-form').exists()).toBe(true);
+  });
+
   it('speaks Spanish', async () => {
     const m = await mountVerifactu(ConfigPage, { path: '/verifactu/config', locale: 'es' });
     await m.live();

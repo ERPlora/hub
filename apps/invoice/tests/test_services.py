@@ -12,7 +12,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.utils import timezone, translation
+from django.utils import translation
 from live.context import system_context
 from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
@@ -24,7 +24,6 @@ from apps.invoice.tests.conftest import A, ISSUER, ctx_for, run
 pytestmark = pytest.mark.django_db
 
 MADRID = ZoneInfo("Europe/Madrid")
-TODAY = timezone.localdate()
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
     "customer_tax_id": "B12345674",
@@ -123,7 +122,7 @@ def test_the_saas_photo_fills_the_issuer_and_an_older_one_is_ignored(db):
 # ── Issuing by hand (INVOICE-F03) ───────────────────────────────────────────────────────────────
 
 
-def test_a_two_line_invoice_writes_its_series_its_header_and_its_lines(issuer):
+def test_a_two_line_invoice_writes_its_series_its_header_and_its_lines(issuer, today):
     invoice = manual(
         lines=[
             {
@@ -141,7 +140,7 @@ def test_a_two_line_invoice_writes_its_series_its_header_and_its_lines(issuer):
         ],
         notes="Thanks",
     )
-    assert invoice.number == f"FACT-{TODAY.year}-000001"
+    assert invoice.number == f"FACT-{today.year}-000001"
     assert (
         invoice.invoice_type,
         invoice.series_code,
@@ -177,8 +176,8 @@ def test_a_two_line_invoice_writes_its_series_its_header_and_its_lines(issuer):
     ) == (
         "Talleres Pérez SL",
         "B12345674",
-        TODAY,
-        TODAY,
+        today,
+        today,
     )
     assert invoice.notes == "Thanks"
     issued = events("invoice.invoice.issued")[-1].payload
@@ -194,7 +193,7 @@ def test_a_two_line_invoice_writes_its_series_its_header_and_its_lines(issuer):
         "rectifies_id": None,
         "substitutes_id": None,
     }
-    series = InvoiceSeries.objects.get(code="FACT", year=TODAY.year)
+    series = InvoiceSeries.objects.get(code="FACT", year=today.year)
     # The factory series is born on first use, named in English in the row and read in Spanish.
     assert (series.current_number, series.invoice_type, series.prefix, series.name) == (
         1,
@@ -204,9 +203,9 @@ def test_a_two_line_invoice_writes_its_series_its_header_and_its_lines(issuer):
     )
 
 
-def test_the_same_series_numbers_its_second_invoice_next(issuer):
+def test_the_same_series_numbers_its_second_invoice_next(issuer, today):
     manual()
-    assert manual().number == f"FACT-{TODAY.year}-000002"
+    assert manual().number == f"FACT-{today.year}-000002"
 
 
 def test_a_full_invoice_needs_the_customers_name_tax_id_and_address_and_uses_no_number(
@@ -233,7 +232,7 @@ def test_a_full_invoice_needs_the_customers_name_tax_id_and_address_and_uses_no_
     assert not InvoiceSeries.objects.filter(current_number__gt=0).exists()
 
 
-def test_a_ticket_series_issues_a_simplified_invoice_without_a_recipient(issuer):
+def test_a_ticket_series_issues_a_simplified_invoice_without_a_recipient(issuer, today):
     ticket = run(
         "invoice.invoice.create",
         {
@@ -250,7 +249,7 @@ def test_a_ticket_series_issues_a_simplified_invoice_without_a_recipient(issuer)
     )
     assert (ticket.invoice_type, ticket.number, ticket.total_amount) == (
         "F2",
-        f"TICKET-{TODAY.year}-000001",
+        f"TICKET-{today.year}-000001",
         165,
     )
 
@@ -377,17 +376,17 @@ def test_a_priced_line_that_comes_to_nothing_is_refused_but_a_free_one_is_honest
     assert free.total_amount == 0
 
 
-def test_an_inactive_series_or_one_that_does_not_issue_invoices_is_refused(issuer):
+def test_an_inactive_series_or_one_that_does_not_issue_invoices_is_refused(issuer, today):
     shop = run(
         "invoice.series.create",
-        {"code": "SHOP", "invoice_type": "F1", "year": TODAY.year, "is_active": False},
+        {"code": "SHOP", "invoice_type": "F1", "year": today.year, "is_active": False},
     )
     with pytest.raises(Conflict) as refused:
         manual(series_id=str(shop.id))
     assert refused.value.code == "invoice.series_inactive"
     credit = run(
         "invoice.series.create",
-        {"code": "ABONO", "invoice_type": "R1", "year": TODAY.year},
+        {"code": "ABONO", "invoice_type": "R1", "year": today.year},
     )
     with pytest.raises(Conflict) as refused:
         manual(series_id=str(credit.id))
@@ -396,18 +395,18 @@ def test_an_inactive_series_or_one_that_does_not_issue_invoices_is_refused(issue
         manual(series_code="NOWHERE")
 
 
-def test_without_a_series_the_default_one_of_the_year_numbers(issuer):
+def test_without_a_series_the_default_one_of_the_year_numbers(issuer, today):
     run(
         "invoice.series.create",
         {
             "code": "WEB",
             "invoice_type": "F1",
-            "year": TODAY.year,
+            "year": today.year,
             "prefix": "W",
             "is_default": True,
         },
     )
-    assert manual().number == f"W-{TODAY.year}-000001"
+    assert manual().number == f"W-{today.year}-000001"
 
 
 # ── Numbering (INVOICE-F11) ─────────────────────────────────────────────────────────────────────
@@ -444,12 +443,12 @@ def test_a_new_year_opens_its_series_inheriting_the_last_ones_and_starts_again(
     )
 
 
-def test_a_series_continues_the_numbering_of_another_system(issuer):
+def test_a_series_continues_the_numbering_of_another_system(issuer, today):
     run(
         "invoice.series.create",
-        {"code": "FACT", "invoice_type": "F1", "year": TODAY.year, "next_number": 120},
+        {"code": "FACT", "invoice_type": "F1", "year": today.year, "next_number": 120},
     )
-    assert manual().number == f"FACT-{TODAY.year}-000120"
+    assert manual().number == f"FACT-{today.year}-000120"
 
 
 def test_a_manual_invoice_says_what_the_operation_is_by_its_lines(issuer):
@@ -492,28 +491,28 @@ def test_a_number_that_exists_in_the_series_is_refused_and_the_counter_does_not_
     assert InvoiceSeries.objects.get(code="FACT", year=2027).current_number == 0
 
 
-def test_a_number_longer_than_sixty_characters_is_refused_when_the_series_is_made(issuer):
+def test_a_number_longer_than_sixty_characters_is_refused_when_the_series_is_made(issuer, today):
     # NumSerieFactura holds 60 characters: the number with its widest sequence must fit.
     long = "{prefix}-{prefix}-{prefix}-{year}-{seq:09d}"
     with pytest.raises(OperationError) as refused:
         run(
             "invoice.series.create",
-            {"code": "SHOP", "invoice_type": "F1", "year": TODAY.year, "prefix": "A" * 20, "format": long},
+            {"code": "SHOP", "invoice_type": "F1", "year": today.year, "prefix": "A" * 20, "format": long},
         )
     assert (refused.value.status, set(refused.value.fields)) == (422, {"format"})
     series = run(
         "invoice.series.create",
-        {"code": "SHOP", "invoice_type": "F1", "year": TODAY.year, "format": long},
+        {"code": "SHOP", "invoice_type": "F1", "year": today.year, "format": long},
     )
     with pytest.raises(OperationError) as refused:
         run("invoice.series.update", {"series_id": str(series.id), "prefix": "B" * 20})
     assert (refused.value.status, set(refused.value.fields)) == (422, {"prefix"})
 
 
-def test_a_manual_invoice_is_numbered_in_a_series_of_this_year(issuer):
+def test_a_manual_invoice_is_numbered_in_a_series_of_this_year(issuer, today):
     old = run(
         "invoice.series.create",
-        {"code": "OLD", "invoice_type": "F1", "year": TODAY.year - 1},
+        {"code": "OLD", "invoice_type": "F1", "year": today.year - 1},
     )
     with pytest.raises(Conflict) as refused:
         manual(series_id=str(old.id))
@@ -607,13 +606,13 @@ def test_marking_a_series_default_demotes_the_one_of_its_year(db):
 
 
 def test_a_series_that_continues_another_system_stays_editable_until_its_first_document(
-    issuer,
+    issuer, today,
 ):
     # Starting at 7 moves the counter but numbers nothing: prefix, format and next number freeze only
     # with the first document the series issues (the e2e of INVOICE-F12 caught it locked at birth).
     series = run(
         "invoice.series.create",
-        {"code": "SHOP", "invoice_type": "F1", "year": TODAY.year, "next_number": 7},
+        {"code": "SHOP", "invoice_type": "F1", "year": today.year, "next_number": 7},
     )
     assert series.format_locked is False
     changed = run(
@@ -626,19 +625,19 @@ def test_a_series_that_continues_another_system_stays_editable_until_its_first_d
     )
     assert (changed.prefix, changed.next_number, changed.format_locked) == (
         "W",
-        f"W{TODAY.year}008",
+        f"W{today.year}008",
         False,
     )
-    assert manual(series_code="SHOP").number == f"W{TODAY.year}008"
+    assert manual(series_code="SHOP").number == f"W{today.year}008"
     with pytest.raises(Conflict) as refused:
         run("invoice.series.update", {"series_id": str(series.id), "prefix": "X"})
     assert refused.value.code == "invoice.series_locked"
 
 
-def test_prefix_format_and_next_number_freeze_with_the_first_number(issuer):
+def test_prefix_format_and_next_number_freeze_with_the_first_number(issuer, today):
     series = run(
         "invoice.series.create",
-        {"code": "FACT", "invoice_type": "F1", "year": TODAY.year},
+        {"code": "FACT", "invoice_type": "F1", "year": today.year},
     )
     changed = run(
         "invoice.series.update",
@@ -654,8 +653,8 @@ def test_prefix_format_and_next_number_freeze_with_the_first_number(issuer):
         changed.format,
         changed.current_number,
         changed.next_number,
-    ) == ("F", "{prefix}{year}{seq:05d}", 9, f"F{TODAY.year}00010")
-    assert manual().number == f"F{TODAY.year}00010"
+    ) == ("F", "{prefix}{year}{seq:05d}", 9, f"F{today.year}00010")
+    assert manual().number == f"F{today.year}00010"
     for change in ({"prefix": "G"}, {"format": "{year}{seq}"}, {"next_number": 99}):
         with pytest.raises(Conflict) as refused:
             run("invoice.series.update", {"series_id": str(series.id), **change})
@@ -717,7 +716,7 @@ def test_a_cancelled_invoice_or_a_rectifying_one_is_not_marked_paid(issuer):
 # ── Rectifying by hand (INVOICE-F08) ────────────────────────────────────────────────────────────
 
 
-def test_rectifying_negates_the_whole_original_and_cancels_it(issuer):
+def test_rectifying_negates_the_whole_original_and_cancels_it(issuer, today):
     original = manual(
         lines=[
             {
@@ -745,7 +744,7 @@ def test_rectifying_negates_the_whole_original_and_cancels_it(issuer):
         rect.number,
         rect.series_code,
         rect.rectification_kind,
-    ) == ("R1", f"RECT-{TODAY.year}-000001", "RECT", "I")
+    ) == ("R1", f"RECT-{today.year}-000001", "RECT", "I")
     assert (rect.base_amount, rect.tax_amount, rect.total_amount) == (
         -12000,
         -2180,
@@ -771,7 +770,7 @@ def test_rectifying_negates_the_whole_original_and_cancels_it(issuer):
         rect.rectifies.status,
     ) == (
         "Wrong customer",
-        TODAY,
+        today,
         "rectification",
         original.number,
         "cancelled",
@@ -796,7 +795,7 @@ def test_rectifying_negates_the_whole_original_and_cancels_it(issuer):
 
 
 def test_a_rectifying_one_or_a_cancelled_one_is_not_rectified_and_no_number_is_used(
-    issuer,
+    issuer, today,
 ):
     original = manual()
     rect = run(
@@ -811,7 +810,7 @@ def test_a_rectifying_one_or_a_cancelled_one_is_not_rectified_and_no_number_is_u
     with pytest.raises(Conflict) as refused:
         run("invoice.invoice.rectify", {"invoice_id": str(rect.id), "reason": "again"})
     assert refused.value.code == "invoice.cannot_rectify_rectification"
-    assert InvoiceSeries.objects.get(code="RECT", year=TODAY.year).current_number == 1
+    assert InvoiceSeries.objects.get(code="RECT", year=today.year).current_number == 1
 
 
 def test_the_type_is_chosen_for_a_full_invoice_and_always_r5_for_a_ticket(issuer):
@@ -850,7 +849,7 @@ def test_the_type_is_chosen_for_a_full_invoice_and_always_r5_for_a_ticket(issuer
     )
 
 
-def test_a_rectification_is_dated_today_and_another_day_is_refused(issuer):
+def test_a_rectification_is_dated_today_and_another_day_is_refused(issuer, today):
     invoice = manual()
     with pytest.raises(Conflict) as refused:
         run(
@@ -858,7 +857,7 @@ def test_a_rectification_is_dated_today_and_another_day_is_refused(issuer):
             {
                 "invoice_id": str(invoice.id),
                 "reason": "x",
-                "issue_date": str(TODAY - dt.timedelta(days=1)),
+                "issue_date": str(today - dt.timedelta(days=1)),
             },
         )
     assert refused.value.code == "invoice.rectify_date_not_allowed"
@@ -866,9 +865,9 @@ def test_a_rectification_is_dated_today_and_another_day_is_refused(issuer):
     assert (
         run(
             "invoice.invoice.rectify",
-            {"invoice_id": str(invoice.id), "reason": "x", "issue_date": str(TODAY)},
+            {"invoice_id": str(invoice.id), "reason": "x", "issue_date": str(today)},
         ).invoice.issue_date
-        == TODAY
+        == today
     )
 
 
@@ -917,7 +916,7 @@ def ticket():
     )
 
 
-def test_a_ticket_is_replaced_by_a_full_invoice_with_its_figures(issuer):
+def test_a_ticket_is_replaced_by_a_full_invoice_with_its_figures(issuer, today):
     simplified = ticket()
     result = run(
         "invoice.invoice.substitute",
@@ -929,7 +928,7 @@ def test_a_ticket_is_replaced_by_a_full_invoice_with_its_figures(issuer):
         True,
         "F3",
         "FACT",
-        f"FACT-{TODAY.year}-000001",
+        f"FACT-{today.year}-000001",
     )
     assert (full.base_amount, full.tax_amount, full.total_amount) == (
         simplified.base_amount,
@@ -960,7 +959,7 @@ def test_a_ticket_is_replaced_by_a_full_invoice_with_its_figures(issuer):
     assert (replaced.can_rectify, replaced.can_substitute) == (False, False)
 
 
-def test_a_ticket_has_one_full_invoice_and_asking_again_issues_nothing(issuer):
+def test_a_ticket_has_one_full_invoice_and_asking_again_issues_nothing(issuer, today):
     simplified = ticket()
     first = run(
         "invoice.invoice.substitute", {"number": simplified.number, **RECIPIENT}
@@ -969,7 +968,7 @@ def test_a_ticket_has_one_full_invoice_and_asking_again_issues_nothing(issuer):
         "invoice.invoice.substitute", {"number": simplified.number, **RECIPIENT}
     )
     assert (again.issued, again.already, again.invoice.id) == (False, True, first.id)
-    assert InvoiceSeries.objects.get(code="FACT", year=TODAY.year).current_number == 1
+    assert InvoiceSeries.objects.get(code="FACT", year=today.year).current_number == 1
 
 
 def test_only_a_ticket_is_replaced_and_the_replaced_one_is_rectified_through_its_full_invoice(

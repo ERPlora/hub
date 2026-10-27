@@ -6,7 +6,7 @@ Estado de la app: en construcción (2026-10-22)
 > Manual de usuario y especificación de `base`, la plataforma del Hub: siempre está, no se activa ni se
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
 > (el del hub viejo: saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
-> la actividad), con lo que acompaña a cualquier pantalla: la campana, «Mejorar plan» y la franja que
+> la actividad), con lo que acompaña a cualquier pantalla: la campana, «erplora.com», «Mejorar plan» y la franja que
 > avisa cuando todavía no se puede facturar. También «Apps», «Plan y límites» de Sistema y las plantillas: la
 > tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer). El acceso (entrar con la
 > cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los dispositivos) está en sus propias pantallas,
@@ -80,6 +80,13 @@ según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo,
 La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método», «Importe» y «Estado», con
 «Buscar actividad…», el embudo de filtros (método y estado), el orden, la vista de tarjetas y «Columnas».
 Se abre también con el enlace del Inicio terminado en `#actividad`.
+
+### «erplora.com» de la barra
+Arriba a la derecha, entre «Mis apps» y los destellos del asistente: una nube y «erplora.com» («Gestionar en
+erplora.com» al pasar por encima). Abre este negocio en el panel de erplora.com: en una pestaña nueva en el navegador y,
+en la app instalada, en el navegador del dispositivo. Solo lo tienen el propietario, el administrador y el encargado, y
+solo si entraron con su cuenta: nunca en una sesión abierta con PIN o con la placa. En la app de Google Play no está.
+En un móvil va dentro de «Más opciones», la primera, como «Gestionar en erplora.com».
 
 ### La campana
 Arriba a la derecha, después de «Mis apps» y de los destellos del asistente; en un móvil, las dos van dentro de
@@ -606,17 +613,24 @@ Implicados: ninguno
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
 <!-- origen: old-hub:HUB_SHELL-F129 -->
-Estado: parcial — un enlace normal, sin el pase de un solo uso, solo en el navegador (no en la app instalada) y sin el botón «erplora.com» de la barra
+Estado: parcial — sin el pase de un solo uso: si el navegador no tiene abierta la sesión de erplora.com, se entra con la cuenta al llegar
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Menú lateral
+Pantalla: Menú lateral, barra de arriba
 Pasos:
   1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Lo ve cualquier
      perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
-     sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima.
+     sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el
+     navegador: en la app instalada no está.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com.
+  3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, arriba a la derecha,
+     «erplora.com», con una nube (en un móvil, «Gestionar en erplora.com», la primera de «Más opciones»).
+  4. Lo pulsa: se abre este negocio en el panel de erplora.com, en una pestaña nueva; en la app instalada, en el
+     navegador del dispositivo. El Hub se queda donde estaba.
 Entra: el negocio en el que está.
 Sale: nada guardado en el hub.
-Si falla: si el hub no sabe a qué negocio pertenece, el botón no sale (nunca un botón que no hace nada).
+Si falla: si el hub no sabe a qué negocio pertenece, ninguno de los dos sale (nunca un botón que no hace nada). Si la
+app instalada no consigue abrir el navegador, lo dice: «No se ha podido abrir esa página. Inténtalo de nuevo.». Un
+empleado, una sesión abierta con PIN o con la placa y la app de Google Play no tienen «erplora.com».
 Implicados: ninguno
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
@@ -2215,8 +2229,9 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
   1. Con la sesión abierta, pulsa los destellos «Asistente» de la barra de arriba, al lado de la campana. Volver a
-     pulsarlos lo cierra. En un móvil, los destellos y la campana van juntos en «Más opciones» (con el número de la
-     campana), para que el título siga centrado: ahí, «Asistente» abre el panel y «Notificaciones», la campana.
+     pulsarlos lo cierra. En un móvil, los destellos y la campana (y «erplora.com», para quien lo tiene) van juntos
+     en «Más opciones» (con el número de la campana), para que el título siga centrado: ahí, «Asistente» abre el
+     panel y «Notificaciones», la campana.
   2. El panel entra por la derecha. En una tableta o un ordenador ocupa una columna al lado de la pantalla y la
      empuja: se puede seguir trabajando con el panel abierto. En un móvil tapa la pantalla, sobre un velo oscuro.
   3. Se cierra con la × «Cerrar», con la tecla Esc (esté donde esté el cursor, salvo en una ventana abierta encima
@@ -2811,7 +2826,14 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   `base.profile.updated`; `base/live.py` sigue con ellos las caras, los dispositivos, el dial y el perfil.
 - `base/spa.py` incrusta en `hub-home` `access` (`credential`, `switch_user`, `idle_minutes`) y `preferences` (la
   apariencia propia); `plan_url`, `account_url` y `report_url` solo en una sesión abierta con la cuenta
-  (gh:hub#2506). En `frontend/main.ts`, el menú de usuario lleva «Perfil» y «Cambiar de usuario», y `startWayIn`
+  (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
+  `base.open_management` (propietario y administrador por `base.*`; el encargado, a mano en `base/apps.py`: no tiene
+  `base.administer_hub`). Lo pinta `TopbarChrome.vue` (`topbar-manage`; en el móvil, `topbar-chrome-more-manage`),
+  un enlace con `target=_blank rel=noopener` que en la app instalada pasa por `openExternalLink` de
+  `@erplora/ui/shell` (`open_external_url`); `base/frontend/lib/management.ts` lo oculta en la copia de Google Play
+  (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Tests:
+  `base/tests/test_spa.py`, `test_access_spa.py`, `ShellChrome.test.ts`, `lib/management.test.ts`; e2e
+  `tests/e2e/base-chrome.spec.ts` y `base-access.spec.ts` (BASE-G56). En `frontend/main.ts`, el menú de usuario lleva «Perfil» y «Cambiar de usuario», y `startWayIn`
   (`base/frontend/lib/access.ts`) arma el bloqueo por inactividad con esos minutos (gh:hub#2537, #2677: no hay
   lectura aparte que pueda fallar), pinta la apariencia propia y, tras un cambio de usuario (anunciado en
   `sessionStorage`), dice «Ahora atiende {name}» y olvida la apariencia anterior. Cambiar de usuario abre la sesión
