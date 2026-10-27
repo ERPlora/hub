@@ -180,6 +180,17 @@ def test_an_app_off_the_blueprint_lists_is_said_to_turn_on_and_one_it_does_not_l
     assert not AppActivation.objects.filter(host="c").exists()
 
 
+def test_an_app_off_the_plan_gives_no_right_to_is_said_to_stay_off(born, monkeypatch):
+    """A paid app without its right cannot be turned on by the load: the review says it stays off, never «turns on»."""
+    from django.apps import apps as django_apps
+
+    monkeypatch.setattr(django_apps.get_app_config("table"), "premium", True)
+
+    summary = call(born, "base.blueprint.inspect", file_base64=a_file(apps=("table",)))
+
+    assert {app.id: app.status for app in summary.apps}["table"] == "inactive"
+
+
 def test_an_app_the_hub_does_not_have_is_said(owner):
     summary = call(owner, "base.blueprint.inspect", file_base64=a_file(apps=("table", "bakery_oven")))
 
