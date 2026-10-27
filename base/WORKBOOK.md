@@ -487,10 +487,10 @@ Si falla: si no se puede comprobar ese paso, no sale.
 Implicados: ninguno
 
 ### BASE-F05 Abrir una app desde «Mis apps»
-<!-- origen: old-hub:HUB_SHELL-F32 -->
+<!-- origen: old-hub:HUB_SHELL-F32 old-hub:HUB_APP-F28 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Inicio · Resumen
+Pantalla: Inicio · Resumen · la barra de arriba de cualquier pantalla
 Pasos:
   1. En «Mis apps», una baldosa por app que esta persona puede abrir, con su icono y su nombre (si no
      cabe, el nombre entero sale al pasar por encima).
@@ -498,12 +498,20 @@ Pasos:
   3. Toca una baldosa: se abre la app. Una app que se está encendiendo dice «Activando…» y no abre nada.
   4. En el móvil, con seis apps o más, se ven las cuatro primeras y «Ver todas las apps», que enseña el
      resto. «Añadir apps», la última, lleva a Apps.
+  5. Para salir de una app, toca «Mis apps» en la barra: la pantalla principal de una app no tiene
+     «Atrás». La hoja empieza por «Inicio», que vuelve al Inicio, y sigue con las apps; tocar una la abre.
+     «Inicio» está ahí aunque la lista aún cargue, esté vacía o no se haya podido leer.
+  6. En la aplicación de Android, el botón atrás del móvil cierra primero lo que haya abierto encima (una
+     ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda. Sin nada abierto, en una
+     ficha o un alta hace lo mismo que «Atrás»; en la pantalla principal de una app vuelve al Inicio,
+     también si se llegó a ella por un enlace; y en el Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
 Sale: cuántas veces se abre cada app en este navegador (solo para ordenar).
 Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lector de pantalla. Sin apps:
 «Aquí aparecerán tus apps. Añade las que necesite tu negocio.». Si no se pudo leer la lista: «No se han
 podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», nunca que no
-hay apps.
+hay apps. En una aplicación de Android antigua, que aún no sabe quedarse en segundo plano, el botón atrás
+vuelve a ser el del sistema.
 Implicados: ninguno
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
@@ -1355,7 +1363,9 @@ Pasos:
   1. La persona no hace nada: cuando la pantalla tiene un error que nadie recogió (también al pintar una parte de la
      pantalla o en una espera que falló sin tratar), se apunta solo.
   2. Se envía al hub sin ventana, sin captura y sin preguntar, aunque la pestaña se esté cerrando.
-  3. Un error idéntico no se vuelve a enviar en 30 segundos, y se recuerdan como mucho 50 distintos.
+  3. Un error idéntico no se vuelve a enviar en 30 segundos, y se recuerdan como mucho 50 distintos. Un aviso del
+     propio navegador que no es un error de la pantalla, el de que dejó parte del dibujo para el momento siguiente, no
+     se envía: no rompe nada y ninguna app lo puede arreglar.
   4. El hub lo deja en su registro de errores con el negocio, la persona y la pantalla donde pasó.
 Entra: el mensaje del error, su traza y la pantalla, solo con sesión.
 Sale: una línea en el registro de errores del hub; en el navegador no se guarda nada.
@@ -2588,8 +2598,8 @@ Pasos:
      con su sector y en «Datos y copias» le ofrece primero la plantilla de ese sector, que deja el negocio con su
      carta y sus mesas.
   2. Recorre la plataforma como su dueño, en el móvil, la tableta y el ordenador, en español y en inglés: el Inicio
-     con «Resumen» y «Actividad», «Mis apps» y la campana; «Añadir apps» y las tres pestañas de Apps; las pestañas de
-     Ajustes y las secciones de «Datos y copias»; Empleados, la ficha de una persona, los roles, las llaves y las
+     con «Resumen» y «Actividad», «Mis apps» y la campana; «Añadir apps» y las pestañas de Apps («De pago» no sale
+     mientras ninguna app se contrate aparte); las pestañas de Ajustes y las secciones de «Datos y copias»; Empleados, la ficha de una persona, los roles, las llaves y las
      aprobaciones; las cinco pestañas de Sistema; Archivos; «Mi perfil»; una dirección que no existe; y el
      asistente, que se abre y contesta.
   3. En cada pantalla comprueba que carga sin error, que nada se sale por un lado y que no queda ningún texto en el
@@ -2801,7 +2811,11 @@ Implicados: ACCOUNTS-F38
   `base/tests/test_services_system.py`, `test_relay.py`, `test_live.py`.
 - Informe de errores de la pantalla: `base/frontend/lib/error-report.ts` (`error`, `unhandledrejection` y
   `app.config.errorHandler`; `navigator.sendBeacon`, el mismo error una vez cada 30 s, 50 recordados), instalado en
-  `frontend/main.ts`. `POST /api/error-report` (`base/error_report.py`, fuera de ninja: un beacon no lleva CSRF) exige
+  `frontend/main.ts`. No envía los avisos del navegador de `BROWSER_NOTICES` («ResizeObserver loop completed with
+  undelivered notifications.» y la forma vieja «ResizeObserver loop limit exceeded»): solo un `error` de `window` sin
+  `Error` detrás (traza vacía) con el mensaje entero, como `ignoreErrors` de Sentry o las reglas de TrackJS; otro mensaje
+  que nombre ResizeObserver, o las mismas palabras lanzadas por la app, sí se envían (`error-report.test.ts`, «the
+  browser notices that are no error»). `POST /api/error-report` (`base/error_report.py`, fuera de ninja: un beacon no lleva CSRF) exige
   sesión, 30 por minuto y persona (`base.rate_limited`), cuerpo ≤ 16 KB y JSON, y escribe una línea `frontend.error
   {json}` en ERROR del logger `base.error_report` (host, usuario, pantalla, mensaje y traza recortados); el logging
   va a la consola y de ahí a CloudWatch (`config/settings.py` `LOGGING`). Tests: `base/tests/test_error_report.py`,

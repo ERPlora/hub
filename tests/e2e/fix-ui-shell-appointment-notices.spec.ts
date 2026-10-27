@@ -68,8 +68,9 @@ function nativeApp(): void {
         (win.__asked as unknown[]).push([command, args ?? null]);
         return null;
       },
-      addPluginListener: async (_plugin: string, _event: string, cb: (payload: unknown) => void) => {
-        win.__tap = cb;
+      // The notice's tap is the `notification` plugin's; the shell also holds the `app` plugin's Back button (BASE-F05).
+      addPluginListener: async (plugin: string, _event: string, cb: (payload: unknown) => void) => {
+        if (plugin === 'notification') win.__tap = cb;
         return { unregister: async () => {} };
       },
     },
