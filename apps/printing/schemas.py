@@ -377,6 +377,10 @@ class UsageSummary(Schema):
     oldest_pending_at: datetime | None = Field(description="When the oldest of them was queued.")
     sent: int = Field(description="Its jobs a device has and has not confirmed.")
     failed: int = Field(description="Its failed jobs.")
+    unattended: int = Field(
+        description="Its jobs waiting that no device set up here can print (no device reaches their printer, or a "
+        "printer of their function and paper)."
+    )
 
 
 class JobSummaryOut(Schema):
@@ -500,6 +504,22 @@ class DeviceUpdateIn(DeviceRefIn):
 
 class DeviceListIn(PageIn):
     pass
+
+
+class CoverageIn(Closed):
+    usage: Usage = Field(description="The function: receipt, kitchen, bar or label.")
+
+
+class CoverageOut(Schema):
+    usage: Usage = Field(description="The function asked about.")
+    configured: bool = Field(
+        description="A device set up here (not retired) reaches an active printer of this function on receipt paper: "
+        "its papers come out, whether that device is on right now or not."
+    )
+    count: int = Field(
+        description="Its jobs waiting that no device set up here can print: their printer is reached by none, or they "
+        "wait for a printer of their function and paper that no device reaches."
+    )
 
 
 class DeviceGetIn(Closed):

@@ -23,6 +23,8 @@ from apps.printing.models import PrintDevice, Printer, PrintJob, Settings, Usage
 from base.business import currency_of
 from base.operations import is_platform_hub
 from apps.printing.schemas import (
+    CoverageIn,
+    CoverageOut,
     DeviceGetIn,
     DeviceGetOut,
     DeviceListIn,
@@ -396,6 +398,32 @@ def list_jobs(ctx: OperationContext, params: JobListIn) -> dict:
     return {"rows": [job_row(job, now) for job in page], "total": total, "limit": params.limit, "offset": params.offset}
 
 
+def coverage(usages: list[str]) -> dict[str, tuple[bool, int]]:
+    """Per function: whether a device set up here reaches an active printer of it on receipt paper, and how many of
+    its jobs wait that no device set up here can print.
+
+    A device set up here (not retired) prints the active printers it reaches: the jobs of those printers, and the jobs
+    of a function no printer took yet on the paper of one of them (``printing.job.claim``). Set up is enough, as the old
+    hub's registration for a station: a device off right now is not a step undone. Only waiting jobs count: one a device
+    has is that device's, and one that ended waits for nobody.
+    """
+    reached = Printer.objects.filter(is_active=True, devices__in=active_devices())
+    papers = {
+        (usage, PrintJob.Format.A4 if kind == Printer.Kind.SYSTEM else PrintJob.Format.RECEIPT)
+        for usage, kind in reached.filter(usage__in=usages).values_list("usage", "kind").distinct()
+    }
+    takeable = Q(printer__in=reached)
+    for usage, paper in papers:
+        takeable |= Q(printer__isnull=True, usage=usage, format=paper)
+    jobs = {
+        row["usage"]: row["waiting"] - row["takeable"]
+        for row in PrintJob.objects.filter(PENDING, usage__in=usages)
+        .values("usage")
+        .annotate(waiting=Count("id"), takeable=Count("id", filter=takeable))
+    }
+    return {usage: ((usage, PrintJob.Format.RECEIPT) in papers, jobs.get(usage, 0)) for usage in usages}
+
+
 @operation(
     "printing.job.summary",
     kind="query",
@@ -423,6 +451,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
     for printer in Printer.objects.filter(is_active=True).order_by(_SYSTEM_LAST, Lower("name"), "id"):
         active.setdefault(printer.usage, []).append(printer)
     settings = current_settings()
+    reach = coverage(USAGES)
     usages = []
     for usage in USAGES:
         row = counts.get(usage, {})
@@ -439,6 +468,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
                 "oldest_pending_at": row.get("oldest"),
                 "sent": row.get("sent", 0),
                 "failed": row.get("failed", 0),
+                "unattended": reach[usage][1],
             }
         )
     return {
@@ -526,3 +556,21 @@ def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
     if device is None or device.retired_at is not None:
         return {"device": None, "retired": device is not None}
     return {"device": device_row(device, key), "retired": False}
+
+
+@operation(
+    "printing.device.coverage",
+    kind="query",
+    permission="printing.view_settings",
+    input=CoverageIn,
+    output=CoverageOut,
+    expose_api=True,
+    ai={
+        "description": "Whether a function (receipt, kitchen, bar, label) has a device set up to print it, and how many of "
+        "its jobs wait that no device set up here can print. «Is anybody printing the kitchen orders?»"
+    },
+)
+def device_coverage(ctx: OperationContext, params: CoverageIn) -> dict:
+    """The Home's «Set up your printer» (``configured`` of the receipts) and the bell's «Nothing is printing» (``count``)."""
+    configured, unattended = coverage([params.usage])[params.usage]
+    return {"usage": params.usage, "configured": configured, "count": unattended}

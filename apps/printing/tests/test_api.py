@@ -34,6 +34,7 @@ ROUTES = {
     ("POST", "/printing/devices", "printing.device.register"),
     ("POST", "/printing/devices/update", "printing.device.update"),
     ("POST", "/printing/devices/retire", "printing.device.retire"),
+    ("GET", "/printing/devices/coverage", "printing.device.coverage"),
 }
 #: The device's own id, as the SPA sends it in X-Device-Id: never in a URL (access logs keep URLs).
 DEVICE = "3f1c9a52-6b0e-4c1d-9a77-0d2b5f8e4c11"

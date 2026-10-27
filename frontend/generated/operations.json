@@ -2395,6 +2395,10 @@
     "method": "post",
     "path": "/api/printing/devices/retire"
   },
+  "printing.device.coverage": {
+    "method": "get",
+    "path": "/api/printing/devices/coverage"
+  },
   "modifier.group.list": {
     "method": "get",
     "path": "/api/modifier/groups"
