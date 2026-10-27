@@ -18,14 +18,14 @@ from operator import attrgetter
 from uuid import UUID
 
 import pydantic
-from babel.numbers import format_currency
+from babel.numbers import format_currency, get_currency_symbol
 from django.conf import settings as django_settings
 from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, QuerySet, Sum
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import (
     AppInactive,
     Conflict,
@@ -96,9 +96,14 @@ from apps.tax.queries import (
 )
 from apps.tax.schemas import TAX_KIND_NAMES
 from base.approvals import Approved, digest
+from base.business import currency_decimals, currency_of
 from base.models import Approval
+from base.operations import is_platform_hub
 
-CURRENCY = "EUR"
+#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
+BUSINESS = "base.business.get"
+#: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
+LIMITS_CURRENCY = "EUR"
 #: In a business of Spain, no cash at all from this total on (Ley 7/2012, art. 7), mixed included.
 CASH_LIMIT = {"ES": 100_000}
 #: In a business of Spain, a ticket (simplified invoice) up to this total, VAT included (RD 1619/2012).
@@ -188,6 +193,17 @@ TYPE_SETTING = {
 
 
 # ── The business ─────────────────────────────────────────────────────────────────────────────────
+
+
+def business_currency(ctx: OperationContext) -> str:
+    """The currency of ``ctx``'s business (ISO 4217), the one a sale charged now keeps, as ``base.business.get`` reads
+    it. Read as the platform: an API key holds only the permissions of what it charges, and every person of the hub may
+    see it anyway. ERPlora's own hub has no business on erplora.com (phase 1: no registry row, ``create_platform_hub``):
+    it charges in the currency of its issuer's country, as its invoices do."""
+    if is_platform_hub(ctx.scope):
+        return currency_of(django_settings.PLATFORM_ISSUER_COUNTRY)
+    business = get(BUSINESS)
+    return business(system_context(ctx.scope), business.input()).currency
 
 
 def business_country() -> str:
@@ -695,13 +711,20 @@ def call_services(ctx: OperationContext, name: str, data: dict):
     return call_app(ctx, name, data, "sale.services_unavailable")
 
 
-def money_text(cents: int | None) -> str:
-    """``cents`` of euro as the reader writes money in a sentence, thousands always grouped as every screen
-    paints them («1.234,56 €», «€1,234.56»; hub#1090); nothing is «—»."""
+def money_text(cents: int | None, currency: str = LIMITS_CURRENCY) -> str:
+    """``cents`` (minor units of ``currency``, with its decimals: none in JPY) as the reader writes money in a sentence,
+    thousands always grouped as every screen paints them («1.234,56 €», «€1,234.56», «PLN 1,234.56»; hub#1090);
+    nothing is «—». Without a currency it is one of Spain's legal limits, which the law writes in euros (Invoicing says
+    its ticket limit so too); any other amount passes its own, the sale's or the business's."""
     if cents is None:
         return "—"
     locale = translation.to_locale(translation.get_language() or "en")
-    return format_currency(Decimal(cents) / 100, CURRENCY, locale=locale)
+    text = format_currency(Decimal(cents).scaleb(-currency_decimals(currency)), currency, locale=locale)
+    # CLDR's currency spacing, which Babel skips: a sign of letters before the figure never touches it («PLN 1.00»).
+    symbol = get_currency_symbol(currency, locale=locale)
+    if symbol[-1:].isalpha() and text.startswith(symbol) and text[len(symbol) : len(symbol) + 1].isdigit():
+        return f"{symbol}\xa0{text[len(symbol):]}"
+    return text
 
 
 def _line_price(
@@ -709,14 +732,15 @@ def _line_price(
 ) -> int:
     if data.booked_price is not None:
         return booked_price(ctx, booking, service.id, data.booked_price)
-    price = _service_price(service, data.unit_price)
+    price = _service_price(service, data.unit_price, business_currency(ctx))
     if service.pricing_type == "fixed":
         return own_price(ctx, service.id, data.staff_id) or price
     return price
 
 
-def _service_price(service, unit_price: int | None) -> int:
-    """The price a line of ``service`` is charged at: its own when fixed, the amount typed otherwise."""
+def _service_price(service, unit_price: int | None, currency: str) -> int:
+    """The price a line of ``service`` is charged at: its own when fixed, the amount typed otherwise (out of its range,
+    said in the business's ``currency``)."""
     if service.pricing_type == "fixed":
         if unit_price is not None:
             message = str(SERVICE_PRICE_FIXED)
@@ -727,7 +751,7 @@ def _service_price(service, unit_price: int | None) -> int:
         raise Conflict(message, code="sale.service_price_required", fields={"unit_price": message})
     low, high = service.min_price, service.max_price
     if (low is not None and unit_price < low) or (high is not None and unit_price > high):
-        message = str(SERVICE_PRICE_OUT_OF_RANGE) % {"min": money_text(low), "max": money_text(high)}
+        message = str(SERVICE_PRICE_OUT_OF_RANGE) % {"min": money_text(low, currency), "max": money_text(high, currency)}
         raise Conflict(
             message, code="sale.service_price_out_of_range", fields={"unit_price": message}
         )
@@ -1626,6 +1650,7 @@ def sale_detail(sale: Sale, *, already: bool = False) -> dict:
         "appointment_id": sale.appointment_id,
         "tax_included": sale.tax_included,
         "currency": sale.currency,
+        "currency_decimals": currency_decimals(sale.currency),
         "subtotal": sale.subtotal,
         "tax_total": sale.tax_total,
         "discount_percent": sale.discount_percent,
@@ -1725,6 +1750,8 @@ def sale_row(sale: Sale) -> dict:
         "customer_name": sale.customer_name,
         "payment_method_name": method_display_name(sale.payment_method_name),
         "staff_id": sale.staff_id,
+        "currency": sale.currency,
+        "currency_decimals": currency_decimals(sale.currency),
         "total": sale.total,
         "tax_total": sale.tax_total,
         "refunded_total": sale.refunded_total,

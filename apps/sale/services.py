@@ -60,8 +60,8 @@ from apps.sale.models import (
 )
 from apps.sale.queries import (
     CASH_LIMIT,
+    LIMITS_CURRENCY,
     Booking,
-    CURRENCY,
     METHOD_NOT_AVAILABLE,
     ORDER_CHANGED,
     ORDER_NOT_FOUND,
@@ -71,6 +71,7 @@ from apps.sale.queries import (
     authoriser,
     breakdown_rows,
     business_country,
+    business_currency,
     call_app,
     call_services,
     charge_parts,
@@ -1616,7 +1617,7 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
         and any(leg["method"].type == PaymentMethod.Type.CASH for leg in legs)
     ):
         raise Conflict(
-            str(CASH_LIMIT_EXCEEDED) % {"limit": money_text(limit)},
+            str(CASH_LIMIT_EXCEEDED) % {"limit": money_text(limit, LIMITS_CURRENCY)},
             code="sale.cash_limit_exceeded",
         )
     return legs
@@ -1917,7 +1918,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         and valuation.total > ticket_limit
     ):
         raise Conflict(
-            str(TICKET_OVER_LIMIT) % {"limit": money_text(ticket_limit)},
+            str(TICKET_OVER_LIMIT) % {"limit": money_text(ticket_limit, LIMITS_CURRENCY)},
             code="sale.ticket_over_limit",
         )
     counter_sale = order.source == Order.Source.COUNTER and not order.lines.exists()
@@ -1959,7 +1960,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                 staff_id=served_by,
                 appointment_id=appointment_id,
                 tax_included=settings.default_tax_included,
-                currency=CURRENCY,
+                currency=business_currency(ctx),
                 subtotal=valuation.subtotal,
                 tax_total=valuation.tax_total,
                 discount_percent=percent,
@@ -2416,8 +2417,8 @@ def _refund_legs(sale: Sale, data: RefundIn) -> list[dict]:
         if allocation.amount > option["remaining"]:
             message = str(REFUND_EXCEEDS_TENDER) % {
                 "method": name,
-                "amount": money_text(allocation.amount),
-                "remaining": money_text(option["remaining"]),
+                "amount": money_text(allocation.amount, sale.currency),
+                "remaining": money_text(option["remaining"], sale.currency),
             }
             raise Conflict(message, code="sale.refund_exceeds_tender")
         if allocation.to_method_id is None:
@@ -2784,7 +2785,7 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
     except _Unprintable:
         return dict(NOT_QUEUED)
     settings = current_settings()
-    currency = sale.currency or CURRENCY
+    currency = sale.currency
     with translation.override(ctx.language):
         kind, document = paper.receipt(
             detail,
@@ -2849,15 +2850,16 @@ def print_bill(ctx: OperationContext, data: OrderRefIn) -> dict:
     order = find_order(data.order_id)
     valued = preview(ctx, PreviewIn(order_id=data.order_id))
     settings = current_settings()
+    currency = business_currency(ctx)
     with translation.override(ctx.language):
-        document = paper.bill(valued, label=order.label, header=settings.receipt_header, decimals=get_currency_precision(CURRENCY))
+        document = paper.bill(valued, label=order.label, header=settings.receipt_header, decimals=get_currency_precision(currency))
     return _queue_paper(
         ctx,
         {
             "job_key": f"sale-order-{order.id}-bill-{uuid.uuid7()}",
             "document_type": "prebill",
             "document": document,
-            "currency": CURRENCY,
+            "currency": currency,
             "source_app": "sale",
             "source_ref": order.label[:64],
         },

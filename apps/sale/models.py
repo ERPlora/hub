@@ -493,7 +493,8 @@ class Sale(UUIDModel):
     staff_id = models.UUIDField(_("served by"), null=True, blank=True)
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)
     tax_included = models.BooleanField(_("prices include VAT"), default=True)
-    currency = models.CharField(_("currency"), max_length=3, default="EUR")
+    # The business's currency when it was charged (its country's): never rewritten afterwards.
+    currency = models.CharField(_("currency"), max_length=3)
     subtotal = models.BigIntegerField(_("taxable base"), default=0)
     tax_total = models.BigIntegerField(_("tax"), default=0)
     discount_percent = models.DecimalField(
