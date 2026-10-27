@@ -392,6 +392,49 @@ export async function itemDetail(
   return res.data;
 }
 
+/** What a template brings, last first (tables before their zones, products before their categories), each with
+ * the operation's route that lists it and the one that takes a row away: the server's own (`base.blueprint`). */
+const TEMPLATE_DATA = [
+  ['/table/tables', '/table/tables/delete'],
+  ['/table/zones', '/table/zones/delete'],
+  ['/service/services', '/service/services/archive'],
+  ['/service/categories', '/service/categories/delete'],
+  ['/inventory/products', '/inventory/products/delete'],
+  ['/inventory/categories', '/inventory/categories/delete'],
+] as const;
+
+/**
+ * Takes away every row a template brings from the business at `origin`, through the apps' operations (their apps
+ * on), until the server says the business is empty (phase 1: `a` and `b` share these rows).
+ */
+export async function emptyOfTemplateData(context: BrowserContext, origin: string): Promise<void> {
+  for (let pass = 0; pass < 5; pass += 1) {
+    for (const [list, remove] of TEMPLATE_DATA) {
+      const rows = await api<{ rows: { id: string }[] }>(context, origin, 'GET', `${list}?limit=100&offset=0`);
+      expect(rows.status, list).toBe(200);
+      for (const row of rows.data.rows) {
+        const res = await api(context, origin, 'POST', remove, { id: row.id });
+        expect(res.status, `${remove} ${row.id}`).toBeLessThan(300);
+      }
+    }
+    const catalogue = await api<{ empty: boolean }>(context, origin, 'GET', '/settings/data/blueprints');
+    if (catalogue.data.empty) return;
+  }
+  throw new Error('the business could not be emptied of what a template brings');
+}
+
+/**
+ * Turns on `apps` in the business at `origin`, as the person of `context` who runs it, through Apps' own command
+ * (`POST /api/apps/enable`, `base.app.enable`): a business is born with every app off (PLAN-HUB round 2026-10-27).
+ * One already on changes nothing.
+ */
+export async function turnOn(context: BrowserContext, origin: string, ...apps: string[]): Promise<void> {
+  for (const app of apps) {
+    const answer = await api(context, origin, 'POST', '/apps/enable', { app });
+    expect(answer.status, `turn on ${app}: ${JSON.stringify(answer.data)}`).toBe(200);
+  }
+}
+
 /** Deletes every demo item (phase 1: `a` and `b` share them), through the API. */
 export async function clearItems(context: BrowserContext, origin: string): Promise<number> {
   let deleted = 0;

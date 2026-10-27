@@ -9,7 +9,7 @@
 // registers it in this Hub with the same id. The SaaS's changes are made on its panel, as the owner makes them.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { api, type Credentials, listReady, login, MAIL_DIR, psql, SAAS, shot, shown } from './helpers';
+import { api, type Credentials, listReady, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn } from './helpers';
 import { readMailCode } from './mail';
 import { STACK } from './stack';
 
@@ -158,6 +158,9 @@ test.beforeAll(async ({ browser }) => {
   business = await businessOf(owner);
   memberId = await joins(owner, employee, business);
   origin = STACK.hub(business.slug);
+  // A business is born with every app off (PLAN-HUB round 2026-10-27): its owner turns on Demo, where the employee works.
+  await login(owner.page, origin, '/apps', owner.credentials);
+  await turnOn(owner.context, origin, 'demo');
   tab = await employee.context.newPage();
 });
 

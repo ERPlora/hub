@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c0c3d361945f785c94a499a7f5fa18e895129f990b77f4781e36eac3374e904b -->
+<!-- generated from WORKBOOK.md sha256:01270152a0e1d429b354ebd137949280dae1f5f3e79102794b70ed1ab2506774 -->
 
 ## What it is for and who it is for
 
@@ -973,21 +973,26 @@ Steps:
   1. After choosing a template or a file, "Review what it brings" shows: "Name", "Type" ("Template" or
      "Backup"), "Language" and "Country" by name, how many "Apps" and, for a file, when it was made
      ("Created").
-  2. Below, one box per app with what it brings (each part and its rows). The ones on in the business come ticked;
-     an app that is off says "This app is off in your business: nothing of it will load." and one this
-     business does not have, "This business does not have this app: nothing of it will load.". A template's
+  2. Below, one box per app with what it brings (each part and its rows). The ones on in the business and the
+     ones the load turns on come ticked: an app of the template or the file that is off says "It is off in your
+     business: loading it turns it on.". An app only its data names, or one the plan does not include, says
+     "This app is off in your business: nothing of it will load." and one this business does not have, "This
+     business does not have this app: nothing of it will load.". A template's
      customers stay out: "Personal data: it loads only from a backup.". What the Hub never loads (people,
      PINs, fiscal data) shows in "Never loaded here".
   3. Untick the apps not wanted and tap "Import" ("Importing…"), or "Choose another" to go back.
   4. When it ends, the report shows (BASE-F32). What the business already had stays as it was: nothing is
      duplicated nor overwritten.
 In: the template or the file and the apps ticked.
-Out: in each app ticked, what it brings and was missing, added as if it were added by hand in that app (its
-categories, products, services, areas, tables and, from a backup, customers), and the report kept
-(`base.blueprint.imported`).
+Out: the apps ticked that were off, turned on before loading, with the ones they need and within the plan's
+limit of apps, as if they were turned on in Apps (`base.app.enabled`); in each app ticked, what it brings and
+was missing, added as if it were added by hand in that app (its categories, products, services, areas,
+tables and, from a backup, customers), and the report kept (`base.blueprint.imported`).
 If it fails: "The import failed: {reason}" and it stays on the review; with no app ticked, "Choose at least
-one app." and it cannot be imported; if none of its apps is on, "Nothing of this file can load in your
-business: none of its apps is on.".
+one app." and it cannot be imported; if none of its apps can be turned on here, "Nothing of this file can
+load in your business: none of its apps can be turned on here.". An app that could not be turned on (the
+plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
+the rest loads.
 Involved: INVENTORY-F12
 
 ### BASE-F32 Read the import report
@@ -1114,12 +1119,14 @@ Status: done
 Actor: owner, administrator
 Screen: Home · Summary
 Steps:
-  1. While the business has nothing a template brings, who administers it sees on top "Start with a business
-     like yours" ("Choose the one most like yours and we leave your apps ready with its catalogue in one go.
-     Then put in your own details."): up to four templates, one per kind of business and in their language when
+  1. While the business has nothing a template brings (a business is born with every app off), who administers
+     it sees on top "Start with a business like yours" ("Choose the one most like yours: we turn on its apps and
+     load its catalogue in one go. Then put in your own details."): up to four templates, one per kind of
+     business and in their language when
      there is one (those of its country first), with their description and "Use this one"; "See all templates" opens "Data and backups" and "Not now"
      closes the card on this device.
-  2. Tap "Use this one": "Preparing «{name}»…" while it loads, with no screens in between.
+  2. Tap "Use this one": "Preparing «{name}»…" while its apps are turned on and it loads, with no screens in
+     between.
   3. In the same card, "Your apps and your catalogue are ready" ("What is left only you can answer: your
      business's details. They are in the list below.") with "Continue", which closes it.
   4. Without reloading, the Home gets up to date: "Finish setting up your business" counts as done the steps

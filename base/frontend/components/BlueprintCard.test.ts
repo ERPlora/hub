@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { load, template } from '../__tests__/data-fixtures';
 import { EMPLOYEE, errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
+import { SESSION_CHANGED } from '../lib/access';
 import BlueprintCard from './BlueprintCard.vue';
 
 const TEMPLATES = ['restaurant.es', 'hair_salon.es', 'restaurant.en', 'hair_salon.en', 'bakery.es'].map((key) => template(key));
@@ -105,6 +106,31 @@ describe('BlueprintCard', () => {
     await m.wrapper.get('[data-testid="blueprint-card-report"]').trigger('click');
     await settle();
     expect(m.router.currentRoute.value.fullPath).toBe('/settings#data');
+  });
+
+  it('promises to turn the template\'s apps on, never that they are on already (round 2026-10-27)', async () => {
+    const m = await card(() => Response.json(load()));
+    expect(m.wrapper.get('[data-testid="blueprint-card"]').text()).toContain(
+      'Choose the one most like yours: we turn on its apps and load its catalogue in one go.',
+    );
+  });
+
+  it('reads the session again once loaded, so the menu and «My apps» have the apps it turned on', async () => {
+    let read = 0;
+    const count = () => (read += 1);
+    window.addEventListener(SESSION_CHANGED, count);
+    try {
+      const m = await card(() => Response.json(load()));
+      await m.wrapper.get('[data-testid="blueprint-card-use-restaurant.es"]').trigger('click');
+      await settle();
+      expect(read).toBe(1);
+      const refusedOnce = await card(() => Response.json({ error: { code: 'base.template_not_found', message: 'Gone.' } }, { status: 404 }));
+      await refusedOnce.wrapper.get('[data-testid="blueprint-card-use-restaurant.es"]').trigger('click');
+      await settle();
+      expect(read).toBe(1); // nothing was loaded
+    } finally {
+      window.removeEventListener(SESSION_CHANGED, count);
+    }
   });
 
   it('a template that could not be opened says nothing changed, why, and tries again', async () => {

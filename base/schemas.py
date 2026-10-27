@@ -472,8 +472,10 @@ class BlueprintDatasetOut(BlueprintPartOut):
 
 
 class BlueprintAppSummaryOut(BlueprintAppOut):
-    status: Literal["on", "inactive", "unknown"] = Field(
-        description="«on»; «inactive»: not on in this hub, nothing of it loads; «unknown»: this hub does not have it."
+    status: Literal["on", "turns_on", "inactive", "unknown"] = Field(
+        description="«on»; «turns_on»: off in this hub, the load turns it on first (with the apps it needs) and then "
+        "loads it; «inactive»: off and left off (only its data names it, or the plan gives no right to it), nothing "
+        "of it loads; «unknown»: this hub does not have it."
     )
     datasets: list[BlueprintDatasetOut]
 
@@ -517,6 +519,11 @@ class AppLoadOut(Schema):
     id: str
     label: str
     status: AppLoadStatus
+    reason: str = Field(
+        "",
+        description="Why an app of the blueprint that was off could not be turned on («inactive»), in the person's "
+        "language: the plan's limit of apps, no right to it…; empty otherwise.",
+    )
     datasets: list[DatasetLoadOut]
 
 

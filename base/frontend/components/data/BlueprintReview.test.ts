@@ -72,9 +72,28 @@ describe('BlueprintReview', () => {
     expect(m.wrapper.text()).toContain('Choose at least one app.');
   });
 
+  it('ticks an app off that the load turns on, saying so, and imports it (round 2026-10-27)', async () => {
+    const turnsOn = summary({
+      apps: [
+        { id: 'table', label: 'Tables', status: 'turns_on', datasets: [{ key: 'table.zone', label: 'Zones', rows: 2, personal: false, travels: true }] },
+        { id: 'kitchen', label: 'Kitchen', status: 'inactive', datasets: [] },
+      ],
+    });
+    const m = await review({ summary: turnsOn });
+    expect(apps(m)).toEqual([
+      ['table', true, false],
+      ['kitchen', false, true],
+    ]);
+    expect(m.wrapper.get('[data-id="table"]').text()).toContain('It is off in your business: loading it turns it on.');
+    await m.wrapper.get('[data-testid="review-import"]').trigger('click');
+    expect(m.wrapper.emitted('import')).toEqual([[['table']]]);
+    const es = await review({ summary: turnsOn }, 'es');
+    expect(es.wrapper.get('[data-id="table"]').text()).toContain('Está desactivada en tu negocio: se activará al cargarla.');
+  });
+
   it('says when nothing of the file can load here', async () => {
     const m = await review({ summary: summary({ apps: [{ id: 'kitchen', label: 'Kitchen', status: 'inactive', datasets: [] }] }) });
-    expect(m.wrapper.text()).toContain('Nothing of this file can load in your business: none of its apps is on.');
+    expect(m.wrapper.text()).toContain('Nothing of this file can load in your business: none of its apps can be turned on here.');
     expect((m.wrapper.get('[data-testid="review-import"]').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
   });
 

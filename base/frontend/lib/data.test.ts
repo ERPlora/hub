@@ -221,9 +221,13 @@ describe('the import (BASE-G103–G107)', () => {
         { id: 'service', label: 'Services', status: 'failed', datasets: [] },
         { id: 'customer', label: 'Customers', status: 'discarded', datasets: [] },
         { id: 'kitchen', label: 'Kitchen', status: 'already', datasets: [] },
+        // Off and not turned on by the load, with why (the plan's limit): it did not go in either.
+        { id: 'pricing', label: 'Pricing', status: 'inactive', reason: 'The plan’s limit.', datasets: [] },
+        // Off and named only by the file's data: nothing to load was asked of it.
+        { id: 'combo', label: 'Combos', status: 'inactive', datasets: [] },
       ],
     };
-    expect(unloaded(report)).toEqual(['Tables', 'Services']);
+    expect(unloaded(report)).toEqual(['Tables', 'Services', 'Pricing']);
   });
 });
 

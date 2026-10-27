@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { load, summary, template } from '../../__tests__/data-fixtures';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { ImportRow } from '../../operations';
+import { SESSION_CHANGED } from '../../lib/access';
 import ImportPanel from './ImportPanel.vue';
 
 afterEach(() => {
@@ -81,6 +82,53 @@ describe('ImportPanel', () => {
     await m.wrapper.get('[data-testid="report-templates"]').trigger('click');
     await settle();
     expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(true);
+  });
+
+  it('reads the session again after a load or a retry: the apps it turned on reach the menu (round 2026-10-27)', async () => {
+    let read = 0;
+    const count = () => (read += 1);
+    window.addEventListener(SESSION_CHANGED, count);
+    try {
+      const m = await panel(
+        {
+          '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
+          '/api/settings/data/blueprints/import': () => Response.json(load({ id: 'again' })),
+        },
+        { imports: [UNFINISHED], unfinished: UNFINISHED },
+      );
+      await m.wrapper.get('[data-testid="report-retry"]').trigger('click');
+      await settle();
+      expect(read).toBe(1);
+      await m.wrapper.get('[data-testid="report-templates"]').trigger('click');
+      await settle();
+      await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
+      await settle();
+      expect(read).toBe(1); // reviewing writes nothing
+      await m.wrapper.get('[data-testid="review-import"]').trigger('click');
+      await settle();
+      expect(read).toBe(2);
+    } finally {
+      window.removeEventListener(SESSION_CHANGED, count);
+    }
+  });
+
+  it('an import refused does not read the session again', async () => {
+    let read = 0;
+    const count = () => (read += 1);
+    window.addEventListener(SESSION_CHANGED, count);
+    try {
+      const m = await panel({
+        '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
+        '/api/settings/data/blueprints/import': refused('The app refused it.'),
+      });
+      await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
+      await settle();
+      await m.wrapper.get('[data-testid="review-import"]').trigger('click');
+      await settle();
+      expect(read).toBe(0);
+    } finally {
+      window.removeEventListener(SESSION_CHANGED, count);
+    }
   });
 
   it('a template that cannot be read says why and stays on the choice', async () => {

@@ -559,8 +559,8 @@ class AppActivation(UUIDModel):
     """Whether a module is on in a business, and whether the business chose it (the rules: ``base.activation``).
 
     ``chosen`` is what the plan's ``max_apps`` counts: an app the business turned on itself, never one the closure by
-    ``requires`` brought along. A business without any row has every module on, its roots chosen (the baseline): its
-    first change writes them all down. ``host`` is the business's slug (the scope's key, as ``Membership`` and the
+    ``requires`` brought along. A business without any row has every module off (the baseline, round 2026-10-27): its
+    first change writes them all down. The hubs of before have every module on, its roots chosen (migration 0017). ``host`` is the business's slug (the scope's key, as ``Membership`` and the
     outbox keep it): phase 1's businesses share one database (plan 2026-10-22, decision 1), and the cut of S5 leaves
     one hub per database, where it is always the same. Phase 2 adds the state ``activating``, while the migrator makes
     an app's tables. The tables of an app off are never dropped.

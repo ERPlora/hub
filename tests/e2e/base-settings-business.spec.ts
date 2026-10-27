@@ -14,7 +14,7 @@
 // Each flow leaves its capture `APP-BASE-6-<key>-<width>`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, untilStill } from './helpers';
+import { api, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
 import { readMailCode } from './mail';
 import { STACK } from './stack';
 
@@ -121,6 +121,10 @@ test('BASE-G96 BASE-G97 BASE-G98 BASE-G99 — Settings › Business and Printing
   await changeLanguage(owner, business, 'es');
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
+  // A business is born with every app off (PLAN-HUB round 2026-10-27): the ones these screens open, and the Home's sales;
+  // the page reads its session again, whose menu has them now.
+  await turnOn(owner.context, origin, 'sale', 'invoice', 'printing');
+  await page.reload();
 
   // BASE-G96: «Settings» from the side menu opens its first tab, «General» (APP-BASE-3); «Business» is the next one.
   await page.locator('ion-item.nav-item', { hasText: 'Settings' }).first().click();
@@ -210,6 +214,7 @@ test('BASE-G98 — the Home of a business in Poland writes its amounts in złoty
   await onlyTheWeek(owner.context);
   const page = await owner.context.newPage();
   await login(page, origin, '/', owner.credentials);
+  await turnOn(owner.context, origin, 'sale'); // born with every app off: the Home's week of sales
   if (process.env.E2E_SAVE_STORAGE_STATE) await owner.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 
   // What Settings › Business says (its country's currency) and the server's seven days, in cents.

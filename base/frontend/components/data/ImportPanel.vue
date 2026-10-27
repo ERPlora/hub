@@ -10,6 +10,7 @@ import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { sessionChanged } from '../../lib/access';
 import { bytesToBase64, MAX_FILE_BYTES } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
 import type { BlueprintSource, BlueprintSummary, ImportRow, Template } from '../../operations';
@@ -92,6 +93,8 @@ async function load(apps: string[]): Promise<void> {
     const done = await importer.run({ ...step.value.source, apps });
     pastUnfinished.value = true;
     step.value = { kind: 'report', load: done };
+    // A load turns on the apps it brings that were off: the menu is the session's, read it again.
+    sessionChanged();
   } catch (error) {
     importError.value = reason(error);
   }
@@ -103,6 +106,7 @@ async function retry(of: ImportRow): Promise<void> {
     const done = await importer.run({ retry_of: of.id });
     pastUnfinished.value = true;
     step.value = { kind: 'report', load: done };
+    sessionChanged();
   } catch (error) {
     retryError.value = reason(error);
   }

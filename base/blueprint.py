@@ -15,7 +15,9 @@ dropped on reading (``Bundle.dropped``).
   turns on is its vertical's apps (``base.catalog.template_apps``, PLAN §15.2), what it brings is its own data.
 - :func:`apply` loads a blueprint app by app, each part on its own: a row an app refuses fails alone and is told, the
   rest loads, and loading again duplicates nothing (each dataset skips what is already there). Personal data (the
-  customers) travels only in a backup, never in a template.
+  customers) travels only in a backup, never in a template. Before it, ``base.blueprint.import`` turns on the apps
+  the manifest lists that are off (round 2026-10-27: a hub is born with every app off); one it could not turn on (the
+  plan's limit, no right to it) loads nothing and its report says why.
 - :func:`undo` removes exactly the rows a load created; :func:`reset` every row of the apps chosen; both through the
   apps' own delete (or archive).
 
@@ -51,6 +53,7 @@ from live.meta import module_configs
 from live.operations import get
 
 from base.catalog import template_apps
+from base.entitlement import blocked_apps
 from base.relay import active_apps
 
 logger = logging.getLogger(__name__)
@@ -80,6 +83,9 @@ FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 # Statuses of a dataset and of an app in the report of a load (the screen names each one, hub#1891).
 APPLIED, PARTIAL, ALREADY, FAILED, EMPTY, DISCARDED = "applied", "partial", "already", "failed", "empty", "discarded"
 INACTIVE, UNKNOWN, NOT_SELECTED = "inactive", "unknown", "not_selected"
+# Statuses of an app in a blueprint's summary, before loading it: on here, off and turned on by the load, off and left
+# off (only its data names it, or the plan gives no right to it), or not in this hub.
+ON, TURNS_ON = "on", "turns_on"
 # Statuses of a whole load.
 COMPLETE = "complete"
 
@@ -410,12 +416,21 @@ def template_out(seed: Template) -> dict:
 def summary(ctx: OperationContext, bundle: Bundle, *, seed: Template | None) -> dict:
     """What a blueprint brings and what of it would load here (BASE-G105), writing nothing."""
     on = active_apps(ctx.scope)
+    blocked = blocked_apps(ctx.scope)
     known = {config.label for config in module_configs()}
     manifest_ = bundle.manifest
+    listed = set(manifest_["apps"])
     backup = manifest_["purpose"] == PURPOSE_BACKUP
     apps = []
     for app in _apps_of(bundle):
-        status = "on" if app in on and app in known else ("inactive" if app in known else "unknown")
+        if app not in known:
+            status = UNKNOWN
+        elif app in on:
+            status = ON
+        elif app in listed and app not in blocked:
+            status = TURNS_ON
+        else:
+            status = INACTIVE
         parts = [
             {
                 "key": part.key,
@@ -486,11 +501,13 @@ def describe_load(load: Any) -> dict:
 # ── Loading ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None) -> Applied:
+def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None,
+          refused: dict[str, str] | None = None) -> Applied:
     """Load ``bundle`` app by app (only ``apps`` if given), each part on its own, and say what happened to each.
 
-    An app this hub does not have, or does not have on, loads nothing and is told; personal data loads only from a
-    backup. Every dataset's failure stays in it: what it created before failing is kept and counted for undo.
+    An app this hub does not have, or does not have on, loads nothing and is told, with why it is off when it could
+    not be turned on (``refused``: its reason by app); personal data loads only from a backup. Every dataset's failure
+    stays in it: what it created before failing is kept and counted for undo.
     """
     with translation.override(ctx.language):
         on = active_apps(ctx.scope)
@@ -514,7 +531,7 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None) -> Ap
             if loaded.created:
                 created[dataset.key] = loaded.created
             loads[dataset.key] = _dataset_report(dataset, loaded, rows)
-        app_reports = [_app_report(app, bundle, apps, on, known, loads) for app in _apps_of(bundle)]
+        app_reports = [_app_report(app, bundle, apps, on, known, loads, refused or {}) for app in _apps_of(bundle)]
         report = {"status": _overall(app_reports, created), "apps": app_reports, "dropped": list(bundle.dropped)}
     return Applied(report=report, created=created)
 
@@ -543,14 +560,15 @@ def _dataset_report(dataset: Dataset, loaded: Loaded, rows: list[dict], *, disca
 
 
 def _app_report(app: str, bundle: Bundle, chosen: set[str] | None, on: frozenset[str], known: set[str],
-                loads: dict[str, dict]) -> dict:
-    report = {"id": app, "label": app_label(app), "status": APPLIED, "datasets": []}
+                loads: dict[str, dict], refused: dict[str, str]) -> dict:
+    report = {"id": app, "label": app_label(app), "status": APPLIED, "reason": "", "datasets": []}
     if chosen is not None and app not in chosen:
         report["status"] = NOT_SELECTED
     elif app not in known:
         report["status"] = UNKNOWN
     elif app not in on:
         report["status"] = INACTIVE
+        report["reason"] = refused.get(app, "")
     else:
         report["datasets"] = [loads[dataset.key] for dataset in datasets_of(app) if dataset.key in loads]
         report["status"] = _app_status({dataset["status"] for dataset in report["datasets"]} - {EMPTY})

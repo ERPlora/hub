@@ -15,7 +15,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, EMPLOYEE, hostPage, psql, shot, shown, turnOn, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = {
@@ -100,6 +100,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const { context, page } = await signedIn(browser, viewport, '/apps');
     // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
     if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+    // A business is born with every app off (PLAN-HUB round 2026-10-27): the demo is turned on first, so «My apps»
+    // has it whatever this run's `a` was left with (`seed_local_hubs` leaves every app on; then this changes nothing).
+    await turnOn(context, A, 'demo');
+    await page.reload();
 
     // BASE-G67 — «My apps»: the apps on, the demo among them, each with its state.
     await expect(page).toHaveURL(`${A}/apps`);

@@ -75,6 +75,25 @@ describe('ImportReport', () => {
     expect(m.wrapper.get('[data-testid="report-dropped"]').text()).toContain('People and their PINs');
   });
 
+  it('says why an app of the blueprint could not be turned on', async () => {
+    const refused: Partial<ImportRow> = {
+      ...PARTIAL,
+      report: {
+        status: 'partial',
+        dropped: [],
+        apps: [
+          { id: 'kitchen', label: 'Kitchen', status: 'inactive', reason: 'You have reached the 1-app limit of your plan.', datasets: [] },
+          { id: 'table', label: 'Tables', status: 'inactive', datasets: [] },
+        ],
+      },
+    };
+    const m = await report({ load: load(refused) });
+    expect(m.wrapper.get('[data-id="kitchen"] [data-testid="report-app-reason"]').text()).toBe(
+      'You have reached the 1-app limit of your plan.',
+    );
+    expect(m.wrapper.find('[data-id="table"] [data-testid="report-app-reason"]').exists()).toBe(false);
+  });
+
   it('heads the last unfinished import with its name and date', async () => {
     const m = await report({ load: load(PARTIAL), unfinished: true });
     expect(m.wrapper.get('[data-testid="report-unfinished"]').text()).toMatch(

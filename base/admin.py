@@ -140,7 +140,7 @@ class LocationAdmin(admin.ModelAdmin):
 class AppActivationAdmin(admin.ModelAdmin):
     """Which apps each business turned on or off, and which it chose (PLAN-HUB §9), as they are: read only. Turning
     one on or off is ``base.app.enable``/``base.app.disable`` (the apps it needs, the plan's limit, the event), never a
-    row edited by hand; a business without rows has every app on (``base.activation``)."""
+    row edited by hand; a business without rows has every app off (``base.activation``, round 2026-10-27)."""
 
     list_display = ("host", "app", "state", "chosen", "changed_at")
     list_filter = ("state", "chosen")

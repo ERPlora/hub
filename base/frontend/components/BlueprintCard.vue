@@ -1,11 +1,13 @@
 <script setup lang="ts">
 // «Start with a business like yours» on the Home (BASE-G131, BASE-F02; PLAN-HUB round 2026-10-21, the old hub's
 // BlueprintHeroCard): to who administers the hub, while the business has nothing a template brings (`empty` of
-// `base.blueprint.list`, live: the phase-1 hub has every app on, so «base.apps» says nothing here), up to four templates,
-// one per kind of business, in the catalogue's order with «Use this one», «See all templates» (Settings › Data) and «Not now», remembered on this
-// device. «Use this one» loads it in one go (`base.blueprint.import`, never people nor fiscal data) and tells how it went
-// in the card: ready, not all of it (what, «See the report»), not started (why, «Try again») or cut halfway (no retry:
-// part may be in). Once seen, it stays until «Continue» or «Not now», though the business is no longer empty.
+// `base.blueprint.list`, live; a business is born with every app off, round 2026-10-27, and with nothing on it is
+// empty), up to four templates, one per kind of business, in the catalogue's order with «Use this one», «See all
+// templates» (Settings › Data) and «Not now», remembered on this device. «Use this one» turns on the template's apps
+// and loads it in one go (`base.blueprint.import`, never people nor fiscal data) and tells how it went in the card:
+// ready, not all of it (what, also an app it could not turn on; «See the report»), not started (why, «Try again») or
+// cut halfway (no retry: part may be in). Once seen, it stays until «Continue» or «Not now», though the business is no
+// longer empty.
 import { InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -13,6 +15,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { sessionChanged } from '../lib/access';
 import { cardOutcome, cardTemplates } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
 import type { Template } from '../operations';
@@ -62,6 +65,8 @@ async function use(template: Template): Promise<void> {
   try {
     const done = await client.api.call('base.blueprint.import', { template: template.key });
     outcome.value = cardOutcome(done);
+    // It turned the template's apps on: the menu and «My apps» are the session's, read it again.
+    sessionChanged();
   } catch (error) {
     const failure = error as ApiError;
     outcome.value =
