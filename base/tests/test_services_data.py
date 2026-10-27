@@ -468,3 +468,17 @@ def test_an_app_already_on_is_left_as_it_is(owner, load):
 
     assert enabled_events("a") == []
     assert total(owner, "inventory.product.list") == 16
+
+
+def test_a_business_outside_spain_gets_verifactu_from_a_template_as_apps_would_give_it(born, load):
+    """VeriFactu files only for Spain (VERIFACTU-F01, hub#274): outside it, turning it on is allowed and it stays
+    inert, so nothing refuses it. The template turns it on through the same ``base.app.enable`` as Apps: on, with no
+    reason against it, and the rest of the template loads."""
+    Hub.objects.filter(slug="c").update(country="PL")
+
+    loaded = load(born, template="restaurant.es")
+
+    verifactu = next(app for app in loaded.report.apps if app.id == "verifactu")
+    assert verifactu.reason == ""
+    assert "verifactu" in modules_on()
+    assert loaded.status == "complete"
