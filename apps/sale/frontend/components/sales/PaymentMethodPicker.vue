@@ -22,8 +22,10 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/vue';
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef, useTemplateRef } from 'vue';
 
+import { useSearchbarName } from '../../composables/useSearchbarName';
+import { useT } from '../../composables/useT';
 import type { PaymentMethodOut } from '../../operations';
 
 /** A short page: a business has a handful of methods; the search finds the rest. */
@@ -44,7 +46,9 @@ const props = withDefaults(
 
 const value = defineModel<string>({ required: true });
 
+const t = useT();
 const open = ref(false);
+useSearchbarName(useTemplateRef('bar'), () => t('sale.sales.picker.search'));
 const typed = shallowRef('');
 /** The name of the chosen method, for when a later answer no longer lists it. */
 const chosenLabel = shallowRef<string>();
@@ -135,6 +139,7 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
       </ion-toolbar>
       <ion-toolbar>
         <ion-searchbar
+          ref="bar"
           :data-testid="`${testid}-search`"
           :value="typed"
           :placeholder="$t('sale.sales.picker.search')"

@@ -15,8 +15,9 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonSearchbar } from '@ionic/vue';
-import { computed, shallowRef } from 'vue';
+import { computed, shallowRef, useTemplateRef } from 'vue';
 
+import { useSearchbarName } from '../../composables/useSearchbarName';
 import { useLocale, useT } from '../../composables/useT';
 import { refusal } from '../../lib/refusal';
 import PosSheet from './PosSheet.vue';
@@ -42,6 +43,7 @@ const locale = useLocale();
 const session = useSession();
 
 const term = shallowRef('');
+useSearchbarName(useTemplateRef('bar'), () => t('sale.pos.table.search'));
 const list = useLive('table.table.list', () => ({
   search: term.value,
   in_service: true,
@@ -141,6 +143,7 @@ function remove(): void {
     </p>
     <template v-else>
       <ion-searchbar
+        ref="bar"
         :placeholder="$t('sale.pos.table.search')"
         :debounce="250"
         :maxlength="100"

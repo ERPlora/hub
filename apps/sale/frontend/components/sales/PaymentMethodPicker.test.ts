@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, errorFrame, flush, ionValue, mountSale } from '../../__tests__/mount-sale';
+import { namesGiven } from '../../__tests__/searchbar-name';
 import type { PaymentMethodOut } from '../../operations';
 import PaymentMethodPicker from './PaymentMethodPicker.vue';
 
@@ -13,6 +14,10 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../../__tests__/searchbar-name')).recordSearchbarName,
+}));
 
 const method = (id: string, name: string, display: string, over: Partial<PaymentMethodOut> = {}): PaymentMethodOut => ({
   id,
@@ -100,6 +105,15 @@ describe('PaymentMethodPicker', () => {
     const field = s.field();
     expect([prop(field.element, 'fill'), field.attributes('mode') ?? prop(field.element, 'mode'), prop(field.element, 'errorText')]).toEqual(['outline', 'md', 'Pick one']);
     expect(field.classes()).toContain('ion-invalid');
+  });
+
+  it('its search box is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
+    const s = await setup({}, 'es');
+    await s.openIt();
+    const bar = s.find('pick-search').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar…');
+    await s.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search…');
   });
 
   it('speaks Spanish', async () => {

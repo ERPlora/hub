@@ -23,9 +23,10 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import { useTaxName } from '../../../tax/frontend/composables/useTaxName';
+import { useSearchbarName } from '../composables/useSearchbarName';
 import { useLocale, useT } from '../composables/useT';
 import { taxLabel } from '../lib/taxLabel';
 
@@ -59,6 +60,7 @@ const locale = useLocale();
 const taxName = useTaxName();
 /** The territory's tax, for the texts that name it. */
 const named = computed(() => ({ tax: taxName.value }));
+useSearchbarName(useTemplateRef('bar'), () => t('sale.common.taxPicker.search', named.value));
 
 const open = ref(false);
 const typed = ref('');
@@ -194,6 +196,7 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
         </ion-toolbar>
         <ion-toolbar>
           <ion-searchbar
+            ref="bar"
             :data-testid="`${testid}-search`"
             :value="typed"
             :placeholder="t('sale.common.taxPicker.search', named)"

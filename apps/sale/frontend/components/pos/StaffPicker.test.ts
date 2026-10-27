@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, errorFrame, ionValue, mountSale, settle } from '../../__tests__/mount-sale';
+import { namesGiven } from '../../__tests__/searchbar-name';
 import { page } from './__tests__/fixtures';
 import StaffPicker from './StaffPicker.vue';
 
@@ -14,6 +15,10 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../../__tests__/searchbar-name')).recordSearchbarName,
+}));
 
 const OP = 'staff.member.list';
 const member = (id: string, full_name: string) => ({
@@ -127,6 +132,14 @@ describe('StaffPicker', () => {
     const m = await setup({ mode: 'line' }, 'en', { status: 200, body: { member: null } });
     expect(asked(m)).toEqual([]);
     expect(m.find('pos-staff-unlinked').exists()).toBe(false);
+  });
+
+  it('its search box is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
+    const m = await setup({}, 'es');
+    const bar = m.wrapper.find('ion-searchbar').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar en el equipo…');
+    await m.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search the team…');
   });
 
   it('«Cancel» closes it without choosing', async () => {
