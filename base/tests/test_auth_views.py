@@ -535,7 +535,7 @@ class TestLogout:
         fake_saas()
         callback(client, {"code": "c1", "next": "/"})
         response = client.post("/auth/logout", HTTP_HOST=HOST)
-        assert (response.status_code, response["Location"]) == (302, "http://localhost:8001/accounts/logout/")
+        assert (response.status_code, response["Location"]) == (302, "http://localhost:8001/logout")
         assert me(client)["user"] is None
 
     def test_needs_the_csrf_token(self, saas):
