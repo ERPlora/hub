@@ -12,7 +12,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, collectProblems, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, untilStill } from './helpers';
+import { api, collectProblems, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
 import { readMailCode } from './mail';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
@@ -185,6 +185,8 @@ test.afterAll(async () => {
 test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names themselves and chooses their PIN', async () => {
   const page = owner.page;
   await login(page, origin, '/profile', owner.credentials);
+  // A business is born with every app off (PLAN-HUB round 2026-10-27): Sales, for the sale of BASE-G60 on the till.
+  await turnOn(owner.context, origin, 'sale');
   const profile = shown(page);
   await expect(profile.getByTestId('profile-summary')).toBeVisible();
   await fill(profile.getByTestId('profile-first-name'), 'Ana');

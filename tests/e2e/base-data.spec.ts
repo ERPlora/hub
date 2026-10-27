@@ -17,9 +17,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, ARTIFACTS, hostPage, shot, shown, untilStill } from './helpers';
+import { A, api, ARTIFACTS, emptyOfTemplateData, hostPage, shot, shown, untilStill } from './helpers';
 
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
 test.use({ actionTimeout: 30_000 });
@@ -29,34 +29,6 @@ const VIEWPORTS = {
   834: { width: 834, height: 1112 },
   1440: { width: 1440, height: 900 },
 } as const;
-
-/** What a template brings, last first (tables before their zones, products before their categories), each with
- * the operation's route that lists it and the one that takes a row away: the server's own (`base.blueprint`). */
-const TEMPLATE_DATA = [
-  ['/table/tables', '/table/tables/delete'],
-  ['/table/zones', '/table/zones/delete'],
-  ['/service/services', '/service/services/archive'],
-  ['/service/categories', '/service/categories/delete'],
-  ['/inventory/products', '/inventory/products/delete'],
-  ['/inventory/categories', '/inventory/categories/delete'],
-] as const;
-
-/** Takes away every row a template brings, through the apps' operations, until the server says the business is empty. */
-async function emptyBusiness(context: BrowserContext): Promise<void> {
-  for (let pass = 0; pass < 5; pass += 1) {
-    for (const [list, remove] of TEMPLATE_DATA) {
-      const rows = await api<{ rows: { id: string }[] }>(context, A, 'GET', `${list}?limit=100&offset=0`);
-      expect(rows.status, list).toBe(200);
-      for (const row of rows.data.rows) {
-        const res = await api(context, A, 'POST', remove, { id: row.id });
-        expect(res.status, `${remove} ${row.id}`).toBeLessThan(300);
-      }
-    }
-    const catalogue = await api<{ empty: boolean }>(context, A, 'GET', '/settings/data/blueprints');
-    if (catalogue.data.empty) return;
-  }
-  throw new Error('the business could not be emptied of what a template brings');
-}
 
 /** A .blueprint.zip with two products of Inventory, the second with a price no app takes: it loads in part. */
 function partialFile(stamp: string): string {
@@ -123,7 +95,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   test(`BASE-G131 BASE-G101–G109 — the templates card and Settings › Data at ${width}`, async ({ browser }) => {
     test.setTimeout(240_000);
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
-    await emptyBusiness(context);
+    await emptyOfTemplateData(context, A);
 
     // BASE-G131 — the card in an empty business; the checklist before loading.
     await page.goto(`${A}/`);

@@ -4,8 +4,9 @@
 // apps» (the menu), and its screens say why they do not open; «Turn on» brings it back. With 20 chosen apps on, the
 // 21st is refused with the plan's notice and «Upgrade plan» (erplora.com's plans). Each flow leaves its capture
 // `APP-BASE-ACTIVATION-<step>-<width>`. The photo is sent the way the SaaS sends it (`PUT /internal/hubs/{id}/state`,
-// signed); `a`'s photo is put back after the run and its rows of `base_appactivation` are cleared before and after
-// each test (a business without rows has every app on: the baseline).
+// signed); `a`'s photo is put back after the run and its rows of `base_appactivation` are put back before and after
+// each test to every app on with the roots chosen, as `seed_local_hubs` leaves the local hubs (a business is born with
+// every app off, PLAN-HUB round 2026-10-27: `a` stands for a hub of before, which kept them on).
 // In Spanish, the flows of FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS, each with its capture
 // `FIX-HUB-BASE-APP-ACTIVATION-<flow>-<width>`: «Activar» an app the business does not use (BASE-F18); «Desactivar»
 // Reservations names Tables, which came along only with it, and «Activar» brings both back, naming it (BASE-F19,
@@ -14,11 +15,12 @@
 // refuses with its own reason (BASE-F25, VERIFACTU-F32). That ticket is issued through Invoicing's API and deleted
 // after the run with its record (`cleanInvoices`), the numbering given back.
 // flow: BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
+import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, HUB_DIR, hostPage, login, psql, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
@@ -53,8 +55,12 @@ async function pushPhoto(plan: Record<string, unknown>): Promise<void> {
   expect(JSON.parse(answer)).toMatchObject({ applied: true, version });
 }
 
-/** `a` back on its baseline: no rows, every app on. */
-const baseline = () => psql("delete from base_appactivation where host = 'a'");
+/** The copy the run keeps of `a`'s rows with every app on (`seed_local_hubs`). */
+const ROWS = 'e2e_base_app_activation_rows';
+
+/** `a` back to every app on, its roots chosen: the rows `seed_local_hubs` wrote, kept at the start of the run. */
+const baseline = () =>
+  psql(`delete from base_appactivation where host = 'a'; insert into base_appactivation select * from ${ROWS}`);
 
 test.beforeAll(() => {
   hubId = psql("select id from base_hub where slug = 'a'");
@@ -68,6 +74,16 @@ test.beforeAll(() => {
       `create table ${BACKUP} as select id, state, state_version from base_hub where id = '${hubId}'`,
     ].join('; '),
   );
+  // Every app on in `a`, whatever a run before left: its rows cleared and written again by `seed_local_hubs` (this
+  // checkout's, on this run's database), then kept for `baseline`.
+  psql("delete from base_appactivation where host = 'a'");
+  execFileSync('uv', ['run', 'python', 'manage.py', 'seed_local_hubs'], {
+    cwd: HUB_DIR,
+    env: { ...process.env, DEBUG: 'True' },
+    encoding: 'utf8',
+  });
+  psql(`drop table if exists ${ROWS}; create table ${ROWS} as select * from base_appactivation where host = 'a'`);
+  expect(Number(psql(`select count(*) from ${ROWS}`)), 'seed_local_hubs wrote every app of a').toBeGreaterThan(0);
   snapshotSeries();
 });
 
@@ -79,6 +95,7 @@ test.afterAll(() => {
     [
       `update base_hub h set state = b.state, state_version = b.state_version from ${BACKUP} b where b.id = h.id`,
       `drop table ${BACKUP}`,
+      `drop table ${ROWS}`,
     ].join('; '),
   );
 });
@@ -222,8 +239,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         ...ids.map((id, index) => `('a', '${id}', 'on', ${index < 20 ? 'true' : 'false'})`),
         "('a', 'website', 'off', false)",
       ];
+      // In place of the rows `baseline` put back (every app on).
       psql(
-        'insert into base_appactivation (id, host, app, state, chosen, changed_at) ' +
+        "delete from base_appactivation where host = 'a'; " +
+          'insert into base_appactivation (id, host, app, state, chosen, changed_at) ' +
           `select gen_random_uuid(), v.host, v.app, v.state, v.chosen, now() from (values ${values.join(', ')}) as v(host, app, state, chosen)`,
       );
       await pushPhoto(GRATIS);
@@ -346,6 +365,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const { context, page } = await signedInSpanish(browser, viewport, '/apps');
     try {
       await search(page, 'Mesas');
+      const before = stored('table'); // on, brought along by Reservas (`baseline`)
+      expect(before).toBe('on:false');
       await testid(page, 'apps-row-table-toggle').click();
 
       // No question: it cannot go off. The notice says why and what to do, and stays past a toast's time.
@@ -356,7 +377,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.waitForTimeout(5_000); // longer than the 4.5 s of an error toast (hub#2594)
       await expect(refused).toBeVisible();
       await expect(appRow(page, 'table').locator('[data-testid="apps-state"]')).toHaveText('Activa');
-      expect(stored('table'), 'nothing written').toBe('none');
+      expect(stored('table'), 'nothing written').toBe(before);
       await snap(page, 'refused', width);
       await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F25-${width}`) });
       await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS-${width}`) });
@@ -402,6 +423,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       }
 
       await search(page, 'VeriFactu');
+      const before = [stored('verifactu'), stored('invoice')]; // VeriFactu chosen, Invoicing along with it (`baseline`)
+      expect(before).toEqual(['on:true', 'on:false']);
       await testid(page, 'apps-row-verifactu-toggle').click();
       const askOff = page.locator('.ep-confirm-dialog').last();
       await expect(askOff).toContainText('¿Desactivar VeriFactu?');
@@ -414,7 +437,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         /VeriFactu aún tiene (1 registro|\d+ registros) por enviar a la AEAT\. Espera a que se envíe?n? o arréglalos? antes de desactivarla\./,
       );
       await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Activa');
-      expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(['none', 'none']);
+      expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(before);
       expect(await menuApps(page)).toEqual(expect.arrayContaining(['VeriFactu', 'Facturación']));
       await snap(page, 'vetoed', width);
       await page.screenshot({ path: shot(`FIX-HUB-BASE-APP-ACTIVATION-BASE-F25-veto-${width}`) });

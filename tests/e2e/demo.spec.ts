@@ -1,6 +1,6 @@
 // The demo hubs end to end (plan docs/plans/2026-10-17-demo-hubs-fase-1.md §3 «e2e»; README «Demo»): the SaaS's
-// /demo/ → «Try the demo» → an empty `demo-<8 hex>` hub with the shell and the session «Demo», no account; something
-// real made in it; `manage.py demo_expire` ends it before its hour (the e2e's clock, as support's) → the host
+// /demo/ → «Try the demo» → an empty `demo-<8 hex>` hub with the shell and the session «Demo», no account, born with
+// every app off like any business (PLAN-HUB round 2026-10-27); the Demo app turned on and something real made in it; `manage.py demo_expire` ends it before its hour (the e2e's clock, as support's) → the host
 // answers 410 «This demo has ended», whose link takes the visitor to the SaaS's /demo/?state=expired, which
 // forgets the demo the session still held as live. Zero CSP violations on the hub's pages.
 //
@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { api, collectProblems, createViaPage, HUB_DIR, listReady, rowNames, SAAS, shot, shown, uniqueName } from './helpers';
+import { api, collectProblems, createViaPage, HUB_DIR, listReady, rowNames, SAAS, shot, shown, turnOn, uniqueName } from './helpers';
 import { STACK } from './stack';
 
 const DEMO_HOST = new RegExp(`^http://(demo-[0-9a-f]{8})\\.localhost:${STACK.hubPort}/`);
@@ -62,6 +62,12 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   expect(me.status).toBe(200);
   expect(me.data.user?.label).toBe('Demo');
   expect(Date.parse(me.data.demo?.expires_at ?? '')).toBeGreaterThan(Date.now());
+
+  // Born with every app off, as any business: the visitor turns on the app they try.
+  const apps = await api<{ apps: { id: string; state: string }[] }>(context, origin, 'GET', '/apps');
+  expect(apps.status).toBe(200);
+  expect(apps.data.apps.filter((app) => app.state !== 'off')).toEqual([]);
+  await turnOn(context, origin, 'demo');
 
   await page.goto(`${origin}/demo/items`);
   await listReady(page);
