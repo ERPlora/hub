@@ -738,3 +738,45 @@ def test_a_sale_line_without_its_rule_keeps_the_tax_of_its_territory(product, ch
     assert [entry.tax for entry in ticket.tax_breakdown] == [tax]
     record = Record.objects.get(invoice_id=ticket.id)
     assert re.findall(r"<sum1:Impuesto>(\d+)</sum1:Impuesto>", record.xml) == [code]
+
+
+def test_the_preview_counts_the_surcharge_in_its_tax_as_the_rectification_does(
+    issuer, shelf, charge
+):
+    # INVOICE-F08 asked to the assistant, on a ticket under the equivalence surcharge: the preview's tax carries the
+    # surcharge's quota too, and the rectification writes the figures it said.
+    root = TaxRule.objects.get(
+        category__key="product.generic", country_code="ES", parent__isnull=True
+    )
+    run(
+        "tax.rule.create",
+        {
+            "country_code": "ES",
+            "tax_category_key": "product.generic",
+            "rate_pct": "5.2",
+            "tax_type": "surcharge",
+            "parent_id": str(root.id),
+            "component_label": "Recargo de equivalencia",
+        },
+    )
+    sale = charge("inv-0032", [{"product": "SHA"}])
+    ticket = deliver("sale.sale.completed").invoice
+    entry = ticket.tax_breakdown[0]
+    assert entry.surcharge_quota > 0
+    seen = run(
+        "invoice.invoice.rectification_preview",
+        {"number": ticket.number, "reason": "Wrong price"},
+    )
+    assert (seen.base_amount, seen.tax_amount, seen.total_amount) == (
+        -entry.base,
+        -(entry.quota + entry.surcharge_quota),
+        -sale.total,
+    )
+    rect = run(
+        "invoice.invoice.rectify", {"number": ticket.number, "reason": "Wrong price"}
+    ).invoice
+    assert (rect.base_amount, rect.tax_amount, rect.total_amount) == (
+        seen.base_amount,
+        seen.tax_amount,
+        seen.total_amount,
+    )
