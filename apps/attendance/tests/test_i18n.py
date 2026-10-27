@@ -10,6 +10,7 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from live.operations import registry
 
 from apps.attendance import queries, schemas, services
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
@@ -89,7 +90,20 @@ def visible_texts() -> set[str]:
     for choices in (Record.Status, Record.Source):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {str(text) for text in lazies} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles attendance's operations give their input data (``gettext_noop``): the assistant's card names each
+    datum by them, so each one needs its Spanish. Only the ones attendance wrote: pydantic leaves ``title`` empty
+    otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "attendance"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():
