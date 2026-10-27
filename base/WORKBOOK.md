@@ -3010,9 +3010,10 @@ Implicados: ACCOUNTS-F38
   (en `BackgroundChrome.vue`, con `lib/report-problem.ts`), el `ReportProblemModal` de `@erplora/ui/components`
   sobre `FormModal`. Sale con `account_url` (la sesión abierta con la cuenta; `base/spa.py` ya no incrusta
   `report_url`). `base.support.report` (`base/services.py`, `database=False`: espera a erplora.com sin transacción
-  abierta) solo acepta una sesión abierta con la cuenta (`CREDENTIAL_SESSION_KEY`, que escribe `_log_in` como
-  `SessionOwner.credential`; una sesión anterior sin ella cuenta como de la cuenta, el `db_default` de
-  `SessionOwner`) y un usuario `saas:<id>`; si no, 403 `base.support_needs_account`. Firma v1 + v2 hacia
+  abierta) solo acepta una sesión abierta con la cuenta (`CREDENTIAL_SESSION_KEY` de `base/access.py`, que escribe
+  `_log_in` como `SessionOwner.credential`; una sesión sin ella no es de la cuenta, y el shell, `base/spa.py`, la
+  copia de `SessionOwner` al cargar, así que una sesión anterior al cambio sigue igual: la de la cuenta puede, la de
+  un turno con PIN no) y un usuario `saas:<id>`; si no, 403 `base.support_needs_account`. Firma v1 + v2 hacia
   `POST {SAAS_INTERNAL_URL}/internal/support/report` del SaaS (`accounts/internal.py`), que llama al mismo
   `send_support_report` que su panel (límite `SUPPORT_REPORT_RATELIMIT` por cuenta, «Reply-To» la cuenta, «From: Hub»
   y el negocio). Un 429 del SaaS es 429 `base.too_many_attempts`; caído, fuera de tiempo o cualquier otra respuesta,

@@ -72,6 +72,7 @@ from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
 from base import access, auth, blueprint, events, files, queries, registry, signing, system
+from base.access import CREDENTIAL_SESSION_KEY
 from base import assistant
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
@@ -172,10 +173,6 @@ logger = logging.getLogger(__name__)
 MODEL_BACKEND = "django.contrib.auth.backends.ModelBackend"
 #: The SaaS account the session belongs to (``SessionOwner`` is the index /internal/sessions/revoke reads).
 SAAS_USER_ID_SESSION_KEY = "saas_user_id"
-#: How the session was opened (``SessionOwner.Credential``), as ``SessionOwner`` notes it, so an operation that touches
-#: no database (``base.support.report``) knows it was opened with the account. A session opened before it was written
-#: has none: ``SessionOwner``'s own default, the account.
-CREDENTIAL_SESSION_KEY = "credential"
 #: Read-only group of ``platform_support`` in the Hub admin (the SaaS's ``support``). Phase 2
 #: replaces it with the ``StaffUser`` mark (PLAN §17).
 SUPPORT_GROUP = "support"
@@ -2764,10 +2761,12 @@ REPORT_BROWSER_MAX = 300
 
 def _reporting_account(ctx: OperationContext) -> str:
     """The erplora.com account behind this session, which support answers to: only a session opened with it on this
-    hub. A PIN or a badge on a shared till (gh:hub#2506), a demo's visitor or a call without a session has none."""
+    hub. A PIN or a badge on a shared till (gh:hub#2506), a demo's visitor or a call without a session has none, and
+    neither has a session that does not say how it was opened (``CREDENTIAL_SESSION_KEY``): never the account by
+    default."""
     request, user = ctx.request, ctx.actor
     username = user.get_username() if hasattr(user, "get_username") else ""
-    opened_with = request.session.get(CREDENTIAL_SESSION_KEY, SessionOwner.Credential.ACCOUNT) if request is not None else ""
+    opened_with = request.session.get(CREDENTIAL_SESSION_KEY) if request is not None else None
     if (
         not username.startswith(SAAS_USERNAME_PREFIX)
         or opened_with != SessionOwner.Credential.ACCOUNT

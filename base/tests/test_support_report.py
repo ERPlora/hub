@@ -12,9 +12,11 @@ import json
 
 import pytest
 
-from base import registry, signing
-from base.models import Membership
-from base.tests.conftest import SECRET
+from base import access, registry, signing
+from base.models import Membership, SessionOwner, TrustedDevice
+from base.services import CREDENTIAL_SESSION_KEY
+from base.tests.conftest import ANA, SECRET
+from base.tests.test_access_account import enter
 from base.tests.test_access_spa import a_device, enter_with_pin, with_pin
 
 pytestmark = pytest.mark.django_db
@@ -31,9 +33,34 @@ def _support(settings):
     settings.SUPPORT_EMAIL = "support@example.com"
 
 
+ACCOUNT_ID = "019a2b3c-0000-7000-8000-000000000042"
+
+
 @pytest.fixture
 def ana(make_user, saas, spa_manifest):
-    return make_user("saas:019a2b3c-0000-7000-8000-000000000042", host="a", role=Membership.Role.MANAGER, first_name="Ana")
+    return make_user(f"saas:{ACCOUNT_ID}", host="a", role=Membership.Role.MANAGER, first_name="Ana")
+
+
+@pytest.fixture
+def account(client, ana, fake_saas):
+    """Ana enters with her erplora.com account the real way, the SaaS's jump and its one-time code, on a tablet (which
+    makes it a shared device of the hub): ``_log_in`` keeps the session's credential in it. A test's own
+    ``fake_saas`` then answers the report."""
+    fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
+    assert enter(client).status_code == 302
+    return ana
+
+
+def load_the_shell(client) -> None:
+    """The SPA's HTML, which the user menu (and its «Report a problem») comes from."""
+    assert client.get("/", HTTP_HOST=HOST, HTTP_ACCEPT="text/html").status_code == 200
+
+
+def forget_the_credential(client) -> None:
+    """The session as one opened before ``_log_in`` kept its credential in it."""
+    session = client.session
+    del session[CREDENTIAL_SESSION_KEY]
+    session.save()
 
 
 def report(client, **body):
@@ -43,10 +70,9 @@ def report(client, **body):
 
 class TestSent:
     def test_it_reaches_erplora_com_signed_with_the_account_the_business_the_screen_and_the_browser(
-        self, client, ana, fake_saas
+        self, client, account, fake_saas
     ):
         saas = fake_saas(body=SENT)
-        client.force_login(ana)
 
         response = report(client, subject="  The printer stops  ", description=" It prints half a ticket.\n")
 
@@ -64,9 +90,8 @@ class TestSent:
             "description": "It prints half a ticket.",
         }
 
-    def test_the_call_is_signed_v1_and_v2_with_the_shared_secret(self, client, ana, fake_saas):
+    def test_the_call_is_signed_v1_and_v2_with_the_shared_secret(self, client, account, fake_saas):
         saas = fake_saas(body=SENT)
-        client.force_login(ana)
 
         report(client)
 
@@ -77,9 +102,8 @@ class TestSent:
         assert headers[signing.SIGNATURE_HEADER] == signing.sign(body, timestamp, SECRET)
         assert headers[signing.SIGNATURE_V2_HEADER] == signing.sign_v2("POST", SAAS_PATH, body, timestamp, SECRET)
 
-    def test_without_a_screen_it_says_none(self, client, ana, fake_saas):
+    def test_without_a_screen_it_says_none(self, client, account, fake_saas):
         saas = fake_saas(body=SENT)
-        client.force_login(ana)
 
         report(client, page=None)
 
@@ -100,19 +124,69 @@ class TestOnlyWithTheAccount:
         assert response.json()["error"]["code"] == "base.support_needs_account"
         assert saas.calls == []
 
-    def test_a_session_opened_with_the_account_on_a_till_can(self, client, ana, fake_saas):
-        # The way in, not the device: the owner who entered with her erplora.com account on a shared till.
+    def test_a_pin_session_opened_before_the_session_kept_its_credential_cannot_report(
+        self, client, ana, make_user, fake_saas
+    ):
+        # A PIN session of a shift opened before the deploy has no credential in the session; its SessionOwner says PIN.
+        # Without the key it is no account's: never the account's by default.
         saas = fake_saas(body=SENT)
+        bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
         a_device(client)
-        client.force_login(ana)
+        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        forget_the_credential(client)
+        assert SessionOwner.objects.get(session_id=client.session.session_key).credential == SessionOwner.Credential.PIN
+
+        response = report(client)
+
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "base.support_needs_account"
+        assert saas.calls == []
+
+    def test_a_session_opened_with_the_account_on_a_till_can(self, client, account, fake_saas):
+        # The way in, not the device: she entered with her erplora.com account on a shared device of the hub.
+        saas = fake_saas(body=SENT)
+        owner = SessionOwner.objects.get(session_id=client.session.session_key)
+        assert owner.credential == SessionOwner.Credential.ACCOUNT
+        assert TrustedDevice.objects.get(pk=owner.device_id).mode == access.SHARED
 
         assert report(client).status_code == 200
         assert len(saas.calls) == 1
+
+    def test_an_account_session_from_before_gets_its_credential_back_once_the_shell_loads(self, client, account, fake_saas):
+        # The user menu only exists once the shell loaded: the shell writes in the session what SessionOwner says, so
+        # the menu and the operation say the same.
+        saas = fake_saas(body=SENT)
+        forget_the_credential(client)
+        assert report(client).status_code == 403
+
+        load_the_shell(client)
+
+        assert client.session[CREDENTIAL_SESSION_KEY] == SessionOwner.Credential.ACCOUNT
+        assert report(client).status_code == 200
+        assert len(saas.calls) == 1
+
+    def test_a_pin_session_from_before_stays_refused_once_the_shell_loads(self, client, ana, make_user, fake_saas):
+        saas = fake_saas(body=SENT)
+        bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
+        a_device(client)
+        enter_with_pin(client, with_pin(bea, "9071"), "9071")
+        forget_the_credential(client)
+
+        load_the_shell(client)
+
+        assert client.session[CREDENTIAL_SESSION_KEY] == SessionOwner.Credential.PIN
+        response = report(client)
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "base.support_needs_account"
+        assert saas.calls == []
 
     def test_a_person_who_is_no_erplora_com_account_cannot(self, client, make_user, saas, spa_manifest, fake_saas):
         # A demo's visitor (``demo:<slug>``) or any local copy without an account behind it.
         fake = fake_saas(body=SENT)
         client.force_login(make_user("demo:a", host="a", role=Membership.Role.OWNER))
+        # Its shell says it entered with no PIN (a demo has no SessionOwner): only the missing account stops it.
+        load_the_shell(client)
+        assert client.session[CREDENTIAL_SESSION_KEY] == SessionOwner.Credential.ACCOUNT
 
         response = report(client)
 
@@ -137,9 +211,8 @@ class TestRefused:
             ({"description": "x" * 5001}, "description"),
         ],
     )
-    def test_what_is_missing_or_too_long_is_a_422_on_its_field_and_nothing_leaves(self, client, ana, fake_saas, body, field):
+    def test_what_is_missing_or_too_long_is_a_422_on_its_field_and_nothing_leaves(self, client, account, fake_saas, body, field):
         saas = fake_saas(body=SENT)
-        client.force_login(ana)
 
         response = report(client, **body)
 
@@ -147,9 +220,8 @@ class TestRefused:
         assert field in response.json()["error"]["fields"]
         assert saas.calls == []
 
-    def test_erplora_com_s_limit_is_said_as_too_many_attempts(self, client, ana, fake_saas):
+    def test_erplora_com_s_limit_is_said_as_too_many_attempts(self, client, account, fake_saas):
         fake_saas(status=429, body={"error": {"code": "accounts.too_many_attempts", "message": "Too many attempts."}})
-        client.force_login(ana)
 
         response = report(client)
 
@@ -171,10 +243,9 @@ class TestRefused:
         ],
     )
     def test_erplora_com_out_of_reach_or_refusing_is_said_with_the_address_to_write_to(
-        self, client, ana, fake_saas, caplog, answer
+        self, client, account, fake_saas, caplog, answer
     ):
         fake_saas(**answer)
-        client.force_login(ana)
 
         response = report(client)
 
@@ -184,26 +255,20 @@ class TestRefused:
         assert "support@example.com" in error["message"]
         assert "base.support_report_not_sent" in caplog.text
 
-    def test_the_text_is_never_logged(self, client, ana, fake_saas, caplog):
+    def test_the_text_is_never_logged(self, client, account, fake_saas, caplog):
         fake_saas(raises=ConnectionRefusedError("refused"))
-        client.force_login(ana)
         caplog.set_level("INFO")
 
         report(client, description="My card is 4242 4242 4242 4242")
 
         assert "4242" not in caplog.text
 
-    def test_the_messages_speak_spanish_to_a_spanish_person(self, client, ana, fake_saas):
+    def test_the_messages_speak_spanish_to_a_spanish_person(self, client, account, fake_saas, settings):
         fake_saas(raises=ConnectionRefusedError("refused"))
-        client.force_login(ana)
+        # Her language in this browser (the cookie entering left, here in English, as she would change it).
+        client.cookies[settings.LANGUAGE_COOKIE_NAME] = "es"
 
-        response = client.post(
-            URL,
-            json.dumps({"subject": "S", "description": "D"}),
-            content_type="application/json",
-            HTTP_HOST=HOST,
-            HTTP_ACCEPT_LANGUAGE="es",
-        )
+        response = client.post(URL, json.dumps({"subject": "S", "description": "D"}), content_type="application/json", HTTP_HOST=HOST)
 
         assert response.json()["error"]["message"] == (
             "No hemos podido enviar tu informe. Escríbenos directamente a support@example.com."

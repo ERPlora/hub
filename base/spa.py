@@ -34,6 +34,7 @@ from live.ninja import run_operation_sync
 from live.spa import render_spa, spa_path_pattern
 
 from base import public_home, queries
+from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models import SessionOwner
 
@@ -81,6 +82,9 @@ def _shell(request: HttpRequest) -> HttpResponse:
     hub = getattr(request, "hub", None)
     if hub is not None and request.user.is_authenticated:
         way_in = queries.shell_access(request, hub.slug)
+        # A session opened before the login kept its credential in it: the shell copies what SessionOwner says, so the
+        # user menu's «Report a problem» (only for the account) and its operation (BASE-F108) say the same.
+        request.session.setdefault(CREDENTIAL_SESSION_KEY, way_in["credential"])
         # erplora.com's pages only for a session opened with the account: on a shared till, the browser's erplora.com
         # session is whoever made it a device of the hub, never the person who entered with a PIN (gh:hub#2506).
         account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
