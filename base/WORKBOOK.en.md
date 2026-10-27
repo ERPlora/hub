@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a6a347be7750fcb121cd12e855947196eea06f99fc7e865bee80f8c30831ec1a -->
+<!-- generated from WORKBOOK.md sha256:efd1cb1e29d651c8f6e164dbee97599e9467e275403c62d3e4a8119fdfb62a9b -->
 
 ## What it is for and who it is for
 
@@ -2238,13 +2238,14 @@ Steps:
      in cents), a yes or a no as "Yes" or "No" and a list by how many items it carries. Everything shows in the
      person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the same one its
      app calls it by, never a technical name. An action of the platform itself is named by the screen where it is
-     done, for example "Change in Settings" or "Delete in Files".
+     done, for example "Change in Settings" or "Delete in Files". Each action shows with its own verb, never a
+     generic one: rectifying an invoice says "Rectify in Invoicing".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
-  5. Under the answer stays the receipt of each action of the turn: "Done: Create in Services", or "Not done,
-     cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …".
+  5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
+     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …".
 In: the action, its data and its risk, as its app declares them; the business's currency.
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads

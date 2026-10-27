@@ -30,10 +30,18 @@ function card(fields: Partial<AssistantCard> = {}): AssistantCard {
 }
 
 describe('the action', () => {
-  it('is named by its verb, never by the operation', () => {
+  it('is named by its own verb, never by the operation', () => {
     expect(actionKey('create')).toBe('base.assistant.card.actions.create');
-    expect(actionKey('bulk_delete')).toBe('base.assistant.card.actions.delete');
-    expect(actionKey('settle')).toBe('base.assistant.card.actions.other');
+    expect(actionKey('bulk_delete')).toBe('base.assistant.card.actions.bulk_delete');
+    // FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: these were «Do this» (a closed list of 24 verbs);
+    // every action the assistant may run now has its own (guardrail: base/tests/test_assistant.py).
+    expect(actionKey('rectify')).toBe('base.assistant.card.actions.rectify');
+    expect(actionKey('settle')).toBe('base.assistant.card.actions.settle');
+  });
+
+  it('only one no catalogue names is «Do this»', () => {
+    expect(actionKey('frobnicate')).toBe('base.assistant.card.actions.other');
+    expect(actionKey('toString')).toBe('base.assistant.card.actions.other');
   });
 });
 
