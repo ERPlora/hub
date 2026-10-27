@@ -25,6 +25,11 @@ ROUTES = {
     ("POST", "/invoice/invoices/from_sale", "invoice.invoice.create_from_sale"),
     ("POST", "/invoice/invoices/substitute", "invoice.invoice.substitute"),
     ("POST", "/invoice/invoices/mark_paid", "invoice.invoice.mark_paid"),
+    (
+        "GET",
+        "/invoice/invoices/rectification_preview",
+        "invoice.invoice.rectification_preview",
+    ),
     ("POST", "/invoice/invoices/rectify", "invoice.invoice.rectify"),
     (
         "POST",
@@ -139,6 +144,16 @@ def test_the_owner_sets_up_the_issuer_and_issues_by_hand(admin_client):
     assert detail.json()["lines"][0]["description"] == "Course"
     document = get(admin_client, "/invoice/invoices/document", number=body["number"])
     assert body["number"] in document.json()["html"]
+    # The rectification it would issue, read before issuing it (INVOICE-F08): nothing is written.
+    seen = get(
+        admin_client,
+        "/invoice/invoices/rectification_preview",
+        number=body["number"],
+        reason="Wrong price",
+    )
+    assert seen.status_code == 200
+    assert (seen.json()["original"]["number"], seen.json()["total_amount"]) == (body["number"], -12100)
+    assert get(admin_client, "/invoice/invoices/detail", number=body["number"]).json()["status"] == "issued"
 
 
 @pytest.mark.django_db
@@ -157,6 +172,8 @@ def test_an_employee_reads_issues_and_pays_but_neither_rectifies_nor_keeps_serie
         ]
         == "paid"
     )
+    preview = get(employee_client, "/invoice/invoices/rectification_preview", number=number, reason="x")
+    assert (preview.status_code, preview.json()["error"]["code"]) == (403, "permission_denied")
     for path, data in (
         ("/invoice/invoices/rectify", {"number": number, "reason": "x"}),
         ("/invoice/series", {"code": "A", "invoice_type": "F1", "year": 2026}),

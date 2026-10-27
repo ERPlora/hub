@@ -15,6 +15,13 @@ INVOICE = [
     "invoice.invoice.paid",
 ]
 SERIES = ["invoice.series.created", "invoice.series.updated", "invoice.invoice.issued"]
+# The rectification's preview: what is left of the invoice and the next number of the rectifying series (INVOICE-F08).
+PREVIEW = [
+    "invoice.invoice.issued",
+    "invoice.invoice.rectified",
+    "invoice.series.created",
+    "invoice.series.updated",
+]
 # What a typed line starts with follows the business's territory and Taxes' rules (TAX-F11).
 TAX_RULES = [
     "tax.rule.created",
@@ -43,6 +50,7 @@ def test_each_query_and_its_events():
         "invoice.invoice.get": INVOICE,
         "invoice.invoice.by_source": INVOICE,
         "invoice.invoice.document": INVOICE,
+        "invoice.invoice.rectification_preview": PREVIEW,
         "invoice.invoice.line_defaults": TAX_RULES,
         "invoice.series.list": SERIES,
         "invoice.series.peek_next": SERIES,

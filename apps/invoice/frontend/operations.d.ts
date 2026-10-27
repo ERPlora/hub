@@ -217,10 +217,39 @@ export interface FromSaleIn extends BySourceIn {
 
 export interface SubstituteIn extends InvoiceRefIn, RecipientIn {}
 
-export interface RectifyIn extends InvoiceRefIn {
+export interface RectificationPreviewIn extends InvoiceRefIn {
   reason: string;
   rectification_type?: RectificationType;
+}
+
+export interface RectifyIn extends RectificationPreviewIn {
   issue_date?: string;
+}
+
+/** The rectifying invoice a rectification would issue now, before it is issued (INVOICE-F08): its number is the
+ *  series' next one, not reserved. */
+export interface RectificationPreviewOut {
+  original: {
+    invoice_id: string;
+    number: string;
+    invoice_type: string;
+    issue_date: string;
+    customer_name: string;
+    total_amount: number;
+    remaining: number;
+  };
+  invoice_type: string;
+  reason: string;
+  series_code: string;
+  next_number: string;
+  issue_date: string;
+  whole: boolean;
+  base_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  currency: string;
+  currency_decimals: number;
+  lines: { description: string; quantity: string; tax_rate: string; base_amount: number; total_amount: number }[];
 }
 
 export interface FromRefundIn {
@@ -395,6 +424,7 @@ declare module '@erplora/ui/sdk' {
     'invoice.invoice.create_from_sale': { input: FromSaleIn; output: IssueOut };
     'invoice.invoice.substitute': { input: SubstituteIn; output: IssueOut };
     'invoice.invoice.mark_paid': { input: MarkPaidIn; output: InvoiceOut };
+    'invoice.invoice.rectification_preview': { input: RectificationPreviewIn; output: RectificationPreviewOut };
     'invoice.invoice.rectify': { input: RectifyIn; output: IssueOut };
     'invoice.invoice.rectify_from_refund': { input: FromRefundIn; output: IssueOut };
     'invoice.invoice.rectify_from_void': { input: FromVoidIn; output: IssueOut };

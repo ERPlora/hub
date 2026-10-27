@@ -2,7 +2,8 @@
 
 A document changes when one is issued, rectified (its status, what is left) or paid; a series and its next
 number change when one is created, updated or numbers a document; the book and the gaps, when a document is
-issued; the issuer, when it is saved or received; what a typed line starts with, when the business's territory or
+issued; a rectification's preview, when a document is issued or rectified or a series changes; the issuer, when
+it is saved or received; what a typed line starts with, when the business's territory or
 a rule of Taxes changes.
 """
 
@@ -15,6 +16,11 @@ live("invoice.invoice.list", on=E.INVOICE_EVENTS)
 live("invoice.invoice.get", on=E.INVOICE_EVENTS)
 live("invoice.invoice.by_source", on=E.INVOICE_EVENTS)
 live("invoice.invoice.document", on=E.INVOICE_EVENTS)
+# The rectification's preview: what is left of the invoice and the next number of the rectifying series (INVOICE-F08).
+live(
+    "invoice.invoice.rectification_preview",
+    on=[E.INVOICE_ISSUED, E.INVOICE_RECTIFIED, E.SERIES_CREATED, E.SERIES_UPDATED],
+)
 # What a typed line starts with follows the business's territory and Taxes' rules (TAX-F11).
 live("invoice.invoice.line_defaults", on=RULE_EVENTS)
 live("invoice.series.list", on=E.SERIES_EVENTS)

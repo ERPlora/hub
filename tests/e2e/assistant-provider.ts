@@ -11,6 +11,10 @@
 // - `E2E-CLOSE-CASH <cents>`: closes the drawer as CASH_REGISTER-F09 asks — reads the close's summary
 //   (`cash_register.session.closing_summary`) with that count, then says it (`closeCashSummary`) and, in the same answer,
 //   asks for the dangerous write `cash_register.session.close` of the session it named, then says how it went;
+// - `E2E-RECTIFY <number> … porque <reason>`: rectifies that invoice as INVOICE-F08 asks — reads the rectification's
+//   preview (`invoice.invoice.rectification_preview`) with that reason, then says it (`rectifyPreview`) and, in the same
+//   answer, asks for the dangerous write `invoice.invoice.rectify` of the invoice it named; a preview refused, it says
+//   why and asks for nothing;
 // - `E2E-CLAIM`: says it created something without running anything;
 // - `E2E-DOWN`: the provider fails (500);
 // - `E2E-SLOW`: a long answer, piece by piece, to stop it half-way;
@@ -79,6 +83,38 @@ export function closeCashSummary(summary: CloseCashSummary): string {
   return lines.join('\n');
 }
 
+/** The rectification's preview as the Hub's `invoice.invoice.rectification_preview` answers it (what the model says). */
+export interface RectificationPreview {
+  original: { number: string; issue_date: string; customer_name: string; total_amount: number; remaining: number };
+  invoice_type: string;
+  reason: string;
+  series_code: string;
+  next_number: string;
+  issue_date: string;
+  whole: boolean;
+  base_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  lines: { description: string; quantity: string; total_amount: number }[];
+}
+
+const day = (iso: string) => iso.split('-').reverse().join('/');
+
+/** What the model says of the rectification's preview before its card: the invoice it rectifies, the rectifying invoice
+ *  that would be born (its number as the series' next one, never as reserved) and what was left of the original. */
+export function rectifyPreview(preview: RectificationPreview): string {
+  const original = preview.original;
+  const whom = original.customer_name ? ` (${original.customer_name})` : '';
+  const lines = [`Vas a rectificar la factura **${original.number}** del ${day(original.issue_date)}${whom} con esta rectificativa:`, ''];
+  lines.push(`- Tipo: ${preview.invoice_type}`, `- Motivo: ${preview.reason}`);
+  lines.push(`- Número: ${preview.next_number} (el siguiente de la serie ${preview.series_code}; se asigna al emitirla)`);
+  lines.push(`- Fecha: ${day(preview.issue_date)}`);
+  if (!preview.whole) lines.push(`- Rectifica lo que queda: ${euros(original.remaining)} de ${euros(original.total_amount)}`);
+  for (const line of preview.lines) lines.push(`- ${line.description} × ${Number(line.quantity)}: ${euros(line.total_amount)}`);
+  lines.push(`- Base: ${euros(preview.base_amount)}`, `- Impuestos: ${euros(preview.tax_amount)}`, `- Total: ${euros(preview.total_amount)}`);
+  return lines.join('\n');
+}
+
 type Message = { role: string; content?: unknown; tool_calls?: { function?: { name?: string } }[] };
 
 function textOf(content: unknown): string {
@@ -135,6 +171,22 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
         return call('cash_register__session__close', { session: summary.number, closing_balance: counted }, closeCashSummary(summary));
       }
     }
+  }
+  const rectify = /E2E-RECTIFY (\S+)(?:.*?porque (.+))?$/m.exec(question);
+  if (rectify) {
+    const reason = rectify[2]?.trim() || 'error en la factura';
+    // The results of this request only: a conversation may have rectified (or cancelled) before.
+    const asked = messages.findLastIndex((message) => message.role === 'user');
+    const results = messages.slice(asked + 1).filter((message) => message.role === 'tool');
+    if (results.length === 0) return call('invoice__invoice__rectification_preview', { number: rectify[1], reason });
+    if (results.length === 1) {
+      const preview = JSON.parse(textOf(results[0].content)) as RectificationPreview & { error?: { message?: string } };
+      if (preview.error) return text(`No se puede rectificar: ${preview.error.message ?? ''}`);
+      return call('invoice__invoice__rectify', { number: preview.original.number, reason }, rectifyPreview(preview));
+    }
+    // The rectification's own result names the original, now «cancelled»: only an error is a refusal.
+    const outcome = JSON.parse(textOf(results.at(-1)!.content) || '{}') as { error?: unknown };
+    return text(outcome.error ? 'No lo he hecho.' : 'Hecho.');
   }
   if (last?.role === 'tool') {
     const result = textOf(last.content);

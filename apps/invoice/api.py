@@ -22,6 +22,7 @@ from apps.invoice.schemas import (
     InvoiceListIn,
     IssuerIn,
     MarkPaidIn,
+    RectificationPreviewIn,
     RectifyIn,
     SeriesCreateIn,
     SeriesListIn,
@@ -84,6 +85,17 @@ async def invoice_substitute(request, data: SubstituteIn):
 @bind(router, "invoice.invoice.mark_paid", "/invoice/invoices/mark_paid")
 async def invoice_mark_paid(request, data: MarkPaidIn):
     return await run_operation(request, services.mark_paid, data)
+
+
+@bind(
+    router,
+    "invoice.invoice.rectification_preview",
+    "/invoice/invoices/rectification_preview",
+)
+async def invoice_rectification_preview(
+    request, params: Query[RectificationPreviewIn]
+):
+    return await run_operation(request, queries.rectification_preview, params)
 
 
 @bind(router, "invoice.invoice.rectify", "/invoice/invoices/rectify")

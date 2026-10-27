@@ -6,7 +6,7 @@ import { request } from 'node:http';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { answerTo, CLAIM_ANSWER, closeCashSummary, DICTATION, FORMAT_ANSWER, GREETING, type Provider, startProvider } from './assistant-provider';
+import { answerTo, CLAIM_ANSWER, closeCashSummary, DICTATION, FORMAT_ANSWER, GREETING, type Provider, rectifyPreview, startProvider } from './assistant-provider';
 
 type Frame = { choices: { delta: { content?: string; tool_calls?: { function: { name?: string; arguments?: string } }[] }; finish_reason: string | null }[] };
 
@@ -121,6 +121,85 @@ describe('answerTo', () => {
     expect(pending).toContain('- Comandas sin servir: 1 (Terraza 2)');
     expect(pending).toContain('- Impresiones sin salir: 3');
     expect(pending).toContain('- No se ha podido comprobar todo lo pendiente.');
+  });
+
+  it('rectifying an invoice (INVOICE-F08): the preview first, then its words and the rectification of that invoice, then the outcome', () => {
+    const question = user('E2E-RECTIFY FACT-2026-000003 rectifica la factura FACT-2026-000003 porque el precio estaba mal');
+    const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
+    expect(toolOf(answerTo([question]).frames)).toEqual({
+      name: 'invoice__invoice__rectification_preview',
+      arguments: '{"number":"FACT-2026-000003","reason":"el precio estaba mal"}',
+    });
+    const preview = {
+      original: { number: 'FACT-2026-000003', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
+      invoice_type: 'R1',
+      reason: 'el precio estaba mal',
+      series_code: 'RECT',
+      next_number: 'RECT-2026-000001',
+      issue_date: '2026-10-27',
+      whole: true,
+      base_amount: -10000,
+      tax_amount: -2100,
+      total_amount: -12100,
+      lines: [{ description: 'Corte', quantity: '-1.000', tax_rate: '21.00', base_amount: -10000, total_amount: -12100 }],
+    };
+    const read = [question, asked('invoice__invoice__rectification_preview'), { role: 'tool', content: JSON.stringify(preview) }];
+    const rectify = answerTo(read);
+    // The preview is said before the card, in the same answer that asks to rectify exactly the invoice it named.
+    expect(textOf(rectify.frames)).toBe(rectifyPreview(preview));
+    expect(toolOf(rectify.frames)).toEqual({
+      name: 'invoice__invoice__rectify',
+      arguments: '{"number":"FACT-2026-000003","reason":"el precio estaba mal"}',
+    });
+    expect(finish(rectify.frames)).toEqual(['tool_calls']);
+    // Issued: its result names the original, now cancelled — that is the rectification done, not a refusal.
+    const issued = { issued: true, invoice: { number: 'RECT-2026-000001', status: 'issued', rectifies: { number: 'FACT-2026-000003', status: 'cancelled' } } };
+    const done = [...read, asked('invoice__invoice__rectify'), { role: 'tool', content: JSON.stringify(issued) }];
+    expect(textOf(answerTo(done).frames)).toBe('Hecho.');
+    const notConfirmed = [...read, asked('invoice__invoice__rectify'), { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed"}}' }];
+    expect(textOf(answerTo(notConfirmed).frames)).toBe('No lo he hecho.');
+    // Asked again in the same conversation (after a «Cancel»): the preview again, read now.
+    const again = [...done, { role: 'assistant', content: 'Hecho.' }, question];
+    expect(toolOf(answerTo(again).frames).name).toBe('invoice__invoice__rectification_preview');
+    // A preview refused (a rectifying invoice, a cancelled one, a replaced ticket): it says why, and asks for nothing.
+    const why = 'Una rectificativa no se puede rectificar.';
+    const refused = [question, asked('invoice__invoice__rectification_preview'), { role: 'tool', content: JSON.stringify({ error: { code: 'invoice.cannot_rectify_rectification', message: why } }) }];
+    expect(toolOf(answerTo(refused).frames).name).toBe('');
+    expect(textOf(answerTo(refused).frames)).toBe(`No se puede rectificar: ${why}`);
+  });
+
+  it('the rectification preview as the model says it: the original, the type, the reason, the next number, the amounts and what was left', () => {
+    const whole = {
+      original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
+      invoice_type: 'R1',
+      reason: 'el precio estaba mal',
+      series_code: 'RECT',
+      next_number: 'RECT-2026-000001',
+      issue_date: '2026-10-27',
+      whole: true,
+      base_amount: -10000,
+      tax_amount: -2100,
+      total_amount: -12100,
+      lines: [{ description: 'Corte', quantity: '-1.000', tax_rate: '21.00', base_amount: -10000, total_amount: -12100 }],
+    };
+    expect(rectifyPreview(whole)).toBe(
+      [
+        'Vas a rectificar la factura **F-1** del 26/10/2026 (Talleres Pérez SL) con esta rectificativa:',
+        '',
+        '- Tipo: R1',
+        '- Motivo: el precio estaba mal',
+        '- Número: RECT-2026-000001 (el siguiente de la serie RECT; se asigna al emitirla)',
+        '- Fecha: 27/10/2026',
+        '- Corte × -1: -121.00 €',
+        '- Base: -100.00 €',
+        '- Impuestos: -21.00 €',
+        '- Total: -121.00 €',
+      ].join('\n'),
+    );
+    const left = rectifyPreview({ ...whole, invoice_type: 'R5', whole: false, original: { ...whole.original, customer_name: '', remaining: 11100 }, total_amount: -11100 });
+    expect(left).toContain('Vas a rectificar la factura **F-1** del 26/10/2026 con esta rectificativa:');
+    expect(left).toContain('- Tipo: R5');
+    expect(left).toContain('- Rectifica lo que queda: 111.00 € de 121.00 €');
   });
 
   it('reads the question from a message with attachments', () => {
