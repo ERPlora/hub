@@ -1142,6 +1142,7 @@
       },
       "voice": {
         "denied": "El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.",
+        "deniedInApp": "El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para dictar.",
         "failed": "No se ha podido transcribir el audio. Inténtalo de nuevo.",
         "tooLong": "La grabación es demasiado larga: dicta un mensaje más corto.",
         "empty": "No se ha oído nada. Inténtalo de nuevo más cerca del micrófono."

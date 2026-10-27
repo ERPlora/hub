@@ -1142,6 +1142,7 @@
       },
       "voice": {
         "denied": "Microphone access is blocked. Allow it in your browser to dictate.",
+        "deniedInApp": "Microphone access is blocked. Allow it in your device settings to dictate.",
         "failed": "The audio could not be transcribed. Try again.",
         "tooLong": "The recording is too long: dictate a shorter message.",
         "empty": "Nothing was heard. Try again closer to the microphone."
