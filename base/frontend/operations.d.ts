@@ -197,7 +197,8 @@ export interface BlueprintDataset extends BlueprintPart {
 }
 
 export interface BlueprintAppSummary extends BlueprintApp {
-  status: 'on' | 'inactive' | 'unknown';
+  /** «turns_on»: off here, the load turns it on first and then loads it (round 2026-10-27); «inactive»: left off. */
+  status: 'on' | 'turns_on' | 'inactive' | 'unknown';
   datasets: BlueprintDataset[];
 }
 
@@ -227,6 +228,8 @@ export interface DatasetLoad extends BlueprintPart {
 
 export interface AppLoad extends BlueprintApp {
   status: AppLoadStatus;
+  /** Why an app of the blueprint that was off could not be turned on («inactive»), in words; empty otherwise. */
+  reason?: string;
   datasets: DatasetLoad[];
 }
 

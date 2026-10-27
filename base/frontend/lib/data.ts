@@ -214,9 +214,12 @@ export const RETRY_BLOCKED_KEY: Record<Exclude<RetryBlocked, ''>, string> = {
   undone: 'base.data.retry.blocked.undone',
 };
 
-/** The apps of a report that did not go in (failed or in part), by name. */
+/** The apps of a report that did not go in (failed, in part, or off because the load could not turn them on and
+ * says why), by name. */
 export function unloaded(report: LoadReport): string[] {
-  return report.apps.filter((app) => app.status === 'failed' || app.status === 'partial').map((app) => app.label);
+  return report.apps
+    .filter((app) => app.status === 'failed' || app.status === 'partial' || (app.status === 'inactive' && !!app.reason))
+    .map((app) => app.label);
 }
 
 // ── The Home's templates card (BASE-G131, BASE-F02) ──────────────────────────────────────────────────────────────
