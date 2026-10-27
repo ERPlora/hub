@@ -44,6 +44,7 @@ from apps.printing.queries import (
     MAX_ATTEMPTS,
     active_devices,
     actor,
+    business_currency,
     cancellable,
     current_settings,
     device_row,
@@ -128,8 +129,6 @@ NOT_ACTIVE_PRINTERS = _("Choose active printers of this business.")
 DEVICE_NUMBER = _("Device %(number)s")
 TEST_PAGE = _("Test page")
 
-#: The amounts' currency when the caller does not say (the one Sales charges in until the Hub keeps its own).
-DEFAULT_CURRENCY = "EUR"
 #: Documents whose copies after the first are duplicates, never a second original (RD 1619/2012 art. 14.4).
 FISCAL_PAPERS = ("receipt", "invoice")
 
@@ -403,13 +402,14 @@ def _given_printer(ref: str, paper: str) -> Printer:
 
 def _stamped(ctx: OperationContext, data: JobCreateIn) -> dict:
     """The document with the envelope the paper needs when the caller left it out: its language (the
-    caller's) and, but on a generic document (which prints every key), its money scale (hub#1159, #2129)."""
+    caller's) and, but on a generic document (which prints every key), its money scale: the decimals of the
+    caller's currency or, when it does not say, of the business's (hub#1159, #2129)."""
     document = dict(data.document)
     if data.format != PrintJob.Format.RECEIPT:
         return document
     document.setdefault("locale", ctx.language)
-    if data.document_type != "generic":
-        document.setdefault("decimals", get_currency_precision(data.currency or DEFAULT_CURRENCY))
+    if data.document_type != "generic" and "decimals" not in document:
+        document["decimals"] = get_currency_precision(data.currency or business_currency(ctx))
     return document
 
 
