@@ -79,7 +79,7 @@ async function signOutOfTheBusiness(): Promise<number> {
   return (await landed).status();
 }
 
-test('BASE-F61: «Sign out» on a personal device lands on erplora.com’s question, never a 404; «Stay signed in» keeps its session', async () => {
+test('BASE-F61: «Sign out» on a personal device lands on erplora.com’s question, never a 404; «Stay signed in» keeps its session', async ({ browser }) => {
   await login(page, origin, '/', credentials);
   expect(await signOutOfTheBusiness()).toBe(200);
   await expect(page).toHaveURL(SIGN_OUT_PAGE);
@@ -92,15 +92,19 @@ test('BASE-F61: «Sign out» on a personal device lands on erplora.com’s quest
   await expect(question.getByTestId('sign-out-stay')).toHaveText('Stay signed in');
   // The business's session is over already: its API knows nobody in this browser.
   expect((await api<{ user: unknown }>(context, origin, 'GET', '/me')).data.user).toBeNull();
+  // Each capture in a browser of its own size with this session, the question loaded there (opening it closes nothing):
+  // a capture right after `setViewportSize` sometimes painted the header a second time at the foot (390 and 834, either
+  // with `fullPage` or not), though the page had one header at the top; a page loaded at its size never did.
+  const signedIn = await context.storageState();
   for (const size of SIZES) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await expect(shown(page).getByTestId('sign-out-confirm')).toBeVisible();
-    await untilStill(page);
-    // The viewport, not `fullPage`: an Ionic page never scrolls its document (its `ion-content` does), and a full-page
-    // capture right after a resize caught the header a second time at the foot.
-    await page.screenshot({ path: shot(`${KEY}-${size.name}`) });
+    const sized = await browser.newContext({ locale: 'en-US', viewport: { width: size.width, height: size.height }, storageState: signedIn });
+    const atSize = await sized.newPage();
+    await atSize.goto(SIGN_OUT_PAGE);
+    await expect(shown(atSize).getByTestId('sign-out-confirm')).toBeVisible();
+    await untilStill(atSize);
+    await atSize.screenshot({ path: shot(`${KEY}-${size.name}`) });
+    await sized.close();
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
 
   await shown(page).getByTestId('sign-out-stay').click();
   await expect(page).toHaveURL(LAUNCHER);
