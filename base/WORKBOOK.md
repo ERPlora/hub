@@ -2285,9 +2285,9 @@ Pasos:
      sale sobre el cuadro con su nombre y su × «Quitar adjunto».
   2. Se envían con el siguiente mensaje, con texto o sin él, y en la burbuja de la persona quedan con su nombre.
      Viajan una sola vez, con esa pregunta: después la conversación solo recuerda cómo se llamaban.
-  3. Para dictar, pulsa «Dictar por voz» (solo sale si el dispositivo puede grabar). El navegador pide permiso para
-     el micrófono. Mientras graba, el botón se pone rojo y se llama «Detener la grabación»; a los dos minutos para
-     solo.
+  3. Para dictar, pulsa «Dictar por voz» (solo sale si el dispositivo puede grabar). El navegador (en la app
+     instalada, el dispositivo) pide permiso para el micrófono. Mientras graba, el botón se pone rojo y se llama
+     «Detener la grabación»; a los dos minutos para solo.
   4. Al parar sale «Transcribiendo…» y el texto cae en el cuadro, detrás de lo que hubiera escrito. **No se envía
      solo**: la persona lo revisa y pulsa «Enviar», y lo que pida pasa por su tarjeta como cualquier otra petición
      (BASE-F97).
@@ -2297,9 +2297,11 @@ transcripción de erplora.com. El navegador nunca habla directamente con erplora
 Si falla: en una línea sobre el cuadro, y el archivo no se adjunta: «menu.pdf es demasiado grande: 8 MB como mucho
 por archivo.», «Los archivos de una pregunta suman 20 MB como mucho.», «menu.zip no se puede adjuntar: imágenes,
 PDF, Word, Excel, texto o CSV.» o «No se ha podido leer menu.pdf.». Con el micrófono denegado, «El acceso al
-micrófono está denegado. Permítelo en tu navegador para dictar.»; una grabación demasiado larga, «La grabación es
-demasiado larga: dicta un mensaje más corto.»; sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del
-micrófono.»; y si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.».
+micrófono está denegado. Permítelo en tu navegador para dictar.» y, en la app instalada (Android o Windows), donde
+no hay navegador, «El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para dictar.»; una
+grabación demasiado larga, «La grabación es demasiado larga: dicta un mensaje más corto.»; sin voz, «No se ha oído
+nada. Inténtalo de nuevo más cerca del micrófono.»; y si no se puede transcribir, «No se ha podido transcribir el
+audio. Inténtalo de nuevo.».
 Implicados: BASE-F93, BASE-F97
 
 ### BASE-F95 Leer la respuesta: texto, listas, tablas y enlaces

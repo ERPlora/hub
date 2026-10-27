@@ -61,10 +61,12 @@ const microphone = () => ({
 
 type Sent = { url: string; body: Record<string, unknown> };
 
-async function composer(options: { offline?: boolean; voice?: object; answer?: (sent: Sent) => Response } = {}) {
+async function composer(
+  options: { offline?: boolean; voice?: object; answer?: (sent: Sent) => Response; locale?: 'en' | 'es' } = {},
+) {
   const sent: Sent[] = [];
   const m = await mountBase(AssistantComposer, {
-    locale: 'es',
+    locale: options.locale ?? 'es',
     props: { offline: options.offline ?? false, voice: options.voice ?? {} },
     onApi: ({ url, init }) => {
       const call = { url, body: JSON.parse(String(init.body ?? '{}')) as Record<string, unknown> };
@@ -207,5 +209,29 @@ describe('AssistantComposer', () => {
     expect(silent.wrapper.get('[data-testid="assistant-composer-problem"]').text()).toBe(
       'No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.',
     );
+  });
+
+  // BASE-F94: the installed app (Android, Windows) has no browser bar, so a refused microphone is allowed again in the
+  // device's settings; in a browser, in the browser.
+  it('a microphone refused inside the installed app points to the device settings, in a browser to the browser', async () => {
+    const win = window as unknown as { __TAURI__?: unknown };
+    const refusal = async (locale: 'en' | 'es') => {
+      const denied = { ...microphone(), getUserMedia: vi.fn(async () => Promise.reject(new DOMException('no', 'NotAllowedError'))) };
+      const m = await composer({ voice: denied, locale });
+      await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+      for (let i = 0; i < 3; i += 1) await flush();
+      const said = m.wrapper.get('[data-testid="assistant-composer-problem"]').text();
+      m.wrapper.unmount();
+      return said;
+    };
+    win.__TAURI__ = { core: { invoke: vi.fn(async () => null) } };
+    try {
+      expect(await refusal('es')).toBe('El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para dictar.');
+      expect(await refusal('en')).toBe('Microphone access is blocked. Allow it in your device settings to dictate.');
+    } finally {
+      delete win.__TAURI__;
+    }
+    expect(await refusal('es')).toBe('El acceso al micrófono está denegado. Permítelo en tu navegador para dictar.');
+    expect(await refusal('en')).toBe('Microphone access is blocked. Allow it in your browser to dictate.');
   });
 });

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:01270152a0e1d429b354ebd137949280dae1f5f3e79102794b70ed1ab2506774 -->
+<!-- generated from WORKBOOK.md sha256:89d752248f7142e4e4cd3065889e0524234c8c5980300e5d9a762f045dd8f405 -->
 
 ## What it is for and who it is for
 
@@ -2173,9 +2173,9 @@ Steps:
      shows over the box with its name and its "Remove attachment" ×.
   2. They go with the next message, with or without text, and stay in the person's bubble by their name. They travel
      only once, with that question: afterwards the conversation only remembers what they were called.
-  3. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser asks for
-     permission to use the microphone. While it records, the button turns red and is called "Stop recording"; after
-     two minutes it stops by itself.
+  3. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
+     app, the device) asks for permission to use the microphone. While it records, the button turns red and is called
+     "Stop recording"; after two minutes it stops by itself.
   4. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
      itself**: the person reviews it and taps "Send", and what they ask goes through its card like any other request
      (BASE-F97).
@@ -2185,9 +2185,10 @@ erplora.com's transcription. The browser never talks to erplora.com directly.
 If it fails: in one line over the box, and the file is not attached: "menu.pdf is too large: 8 MB at most per file.",
 "The files of one question add up to 20 MB at most.", "menu.zip cannot be attached: images, PDF, Word, Excel, text
 or CSV." or "menu.pdf could not be read.". With the microphone blocked, "Microphone access is blocked. Allow it in
-your browser to dictate."; a recording too long, "The recording is too long: dictate a shorter message."; no voice,
-"Nothing was heard. Try again closer to the microphone."; and if it cannot be transcribed, "The audio could not be
-transcribed. Try again.".
+your browser to dictate." and, in the installed app (Android or Windows), where there is no browser, "Microphone
+access is blocked. Allow it in your device settings to dictate."; a recording too long, "The recording is too long:
+dictate a shorter message."; no voice, "Nothing was heard. Try again closer to the microphone."; and if it cannot be
+transcribed, "The audio could not be transcribed. Try again.".
 Involved: BASE-F93, BASE-F97
 
 ### BASE-F95 Read the answer: text, lists, tables and links

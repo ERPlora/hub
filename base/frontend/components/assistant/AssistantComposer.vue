@@ -4,7 +4,7 @@
 // are a new line. The files erplora.com reads become chips that can be removed before sending; a refusal (type, size,
 // microphone, an empty dictation) is one line above the box until the next try. A dictation lands in the box after what
 // was written and is never sent by itself. What is written outlives the panel (it is the assistant's `draft`).
-import { HubIcon } from '@erplora/ui/shell';
+import { HubIcon, nativeBridge } from '@erplora/ui/shell';
 import { useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonIcon, IonSpinner, IonTextarea } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, shallowRef, useTemplateRef } from 'vue';
@@ -150,7 +150,9 @@ async function toggleMic(): Promise<void> {
   } catch (error) {
     const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
     if (!denied) console.error('assistant: the microphone did not start', error);
-    problem.value = { key: denied ? 'base.assistant.voice.denied' : 'base.assistant.voice.failed', values: {} };
+    // The installed app has no browser bar: there the microphone is allowed again in the device's settings.
+    const refused = nativeBridge() ? 'base.assistant.voice.deniedInApp' : 'base.assistant.voice.denied';
+    problem.value = { key: denied ? refused : 'base.assistant.voice.failed', values: {} };
   }
 }
 
