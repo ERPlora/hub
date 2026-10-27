@@ -11,6 +11,7 @@ const EUR = { currency: 'EUR', decimals: 2 };
 const PLN = { currency: 'PLN', decimals: 2 };
 const JPY = { currency: 'JPY', decimals: 0 };
 const HUF = { currency: 'HUF', decimals: 2 };
+const KWD = { currency: 'KWD', decimals: 3 };
 
 /** Intl puts a narrow no-break space before «€» and «%» in Spanish: compared as a plain space. */
 const spaced = (text: string) => plain(text);
@@ -110,6 +111,32 @@ describe('centsFromAmount', () => {
     expect(centsFromAmount('12,345')).toBeUndefined();
     expect(centsFromAmount('-3')).toBeUndefined();
     expect(centsFromAmount('abc')).toBeUndefined();
+  });
+});
+
+describe('centsFromAmount in the business’s money (flow business-currency)', () => {
+  it('takes the business’s code or symbol around the figure as no part of it', () => {
+    expect(centsFromAmount('12,50 zł', PLN)).toBe(1250);
+    expect(centsFromAmount('PLN 12.50', PLN)).toBe(1250);
+    expect(centsFromAmount('zł12,5', PLN)).toBe(1250);
+    expect(centsFromAmount('12,50 €', EUR)).toBe(1250);
+  });
+
+  it('reads with the decimals the server counts the money in, never the browser’s', () => {
+    // The yen has none: a mark only groups thousands.
+    expect(centsFromAmount('1.234', JPY)).toBe(1234);
+    expect(centsFromAmount('1234', JPY)).toBe(1234);
+    expect(centsFromAmount('12,5', JPY)).toBeUndefined();
+    // The dinar has three.
+    expect(centsFromAmount('1,234', KWD)).toBe(1234);
+    expect(centsFromAmount('12.5', KWD)).toBe(12500);
+    // The forint has two here (Intl gives it none).
+    expect(centsFromAmount('12,50', HUF)).toBe(1250);
+  });
+
+  it('another currency’s mark is not an amount of this one', () => {
+    expect(centsFromAmount('12,50 €', PLN)).toBeUndefined();
+    expect(centsFromAmount('12,50 zł')).toBeUndefined();
   });
 });
 

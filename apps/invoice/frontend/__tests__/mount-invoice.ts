@@ -16,6 +16,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
@@ -26,6 +27,28 @@ import es from '../locale/es.json';
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+
+/** The business of the hub (`base.business.get`): one in Spain, in euros, unless a test says another
+ *  (flow business-currency: what a person types is read in the business's money). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Peluquería Ana',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/businesses/1/settings',
+    ...fields,
+  };
+}
+
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+export const JAPANESE: Partial<Business> = { country: 'JP', country_name: 'Japan', currency: 'JPY', currency_label: 'JPY · Japanese Yen', currency_decimals: 0 };
 
 /** Every permission of the invoice app (owner, admin: apps.py `role_permissions`) and what its screens
  *  read from the other apps (Customers' cards for the recipient, Taxes' categories). */

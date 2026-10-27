@@ -30,7 +30,7 @@ import RectifyModal from '../components/RectifyModal.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney, moneyOf } from '../lib/format';
+import { formatDate, formatMoney, moneyOf, useBusinessMoney } from '../lib/format';
 import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
 import { filterQuery, filtersInUse, invalidAmounts, reversedDates } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
@@ -46,15 +46,16 @@ const locale = useLocale();
 /** The longest series code the server takes (`SERIES_CODE_MAX_LENGTH`). */
 const SERIES_MAX = 20;
 
-/** The table's filters (its funnel), as typed: the total in euros. A filter not in use is absent. */
+/** The table's filters (its funnel), as typed: the total in the business's money. A filter not in use is absent. */
 const filters = ref<DataTableFilters>({});
+const money = useBusinessMoney();
 const table = useServerTable('invoice.invoice.list', {
   sort: 'issued_at',
   dir: 'desc',
   maxSearch: 120,
-  filters: (): Partial<InvoiceListIn> => filterQuery(filters.value),
+  filters: (): Partial<InvoiceListIn> => filterQuery(filters.value, money.value),
   // Only the filters that really apply narrow the list (an amount it cannot read does not).
-  narrowed: () => filtersInUse(filters.value) > 0,
+  narrowed: () => filtersInUse(filters.value, money.value) > 0,
 });
 const { data: result, status, error, refresh } = table;
 
@@ -65,7 +66,7 @@ const tableError = computed(() => (status.value === 'error' && !Object.keys(refu
 /** Under each filter: what it cannot read or a reversed range, else what the server refused. */
 const filterErrors = computed<Record<string, string>>(() => ({
   ...refusedFilters.value,
-  ...Object.fromEntries(invalidAmounts(filters.value).map((key) => [key, t('invoice.filters.amountInvalid')])),
+  ...Object.fromEntries(invalidAmounts(filters.value, money.value).map((key) => [key, t('invoice.filters.amountInvalid')])),
   ...(reversedDates(filters.value) ? { issue_date_to: t('invoice.filters.dateOrder') } : {}),
 }));
 

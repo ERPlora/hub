@@ -58,4 +58,14 @@ describe('invoice filters', () => {
     expect(filtersInUse({ status: 'paid', issue_date_from: '2026-10-01', total_amount_to: '5' })).toBe(3);
     expect(filtersInUse({ total_amount_from: 'abc', issue_date_from: '2026-10-14', issue_date_to: '2026-10-01' })).toBe(0);
   });
+
+  it('read the totals in the business’s money: its symbol is no part of them, and its own decimals (flow business-currency)', () => {
+    const PLN = { currency: 'PLN', decimals: 2 };
+    const JPY = { currency: 'JPY', decimals: 0 };
+    expect(filterQuery({ total_amount_from: '12,50 zł', total_amount_to: 'PLN 20' }, PLN)).toEqual({ total_amount_from: 1250, total_amount_to: 2000 });
+    expect(invalidAmounts({ total_amount_from: '12,50 zł' }, PLN)).toEqual([]);
+    expect(filtersInUse({ total_amount_from: '12,50 zł' }, PLN)).toBe(1);
+    expect(filterQuery({ total_amount_from: '1.234' }, JPY)).toEqual({ total_amount_from: 1234 });
+    expect(invalidAmounts({ total_amount_from: '12,50 zł' })).toEqual(['total_amount_from']);
+  });
 });

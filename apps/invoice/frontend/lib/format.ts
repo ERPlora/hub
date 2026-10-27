@@ -7,6 +7,7 @@
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const FALLBACK_LOCALE = 'en';
 const NO_MONEY_DECIMALS = 2;
@@ -103,14 +104,39 @@ export function formatDate(value: string | null | undefined, locale: string): st
   return format.format(day);
 }
 
-const AMOUNT = /^\d+(?:[.,]\d{1,2})?$/;
+const AMOUNT = /^(\d+)(?:[.,](\d+))?$/;
+const THOUSANDS = /^\d{1,3}([.,])\d{3}(?:\1\d{3})*$/;
 
-/** An amount as typed («12,5», «12.50», 7) → whole cents; blank, negative or not an amount → `undefined`. */
-export function centsFromAmount(value: string | number | null | undefined): number | undefined {
+/** How `currency` may be written around an amount: its code, its symbol and its narrow symbol («PLN», «zł»). */
+function currencyMarks(currency: string): string[] {
+  const marks = (['code', 'symbol', 'narrowSymbol'] as const).map(
+    (currencyDisplay) =>
+      numberFormat(FALLBACK_LOCALE, `mark-${currency}-${currencyDisplay}`, { style: 'currency', currency, currencyDisplay })
+        .formatToParts(1)
+        .find((part) => part.type === 'currency')?.value ?? currency,
+  );
+  return [...new Set(marks)].sort((a, b) => b.length - a.length);
+}
+
+/** An amount as typed («12,5», «12.50 zł», 7) → minor units of `money`, with the decimals the server counts it in
+ *  (none in yen, where a mark only groups thousands: «1.234»); its code or symbol around the figure is no part of
+ *  it. Blank, negative or not an amount → `undefined`. While the money is unknown, two decimals and no symbol. */
+export function centsFromAmount(value: string | number | null | undefined, money?: Money): number | undefined {
   if (value === null || value === undefined) return undefined;
-  const text = String(value).trim();
-  if (!text || !AMOUNT.test(text)) return undefined;
-  return Math.round(Number(text.replace(',', '.')) * 100);
+  let text = String(value).replace(/[\s\u00a0\u202f]/g, '');
+  for (const mark of money ? currencyMarks(money.currency) : []) {
+    const upper = text.toUpperCase();
+    if (upper.startsWith(mark.toUpperCase())) text = text.slice(mark.length);
+    else if (upper.endsWith(mark.toUpperCase())) text = text.slice(0, -mark.length);
+    else continue;
+    break;
+  }
+  const decimals = money?.decimals ?? NO_MONEY_DECIMALS;
+  if (decimals === 0 && THOUSANDS.test(text)) text = text.replace(/[.,]/g, '');
+  const match = AMOUNT.exec(text);
+  const fraction = match?.[2] ?? '';
+  if (!match || fraction.length > decimals) return undefined;
+  return Number(match[1]) * 10 ** decimals + Number(fraction.padEnd(decimals, '0') || '0');
 }
 
 /** The text with Intl's no-break spaces as plain ones (what a test or a search compares). */

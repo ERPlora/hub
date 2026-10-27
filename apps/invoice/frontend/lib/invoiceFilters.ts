@@ -5,16 +5,16 @@
 import type { DataTableFilters } from '@erplora/ui/components';
 
 import type { InvoiceListIn, InvoiceSource, InvoiceStatus, InvoiceType } from '../operations';
-import { centsFromAmount } from './format';
+import { centsFromAmount, type Money } from './format';
 import { SOURCE_CODES, STATUS_CODES, TYPE_CODES } from './invoice';
 
 const AMOUNTS = ['total_amount_from', 'total_amount_to'] as const;
 
 const typed = (values: DataTableFilters, key: string): string => (values[key] ?? '').trim();
 
-/** The amount filters typed that are not amounts. */
-export function invalidAmounts(values: DataTableFilters): string[] {
-  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromAmount(values[key]) === undefined);
+/** The amount filters typed that are not amounts of the business's `money`. */
+export function invalidAmounts(values: DataTableFilters, money?: Money): string[] {
+  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromAmount(values[key], money) === undefined);
 }
 
 /** «Issued until» is a day before «Issued from»: neither is sent. */
@@ -24,8 +24,8 @@ export function reversedDates(values: DataTableFilters): boolean {
   return from !== '' && to !== '' && to < from;
 }
 
-/** What the list query takes from the filters. */
-export function filterQuery(values: DataTableFilters): Partial<InvoiceListIn> {
+/** What the list query takes from the filters, the totals in minor units of the business's `money`. */
+export function filterQuery(values: DataTableFilters, money?: Money): Partial<InvoiceListIn> {
   const query: Partial<InvoiceListIn> = {};
   if (STATUS_CODES.includes(values.status as InvoiceStatus)) query.status = values.status as InvoiceStatus;
   if (TYPE_CODES.includes(values.invoice_type as InvoiceType)) query.invoice_type = values.invoice_type as InvoiceType;
@@ -39,13 +39,13 @@ export function filterQuery(values: DataTableFilters): Partial<InvoiceListIn> {
     if (to) query.issue_date_to = to;
   }
   for (const key of AMOUNTS) {
-    const cents = centsFromAmount(values[key]);
+    const cents = centsFromAmount(values[key], money);
     if (cents !== undefined) query[key] = cents;
   }
   return query;
 }
 
 /** The filters that really apply (what it cannot read, or a reversed range, does not). */
-export function filtersInUse(values: DataTableFilters): number {
-  return Object.keys(filterQuery(values)).length;
+export function filtersInUse(values: DataTableFilters, money?: Money): number {
+  return Object.keys(filterQuery(values, money)).length;
 }

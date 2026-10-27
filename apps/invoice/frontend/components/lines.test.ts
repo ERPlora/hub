@@ -32,4 +32,14 @@ describe('manual invoice lines', () => {
     expect(unreadablePrice([line(), line({ price: '12,345' }), line({ price: 'abc' })])).toBe(2);
     expect(unreadablePrice([line()])).toBeNull();
   });
+
+  it('reads each price in the business’s money: its symbol is no part of it, and its own decimals (flow business-currency)', () => {
+    const PLN = { currency: 'PLN', decimals: 2 };
+    const JPY = { currency: 'JPY', decimals: 0 };
+    expect(unreadablePrice([line({ price: '12,50 zł' })], PLN)).toBeNull();
+    expect(linePayload(line({ price: '12,50 zł' }), PLN).unit_price).toBe(1250);
+    expect(unreadablePrice([line({ price: '1.234' })], JPY)).toBeNull();
+    expect(linePayload(line({ price: '1.234' }), JPY).unit_price).toBe(1234);
+    expect(unreadablePrice([line(), line({ price: '12,50 zł' })])).toBe(2);
+  });
 });

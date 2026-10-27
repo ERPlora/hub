@@ -13,7 +13,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import { click, errorFrame, flush, ionValue, mountInvoice } from '../__tests__/mount-invoice';
+import { business, click, errorFrame, flush, ionValue, JAPANESE, mountInvoice, POLISH } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from './InvoiceCreateModal.vue';
 import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
 import RecipientFields from './RecipientFields.vue';
@@ -127,6 +127,20 @@ describe('InvoiceCreateModal', () => {
     ]);
     expect(toastSuccess).toHaveBeenCalledWith('Invoice FACT-2026-000009 issued');
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('reads each price in the business’s money: «12,50 zł» in Poland, «1.234» yen in Japan (flow business-currency)', async () => {
+    for (const [country, typed, cents] of [[POLISH, '12,50 zł', 1250], [JAPANESE, '1.234', 1234]] as const) {
+      const s = await setup();
+      await s.result('base.business.get', business(country));
+      await s.choose('TICKET', 'F2');
+      await s.line('Course', typed);
+      s.answer(201, CREATED);
+      await click(s.submit());
+      expect(s.inDoc('invoice-create-error')).toBeNull();
+      expect((s.sent()[0]?.body as { lines: { unit_price: number }[] }).lines[0].unit_price).toBe(cents);
+      s.wrapper.unmount();
+    }
   });
 
   it('a price that is not an amount is said with its line, and nothing is sent', async () => {

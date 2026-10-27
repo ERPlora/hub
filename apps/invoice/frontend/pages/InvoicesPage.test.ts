@@ -8,7 +8,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice } from '../__tests__/mount-invoice';
+import { business, BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice, POLISH } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
@@ -137,6 +137,14 @@ describe('InvoicesPage: the live list', () => {
     await s.show(PAGE);
     await s.filter({ status: 'paid', total_amount_from: '10' });
     expect(s.params()).toEqual([{ status: 'paid', total_amount_from: 1000, sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
+  });
+
+  it('a total typed with the business’s symbol travels in its cents (flow business-currency)', async () => {
+    const s = await setup();
+    await s.result('base.business.get', business(POLISH));
+    await s.show(PAGE);
+    await s.filter({ total_amount_from: '12,50 zł' });
+    expect(s.params()).toEqual([{ total_amount_from: 1250, sort: 'issued_at', dir: 'desc', limit: 50, offset: 0 }]);
   });
 
   // flow: ninguno — FIX DataTable parte 2b-2 (PLAN-MIGRATIONS §13: filtros como en la vieja)

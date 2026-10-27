@@ -19,7 +19,7 @@ import { computed, shallowRef, watch } from 'vue';
 
 import { useTaxKind } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
-import { typedRate } from '../lib/format';
+import { typedRate, useBusinessMoney } from '../lib/format';
 import { type Recipient, recipientComplete, recipientFrom, recipientPayload } from '../lib/recipient';
 import { refusal } from '../lib/refusal';
 import type { InvoiceOut, InvoiceType } from '../operations';
@@ -38,6 +38,8 @@ const command = useCommand('invoice.invoice.create');
 const tax = useTaxKind();
 const defaults = useLive('invoice.invoice.line_defaults', () => ({}));
 const defaultRate = computed(() => typedRate(defaults.data.value?.tax_rate ?? null, locale.value));
+/** The business's money: each price is read in it (its symbol is no part of it; its own decimals). */
+const money = useBusinessMoney();
 const seriesCode = shallowRef('');
 const invoiceType = shallowRef<InvoiceType | undefined>(undefined);
 const recipient = shallowRef<Recipient>(recipientFrom(null));
@@ -78,7 +80,7 @@ const fieldErrors = computed(() => error.value?.fields ?? {});
 
 async function issue(): Promise<void> {
   if (!ready.value || command.pending.value) return;
-  const unreadable = unreadablePrice(lines.value);
+  const unreadable = unreadablePrice(lines.value, money.value);
   local.value = unreadable === null ? null : t('invoice.create.notAnAmount', { line: unreadable });
   if (local.value) return;
   let invoice;
@@ -87,7 +89,7 @@ async function issue(): Promise<void> {
       ...(seriesCode.value ? { series_code: seriesCode.value } : {}),
       ...recipientPayload(recipient.value),
       notes: notes.value.trim(),
-      lines: lines.value.map(linePayload),
+      lines: lines.value.map((line) => linePayload(line, money.value)),
     });
   } catch {
     return; // The window shows `command.error`.
