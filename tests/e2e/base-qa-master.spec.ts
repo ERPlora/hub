@@ -314,10 +314,12 @@ for (const language of LANGUAGES) {
       await expect(page).toHaveURL(`${origin}/apps`);
       await check('apps');
       await page.screenshot({ path: shot(`APP-BASE-10-BASE-F05-${language}-${size.label}`) });
-      for (const id of ['all', 'paid']) {
-        await tab(page, id);
-        await check(`apps-${id}`);
-      }
+      await tab(page, 'all');
+      await check('apps-all');
+      // BASE-F14 (hub#270, PLAN §32): «Paid» is only there when some app is sold apart; in this seed none is, so Apps
+      // has «My apps» and «Add apps» and no «Paid».
+      await expect(shown(page).locator('[data-testid="tab-mine"]')).toBeVisible();
+      await expect(shown(page).locator('[data-testid="tab-paid"]')).toHaveCount(0);
 
       // Settings, its four tabs and the three sections of Data.
       await menu(page, 'settings', /\/settings/);

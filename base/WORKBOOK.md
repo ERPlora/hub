@@ -2596,8 +2596,8 @@ Pasos:
      con su sector y en «Datos y copias» le ofrece primero la plantilla de ese sector, que deja el negocio con su
      carta y sus mesas.
   2. Recorre la plataforma como su dueño, en el móvil, la tableta y el ordenador, en español y en inglés: el Inicio
-     con «Resumen» y «Actividad», «Mis apps» y la campana; «Añadir apps» y las tres pestañas de Apps; las pestañas de
-     Ajustes y las secciones de «Datos y copias»; Empleados, la ficha de una persona, los roles, las llaves y las
+     con «Resumen» y «Actividad», «Mis apps» y la campana; «Añadir apps» y las pestañas de Apps («De pago» no sale
+     mientras ninguna app se contrate aparte); las pestañas de Ajustes y las secciones de «Datos y copias»; Empleados, la ficha de una persona, los roles, las llaves y las
      aprobaciones; las cinco pestañas de Sistema; Archivos; «Mi perfil»; una dirección que no existe; y el
      asistente, que se abre y contesta.
   3. En cada pantalla comprueba que carga sin error, que nada se sale por un lado y que no queda ningún texto en el

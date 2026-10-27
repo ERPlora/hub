@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:378e093f21498952ffe98fadaf95fcd459f16b07843a3b3b68d8ce5c9e1f8a2d -->
+<!-- generated from WORKBOOK.md sha256:5d3a651de9db15e45bd59d213c0bc364d123324288e18554cae20d45f5d2c342 -->
 
 ## What it is for and who it is for
 
@@ -2472,8 +2472,8 @@ Steps:
      with its sector and in "Data and backups" offers that sector's template first, which leaves the business with
      its menu and its tables.
   2. It goes through the platform as its owner, on the phone, the tablet and the computer, in Spanish and in English:
-     the Home with "Summary" and "Activity", "My apps" and the bell; "Add apps" and the three tabs of Apps; the tabs
-     of Settings and the sections of "Data and backups"; Employees, a person's page, the roles, the keys and the
+     the Home with "Summary" and "Activity", "My apps" and the bell; "Add apps" and the tabs of Apps ("Paid" does
+     not show while no app is sold apart); the tabs of Settings and the sections of "Data and backups"; Employees, a person's page, the roles, the keys and the
      approvals; the five tabs of System; Files; "My profile"; an address that does not exist; and the assistant,
      which opens and answers.
   3. On each screen it checks that it loads with no error, that nothing runs off a side and that no text is left in
