@@ -170,6 +170,15 @@ async function namesCutShort(page: Page): Promise<string[]> {
     );
 }
 
+/** Opens `path` from inside the Hub, as one of its links does: the SPA's router, no page load. */
+async function openInside(page: Page, path: string): Promise<void> {
+  type Mounted = { __vue_app__: { config: { globalProperties: { $router: { push: (to: string) => Promise<unknown> } } } } };
+  await page.evaluate(
+    (to) => (document.querySelector('#app') as unknown as Mounted).__vue_app__.config.globalProperties.$router.push(to),
+    path,
+  );
+}
+
 /** `a`'s row of `app` as `state:chosen`, or `none`. */
 const stored = (app: string) =>
   psql(`select coalesce((select state || ':' || chosen from base_appactivation where host = 'a' and app = '${app}'), 'none')`);
@@ -208,23 +217,23 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect.poll(() => menuApps(page), { message: 'the menu follows without a reload' }).not.toContain('Tasks');
       await snap(page, 'off', width);
 
-      // Its screen says why it does not open, and its data is not touched (BASE-F26), opened from inside the Hub (the
-      // router, as a link of a notice would) and loaded cold (a bookmark), with no error of the page either way: the
-      // gate's page is mounted in Tasks' address, and the outlet looked it up by that address, found none and read
+      // Its screen says why it does not open, and its data is not touched (BASE-F26), opened from inside the Hub (as a
+      // link of a notice would), left and opened again, and loaded cold (a bookmark), with no error of the page any way:
+      // the gate's page is mounted in Tasks' address, and the outlet looked it up by that address, found none and read
       // `ionPageElement` of nothing (the page that was on screen stayed there, inside the Hub).
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(String(error)));
-      await page.evaluate(
-        (path) =>
-          (
-            document.querySelector('#app') as unknown as {
-              __vue_app__: { config: { globalProperties: { $router: { push: (to: string) => Promise<unknown> } } } };
-            }
-          ).__vue_app__.config.globalProperties.$router.push(path),
-        tasksScreen,
-      );
+      const apps = page.locator('[data-testid="apps-counter"]');
+      await openInside(page, tasksScreen);
       await expect(testid(page, 'app-blocked-missing')).toBeVisible();
-      await expect.soft(page.locator('[data-testid="apps-counter"]'), 'Apps slid out').toBeHidden();
+      await expect.soft(apps, 'Apps slid out').toBeHidden();
+      await openInside(page, '/apps');
+      await expect(testid(page, 'apps-counter')).toBeVisible();
+      await openInside(page, tasksScreen);
+      await expect(testid(page, 'app-blocked-missing')).toBeVisible();
+      await expect.soft(apps, 'Apps slid out again').toBeHidden();
+      // The page it left, as Ionic brings back any page: not a second copy on every visit.
+      await expect(page.locator('[data-testid="app-blocked-missing"]'), 'one page of the gate').toHaveCount(1);
       await page.goto(`${A}${tasksScreen}`);
       await expect(testid(page, 'app-blocked-missing')).toBeVisible();
       await snap(page, 'blocked-screen', width);
