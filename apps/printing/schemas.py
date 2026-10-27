@@ -12,6 +12,7 @@ from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import BeforeValidator, ConfigDict, JsonValue, StringConstraints, model_validator
 
@@ -31,6 +32,11 @@ PAGE_ONLY_A4 = _("Only an A4 job carries a page: a receipt printer prints the st
 PAGE_TOO_LARGE = _("The A4 page is larger than 2 MB.")
 PAGE_WITH_SCRIPT = _("The A4 page cannot carry a script.")
 A4_ONCE = _("An A4 page prints once: ask for another job for another copy.")
+
+# How the Printing screens name the data the models do not (the assistant's card names each datum by its title).
+JOB = gettext_noop("Job")
+ATTEMPT = gettext_noop("Attempt")
+REFERENCE = gettext_noop("Reference")
 
 _SCRIPT = re.compile(r"<\s*script\b", re.IGNORECASE)
 
@@ -255,10 +261,12 @@ class JobCreateIn(Closed):
     )
     currency: Annotated[str, StringConstraints(pattern=r"^[A-Z]{3}$")] | None = Field(
         None,
+        title=gettext_noop("Currency"),
         description="The amounts' currency (ISO 4217), for their decimals; without it, the business's.",
     )
     automatic: bool = Field(
         False,
+        title=gettext_noop("Automatic print at checkout"),
         description="The print by itself at checkout: it follows «print the receipt at checkout» and «open the drawer "
         "at checkout» of the settings.",
     )
@@ -267,7 +275,9 @@ class JobCreateIn(Closed):
         description="With automatic: false keeps the drawer shut whatever the settings (a checkout with no cash).",
     )
     source_app: _text(32) | None = Field(None, description="The app that asks for it (sale).")
-    source_ref: _text(64) | None = Field(None, description="The document it is, as a person reads it (T-000123).")
+    source_ref: _text(64) | None = Field(
+        None, title=REFERENCE, description="The document it is, as a person reads it (T-000123)."
+    )
 
     @model_validator(mode="after")
     def _page(self):
@@ -339,7 +349,7 @@ class JobListIn(PageIn):
 
 
 class JobRefIn(Closed):
-    job_id: UUID | None = Field(None, description="The job's id.")
+    job_id: UUID | None = Field(None, title=JOB, description="The job's id.")
     reference: _text(64, 1) | None = Field(
         None, description="The number of its document (T-000123), when the id is not known: its newest job."
     )
@@ -420,16 +430,18 @@ class JobClaimOut(Schema):
 
 
 class JobCompleteIn(Closed):
-    job_id: UUID = Field(description="The job the device printed.")
+    job_id: UUID = Field(title=JOB, description="The job the device printed.")
     device: DeviceName = Field(description="The own id of the device that printed it: the one that took it.")
-    attempt: int = Field(ge=1, description="The hand-out it printed (the `attempts` it was given).")
+    attempt: int = Field(ge=1, title=ATTEMPT, description="The hand-out it printed (the `attempts` it was given).")
 
 
 class JobFailIn(Closed):
-    job_id: UUID = Field(description="The job the device could not print.")
+    job_id: UUID = Field(title=JOB, description="The job the device could not print.")
     device: DeviceName = Field(description="The own id of the device that could not print it: the one that has it.")
-    attempt: int = Field(ge=1, description="The hand-out that failed (the `attempts` it was given).")
-    error: DeviceError = Field(description="Why, as the device says it (cut at 500 characters).")
+    attempt: int = Field(ge=1, title=ATTEMPT, description="The hand-out that failed (the `attempts` it was given).")
+    error: DeviceError = Field(
+        title=gettext_noop("Print error"), description="Why, as the device says it (cut at 500 characters)."
+    )
 
 
 class JobAckOut(Schema):
@@ -468,7 +480,9 @@ class DeviceRegisterIn(Closed):
 
 
 class DeviceRefIn(Closed):
-    device_id: UUID = Field(description="The device's registration id (printing.device.list).")
+    device_id: UUID = Field(
+        title=gettext_noop("Device"), description="The device's registration id (printing.device.list)."
+    )
 
 
 class DeviceUpdateIn(DeviceRefIn):

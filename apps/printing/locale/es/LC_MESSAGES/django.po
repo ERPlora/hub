@@ -403,3 +403,25 @@ msgstr "dado de alta por"
 
 msgid "Devices"
 msgstr "Dispositivos"
+
+# How the assistant's card names the data of printing's writes (titles of the schemas).
+msgid "Job"
+msgstr "Trabajo"
+
+msgid "Attempt"
+msgstr "Intento"
+
+msgid "Reference"
+msgstr "Referencia"
+
+msgid "Currency"
+msgstr "Moneda"
+
+msgid "Automatic print at checkout"
+msgstr "Impresión automática al cobrar"
+
+msgid "Print error"
+msgstr "Error de impresión"
+
+msgid "Device"
+msgstr "Dispositivo"
