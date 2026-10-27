@@ -38,6 +38,3 @@ Al registrarlos: cambiar el `icon` de `apps.py` (y `pnpm gen:app-icons`) y los `
 - **Modo del dispositivo** (compartido / personal): lo decide `base` con el PIN y el dispositivo de
   confianza (fase 2). `frontend/lib/device.ts` devuelve «compartido» hasta entonces; cuando la sesión lo
   traiga, ese fichero lo lee y ATTENDANCE-F03 pasa a `hecho`.
-- **Relay del outbox** (fase 2): entrega `staff.member.terminated` a `attendance.record.close_for_terminated`
-  (ATTENDANCE-F13). La reacción está hecha y probada contra Personal real; cuando el relay llegue,
-  ATTENDANCE-F13 pasa a `hecho` sin tocar la app.
