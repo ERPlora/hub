@@ -311,7 +311,7 @@ test('BASE-G54 BASE-G57: the employee enters on a till, creates their PIN there,
   await expect(owner.page).toHaveURL(/\/login\?next=%2F&notice=device_limit$/);
   const notice = shown(owner.page).getByTestId('access-notice');
   await expect(notice).toContainText('Session opened on another device');
-  await expect(notice.getByTestId('access-upgrade')).toHaveAttribute('href', `${SAAS}/store/plans`);
+  await expect(notice.getByTestId('access-upgrade')).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
   // An account without a name shows by the start of its address, however long, on one line like the others; and the
   // link closes the notice's text without a line taller than the rest.
   const faces = shown(owner.page).getByTestId('pin-face');

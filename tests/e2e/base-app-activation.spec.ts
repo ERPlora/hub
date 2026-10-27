@@ -238,7 +238,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(notice).toContainText('You have reached the 20-app limit of your plan. Upgrade your plan or turn one off.');
       const upgrade = notice.locator('[data-testid="apps-limit-upgrade"]');
       await expect(upgrade).toHaveText('Upgrade plan');
-      await expect(upgrade).toHaveAttribute('href', new RegExp(`/store/plans\\?business=${hubId}$`));
+      await expect(upgrade).toHaveAttribute('href', new RegExp(`/dashboard/store/plans\\?business=${hubId}$`));
       await expect(appRow(page, 'website').locator('[data-testid="apps-state"]')).toHaveText('Off');
       expect(psql("select state from base_appactivation where host = 'a' and app = 'website'")).toBe('off');
       await snap(page, 'limit', width);

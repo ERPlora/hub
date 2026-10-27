@@ -121,9 +121,9 @@ def test_each_business_has_its_own_plan():
 
 
 def test_the_channel_says_where_the_plan_is_upgraded(settings):
-    assert run("whatsapp_inbox.channel.get", {}).plans_url == "https://erplora.com/store/plans"
+    assert run("whatsapp_inbox.channel.get", {}).plans_url == "https://erplora.com/dashboard/store/plans"
     settings.SAAS_URL = "https://erplora.com/"
-    assert run("whatsapp_inbox.channel.get", {}).plans_url == "https://erplora.com/store/plans"
+    assert run("whatsapp_inbox.channel.get", {}).plans_url == "https://erplora.com/dashboard/store/plans"
     # A server not linked to erplora.com has nowhere to send the owner.
     settings.SAAS_URL = ""
     assert run("whatsapp_inbox.channel.get", {}).plans_url == ""

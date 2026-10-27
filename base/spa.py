@@ -4,7 +4,7 @@ Next to ``spa-config`` it embeds the result of ``base.session.me`` (``session-me
 paints the menu and decides on the login without a first round trip. ``spa-config`` carries
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
 jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
-Home, BASE-G127), where its plan is changed on the SaaS (``/store/plans?business=<hub id>``, the menu's «Upgrade
+Home, BASE-G127), where its plan is changed on the SaaS (``/dashboard/store/plans?business=<hub id>``, the menu's «Upgrade
 plan», BASE-G169) and the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1), those three only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
 ``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). ``widget-list`` carries
@@ -31,7 +31,7 @@ from live.ninja import run_operation_sync
 from live.spa import render_spa, spa_path_pattern
 
 from base import public_home, queries
-from base.auth import saas_url
+from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models import SessionOwner
 
 SESSION_ME_ID = "session-me"
@@ -76,11 +76,11 @@ def _shell(request: HttpRequest) -> HttpResponse:
         account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
         extra_json[HUB_HOME_ID] = {
             "name": hub.name,
-            "plan_url": saas_url(f"/store/plans?business={hub.id}") if account else "",
-            "account_url": saas_url("/account") if account else "",
-            "report_url": saas_url("/report-a-problem") if account else "",
+            "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if account else "",
+            "account_url": saas_url(f"{SAAS_PANEL_PATH}/account") if account else "",
+            "report_url": saas_url(f"{SAAS_PANEL_PATH}/report-a-problem") if account else "",
             # APP-BASE-5: «Members» of the business on erplora.com (HUBS-F24…F29), where people are invited.
-            "members_url": saas_url(f"/businesses/{hub.id}/members") if account else "",
+            "members_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/members") if account else "",
             "access": way_in,
             "preferences": queries.appearance_of(request.user),
         }
