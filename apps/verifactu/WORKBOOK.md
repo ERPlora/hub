@@ -20,6 +20,10 @@ un **registro de facturación** encadenado (cada registro lleva la huella del an
 cotejo, que se envía a la Agencia Tributaria (AEAT). Si no puede salir en ese momento, se queda en la cola
 y sale solo después, en orden. Sirve igual a la peluquería y al restaurante: todo es común.
 
+Solo vale para negocios de **España** (Canarias, Ceuta y Melilla incluidas): VeriFactu obliga a quien tributa
+aquí. Un negocio dado de alta en erplora.com en otro país no registra ni envía nada a la AEAT aunque tenga la app
+encendida: sus facturas y tiques salen sin registro ni QR de VeriFactu, como con la app apagada.
+
 Quién la usa:
 
 - El **empleado** consulta los registros, la cola, los eventos y el estado de la cadena.
@@ -214,7 +218,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 | ID | Flujo | Estado |
 |---|---|---|
-| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2) |
+| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, encendida, no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), y que Apps no la ofrezca allí espera un gancho de encendido de la plataforma |
 | VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
 | VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
@@ -252,13 +256,16 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 ### VERIFACTU-F01 Activar VeriFactu
 <!-- origen: old-hub:HUB-F300 old:verifactu/workflow/configuracion.md#verifactu-f01 -->
-Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2)
+Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, encendida, no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), y que Apps no la ofrezca allí espera un gancho de encendido de la plataforma
 Actor: administrador
 Pantalla: Hub: Apps
 Pasos:
 1. En las apps del Hub, enciende **VeriFactu** (se enciende Facturación con ella).
 2. Desde ese momento cada factura que emite Facturación se registra (VERIFACTU-F13) en el entorno de
    pruebas.
+3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), VeriFactu encendida no
+   hace nada: las facturas salen sin registro ni QR, en **VeriFactu → Ajustes** «Todavía no puede pasar a
+   producción:» dice «este negocio no está en España: VeriFactu solo es para negocios de España, así que no se envía nada a la AEAT», y lo que pida registrar o enviar algo contesta «VeriFactu solo es para negocios de España.»
 Entra: nada más que la orden.
 Sale: la app activa; sin interruptor propio.
 Si falla: lo dice la página de apps del Hub.
@@ -429,6 +436,8 @@ pendiente o suspendida, «Tu cuenta de ERPlora tiene un pago pendiente o está s
 cuenta de ERPlora para pasar a producción.» (`verifactu.hub_not_active`); con certificado propio que falta o ha
 caducado, «No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado.»
 (`verifactu.no_own_certificate`). Todos son 409 y el entorno sigue en pruebas. Ya en producción, no hace nada.
+En un negocio de fuera de España se niega como con la app apagada, «VeriFactu solo es para negocios de España.» (404 `app_inactive`), y Ajustes
+lo dice en la lista de lo que falta: «este negocio no está en España: VeriFactu solo es para negocios de España, así que no se envía nada a la AEAT» (`outside_spain`).
 Si en producción se pierde la ruta (la foto deja de traer el otorgamiento aprobado, o caduca el certificado propio),
 no se vuelve a pruebas (ya hay registros de producción): **no se sella nada nuevo** —la venta o la factura se
 rechazan con 409 y el código de la ruta (`verifactu.representation_not_approved`,
@@ -518,7 +527,8 @@ Pasos:
 2. En la **misma transacción** que la emite, con la sesión de quien emite, Facturación pide a VeriFactu su
    registro (el registro lleva a ese usuario en «creado por»). Solo si la base de datos falla un momento (un
    cerrojo, una conexión) el documento queda «pendiente» y la reacción al aviso `invoice.invoice.issued` lo
-   sella después, como el sistema.
+   sella después, como el sistema. Si el negocio no está en España, VeriFactu no registra nada: la factura se
+   emite igual, sin registro ni QR, como con la app apagada, y nunca se deshace por eso.
 3. VeriFactu lee la factura (número, fechas, emisor, cliente, importes, desglose por clave fiscal y la factura
    que rectifica o sustituye) y la comprueba: el desglose suma la base y la cuota, la cuota de cada clave
    cuadra con su tipo, no pasa de 12 claves (las que admite la AEAT; nunca se recorta), una factura ordinaria
@@ -576,7 +586,8 @@ Entra: los registros pendientes; la vía; la respuesta de la pasarela.
 Sale: el estado y la respuesta en cada registro (avisa `verifactu.record.transmitted` y, según el caso,
 `verifactu.record.rejected` o `verifactu.record.accepted_with_errors`, sin importes).
 Si falla: sin pasarela configurada, sin datos del productor o sin vía lista, no se manda nada y cada registro
-dice por qué espera (VERIFACTU-F17). Nunca se da por aceptado un registro sin la respuesta de la AEAT.
+dice por qué espera (VERIFACTU-F17). Nunca se da por aceptado un registro sin la respuesta de la AEAT. Un negocio
+de fuera de España no envía nada nunca: lo que quedó sellado antes se guarda tal cual, sin salir, y dice por qué.
 Implicados: VERIFACTU-F20, FLOW-F04 (la tarjeta de la galería de Automatizaciones que crea una tarea urgente cuando
 la AEAT rechaza un registro)
 
@@ -606,7 +617,8 @@ Pasos:
 2. Se abre «Registro {número}» con la factura, la cadena, el QR, la respuesta de la AEAT y el XML.
 3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («La pasarela de envío de ERPlora no está
    configurada en este servidor», «Sin vía de envío
-   lista», «La AEAT pidió esperar hasta las {hora}», «No se pudo contactar: {motivo}») y cuándo: «Sale solo en
+   lista», «La AEAT pidió esperar hasta las {hora}», «No se pudo contactar: {motivo}», fuera de España
+   «este negocio no está en España: VeriFactu solo es para negocios de España, así que no se envía nada a la AEAT») y cuándo: «Sale solo en
    la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer nada.»
    con el «Próximo intento».
 Entra: el registro.
@@ -639,7 +651,8 @@ Pasos:
 2. VeriFactu devuelve el más reciente: su enlace y su imagen de QR, su CSV, su estado, su tipo y su huella.
 Entra: el id de la factura.
 Sale: el registro (`verifactu.record.by_invoice`); sin registro, nada (el documento sale sin QR).
-Si falla: sin VeriFactu activa o sin permiso de consulta, el documento sale sin QR.
+Si falla: sin VeriFactu activa, sin permiso de consulta o en un negocio de fuera de España, el documento sale sin
+QR ni recibo de VeriFactu.
 Implicados: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Enviar después lo que no pudo salir (contingencia automática)
@@ -658,7 +671,7 @@ Pasos:
    espera} en espera».
 Entra: los registros pendientes.
 Sale: los envíos y sus respuestas (avisa `verifactu.contingency.processed`).
-Si falla: lo que no sale sigue en la cola con su motivo.
+Si falla: lo que no sale sigue en la cola con su motivo; en un negocio de fuera de España no sale nunca.
 Implicados: VERIFACTU-F15
 
 ### VERIFACTU-F21 Procesar la cola a mano
@@ -867,6 +880,8 @@ Pasos:
    VeriFactu esté encendida, porque VeriFactu la necesita.
 2. Si queda alguno, lo niega y VeriFactu sigue encendida. Lo que la AEAT ya contestó (aceptado, aceptado con errores
    o rechazado) no cuenta: un rechazo se subsana con un registro nuevo, que cuenta mientras no salga.
+3. En un negocio de fuera de España no lo niega nunca: sus registros no se van a enviar, así que apagarla no para
+   nada; se guardan tal cual.
 Entra: la petición de apagar.
 Sale: nada si se niega; la app apagada si no queda nada por enviar.
 Si falla: «VeriFactu aún tiene {n} registros por enviar a la AEAT. Espera a que se envíen o arréglalos antes de
@@ -981,6 +996,12 @@ Todas se pueden seguir en vivo.
 | Envía el otorgamiento de representación firmado a revisión | configurar | F05, F06 | `verifactu.representation.submit` |
 | Da el modelo oficial en blanco (PDF) | configurar | F05 | `verifactu.representation.model` |
 
+En un negocio de fuera de España, lo que sella un registro o habla con la AEAT o con la pasarela (registrar,
+subsanar, anular, enviar ya, conciliar, consultar la AEAT, recuperar desde ella, probar la conexión, la factura de
+prueba, pasar a producción y enviar el otorgamiento) contesta como con la app apagada: 404 `app_inactive`,
+«VeriFactu solo es para negocios de España.». La pasada de la cola no envía nada y deja a cada registro su motivo
+(`outside_spain`); el registro de una factura (`verifactu.record.by_invoice`) no se da.
+
 ### Lo que avisa
 
 | Aviso | Cuándo | Qué lleva | Servicio |
@@ -1006,7 +1027,7 @@ Todas se pueden seguir en vivo.
 
 Corre como el sistema, en su propia transacción, y es idempotente: un registro de alta por factura y entorno.
 Es el **respaldo**: Facturación lo pide dentro de su emisión (contrato abajo) y el aviso de un documento ya
-sellado no añade nada (`already`).
+sellado no añade nada (`already`). En un negocio de fuera de España no reacciona (se da por entregado).
 
 ### Lo que necesita de otras apps
 
@@ -1021,7 +1042,7 @@ sellado no añade nada (`already`).
 |---|---|---|
 | Facturación | Sellar el registro de cada documento dentro de su emisión | `verifactu.record.create` |
 | Ventas, Facturación, Impresión | Poner el QR y el estado fiscal en el tique y la factura | `verifactu.record.by_invoice` |
-| Plataforma (`base.app.disable`) | No apagar VeriFactu con registros sin enviar | `can_disable` de `VerifactuConfig` (`queries.disable_refusal`) |
+| Plataforma (`base.app.disable`) | No apagar VeriFactu con registros sin enviar (en España) | `can_disable` de `VerifactuConfig` |
 
 ### Quién puede qué
 
@@ -1411,6 +1432,17 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     persona arregla su causa; por eso queda como evento crítico.
 14. **Un rechazo de VeriFactu deshace la emisión** (contrato con Facturación): reintentarlo fallaría igual;
     solo un error pasajero de la base de datos deja el documento «pendiente» para la reacción.
+15. **VeriFactu solo vale en España** (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN, 2026-10-27): el RD
+    1007/2023 y la Orden HAC/1177/2024 obligan a quien tributa en España (Canarias, Ceuta y Melilla son regiones de
+    ES). Un negocio con otro país en su cuenta (`base.Hub.country`, que lee `base.business.get`) se comporta como con
+    la app apagada (`queries.outside_spain`, `refuse_outside_spain` → `AppInactive`): sus facturas salen
+    «unavailable» (nunca un 409 que las deshaga), la reacción no sella, la cola no envía (`blockers` →
+    `outside_spain`), la factura no pinta recibo (`by_invoice` vacío) y el veto de apagar no lo atrapa
+    (`disable_refusal` → `None`). Sin país (una demo) o en el hub propio de ERPlora (`PLATFORM_ISSUER_COUNTRY`), es
+    España. Lo sellado antes en un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda
+    sin enviar, con su motivo. Que **Apps** no la ofrezca encendible fuera de España necesita un gancho de encendido
+    de la plataforma (`can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como `can_disable`, que respeten
+    `base.app.enable` y `base.app.list`); hasta entonces se enciende y no hace nada.
 
 ### Cambios frente al producto actual
 
