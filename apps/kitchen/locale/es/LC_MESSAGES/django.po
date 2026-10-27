@@ -626,3 +626,19 @@ msgstr "PLATO ANULADO · %(label)s"
 #, python-format
 msgid "CANCELLED · %(label)s"
 msgstr "ANULADA · %(label)s"
+
+# How the assistant's card names the data of kitchen's writes (titles of the schemas).
+msgid "Ticket type"
+msgstr "Tipo de comanda"
+
+msgid "Dishes"
+msgstr "Platos"
+
+msgid "From check"
+msgstr "Cuenta de origen"
+
+msgid "Into check"
+msgstr "Cuenta de destino"
+
+msgid "Station colour"
+msgstr "Color de la estación"

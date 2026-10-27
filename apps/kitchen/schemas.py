@@ -17,6 +17,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -30,6 +31,11 @@ SAY_WHICH_STATION = _("Say which station: its id or its name.")
 SAY_PRODUCT_OR_CATEGORY = _("Say one product or one category, not both.")
 SAY_WHAT_DISH = _("Say which dish: a product of the catalogue or its name.")
 ADD_A_DISH = _("Add at least one dish.")
+
+# How the Kitchen screens name the data the models do not (the assistant's card names each datum by its title).
+TICKET_TYPE = gettext_noop("Ticket type")
+DISHES = gettext_noop("Dishes")
+STATION_COLOUR = gettext_noop("Station colour")
 
 TicketStatus = Literal["pending", "preparing", "ready", "served", "cancelled"]
 ItemStatus = Literal["pending", "preparing", "ready", "served", "cancelled", "voided"]
@@ -363,7 +369,9 @@ class TicketSendIn(In):
         "",
         description="What the kitchen reads as the check's name (Table 4); empty: the check's title.",
     )
-    channel: OrderType = Field("dine_in", description="dine_in, takeaway or delivery.")
+    channel: OrderType = Field(
+        "dine_in", title=TICKET_TYPE, description="dine_in, takeaway or delivery."
+    )
     priority: Literal["normal", "rush"] = Field(
         "normal", description="rush sends it urgent."
     )
@@ -389,6 +397,7 @@ class TicketReceiveIn(Reaction):
     label: str = Field("", description="What the kitchen reads as the check's name.")
     channel: str = Field(
         "dine_in",
+        title=TICKET_TYPE,
         description="dine_in, takeaway or delivery; anything else is dine_in.",
     )
     priority: str = Field(
@@ -396,7 +405,7 @@ class TicketReceiveIn(Reaction):
     )
     waiter: str = Field("", description="Who sent it.")
     items: list[ReceivedItemIn] = Field(
-        default_factory=list, description="The lines sent."
+        default_factory=list, title=DISHES, description="The lines sent."
     )
 
     @field_validator("label", "waiter", mode="before")
@@ -426,10 +435,14 @@ class TicketSyncIn(Reaction):
 
     order_id: UUID | None = Field(None, description="The check Sales changed.")
     from_order_id: UUID | None = Field(
-        None, description="The check absorbed by a merge."
+        None,
+        title=gettext_noop("From check"),
+        description="The check absorbed by a merge.",
     )
     to_order_id: UUID | None = Field(
-        None, description="The check that stays after a merge."
+        None,
+        title=gettext_noop("Into check"),
+        description="The check that stays after a merge.",
     )
 
 
@@ -463,7 +476,7 @@ class TicketCreateIn(In):
     label: Label = Field("", description="Where it goes (Staff, Table 4).")
     notes: Notes = Field("", description="Notes for the whole ticket.")
     items: list[ManualItemIn] = Field(
-        description="Its dishes (at least one).", max_length=MAX_ITEMS
+        title=DISHES, description="Its dishes (at least one).", max_length=MAX_ITEMS
     )
 
     @field_validator("items")
@@ -487,6 +500,7 @@ class TicketRushIn(TicketRefIn):
 class ItemBumpIn(TicketRefIn):
     item_ids: list[UUID] = Field(
         default_factory=list,
+        title=DISHES,
         description="The dishes; empty: every dish of the ticket in the station's scope.",
     )
     station: StationScope
@@ -533,7 +547,9 @@ StationPage = Page[StationOut]
 
 class StationIn(In):
     name: _text(80, 1) = Field(description="Its name (Grill).")
-    color: Hex = Field("#F97316", description="Its colour, #RRGGBB.")
+    color: Hex = Field(
+        "#F97316", title=STATION_COLOUR, description="Its colour, #RRGGBB."
+    )
     destination: Destination = Field(
         "both", description="both (screen and paper), display or printer."
     )
@@ -550,7 +566,9 @@ class StationIn(In):
 
 class StationPatchIn(StationRefIn):
     name: _text(80, 1) | None = Field(None, description="Its new name.")
-    color: Hex | None = Field(None, description="Its colour, #RRGGBB.")
+    color: Hex | None = Field(
+        None, title=STATION_COLOUR, description="Its colour, #RRGGBB."
+    )
     destination: Destination | None = Field(
         None, description="both, display or printer."
     )
