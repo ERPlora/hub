@@ -175,7 +175,10 @@ class TestSigningOut:
         assert (response.status_code, response["Location"]) == (302, "/login")
         assert not Session.objects.exists()
 
-    def test_anywhere_else_it_goes_on_to_erplora_com_s_sign_out_as_before(self, client, ana):
+    def test_anywhere_else_it_goes_on_to_erplora_com_which_asks_before_closing_its_own_session(self, client, ana):
         client.force_login(ana)
         response = client.post("/auth/logout", HTTP_HOST=HOST)
-        assert response["Location"] == "http://localhost:8001/accounts/logout/"
+        # erplora.com's «Sign out of erplora.com?» (saas `accounts/frontend/pages/SignOutPage.vue`, ACCOUNTS-F09), never
+        # allauth's old `/accounts/logout/`, a 404 since the SaaS runs headless (saas `accounts/tests/test_login.py`).
+        assert (response.status_code, response["Location"]) == (302, "http://localhost:8001/logout")
+        assert not Session.objects.exists()
