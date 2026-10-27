@@ -1,6 +1,7 @@
 // Test helper of base's Home and its pieces of the chrome: the SDK's live harness (fake clock, fake network
 // serving the stream and the API) on the hub's generated op → route map, the shell's i18n with base's
-// catalogues merged in, a session, the shell's config and a memory router with the routes a test names.
+// catalogues merged in, a session, the shell's config, a memory router with the routes a test names and Ionic's
+// router API on it (`useIonRouter`).
 import {
   createShellI18n,
   provideSession,
@@ -11,8 +12,9 @@ import {
 } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { mount } from '@vue/test-utils';
+import { vi } from 'vitest';
 import { type Component, createApp, ref } from 'vue';
-import { createMemoryHistory, createRouter, type RouteRecordRaw } from 'vue-router';
+import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
 
 import {
   type ApiHandler,
@@ -98,6 +100,19 @@ export interface MountOptions {
   onApi?: ApiHandler;
 }
 
+/** Ionic's router API (`useIonRouter`) as the shell's Ionic router provides it app-wide (`navManager`), on the test's
+ *  router: `handleNavigate(location, action, direction)` is a spy that navigates. */
+function navManager(router: Router) {
+  return {
+    handleNavigate: vi.fn((location: RouteLocationRaw, action = 'push') =>
+      action === 'replace' ? router.replace(location) : router.push(location),
+    ),
+    canGoBack: () => Boolean(window.history.state?.back),
+    goBack: () => router.back(),
+    goForward: () => router.forward(),
+  };
+}
+
 /** The subscription id the stream holds for `op` (the first one). */
 export function subId(client: LiveClient, op: OpName): string {
   const sub = client.stream.subscriptions(op)[0];
@@ -125,12 +140,13 @@ export async function mountBase(component: Component, options: MountOptions = {}
     app,
   });
   provideShellConfig({ homePath: '/', home: true, sidebar: options.sidebar }, app);
+  const ionRouter = navManager(router);
   const wrapper = mount(component, {
     props: options.props,
     attachTo: document.body,
     global: {
       plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
-      provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
+      provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client, navManager: ionRouter },
       stubs: options.stubs,
     },
   });
@@ -141,5 +157,5 @@ export async function mountBase(component: Component, options: MountOptions = {}
     call.push(resultFrame(subId(harness.client, op), data, rev));
     await flush();
   }
-  return { ...harness, router, wrapper, live, result };
+  return { ...harness, router, ionRouter, wrapper, live, result };
 }

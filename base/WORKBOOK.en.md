@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:efd1cb1e29d651c8f6e164dbee97599e9467e275403c62d3e4a8119fdfb62a9b -->
+<!-- generated from WORKBOOK.md sha256:429bb5f6d1adc825930a95e185a52bdce77783fa6646af117ac4b7c2c562b5d0 -->
 
 ## What it is for and who it is for
 
@@ -482,7 +482,7 @@ Involved: none
 ### BASE-F05 Open an app from "My apps"
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Home · Summary
+Screen: Home · Summary · the top bar of any screen
 Steps:
   1. In "My apps", one tile per app this person can open, with its icon and its name (if it does not
      fit, the whole name shows on hover).
@@ -490,11 +490,19 @@ Steps:
   3. They tap a tile: the app opens. An app that is being turned on says "Activating…" and opens nothing.
   4. On a phone, with six apps or more, the first four show and "View all apps", which shows the rest.
      "Add apps", the last one, leads to Apps.
+  5. To leave an app, tap "My apps" in the bar: the main screen of an app has no "Back". The sheet starts
+     with "Home", which goes back to the Home, and goes on with the apps; tapping one opens it. "Home" is
+     there even while the list loads, when it is empty or when it could not be read.
+  6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
+     or the menu); a window that cannot be closed that way stays. With nothing open, on a record or a new
+     one it does the same as "Back"; on the main screen of an app it goes back to the Home, also when that
+     screen was reached through a link; and on the Home it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
 Out: how many times each app is opened in this browser (only to order them).
 If it fails: while loading, grey tiles and "Loading your apps…" for the screen reader. Without apps:
 "Your apps will show up here. Add the ones your business needs.". If the list could not be read: "Could
 not load your apps. Reload the page; if it keeps failing, sign in again.", never that there are no apps.
+In an older Android app, which cannot yet stay in the background, the back button is the system's again.
 Involved: none
 
 ### BASE-F06 See the apps' panels on the Home
@@ -1300,7 +1308,9 @@ Steps:
   1. The person does nothing: when the screen has an error nobody caught (also while drawing a part of the
      screen, or in a wait that failed untreated), it is noted by itself.
   2. It is sent to the hub with no window, no capture and no question, even while the tab is closing.
-  3. An identical error is not sent again within 30 seconds, and at most 50 different ones are remembered.
+  3. An identical error is not sent again within 30 seconds, and at most 50 different ones are remembered. A notice
+     from the browser itself that is no error of the screen, the one saying it left part of the drawing for the next
+     moment, is not sent: it breaks nothing and no app can fix it.
   4. The hub leaves it in its error log with the business, the person and the screen where it happened.
 In: the error's message, its trace and the screen, only with a session.
 Out: one line in the hub's error log; nothing is kept in the browser.
@@ -2464,8 +2474,8 @@ Steps:
      with its sector and in "Data and backups" offers that sector's template first, which leaves the business with
      its menu and its tables.
   2. It goes through the platform as its owner, on the phone, the tablet and the computer, in Spanish and in English:
-     the Home with "Summary" and "Activity", "My apps" and the bell; "Add apps" and the three tabs of Apps; the tabs
-     of Settings and the sections of "Data and backups"; Employees, a person's page, the roles, the keys and the
+     the Home with "Summary" and "Activity", "My apps" and the bell; "Add apps" and the tabs of Apps ("Paid" does
+     not show while no app is sold apart); the tabs of Settings and the sections of "Data and backups"; Employees, a person's page, the roles, the keys and the
      approvals; the five tabs of System; Files; "My profile"; an address that does not exist; and the assistant,
      which opens and answers.
   3. On each screen it checks that it loads with no error, that nothing runs off a side and that no text is left in

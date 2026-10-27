@@ -4,12 +4,28 @@
 // CloudWatch counts. An identical error is sent once every 30 s and at most 50 different ones are remembered; the
 // report is best effort: `navigator.sendBeacon` (it survives the page closing and needs no answer), never retried, and
 // a report that cannot leave never makes another. Nothing is kept in the browser. The address goes without its query
-// string (a sign-in code may travel there).
+// string (a sign-in code may travel there). The browser's own notices that are no error of the screen are not sent
+// (BASE-F47, `BROWSER_NOTICES`).
 import type { App } from 'vue';
 
 export const REPORT_URL = '/api/error-report';
 export const DEDUPE_MS = 30_000;
 export const MAX_REMEMBERED = 50;
+
+/**
+ * Notices the browser raises as a window `error` with no Error behind them, that are no error of the screen and that no
+ * app can fix: the ResizeObserver loop notice (the browser held some size notifications for the next frame; nothing
+ * broke), in its current words and in Chrome's older ones. Every error reporter drops them on the client (Sentry's
+ * `ignoreErrors`, TrackJS's ignore rules). Compared whole: anything else that names ResizeObserver, or the same words
+ * thrown by the app (with a stack), is a real error and is sent.
+ */
+export const BROWSER_NOTICES: ReadonlySet<string> = new Set([
+  'ResizeObserver loop completed with undelivered notifications.',
+  'ResizeObserver loop limit exceeded',
+]);
+
+const isBrowserNotice = (error: ScreenError): boolean =>
+  error.kind === 'error' && error.stack === '' && BROWSER_NOTICES.has(error.message);
 
 export type ErrorKind = 'error' | 'unhandledrejection' | 'vue';
 
@@ -30,7 +46,7 @@ export interface ReporterDeps {
 }
 
 export interface ErrorReporter {
-  /** Sends `error` unless the same was sent within 30 s; whether it was sent. Never throws. */
+  /** Sends `error` unless it is a browser notice or the same was sent within 30 s; whether it was sent. Never throws. */
   report(error: ScreenError): boolean;
 }
 
@@ -39,6 +55,7 @@ export function createErrorReporter(deps: ReporterDeps = browserDeps()): ErrorRe
   const sentAt = new Map<string, number>();
   return {
     report(error) {
+      if (isBrowserNotice(error)) return false;
       const key = `${error.kind}\u0000${error.message}\u0000${error.stack}`;
       const now = deps.now();
       const last = sentAt.get(key);
