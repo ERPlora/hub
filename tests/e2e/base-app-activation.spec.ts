@@ -203,6 +203,13 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       expect(await menuApps(page)).toContain('Tasks');
       await snap(page, 'counter', width);
 
+      // Tasks' own screen, visited while on and left behind (as Ionic keeps the pages one came from): the gate below
+      // must win over it in the same address.
+      await openInside(page, tasksScreen);
+      await expect(testid(page, 'task-views')).toBeVisible();
+      await openInside(page, '/apps');
+      await expect(testid(page, 'apps-counter')).toBeVisible();
+
       // BASE-F23 — «Turn off» asks with its name; confirmed, Tasks leaves «My apps» and the menu.
       await testid(page, 'apps-row-task-toggle').click();
       const confirm = page.locator('.ep-confirm-dialog').last();

@@ -1,8 +1,8 @@
 diff --git a/dist/index.js b/dist/index.js
-index 56807374194f8231aa978440339a317e9f8d6eac..94753337a4ce77ce7cbce817b638910f0158cc00 100644
+index 56807374194f8231aa978440339a317e9f8d6eac..8ba1faf147457c6bc2e95b097fe4f73c7aafc406 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -1343,6 +1343,23 @@ const IonRouterOutlet = /*@__PURE__*/ defineComponent({
+@@ -1343,6 +1343,26 @@ const IonRouterOutlet = /*@__PURE__*/ defineComponent({
          const viewStacks = inject("viewStacks");
          const components = shallowRef([]);
          let skipTransition = false;
@@ -13,11 +13,14 @@ index 56807374194f8231aa978440339a317e9f8d6eac..94753337a4ce77ce7cbce817b638910f
 +         * `findViewItemByRouteInfo`, which resolves the address again and gets the screen's own
 +         * route: the gate's page got a new view on every visit, and its transition read
 +         * `ionPageElement` of nothing and left the page before on screen. When the address finds
-+         * no view, the one of the route the router matched, in that address, is it.
++         * no view on a route the router matched, the one of the route it matched, in that address, is it.
 +         */
 +        const findViewItemOnRoute = (routeInfo) => {
 +            const found = viewStacks.findViewItemByRouteInfo(routeInfo, id);
-+            if (found)
++            // The view the address finds counts only on a route the router matched now: with the gate
++            // on screen, the view of the screen's own route, visited before and kept on the stack, would
++            // otherwise come back in the gate's place.
++            if (found && route.matched.includes(found.matchedRoute))
 +                return found;
 +            const matchedRoute = matchedRouteRef.value;
 +            const stack = viewStacks.getViewStack(id);
@@ -26,7 +29,7 @@ index 56807374194f8231aa978440339a317e9f8d6eac..94753337a4ce77ce7cbce817b638910f
          // The base url for this router outlet
          let parentOutletPath;
          /**
-@@ -1502,12 +1519,49 @@ const IonRouterOutlet = /*@__PURE__*/ defineComponent({
+@@ -1502,12 +1522,49 @@ const IonRouterOutlet = /*@__PURE__*/ defineComponent({
              });
              return result;
          };
@@ -78,7 +81,7 @@ index 56807374194f8231aa978440339a317e9f8d6eac..94753337a4ce77ce7cbce817b638910f
              /**
               * All views that can be transitioned to must have
               * an `<ion-page>` element for transitions and lifecycle
-@@ -1523,6 +1577,18 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
+@@ -1523,6 +1580,18 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
              if (!leavingViewItem && prevRouteLastPathname) {
                  leavingViewItem = viewStacks.findViewItemByPathname(prevRouteLastPathname, id);
              }
@@ -97,7 +100,7 @@ index 56807374194f8231aa978440339a317e9f8d6eac..94753337a4ce77ce7cbce817b638910f
              /**
               * If the entering view is already
               * visible, then no transition is needed.
-@@ -1547,6 +1613,20 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
+@@ -1547,6 +1616,20 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
                  !isViewVisible(leavingViewItem.ionPageElement)) {
                  return;
              }
@@ -118,7 +121,7 @@ index 56807374194f8231aa978440339a317e9f8d6eac..94753337a4ce77ce7cbce817b638910f
              fireLifecycle(enteringViewItem.vueComponent, enteringViewItem.vueComponentRef, LIFECYCLE_WILL_ENTER);
              if ((leavingViewItem === null || leavingViewItem === void 0 ? void 0 : leavingViewItem.ionPageElement) &&
                  enteringViewItem !== leavingViewItem) {
-@@ -1633,7 +1713,7 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
+@@ -1633,7 +1716,7 @@ See https://ionicframework.com/docs/vue/navigation#ionpage for more information.
                  return;
              }
              const currentRoute = ionRouter.getCurrentRouteInfo();
