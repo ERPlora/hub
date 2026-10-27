@@ -73,6 +73,8 @@ async function spanish(
   await page.goto(`${A}/`);
   await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
   await expect(card(page)).toHaveAttribute('aria-busy', 'false');
+  // The person's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   return { context, page };
 }
 
