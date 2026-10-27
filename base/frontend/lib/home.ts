@@ -44,8 +44,6 @@ export interface HubHome {
   plan_url: string;
   /** The person's account on erplora.com (the user menu's «My account»). */
   account_url: string;
-  /** erplora.com's form to report a problem to support (the user menu's «Report a problem», PLAN-SAAS §1.1). */
-  report_url: string;
   /** «Members» of this business on erplora.com, where people are invited, given a role and removed (APP-BASE-5). */
   members_url?: string;
   /** This business on erplora.com's panel (the bar's «erplora.com», BASE-F11); empty for who may not open it. */

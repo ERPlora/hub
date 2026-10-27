@@ -5,7 +5,8 @@ paints the menu and decides on the login without a first round trip. ``spa-confi
 ``loginUrl``, ``/auth/login``, where the shell's auth gate sends (appending ``?next=``): the Hub's own
 jump to the SaaS's login, which gives it its ``state``. ``hub-home`` carries this hub's name (the SaaS's, which heads the
 Home, BASE-G127), where its plan is changed on the SaaS (``/dashboard/store/plans?business=<hub id>``, the menu's «Upgrade
-plan», BASE-G169), the SaaS's account and «Report a problem» pages (the user menu, PLAN-SAAS §1.1) and this business on
+plan», BASE-G169), the SaaS's account page (the user menu's «My account», PLAN-SAAS §1.1; its «Report a problem» is the
+hub's own dialog, BASE-F108, offered where «My account» is) and this business on
 the SaaS's panel (``manage_url``, the bar's «erplora.com», BASE-F11; only with ``base.open_management``), those only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
 ``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). ``widget-list`` carries
@@ -33,6 +34,7 @@ from live.ninja import run_operation_sync
 from live.spa import render_spa, spa_path_pattern
 
 from base import public_home, queries
+from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models import SessionOwner
 
@@ -80,6 +82,9 @@ def _shell(request: HttpRequest) -> HttpResponse:
     hub = getattr(request, "hub", None)
     if hub is not None and request.user.is_authenticated:
         way_in = queries.shell_access(request, hub.slug)
+        # A session opened before the login kept its credential in it: the shell copies what SessionOwner says, so the
+        # user menu's «Report a problem» (only for the account) and its operation (BASE-F108) say the same.
+        request.session.setdefault(CREDENTIAL_SESSION_KEY, way_in["credential"])
         # erplora.com's pages only for a session opened with the account: on a shared till, the browser's erplora.com
         # session is whoever made it a device of the hub, never the person who entered with a PIN (gh:hub#2506).
         account = way_in["credential"] == SessionOwner.Credential.ACCOUNT
@@ -87,7 +92,6 @@ def _shell(request: HttpRequest) -> HttpResponse:
             "name": hub.name,
             "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if account else "",
             "account_url": saas_url(f"{SAAS_PANEL_PATH}/account") if account else "",
-            "report_url": saas_url(f"{SAAS_PANEL_PATH}/report-a-problem") if account else "",
             # APP-BASE-5: «Members» of the business on erplora.com (HUBS-F24…F29), where people are invited.
             "members_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/members") if account else "",
             # BASE-F11: the bar's «erplora.com», this business on the panel, for who runs it (gh:hub#364).

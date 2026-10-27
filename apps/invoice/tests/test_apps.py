@@ -1,8 +1,23 @@
-"""The invoice app declares its module metadata, its menu entries, its permissions and what each role gets."""
+"""The invoice app declares its module metadata, its menu entries, its permissions, what each role gets and its
+hooks of the Home."""
 
 from django.apps import apps
 from django.conf import settings
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import (
+    Category,
+    LiveAppConfig,
+    Nav,
+    SetupCheck,
+    SetupStep,
+    module_configs,
+    permissions_for_role,
+)
+from live.operations import registry
+
+from apps.invoice import events as E
+from base import home
 
 PERMISSIONS = [
     "invoice.view_invoice",
@@ -184,3 +199,125 @@ def test_the_system_alone_issues_erploras_own_invoices():
         assert registry[name].permission == "invoice.issue_platform", name
         assert registry[name].expose_api is False, name
     assert "invoice.issue_platform" not in invoice().permissions
+
+
+# The Home's hooks (PLAN-HUB round 2026-10-21; FIX-INVOICE-SETUP-HOOKS): the old hub's ⛔ «Your business details»
+# (a core item there, ``BLOCKING_KEYS``; here the issuer lives in Invoicing) and the old module's module.json `setup`
+# «Your invoice numbering» (it had no `widgets` nor `bell`), on the queries the Issuer and Series screens read.
+
+
+def steps() -> dict[str, SetupStep]:
+    return {step.key: step for step in invoice().setup}
+
+
+def test_the_homes_steps_are_your_business_details_then_your_invoice_numbering():
+    assert all(isinstance(step, SetupStep) for step in invoice().setup)
+    assert [step.key for step in invoice().setup] == ["business_identity", "numbering"]
+
+
+def test_your_business_details_is_done_with_the_issuer_every_document_needs():
+    """INVOICE-F21: done when the issuer has what issuing refuses to go without (``Issuer.configured``: legal name,
+    tax ID and address), set up in Invoicing → Issuer by whoever may change it (gh:hub#1954: the screen with the tax
+    ID in sight, never a settings tab without it)."""
+    step = steps()["business_identity"]
+    assert (
+        step.operation,
+        list(step.configured_when),
+        dict(step.params),
+        step.route,
+        step.permission,
+        step.icon,
+        list(step.countries),
+        step.order,
+        step.required,
+    ) == (
+        "invoice.issuer.get",
+        [SetupCheck(field="configured", truthy=True)],
+        {},
+        "/invoice/issuer",
+        "invoice.manage_issuer",
+        "ion:storefront-outline",
+        [],
+        40,
+        True,
+    )
+    assert "configured" in registry[step.operation].output.model_fields
+    # The ⛔ is base's (its LEGAL_STEPS, the old hub's BLOCKING_KEYS), never the module's.
+    assert home.level_of(f"invoice.{step.key}", step.required) == home.LEVEL_LEGAL
+
+
+def test_your_invoice_numbering_is_done_once_the_business_has_its_numbering():
+    """INVOICE-F14: the series of the year are born on their own with the first document, so the step is
+    recommended, pending only while the business has no series at all (before its first document, the one moment a
+    prefix or the numbering of another system can still be chosen) and done for good after: a new year's series
+    inherit the last year's prefix and format."""
+    step = steps()["numbering"]
+    assert (
+        step.operation,
+        list(step.configured_when),
+        dict(step.params),
+        step.route,
+        step.permission,
+        step.icon,
+        list(step.countries),
+        step.order,
+        step.required,
+    ) == (
+        "invoice.numbering.status",
+        [SetupCheck(field="total_series", truthy=True)],
+        {},
+        "/invoice/series",
+        "invoice.manage_series",
+        "ion:layers-outline",
+        [],
+        50,
+        False,
+    )
+    assert "total_series" in registry[step.operation].output.model_fields
+    assert registry[step.operation].kind == "query"  # it only reads: it never opens the year's series
+    assert home.level_of(f"invoice.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+
+
+def test_the_steps_speak_the_language_of_whoever_reads_them():
+    """gh:hub#868: the old checklist said a module's step in English to a Spanish reader."""
+    texts = {}
+    for language in ("en", "es"):
+        with translation.override(language):
+            texts[language] = [(str(step.title), str(step.description)) for step in invoice().setup]
+    assert texts["en"] == [
+        (
+            "Your business details",
+            "Legal name, tax ID and address: without them you cannot issue an invoice.",
+        ),
+        (
+            "Your invoice numbering",
+            "Before your first sale, check the prefix your invoice numbers will carry. If you are coming from "
+            "another system, continue its numbering instead of starting again at 1.",
+        ),
+    ]
+    assert texts["es"] == [
+        (
+            "Los datos de tu negocio",
+            "Razón social, NIF y domicilio: sin ellos no puedes emitir una factura.",
+        ),
+        (
+            "Tu numeración de facturas",
+            "Antes de tu primera venta, revisa el prefijo con el que saldrán tus números de factura. Si vienes de "
+            "otro sistema, continúa su numeración en vez de empezar otra vez por el 1.",
+        ),
+    ]
+
+
+def test_each_step_is_refreshed_by_the_events_that_change_its_query():
+    # gh:hub#900: the old notice stayed after the business details were saved; the issuer saved or received, a
+    # series created or changed and a document that opens one re-run the steps.
+    identity, numbering = steps()["business_identity"], steps()["numbering"]
+    assert list(identity.refresh_on) == [E.ISSUER_UPDATED]
+    assert list(numbering.refresh_on) == E.SERIES_EVENTS
+    for step in (identity, numbering):
+        assert set(step.refresh_on) <= set(live_registry.subscribable[step.operation]), step.key
+
+
+def test_the_app_brings_no_panels_nor_counters_to_the_home():
+    # The old module had neither `widgets` nor `bell`.
+    assert (list(invoice().widgets), list(invoice().bell)) == ([], [])

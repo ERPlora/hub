@@ -72,6 +72,7 @@ from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
 from base import access, auth, blueprint, events, files, queries, registry, signing, system
+from base.access import CREDENTIAL_SESSION_KEY
 from base import assistant
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
@@ -227,6 +228,7 @@ def _log_in(
     as that device and the business allow (``base.access.session_lifetime``), fixed now."""
     login(request, user, backend=MODEL_BACKEND)
     request.session[SAAS_USER_ID_SESSION_KEY] = saas_user_id
+    request.session[CREDENTIAL_SESSION_KEY] = credential
     if device is not None:
         policy = queries.access_settings().pin_policy
         request.session.set_expiry(timezone.now() + access.session_lifetime(device.mode, policy))
@@ -2761,6 +2763,115 @@ def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> 
         raise _gateway_failure(
             "base.assistant_transcribe_failed", gettext("The audio could not be transcribed: try again.")
         ) from None
+
+
+# ── «Report a problem» (BASE-F108; ACCOUNTS-F38 of the SaaS) ────────────────────────────────────────────────────────
+# The user menu's dialog sends it to erplora.com, which mails its support mailbox «Reply-To» the account and limits it
+# per account (SUPPORT_REPORT_RATELIMIT, the panel's and the hub's together): the hub keeps nothing and limits nothing.
+from base.schemas import SupportReportIn, SupportReportOut  # noqa: E402
+
+SUPPORT_REPORT_PATH = "/internal/support/report"
+#: Characters of the browser a report sends: erplora.com keeps as many.
+REPORT_BROWSER_MAX = 300
+
+
+def _reporting_account(ctx: OperationContext) -> str:
+    """The erplora.com account behind this session, which support answers to: only a session opened with it on this
+    hub. A PIN or a badge on a shared till (gh:hub#2506), a demo's visitor or a call without a session has none, and
+    neither has a session that does not say how it was opened (``CREDENTIAL_SESSION_KEY``): never the account by
+    default."""
+    request, user = ctx.request, ctx.actor
+    username = user.get_username() if hasattr(user, "get_username") else ""
+    opened_with = request.session.get(CREDENTIAL_SESSION_KEY) if request is not None else None
+    if (
+        not username.startswith(SAAS_USERNAME_PREFIX)
+        or opened_with != SessionOwner.Credential.ACCOUNT
+        or getattr(request, "hub", None) is None
+    ):
+        raise PermissionDenied(
+            gettext("Sign in with your erplora.com account to report a problem."), code="base.support_needs_account"
+        )
+    return saas_user_id_of(user)
+
+
+def _report_not_sent() -> OperationError:
+    return OperationError(
+        gettext("We could not send your report. Write to us directly at %(email)s.") % {"email": settings.SUPPORT_EMAIL},
+        code="base.report_not_sent",
+        status=503,
+    )
+
+
+def _reply_to(answer: bytes) -> str | None:
+    """The address erplora.com says support answers to, or ``None`` when its answer is no report sent."""
+    try:
+        payload = json.loads(answer)
+    except ValueError:
+        return None
+    reply_to = payload.get("reply_to") if isinstance(payload, dict) else None
+    return reply_to if isinstance(reply_to, str) and reply_to else None
+
+
+@operation(
+    "base.support.report",
+    kind="command",
+    permission=VIEW_HOME,
+    input=SupportReportIn,
+    output=SupportReportOut,
+    ai={
+        "description": "Sends erplora.com's support team a problem the person describes: a short subject and what "
+        "happened. Their account, this business, the screen and the browser go with it, and support answers by email "
+        "to their account. Only for a person who entered with their erplora.com account, never with a PIN.",
+        "risk": "normal",
+    },
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    database=False,
+)
+def support_report(ctx: OperationContext, data: SupportReportIn) -> dict:
+    """«Report a problem» (BASE-F108): ``POST {SAAS_INTERNAL_URL}/internal/support/report``, signed v1 + v2, with the
+    account, the business, the screen and the browser. erplora.com's limit is «Too many attempts…»; erplora.com out of
+    reach or refusing it, the address to write to. The text is never logged."""
+    account = _reporting_account(ctx)
+    subject, description = data.subject.strip(), data.description.strip()
+    missing = {}
+    if not subject:
+        missing["subject"] = gettext("Add a subject.")
+    if not description:
+        missing["description"] = gettext("Describe the problem, please.")
+    if missing:
+        raise InvalidPayload(" ".join(missing.values()), code="base.support_report_incomplete", fields=missing)
+    request = ctx.request
+    hub = request.hub
+    body = json.dumps(
+        {
+            "account": account,
+            "hub": hub.slug,
+            "hub_id": str(hub.id),
+            "page": data.page,
+            "browser": request.headers.get("User-Agent", "")[:REPORT_BROWSER_MAX],
+            "subject": subject,
+            "description": description,
+        }
+    ).encode()
+    headers = {
+        "Content-Type": "application/json",
+        **signing.signed_headers("POST", SUPPORT_REPORT_PATH, body, int(time.time()), settings.INTERNAL_SHARED_SECRET),
+    }
+    try:
+        status, answer = auth.post(auth.saas_internal_url(SUPPORT_REPORT_PATH), body, headers, auth.TIMEOUT_SECONDS)
+    except OSError as failed:
+        logger.warning("base.support_report_not_sent hub=%s: the SaaS is unreachable (%s).", hub.slug, failed)
+        raise _report_not_sent() from None
+    if status == 429:
+        raise OperationError(
+            gettext("Too many attempts. Please try again in a few minutes."), code="base.too_many_attempts", status=429
+        )
+    reply_to = _reply_to(answer) if status == 200 else None
+    if reply_to is None:
+        logger.warning("base.support_report_not_sent hub=%s: the SaaS answered %s.", hub.slug, status)
+        raise _report_not_sent()
+    logger.info("base.support_report_sent hub=%s", hub.slug)
+    return {"reply_to": reply_to}
 
 
 # ── Apps turned on and off by the business, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25) ────────────

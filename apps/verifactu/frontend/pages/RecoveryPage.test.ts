@@ -8,6 +8,7 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { resolveIcon } from '../../../../packages/ui/src/shell/icons';
 import { click, flush, ionValue, MANAGER, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { ChainStatusOut, ConfigOut } from '../operations';
@@ -114,6 +115,13 @@ describe('RecoveryPage', () => {
     ]);
     const cells = s.wrapper.findAll('[data-testid="verifactu-recovery-aeat-row"]')[0].findAll('[role="cell"]').map((c) => plain(c.text().trim()));
     expect(cells.slice(0, 5)).toEqual(['TICKET-2026-000003', '10/14/2026', 'AAAAAAAAAA…AAAAAAAAAA', 'Registered', 'A-1']);
+  });
+
+  it('as cards, each AEAT record wears the old module’s shield (a registered icon)', async () => {
+    const s = await setup();
+    const cardIcon = (s.table().props() as Record<string, unknown>).cardIcon as () => string;
+    expect(cardIcon()).toBe('ion:shield-checkmark-outline');
+    expect(resolveIcon(cardIcon())).toBeTruthy();
   });
 
   it('searches, sorts and filters the AEAT records on the server', async () => {

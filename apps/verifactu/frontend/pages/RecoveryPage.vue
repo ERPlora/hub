@@ -252,7 +252,7 @@ async function continueManually(): Promise<void> {
         :sort-dir="aeatTable.dir.value"
         :views="['table', 'cards']"
         :card-title="(row: AeatRecordOut) => row.invoice_number"
-        :card-icon="() => 'lucide:shield-check'"
+        :card-icon="() => 'ion:shield-checkmark-outline'"
         :entity-label="{ one: $t('verifactu.recovery.aeatEntity.one'), many: $t('verifactu.recovery.aeatEntity.many') }"
         :loading="aeatStatus === 'loading'"
         :error="aeatTableError"

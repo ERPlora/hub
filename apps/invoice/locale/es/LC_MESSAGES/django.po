@@ -892,3 +892,25 @@ msgstr "Líneas"
 
 msgid "Type of rectifying invoice"
 msgstr "Tipo de rectificativa"
+
+#: apps.py
+msgid "Your business details"
+msgstr "Los datos de tu negocio"
+
+#: apps.py
+msgid "Legal name, tax ID and address: without them you cannot issue an invoice."
+msgstr "Razón social, NIF y domicilio: sin ellos no puedes emitir una factura."
+
+#: apps.py
+msgid "Your invoice numbering"
+msgstr "Tu numeración de facturas"
+
+#: apps.py
+msgid ""
+"Before your first sale, check the prefix your invoice numbers will carry. If "
+"you are coming from another system, continue its numbering instead of "
+"starting again at 1."
+msgstr ""
+"Antes de tu primera venta, revisa el prefijo con el que saldrán tus números "
+"de factura. Si vienes de otro sistema, continúa su numeración en vez de "
+"empezar otra vez por el 1."

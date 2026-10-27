@@ -67,9 +67,11 @@ def test_the_list_of_an_owner_over_http(client, make_user, settings):
 
     assert response.status_code == 200
     body = response.json()
-    # Base's own steps; the modules of the store bring theirs too (VeriFactu's, FIX-VERIFACTU-SETUP-HOOKS).
+    # Base's own steps; the modules of the store bring theirs too (VeriFactu's, FIX-VERIFACTU-SETUP-HOOKS), and the
+    # one wall is Invoicing's while the hub has no issuer (FIX-INVOICE-SETUP-HOOKS).
     assert [item["key"] for item in body["items"] if item["app"] == "base"] == ["base.apps", "base.team"]
-    assert body["blocking_pending"] == 0
+    walls = [item["key"] for item in body["items"] if item["level"] == "legal" and item["state"] == "pending"]
+    assert (walls, body["blocking_pending"]) == (["invoice.business_identity"], 1)
 
 
 def test_an_anonymous_visitor_gets_no_home(client):
@@ -125,6 +127,7 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/assistant/usage", "base.assistant.usage"),
         ("POST", "/api/assistant/report", "base.assistant.report"),
         ("POST", "/api/assistant/transcribe", "base.assistant.transcribe"),
+        ("POST", "/api/support/report", "base.support.report"),
     } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS}
 
 

@@ -1448,6 +1448,21 @@ class AssistantReportOut(Schema):
     duplicate: bool
 
 
+class SupportReportIn(Schema):
+    """What the person writes to erplora.com's support (BASE-F108), with the limits of erplora.com's own page
+    (ACCOUNTS-F38); the account, the business and the browser go with it on their own."""
+
+    subject: str = Field(max_length=150, title=gettext_noop("Report subject"))
+    description: str = Field(max_length=5000, title=gettext_noop("What happened?"))
+    #: The hub's screen the person was on, as the SPA's router knew it.
+    page: str | None = Field(default=None, max_length=500, title=gettext_noop("Screen"))
+
+
+class SupportReportOut(Schema):
+    #: Where support answers: the account's email, as erplora.com says.
+    reply_to: str
+
+
 class AssistantTranscribeIn(Schema):
     # 2 MB of audio is 2 796 204 characters of base64 (the gateway's own limit).
     audio: str = Field(min_length=1, max_length=2_800_000, description="The recording, in base64.")

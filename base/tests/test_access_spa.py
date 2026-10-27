@@ -3,7 +3,7 @@
 - «Switch user» (BASE-G60) only on a shared device of the hub of a business that asks, with somebody on its grid.
 - The lock after inactivity (BASE-G59) only there and when the business always asks: its minutes, served with the
   session itself, so a till never has to read them on its own and fall back to anything (gh:hub#2537, hub#2677).
-- erplora.com's pages (account, report, plan, the bar's «erplora.com») only for a session opened with the account: a
+- erplora.com's pages (account, plan, the bar's «erplora.com») only for a session opened with the account: a
   session opened with a PIN or a badge on a shared till is not that browser's erplora.com account (gh:hub#2506).
 """
 
@@ -56,7 +56,8 @@ def test_an_account_s_session_keeps_erplora_com_s_pages_and_no_switch_off_a_till
     ana, _ = people
     client.force_login(ana)
     home = hub_home(client)
-    assert home["account_url"] and home["report_url"] and home["plan_url"] and home["members_url"] and home["manage_url"]
+    assert home["account_url"] and home["plan_url"] and home["members_url"] and home["manage_url"]
+    assert "report_url" not in home
     assert home["access"] == {"credential": "account", "switch_user": False, "idle_minutes": None}
 
 
@@ -66,7 +67,7 @@ def test_a_pin_session_on_a_till_switches_user_and_never_names_erplora_com(clien
     with_pin(ana, "4826")
     enter_with_pin(client, with_pin(bea, "9071"), "9071")
     home = hub_home(client)
-    assert (home["account_url"], home["report_url"], home["plan_url"], home["members_url"]) == ("", "", "", "")
+    assert (home["account_url"], home["plan_url"], home["members_url"]) == ("", "", "")
     assert home["access"] == {"credential": "pin", "switch_user": True, "idle_minutes": None}
 
 

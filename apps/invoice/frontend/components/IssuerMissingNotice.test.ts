@@ -4,7 +4,9 @@
 // set up, or when it cannot be read (the page says that itself).
 import { describe, expect, it } from 'vitest';
 
-import { click, errorFrame, flush, mountInvoice } from '../__tests__/mount-invoice';
+import { click, EMPLOYEE, errorFrame, flush, MANAGER, mountInvoice } from '../__tests__/mount-invoice';
+import type { SessionMe } from '@erplora/ui/shell';
+
 import type { IssuerOut } from '../operations';
 import IssuerMissingNotice from './IssuerMissingNotice.vue';
 
@@ -26,8 +28,8 @@ const EMPTY: IssuerOut = {
 };
 const SET: IssuerOut = { ...EMPTY, configured: true, legal_name: 'Peluquería Ana SL', tax_id: 'B12345674', address: 'Calle Mayor 1' };
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountInvoice(IssuerMissingNotice, { path: '/invoice/invoices', locale });
+async function setup(locale: 'en' | 'es' = 'en', session?: SessionMe) {
+  const m = await mountInvoice(IssuerMissingNotice, { path: '/invoice/invoices', locale, session });
   const call = await m.live();
   const banner = () => m.find('invoice-issuer-notice');
   return { ...m, call, banner };
@@ -68,6 +70,25 @@ describe('IssuerMissingNotice', () => {
     expect(s.banner().exists()).toBe(false);
   });
 
+  it('to whoever may not change the issuer, says an administrator has to set it up, with no «Set up»', async () => {
+    // The Home's ⛔ says the same (gh:hub#435): «Set up» would open an Issuer page they can only read.
+    for (const session of [EMPLOYEE, MANAGER]) {
+      const s = await setup('en', session);
+      await s.result(OP, EMPTY);
+      expect(s.banner().text()).toContain('You cannot invoice yet');
+      expect(s.find('invoice-issuer-notice-item').text()).toBe('The business’s details');
+      expect(s.find('invoice-issuer-notice-setup').exists()).toBe(false);
+      expect(s.find('invoice-issuer-notice-delegated').text()).toBe('An administrator has to set this up.');
+    }
+  });
+
+  it('to whoever may change it, offers «Set up» and no note', async () => {
+    const s = await setup();
+    await s.result(OP, EMPTY);
+    expect(s.find('invoice-issuer-notice-setup').exists()).toBe(true);
+    expect(s.find('invoice-issuer-notice-delegated').exists()).toBe(false);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup('es');
     await s.result(OP, EMPTY);
@@ -75,5 +96,11 @@ describe('IssuerMissingNotice', () => {
     expect(s.banner().text()).toContain('No se podrá emitir ningún tique ni factura hasta que configures esto:');
     expect(s.find('invoice-issuer-notice-item').text()).toBe('Los datos de tu negocio');
     expect(s.find('invoice-issuer-notice-setup').text()).toBe('Configurar');
+  });
+
+  it('speaks Spanish to whoever may not change the issuer', async () => {
+    const s = await setup('es', EMPLOYEE);
+    await s.result(OP, EMPTY);
+    expect(s.find('invoice-issuer-notice-delegated').text()).toBe('Esto lo tiene que configurar un administrador.');
   });
 });

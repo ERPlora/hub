@@ -2,7 +2,8 @@
 // - «Upgrade plan» at the foot of the side menu (BASE-F11): lined up with the QR above it and inside the menu, and on
 //   the rail (≥992 px, the menu folded to its icons) only its icon, still named, inside the 68 px;
 // - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height;
-// - the user menu's «My account» and «Report a problem» (PLAN-SAAS §1.1): erplora.com's pages, in a new tab;
+// - the user menu's «My account» (PLAN-SAAS §1.1): erplora.com's page, in a new tab; its «Report a problem» is the
+//   hub's own dialog (BASE-F108, tests/e2e/base-report-problem.spec.ts);
 // - «erplora.com» of the bar (BASE-F11): this business on erplora.com's panel, in a new tab, for who runs it; on a
 //   phone, the first row of «More options». An employee's bar has none.
 // No module of main declares a ⛔ step yet (Invoicing's comes with its own task), so the strip's test serves the page
@@ -169,13 +170,10 @@ test('BASE-F01 — the blocking strip sits between the bar and the content, at i
   }
 });
 
-test('the user menu opens «My account» and «Report a problem» on erplora.com, in a new tab', async ({ page }) => {
+test('the user menu opens «My account» on erplora.com, in a new tab; «Report a problem» stays in the hub', async ({ page }) => {
   await login(page, A, '/');
   const trigger = page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name');
-  const entries = [
-    { id: 'account', label: 'My account', address: `${STACK.saas}/dashboard/account` },
-    { id: 'report', label: 'Report a problem', address: `${STACK.saas}/dashboard/report-a-problem` },
-  ];
+  const entries = [{ id: 'account', label: 'My account', address: `${STACK.saas}/dashboard/account` }];
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/`);
@@ -200,12 +198,16 @@ test('the user menu opens «My account» and «Report a problem» on erplora.com
       await expect(link).toHaveAttribute('target', '_blank');
       await expect(link).toHaveAttribute('rel', 'noopener');
     }
+    // BASE-F108: «Report a problem» is a button of the hub, no link to erplora.com.
+    const report = page.locator('ion-popover [data-testid="user-menu-report"]');
+    await expect(report, `report at ${vp.label}`).toContainText('Report a problem');
+    await expect(report.locator('a.item-native')).toHaveCount(0);
     await untilStill(page);
     await page.screenshot({ path: shot(`APP-BASE-1-user-menu-${vp.label}`) });
     if (vp.width === 1440) {
-      // Tapped, the page opens in a tab of its own and the hub stays where it was.
-      const [tab] = await Promise.all([page.waitForEvent('popup'), page.locator('ion-popover [data-testid="user-menu-report"]').click()]);
-      await tab.waitForURL(`${STACK.saas}/dashboard/report-a-problem`);
+      // Tapped, «My account» opens in a tab of its own and the hub stays where it was.
+      const [tab] = await Promise.all([page.waitForEvent('popup'), page.locator('ion-popover [data-testid="user-menu-account"]').click()]);
+      await tab.waitForURL(`${STACK.saas}/dashboard/account`);
       await tab.close();
       await expect(page).toHaveURL(`${A}/`);
     } else {

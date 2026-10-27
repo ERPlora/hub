@@ -2846,5 +2846,9 @@
   "base.assistant.transcribe": {
     "method": "post",
     "path": "/api/assistant/transcribe"
+  },
+  "base.support.report": {
+    "method": "post",
+    "path": "/api/support/report"
   }
 }

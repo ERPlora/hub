@@ -27,6 +27,7 @@ import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/fronte
 import { installErrorReport } from '../base/frontend/lib/error-report';
 import { approvalPass } from '../base/frontend/lib/approval';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
+import { openReportProblem } from '../base/frontend/lib/report-problem';
 import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
 import { OPERATION_ROUTES } from './generated/operation-routes';
 
@@ -105,10 +106,11 @@ export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShe
 
 /**
  * The user menu: «Profile» (the person's page in this hub, BASE-G125) and, on a shared till of a business that asks,
- * «Switch user» (BASE-G60), both from `hub-home`'s `access` (APP-BASE-3); then the person's account and «Report a
- * problem», erplora.com's pages (PLAN-SAAS §1.1), opened from the addresses `base/spa.py` embeds only in a session
- * opened with the account (a new tab; the system browser in the installed app; gh:hub#2506); then the Hub's sign out,
- * a form POST to `/auth/logout` once the assistant's conversation is forgotten (`signOut`). Without `hub-home` (no hub), only the sign out.
+ * «Switch user» (BASE-G60), both from `hub-home`'s `access` (APP-BASE-3); then the person's account, erplora.com's
+ * page (PLAN-SAAS §1.1), opened from the address `base/spa.py` embeds only in a session opened with the account (a new
+ * tab; the system browser in the installed app; gh:hub#2506), and with it «Report a problem», base's own dialog
+ * (BASE-F108), since only that session has an account for support to answer to; then the Hub's sign out, a form POST
+ * to `/auth/logout` once the assistant's conversation is forgotten (`signOut`). Without `hub-home` (no hub), only the sign out.
  */
 export function userMenu(doc: Document): ShellUserMenu {
   const home = readJsonBlock<HubHome>('hub-home', doc);
@@ -119,10 +121,10 @@ export function userMenu(doc: Document): ShellUserMenu {
   if (readAccess(doc).switch_user) {
     items.push({ id: 'switch-user', labelKey: 'base.userMenu.switchUser', icon: 'ion:people-outline', to: '/switch-user' });
   }
-  if (home.account_url && home.report_url) {
+  if (home.account_url) {
     items.push(
       { id: 'account', labelKey: 'base.userMenu.account', icon: 'ion:person-outline', href: home.account_url },
-      { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', href: home.report_url },
+      { id: 'report', labelKey: 'base.userMenu.reportProblem', icon: 'ion:chatbubbles-outline', run: openReportProblem },
     );
   }
   return { items, logout: signOut };

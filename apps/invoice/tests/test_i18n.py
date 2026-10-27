@@ -82,13 +82,15 @@ def messages_of(module) -> list:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, errors, paper)."""
+    """The English source of every lazy text the app shows (menu, store, Home, admin, choices, errors, paper)."""
     config = apps.get_app_config("invoice")
     lazies = [
         config.verbose_name,
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        # The Home's steps (FIX-INVOICE-SETUP-HOOKS): base paints them in the reader's language.
+        *(text for step in config.setup for text in (step.title, step.description)),
         *messages_of(queries),
         *messages_of(schemas),
         *messages_of(services),

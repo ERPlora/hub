@@ -107,9 +107,10 @@ erplora.com, en una pestaña nueva. Solo en el navegador: en la app instalada no
 ### El menú de usuario
 Se abre tocando a la persona, arriba del menú lateral. Primero «Perfil» y, en una caja compartida de un negocio
 que pide PIN, «Cambiar de usuario»; después, solo si se entró con la cuenta (nunca en una sesión de PIN), «Mi
-cuenta» y «Reportar un problema», que abren esas páginas en erplora.com (en una pestaña nueva; en la app
-instalada, en el navegador del dispositivo); al final «Tema» (claro, oscuro o el del sistema) y «Cerrar sesión».
-Las de erplora.com salen también en la app instalada: ninguna vende nada.
+cuenta», que abre esa página en erplora.com (en una pestaña nueva; en la app instalada, en el navegador del
+dispositivo), y «Reportar un problema», que abre un formulario en una ventana sin salir del hub (BASE-F108); al
+final «Tema» (claro, oscuro o el del sistema) y «Cerrar sesión». Las dos salen también en la app instalada:
+ninguna vende nada.
 
 ### La franja «Todavía no puedes facturar»
 Encima de cualquier pantalla mientras falta un paso que impide facturar: «No se podrá emitir ningún
@@ -408,6 +409,7 @@ En la pantalla Archivos:
 | BASE-F105 | Informar de una respuesta mala | hecho |
 | BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
+| BASE-F108 | Reportar un problema a soporte | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -1359,7 +1361,7 @@ Entra: el mensaje del error, su traza y la pantalla, solo con sesión.
 Sale: una línea en el registro de errores del hub; en el navegador no se guarda nada.
 Si falla: no pasa nada visible: el envío no se reintenta ni genera otro informe. Sin sesión, o con más de 30
 informes por minuto de la misma persona, el hub no lo apunta. Para contar algo a mano, «Reportar un problema» del
-menú de usuario.
+menú de usuario (BASE-F108).
 Implicados: ninguno
 
 ### BASE-F48 Abrir Ajustes y moverse por sus pestañas
@@ -2596,6 +2598,30 @@ Si falla: lo que falla en una pantalla es un fallo de la app que la tiene y se a
 todavía los tipos de negocio o el asistente de pruebas, la QA no empieza y dice cuál falta.
 Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48, BASE-F92
 
+### BASE-F108 Reportar un problema a soporte
+<!-- origen: nuevo (Ioan, 2026-10-25: «Reportar un problema» del menú de usuario en una ventana del hub, sin salir a la página de erplora.com de ACCOUNTS-F38) -->
+Estado: hecho
+Actor: propietario, administrador, responsable, empleado (quien entró con su cuenta de erplora.com)
+Pantalla: El menú de usuario
+Pasos:
+  1. En el menú de usuario, «Reportar un problema». Solo sale si se entró con la cuenta: nunca en una sesión de PIN
+     de una caja compartida, que no tiene una cuenta a la que responder.
+  2. Se abre «Reportar un problema» en una ventana, sin salir del hub: «Cuéntanos qué ha fallado. Te responderemos
+     por correo electrónico.», con «Asunto» y «¿Qué pasó?» («Describe los pasos y lo que esperabas que pasara») y,
+     debajo, «Con tu informe van tu cuenta, tus negocios, la página de la que vienes y tu navegador.».
+  3. «Enviar informe» espera a que los dos estén escritos; mientras se envía, la ventana no se cierra ni se envía
+     dos veces.
+  4. Sale «Informe enviado», con el correo al que soporte responderá, y «Cerrar».
+  5. «Cancelar» o cerrar la ventana no manda nada, y lo escrito sigue ahí si se vuelve a abrir.
+Entra: el asunto y lo que pasó.
+Sale: un correo al buzón de soporte de erplora.com con el asunto, el texto y, debajo, la cuenta, sus negocios, este
+negocio, la pantalla en la que estaba y su navegador; soporte contesta al correo de la cuenta (ACCOUNTS-F38). El hub
+no guarda nada.
+Si falla: tras cinco informes en una hora (los del hub y los de erplora.com juntos), «Demasiados intentos. Vuelve a
+intentarlo en unos minutos.»; si erplora.com no responde o no puede enviarlo, un aviso con la dirección de soporte
+para escribir directamente. En los dos casos lo escrito se queda y se puede volver a enviar.
+Implicados: ACCOUNTS-F38
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -2825,7 +2851,7 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   `base.pin.set`, `base.device.mode_changed|renamed|removed|pruned`, `base.access.settings_changed` y
   `base.profile.updated`; `base/live.py` sigue con ellos las caras, los dispositivos, el dial y el perfil.
 - `base/spa.py` incrusta en `hub-home` `access` (`credential`, `switch_user`, `idle_minutes`) y `preferences` (la
-  apariencia propia); `plan_url`, `account_url` y `report_url` solo en una sesión abierta con la cuenta
+  apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta
   (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
   `base.open_management` (propietario y administrador por `base.*`; el encargado, a mano en `base/apps.py`: no tiene
   `base.administer_hub`). Lo pinta `TopbarChrome.vue` (`topbar-manage`; en el móvil, `topbar-chrome-more-manage`),
@@ -2991,6 +3017,22 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
   lista de vigilancia), §10 (el informe PASS/FAIL por escenario) y §11 (el `POST /api/command|query` del runtime en
   Rust): aquí cada flujo tiene su e2e en `tests/e2e`, el banco es la pila de su README y la API es la de django-ninja
   de cada operación. La propina sigue fuera (pm#100).
+- «Reportar un problema» (BASE-F108, FIX-HUB-BASE-REPORT-PROBLEM-MODAL): la entrada `report` del menú de usuario
+  (`frontend/main.ts`) es una acción (`run` de `ShellUserMenuItem`, `packages/ui`) que abre `ReportProblemDialog.vue`
+  (en `BackgroundChrome.vue`, con `lib/report-problem.ts`), el `ReportProblemModal` de `@erplora/ui/components`
+  sobre `FormModal`. Sale con `account_url` (la sesión abierta con la cuenta; `base/spa.py` ya no incrusta
+  `report_url`). `base.support.report` (`base/services.py`, `database=False`: espera a erplora.com sin transacción
+  abierta) solo acepta una sesión abierta con la cuenta (`CREDENTIAL_SESSION_KEY` de `base/access.py`, que escribe
+  `_log_in` como `SessionOwner.credential`; una sesión sin ella no es de la cuenta, y el shell, `base/spa.py`, la
+  copia de `SessionOwner` al cargar, así que una sesión anterior al cambio sigue igual: la de la cuenta puede, la de
+  un turno con PIN no) y un usuario `saas:<id>`; si no, 403 `base.support_needs_account`. Firma v1 + v2 hacia
+  `POST {SAAS_INTERNAL_URL}/internal/support/report` del SaaS (`accounts/internal.py`), que llama al mismo
+  `send_support_report` que su panel (límite `SUPPORT_REPORT_RATELIMIT` por cuenta, «Reply-To» la cuenta, «From: Hub»
+  y el negocio). Un 429 del SaaS es 429 `base.too_many_attempts`; caído, fuera de tiempo o cualquier otra respuesta,
+  503 `base.report_not_sent` con `SUPPORT_EMAIL`. El hub no pone límite propio (el del SaaS ya va por cuenta) ni
+  registra el texto. Tests: `base/tests/test_support_report.py`; Vitest de `base/frontend/lib/report-problem.test.ts`,
+  `components/ReportProblemDialog.test.ts` y `frontend/main.test.ts`; e2e `tests/e2e/base-report-problem.spec.ts`
+  contra el SaaS de la pila.
 
 ## Lo que NO hace, a propósito
 
@@ -2999,8 +3041,9 @@ Implicados: HUBS-F01, BASE-F05, BASE-F14, BASE-F29, BASE-F38, BASE-F39, BASE-F48
 - No enseña nunca a un cliente los ejemplos de la app Demo.
 - Importar no trae personas, PIN, datos fiscales ni los ajustes del negocio; exportar no los lleva nunca, ni
   archivos ni imágenes.
-- No tiene formulario de soporte propio: «Reportar un problema» abre el de erplora.com, que manda el aviso
-  con la cuenta y el negocio; el hub no guarda nada.
+- No guarda los informes de «Reportar un problema» ni abre incidencias: los manda a erplora.com, que los envía al
+  buzón de soporte con la cuenta y el negocio (BASE-F108). No acepta un informe desde una sesión de PIN, que no tiene
+  una cuenta a la que responder, ni capturas adjuntas.
 - No vende ni enseña importes: el precio y la compra de una app de pago son de la Tienda de erplora.com, y en la
   app instalada ni siquiera lleva a ella.
 - No pregunta a erplora.com al abrir una app: usa lo último que erplora.com le pasó del negocio.

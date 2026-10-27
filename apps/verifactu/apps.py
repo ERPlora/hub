@@ -15,7 +15,7 @@ class VerifactuConfig(LiveAppConfig):
     label = "verifactu"
     kind = "app"
     verbose_name = _("VeriFactu")
-    icon = "lucide:shield-check"
+    icon = "ion:shield-checkmark-outline"
     category = Category.SALES
     premium = False
     # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.
@@ -55,7 +55,7 @@ class VerifactuConfig(LiveAppConfig):
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
     # module's own icon. Registered icons only (packages/ui/src/shell/icons.ts): the old document-text-outline
-    # and shield-checkmark-outline wait in UI-REQUESTS.md.
+    # waits in UI-REQUESTS.md.
     navigation = [
         Nav("records", _("Records"), "ion:list-outline", "/verifactu/records"),
         Nav(
@@ -65,7 +65,7 @@ class VerifactuConfig(LiveAppConfig):
             "/verifactu/contingency",
         ),
         Nav("events", _("Events"), "ion:time-outline", "/verifactu/events"),
-        Nav("recovery", _("Recovery"), "lucide:shield-check", "/verifactu/recovery"),
+        Nav("recovery", _("Recovery"), "ion:shield-checkmark-outline", "/verifactu/recovery"),
         Nav("config", _("Configuration"), "ion:key-outline", "/verifactu/config"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/verifactu/settings"),
     ]
@@ -76,7 +76,7 @@ class VerifactuConfig(LiveAppConfig):
     # refuses every sale without it (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). The panels read the queries of the old ones, each
     # refreshed by the events live.py re-runs it on; the latest events are a component of the app, which names each
     # event's type in the reader's language (gh:verifactu#139). Registered icons only: the old
-    # `shield-checkmark-outline` and `stats-chart-outline` wait in UI-REQUESTS.md.
+    # `stats-chart-outline` waits in UI-REQUESTS.md.
     setup = [
         SetupStep(
             key="sending_route",
@@ -87,7 +87,7 @@ class VerifactuConfig(LiveAppConfig):
                 "Sign the authorisation for ERPlora to send your invoices to the AEAT, or upload your business "
                 "certificate."
             ),
-            icon="lucide:shield-check",
+            icon="ion:shield-checkmark-outline",
             route="/verifactu/config",
             permission="verifactu.configure",
             required=True,
@@ -98,7 +98,7 @@ class VerifactuConfig(LiveAppConfig):
         Widget(
             key="pending",
             title=_("VeriFactu pending"),
-            icon="lucide:shield-check",
+            icon="ion:shield-checkmark-outline",
             size="sm",
             permission=VIEW,
             default=True,

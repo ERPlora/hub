@@ -1739,6 +1739,44 @@ msgid "The report could not be sent: try again in a moment."
 msgstr "No se ha podido enviar la denuncia: inténtalo de nuevo en un momento."
 
 #: base/services.py
+msgid "Sign in with your erplora.com account to report a problem."
+msgstr "Entra con tu cuenta de erplora.com para reportar un problema."
+
+#: base/services.py
+msgid "Add a subject."
+msgstr "Añade un asunto."
+
+#: base/services.py
+msgid "Describe the problem, please."
+msgstr "Describe el problema, por favor."
+
+#: base/services.py
+#, python-format
+msgid "We could not send your report. Write to us directly at %(email)s."
+msgstr "No hemos podido enviar tu informe. Escríbenos directamente a %(email)s."
+
+#: base/services.py
+msgid "Too many attempts. Please try again in a few minutes."
+msgstr "Demasiados intentos. Vuelve a intentarlo en unos minutos."
+
+#: base/assistant.py
+msgctxt "base"
+msgid "Report a problem"
+msgstr "Reportar un problema"
+
+#: base/schemas.py
+msgid "Report subject"
+msgstr "Asunto del informe"
+
+#: base/schemas.py
+msgid "What happened?"
+msgstr "¿Qué pasó?"
+
+#: base/schemas.py
+msgid "Screen"
+msgstr "Pantalla"
+
+#: base/services.py
 msgid "The recording is too long: dictate a shorter message."
 msgstr "La grabación es demasiado larga: dicta un mensaje más corto."
 

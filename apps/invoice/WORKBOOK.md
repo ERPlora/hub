@@ -63,8 +63,9 @@ Aquí manda la especificación oficial sobre el mercado:
 - Al activar Facturación se activan con ella **Ventas**, **Impuestos** y **Clientes** (las requiere).
   **VeriFactu** no se activa sola, pero en España hace falta para que cada factura llegue a la AEAT.
 - **El emisor** (razón social, NIF y domicilio del negocio) es obligatorio: **sin él no se emite
-  ningún documento** (Facturación → Emisor, INVOICE-F21); hasta entonces, **Facturas** y **Series** lo
-  avisan arriba («Todavía no puedes facturar», con «Configurar»). Hoy la identidad fiscal del negocio vive en
+  ningún documento** (Facturación → Emisor, INVOICE-F21); hasta entonces, el Inicio lo pide en «Termina de
+  configurar tu negocio» con el paso «Los datos de tu negocio» y la píldora «Necesario para facturar», y
+  **Facturas** y **Series** lo avisan arriba («Todavía no puedes facturar», con «Configurar»). Hoy la identidad fiscal del negocio vive en
   la cuenta de ERPlora (el SaaS); cuando el SaaS la mande en la foto del hub, el emisor se rellenará
   solo (INVOICE-F22) y la pantalla dirá que viene de la cuenta.
 - **«Hoy» es la hora de Madrid** en la fase 1 (el Hub todavía no guarda la zona horaria del negocio):
@@ -74,7 +75,8 @@ Aquí manda la especificación oficial sobre el mercado:
   (facturas completas y sustitutivas, F1 y F3) y «RECT» (rectificativas, R1–R5), con el código como
   prefijo (`TICKET-2026-000001`). La de un año nuevo hereda el nombre, el prefijo y el formato de la del
   año anterior con el mismo código. La venta numera **siempre** en esas tres; una serie con otro código
-  sirve para las facturas hechas a mano (INVOICE-F12).
+  sirve para las facturas hechas a mano (INVOICE-F12). Mientras el negocio no tiene ninguna serie, el Inicio
+  recomienda revisarlas con el paso «Tu numeración de facturas» (INVOICE-F14).
 
 Configuración inicial, paso a paso:
 
@@ -95,7 +97,8 @@ columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cl
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
 último emitido sale arriba. Mientras el emisor no está configurado, arriba sale «Todavía no puedes
 facturar» («No se podrá emitir ningún tique ni factura hasta que configures esto:», «Los datos de tu
-negocio» y «Configurar», que abre **Emisor**). Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
+negocio» y «Configurar», que abre **Emisor**; a quien no puede cambiar el emisor, en lugar de «Configurar», «Esto lo
+tiene que configurar un administrador.»). Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
 que están «Emitida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
 están canceladas ni sustituidas). El botón **+** abre «Nueva factura manual» (INVOICE-F03); sin permiso
 de emitir no aparece, ni tampoco «Marcar pagada». La lista se pone al día sola cuando se emite, se
@@ -197,7 +200,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F11 | Numerar cada documento en su serie y su año | hecho |
 | INVOICE-F12 | Crear una serie de numeración | hecho |
 | INVOICE-F13 | Cambiar una serie | hecho |
-| INVOICE-F14 | Saber si la numeración del año está preparada | parcial — falta la tarea «Tu numeración de facturas» de Inicio, que es de la plataforma; hoy la respuesta solo se pide por la API |
+| INVOICE-F14 | Saber si la numeración del año está preparada | hecho |
 | INVOICE-F15 | Comprobar que la numeración no tiene huecos | hecho |
 | INVOICE-F16 | Buscar una factura | hecho |
 | INVOICE-F17 | Ver una factura | hecho |
@@ -548,17 +551,25 @@ Implicados: ninguno
 
 ### INVOICE-F14 Saber si la numeración del año está preparada
 <!-- origen: old:invoice/workflow/numeracion.md#invoice-f14 -->
-Estado: parcial — falta la tarea «Tu numeración de facturas» de Inicio, que es de la plataforma; hoy la respuesta solo se pide por la API
-Actor: responsable, administrador, asistente
-Pantalla: ninguna (la tarea de Inicio llegará con la plataforma)
+Estado: hecho
+Actor: propietario, responsable, administrador, asistente
+Pantalla: Inicio, Series
 Pasos:
-1. Se pregunta (asistente, API o la futura tarea de Inicio) si la numeración del año está preparada.
-2. La respuesta dice el año del negocio y cuántas series ordinarias (F1, F2, F3), de rectificativas
-   (R1–R5) y predeterminadas tiene ese año, y si está preparada (al menos una ordinaria y una de
-   rectificativas).
-Entra: las series del año del negocio.
-Sale: nada; solo se lee.
-Si falla: nada que fallar; un negocio recién creado responde que no está preparada.
+1. En el Inicio, mientras el negocio no tiene ninguna serie, «Termina de configurar tu negocio» muestra el
+   paso «Tu numeración de facturas» con la píldora «Recomendado»: «Antes de tu primera venta, revisa el
+   prefijo con el que saldrán tus números de factura. Si vienes de otro sistema, continúa su numeración en
+   vez de empezar otra vez por el 1.». Solo lo ve quien lleva las series.
+2. «Configurar» abre **Facturación → Series**. Si quieres otro prefijo, otro formato o seguir la numeración de
+   otro sistema, crea allí las series del año (INVOICE-F12); si no, no hace falta hacer nada: las series se
+   crean solas con el primer documento.
+3. En cuanto el negocio tiene su primera serie, creada a mano o nacida con el primer documento, el paso queda
+   «Hecho» sin recargar, y sigue hecho los años siguientes (la serie de un año nuevo hereda la del anterior).
+4. El asistente o la API preguntan además si la numeración del año está preparada: la respuesta dice el año
+   del negocio y cuántas series ordinarias (F1, F2, F3), de rectificativas (R1–R5) y predeterminadas tiene ese
+   año, cuántas tiene en total, y si está preparada (al menos una ordinaria y una de rectificativas).
+Entra: las series del negocio.
+Sale: nada; solo se lee (ni el Inicio ni la pregunta crean ninguna serie).
+Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente y responde que no está preparada.
 Implicados: ninguno
 
 ### INVOICE-F15 Comprobar que la numeración no tiene huecos
@@ -676,14 +687,19 @@ Implicados: SALE-F29
 <!-- origen: old-hub:HUB_SHELL-F164 -->
 Estado: hecho
 Actor: propietario, administrador
-Pantalla: Facturas, Series, Emisor
+Pantalla: Inicio, Facturas, Series, Emisor
 Pasos:
-1. Abre **Facturación → Emisor**, o pulsa «Configurar» en el aviso «Todavía no puedes facturar» que sale
-   arriba en **Facturas** y **Series** mientras no hay emisor.
-2. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
+1. Mientras no hay emisor, el Inicio muestra en «Termina de configurar tu negocio» el paso «Los datos de tu
+   negocio» con la píldora «Necesario para facturar»: «Razón social, NIF y domicilio: sin ellos no puedes
+   emitir una factura.». Lo ven todos; «Configurar» solo quien puede cambiar el emisor, y a los demás les dice
+   «Esto lo tiene que configurar un administrador.».
+2. Pulsa «Configurar» en ese paso, abre **Facturación → Emisor**, o pulsa «Configurar» en el aviso «Todavía no
+   puedes facturar» que sale arriba en **Facturas** y **Series** mientras no hay emisor (a quien no puede cambiar
+   el emisor, ese aviso también le dice «Esto lo tiene que configurar un administrador.», sin «Configurar»).
+3. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
    (España de entrada).
-3. Pulsa «Guardar»: sale «Emisor guardado.» y el aviso de **Facturas** y **Series** desaparece, también en
-   los demás dispositivos.
+4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso de **Facturas** y **Series** desaparece y el paso del
+   Inicio queda «Hecho», sin recargar y también en los demás dispositivos.
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
 avisa `invoice.issuer.updated`.
@@ -847,6 +863,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 | VeriFactu | Su «Crear factura de prueba» | `invoice.invoice.create` |
 | Ventas | Emitir el documento de su cobro, su anulación y su devolución, dentro de ellos | `invoice.invoice.create_from_sale`, `invoice.invoice.rectify_from_void`, `invoice.invoice.rectify_from_refund` |
 | Ventas e Impresión | El emisor de sus papeles | `invoice.issuer.get` |
+| Plataforma (Inicio) | Los pasos «Los datos de tu negocio» (F21) y «Tu numeración de facturas» (F14) de «Termina de configurar tu negocio» | `invoice.issuer.get`, `invoice.numbering.status` |
 
 ### Quién puede qué
 
@@ -863,6 +880,42 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 
 ## Para quien lo mantiene
 
+- **El Inicio** (FIX-INVOICE-SETUP-HOOKS, 2026-10-27; ronda 2026-10-21 «Inicio» de PLAN-HUB): `InvoiceConfig.setup`
+  declara dos pasos de «Termina de configurar tu negocio», sin paneles ni contadores de la campana (el módulo viejo
+  no tenía `widgets` ni `bell`):
+  - `business_identity` («Los datos de tu negocio», orden 40, el ítem del núcleo del hub viejo, `BLOCKING_KEYS`):
+    hecho con `configured` de `invoice.issuer.get`, la misma condición con la que `_configured_issuer` rechaza
+    emitir, así que «bloquea ⇔ la emisión se rechaza». El ⛔ lo pone `base` (`base.home.LEGAL_STEPS`), nunca la app;
+    pendiente, también se le dice a quien no tiene `invoice.manage_issuer` (`actionable: false`, gh:hub#435). El
+    texto viejo hablaba solo de razón social y NIF; aquí el domicilio también es obligatorio y el texto lo dice.
+    Lleva a `/invoice/issuer`, la pantalla con el NIF a la vista (gh:hub#1954), y se refresca con
+    `invoice.issuer.updated` (gh:hub#900: el aviso viejo no se iba al guardar).
+  - `numbering` («Tu numeración de facturas», orden 50, el `setup` del módulo viejo): hecho con `total_series` de
+    `invoice.numbering.status`, `required = False` (recomendado), solo para quien tiene `invoice.manage_series`, y
+    se refresca con `SERIES_EVENTS` (la serie que nace con el primer documento avisa con `invoice.invoice.issued`).
+    El viejo lo daba por hecho con una ordinaria y una rectificativa del año y lo pedía como «Importante», porque
+    allí las series se creaban a mano; aquí nacen solas, y con aquella condición el paso seguiría pendiente hasta
+    la primera devolución y volvería cada 1 de enero sin nada que hacer. Decisión de mercado: ningún TPV ni
+    programa de facturación pone la numeración como tarea obligatoria del arranque; todos numeran solos con un
+    formato de fábrica y dejan el prefijo y el número de inicio en los ajustes (el arranque de Facturación de Odoo
+    pide los datos de la empresa, el diseño, el pago y una factura de prueba, y numera `INV/año/00001` solo,
+    <https://www.odoo.com/documentation/19.0/applications/finance/accounting/customer_invoices/sequence.html>;
+    Square numera solo y no deja cambiar el número de inicio,
+    <https://community.squareup.com/t5/Questions-How-To/Is-there-a-way-to-change-the-invoice-number-so-I-m-not-starting/m-p/42451>;
+    Shopify empieza en #1001 con prefijo y sufijo en los ajustes,
+    <https://community.shopify.com/t/how-can-i-set-a-specific-starting-order-number-in-shopify/236203>; Business
+    Central rellena el siguiente número de su serie y deja crear series aparte,
+    <https://learn.microsoft.com/en-us/dynamics365/business-central/ui-create-number-series>; WooCommerce (sus
+    plugins de facturas) toma el número de inicio de sus ajustes,
+    <https://docs.wpovernight.com/woocommerce-pdf-invoices-packing-slips/invoice-numbers-explained/>; Lightspeed
+    numera en secuencia con un prefijo editable,
+    <https://resto-support.lightspeedhq.com/hc/en-us/articles/227759668>; Toast no deja tocar el número de cuenta,
+    <https://support.toasttab.com/fr-CA/article/Can-a-customer-customize-their-check-numbers-on-POS>; Holded asigna
+    los números solo, sin saltos, <https://www.holded.com/es/programa-facturacion>). Lo que sí duele en los foros
+    (Square, Shopify) es no poder seguir la numeración de otro sistema una vez empezada: por eso el paso existe,
+    recomendado, mientras se puede (antes del primer documento: luego la serie congela su prefijo y su formato), y
+    queda hecho para siempre en cuanto el negocio tiene su numeración (la serie de un año nuevo hereda la del
+    anterior). La respuesta de la API (`configured`: una ordinaria y una rectificativa del año) no cambia.
 - **Moneda** (FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY, 2026-10-25): la factura hecha a mano guarda la moneda
   del negocio, la de su país (`queries.business_currency`, que lee `base.business.get` como la plataforma: una API key
   solo tiene el permiso de su operación); la nacida de una venta, la de la venta; una rectificativa, la de su original;
