@@ -63,6 +63,10 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   peluquería).
 - **Nada en efectivo desde 1.000 €** en un negocio de España, también repartido entre medios (Ley
   7/2012, art. 7).
+- **Los dos límites de España, solo en España**: el tique hasta 3.000 € y el efectivo hasta 1.000 € los
+  lleva solo un negocio de España, como el TPV de Odoo, que los pone con su localización española
+  ([l10n_es_pos](https://apps.odoo.com/apps/modules/13.0/l10n_es_pos)); fuera de España rige la ley de su
+  país (en Polonia, por ejemplo, no hay tope de efectivo para quien compra como particular).
 
 ## Antes de empezar
 
@@ -90,6 +94,10 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 - De fábrica hay dos medios de pago: **Efectivo** y **Tarjeta**. Bizum, transferencia u otro se
   añaden con el asistente diciendo su tipo (SALE-F37).
 - Venta por peso: tecleando la cantidad (SALE-F10); no hay lector de báscula.
+- **Moneda**: la del negocio, la de su país, con sus decimales: el euro en España, el esloti en Polonia, el
+  yen (sin céntimos) en Japón. El TPV cobra, teclea y escribe en ella, y cada venta guarda la suya: una venta
+  ya cobrada se ve, se reimprime y se devuelve en la moneda en que se cobró, aunque la del negocio cambie.
+  Los ejemplos de este manual van en euros, como en España.
 
 Configuración inicial, paso a paso:
 
@@ -148,7 +156,7 @@ Hoja que abre «Cobrar». Arriba, el importe grande (el que calcula el servidor)
 <total>» si hay líneas marcadas y «Restante» al repartir. A un lado, el resumen («Tique» / «Factura»,
 cliente), con «Factura» los datos del cliente y, con Servicios, «Líneas pagadas de otra forma»: cada
 línea de servicio del cobro con su hueco del bono (SALE-F27). Al otro, «Cobros tomados», los medios de pago
-(el efectivo, no disponible desde 1.000 €, con su motivo), «Entregado», «Cambio» y el teclado en
+(el efectivo, en un negocio de España no disponible desde 1.000 €, con su motivo), «Entregado», «Cambio» y el teclado en
 efectivo, o «Importe exacto» y «Cobra <importe> en el datáfono y confirma.» con otro medio;
 «Repartir el cobro» y «Añadir este cobro». Pie: el motivo si no se puede cobrar y «Cobrar <importe>»
 («Cobrando…» mientras va); con la caja cerrada y efectivo, el rechazo y «Abrir sesión de caja».
@@ -623,7 +631,8 @@ Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Para una línea, toca su etiqueta de precio («Descuento en la línea»); para toda la cuenta, el botón
    de etiqueta del pie («Descuento del ticket»).
-2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda.
+2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda del negocio
+   («€», «zł»…).
 3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
    la fila «Descuento del ticket».
 4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, lo da un responsable: quien
@@ -1597,7 +1606,18 @@ administrador y responsable, los mismos que anulan y devuelven).
 - **Límites legales en España** (país del negocio, el de Impuestos: hoy `ES` para todos): nada en efectivo
   desde 1.000 € (100.000 céntimos), también repartido y también en una cuenta cobrada por partes (la
   operación es la cuenta entera: lo ya cobrado más lo que le queda, `operation_total` de la previsión); tique hasta 3.000 € con IVA (300.000), por
-  encima solo factura.
+  encima solo factura. Son de la ley española y van en euros (`queries.LIMITS_CURRENCY`, también en sus
+  avisos): `CASH_LIMIT` y `TICKET_LIMIT` solo tienen `ES`, y un negocio de otro país no lleva ninguno.
+- **Moneda** (FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja, Facturas e Inventario en hub#273): la del
+  negocio la da `base.business.get` desde el registro de este hub (la de su país, APP-BASE-6), nunca preguntando a
+  erplora.com; `queries.business_currency(ctx)` la lee como la plataforma (una API key solo trae los permisos de lo
+  que cobra) y, en el hub propio de ERPlora (fase 1, sin negocio registrado), da la del país de su emisor
+  (`PLATFORM_ISSUER_COUNTRY`), como sus facturas. `Sale.currency` se guarda al cobrar y ya no tiene valor por
+  defecto (migración `0011`, sin datos); lo cobrado se pinta, se avisa (`money_text(cents, currency)`) y se imprime
+  con la suya. `SaleOut`, `SaleRow` y `sale.refund.options` llevan `currency` y `currency_decimals` (los de
+  `babel`, nunca los de Intl, que le da 0 al forinto); el TPV, `useBusinessMoney()` de `base`, y mientras el
+  negocio no contesta un importe va sin símbolo, nunca en euros. Los teclados (`PayKeypad`, `PosNumpad`)
+  desactivan la coma en una moneda sin decimales.
 - **El impuesto del territorio no es de Ventas** (TAX-F11; ronda 2026-10-17 de PLAN-HUB): lo publica solo
   `tax.settings.get` (`tax_kind`). Las pantallas lo nombran con `useTaxName()` de Impuestos
   (`apps/tax/frontend/composables/useTaxName.ts`) y el 409 `sale.tax_category_missing` con
@@ -1762,6 +1782,9 @@ administrador y responsable, los mismos que anulan y devuelven).
     micrófonos de Odoo (módulos `pits_voice_to_text_chatter`, `kg_voice_chatter`) solo salen en
     navegadores que pueden; Gboard y el teclado de Apple quitan el micrófono sin permiso de voz; Square y
     Toast IQ (texto) y Lightspeed AI (conversacional) no tienen tecla de voz en el TPV.
+39. **La moneda sale del país del negocio** (el hub viejo la fijaba en su configuración, y sales#380: el botón
+    del descuento en importe pintaba siempre «€»): el TPV, Ventas, el tique y las devoluciones van en la moneda
+    del negocio o en la de su venta, con sus decimales (el yen sin céntimos, también en el teclado).
 
 ### Lo que NO hace, a propósito
 
