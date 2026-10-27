@@ -655,7 +655,7 @@ export interface AssistantUsage {
   demo: boolean;
 }
 
-/** `base.AssistantReportIn`. */
+/** `base.SupportReportIn` («Report a problem» of the user menu, BASE-F108). */
 export interface SupportReportInput {
   subject: string;
   description: string;
@@ -663,6 +663,7 @@ export interface SupportReportInput {
   page?: string | null;
 }
 
+/** `base.AssistantReportIn`. */
 export interface AssistantReportInput {
   message_id: string;
   reason: 'incorrect' | 'harmful' | 'instructions' | 'other';

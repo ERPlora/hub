@@ -17,6 +17,7 @@ from base.models import Membership, SessionOwner, TrustedDevice
 from base.services import CREDENTIAL_SESSION_KEY
 from base.tests.conftest import ANA, SECRET
 from base.tests.test_access_account import enter
+from base.tests.test_access_badge import badge, with_badge
 from base.tests.test_access_spa import a_device, enter_with_pin, with_pin
 
 pytestmark = pytest.mark.django_db
@@ -193,6 +194,42 @@ class TestOnlyWithTheAccount:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "base.support_needs_account"
         assert fake.calls == []
+
+    def test_a_badge_session_on_a_till_cannot_report_and_nothing_leaves(self, client, ana, make_user, fake_saas):
+        # A card on a shared till is the device's way in, like a PIN: the browser's erplora.com account is whoever
+        # made it a device of the hub, never the person who swiped (gh:hub#2506).
+        saas = fake_saas(body=SENT)
+        bea = make_user("saas:2", host="a", role=Membership.Role.EMPLOYEE, first_name="Bea")
+        a_device(client)
+        with_badge(bea, "04a1b2c3")
+        assert badge(client, "04a1b2c3").status_code == 200
+        assert SessionOwner.objects.get(session_id=client.session.session_key).credential == SessionOwner.Credential.BADGE
+
+        response = report(client)
+
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "base.support_needs_account"
+        assert saas.calls == []
+
+    def test_the_platform_s_staff_on_hubs_erplora_com_cannot_report_and_nothing_leaves(
+        self, client, saas, spa_manifest, fake_saas
+    ):
+        # The staff's session on hubs.erplora.com is opened with their account too, but it is no customer's: no
+        # report leaves it, with or without a hub chosen for the admin.
+        from base.tests.test_auth_views import DEEP_LINK, PLATFORM, ROOT, callback
+
+        fake_saas(body=ROOT)
+        assert callback(client, {"code": "c1", "next": DEEP_LINK}, PLATFORM).status_code == 302
+        assert client.session[CREDENTIAL_SESSION_KEY] == SessionOwner.Credential.ACCOUNT
+        fake = fake_saas(body=SENT)
+        for chosen in (False, True):
+            if chosen:
+                assert client.get(DEEP_LINK, HTTP_HOST=PLATFORM).status_code == 302
+            payload = {"subject": "The printer stops", "description": "It prints half a ticket."}
+            response = client.post(URL, json.dumps(payload), content_type="application/json", HTTP_HOST=PLATFORM)
+            # Without a hub chosen, the platform host sends everything to the admin; with one, the operation refuses.
+            assert response.status_code in (302, 401, 403, 404), (chosen, response.status_code, response.content[:200])
+            assert fake.calls == [], chosen
 
     def test_without_a_session_it_is_refused(self, client, saas, fake_saas):
         fake = fake_saas(body=SENT)
