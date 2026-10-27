@@ -6,12 +6,14 @@ parecido que ya existe; se cambia en cuanto llegue.
 ## Iconos
 
 - `ion:print-outline` — icono del módulo (`apps.py`: `icon`), entrada de menú y pestaña **Impresoras**
-  (`frontend/tabs.ts`), acción «Probar» de la tabla y cabecera de los ajustes. Es el icono del producto
-  actual (`print`; Caja, Facturación y Ventas lo piden también). Hoy: `lucide:receipt`.
+  (`frontend/tabs.ts`), acción «Probar» de la tabla, cabecera de los ajustes y, en el Inicio, el paso
+  «Configura la impresora» y las filas «Nadie está imprimiendo «…»» de la campana (`apps.py`: `setup` y
+  `bell`; el viejo pintaba ahí `print-outline`). Es el icono del producto actual (`print`; Caja, Facturación
+  y Ventas lo piden también). Hoy: `lucide:receipt`.
 
-Al registrarlo, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts`, la acción `test`
-de `frontend/pages/PrintersPage.vue`, `frontend/components/SettingsCard.vue`, su test
-(`tests/test_apps.py`, `frontend/tabs.test.ts`) y regenerar `pnpm gen:app-icons`.
+Al registrarlo, cambiar a la vez `apps.py` (`icon`, `navigation`, `setup` y `bell`), `frontend/tabs.ts`, la
+acción `test` de `frontend/pages/PrintersPage.vue`, `frontend/components/SettingsCard.vue`, sus tests
+(`tests/test_apps.py`, `tests/test_integration_home.py`, `frontend/tabs.test.ts`) y regenerar `pnpm gen:app-icons`.
 
 ## Puente con la app nativa (bloque 6)
 

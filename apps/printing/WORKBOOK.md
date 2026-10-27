@@ -72,7 +72,8 @@ Configuración inicial, paso a paso:
    escribe su dirección (la IP de su hoja de configuración, la MAC de Bluetooth o el nombre de la cola
    USB), el ancho de papel y su función (PRINTING-F03, PRINTING-F04).
 2. En el dispositivo que está junto a la impresora, abre **Impresión → Dispositivos**, pulsa «Imprimir
-   desde este dispositivo», ponle nombre y marca las impresoras a las que llega (PRINTING-F18).
+   desde este dispositivo», ponle nombre y marca las impresoras a las que llega (PRINTING-F18). Hasta que
+   llegue a una impresora de recibos, el Inicio te lo recuerda con «Configura la impresora» (PRINTING-F01).
 3. Pulsa «Probar» en la fila de la impresora y comprueba que sale la hoja de prueba (PRINTING-F05).
 4. En **Impresión → Ajustes** decide si el tique sale solo al cobrar, si se abre el cajón con él,
    cuántas copias y, si tienes varias impresoras con la misma función, cuál es la de cada una
@@ -201,26 +202,39 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
 
 ### PRINTING-F01 Ver cómo va la impresión
-<!-- origen: wf:restaurante-dia#rec_restaurante-f16 old-hub:HUB_SHELL-F60 old-hub:HUB_SHELL-F63 old-hub:HUB_SHELL-F75 old-hub:HUB-F201 old-hub:HUB-F202 old-hub:HUB-F203 old:printing/workflow/impresoras.md#printing-f01 -->
+<!-- origen: wf:restaurante-dia#rec_restaurante-f16 old-hub:HUB_SHELL-F27 old-hub:HUB_SHELL-F60 old-hub:HUB_SHELL-F63 old-hub:HUB_SHELL-F75 old-hub:HUB-F201 old-hub:HUB-F202 old-hub:HUB-F203 old:printing/workflow/impresoras.md#printing-f01 -->
 Estado: hecho
 Vertical: común
 Actor: administrador, responsable, empleado
-Pantalla: Impresoras, Cola
+Pantalla: Inicio, Impresoras, Cola
 Pasos:
-1. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora y cuál
+1. En el **Inicio**, mientras ningún dispositivo dado de alta llega a una impresora de recibos activa,
+   «Termina de configurar tu negocio» trae «Configura la impresora» («Da de alta el dispositivo que
+   imprime los tiques de tus clientes, para que la primera venta salga en papel.»), «Recomendado», a
+   quien gestiona las impresoras. «Configurar» lleva a **Impresión → Dispositivos** (PRINTING-F18); el
+   paso queda «Hecho» en cuanto ese dispositivo está dado de alta, encendido o no.
+2. Si una función tiene trabajos en cola que ningún dispositivo dado de alta puede sacar (ninguno llega a
+   su impresora, o esperan impresora y ninguno llega a una de su función), la campana de todos los que
+   ven Impresión enseña una fila por función: «Nadie está imprimiendo «Recibo»» (o «Cocina», «Barra»,
+   «Etiqueta») con cuántos esperan. Tocarla abre **Impresión → Impresoras**.
+3. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora y cuál
    la imprime, cuánto espera y desde cuándo.
-2. Abre **Impresión → Cola** para ver cada trabajo con su estado, sus intentos y su último error.
-3. Si una función sale «En cola, sin impresora» o hay un aviso naranja, el papel no está saliendo:
+4. Abre **Impresión → Cola** para ver cada trabajo con su estado, sus intentos y su último error.
+5. Si una función sale «En cola, sin impresora» o hay un aviso naranja, el papel no está saliendo:
    sigue por PRINTING-F04 (dar la función a una impresora) o PRINTING-F14 (sacar el trabajo del
    atasco).
-Entra: la cola y las impresoras del negocio.
+Entra: la cola, las impresoras y los dispositivos del negocio.
 Sale: nada guardado. Lo que depende del reloj (cuánto lleva esperando, el aviso naranja, «Esperando»
 y un enviado que no contestó a tiempo) se recalcula solo cada 30 s, sin esperar a otro cambio; «Todo al
 día» exige que no haya nada en cola, enviado sin confirmar ni fallido. Las pantallas se refrescan solas al encolarse, enviarse, imprimirse, fallar,
-reintentarse o cancelarse un trabajo.
+reintentarse o cancelarse un trabajo. El paso del Inicio y las filas de la campana cambian solos, sin
+recargar, al encolarse, fallar o cancelarse un trabajo, al darse de alta, cambiarse o retirarse un
+dispositivo y al cambiar una impresora; la fila se va sola cuando un dispositivo puede sacar lo que espera
+(no hay «marcar como leído»).
 Si falla: «No se pudo leer la cola de impresión.» con «Reintentar»; no se pinta «Todo al día» cuando
-la lectura falla.
-Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08
+la lectura falla. La campana no mira el reloj ni si el dispositivo está encendido: un dispositivo dado de
+alta pero apagado no la hace sonar (la cola lo dice con «Esperando» pasado un minuto).
+Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
 
 ### PRINTING-F02 Encontrar una impresora de la red sin escribir su dirección
 <!-- origen: old-hub:HUB_APP-F07 old-hub:HUB_APP-F08 old-hub:HUB_APP-F09 old-hub:HUB_APP-F15 old-hub:HUB_APP-F16 old-hub:HUB_SHELL-F138 old-hub:HUB_SHELL-F140 old-hub:HUB_APP-F13 old-hub:HUB_PERIPHERALS-F01 old-hub:HUB_PERIPHERALS-F03 old:printing/workflow/impresoras.md#printing-f02 qa:modules/printing/discover-printers qa:verticals/restaurant/10-hardware-offline-and-recovery -->
@@ -635,6 +649,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
 | El resumen de la cola por función, con la impresora por la que sale cada una | ver | F01 | `printing.job.summary` |
+| Si una función tiene un dispositivo dado de alta que la imprime y cuántos de sus trabajos en cola no puede sacar ninguno (el paso del Inicio y la campana) | ver | F01 | `printing.device.coverage` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -693,6 +708,7 @@ Nada (`requires = []`). No lee modelos de nadie: quien imprime manda el document
 | Inventario | Etiqueta de código de barras | `printing.job.create` |
 | Cocina | La comanda de cada estación y su reimpresión | `printing.job.create` |
 | `base` (`/ws/print`) | Entregar y confirmar trabajos | `printing.job.claim`, `printing.job.complete`, `printing.job.fail` |
+| `base` (Inicio y campana) | «Configura la impresora» y «Nadie está imprimiendo «…»» | `printing.device.coverage` |
 
 ### Quién puede qué
 
@@ -883,6 +899,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 | Tabla de enrutado retirada (`printing_routing`) | No existe | Sin consumidor desde printing#25 |
 | La cola guardaba el documento sin límite de tamaño | ≤ 512 KB por documento, ≤ 2 MB de HTML | Que una sesión no meta ficheros en la BD |
 | La cola refrescaba cada 30 s | En vivo (`useLive`) | Plataforma nueva |
+| «Configura la impresora» era un paso del núcleo del Hub: hecho con algún dispositivo registrado para la estación de recibos | Lo declara Impresión (`setup` de su `LiveAppConfig`), mismo texto y orden (70, «Recomendado»): hecho con un dispositivo dado de alta que llega a una impresora de recibos activa; lleva a **Dispositivos** | PLAN-HUB ronda 2026-10-21 «Inicio»: la impresora vive en su app; aquí la impresora y el dispositivo son dos altas, y el papel solo sale con las dos |
+| «Nadie está imprimiendo «kitchen»» en la campana: trabajos de una estación esperando más de un minuto sin ningún dispositivo vivo, sondeado cada 30 s, con la clave interna | «Nadie está imprimiendo «Cocina»»: trabajos en cola que ningún dispositivo dado de alta puede sacar, en vivo, con el nombre de la función; lleva a **Impresoras** | La campana se recalcula por avisos, sin reloj, y el Hub no guarda si un dispositivo está encendido: el apagado lo dice la cola («Esperando»). El nombre interno era el defecto de HUB_SHELL-F63; Impresoras es donde se arregla (hub#2016) |
 
 ### Paridad con la pantalla actual
 
