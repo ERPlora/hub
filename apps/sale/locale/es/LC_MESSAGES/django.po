@@ -852,3 +852,64 @@ msgstr "Vender a precio libre"
 
 msgid "Delete an open check with something on it"
 msgstr "Eliminar una cuenta abierta con algo pedido"
+
+# How the assistant's card names the data of sale's writes (titles of the schemas).
+msgid "Line"
+msgstr "Línea"
+
+msgid "Open-price lines"
+msgstr "Líneas de precio libre"
+
+msgid "Services"
+msgstr "Servicios"
+
+msgid "Menus"
+msgstr "Menús"
+
+msgid "Quick note"
+msgstr "Nota rápida"
+
+msgid "Product"
+msgstr "Producto"
+
+msgid "Modifiers"
+msgstr "Suplementos"
+
+msgid "Dishes"
+msgstr "Platos"
+
+msgid "Booked price"
+msgstr "Precio reservado"
+
+msgid "Voucher"
+msgstr "Bono"
+
+msgid "Lines to move"
+msgstr "Líneas a mover"
+
+msgid "From check"
+msgstr "Cuenta de origen"
+
+msgid "Into check"
+msgstr "Cuenta de destino"
+
+msgid "Order type"
+msgstr "Tipo de pedido"
+
+msgid "Priority"
+msgstr "Prioridad"
+
+msgid "Served by"
+msgstr "Atendido por"
+
+msgid "Lines to charge"
+msgstr "Líneas a cobrar"
+
+msgid "Check version"
+msgstr "Versión de la cuenta"
+
+msgid "Print as duplicate"
+msgstr "Imprimir como duplicado"
+
+msgid "Refund amount"
+msgstr "Importe a devolver"

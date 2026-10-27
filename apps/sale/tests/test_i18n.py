@@ -9,6 +9,7 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from live.operations import registry
 
 from apps.sale import models, pricing, queries, schemas, services
 
@@ -83,7 +84,19 @@ def visible_texts() -> set[str]:
         *models.Sale.Status.labels,
     ]
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {str(text) for text in lazies} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles sale's operations give their input data (``gettext_noop``): the assistant's card names each datum
+    by them, so each one needs its Spanish. Only the ones sale wrote: pydantic leaves ``title`` empty otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "sale"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():
