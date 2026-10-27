@@ -99,10 +99,12 @@ async function checkOf(context: BrowserContext, label: string): Promise<{ id: st
   return res.data.rows.find((row) => row.label === label);
 }
 
-// rv-hub-292: the till lays itself out for the window a frame after a resize (its media query and its ResizeObserver).
-// Read before that, the cart button is the old size's: at 834 straight after 390 the phone's button was tapped on its
-// way out and the tap waited for it until the test's 3 minutes ran out. A busy machine makes that late frame the rule:
-// here the CPU runs 20 times slower.
+// rv-hub-292: the till goes through 390 twice, and the first time its drawer was opened. The second time the open
+// drawer covers the cart button, and a spec that tapped it again waited for it until the test's time ran out: this is
+// what fails here when `openTillCart` taps whatever the drawer's state. The CPU runs 20 times slower, as on a busy
+// machine, but that does not make the other fault certain (reading the button before the till has laid itself out
+// for the new window, a frame after the resize): `sale-helpers.spec.ts` catches that one, with a till that is late on
+// purpose.
 test('the check is on screen at each size, whatever the size before, on a busy machine too', async ({ page }) => {
   test.setTimeout(90_000);
   await freshTill(page);
