@@ -13,17 +13,19 @@ import logging
 from types import SimpleNamespace
 
 import pytest
+from django.apps import apps as django_apps
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
-from live.context import OperationContext, Scope
-from live.operations import Operation
+from live.context import OperationContext, Scope, system_context
+from live.operations import Operation, get
 from pydantic import BaseModel, ConfigDict
 
-from base import entitlement
+from base import entitlement, registry
 from base.entitlement import EntitlementBlocked
 from base.models import Hub
 from base.relay import active_apps
+from base.schemas import HubStateIn
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -249,3 +251,48 @@ def test_the_end_of_a_right_is_read_now(modules, monkeypatch):
     later = timezone.now() + dt.timedelta(minutes=2)
     monkeypatch.setattr(entitlement.timezone, "now", lambda: later)
     assert entitlement.blocked_apps(A) == frozenset({"stock", "invoice"})
+
+
+# --- A right that ends and is bought again: the business's data waits for it (BILLING-F34 of the SaaS) ----------
+
+
+def push(slug, version, *rights):
+    """A newer photo of ``slug`` naming ``rights``, through the door the SaaS uses (``base.hub.state_apply``)."""
+    answer = get("base.hub.state_apply")(
+        system_context(registry.REGISTRY_SCOPE),
+        HubStateIn(id=Hub.objects.get(slug=slug).id, version=version, photo=photo(*rights)),
+    )
+    assert answer.applied
+
+
+def run(operation_name, /, **data):
+    op = get(operation_name)
+    return op(ctx(), op.input.model_validate(data)).model_dump(mode="json")
+
+
+@pytest.mark.django_db
+def test_a_paid_app_blocked_when_its_right_ends_comes_back_with_its_data_when_bought_again(monkeypatch):
+    """BILLING-F34 of the SaaS, step 3: nothing is deleted, and bought again the business has the app as it was. The
+    block only reads the photo, so what the business wrote with the app waits; the newer photo that names it again,
+    open-ended, opens it on those same rows. The twin, for a right, of ``test_turning_one_off_and_on_again_keeps_its_data``
+    (``test_app_activation.py``)."""
+    from apps.task.models import Project
+
+    monkeypatch.setattr(django_apps.get_app_config("task"), "premium", True)
+    keep("a", photo({"id": "task", "source": "purchase"}))
+    written = run("task.project.create", code="SPRING", name="Spring menu", color="#336699")
+
+    ended = (timezone.now() - dt.timedelta(minutes=1)).isoformat()
+    push("a", 2, {"id": "task", "source": "purchase", "valid_until": ended})
+
+    with pytest.raises(EntitlementBlocked) as refused:
+        run("task.project.list")
+    assert (refused.value.status, refused.value.code) == (402, "app_entitlement_blocked")
+    assert Project.objects.filter(pk=written["id"], code="SPRING", name="Spring menu", color="#336699").exists()
+
+    push("a", 3, {"id": "task", "source": "purchase"})
+
+    [again] = run("task.project.list")["rows"]
+    assert {key: again[key] for key in ("id", "code", "name", "color")} == {
+        key: written[key] for key in ("id", "code", "name", "color")
+    }
