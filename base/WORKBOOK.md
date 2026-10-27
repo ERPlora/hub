@@ -487,10 +487,10 @@ Si falla: si no se puede comprobar ese paso, no sale.
 Implicados: ninguno
 
 ### BASE-F05 Abrir una app desde «Mis apps»
-<!-- origen: old-hub:HUB_SHELL-F32 -->
+<!-- origen: old-hub:HUB_SHELL-F32 old-hub:HUB_APP-F28 -->
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Inicio · Resumen
+Pantalla: Inicio · Resumen · la barra de arriba de cualquier pantalla
 Pasos:
   1. En «Mis apps», una baldosa por app que esta persona puede abrir, con su icono y su nombre (si no
      cabe, el nombre entero sale al pasar por encima).
@@ -498,12 +498,20 @@ Pasos:
   3. Toca una baldosa: se abre la app. Una app que se está encendiendo dice «Activando…» y no abre nada.
   4. En el móvil, con seis apps o más, se ven las cuatro primeras y «Ver todas las apps», que enseña el
      resto. «Añadir apps», la última, lleva a Apps.
+  5. Para salir de una app, toca «Mis apps» en la barra: la pantalla principal de una app no tiene
+     «Atrás». La hoja empieza por «Inicio», que vuelve al Inicio, y sigue con las apps; tocar una la abre.
+     «Inicio» está ahí aunque la lista aún cargue, esté vacía o no se haya podido leer.
+  6. En la aplicación de Android, el botón atrás del móvil cierra primero lo que haya abierto encima (una
+     ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda. Sin nada abierto, en una
+     ficha o un alta hace lo mismo que «Atrás»; en la pantalla principal de una app vuelve al Inicio,
+     también si se llegó a ella por un enlace; y en el Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
 Sale: cuántas veces se abre cada app en este navegador (solo para ordenar).
 Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lector de pantalla. Sin apps:
 «Aquí aparecerán tus apps. Añade las que necesite tu negocio.». Si no se pudo leer la lista: «No se han
 podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», nunca que no
-hay apps.
+hay apps. En una aplicación de Android antigua, que aún no sabe quedarse en segundo plano, el botón atrás
+vuelve a ser el del sistema.
 Implicados: ninguno
 
 ### BASE-F06 Ver los paneles de las apps en Inicio

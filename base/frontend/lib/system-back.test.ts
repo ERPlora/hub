@@ -37,10 +37,12 @@ function presentOverlay(tag: string, opts: { backdropDismiss?: boolean; hidden?:
 
 type FakeMenu = HTMLElement & { isOpen: () => Promise<boolean>; close: ReturnType<typeof vi.fn> };
 
-function openMenu(): FakeMenu {
+/** An `ion-menu` (the drawer): open, or still sliding in (Ionic shows it, `show-menu`, before `isOpen()` says so). */
+function openMenu(opts: { sliding?: boolean } = {}): FakeMenu {
   const menu = document.createElement('ion-menu') as unknown as FakeMenu;
-  menu.isOpen = async () => true;
+  menu.isOpen = async () => !opts.sliding;
   menu.close = vi.fn(async () => true);
+  if (opts.sliding) menu.classList.add('show-menu');
   document.body.appendChild(menu);
   return menu;
 }
@@ -105,6 +107,23 @@ describe('gh:hub#1906 — closeTopmostLayer', () => {
 
     await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
     expect(menu.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('a drawer still sliding in holds the press: nothing moves under it (Ionic ignores a close mid-slide)', async () => {
+    const menu = openMenu({ sliding: true });
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+    expect(menu.close).not.toHaveBeenCalled();
+  });
+
+  it('a menu that is neither open nor shown (pinned beside the content, or closed) does not count', async () => {
+    const menu = document.createElement('ion-menu') as unknown as FakeMenu;
+    menu.isOpen = async () => false;
+    menu.close = vi.fn(async () => true);
+    document.body.appendChild(menu);
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('none');
+    expect(menu.close).not.toHaveBeenCalled();
   });
 
   it('asks the app with a CANCELABLE `erplora:back`; `preventDefault()` means it closed something', async () => {

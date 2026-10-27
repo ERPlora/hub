@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:efd1cb1e29d651c8f6e164dbee97599e9467e275403c62d3e4a8119fdfb62a9b -->
+<!-- generated from WORKBOOK.md sha256:378e093f21498952ffe98fadaf95fcd459f16b07843a3b3b68d8ce5c9e1f8a2d -->
 
 ## What it is for and who it is for
 
@@ -482,7 +482,7 @@ Involved: none
 ### BASE-F05 Open an app from "My apps"
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: Home · Summary
+Screen: Home · Summary · the top bar of any screen
 Steps:
   1. In "My apps", one tile per app this person can open, with its icon and its name (if it does not
      fit, the whole name shows on hover).
@@ -490,11 +490,19 @@ Steps:
   3. They tap a tile: the app opens. An app that is being turned on says "Activating…" and opens nothing.
   4. On a phone, with six apps or more, the first four show and "View all apps", which shows the rest.
      "Add apps", the last one, leads to Apps.
+  5. To leave an app, tap "My apps" in the bar: the main screen of an app has no "Back". The sheet starts
+     with "Home", which goes back to the Home, and goes on with the apps; tapping one opens it. "Home" is
+     there even while the list loads, when it is empty or when it could not be read.
+  6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
+     or the menu); a window that cannot be closed that way stays. With nothing open, on a record or a new
+     one it does the same as "Back"; on the main screen of an app it goes back to the Home, also when that
+     screen was reached through a link; and on the Home it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
 Out: how many times each app is opened in this browser (only to order them).
 If it fails: while loading, grey tiles and "Loading your apps…" for the screen reader. Without apps:
 "Your apps will show up here. Add the ones your business needs.". If the list could not be read: "Could
 not load your apps. Reload the page; if it keeps failing, sign in again.", never that there are no apps.
+In an older Android app, which cannot yet stay in the background, the back button is the system's again.
 Involved: none
 
 ### BASE-F06 See the apps' panels on the Home

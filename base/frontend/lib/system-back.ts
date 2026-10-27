@@ -15,7 +15,8 @@
 // A press, topmost first:
 //   1. a presented Ionic overlay in the document (modal, alert, popover, action sheet, loading) — dismissed with role
 //      `backdrop` like Ionic's own hardware back; one that cannot be dismissed (`backdropDismiss: false`) HOLDS it;
-//   2. an open `ion-menu` (the drawer);
+//   2. an open `ion-menu` (the drawer); one still sliding in or out HOLDS the press (Ionic ignores a close mid-slide,
+//      and the screen must not move under it);
 //   3. the mounted app, through the `erplora:back` contract below;
 //   and with nothing open:
 //   4. on a detail view, the screen's own Back (the topbar's: history inside the app, else its `backHref`);
@@ -62,9 +63,13 @@ function topmostPresentedOverlay(doc: Document): IonicOverlay | undefined {
   return presented[presented.length - 1];
 }
 
-async function openMenu(doc: Document): Promise<IonicMenu | undefined> {
+/** Ionic's class on a drawer that is showing: open, or sliding in or out (never the menu pinned beside the content). */
+const MENU_SHOWN = 'show-menu';
+
+async function shownMenu(doc: Document): Promise<{ menu: IonicMenu; open: boolean } | undefined> {
   for (const menu of Array.from(doc.querySelectorAll<IonicMenu>('ion-menu'))) {
-    if (typeof menu.isOpen === 'function' && (await menu.isOpen())) return menu;
+    const open = typeof menu.isOpen === 'function' && (await menu.isOpen());
+    if (open || menu.classList.contains(MENU_SHOWN)) return { menu, open };
   }
   return undefined;
 }
@@ -79,9 +84,10 @@ export async function closeTopmostLayer(doc: Document = document, win: Window = 
     void overlay.dismiss(undefined, 'backdrop');
     return 'closed';
   }
-  const menu = await openMenu(doc);
-  if (menu?.close) {
-    void menu.close();
+  const shown = await shownMenu(doc);
+  if (shown) {
+    if (!shown.open || !shown.menu.close) return 'held';
+    void shown.menu.close();
     return 'closed';
   }
   const ask = new CustomEvent(SHELL_BACK_EVENT, { cancelable: true });
