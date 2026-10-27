@@ -151,7 +151,8 @@ Vacía: «Sin eventos.». Cargando: «Cargando…». Error: el mensaje con «Rei
 Menú **VeriFactu → Recuperación**. Título «Recuperación de cadena». Campo «NIF del emisor» (rellenado con el
 del emisor de Facturación) y el entorno actual. Bloque «Integridad de la cadena» con el último veredicto
 («Cadena de huellas íntegra ✓», «Cadena de huellas ROTA ✗» con la secuencia, o «Sin validar todavía») y la
-nota «Recalcula las huellas SHA-256 y verifica el encadenado. No vuelve a auditar los importes.». Botones
+nota «Recalcula las huellas SHA-256 y verifica el encadenado. No vuelve a auditar los importes: la base, la cuota y
+el total se toman como los declaró la factura.». Botones
 «Validar cadena», «Consultar AEAT» y «Recuperar cadena desde la AEAT». Tabla «Últimos registros en la AEAT»:
 «Factura», «Fecha», «Huella», «Estado», «CSV» y «Consultado el»; vacía: «Sin datos de la AEAT. Pulsa
 «Consultar AEAT».». Bloque «Continuar cadena manualmente (migración)» con «Última huella (64 hex)», «Nº de
@@ -327,8 +328,8 @@ Actor: administrador
 Pantalla: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, el interruptor «Usar mi propio certificado» enseña la vía actual con su
-   explicación: «ERPlora remite tus registros a Hacienda en tu nombre, con su propio sello. No necesitas
-   certificado.» o «Envías tú directamente a Hacienda con el certificado de tu negocio, subido en Configuración
+   explicación: «ERPlora remite tus registros de facturación a Hacienda en tu nombre, con su propio sello. No
+   necesitas certificado.» o «Envías tú directamente a Hacienda con el certificado de tu negocio, subido en Configuración
    → Mi certificado.».
 2. Cámbialo.
 3. Sale «Listo: a partir de ahora envías con tu propio certificado.» o «Listo: a partir de ahora remite
@@ -627,9 +628,9 @@ Pantalla: Ficha de registro
 Pasos:
 1. En **Registros**, pulsa una fila.
 2. Se abre «Registro {número}» con la factura, la cadena, el QR, la respuesta de la AEAT y el XML.
-3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («La pasarela de envío de ERPlora no está
-   configurada en este servidor», «Sin vía de envío
-   lista», «La AEAT pidió esperar hasta las {hora}», «No se pudo contactar: {motivo}») y cuándo: «Sale solo en
+3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («la pasarela de envío de ERPlora no está
+   configurada en este servidor», «tu certificado propio no está cargado o ha caducado», «la AEAT pidió esperar
+   hasta las {hora}», «no se ha podido contactar con la pasarela o con la AEAT ({detalle})») y cuándo: «Sale solo en
    la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer nada.»
    con el «Próximo intento».
 4. En un negocio de fuera de España dice solo «este negocio no está en España: VeriFactu solo es para negocios de
@@ -699,8 +700,8 @@ Pasos:
 3. Debajo de la tabla sale el resultado; la tabla se pone al día sola.
 Entra: la cola.
 Sale: como VERIFACTU-F20.
-Si falla: sin pasarela, «La pasarela de envío de ERPlora no está configurada en este servidor: los registros
-siguen en la cola y saldrán en cuanto lo esté.».
+Si falla: sin pasarela, el aviso «la pasarela de envío de ERPlora no está configurada en este servidor»; los
+registros siguen en la cola y salen en cuanto lo esté.
 Implicados: VERIFACTU-F20
 
 ### VERIFACTU-F22 Reintentar una entrada de la cola
@@ -714,7 +715,8 @@ Pasos:
    los intentos se conservan.
 Entra: el registro elegido.
 Sale: el registro reprogramado (avisa `verifactu.contingency.retried`).
-Si falla: un registro aceptado o rechazado no está en la cola: «Este registro no está en la cola.».
+Si falla: un registro aceptado o rechazado no está en la cola: «Este registro no está en la cola: ya está en la AEAT, o la AEAT lo
+rechazó.».
 Implicados: VERIFACTU-F21
 
 ### VERIFACTU-F23 Descartar una entrada de la cola
@@ -752,7 +754,8 @@ Pasos:
 Entra: el registro rechazado o aceptado con errores.
 Sale: el registro de subsanación (avisa `verifactu.record.created`).
 Si falla: solo se subsana un registro de alta rechazado o aceptado con errores, y solo el último de su
-factura: «Este registro no se puede subsanar.».
+factura: «Este registro no se puede subsanar: solo se subsana el último registro de un alta que la AEAT rechazó o
+aceptó con errores.».
 Implicados: INVOICE-F08
 
 ### VERIFACTU-F25 Reenviar un registro concreto
@@ -767,8 +770,9 @@ Pasos:
 3. El registro queda con la respuesta de la AEAT, como en VERIFACTU-F15.
 Entra: el registro elegido (por su id o por el número de su factura).
 Sale: el envío y su respuesta (avisa `verifactu.record.transmitted`).
-Si falla: sin pasarela, «La pasarela de envío de ERPlora no está configurada en este servidor: el registro
-sigue pendiente y saldrá en cuanto lo esté.»; ya aceptado, «Este registro ya está en la AEAT.»; con la espera
+Si falla: sin pasarela, «No se puede enviar ahora: la pasarela de envío de ERPlora no está configurada en este
+servidor. Sigue en la cola y sale en cuanto se pueda.»; ya aceptado o rechazado, «Este registro no está en la cola:
+ya está en la AEAT, o la AEAT lo rechazó.»; con la espera
 de la AEAT en curso, «La AEAT pidió esperar: sale solo a las {hora}.». Nunca dice «aceptado» sin respuesta.
 Implicados: VERIFACTU-F15
 
@@ -835,7 +839,8 @@ Pasos:
 1. En **VeriFactu → Recuperación**, bloque «Continuar cadena manualmente (migración)», escribe la «Última
    huella (64 hex)» de la aplicación anterior, el «Nº de factura» y la «Fecha» de ese último registro.
 2. Pulsa «Continuar desde esta huella» y confirma («La huella indicada será el antecedente del próximo
-   registro fiscal. Usa esta opción únicamente durante una migración.»).
+   registro fiscal. Usa esta opción únicamente durante una migración y con los datos del último registro de la
+   aplicación anterior.»).
 3. Sale «Operación completada.»; la próxima factura se encadena sobre esa huella.
 Entra: la huella, el número y la fecha del último registro de la aplicación anterior.
 Sale: un ancla nueva (avisa `verifactu.chain.recovered`).
@@ -853,13 +858,14 @@ Pasos:
 1. Solo para una factura que **nunca debió emitirse** (un duplicado, una prueba hecha en producción). Una
    devolución o una corrección no se anula: es una rectificativa en Facturación (VERIFACTU-F14).
 2. En la ficha del registro de alta, pulsa «Anular registro», escribe el motivo y confirma («Se declarará a la
-   AEAT que esta factura se emitió por error. La factura sigue en Facturación.»).
+   AEAT que esta factura se emitió por error. Una devolución o una corrección nunca es esto: es una rectificativa
+   en Facturación. La factura sigue en Facturación.»).
 3. Se sella un registro de **anulación** encadenado, que sale como cualquier otro, y aparece en Registros con
    tipo «Anulación».
 Entra: el registro de alta (o el número de su factura).
 Sale: el registro de anulación (avisa `verifactu.record.created`).
 Si falla: un alta rechazada no se anula (no está en la AEAT); una ya anulada, tampoco: «Este registro no se
-puede anular.». Si la AEAT rechazó la anulación, se puede volver a anular: la nueva lleva `RechazoPrevio = S`
+puede anular: solo se anula un alta que está (o estará) en la AEAT y no tiene anulación.». Si la AEAT rechazó la anulación, se puede volver a anular: la nueva lleva `RechazoPrevio = S`
 (§9.2.2, «anulación por rechazo»).
 Implicados: INVOICE-F07
 
@@ -953,7 +959,7 @@ Sale: si la AEAT lo tenía y el registro (avisa `verifactu.record.reconciled`; l
 En la ficha sale «La AEAT ya tiene {número}: sale de la cola.» o, en aviso, «La AEAT no tiene {número}: sigue en la
 cola y sale en la siguiente pasada.».
 Si falla: un registro aceptado o rechazado no está en la cola (la ficha no ofrece el botón; por la API, «Este
-registro no está en la cola.»); sin pasarela o si la AEAT no contesta, el motivo, encima de los botones, y el
+registro no está en la cola: ya está en la AEAT, o la AEAT lo rechazó.»); sin pasarela o si la AEAT no contesta, el motivo, encima de los botones, y el
 registro sigue en la cola.
 Implicados: VERIFACTU-F22, VERIFACTU-F23, VERIFACTU-F27
 

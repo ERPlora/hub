@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:da3a631d05763fd48e89b3b072e231e8dc9fcbcc89d2bdd7b54e6445e5309bf1 -->
+<!-- generated from WORKBOOK.md sha256:791b5a44108afac71b0a594f8a6a7f132e2269ea375943ae684b3f6becff5525 -->
 
 ## What it is for and who it is for
 
@@ -139,7 +139,8 @@ Empty: "No events.". Loading: "Loading…". Error: the message with "Retry".
 Menu **VeriFactu → Recovery**. Title "Chain recovery". Field "Issuer tax ID" (filled with Invoicing's issuer's)
 and the current environment. Block "Chain integrity" with the last verdict ("Fingerprint chain intact ✓",
 "Fingerprint chain BROKEN ✗" with the sequence, or "Not validated yet") and the note "This recomputes the SHA-256
-fingerprints and verifies the chaining. It does not re-audit the amounts.". Buttons "Validate chain", "Query AEAT"
+fingerprints and verifies the chaining. It does not re-audit the amounts: the base, the tax and the total are
+taken as the invoice declared them.". Buttons "Validate chain", "Query AEAT"
 and "Recover chain from AEAT". Table "Latest records at the AEAT": "Invoice", "Date", "Fingerprint", "Status",
 "CSV" and "Queried on"; empty: "No AEAT data. Press «Query AEAT».". Block "Continue chain manually (migration)" with
 "Last fingerprint (64 hex)", "Invoice number" and "Date" and "Continue from this fingerprint". Both recoveries ask
@@ -605,8 +606,8 @@ Steps:
 1. In **Records**, tap a row.
 2. "Record {number}" opens with the invoice, the chain, the QR, the AEAT's answer and the XML.
 3. If it is not at the AEAT, "Not at the AEAT yet" says why ("ERPlora's sending gateway is not configured on this
-   server", "No sending route
-   ready", "The AEAT asked to wait until {time}", "Could not reach it: {reason}") and when: "It goes out by
+   server", "your own certificate is not loaded or has expired", "the AEAT asked to wait until {time}", "the
+   gateway or the AEAT could not be reached ({detail})") and when: "It goes out by
    itself with the next pass, in order, and declared as late if it failed before. You do not have to do anything."
    with the "Next attempt".
 4. In a business outside Spain it only says "this business is not in Spain: VeriFactu is only for businesses in
@@ -674,8 +675,8 @@ Steps:
 3. Under the table the result shows; the table updates by itself.
 In: the queue.
 Out: like VERIFACTU-F20.
-If it fails: with no gateway, "ERPlora's sending gateway is not configured on this server: the records stay in the
-queue and go out as soon as it is.".
+If it fails: with no gateway, the notice "ERPlora's sending gateway is not configured on this server"; the records
+stay in the queue and go out as soon as it is.
 Involved: VERIFACTU-F20
 
 ### VERIFACTU-F22 Retry a queue entry
@@ -688,7 +689,8 @@ Steps:
    the attempts are kept.
 In: the chosen record.
 Out: the rescheduled record (it announces `verifactu.contingency.retried`).
-If it fails: an accepted or rejected record is not in the queue: "This record is not in the queue.".
+If it fails: an accepted or rejected record is not in the queue: "This record is not in the queue: it is already in the AEAT, or the
+AEAT rejected it.".
 Involved: VERIFACTU-F21
 
 ### VERIFACTU-F23 Discard a queue entry
@@ -723,7 +725,8 @@ Steps:
 In: the rejected or accepted-with-errors record.
 Out: the correction record (it announces `verifactu.record.created`).
 If it fails: only a registration record rejected or accepted with errors is corrected, and only the last one of its
-invoice: "This record cannot be corrected.".
+invoice: "This record cannot be corrected: only the last record of a registration the AEAT rejected or accepted
+with errors can.".
 Involved: INVOICE-F08
 
 ### VERIFACTU-F25 Resend a given record
@@ -737,8 +740,9 @@ Steps:
 3. The record ends with the AEAT's answer, as in VERIFACTU-F15.
 In: the chosen record (by its id or by its invoice's number).
 Out: the submission and its answer (it announces `verifactu.record.transmitted`).
-If it fails: with no gateway, "ERPlora's sending gateway is not configured on this server: the record stays pending
-and goes out as soon as it is."; already accepted, "This record is already at the AEAT."; with the AEAT's wait under
+If it fails: with no gateway, "It cannot be sent now: ERPlora's sending gateway is not configured on this server. It
+stays in the queue and goes out as soon as it can."; already accepted or rejected, "This record is not in the queue:
+it is already in the AEAT, or the AEAT rejected it."; with the AEAT's wait under
 way, "The AEAT asked to wait: it goes out by itself at {time}.". It never says "accepted" without an answer.
 Involved: VERIFACTU-F15
 
@@ -801,7 +805,8 @@ Steps:
 1. In **VeriFactu → Recovery**, block "Continue chain manually (migration)", type the "Last
    fingerprint (64 hex)" of the previous application, the "Invoice number" and the "Date" of that last record.
 2. Tap "Continue from this fingerprint" and confirm ("The fingerprint given will be the predecessor of the next
-   fiscal record. Use this only during a migration.").
+   fiscal record. Use this only during a migration and with the data of the last record of the previous
+   application.").
 3. "Operation completed." shows; the next invoice chains on that fingerprint.
 In: the fingerprint, the number and the date of the previous application's last record.
 Out: a new anchor (it announces `verifactu.chain.recovered`).
@@ -818,13 +823,15 @@ Steps:
 1. Only for an invoice that **should never have been issued** (a duplicate, a test made in production). A
    refund or a correction is not cancelled: it is a rectifying invoice in Invoicing (VERIFACTU-F14).
 2. In the detail of the registration record, tap "Cancel record", write the reason and confirm ("The AEAT will be
-   told this invoice was issued by error. The invoice stays in Invoicing.").
+   told this invoice was issued by error. A refund or a correction is never this: it is a rectifying invoice in
+   Invoicing. The invoice stays in Invoicing.").
 3. A chained **cancellation** record is sealed, which goes out like any other, and shows in Records with
    type "Cancellation".
 In: the registration record (or its invoice's number).
 Out: the cancellation record (it announces `verifactu.record.created`).
 If it fails: a rejected registration is not cancelled (it is not at the AEAT); an already cancelled one, neither:
-"This record cannot be cancelled.". If the AEAT rejected the cancellation, it can be cancelled again: the new one
+"This record cannot be cancelled: only a registration that reached (or will reach) the AEAT and has no
+cancellation can.". If the AEAT rejected the cancellation, it can be cancelled again: the new one
 carries `RechazoPrevio = S` (§9.2.2, "cancellation after rejection").
 Involved: INVOICE-F07
 
@@ -914,7 +921,7 @@ Out: if the AEAT had it, the record (it announces `verifactu.record.reconciled`;
 In the detail "The AEAT already has {number}: it is out of the queue." shows or, as a warning, "The AEAT does not have
 {number}: it stays in the queue and goes out with the next pass.".
 If it fails: an accepted or rejected record is not in the queue (the detail does not offer the button; through the
-API, "This record is not in the queue."); with no gateway or if the AEAT does not answer, the reason, above the
+API, "This record is not in the queue: it is already in the AEAT, or the AEAT rejected it."); with no gateway or if the AEAT does not answer, the reason, above the
 buttons, and the record stays in the queue.
 Involved: VERIFACTU-F22, VERIFACTU-F23, VERIFACTU-F27
 
