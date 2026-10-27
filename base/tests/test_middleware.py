@@ -336,7 +336,7 @@ class TestPlatformHost:
     def test_logout_is_left_alone(self, client, superuser):
         client.force_login(superuser)
         response = client.post("/auth/logout", HTTP_HOST=PLATFORM)
-        assert (response.status_code, response["Location"]) == (302, "http://localhost:8001/accounts/logout/")
+        assert (response.status_code, response["Location"]) == (302, "http://localhost:8001/logout")
         assert browse(client, "/admin/", PLATFORM)["Location"] == SAAS_HUBS
 
     # With the URL prefixed (SCRIPT_NAME) or not (Daphne's root_path only): reverse() carries the

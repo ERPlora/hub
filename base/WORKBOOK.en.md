@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:89d752248f7142e4e4cd3065889e0524234c8c5980300e5d9a762f045dd8f405 -->
+<!-- generated from WORKBOOK.md sha256:a6a347be7750fcb121cd12e855947196eea06f99fc7e865bee80f8c30831ec1a -->
 
 ## What it is for and who it is for
 
@@ -1559,10 +1559,11 @@ Screen: The user menu
 Steps:
   1. They open the user card at the top of the side menu (on a phone, first the menu with the bar's button).
   2. They tap "Sign out".
-  3. On a till with the PIN pad it goes back to **Access**, ready for the next person. On another device,
-     erplora.com's session ends too (erplora.com asks to confirm it).
+  3. On a till with the PIN pad it goes back to **Access**, ready for the next person. On another device, erplora.com
+     asks "Sign out of erplora.com?": "Sign out" ends it too and erplora.com asks to sign in again; "Stay signed in"
+     leaves it open and shows the account's businesses.
 In: the session.
-Out: the session closed in the business.
+Out: the session closed in the business; erplora.com's, only if the person confirms it.
 If it fails: if the business does not answer, the session expires by itself.
 Involved: none
 

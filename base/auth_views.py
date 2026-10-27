@@ -62,7 +62,10 @@ logger = logging.getLogger(__name__)
 USER_INACTIVE = "user_inactive"
 #: The platform host's callback got a ``next`` that is no hub's deep link.
 INVALID_NEXT = "invalid_next"
-SAAS_LOGOUT_PATH = "/accounts/logout/"
+#: erplora.com's «Sign out of erplora.com?» (saas ``accounts/frontend/pages/SignOutPage.vue``, ACCOUNTS-F09): it asks
+#: before closing its own session, since a redirect is a GET and a GET never signs anybody out. Not allauth's old
+#: ``/accounts/logout/``, a 404 since the SaaS runs headless (saas ``accounts/tests/test_login.py``).
+SAAS_LOGOUT_PATH = "/logout"
 #: The 403 of a callback without this browser's state, with a link to sign in again.
 LOGIN_RETRY_TEMPLATE = "base/login_retry.html"
 #: The 429 of a refused callback from a caller past :data:`CALLBACK_ATTEMPTS`.
@@ -236,9 +239,10 @@ def with_language_cookie(response: HttpResponse, language: str) -> None:
 
 @require_POST
 def auth_logout(request: HttpRequest) -> HttpResponseRedirect:
-    """Close the Hub's session, then the SaaS's (its page asks to confirm); a demo's goes back to the demo door. On a
-    device with the PIN pad (BASE-G61) it goes back to the hub's Access: the next person enters with their PIN, and
-    erplora.com's session in this browser is whoever made it a device's, not the person signing out."""
+    """Close the Hub's session, then on to the SaaS's page that asks whether to close its own (``SAAS_LOGOUT_PATH``); a
+    demo's goes back to the demo door. On a device with the PIN pad (BASE-G61) it goes back to the hub's Access: the
+    next person enters with their PIN, and erplora.com's session in this browser is whoever made it a device's, not the
+    person signing out."""
     demo = _is_demo(request)
     pin_pad = not demo and _hub_slug_of(request) is not None and queries.pin_door_open(request, _hub_slug_of(request))
     logout(request)

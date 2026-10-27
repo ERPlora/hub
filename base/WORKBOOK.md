@@ -1626,10 +1626,11 @@ Pantalla: El menú de usuario
 Pasos:
   1. Abre la tarjeta de usuario arriba del menú lateral (en el móvil, primero el menú con el botón de la barra).
   2. Pulsa «Cerrar sesión».
-  3. En una caja con pinpad vuelve a **Acceso**, lista para la siguiente persona. En otro dispositivo, la sesión
-     de erplora.com también se cierra (erplora.com pide confirmarlo).
+  3. En una caja con pinpad vuelve a **Acceso**, lista para la siguiente persona. En otro dispositivo, erplora.com
+     pregunta «¿Cerrar la sesión de erplora.com?»: «Cerrar sesión» la cierra también y erplora.com pide entrar de
+     nuevo; «Seguir conectado» la deja abierta y enseña los negocios de la cuenta.
 Entra: la sesión.
-Sale: la sesión cerrada en el negocio.
+Sale: la sesión cerrada en el negocio; la de erplora.com, solo si la persona lo confirma.
 Si falla: si el negocio no contesta, la sesión caduca sola.
 Implicados: ninguno
 
