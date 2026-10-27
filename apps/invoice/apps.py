@@ -3,7 +3,9 @@ substitutes a ticket F3 and the rectifying invoices R1–R5), their numbering se
 on each one (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+
+from apps.invoice.events import ISSUER_UPDATED, SERIES_EVENTS
 
 
 class InvoiceConfig(LiveAppConfig):
@@ -58,4 +60,43 @@ class InvoiceConfig(LiveAppConfig):
         Nav("invoices", _("Invoices"), "ion:receipt-outline", "/invoice/invoices"),
         Nav("series", _("Series"), "ion:layers-outline", "/invoice/series"),
         Nav("issuer", _("Issuer"), "ion:storefront-outline", "/invoice/issuer"),
+    ]
+    # The Home's hooks (PLAN-HUB round 2026-10-21): the old hub's ⛔ «Your business details» (a core item there,
+    # ``BLOCKING_KEYS``; here the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``) and the old module's
+    # «Your invoice numbering» (it had no `widgets` nor `bell`), on the queries the Issuer and Series screens read.
+    # The first is done with what issuing refuses to go without (``Issuer.configured``). The year's series are born
+    # with the first document, so the second is recommended and only waits while the business has no series at all:
+    # before its first document, the one moment to choose a prefix or continue another system's numbering; a new
+    # year's series inherit the last one's (INVOICE-F14). Registered icons only: the old `business-outline` and
+    # `bookmark-outline` wait in UI-REQUESTS.md.
+    setup = [
+        SetupStep(
+            key="business_identity",
+            operation="invoice.issuer.get",
+            configured_when=[SetupCheck(field="configured", truthy=True)],
+            title=_("Your business details"),
+            description=_("Legal name, tax ID and address: without them you cannot issue an invoice."),
+            icon="ion:storefront-outline",
+            route="/invoice/issuer",
+            permission="invoice.manage_issuer",
+            order=40,
+            required=True,
+            refresh_on=[ISSUER_UPDATED],
+        ),
+        SetupStep(
+            key="numbering",
+            operation="invoice.numbering.status",
+            configured_when=[SetupCheck(field="total_series", truthy=True)],
+            title=_("Your invoice numbering"),
+            description=_(
+                "Before your first sale, check the prefix your invoice numbers will carry. If you are coming from "
+                "another system, continue its numbering instead of starting again at 1."
+            ),
+            icon="ion:layers-outline",
+            route="/invoice/series",
+            permission="invoice.manage_series",
+            order=50,
+            required=False,
+            refresh_on=SERIES_EVENTS,
+        ),
     ]
