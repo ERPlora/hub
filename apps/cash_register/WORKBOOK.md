@@ -729,9 +729,12 @@ cajero del producto actual es un empleado.
 - **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6;
   `queries.business_currency`, leída como la plataforma: una API key solo tiene el permiso de su operación); en
   pantalla, `useBusinessMoney()` de `base`. Los decimales, de `babel` (los del servidor, nunca los de Intl: Intl le
-  da 0 al forinto y Babel 2). Mientras Ventas siga fijando `EUR` (su `FIX`), las cifras de las ventas salen con el
-  símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas del
-  producto actual).
+  da 0 al forinto y Babel 2). Ventas cobra en esa misma moneda y cada venta guarda la suya al nacer (`Sale.currency`,
+  hub#286). Caja copia el `amount` de cada cobro, anulación y devolución sin leer `Sale.currency`, y lo suma y lo
+  pinta en la del negocio, que es la de cada venta: el país, y con él la moneda, no cambia desde que el negocio puede
+  vender (`hubs.country_locked` del SaaS). Solo una venta de antes de hub#286 en un negocio sin euro guarda `EUR` y
+  sale con el símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas
+  del producto actual).
   El total de un arqueo lo suma el servidor; un billete o moneda de otra moneda es 422.
 - **Zona horaria (fase 1)**: `Europe/Madrid` (`TIME_ZONE` del Hub) para todos los negocios: día de
   negocio, número de sesión y corte del cierre automático. Cuando el Hub guarde la zona de cada negocio,
