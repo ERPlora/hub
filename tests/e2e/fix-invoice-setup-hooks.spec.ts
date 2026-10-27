@@ -102,6 +102,15 @@ async function markNoReload(page: Page): Promise<void> {
   await page.evaluate(() => Object.assign(window, { __e2eNoReload: true }));
 }
 
+/** The lines a text takes on screen: the distinct tops of its line boxes. */
+async function lines(text: Locator): Promise<number> {
+  return text.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+  });
+}
+
 async function expectNoReload(page: Page): Promise<void> {
   expect(await page.evaluate(() => (window as { __e2eNoReload?: boolean }).__e2eNoReload === true)).toBe(true);
 }
@@ -203,6 +212,15 @@ test('INVOICE-F21 and INVOICE-F14: an employee is told about the ⛔ without «C
     const notice = shown(page).locator('[data-testid="invoice-issuer-notice"]');
     await expect(notice.locator('[data-testid="invoice-issuer-notice-delegated"]')).toHaveText('Esto lo tiene que configurar un administrador.');
     await expect(notice.locator('[data-testid="invoice-issuer-notice-setup"]')).toHaveCount(0);
+    // On a phone the note goes on its own line under the step, as the strip above says it: never a narrow column
+    // beside the step's name, broken into three lines.
+    const step = await notice.locator('[data-testid="invoice-issuer-notice-item"]').boundingBox();
+    const note = notice.locator('[data-testid="invoice-issuer-notice-delegated"]');
+    const noteBox = await note.boundingBox();
+    if (!step || !noteBox) throw new Error('the notice paints the step and its note');
+    expect(noteBox.y, 'the note starts under the step').toBeGreaterThanOrEqual(step.y + step.height - 1);
+    expect(Math.abs(noteBox.x - step.x), 'the step and its note start at the same edge').toBeLessThanOrEqual(1);
+    expect(await lines(note), 'the note in at most two lines').toBeLessThanOrEqual(2);
     await untilStill(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, 'no sideways scroll at 390').toBeLessThanOrEqual(0);

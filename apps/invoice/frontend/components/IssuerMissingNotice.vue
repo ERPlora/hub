@@ -29,25 +29,35 @@ const missing = computed(() => issuer.value != null && !issuer.value.configured)
   >
     {{ $t('invoice.issuerNotice.message') }}
     <template #actions>
-      <span
-        class="issuer-notice__item"
-        data-testid="invoice-issuer-notice-item"
-      >{{ $t('invoice.issuerNotice.item') }}</span>
-      <IonButton
-        v-if="canManage"
-        size="small"
-        fill="outline"
-        color="danger"
-        data-testid="invoice-issuer-notice-setup"
-        @click="router.push('/invoice/issuer')"
-      >
-        {{ $t('invoice.issuerNotice.setUp') }}
-      </IonButton>
+      <template v-if="canManage">
+        <span
+          class="issuer-notice__item"
+          data-testid="invoice-issuer-notice-item"
+        >{{ $t('invoice.issuerNotice.item') }}</span>
+        <IonButton
+          size="small"
+          fill="outline"
+          color="danger"
+          data-testid="invoice-issuer-notice-setup"
+          @click="router.push('/invoice/issuer')"
+        >
+          {{ $t('invoice.issuerNotice.setUp') }}
+        </IonButton>
+      </template>
+      <!-- The note on its own line under the step, as base's strip says it (never a narrow column beside it). -->
       <span
         v-else
-        class="issuer-notice__delegated"
-        data-testid="invoice-issuer-notice-delegated"
-      >{{ $t('invoice.issuerNotice.delegated') }}</span>
+        class="issuer-notice__step"
+      >
+        <span
+          class="issuer-notice__item"
+          data-testid="invoice-issuer-notice-item"
+        >{{ $t('invoice.issuerNotice.item') }}</span>
+        <span
+          class="issuer-notice__delegated"
+          data-testid="invoice-issuer-notice-delegated"
+        >{{ $t('invoice.issuerNotice.delegated') }}</span>
+      </span>
     </template>
   </InlineFeedback>
 </template>
@@ -62,8 +72,19 @@ const missing = computed(() => issuer.value != null && !issuer.value.configured)
   font-weight: 600;
 }
 
+.issuer-notice__step {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.issuer-notice__step > .issuer-notice__item {
+  align-self: flex-start;
+}
+
 .issuer-notice__delegated {
-  align-self: center;
   font-style: italic;
 }
 </style>
