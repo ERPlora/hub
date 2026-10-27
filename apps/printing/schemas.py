@@ -254,7 +254,8 @@ class JobCreateIn(Closed):
         "the first of a receipt or an invoice prints as a duplicate.",
     )
     currency: Annotated[str, StringConstraints(pattern=r"^[A-Z]{3}$")] | None = Field(
-        None, description="The amounts' currency (ISO 4217), for their decimals; without it, EUR."
+        None,
+        description="The amounts' currency (ISO 4217), for their decimals; without it, the business's.",
     )
     automatic: bool = Field(
         False,
