@@ -17,7 +17,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
 import { withApproval } from '../../lib/approval';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, moneyOf } from '../../lib/format';
 import { refusal } from '../../lib/refusal';
 import type { RefundOptionsOut, TenderOption } from '../../operations';
 import {
@@ -41,9 +41,10 @@ const emit = defineEmits<{ refunded: [] }>();
 
 const t = useT();
 const locale = useLocale();
-const money = (cents: number): string => formatMoney(cents, locale.value);
-
 const { data, error: loadError, refresh } = useLive('sale.refund.options', () => ({ sale_id: props.saleId }));
+/** The sale's own currency: what it charged is what goes back (flow business-currency). */
+const saleMoney = computed(() => (data.value ? moneyOf(data.value) : undefined));
+const money = (cents: number): string => formatMoney(cents, locale.value, saleMoney.value);
 const command = useCommand('sale.sale.refund');
 
 /** This attempt's key: born with the window, the same on every retry. */
@@ -66,7 +67,7 @@ const sessions = computed(() => (data.value ? sessionsPicked(data.value.lines, p
 
 function propose(options: RefundOptionsOut, marked: Picked): void {
   const split = proposal(options.tenders, options.lines, marked);
-  typed.value = Object.fromEntries(Object.entries(split).map(([id, cents]) => [id, amountInput(cents, locale.value)]));
+  typed.value = Object.fromEntries(Object.entries(split).map(([id, cents]) => [id, amountInput(cents, locale.value, saleMoney.value)]));
 }
 
 // The first answer seeds the proposal; a later one (another refund elsewhere) keeps what was typed.
@@ -89,7 +90,7 @@ function proposeAll(): void {
   if (data.value) propose(data.value, {});
 }
 
-const amounts = computed(() => Object.fromEntries(tenders.value.map((tender) => [tender.payment_id, parseAmount(typed.value[tender.payment_id] ?? '')])));
+const amounts = computed(() => Object.fromEntries(tenders.value.map((tender) => [tender.payment_id, parseAmount(typed.value[tender.payment_id] ?? '', saleMoney.value)])));
 const total = computed(() => Object.values(amounts.value).reduce((sum, cents) => (Number.isFinite(cents) ? sum + cents : sum), 0));
 const block = computed(() => refundBlock(tenders.value, amounts.value, destinations.value, reason.value, sessions.value));
 
@@ -188,6 +189,7 @@ defineExpose({ confirm });
       <RefundLines
         v-if="data.lines.length"
         :lines="data.lines"
+        :money="saleMoney"
         :picked="picked"
         @update:picked="setPicked"
       />
@@ -198,6 +200,7 @@ defineExpose({ confirm });
           :amount="typed[tender.payment_id] ?? ''"
           :destination="destinations[tender.payment_id] ?? ''"
           :tender="tender"
+          :money="saleMoney"
           :error="cardError(tender)"
           @update:amount="typed[tender.payment_id] = $event"
           @update:destination="destinations[tender.payment_id] = $event"

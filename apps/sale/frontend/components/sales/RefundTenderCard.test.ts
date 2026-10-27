@@ -31,8 +31,11 @@ const tender = (over: Partial<TenderOption> = {}): TenderOption => ({
   ...over,
 });
 
+/** The sale's own money, as `sale.refund.options` sends it (flow business-currency). */
+const EUR = { currency: 'EUR', decimals: 2 };
+
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountSale(RefundTenderCard, { props: { tender: tender(), amount: '10.00', destination: '', ...props }, locale });
+  const m = await mountSale(RefundTenderCard, { props: { tender: tender(), amount: '10.00', destination: '', money: EUR, ...props }, locale });
   const figures = () => m.wrapper.findAll('[data-testid="refund-tender-figure"]').map((f) => plain(f.text()));
   return { ...m, figures };
 }

@@ -141,6 +141,16 @@ describe('amounts as typed', () => {
     expect(Number.isNaN(parseAmount('12,5,0'))).toBe(true);
     expect(Number.isNaN(parseAmount('-3'))).toBe(true);
   });
+
+  it('go back in the sale’s own currency, with its decimals: a yen has none (flow business-currency)', () => {
+    const yen = { currency: 'JPY', decimals: 0 };
+    const zloty = { currency: 'PLN', decimals: 2 };
+    expect(amountInput(5003, 'en', yen)).toBe('5003');
+    expect(parseAmount('5003', yen)).toBe(5003);
+    expect(Number.isNaN(parseAmount('50,5', yen))).toBe(true);
+    expect(amountInput(123456, 'es', zloty)).toBe('1234,56');
+    expect(parseAmount('1234,56', zloty)).toBe(123456);
+  });
 });
 
 describe('refundBlock', () => {

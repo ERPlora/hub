@@ -40,6 +40,13 @@ describe('sales filters', () => {
     expect(invalidAmounts({ total_min: '12.50', total_max: ' ' })).toEqual([]);
   });
 
+  it('«Total» is typed in the business’s currency, with its decimals: yen without them (flow business-currency)', () => {
+    const yen = { currency: 'JPY', decimals: 0 };
+    expect(filterQuery({ total_min: '1000', total_max: '2500' }, yen)).toEqual({ total_min: 1000, total_max: 2500 });
+    expect(invalidAmounts({ total_min: '10,5' }, yen)).toEqual(['total_min']);
+    expect(filtersInUse({ total_min: '1000' }, yen)).toBe(1);
+  });
+
   it('a «to» day before its «from» is said, sends neither and leaves the period ruling', () => {
     const reversed = { date_from: '2026-10-14', date_to: '2026-10-01', status: 'completed' };
     expect(reversedDates(reversed)).toBe(true);

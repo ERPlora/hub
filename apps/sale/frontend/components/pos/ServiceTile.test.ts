@@ -11,6 +11,7 @@ import ServiceTile from './ServiceTile.vue';
 describe('ServiceTile', () => {
   it('paints the initials, the name, the duration and the fixed price in the reader’s language', async () => {
     const m = await mountSale(ServiceTile, { props: { service: service() }, locale: 'es' });
+    await m.live();
     const tile = m.find('pos-service-sv1');
     expect(tile.find('.pos-tile__thumb').text()).toBe('CD');
     expect(tile.find('.pos-tile__name').text()).toBe('Corte de pelo');
@@ -26,6 +27,7 @@ describe('ServiceTile', () => {
     ['free', 'Gratis'],
   ] as const)('a %s service says how it is priced', async (pricing_type, text) => {
     const m = await mountSale(ServiceTile, { props: { service: service({ pricing_type, price: 6500 }) }, locale: 'es' });
+    await m.live();
     expect(plain(m.find('pos-service-sv1').find('.pos-tile__price').text())).toBe(text);
   });
 

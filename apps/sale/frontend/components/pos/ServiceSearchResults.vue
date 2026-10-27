@@ -12,12 +12,13 @@ import { computed } from 'vue';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{ term: string }>();
 const emit = defineEmits<{ pick: [service: ServiceSaleOut] }>();
 
 const locale = useLocale();
+const business = useBusinessMoney();
 const taxName = useTaxName();
 const { data } = useLive('service.service.list_for_sale', () => ({ search: props.term, limit: 20, offset: 0 }));
 const rows = computed(() => data.value?.rows ?? []);
@@ -49,7 +50,7 @@ const rows = computed(() => data.value?.rows ?? []);
             :class="{ 'pos-search__warn': item.needs_tax_setup }"
           >{{ item.needs_tax_setup ? $t('sale.pos.notSellableNoTaxCategory', { tax: taxName }) : $t('sale.pos.serviceMinutes', { minutes: item.duration_minutes }) }}</span>
         </span>
-        <span class="pos-search__price">{{ formatMoney(item.price, locale) }}</span>
+        <span class="pos-search__price">{{ formatMoney(item.price, locale, business) }}</span>
       </button>
     </ion-item>
   </ion-list>

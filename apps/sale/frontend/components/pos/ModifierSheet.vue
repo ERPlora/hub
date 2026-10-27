@@ -11,7 +11,7 @@ import { computed, shallowRef, watch } from 'vue';
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { TargetGroupOut } from '../../../../modifier/frontend/operations';
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { addedCents, choose, type Choice, chosenIds, initialChoice, missingGroup, unchoose } from '../../lib/modifierChoice';
 import ChoiceGroupSection, { type SectionGroup } from './ChoiceGroupSection.vue';
 import PosSheet from './PosSheet.vue';
@@ -27,6 +27,7 @@ const emit = defineEmits<{ add: [optionIds: string[]] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 const choice = shallowRef<Choice>(initialChoice(props.groups));
 const attention = shallowRef<string | null>(null);
@@ -42,7 +43,7 @@ watch(
 );
 
 const missing = computed(() => missingGroup(props.groups, choice.value));
-const price = computed(() => formatMoney((props.product?.price ?? 0) + addedCents(props.groups, choice.value), locale.value));
+const price = computed(() => formatMoney((props.product?.price ?? 0) + addedCents(props.groups, choice.value), locale.value, business.value));
 
 const sections = computed<SectionGroup[]>(() =>
   props.groups.map((group) => ({ ...group, options: group.options.map((option) => ({ ...option, label: option.name })) })),

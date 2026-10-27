@@ -53,6 +53,8 @@ describe('RefundModal', () => {
       sale_id: 's1',
       number: '20261014-0007',
       status: 'completed',
+      currency: 'EUR',
+      currency_decimals: 2,
       total: 100,
       refunded_total: 0,
       refundable_total: 100,

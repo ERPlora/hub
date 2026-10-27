@@ -19,12 +19,12 @@ const method = (id: string, type: PaymentMethodOut['type']): PaymentMethodOut =>
 const CASH = method('cash', 'cash');
 const CARD = method('card', 'card');
 
-function setup(total: number | undefined = 4250, cashLimit: number | null = 100000) {
+function setup(total: number | undefined = 4250, cashLimit: number | null = 100000, decimals = 2) {
   const totalRef = ref(total);
   const methods = ref<PaymentMethodOut[]>([CASH, CARD]);
   const limit = ref(cashLimit);
   const scope = effectScope();
-  const tender = scope.run(() => useTender({ total: totalRef, methods, cashLimit: limit }))!;
+  const tender = scope.run(() => useTender({ total: totalRef, methods, cashLimit: limit, decimals: () => decimals }))!;
   const type = (...keys: string[]) => keys.forEach((k) => tender.press(k));
   return { tender, totalRef, methods, limit, type };
 }
@@ -54,7 +54,7 @@ describe('useTender: one method', () => {
     const totalRef = ref<number | undefined>(50000);
     const scope = effectScope();
     const tender = scope.run(() =>
-      useTender({ total: totalRef, operationTotal: () => 120000, methods: [CASH, CARD], cashLimit: 100000 }),
+      useTender({ total: totalRef, operationTotal: () => 120000, methods: [CASH, CARD], cashLimit: 100000, decimals: 2 }),
     )!;
     expect(tender.cashOff.value).toBe(true);
     expect(tender.method.value?.id).toBe('card');
@@ -161,5 +161,22 @@ describe('useTender: split', () => {
     tender.addLeg();
     tender.removeLeg(tender.legs.value[0].id);
     expect([tender.legs.value, tender.remaining.value]).toEqual([[], 4250]);
+  });
+});
+
+describe('useTender: the business’s currency (flow business-currency)', () => {
+  it('types yen as yen: no decimals, no separator, and the change in yen', () => {
+    const { tender, type } = setup(4250, null, 0);
+    type('5', '.', '0', '0', '0');
+    expect([tender.typed.value, tender.change.value]).toEqual([5000, 750]);
+  });
+
+  it('a leg brought back to the keypad keeps its yen', () => {
+    const { tender, type } = setup(4250, null, 0);
+    tender.startSplit();
+    type('1', '0', '0', '0');
+    tender.addLeg();
+    tender.editLeg(tender.legs.value[0].id);
+    expect(tender.typed.value).toBe(1000);
   });
 });

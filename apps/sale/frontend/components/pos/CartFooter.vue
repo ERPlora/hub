@@ -9,7 +9,7 @@ import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, formatPercent } from '../../lib/format';
+import { formatMoney, formatPercent, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{
   hasLines: boolean;
@@ -28,9 +28,10 @@ const emit = defineEmits<{ discount: []; prebill: []; charge: [] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 const hasDiscount = computed(() => Number(props.discountPercent) > 0 || props.discountAmount > 0);
-const totalText = computed(() => (props.total === undefined ? '—' : formatMoney(props.total, locale.value)));
+const totalText = computed(() => (props.total === undefined ? '—' : formatMoney(props.total, locale.value, business.value)));
 const discountLabel = computed(() => {
   const percent = Number(props.discountPercent) > 0 ? ` −${formatPercent(props.discountPercent, locale.value)}` : '';
   return `${t('sale.pos.discountTicket')}${percent}`;
@@ -45,7 +46,7 @@ const discountLabel = computed(() => {
       data-testid="pos-ticket-discount-row"
     >
       <span>{{ discountLabel }}</span>
-      <span>−{{ formatMoney(ticketDiscount, locale) }}</span>
+      <span>−{{ formatMoney(ticketDiscount, locale, business) }}</span>
     </div>
     <div class="pos-foot__total">
       <span>{{ $t('sale.pos.total') }}</span>

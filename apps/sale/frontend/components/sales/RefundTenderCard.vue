@@ -8,7 +8,7 @@ import { IonInput } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, type Money } from '../../lib/format';
 import type { TenderOption } from '../../operations';
 import PaymentMethodPicker from './PaymentMethodPicker.vue';
 
@@ -17,8 +17,10 @@ const props = withDefaults(
     tender: TenderOption;
     /** Why the amount cannot go as it is (the window's message), painted under it. */
     error?: string;
+    /** The sale's own currency: what the tender charged and gives back. */
+    money?: Money;
   }>(),
-  { error: undefined },
+  { error: undefined, money: undefined },
 );
 
 /** What goes back on it, as typed. */
@@ -32,7 +34,7 @@ const locale = useLocale();
 /** The reasons the server gives for a tender that cannot go back its own way; any other reads generic. */
 const REASONS = new Set(['already_refunded', 'method_unavailable']);
 
-const money = (cents: number): string => formatMoney(cents, locale.value);
+const money = (cents: number): string => formatMoney(cents, locale.value, props.money);
 
 const figures = computed(() =>
   [

@@ -31,6 +31,7 @@ const BASE = { methods: [CASH, CARD], method: CASH, cashOff: false, splitting: f
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountSale(CheckoutTender, { props: { ...BASE, ...props }, locale });
+  await m.live();
   const text = (testid: string) => plain(m.find(testid).text()).replace(/\s+/g, ' ').trim();
   const parts = (testid: string) => m.find(testid).findAll('span').map((p) => plain(p.text()));
   return { ...m, text, parts };

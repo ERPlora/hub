@@ -13,7 +13,7 @@ import { computed } from 'vue';
 import type { OrderLineOut } from '../../operations';
 import { useLocale, useT } from '../../composables/useT';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatPercent, formatQuantity } from '../../lib/format';
+import { formatMoney, formatPercent, formatQuantity, useBusinessMoney } from '../../lib/format';
 import QtyStepper from './QtyStepper.vue';
 
 const props = defineProps<{
@@ -38,6 +38,7 @@ const emit = defineEmits<{
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 const fired = computed(() => !!props.line.fired_at);
 const covered = computed(() => props.line.paid_by_voucher);
@@ -45,7 +46,7 @@ const discounted = computed(() => Number(props.line.discount_percent) > 0);
 
 /** «1,50 €», or «12,00 € / kg» (and «/ 100 g») when it is not priced by the unit. */
 const price = computed(() => {
-  const money = formatMoney(props.line.unit_price, locale.value);
+  const money = formatMoney(props.line.unit_price, locale.value, business.value);
   if (props.line.pricing_unit === 'ud') return money;
   const per = Number(props.line.price_quantity) === 1 ? props.line.pricing_unit : formatQuantity(props.line.price_quantity, props.line.pricing_unit, locale.value);
   return `${money} / ${per}`;
@@ -146,7 +147,7 @@ function onRow(): void {
       <span
         class="pos-line__amount"
         :class="{ 'pos-line__amount--gift': line.is_gift }"
-      >{{ formatMoney(line.line_total, locale) }}</span>
+      >{{ formatMoney(line.line_total, locale, business) }}</span>
       <template v-if="fired">
         <span class="pos-line__actions">
           <button

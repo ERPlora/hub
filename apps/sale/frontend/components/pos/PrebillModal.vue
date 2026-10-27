@@ -16,7 +16,7 @@ import { computed, shallowRef, useTemplateRef } from 'vue';
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatQuantity } from '../../lib/format';
+import { formatMoney, formatQuantity, useBusinessMoney } from '../../lib/format';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
 
@@ -25,6 +25,7 @@ const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
 const locale = useLocale();
+const businessMoney = useBusinessMoney();
 const paper = useTemplateRef<HTMLElement>('paper');
 
 const { data: valued, error, refresh } = useLive('sale.checkout.preview', () => ({ order_id: props.order.id }));
@@ -33,7 +34,7 @@ const business = computed(() => props.header.split('\n')[0]?.trim() || t('sale.p
 const now = computed(() => formatDateTime(new Date(), locale.value));
 
 const amount = (line: OrderLineOut) =>
-  `${formatQuantity(line.quantity, line.unit, locale.value)} × ${formatMoney(line.unit_price, locale.value)}`;
+  `${formatQuantity(line.quantity, line.unit, locale.value)} × ${formatMoney(line.unit_price, locale.value, businessMoney.value)}`;
 
 /** The kinds of tax the bill names in the reader's language; a component with its own name keeps it. */
 const TAX_KINDS = new Set(['vat', 'surcharge', 'igic', 'ipsi']);
@@ -169,7 +170,7 @@ async function print(): Promise<void> {
           >
             <span class="pos-bill__name">{{ lineName(line) }}</span>
             <span class="pos-bill__qty">{{ amount(line) }}</span>
-            <span class="pos-bill__amount">{{ formatMoney(line.line_total, locale) }}</span>
+            <span class="pos-bill__amount">{{ formatMoney(line.line_total, locale, businessMoney) }}</span>
             <span
               v-if="line.modifiers.length"
               class="pos-bill__options"
@@ -190,11 +191,11 @@ async function print(): Promise<void> {
             class="pos-bill__row pos-bill__discount"
           >
             <dt>{{ $t('sale.pos.docDiscount') }}</dt>
-            <dd>−{{ formatMoney(valued.ticket_discount_amount, locale) }}</dd>
+            <dd>−{{ formatMoney(valued.ticket_discount_amount, locale, businessMoney) }}</dd>
           </div>
           <div class="pos-bill__row">
             <dt>{{ $t('sale.pos.docSubtotal') }}</dt>
-            <dd>{{ formatMoney(valued.subtotal, locale) }}</dd>
+            <dd>{{ formatMoney(valued.subtotal, locale, businessMoney) }}</dd>
           </div>
           <div
             v-for="row in taxes"
@@ -203,13 +204,13 @@ async function print(): Promise<void> {
           >
             <dt>{{ row.label }}</dt>
             <dd>
-              <span>{{ formatMoney(row.base, locale) }}</span>
-              <span>{{ formatMoney(row.tax, locale) }}</span>
+              <span>{{ formatMoney(row.base, locale, businessMoney) }}</span>
+              <span>{{ formatMoney(row.tax, locale, businessMoney) }}</span>
             </dd>
           </div>
           <div class="pos-bill__row pos-bill__total">
             <dt>{{ $t('sale.pos.total') }}</dt>
-            <dd>{{ formatMoney(valued.total, locale) }}</dd>
+            <dd>{{ formatMoney(valued.total, locale, businessMoney) }}</dd>
           </div>
         </dl>
         <p class="pos-bill__notice">

@@ -1,10 +1,19 @@
 // Numbers of the sale screens: the server keeps money in cents and quantities and percentages as
-// decimal strings; a person reads them in the page's language and types euros. Until
+// decimal strings; a person reads them in the page's language and types amounts. Until
 // `@erplora/ui/components/format` has money and number formatters (UI-REQUESTS.md), this is the one
-// place the app turns them into text (`Intl.NumberFormat`) and euros into cents.
+// place the app turns them into text (`Intl.NumberFormat`) and typed amounts into cents.
+// The money is the business's (`useBusinessMoney`: its country's currency and the decimals the server counts it in)
+// on the till, and a charged sale's own (`moneyOf`) on what it shows or prints: the screens pass it, and until it is
+// known an amount is a figure with two decimals and no sign, never the euro by default. Its decimals come from the
+// server, never from the browser's Intl (which gives none to the forint).
 
-const CURRENCY = 'EUR';
+import type { Money } from '../../../../base/frontend/lib/home';
+
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
 const FALLBACK_LOCALE = 'en';
+const NO_MONEY_DECIMALS = 2;
 
 const cache = new Map<string, Intl.NumberFormat>();
 
@@ -25,12 +34,39 @@ function formatter(locale: string, key: string, options: Intl.NumberFormatOption
 
 const missing = (value: unknown) => value === null || value === undefined || value === '' || Number.isNaN(Number(value));
 
+/** The decimals of `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
+export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
+
+/** The money a charged sale is shown in: its own currency and decimals, as the server sent them; unknown (a figure
+ *  without a sign) if a server half way through a deploy does not send them yet. */
+export const moneyOf = (sale: { currency: string; currency_decimals: number }): Money | undefined =>
+  sale.currency ? { currency: sale.currency, decimals: sale.currency_decimals } : undefined;
+
 // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
 // here beside «1.234,56 €» in the other screens (hub#1090).
-/** `cents` as euros in `locale` («€1,234.56», «1.234,56 €»); nothing to show is «—». */
-export function formatMoney(cents: number | null | undefined, locale: string): string {
+function moneyOptions(money: Money | undefined, decimals: number): Intl.NumberFormatOptions {
+  const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' } as const;
+  return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
+}
+
+/** `cents` (minor units) as `money` in `locale` («€1,234.56», «1.234,56 zł», «¥5,003»; «1.234,56» while the
+ *  money is unknown); nothing to show is «—». */
+export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   if (missing(cents)) return '—';
-  return formatter(locale, 'money', { style: 'currency', currency: CURRENCY, useGrouping: 'always' }).format((cents as number) / 100);
+  const decimals = moneyDecimals(money);
+  return formatter(locale, `money-${money?.currency ?? ''}-${decimals}`, moneyOptions(money, decimals)).format(
+    (cents as number) / 10 ** decimals,
+  );
+}
+
+/** The sign of `money` alone, as a till there writes it («€», «zł», «¥»); nothing while it is unknown. */
+export function currencySign(locale: string, money?: Money): string {
+  if (!money) return '';
+  return (
+    formatter(locale, `sign-${money.currency}`, { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0)
+      .find((part) => part.type === 'currency')?.value ?? money.currency
+  );
 }
 
 /** A percentage («21.00» → «21%», «12.50» → «12,5 %»); nothing to show is «—». */
@@ -45,14 +81,15 @@ export function formatQuantity(value: string | number, unit: string, locale: str
   return unit && unit !== 'ud' ? `${number} ${unit}` : number;
 }
 
-const AMOUNT = /^\d+(?:[.,]\d{1,2})?$/;
-
-/** Euros as typed («12,5», «12.50», 7) → whole cents; blank or not an amount → `undefined`. */
-export function centsFromEuros(value: string | number | null | undefined): number | undefined {
+/** An amount of `money` as typed («12,5», «12.50», 7; «1000» yen) → whole minor units, with at most the decimals
+ *  of its currency; blank or not an amount → `undefined`. */
+export function centsFromAmount(value: string | number | null | undefined, money?: Money): number | undefined {
   if (value === null || value === undefined) return undefined;
   const text = String(value).trim();
-  if (!text || !AMOUNT.test(text)) return undefined;
-  return Math.round(Number(text.replace(',', '.')) * 100);
+  const decimals = moneyDecimals(money);
+  const amount = decimals > 0 ? new RegExp(`^\\d+(?:[.,]\\d{1,${decimals}})?$`) : /^\d+$/;
+  if (!text || !amount.test(text)) return undefined;
+  return Math.round(Number(text.replace(',', '.')) * 10 ** decimals);
 }
 
 /** A day as the reader writes it («14/11/2026», «11/14/2026»); nothing to show is «—». */

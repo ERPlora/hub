@@ -8,7 +8,7 @@ import type { DataTableFilterOption, DataTableFilters } from '@erplora/ui/compon
 import type { LiveClient } from '@erplora/ui/sdk';
 
 import type { SaleListIn, SaleStatus } from '../operations';
-import { centsFromEuros } from './format';
+import { centsFromAmount, type Money } from './format';
 
 export const SALE_STATUSES: readonly SaleStatus[] = ['completed', 'voided', 'refunded'];
 
@@ -18,9 +18,9 @@ const METHODS_PAGE = 20;
 
 const typed = (values: DataTableFilters, key: string): string => (values[key] ?? '').trim();
 
-/** The amount filters typed that are not amounts. */
-export function invalidAmounts(values: DataTableFilters): string[] {
-  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromEuros(values[key]) === undefined);
+/** The amount filters typed that are not amounts of the business's `money`. */
+export function invalidAmounts(values: DataTableFilters, money?: Money): string[] {
+  return AMOUNTS.filter((key) => typed(values, key) !== '' && centsFromAmount(values[key], money) === undefined);
 }
 
 /** «Date to» is a day before «Date from»: neither is sent. */
@@ -35,8 +35,8 @@ export function hasDateRange(values: DataTableFilters): boolean {
   return !reversedDates(values) && (typed(values, 'date_from') !== '' || typed(values, 'date_to') !== '');
 }
 
-/** What the list query takes from the filters. */
-export function filterQuery(values: DataTableFilters): Partial<SaleListIn> {
+/** What the list query takes from the filters; «Total» is typed in the business's `money`. */
+export function filterQuery(values: DataTableFilters, money?: Money): Partial<SaleListIn> {
   const query: Partial<SaleListIn> = {};
   if (SALE_STATUSES.includes(values.status as SaleStatus)) query.status = values.status as SaleStatus;
   const method = typed(values, 'payment_method_name');
@@ -48,15 +48,15 @@ export function filterQuery(values: DataTableFilters): Partial<SaleListIn> {
     if (to) query.date_to = to;
   }
   for (const key of AMOUNTS) {
-    const cents = centsFromEuros(values[key]);
+    const cents = centsFromAmount(values[key], money);
     if (cents !== undefined) query[key] = cents;
   }
   return query;
 }
 
 /** The filters that really apply (what it cannot read, or a reversed range, does not). */
-export function filtersInUse(values: DataTableFilters): number {
-  return Object.keys(filterQuery(values)).length;
+export function filtersInUse(values: DataTableFilters, money?: Money): number {
+  return Object.keys(filterQuery(values, money)).length;
 }
 
 /** The «Payment» lookup: the first methods matching what is typed, from the server. */

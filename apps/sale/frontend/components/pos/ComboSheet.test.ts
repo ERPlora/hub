@@ -35,6 +35,7 @@ async function setup(props: Record<string, unknown> = {}) {
     props: { open: true, combo: MENU, pending: false, error: null, ...props },
     locale: 'es',
   });
+  await m.live();
   await settle();
   return m;
 }

@@ -31,6 +31,8 @@ export interface UseTenderOptions<M extends TenderMethod> {
    * charged in parts already charged plus all it has left; Ley 7/2012 art. 7). `total` without it.
    */
   operationTotal?: MaybeRefOrGetter<number | undefined>;
+  /** The decimals of the business's currency (none in JPY): what the keypad types (flow business-currency). */
+  decimals: MaybeRefOrGetter<number>;
 }
 
 export function useTender<M extends TenderMethod>(options: UseTenderOptions<M>) {
@@ -48,7 +50,7 @@ export function useTender<M extends TenderMethod>(options: UseTenderOptions<M>) 
     const methods = toValue(options.methods);
     return methods.find((m) => m.id === pickedId.value) ?? defaultMethod(methods, cashOff.value);
   });
-  const typed = computed(() => typedCents(text.value));
+  const typed = computed(() => typedCents(text.value, toValue(options.decimals)));
   const remaining = computed(() => remainingCents(total.value, legs.value));
   /** The leg «Add this payment» would take now. */
   const pending = computed(() => (splitting.value ? planLeg(method.value, typed.value, remaining.value) : undefined));
@@ -67,7 +69,7 @@ export function useTender<M extends TenderMethod>(options: UseTenderOptions<M>) 
   }
 
   function press(key: string): void {
-    text.value = pushKey(primed.value ? '' : text.value, key);
+    text.value = pushKey(primed.value ? '' : text.value, key, toValue(options.decimals));
     primed.value = false;
   }
 
@@ -93,7 +95,7 @@ export function useTender<M extends TenderMethod>(options: UseTenderOptions<M>) 
     if (!leg) return;
     removeLeg(id);
     pickedId.value = leg.method.id;
-    text.value = centsToTyped(leg.tendered);
+    text.value = centsToTyped(leg.tendered, toValue(options.decimals));
     primed.value = true;
   }
 

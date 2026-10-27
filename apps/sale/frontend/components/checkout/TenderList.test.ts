@@ -18,6 +18,7 @@ const LEGS: Leg[] = [
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountSale(TenderList, { props: { legs: LEGS }, locale });
+  await m.live();
   const rows = () => m.wrapper.findAll('[data-testid="sale-checkout-leg"]');
   return { ...m, rows };
 }

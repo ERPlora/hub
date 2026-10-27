@@ -10,7 +10,7 @@ import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale } from '../__tests__/mount-sale';
+import { business, BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountSale, POLISH } from '../__tests__/mount-sale';
 import DocumentModal from '../components/document/DocumentModal.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import RefundModal from '../components/sales/RefundModal.vue';
@@ -53,6 +53,8 @@ const row = (id: string, over: Partial<SaleRow> = {}): SaleRow => ({
   id,
   number: `20261014-000${id.slice(1)}`,
   business_day: '2026-10-14',
+  currency: 'EUR',
+  currency_decimals: 2,
   created_at: '2026-10-14T10:05:00Z',
   status: 'completed',
   document_type: 'ticket',
@@ -185,6 +187,21 @@ describe('SalesPage: the screen', () => {
     await s.show(PAGE);
     expect(s.prop<(r: SaleRow) => string>('cardTitle')(ROWS[0])).toBe('20261014-0001');
     expect(s.prop<(r: SaleRow) => string>('cardIcon')(ROWS[0])).toBe('receipt-outline');
+  });
+});
+
+describe('SalesPage: the money of each sale (flow business-currency)', () => {
+  it('a sale charged in złoty keeps them in its row while the business is now in euros', async () => {
+    const s = await setup({ business: business() });
+    await s.show({ ...PAGE, rows: [row('s1', { currency: 'PLN', currency_decimals: 2, total: 1250 })], total: 1 });
+    expect(s.cells(0)[5]).toBe('zł 12.50');
+  });
+
+  it('«Total» is typed in the business’s currency: yen without decimals reach the server as they are', async () => {
+    const s = await setup({ business: business({ ...POLISH, currency: 'JPY', currency_decimals: 0 }) });
+    s.table().vm.$emit('update:filters', { total_min: '1000' });
+    await flush();
+    expect(s.list().at(-1)).toMatchObject({ total_min: 1000 });
   });
 });
 

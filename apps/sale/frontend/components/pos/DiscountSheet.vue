@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The discount sheet (SALE-F14): «Ticket discount» or «Discount on <item>». A percentage on the keypad
-// (never over 100); the ticket can switch to a fixed amount with the currency button (switching clears
+// (never over 100); the ticket can switch to a fixed amount with the button of the business's currency (switching clears
 // what was typed; a check with only a fixed amount opens on it). «Apply −N %» / «Apply −<amount>»
 // hands one kind up (the other at 0); «Remove» hands both at 0. The page picks the door — the
 // manager's above the business's cap — and a refusal is read here, over the buttons.
@@ -8,7 +8,7 @@ import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { centsFromEuros, formatMoney, formatPercent } from '../../lib/format';
+import { centsFromAmount, currencySign, formatMoney, formatPercent, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
 
@@ -27,6 +27,7 @@ const emit = defineEmits<{ apply: [discount: { percent: string; amount: number }
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 const mode = shallowRef<DiscountMode>('percent');
 const typed = shallowRef('');
@@ -47,9 +48,10 @@ watch(typed, (now, before) => {
 });
 
 const value = computed(() => typed.value.replace(/\.$/, '') || '0');
-const cents = computed(() => centsFromEuros(value.value) ?? 0);
-const shown = computed(() => (mode.value === 'percent' ? formatPercent(value.value, locale.value) : formatMoney(cents.value, locale.value)));
-const currency = computed(() => formatMoney(0, locale.value).replace(/[\d.,\s  ]/g, ''));
+const cents = computed(() => centsFromAmount(value.value, business.value) ?? 0);
+const shown = computed(() => (mode.value === 'percent' ? formatPercent(value.value, locale.value) : formatMoney(cents.value, locale.value, business.value)));
+/** The amount button's sign: the business's currency («€», «zł»; gh:sales#380), «¤» until the business answers. */
+const currency = computed(() => currencySign(locale.value, business.value) || '¤');
 const ready = computed(() => (mode.value === 'percent' ? Number(value.value) > 0 : cents.value > 0));
 const title = computed(() => (ticket.value ? t('sale.pos.discountTicket') : t('sale.pos.discountLineOf', { name: props.name })));
 
@@ -95,6 +97,7 @@ function apply(): void {
     </template>
     <PosNumpad
       v-model="typed"
+      :decimals="mode === 'percent' ? 2 : moneyDecimals(business)"
       :max-length="mode === 'percent' ? 6 : 9"
     />
     <template #foot>

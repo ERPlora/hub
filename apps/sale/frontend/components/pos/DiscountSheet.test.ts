@@ -31,6 +31,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     },
     { locale },
   );
+  await m.live();
   await settle();
   const press = async (...keys: string[]) => {
     for (const key of keys) await click(m.find(`pos-key-${key}`).element);

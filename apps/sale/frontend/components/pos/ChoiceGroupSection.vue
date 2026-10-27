@@ -19,7 +19,7 @@ export interface SectionGroup extends ChoiceGroup {
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { type Choice, countOf, ruleOf } from '../../lib/modifierChoice';
 
 const props = defineProps<{ kind: 'options' | 'menu'; group: SectionGroup; choice: Choice; attention: string | null }>();
@@ -27,6 +27,7 @@ const emit = defineEmits<{ tap: [optionId: string]; less: [optionId: string] }>(
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 /** The hooks of each kind: the options sheet keeps the ones it had. */
 const HOOKS = {
@@ -38,7 +39,7 @@ const rule = computed(() => ruleOf(props.group));
 
 function supplement(cents: number): string {
   if (!cents) return '';
-  return `${cents > 0 ? '+' : '−'}${formatMoney(Math.abs(cents), locale.value)}`;
+  return `${cents > 0 ? '+' : '−'}${formatMoney(Math.abs(cents), locale.value, business.value)}`;
 }
 </script>
 

@@ -17,7 +17,7 @@ import { computed } from 'vue';
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatQuantity } from '../../lib/format';
+import { formatMoney, formatQuantity, moneyOf } from '../../lib/format';
 import type { SaleOut, SettingsOut } from '../../operations';
 import type { FiscalRecord } from './FiscalRecordFollower.vue';
 
@@ -40,7 +40,7 @@ const locale = useLocale();
 /** The taxes the paper names short («IVA 10 %»); any other keeps the label its rule gave it. */
 const TAX_NAMES = new Set(['vat', 'surcharge', 'igic', 'ipsi']);
 
-const money = (cents: number): string => formatMoney(cents, locale.value);
+const money = (cents: number): string => formatMoney(cents, locale.value, moneyOf(props.sale));
 
 const header = computed(() => (props.settings?.receipt_header ?? '').split('\n').map((line) => line.trim()).filter(Boolean));
 const businessName = computed(() => header.value[0] ?? t('sale.document.defaultBusiness'));

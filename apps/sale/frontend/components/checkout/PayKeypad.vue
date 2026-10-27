@@ -1,11 +1,13 @@
 <script setup lang="ts">
 // The keypad of the charge sheet (the old `.numpad`): three columns, 1…9, the decimal separator, 0 and
 // C. It only sends the key pressed ('.' for the separator, whatever the page language shows); what the
-// keys build is the tender's (lib/checkout/tender.ts). No quick amounts: removed on purpose (2026-07-19).
+// keys build is the tender's (lib/checkout/tender.ts). No quick amounts: removed on purpose (2026-07-19). A currency
+// without decimals (the yen; flow business-currency) has the separator off, as the till's own keypad (PosNumpad).
 import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
 
+withDefaults(defineProps<{ decimals?: number }>(), { decimals: 2 });
 const emit = defineEmits<{ key: [key: string] }>();
 
 const locale = useLocale();
@@ -37,6 +39,7 @@ const KEY_ID: Record<string, string> = { '.': 'dot', C: 'clear' };
       class="pay-keypad__key"
       :data-testid="`sale-checkout-keypad-${KEY_ID[key] ?? key}`"
       :aria-label="key === 'C' ? $t('sale.checkout.keypadClear') : undefined"
+      :disabled="key === '.' && decimals === 0"
       @click="emit('key', key)"
     >
       {{ key === '.' ? separator : key }}
@@ -66,6 +69,11 @@ const KEY_ID: Record<string, string> = { '.': 'dot', C: 'clear' };
 
 .pay-keypad__key:active {
   background: var(--ion-color-light, #f2f1ed);
+}
+
+.pay-keypad__key:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .pay-keypad__key:focus-visible {

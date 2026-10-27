@@ -9,7 +9,7 @@ import { computed, shallowRef, watch } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useLocale } from '../../composables/useT';
-import { centsFromEuros, formatMoney } from '../../lib/format';
+import { centsFromAmount, formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
 
@@ -18,16 +18,18 @@ const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ add: [cents: number] }>();
 
 const locale = useLocale();
+const business = useBusinessMoney();
 const typed = shallowRef('');
 
 watch(open, (isOpen) => isOpen && (typed.value = ''), { immediate: true });
 
-const cents = computed(() => centsFromEuros(typed.value.replace(/\.$/, '')) ?? 0);
-const amount = computed(() => formatMoney(cents.value, locale.value));
-const suggestion = computed(() => formatMoney(props.service?.price ?? 0, locale.value));
+const cents = computed(() => centsFromAmount(typed.value.replace(/\.$/, ''), business.value) ?? 0);
+const amount = computed(() => formatMoney(cents.value, locale.value, business.value));
+const suggestion = computed(() => formatMoney(props.service?.price ?? 0, locale.value, business.value));
 
 function suggest(): void {
-  typed.value = ((props.service?.price ?? 0) / 100).toFixed(2);
+  const decimals = moneyDecimals(business.value);
+  typed.value = ((props.service?.price ?? 0) / 10 ** decimals).toFixed(decimals);
 }
 
 function add(): void {
@@ -49,7 +51,10 @@ function add(): void {
         {{ amount }}
       </p>
     </template>
-    <PosNumpad v-model="typed" />
+    <PosNumpad
+      v-model="typed"
+      :decimals="moneyDecimals(business)"
+    />
     <ion-button
       v-if="service && service.price > 0"
       fill="outline"

@@ -14,7 +14,7 @@ import { computed } from 'vue';
 
 import { taxNameKey, useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, formatQuantity } from '../../lib/format';
+import { formatMoney, formatQuantity, useBusinessMoney } from '../../lib/format';
 import type { StatsOut } from '../../operations';
 import type { DayBounds } from './period';
 
@@ -22,6 +22,7 @@ const props = defineProps<{ bounds: DayBounds }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const territoryTax = useTaxName();
 
 const { data, error } = useLive('sale.sale.stats', () => ({ ...props.bounds }));
@@ -49,7 +50,7 @@ const cards = computed(() =>
     const stats = error.value ? undefined : data.value;
     const value = stats?.[card.field];
     let text = '—';
-    if (typeof value === 'number') text = card.kind === 'money' ? formatMoney(value, locale.value) : formatQuantity(value, '', locale.value);
+    if (typeof value === 'number') text = card.kind === 'money' ? formatMoney(value, locale.value, business.value) : formatQuantity(value, '', locale.value);
     return { key: card.key, label: card.label ? t(card.label) : taxLabel.value, text };
   }),
 );

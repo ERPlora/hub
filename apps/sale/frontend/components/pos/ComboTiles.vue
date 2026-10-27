@@ -10,12 +10,13 @@ import { computed } from 'vue';
 
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { useLocale } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { initials, tileGradient } from './till';
 
 const emit = defineEmits<{ pick: [combo: SaleComboOut] }>();
 
 const locale = useLocale();
+const business = useBusinessMoney();
 const { data, error, refresh } = useLive('combo.combo.for_sale', { limit: 50 });
 
 const menus = computed(() => data.value?.rows ?? []);
@@ -61,7 +62,7 @@ const failed = computed(() => !!error.value && !['app_inactive', 'permission_den
         class="pos-menu__badge"
         :data-testid="`pos-menu-${menu.id}-badge`"
       >{{ $t('sale.pos.menu.badge') }}</span>
-      <span class="pos-menu__price">{{ formatMoney(menu.price, locale) }}</span>
+      <span class="pos-menu__price">{{ formatMoney(menu.price, locale, business) }}</span>
     </span>
   </button>
 </template>

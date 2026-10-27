@@ -6,15 +6,16 @@ import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{ count: number; total: number | undefined; expanded: boolean }>();
 const emit = defineEmits<{ open: [] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
-const totalText = computed(() => (props.total === undefined ? '—' : formatMoney(props.total, locale.value)));
+const totalText = computed(() => (props.total === undefined ? '—' : formatMoney(props.total, locale.value, business.value)));
 const label = computed(() => {
   if (props.count === 0) return t('sale.pos.openCart');
   if (props.count === 1) return t('sale.pos.openCartWithItemsOne', { total: totalText.value });

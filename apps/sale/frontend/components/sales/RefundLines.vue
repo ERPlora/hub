@@ -10,11 +10,12 @@ import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, formatQuantity } from '../../lib/format';
+import { formatMoney, formatQuantity, type Money } from '../../lib/format';
 import type { LineOption } from '../../operations';
 import { milli, type Picked, wholeLeft } from './refund';
 
-const props = defineProps<{ lines: readonly LineOption[] }>();
+/** `money`: the sale's own currency, the one its lines were charged in. */
+const props = defineProps<{ lines: readonly LineOption[]; money?: Money }>();
 
 /** Units marked per line, in thousandths of a unit. */
 const picked = defineModel<Picked>('picked', { required: true });
@@ -33,7 +34,7 @@ const rows = computed(() =>
       partly: left > 0 && returned > 0,
       returned: formatQuantity(line.returned, '', locale.value),
       total: formatQuantity(line.quantity, '', locale.value),
-      amount: line.paid_by_voucher ? t('sale.refund.linePaidWithVoucher', { name: line.voucher_name }) : formatMoney(line.line_total, locale.value),
+      amount: line.paid_by_voucher ? t('sale.refund.linePaidWithVoucher', { name: line.voucher_name }) : formatMoney(line.line_total, locale.value, props.money),
       marked: units > 0,
       whole: wholeLeft(line),
       units: String(Math.round(units / 1000)),

@@ -10,7 +10,7 @@ import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
 import { type Leg, needsTendered, type TenderMethod } from '../../lib/checkout/tender';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import type { PaymentMethodOut } from '../../operations';
 import MethodPicker from './MethodPicker.vue';
 import PayKeypad from './PayKeypad.vue';
@@ -40,7 +40,8 @@ const emit = defineEmits<{
 }>();
 
 const locale = useLocale();
-const money = (cents: number): string => formatMoney(cents, locale.value);
+const business = useBusinessMoney();
+const money = (cents: number): string => formatMoney(cents, locale.value, business.value);
 
 const cash = computed(() => needsTendered(props.method));
 const typing = computed(() => cash.value || props.splitting);
@@ -78,7 +79,10 @@ const amountLabel = computed(() => (props.splitting && !cash.value ? 'sale.check
         <span>{{ $t('sale.checkout.change') }}</span>
         <span class="amt__value">{{ money(change) }}</span>
       </div>
-      <PayKeypad @key="emit('key', $event)" />
+      <PayKeypad
+        :decimals="moneyDecimals(business)"
+        @key="emit('key', $event)"
+      />
     </template>
     <template v-else>
       <div

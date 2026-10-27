@@ -25,6 +25,7 @@ const COFFEE: SectionGroup = {
 
 async function setup(kind: 'options' | 'menu', choice: Choice, attention: string | null = null, group: SectionGroup = COFFEE) {
   const m = await mountSale(ChoiceGroupSection, { props: { kind, group, choice, attention }, locale: 'es' });
+  await m.live();
   await settle();
   return m;
 }

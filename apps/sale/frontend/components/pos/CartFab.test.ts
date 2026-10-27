@@ -7,7 +7,9 @@ import { plain } from '../../lib/format';
 import CartFab from './CartFab.vue';
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
-  return mountSale(CartFab, { props: { count: 0, total: undefined, expanded: false, ...props }, locale });
+  const mounted = await mountSale(CartFab, { props: { count: 0, total: undefined, expanded: false, ...props }, locale });
+  await mounted.live();
+  return mounted;
 }
 
 describe('CartFab', () => {

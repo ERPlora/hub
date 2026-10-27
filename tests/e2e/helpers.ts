@@ -7,6 +7,7 @@
 // `database.ts` runs it on an e2e database and `global-setup.ts` checks it (`seed_local_hubs --check`) before
 // the first spec. The shared `hub` database needs it once, by hand.
 import { execSync, spawn } from 'node:child_process';
+import { createHmac } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -705,4 +706,44 @@ export function decodeSubs(url: string): unknown[] {
   } catch {
     return [json];
   }
+}
+
+// ── The business's registration (flow business-currency) ──────────────────────────────────────────
+
+/** The secret `/internal` is signed with; the local default of both projects. */
+const INTERNAL_SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
+
+/** A hub's registration as erplora.com sent it (`base_hub`): read before a run moves its business, put back after. */
+export interface Registration {
+  id: string;
+  slug: string;
+  name: string;
+  country: string;
+  timezone: string;
+  language: string;
+  vertical: string | null;
+}
+
+/** The registration of the hub `slug` as the run finds it. */
+export function registrationOf(slug: string): Registration {
+  const [id, name, country, timezone, language, vertical] = psql(
+    `select id, name, country, timezone, language, coalesce(vertical, '') from base_hub where slug = '${slug}'`,
+  ).split('|');
+  return { id, slug, name, country, timezone, language, vertical: vertical || null };
+}
+
+/** erplora.com registers `registration`'s business in `country`, the way the SaaS does (`PUT /internal/hubs/{id}`,
+ *  signed): its currency is then its country's. */
+export async function registerBusinessIn(registration: Registration, country: string): Promise<void> {
+  const body = JSON.stringify({ ...registration, country });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
+  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${registration.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
+    body,
+  });
+  const answer = await response.text();
+  expect(response.status, answer).toBe(200);
+  expect(psql(`select country from base_hub where slug = '${registration.slug}'`)).toBe(country);
 }

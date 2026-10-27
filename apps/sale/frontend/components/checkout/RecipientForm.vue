@@ -14,7 +14,7 @@ import { countryOptions } from '../../../../customer/frontend/components/Custome
 import { useLocale, useT } from '../../composables/useT';
 import { defaultIdType, HOME_COUNTRY, ID_TYPES, type Recipient, recipientComplete } from '../../lib/checkout/recipient';
 import { recipientIssue } from '../../lib/checkout/taxId';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import type { IdType } from '../../operations';
 
 const props = defineProps<{
@@ -30,6 +30,7 @@ const model = defineModel<Recipient>({ required: true });
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 
 const issue = computed(() => recipientIssue(model.value));
 const complete = computed(() => recipientComplete(model.value) && !issue.value);
@@ -39,7 +40,7 @@ const countries = computed(() => countryOptions(locale.value));
 const heading = computed(() => {
   if (complete.value) return { title: t('sale.checkout.limitReadyTitle'), body: t('sale.checkout.limitReadyBody') };
   if (props.reason === 'limit') {
-    return { title: t('sale.checkout.limitBlockedTitle'), body: t('sale.checkout.limitBlockedBody', { max: formatMoney(props.max, locale.value) }) };
+    return { title: t('sale.checkout.limitBlockedTitle'), body: t('sale.checkout.limitBlockedBody', { max: formatMoney(props.max, locale.value, business.value) }) };
   }
   return { title: t('sale.checkout.invoiceRecipientTitle'), body: t('sale.checkout.invoiceRecipientBody') };
 });

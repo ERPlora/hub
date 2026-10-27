@@ -21,6 +21,7 @@ async function setup(
   locale: 'en' | 'es' = 'en',
 ) {
   const m = await mountSale(RecipientForm, { props: { modelValue: BLANK, reason: 'invoice', max: 300000, ...props }, locale });
+  await m.live();
   await m.wrapper.setProps({ 'onUpdate:modelValue': (modelValue: Recipient) => m.wrapper.setProps({ modelValue }) });
   const field = (name: string) => m.inDoc(`sale-checkout-recipient-${name}`) as Control | null;
   const box = () => m.find('sale-checkout-recipient');

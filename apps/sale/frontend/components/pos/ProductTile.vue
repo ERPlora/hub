@@ -10,7 +10,7 @@ import { computed } from 'vue';
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 import { initials, tileGradient } from './till';
 
 const props = defineProps<{ product: ProductOut }>();
@@ -18,6 +18,7 @@ const emit = defineEmits<{ pick: [product: ProductOut] }>();
 
 const t = useT();
 const locale = useLocale();
+const business = useBusinessMoney();
 const taxName = useTaxName();
 
 const soldOut = computed(() => Boolean(props.product.is_sold_out));
@@ -67,7 +68,7 @@ const thumbStyle = computed(() => ({ background: tileGradient(props.product.name
         v-if="product.unit !== 'ud'"
         class="pos-tile__unit"
       >{{ product.unit }}</span>
-      <span class="pos-tile__price">{{ formatMoney(product.price, locale) }}</span>
+      <span class="pos-tile__price">{{ formatMoney(product.price, locale, business) }}</span>
     </span>
   </button>
 </template>

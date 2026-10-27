@@ -13,7 +13,7 @@ import type { CheckoutFailure } from '../../composables/checkout/useCheckout';
 import { useLocale, useT } from '../../composables/useT';
 import type { ChargeBlock } from '../../lib/checkout/blocks';
 import { needsTendered, type TenderMethod } from '../../lib/checkout/tender';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{
   /** The server's total of this charge; `undefined` while it loads. */
@@ -46,7 +46,8 @@ const drawerClosed = computed(
 
 const t = useT();
 const locale = useLocale();
-const money = (cents: number): string => formatMoney(cents, locale.value);
+const business = useBusinessMoney();
+const money = (cents: number): string => formatMoney(cents, locale.value, business.value);
 
 /** The short form, on the button; none keeps «Charge <amount>». */
 const short = computed(() => {

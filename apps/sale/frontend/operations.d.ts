@@ -626,7 +626,9 @@ export interface SaleOut {
   staff_id: string | null;
   appointment_id: string | null;
   tax_included: boolean;
+  /** The currency it was charged in (the business's then), never rewritten; its decimals as the server counts them. */
   currency: string;
+  currency_decimals: number;
   subtotal: number;
   tax_total: number;
   discount_percent: string;
@@ -720,6 +722,8 @@ export interface SaleRow {
   customer_name: string;
   payment_method_name: string;
   staff_id: string | null;
+  currency: string;
+  currency_decimals: number;
   total: number;
   tax_total: number;
   refunded_total: number;
@@ -852,6 +856,9 @@ export interface RefundOptionsOut {
   sale_id: string;
   number: string;
   status: SaleStatus;
+  /** The currency it was charged in (what goes back goes in it) and its decimals as the server counts them. */
+  currency: string;
+  currency_decimals: number;
   total: number;
   refunded_total: number;
   refundable_total: number;

@@ -7,14 +7,11 @@
 // are in euros, and the invoice issued in Poland keeps its złoty. Each width leaves its captures
 // `FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY-<width>` (Cash register), `…-invoice-<width>`, `…-inventory-<width>`
 // and, back in Spain, `…-es-1440`. What the run creates is deleted after it and `a`'s registration put back.
-import { createHmac } from 'node:crypto';
-
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
 import { createProduct, dialog, productsReady } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, issuerNow, type IssuerOut, restoreIssuer, snapshotSeries } from './invoice-helpers';
-import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY';
 const SIZES = [
@@ -22,21 +19,9 @@ const SIZES = [
   { name: '834', width: 834, height: 1112 },
   { name: '1440', width: 1440, height: 900 },
 ] as const;
-/** The secret `/internal` is signed with; the local default of both projects. */
-const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
 const RUN = Date.now().toString(36).toUpperCase();
 const SKU = `E2E-CUR-${RUN}`;
 const CUSTOMER = `e2e Talleres ${RUN}`;
-
-interface Registration {
-  id: string;
-  slug: string;
-  name: string;
-  country: string;
-  timezone: string;
-  language: string;
-  vertical: string | null;
-}
 
 /** `a`'s registration as the run found it (put back after). */
 let original: Registration;
@@ -48,19 +33,7 @@ test.describe.configure({ mode: 'serial' });
 test.use({ actionTimeout: 30_000 });
 
 /** erplora.com registers `a`'s business in `country`, the way the SaaS does (`PUT /internal/hubs/{id}`, signed). */
-async function registerIn(country: string): Promise<void> {
-  const body = JSON.stringify({ ...original, country });
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const signature = createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${original.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
-    body,
-  });
-  const answer = await response.text();
-  expect(response.status, answer).toBe(200);
-  expect(psql(`select country from base_hub where slug = 'a'`)).toBe(country);
-}
+const registerIn = (country: string): Promise<void> => registerBusinessIn(original, country);
 
 /** A manual invoice of the run, issued through Invoicing's API (setup; the check is the screen's). */
 async function issueInvoice(context: BrowserContext): Promise<{ id: string; number: string; currency: string }> {
@@ -83,10 +56,7 @@ async function sessionsReady(page: Page): Promise<void> {
 }
 
 test.beforeAll(async ({ browser }) => {
-  const [id, slug, name, country, timezone, language, vertical] = psql(
-    `select id, slug, name, country, timezone, language, coalesce(vertical, '') from base_hub where slug = 'a'`,
-  ).split('|');
-  original = { id, slug, name, country, timezone, language, vertical: vertical || null };
+  original = registrationOf('a');
   snapshotSeries();
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
