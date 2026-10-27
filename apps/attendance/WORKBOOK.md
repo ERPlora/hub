@@ -207,8 +207,12 @@ Sale: los ajustes que leen Fichar (ATTENDANCE-F03) y la revisión de jornadas (A
 aviso de ajustes cambiados.
 Si falla: una latitud o longitud fuera de rango, solo una de las dos o unas horas que no son un entero
 de 1 a 24 se señalan en su campo; con la ubicación pedida y el local sin fijar, avisa «Fija la
-ubicación del lugar de trabajo o nadie podrá fichar desde un dispositivo personal.»; quien no es
-responsable ve los ajustes en solo lectura.
+ubicación del lugar de trabajo o nadie podrá fichar desde un dispositivo personal.»; con la ubicación
+denegada, «Usar mi ubicación actual» deja lo escrito y avisa, debajo del botón, «El acceso a la
+ubicación está denegado. Permite la ubicación en este navegador para leer la posición del lugar de
+trabajo o escribe las coordenadas.» (en la app instalada, que no tiene navegador, «El acceso a la
+ubicación está denegado. Permite la ubicación en los ajustes del dispositivo para leer la posición del
+lugar de trabajo o escribe las coordenadas.»); quien no es responsable ve los ajustes en solo lectura.
 Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró
@@ -537,7 +541,13 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   `tests/e2e/attendance-flows.spec.ts` a 834 y 1440.
 - Ajustes envía solo los campos que la persona tocó y cambió; lo que la pantalla juzga mal antes de
   enviar va bajo su campo, como el 422 del servidor, y la etiqueta larga del interruptor parte línea
-  para que el formulario quepa en un móvil.
+  para que el formulario quepa en un móvil. Lo que falla al leer la ubicación sale bajo «Usar mi ubicación
+  actual» (`attendance-settings-location-error`), no en la franja de arriba, que en un móvil queda fuera de la
+  vista desde el botón; la franja solo lleva el error al guardar. Con la ubicación denegada, `nativeBridge()` de
+  `@erplora/ui/shell` elige el aviso: en la app instalada, `attendance.settings.locationDeniedInApp` (los
+  ajustes del dispositivo), como la tecla «Hablar» del TPV (SALE-F01). Tests: `SettingsPage.test.ts` y la
+  e2e `tests/e2e/attendance-settings-location.spec.ts` (la ubicación sin conceder, en un fichero propio:
+  `attendance-flows.spec.ts` la concede para F04).
 
 ## Paridad con el producto actual (para quien lo mantiene)
 

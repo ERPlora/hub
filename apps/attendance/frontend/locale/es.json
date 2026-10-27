@@ -149,6 +149,7 @@
       "coordinatesIncomplete": "Rellena la latitud y la longitud, o deja las dos vacías.",
       "invalidAutoClose": "Escribe un número entero de horas entre 1 y 24.",
       "locationDenied": "El acceso a la ubicación está denegado. Permite la ubicación en este navegador para leer la posición del lugar de trabajo o escribe las coordenadas.",
+      "locationDeniedInApp": "El acceso a la ubicación está denegado. Permite la ubicación en los ajustes del dispositivo para leer la posición del lugar de trabajo o escribe las coordenadas.",
       "readOnly": "Solo un responsable o un administrador puede cambiar estos ajustes.",
       "loadError": "No se han podido cargar los ajustes.",
       "locationPending": "Pedir la ubicación necesita saber si un dispositivo es el TPV del mostrador o el móvil de alguien, y este Hub aún no lo distingue: hasta entonces, todo dispositivo ficha como el mostrador y no se pide ninguna ubicación."

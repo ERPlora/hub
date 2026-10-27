@@ -103,13 +103,65 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.find('attendance-settings-accuracy').text()).toContain('±12 m');
   });
 
-  it('a denied location says so and keeps what was typed', async () => {
+  // The notice goes where the person tapped, under «Use my current location»: on a phone that button sits below
+  // the fold, and the banner up top (which keeps the save's errors) went unseen.
+  it('a denied location says so under «Use my current location» and keeps what was typed', async () => {
     const { GeoError } = await import('../lib/geo');
     geo.getPosition.mockRejectedValueOnce(new GeoError('denied'));
     const s = await setup();
     await click(s.field('use-location'));
     await settle();
-    expect(s.find('attendance-settings-error').text()).toContain('Location access is denied');
+    const notice = s.find('attendance-settings-location-error');
+    expect(notice.text()).toBe('Location access is denied. Allow location in this browser to read the workplace position, or type the coordinates.');
+    expect(s.field('use-location').closest('section')?.contains(notice.element)).toBe(true);
+    expect(s.find('attendance-settings-error').exists()).toBe(false);
+  });
+
+  it('a new tap on «Use my current location» lifts the last notice', async () => {
+    const { GeoError } = await import('../lib/geo');
+    geo.getPosition.mockRejectedValueOnce(new GeoError('denied')).mockResolvedValueOnce({ lat: 40.4, lng: -3.7, accuracy_m: 8 });
+    const s = await setup();
+    await click(s.field('use-location'));
+    await settle();
+    expect(s.find('attendance-settings-location-error').exists()).toBe(true);
+    await click(s.field('use-location'));
+    await settle();
+    expect(s.find('attendance-settings-location-error').exists()).toBe(false);
+    expect(s.find('attendance-settings-accuracy').text()).toContain('±8 m');
+  });
+
+  // The installed app (Android, Windows) has no browser bar: there a denied location is allowed again in the
+  // device's settings (as the till's «Speak» key, SALE-F01). Tauri does not run here: its bridge is simulated.
+  it('a denied location inside the installed app points to the device settings', async () => {
+    const { GeoError } = await import('../lib/geo');
+    const win = window as unknown as { __TAURI__?: unknown };
+    const noticeOf = async (locale: 'en' | 'es', code: 'denied' | 'unavailable' = 'denied') => {
+      geo.getPosition.mockRejectedValueOnce(new GeoError(code));
+      const s = await setup({ locale });
+      await ionValue(s.field('workplace_lat'), '40.4', 'ionInput');
+      await click(s.field('use-location'));
+      await settle();
+      expect(s.field('workplace_lat').value).toBe('40.4');
+      const notice = s.find('attendance-settings-location-error').text();
+      s.wrapper.unmount();
+      return notice;
+    };
+    win.__TAURI__ = { core: { invoke: vi.fn(async () => null) } };
+    try {
+      expect(await noticeOf('en')).toBe(
+        'Location access is denied. Allow location in your device settings to read the workplace position, or type the coordinates.',
+      );
+      expect(await noticeOf('es')).toBe(
+        'El acceso a la ubicación está denegado. Permite la ubicación en los ajustes del dispositivo para leer la posición del lugar de trabajo o escribe las coordenadas.',
+      );
+      // Only the denial changes: a position that cannot be read says so as anywhere.
+      expect(await noticeOf('en', 'unavailable')).toBe('Your position could not be determined. Move to an open area and try again.');
+    } finally {
+      delete win.__TAURI__;
+    }
+    expect(await noticeOf('es')).toBe(
+      'El acceso a la ubicación está denegado. Permite la ubicación en este navegador para leer la posición del lugar de trabajo o escribe las coordenadas.',
+    );
   });
 
   // WORKBOOK ATTENDANCE-F04 «Si falla»: what is wrong is pointed at in its own field, not in a banner.
@@ -155,6 +207,18 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     await click(s.field('save'));
     await settle();
     expect(s.field('auto_close_after_hours').errorText).toBe('Too many');
+  });
+
+  // The banner up top keeps only the save's errors (the location's go under its button): a failed save still says so.
+  it('a failed save says so in the banner up top, not under «Use my current location»', async () => {
+    const s = await setup();
+    s.answerBy({ '/api/attendance/settings': [500, { error: { code: 'error', message: 'Boom' } }] });
+    await ionValue(s.field('auto_close_after_hours'), '20', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect(s.find('attendance-settings-error').text()).toBe('Boom');
+    expect(s.find('attendance-settings-location-error').exists()).toBe(false);
+    expect(s.field('auto_close_after_hours').value).toBe('20');
   });
 
   it('an employee reads them, read-only, without Save', async () => {
