@@ -11,6 +11,8 @@
 // Nothing reaches VeriFactu's tax agency: issuing seals the record locally (no transmission in this stack).
 // What this file creates is deleted after it (its invoices, their records, the numbering as found).
 // flow: INVOICE-F08
+// flow: BASE-F97 (the card and its receipt name the action: «Rectify in Invoicing», «Rectificar en Facturación»;
+// FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING, it said «Do this»)
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -173,7 +175,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   });
   // Reading it issued nothing; the card is the dangerous one, naming the invoice and the reason.
   expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
-  await expect(card(page)).toContainText('in Invoicing. Check each datum before going on.');
+  await expect(card(page)).toContainText('Rectify in Invoicing. Check each datum before going on.');
   await expect(card(page)).toContainText(`Number: ${invoice.number}`);
   await expect(card(page)).toContainText(`Reason: ${REASON}`);
   const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
@@ -189,7 +191,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   // «Cancel»: nothing is issued and the original stays issued.
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  await expect(receipts(page).last()).toContainText('Not done, cancelled:');
+  await expect(receipts(page).last()).toHaveText('Not done, cancelled: Rectify in Invoicing');
   const cancelled = await invoiceOf(context, invoice.id);
   expect([cancelled.status, cancelled.rectifications]).toEqual(['issued', []]);
   for (const vp of VIEWPORTS) {
@@ -208,7 +210,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   await expect(submit).toBeEnabled();
   await decide(page, 'submit');
   await expect(lastAnswer(page)).toContainText('Hecho.');
-  await expect(receipts(page).last()).toContainText('Done:');
+  await expect(receipts(page).last()).toHaveText('Done: Rectify in Invoicing');
   const after = await invoiceOf(context, invoice.id);
   expect(after.status).toBe('cancelled');
   expect(after.rectifications).toHaveLength(1);
@@ -238,6 +240,40 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   await expect(shown(page).locator('[data-testid=invoice-detail-rectifies-link]')).toHaveText(invoice.number);
   // The owner's session, with the assistant docked, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+});
+
+// FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: in Spanish the card said «Hacer esto en Facturación»
+// (a closed list of 24 verbs); now it names the action, and so does the receipt. Cancelled: nothing is issued.
+test('BASE-F97 — in Spanish the card and the receipt of rectifying say «Rectificar en Facturación», never «Hacer esto»', async ({ browser }) => {
+  const FIX = 'FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/invoice/invoices');
+  // In Spanish (the Hub's language cookie, as the sign-in sets it).
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${A}/invoice/invoices`);
+  const invoice = await anInvoice(context);
+  await openPanel(page);
+  await ask(page, asked(invoice.number));
+  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await expect(card(page)).toContainText('¿Ejecutar esta acción?');
+  await expect(card(page)).not.toContainText('Hacer esto');
+  const sentence = card(page).locator('.assistant-confirm-text').first();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(sentence).toHaveText('Rectificar en Facturación. Revisa cada dato antes de seguir.');
+    // The action's name wraps inside the card, never past it (390 wide).
+    expect(await sentence.evaluate((el) => el.scrollWidth <= el.clientWidth), `${FIX}-${vp.label} overflows`).toBe(true);
+    await untilStill(page);
+    await page.screenshot({ path: shot(`${FIX}-${vp.label}`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(receipts(page).last()).toHaveText('No se hizo, cancelado: Rectificar en Facturación');
+  expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
+  await context.close();
 });
 
 test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says why and offers no card', async ({ page }) => {

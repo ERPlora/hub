@@ -42,8 +42,8 @@ afterEach(() => {
 /** The dialog's body: Ionic moves the modal's content out of the component's root, into the document. */
 const body = () => document.querySelector<HTMLElement>('[data-testid="assistant-confirm"]')?.textContent ?? '';
 
-async function card(value: AssistantCard | null, more = false) {
-  const m = await mountBase(AssistantConfirm, { locale: 'es', props: { card: value, more, money: { currency: 'EUR', decimals: 2 } } });
+async function card(value: AssistantCard | null, more = false, locale: 'en' | 'es' = 'es') {
+  const m = await mountBase(AssistantConfirm, { locale, props: { card: value, more, money: { currency: 'EUR', decimals: 2 } } });
   await flush();
   return { ...m, dialog: m.wrapper.findComponent(ConfirmDialog) };
 }
@@ -70,6 +70,26 @@ describe('AssistantConfirm', () => {
     dialog.vm.$emit('update:typed', '3');
     dialog.vm.$emit('confirm');
     expect(wrapper.emitted('decide')).toEqual([[true, '3', false]]);
+  });
+
+  it('a write outside the old list of verbs names its own, in Spanish and in English, never «Do this»', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: rectifying an invoice said «Hacer esto en Facturación».
+    const rectify: AssistantCard = {
+      ...HIGH,
+      operation: 'invoice.invoice.rectify',
+      app: 'invoice',
+      app_name: 'Facturación',
+      action: 'rectify',
+      fields: [{ name: 'reason', label: 'Reason', kind: 'text', value: 'precio mal' }],
+      count: null,
+      confirm_word: 'CONFIRMAR',
+    };
+    await card(rectify);
+    expect(body()).toContain('Rectificar en Facturación. Revisa cada dato antes de seguir.');
+    document.body.innerHTML = '';
+    await card({ ...rectify, app_name: 'Invoicing', confirm_word: 'CONFIRM' }, false, 'en');
+    expect(body()).toContain('Rectify in Invoicing. Check each datum before going on.');
+    expect(body()).not.toContain('Do this');
   });
 
   it('a dangerous one sends what the person typed, as typed, for the server to check it again (rv-hub-247)', async () => {

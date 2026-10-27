@@ -8,6 +8,7 @@ The gateway is ``fake_gateway.FakeGateway``: a real HTTP server on 127.0.0.1 tha
 import asyncio
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -232,6 +233,54 @@ def test_every_action_of_base_names_its_screen():
     actions = {op.name for op in registry.values() if op.app_label == "base" and assistant.is_tool(op)}
     actions |= set(assistant.NOT_FROM_CHAT)
     assert sorted(name for name in actions if name.split(".")[1] not in assistant.BASE_SCREENS) == []
+
+
+def named_actions() -> dict[str, dict[str, str]]:
+    """The verbs the card and its receipt name an action by, per language: ``base.assistant.card.actions`` of base's
+    catalogues, the very keys ``assistant-card.ts`` ``actionKey`` looks the card's ``action`` up in («other» is «Do
+    this»)."""
+    locale = Path(settings.BASE_DIR) / "base/frontend/locale"
+    return {
+        language: json.loads((locale / f"{language}.json").read_text())["base"]["assistant"]["card"]["actions"]
+        for language in ("en", "es")
+    }
+
+
+def unnamed(operations: Iterable[Operation], verbs: dict[str, dict[str, str]]) -> list[str]:
+    """The writes the assistant may call whose card and receipt would say «Do this» in a language: their card's
+    ``action`` has no verb of its own there."""
+    return sorted(
+        f"{language}: {op.name}"
+        for op in operations
+        if op.kind == "command" and assistant.is_tool(op)
+        for language, actions in verbs.items()
+        if (action := assistant.card(op, {}, language)["action"]) == "other" or not str(actions.get(action, "")).strip()
+    )
+
+
+FROBNICATE = Operation(
+    name="demo.item.frobnicate",
+    kind="command",
+    permission="demo.manage",
+    input=TitledIn,
+    output=TitledIn,
+    expose_api=False,
+    ai={"description": "A write whose verb no catalogue names."},
+    fn=lambda ctx, data: data,
+)
+
+
+def test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish():
+    """FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING: a closed list of 24 verbs left 124 actions as
+    «Do this in Invoicing» (rectify, substitute, mark_paid, print, reschedule…). Every write of every app the
+    assistant may call has its own verb in both catalogues: an app with a new one fails here, saying which."""
+    assert unnamed(registry.values(), named_actions()) == []
+
+
+def test_the_guardrail_catches_a_write_whose_verb_nobody_names():
+    assert unnamed([FROBNICATE], named_actions()) == ["en: demo.item.frobnicate", "es: demo.item.frobnicate"]
+    # A read never shows a card nor a receipt: it needs no verb.
+    assert unnamed([get("demo.item.list")], {"en": {}, "es": {}}) == []
 
 
 def test_a_dangerous_write_asks_to_type_a_word_in_the_persons_language():

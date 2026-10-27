@@ -2,6 +2,7 @@
 // `confirm`, base/assistant.py `card`): its action by its verb and its app by its name, never the operation's id; each
 // datum in words — an amount the schema says is in cents, in the business's currency (gh:hub#1045), a yes or no, a
 // dash for nothing, a list by how many. A normal write is one line; a dangerous one, every datum and what to type.
+import en from '../locale/en.json';
 import { formatValue, type Money } from './home';
 
 export interface AssistantField {
@@ -33,15 +34,13 @@ export interface CardFormat {
   t: Translate;
 }
 
-/** The verbs a card names (`base.assistant.card.actions.<verb>`); another one is «Do this». */
-const VERBS = [
-  'create', 'add', 'update', 'set', 'delete', 'remove', 'void', 'refund', 'cancel', 'close', 'open', 'confirm',
-  'complete', 'issue', 'send', 'import', 'move', 'assign', 'archive', 'restore', 'approve', 'reject', 'enable', 'disable',
-];
+/** The verb of each action a card or a receipt names (`base.assistant.card.actions.<action>`, base's catalogue): one
+ *  per action of every write the assistant may run (guardrail: base/tests/test_assistant.py); another one is «Do
+ *  this». */
+const ACTIONS: Readonly<Record<string, string>> = en.base.assistant.card.actions;
 
 export function actionKey(action: string): string {
-  const verb = VERBS.find((known) => action === known || action.endsWith(`_${known}`) || action.startsWith(`${known}_`));
-  return `base.assistant.card.actions.${verb ?? 'other'}`;
+  return `base.assistant.card.actions.${Object.hasOwn(ACTIONS, action) ? action : 'other'}`;
 }
 
 /** The data a card names itself in the person's language (`base.assistant.card.fields.<name>`); another, by the
