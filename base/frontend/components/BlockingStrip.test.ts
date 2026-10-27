@@ -47,7 +47,8 @@ describe('BlockingStrip', () => {
     expect(s.client.stream.subscriptions('base.setup.status').map((sub) => sub.params)).toEqual([{}]);
     expect(s.strip().attributes('role')).toBe('alert');
     expect(s.strip().text()).toContain('Todavía no puedes facturar');
-    expect(s.strip().text()).toContain('No se podrá emitir ningún ticket ni factura hasta que configures esto:');
+    // «tique», the word Invoicing's own notice under it uses (FIX-HUB-BASE-BLOCKING-STRIP-SAYS-TICKET-WHERE-INVOICING-SAYS-TIQUE).
+    expect(s.strip().text()).toContain('No se podrá emitir ningún tique ni factura hasta que configures esto:');
     expect(s.strip().get('[data-testid="blocking-item"]').text()).toContain('Los datos de tu negocio');
     await s.strip().get('[data-testid="blocking-configure-invoice.business_identity"]').trigger('click');
     await flush();
