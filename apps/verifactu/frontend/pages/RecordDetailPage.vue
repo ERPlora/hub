@@ -42,6 +42,8 @@ const loadError = computed(() =>
     : null,
 );
 const pending = computed(() => transmit.pending.value || reconcile.pending.value || correct.pending.value);
+// A business outside Spain never sends it (VeriFactu is only for Spain): no «it goes out by itself».
+const neverSent = computed(() => !!record.value?.waiting.some((reason) => reason.code === 'outside_spain'));
 
 const when = (value: string | null | undefined) => (value ? formatDateTime(value, locale.value) : '—');
 
@@ -205,7 +207,9 @@ async function correctIt(): Promise<void> {
             {{ reason.message }}
           </li>
         </ul>
-        <p>{{ $t('verifactu.detail.waitingWhen') }}</p>
+        <p v-if="!neverSent">
+          {{ $t('verifactu.detail.waitingWhen') }}
+        </p>
         <p v-if="record.next_attempt_at">
           {{ $t('verifactu.detail.nextAttempt') }}: {{ when(record.next_attempt_at) }}
         </p>

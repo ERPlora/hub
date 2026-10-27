@@ -7,7 +7,9 @@
 // production, why records wait (e.g. the authorisation was revoked) and «Back to testing» (asks first; only until the first production
 // record). «Live test»: «Test the connection» (whoever may send), which presents nothing to the AEAT, and «Create test
 // invoice» (owner and admin, in testing), with the last result. «Responsible declaration»: «Read the signed
-// declaration», its version and the identifying data every record carries (VERIFACTU-F12).
+// declaration», its version and the identifying data every record carries (VERIFACTU-F12). Outside Spain VeriFactu is not
+// for the business: «VeriFactu is only for businesses in Spain.» is the one reason in sight, and the switch, «Go live» and
+// the live test are disabled (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN).
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
@@ -40,6 +42,7 @@ const fresh = shallowRef<DiagnosticOut | null>(null);
 
 const result = computed(() => fresh.value ?? last.value?.result ?? null);
 const busy = computed(() => update.pending.value || goLive.pending.value || back.pending.value || diagnose.pending.value || testInvoice.pending.value);
+const outsideSpain = computed(() => !!config.value?.live_blockers.some((reason) => reason.code === 'outside_spain'));
 
 const identity = computed(() => {
   const p = config.value?.producer;
@@ -159,6 +162,13 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
       <ion-spinner />
     </div>
     <InlineFeedback
+      v-if="outsideSpain"
+      tone="warning"
+      data-testid="verifactu-settings-outside-spain"
+    >
+      {{ $t('verifactu.onlyInSpain') }}
+    </InlineFeedback>
+    <InlineFeedback
       v-if="refused"
       tone="danger"
       data-testid="verifactu-settings-error"
@@ -178,7 +188,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           v-if="canConfigure"
           data-testid="verifactu-settings-own"
           :checked="config.route === 'own'"
-          :disabled="busy"
+          :disabled="busy || outsideSpain"
           @ion-change="setRoute"
         >
           {{ $t('verifactu.settings.ownCertificate') }}
@@ -208,7 +218,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             {{ $t('verifactu.settings.goLiveHint') }}
           </p>
           <InlineFeedback
-            v-if="config.live_blockers.length"
+            v-if="config.live_blockers.length && !outsideSpain"
             tone="warning"
             data-testid="verifactu-settings-live-blockers"
           >
@@ -244,7 +254,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             </ul>
           </InlineFeedback>
           <InlineFeedback
-            v-if="config.reasons.length"
+            v-if="config.reasons.length && !outsideSpain"
             tone="warning"
             data-testid="verifactu-settings-waiting"
           >
@@ -294,7 +304,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           <ion-button
             v-if="canSend"
             data-testid="verifactu-settings-test"
-            :disabled="busy"
+            :disabled="busy || outsideSpain"
             @click="testConnection"
           >
             {{ $t('verifactu.settings.testRun') }}
@@ -303,7 +313,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
             v-if="canConfigure && config.environment === 'testing'"
             fill="outline"
             data-testid="verifactu-settings-test-invoice"
-            :disabled="busy"
+            :disabled="busy || outsideSpain"
             @click="createTestInvoice"
           >
             {{ $t('verifactu.settings.testCreate') }}

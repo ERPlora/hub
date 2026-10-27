@@ -2,6 +2,7 @@
   "verifactu": {
     "title": "VeriFactu",
     "noPermission": "No tienes permiso",
+    "onlyInSpain": "VeriFactu solo es para negocios de España.",
     "cancel": "Cancelar",
     "back": "Volver",
     "yes": "Sí",

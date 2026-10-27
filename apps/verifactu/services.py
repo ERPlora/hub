@@ -57,6 +57,7 @@ from apps.verifactu.models import (
     wait_reason_text,
 )
 from apps.verifactu.queries import (
+    OUTSIDE_SPAIN,
     aeat_row,
     blockers,
     can_cancel,
@@ -72,6 +73,7 @@ from apps.verifactu.queries import (
     own_certificate,
     own_certificate_material,
     production_open,
+    refuse_outside_spain,
     route_problem,
     saas_unreachable,
     summary,
@@ -619,6 +621,7 @@ def _seal_alta(
     },
 )
 def create_record(ctx: OperationContext, data: RecordCreateIn) -> RecordCreateOut:
+    refuse_outside_spain(ctx)
     invoice = find_invoice(data.invoice_id, data.number)
     config = _config(lock=False)
     # A person (or an API key) issuing now is refused without a way to the AEAT; the platform's reaction to a
@@ -648,6 +651,7 @@ def create_record(ctx: OperationContext, data: RecordCreateIn) -> RecordCreateOu
     },
 )
 def correct_record(ctx: OperationContext, data: RecordCorrectIn) -> RecordCreateOut:
+    refuse_outside_spain(ctx)
     target = find_record(data.record_id, data.invoice_number, lock=True)
     if not can_correct(target):
         raise Conflict(str(CANNOT_CORRECT), code="verifactu.cannot_correct")
@@ -673,6 +677,7 @@ def correct_record(ctx: OperationContext, data: RecordCorrectIn) -> RecordCreate
     },
 )
 def cancel_record(ctx: OperationContext, data: RecordCancelIn) -> RecordCreateOut:
+    refuse_outside_spain(ctx)
     target = find_record(data.record_id, data.invoice_number, lock=True)
     if target.record_type != Record.Type.ALTA:
         target = target.cancels or target
@@ -1083,7 +1088,7 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
     for code in blockers(
         config, only.environment if strict else config.environment, ctx.scope
     ):
-        if code == "gateway_unavailable":
+        if code in (OUTSIDE_SPAIN, "gateway_unavailable"):
             if strict:
                 raise Conflict(
                     str(CANNOT_SEND) % {"why": wait_reason_text(code)},
@@ -1123,6 +1128,7 @@ def _send(ctx: OperationContext, *, only: Record | None = None) -> _Tally:
     },
 )
 def transmit_record(ctx: OperationContext, data: RecordTransmitIn) -> TransmitOut:
+    refuse_outside_spain(ctx)
     record = find_record(data.record_id, data.invoice_number)
     if record.status not in Record.UNSENT:
         raise Conflict(str(NOT_IN_QUEUE), code="verifactu.not_in_queue")
@@ -1208,6 +1214,7 @@ def retry_record(ctx: OperationContext, data: ContingencyRetryIn) -> RecordSumma
     },
 )
 def reconcile_record(ctx: OperationContext, data: RecordReconcileIn) -> ReconcileOut:
+    refuse_outside_spain(ctx)
     found = find_record(data.record_id, data.invoice_number)
     if found.status not in Record.UNSENT:
         raise Conflict(str(NOT_IN_QUEUE), code="verifactu.not_in_queue")
@@ -1573,6 +1580,7 @@ def _query_aeat(
     },
 )
 def query_aeat(ctx: OperationContext, data: AeatQueryIn) -> AeatQueryOut:
+    refuse_outside_spain(ctx)
     config = config_row()
     today = timezone.localdate()
     nif = data.issuer_nif or issuer_identity()[0]
@@ -1603,6 +1611,7 @@ def query_aeat(ctx: OperationContext, data: AeatQueryIn) -> AeatQueryOut:
     },
 )
 def recover_from_aeat(ctx: OperationContext, data: RecoverFromAeatIn) -> RecoveryOut:
+    refuse_outside_spain(ctx)
     config = config_row()
     nif = data.issuer_nif or issuer_identity()[0]
     if _unsent(nif, config.environment).exists():
@@ -1667,6 +1676,7 @@ def recover_from_aeat(ctx: OperationContext, data: RecoverFromAeatIn) -> Recover
     },
 )
 def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
+    refuse_outside_spain(ctx)
     config = config_row()
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment, ctx.scope)
@@ -1746,6 +1756,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     },
 )
 def create_test_invoice(ctx: OperationContext, data: NoInput) -> TestInvoiceOut:
+    refuse_outside_spain(ctx)
     config = _config(lock=False)
     environment = effective_environment(ctx, config)
     if environment != Environment.TESTING:
@@ -1867,6 +1878,7 @@ def _refuse_on_the_platform_hub(ctx: OperationContext) -> None:
     },
 )
 def go_live(ctx: OperationContext, data: NoInput) -> ConfigOut:
+    refuse_outside_spain(ctx)
     _refuse_on_the_platform_hub(ctx)
     config = _config()
     if config.environment == Environment.PRODUCTION:
@@ -2220,6 +2232,7 @@ def _representation_payload(
 def submit_representation(
     ctx: OperationContext, data: RepresentationSubmitIn
 ) -> ConfigOut:
+    refuse_outside_spain(ctx)
     hub_id = config_row().hub_id
     if hub_id is None:
         raise Conflict(str(HUB_UNREGISTERED), code="verifactu.hub_unregistered")

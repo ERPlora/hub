@@ -7,6 +7,9 @@
 // «Not loaded», holder, its tax ID, kind, uploaded and expiry dates and the warning 30 days before it expires (or that
 // it expired); who configures VeriFactu uploads the .p12/.pfx here with its password («Upload the certificate») or
 // removes it («Remove», asking first in a card). It is kept encrypted in the hub's database and never shown again.
+// Outside Spain VeriFactu is not for the business: «VeriFactu is only for businesses in Spain.» is the one reason said,
+// with no authorisation to sign and no certificate to upload, only the certificate's state
+// (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN).
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastSuccess, useSession } from '@erplora/ui/shell';
@@ -35,6 +38,7 @@ const { data: config, status, error } = useLive('verifactu.config.get', () => ({
 const upload = useCommand('verifactu.certificate.upload');
 const remove = useCommand('verifactu.certificate.remove');
 const busy = computed(() => upload.pending.value || remove.pending.value);
+const outsideSpain = computed(() => !!config.value?.live_blockers.some((reason) => reason.code === 'outside_spain'));
 
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput');
 const picked = shallowRef<File | null>(null);
@@ -127,6 +131,13 @@ async function removeCertificate(): Promise<void> {
       <ion-spinner />
     </div>
     <template v-if="config">
+      <InlineFeedback
+        v-if="outsideSpain"
+        tone="warning"
+        data-testid="verifactu-config-outside-spain"
+      >
+        {{ $t('verifactu.onlyInSpain') }}
+      </InlineFeedback>
       <ion-segment
         :value="tab"
         mode="md"
@@ -153,17 +164,19 @@ async function removeCertificate(): Promise<void> {
         class="verifactu-config__panel"
         data-testid="verifactu-config-erplora"
       >
-        <InlineFeedback
-          v-if="!config.synced_at"
-          tone="info"
-          data-testid="verifactu-config-not-synced"
-        >
-          {{ $t('verifactu.config.notSynced') }}
-        </InlineFeedback>
-        <RepresentationGrant
-          :config="config"
-          :can-configure="canConfigure"
-        />
+        <template v-if="!outsideSpain">
+          <InlineFeedback
+            v-if="!config.synced_at"
+            tone="info"
+            data-testid="verifactu-config-not-synced"
+          >
+            {{ $t('verifactu.config.notSynced') }}
+          </InlineFeedback>
+          <RepresentationGrant
+            :config="config"
+            :can-configure="canConfigure"
+          />
+        </template>
       </section>
 
       <section
@@ -201,7 +214,7 @@ async function removeCertificate(): Promise<void> {
           {{ expiry.text }}
         </InlineFeedback>
         <div
-          v-if="canConfigure"
+          v-if="canConfigure && !outsideSpain"
           class="verifactu-config__upload"
           data-testid="verifactu-config-cert-form"
         >
