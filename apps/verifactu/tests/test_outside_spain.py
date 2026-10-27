@@ -115,14 +115,25 @@ def test_the_queue_sends_nothing_of_a_business_outside_spain(issuer, gateway_ans
     assert (kept.status, kept.wait_reason) == (Record.Status.PENDING, "outside_spain")
 
 
-def test_a_record_left_unsent_outside_spain_says_why(issuer):
+def test_a_record_left_unsent_outside_spain_says_why_and_offers_nothing_to_do(issuer):
     record = sealed_in_spain()
     business_in("PL")
-    waiting = run("verifactu.record.get", {"record_id": str(record.id)}).waiting
-    assert [(reason.code, reason.message) for reason in waiting][:1] == [("outside_spain", NOT_SENT)]
+    shown = run("verifactu.record.get", {"record_id": str(record.id)})
+    assert [(reason.code, reason.message) for reason in shown.waiting] == [("outside_spain", NOT_SENT)]
+    # It never goes out: no next attempt, and nothing to send, correct or cancel.
+    assert (shown.next_attempt_at, shown.can_transmit, shown.can_correct, shown.can_cancel) == (None, False, False, False)
     config = run("verifactu.config.get")
     assert [reason.code for reason in config.reasons] == ["outside_spain"]
-    assert "outside_spain" in [reason.code for reason in config.live_blockers]
+    # What keeps it from going live is that alone: nothing else would let it.
+    assert [reason.code for reason in config.live_blockers] == ["outside_spain"]
+
+
+def test_a_rejected_record_outside_spain_offers_no_correction(issuer):
+    record = sealed_in_spain()
+    Record.objects.filter(pk=record.pk).update(status=Record.Status.REJECTED)
+    assert run("verifactu.record.get", {"record_id": str(record.id)}).can_correct is True
+    business_in("PL")
+    assert run("verifactu.record.get", {"record_id": str(record.id)}).can_correct is False
 
 
 # (d) What seals or reaches the AEAT, the receipt and the veto

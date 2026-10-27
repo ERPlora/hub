@@ -436,8 +436,9 @@ pendiente o suspendida, «Tu cuenta de ERPlora tiene un pago pendiente o está s
 cuenta de ERPlora para pasar a producción.» (`verifactu.hub_not_active`); con certificado propio que falta o ha
 caducado, «No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado.»
 (`verifactu.no_own_certificate`). Todos son 409 y el entorno sigue en pruebas. Ya en producción, no hace nada.
-En un negocio de fuera de España se niega como con la app apagada, «VeriFactu solo es para negocios de España.» (404 `app_inactive`), y Ajustes
-lo dice en la lista de lo que falta: «este negocio no está en España: VeriFactu solo es para negocios de España, así que no se envía nada a la AEAT» (`outside_spain`).
+En un negocio de fuera de España se niega como con la app apagada, «VeriFactu solo es para negocios de España.» (404
+`app_inactive`), y en Ajustes la lista de lo que falta dice solo «este negocio no está en España: VeriFactu solo es
+para negocios de España, así que no se envía nada a la AEAT» (`outside_spain`).
 Si en producción se pierde la ruta (la foto deja de traer el otorgamiento aprobado, o caduca el certificado propio),
 no se vuelve a pruebas (ya hay registros de producción): **no se sella nada nuevo** —la venta o la factura se
 rechazan con 409 y el código de la ruta (`verifactu.representation_not_approved`,
@@ -617,10 +618,12 @@ Pasos:
 2. Se abre «Registro {número}» con la factura, la cadena, el QR, la respuesta de la AEAT y el XML.
 3. Si no está en la AEAT, «Aún no está en la AEAT» dice por qué («La pasarela de envío de ERPlora no está
    configurada en este servidor», «Sin vía de envío
-   lista», «La AEAT pidió esperar hasta las {hora}», «No se pudo contactar: {motivo}», fuera de España
-   «este negocio no está en España: VeriFactu solo es para negocios de España, así que no se envía nada a la AEAT») y cuándo: «Sale solo en
+   lista», «La AEAT pidió esperar hasta las {hora}», «No se pudo contactar: {motivo}») y cuándo: «Sale solo en
    la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer nada.»
    con el «Próximo intento».
+4. En un negocio de fuera de España dice solo «este negocio no está en España: VeriFactu solo es para negocios de
+   España, así que no se envía nada a la AEAT», sin próximo intento ni botones para enviar, subsanar o anular:
+   nunca sale.
 Entra: el registro.
 Sale: nada; es consulta.
 Si falla: «Registro no encontrado» o el mensaje del fallo.

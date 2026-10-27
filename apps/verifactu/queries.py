@@ -277,10 +277,10 @@ def live_problems(config: Config, scope: Scope) -> list[str]:
     """Everything that keeps this business from going live now (VERIFACTU-F08), as codes; empty when it can, in
     ``go_live``'s order: the server (closed, no gateway), a demo, the route, the account. Invoicing's issuer is told
     apart. A demo never goes live, as in the old Hub; whether it is one, the platform says
-    (``base.operations.is_demo_hub``)."""
-    found = [] if production_open() else ["production_closed"]
+    (``base.operations.is_demo_hub``). Outside Spain, that alone: nothing else would ever let it."""
     if outside_spain(scope):
-        found.append(OUTSIDE_SPAIN)
+        return [OUTSIDE_SPAIN]
+    found = [] if production_open() else ["production_closed"]
     if not gateway.configured():
         found.append("gateway_unavailable")
     if platform.is_demo_hub(scope):
@@ -621,6 +621,8 @@ def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
 def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
     record = find_record(data.record_id, data.invoice_number)
     config = config_row()
+    # Outside Spain it never goes out: no next attempt, and nothing to send, correct or cancel (each would be refused).
+    spanish = not outside_spain(ctx.scope)
     events = record.events.select_related("record").order_by("-created_at", "-id")[
         :RECORD_EVENTS_SHOWN
     ]
@@ -648,7 +650,7 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         attempts=record.attempts,
         # A refusal of the gateway waits for a change, never on a timer (services._send_chain).
         next_attempt_at=record.next_attempt_at
-        if record.status in Record.UNSENT and record.wait_reason != "refused"
+        if spanish and record.status in Record.UNSENT and record.wait_reason != "refused"
         else None,
         transmitted_at=record.transmitted_at,
         transmission_id=record.transmission_id,
@@ -658,9 +660,9 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         aeat_code=record.aeat_code,
         aeat_message=record.aeat_message,
         waiting=waiting_of(record, config, ctx.scope),
-        can_transmit=record.status in Record.UNSENT,
-        can_correct=can_correct(record),
-        can_cancel=can_cancel(record),
+        can_transmit=spanish and record.status in Record.UNSENT,
+        can_correct=spanish and can_correct(record),
+        can_cancel=spanish and can_cancel(record),
         events=[event_out(event) for event in events],
     )
 
