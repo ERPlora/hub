@@ -92,7 +92,7 @@ Configuración inicial, paso a paso:
 Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla o de tarjetas; en el móvil,
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
 columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
-«Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes). Sin ordenar, lo
+«Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
 último emitido sale arriba. Mientras el emisor no está configurado, arriba sale «Todavía no puedes
 facturar» («No se podrá emitir ningún tique ni factura hasta que configures esto:», «Los datos de tu
 negocio» y «Configurar», que abre **Emisor**). Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
@@ -144,7 +144,8 @@ Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura
 ### Nueva factura manual
 Ventana con la «Serie» (las activas del año que emiten F1 o F2; de entrada, la predeterminada o FACT),
 el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
-líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en la moneda del negocio) y el
+líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en la moneda del negocio y con sus decimales; su símbolo o su código alrededor de la
+cifra no cuentan, como en 12,50 zł) y el
 tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
 Canarias o «IPSI %» en Ceuta y Melilla, que empiezan en el tipo general de su regla de Impuestos y vacíos
 si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. «Emitir
