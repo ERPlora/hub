@@ -37,9 +37,26 @@ describe('formatQuantity', () => {
 });
 
 describe('formatMoney', () => {
-  it('turns cents into euros in the reader’s language', () => {
-    expect(formatMoney(2450, 'en')).toBe('€24.50');
-    expect(formatMoney(2450, 'es')).toBe('24,50\u00a0€');
+  const EUR = { currency: 'EUR', decimals: 2 };
+
+  it('turns minor units into the business’s currency in the reader’s language', () => {
+    expect(formatMoney(2450, 'en', EUR)).toBe('€24.50');
+    expect(formatMoney(2450, 'es', EUR)).toBe('24,50\u00a0€');
+  });
+
+  it('a business in Poland reads zlotys, never euros', () => {
+    expect(formatMoney(2450, 'es', { currency: 'PLN', decimals: 2 })).toBe('24,50\u00a0zł');
+    expect(formatMoney(2450, 'en', { currency: 'PLN', decimals: 2 })).toBe('zł\u00a024.50');
+  });
+
+  it('the decimals are the server’s: the yen has none, the forint keeps its two (Intl gives it none)', () => {
+    expect(formatMoney(2450, 'en', { currency: 'JPY', decimals: 0 })).toBe('¥2,450');
+    expect(formatMoney(2450, 'en', { currency: 'HUF', decimals: 2 })).toBe('Ft\u00a024.50');
+  });
+
+  it('until the business answers, an amount is a figure without a symbol, never in euros', () => {
+    expect(formatMoney(2450, 'es')).toBe('24,50');
+    expect(formatMoney(2450, 'en', undefined)).toBe('24.50');
   });
 });
 
