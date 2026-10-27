@@ -1,8 +1,8 @@
 # Workbook — Control horario (app)
 Prefijo: ATTENDANCE
 Alcance MVP: transversal (lo necesitan la peluquería y el restaurante: todo negocio con empleados)
-Estado de la app: hecha (servidor y páginas); el panel de Inicio, el modo del dispositivo y el aviso de
-la baja en Personal esperan a la plataforma (ver «Lo que queda fuera»)
+Estado de la app: hecha (servidor y páginas); el panel de Inicio y el modo del dispositivo esperan a la
+plataforma (ver «Lo que queda fuera»)
 
 > Manual de usuario y especificación de la app `attendance`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -109,7 +109,7 @@ no está activa en este negocio» si se apaga y «No tienes permiso» si el pape
 | ATTENDANCE-F10 | Sacar el mes en CSV para la gestoría o la Inspección | común | hecho |
 | ATTENDANCE-F11 | Ver quién está fichado ahora | común | hecho (en Registros; el panel de Inicio espera al Hub) |
 | ATTENDANCE-F12 | Fichar la entrada o la salida de otra persona | común | hecho (asistente y API) |
-| ATTENDANCE-F13 | Cerrar la jornada abierta de quien se da de baja | común | parcial: el aviso de la baja llega con el relay del outbox (fase 2) |
+| ATTENDANCE-F13 | Cerrar la jornada abierta de quien se da de baja | común | hecho (reacción por el relay del outbox) |
 
 ### ATTENDANCE-F01 Fichar la entrada al llegar y la salida al irse
 <!-- origen: old:attendance/WORKFLOW.md#attendance-f01 qa:modules/attendance/clock-in-and-out gh:attendance#1 gh:attendance#11 gh:attendance#18 gh:hub#2553 -->
@@ -340,7 +340,7 @@ Pasos:
 2. Cambia solo en cuanto alguien ficha la entrada o la salida, empieza o termina una pausa, o se
    corrige una jornada.
 3. Una jornada «Por revisar» (o ya olvidada) no cuenta: nadie sabe si esa persona sigue dentro. Una
-   ficha dada de baja tampoco.
+   ficha dada de baja tampoco (su jornada abierta se cierra sola, ATTENDANCE-F13).
 Entra: las jornadas abiertas (ATTENDANCE-F01, ATTENDANCE-F08).
 Sale: nada; solo lee.
 Si falla: el aviso de error en su lugar, sin tapar la tabla.
@@ -364,16 +364,15 @@ Implicados: STAFF-F01, ATTENDANCE-F01, ATTENDANCE-F02
 
 ### ATTENDANCE-F13 Cerrar la jornada abierta de quien se da de baja
 <!-- origen: nuevo (la baja en Personal, STAFF-F06) -->
-Estado: parcial — la reacción está hecha y probada contra Personal real, pero el aviso de la baja le
-llega con el relay del outbox, que es de la plataforma (fase 2). Hasta entonces la jornada abierta
-de quien se da de baja no cuenta en «Fichados ahora» y la cierra un responsable con una corrección
-(ATTENDANCE-F08).
+Estado: hecho (reacción por el relay del outbox)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Un responsable da de baja a una persona en Personal (STAFF-F06) mientras tiene la jornada abierta.
-2. Control horario cierra esa jornada en ese momento (y su pausa en curso) con una corrección del
-   «Sistema» cuyo motivo es «Jornada cerrada al dar de baja a la persona en Personal.».
+2. En unos segundos, Control horario cierra esa jornada (y su pausa en curso) a esa hora, con una
+   corrección del «Sistema» cuyo motivo es «Jornada cerrada al dar de baja a la persona en Personal.».
+3. En «Registros» la jornada sale «Cerrada», con esa corrección en su «Historial», y la persona ya no
+   cuenta en «Fichados ahora».
 Entra: el aviso de Personal `staff.member.terminated`.
 Sale: la jornada cerrada, con su entrada en el historial; el aviso de jornada corregida.
 Si falla: si la persona no tenía jornada abierta, no se hace nada (y una segunda entrega del aviso
@@ -434,7 +433,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - **Personal** (`requires = ["staff"]`): la jornada es de una ficha de Personal (`staff.Member`), y la
   persona de la sesión se encuentra por la ficha vinculada a su cuenta. Lee los nombres de las fichas
   (también las dadas de baja) para la tabla, el CSV y el filtro.
-- `staff.member.terminated` → `attendance.record.close_for_terminated` (ATTENDANCE-F13).
+- `staff.member.terminated` → `attendance.record.close_for_terminated` (ATTENDANCE-F13), entregado por el
+  relay del outbox del worker una sola vez por aviso.
 - `staff.member.updated` y `staff.member.terminated` vuelven a pintar las listas (el nombre o el
   estado de una persona).
 - De la plataforma: la sesión y la zona horaria del negocio (fase 1: `Europe/Madrid`).
@@ -454,7 +454,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y
   un `tests/test_<fichero>.py` por fichero, más `test_integration_staff.py` (contra Personal real, sin
-  dobles) y `test_concurrency.py` (hilos).
+  dobles), `test_relay.py` (la baja en Personal entregada por el relay real del worker) y
+  `test_concurrency.py` (hilos).
 - Modelos: `Record` (la jornada), `Break` (la pausa), `Correction` (el rastro, solo se inserta) y
   `AttendanceSettings` (una fila, restricción `attendance_settings_singleton`). UUIDv7, sin `hub_id`.
   `Record.member` es una FK a `staff.Member` con `PROTECT`: una ficha con jornadas no se puede borrar
@@ -489,9 +490,11 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   en UTC): la corre el worker como sistema (fase 1, en su ámbito fijo; fase 2, en cada hub;
   `tests/test_scheduled_review.py` la pasa por `base.scheduler`) y la aplica también `clock_in` a la
   persona que ficha, para no depender del worker.
-- La reacción a `staff.member.terminated` (ATTENDANCE-F13) está hecha y probada contra Personal real
-  (`tests/test_integration_staff.py`); su entrega automática es el relay del outbox, que llega con el
-  worker de la fase 2, como las reacciones de `inventory`, `customer` o `sale`.
+- La reacción a `staff.member.terminated` (ATTENDANCE-F13) se la entrega el relay del outbox del worker
+  (`base.relay`, desde hub#105), una sola vez por aviso, como las de `task` o `service`:
+  `tests/test_relay.py` la pasa por un tick del bucle real (`base.worker.run`), con la pausa en curso,
+  la segunda entrega que no cambia nada y dos negocios (el aviso de la corrección solo se oye en el
+  suyo); `tests/test_integration_staff.py` la prueba contra Personal real llamándola directamente.
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high`
   en corregir) y todo campo de entrada lleva `description`.
 - **Admin de Django** (ronda 12, PLAN §17): ajustes con CRUD completo; jornadas, pausas y correcciones
@@ -512,9 +515,6 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   supresión automática no está (como attendance#7 del producto actual).
 - **Iconos propios** (café, play, ubicación, huella): pedidos en `UI-REQUESTS.md`; mientras, iconos
   registrados equivalentes.
-- **Entrega automática del aviso de la baja** (ATTENDANCE-F13): es el relay del outbox de la fase 2. La
-  reacción está hecha y probada; mientras tanto la jornada de quien se da de baja no cuenta en
-  «Fichados ahora» y la cierra un responsable con una corrección (ATTENDANCE-F08).
 - **Varios locales con su propia ubicación** (attendance#4 del producto actual, ATTENDANCE-F04): un Hub es
   un negocio con una ubicación; varios locales por negocio no existen en la plataforma.
 - **Botón de fichar en la cabecera del TPV** (hub#2553 del producto actual, ATTENDANCE-F01): es de la

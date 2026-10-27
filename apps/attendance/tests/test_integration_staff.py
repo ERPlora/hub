@@ -79,7 +79,8 @@ def test_a_deactivated_record_cannot_clock_in_but_still_clocks_out(ana, clock):
 
 
 def test_terminating_in_staff_closes_the_open_day(ana, clock):
-    # ATTENDANCE-F13: Staff's event, handed to this app's reaction as the relay will.
+    # ATTENDANCE-F13: Staff's event, handed to this app's reaction directly (the worker's relay hands it
+    # over in tests/test_relay.py).
     _, member_id, ctx = ana
     run("attendance.record.clock_in", {}, ctx)
     clock("2026-10-06T11:00")

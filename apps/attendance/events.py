@@ -4,9 +4,9 @@ services.py records them in the outbox, in the command's transaction; live.py na
 each live query. They carry ids only: never a position or the reason of a correction (personal data).
 
 Reaction: a staff member's termination closes their open working day (ATTENDANCE-F13), through an
-operation of this app run as the system, in its own transaction. The outbox relay (phase 2, in the
-worker) hands each delivered event to ``react``; the operation closes nothing when the person has no
-open day, so a repeated delivery changes nothing.
+operation of this app run as the system, in its own transaction. The worker's outbox relay
+(``base.relay``) hands each event to ``react`` once; the operation closes nothing when the person has no
+open day, so a repeated delivery changes nothing (tests/test_relay.py runs it through the real loop).
 """
 
 from typing import Any
