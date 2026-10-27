@@ -186,6 +186,9 @@ Menú **VeriFactu → Configuración**. Título «Configuración de VeriFactu».
   VeriFactu ve «Elegir el fichero .p12 / .pfx», «Contraseña del certificado», «Subir el certificado» y, con uno
   cargado, «Quitar» (pregunta antes, en una tarjeta). Nota: «El certificado y su contraseña se guardan cifrados
   en este Hub y solo viajan a la pasarela de ERPlora al enviar a la AEAT; no se vuelven a mostrar.».
+En un negocio de fuera de España, arriba sale «VeriFactu solo es para negocios de España.» como único motivo: «Lo
+remite ERPlora» no enseña el otorgamiento ni el trámite, y «Mi certificado» solo enseña el estado del certificado, sin
+subirlo ni quitarlo.
 
 ### Ajustes
 Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
@@ -201,6 +204,8 @@ Menú **VeriFactu → Ajustes**. Título «Ajustes de VeriFactu». Tres bloques:
   identificativos de este sistema» (Productor, NIF del productor, Nombre del sistema, Código del sistema,
   Versión instalada, Número de instalación, Solo VERI\*FACTU, Puede dar servicio a varios obligados, Da
   servicio a varios obligados: siempre «S»).
+En un negocio de fuera de España, arriba sale «VeriFactu solo es para negocios de España.» como único motivo, y «Usar mi propio certificado»,
+«Pasar a producción», «Probar la conexión» y «Crear factura de prueba» van deshabilitados.
 Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde si fue bien, roja si no).
 
 ## Estados de cada pantalla
@@ -264,8 +269,8 @@ Pasos:
 2. Desde ese momento cada factura que emite Facturación se registra (VERIFACTU-F13) en el entorno de
    pruebas.
 3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), VeriFactu encendida no
-   hace nada: las facturas salen sin registro ni QR, en **VeriFactu → Ajustes** «Todavía no puede pasar a
-   producción:» dice «este negocio no está en España: VeriFactu solo es para negocios de España, así que no se envía nada a la AEAT», y lo que pida registrar o enviar algo contesta «VeriFactu solo es para negocios de España.»
+   hace nada: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
+   arriba «VeriFactu solo es para negocios de España.» sin ofrecer nada que lleve a la AEAT, y lo que pida registrar o enviar algo contesta lo mismo.
 Entra: nada más que la orden.
 Sale: la app activa; sin interruptor propio.
 Si falla: lo dice la página de apps del Hub.
@@ -283,6 +288,8 @@ Pasos:
 3. El Hub lo abre con la contraseña, lee titular, NIF, tipo y caducidad y lo guarda cifrado (Fernet) junto con
    la contraseña en la base de datos del hub. Sale «Certificado subido: {titular} ({NIF}).» y la pestaña pasa a
    «Cargado». Subir otro sustituye al anterior.
+4. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la pestaña solo enseña el estado del
+   certificado, sin subirlo ni quitarlo.
 Entra: el `.p12`/`.pfx` en base64 y su contraseña (`verifactu.certificate.upload`).
 Sale: el certificado guardado (`OwnCertificate`), un evento «Certificado propio de … subido» y el aviso
 `verifactu.config.changed`. El fichero y la contraseña no se vuelven a mostrar: ni en la API, ni en el admin,
@@ -328,6 +335,7 @@ Pasos:
 2. Cámbialo.
 3. Sale «Listo: a partir de ahora envías con tu propio certificado.» o «Listo: a partir de ahora remite
    ERPlora en tu nombre.».
+4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y el interruptor va deshabilitado.
 Entra: la vía elegida; el certificado subido (VERIFACTU-F02) y el estado de la autorización, de la cuenta.
 Sale: la vía guardada; los registros siguientes salen por ella (avisa `verifactu.config.changed`).
 Si falla: sin certificado vigente, «No hay ningún certificado válido cargado: súbelo en VeriFactu →
@@ -353,6 +361,8 @@ Pasos:
 5. «Enviar a revisión»: el Hub comprueba los documentos y los reenvía tal cual al SaaS; queda «En revisión».
 6. Una persona de ERPlora lo revisa en el SaaS; la cuenta manda al Hub el estado nuevo: «Aprobado», «Devuelto»
    (con el motivo) o «Revocado».
+7. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la
+   pestaña no enseña el otorgamiento ni el trámite.
 Entra: el emisor de Facturación (obligado tributario), el representante, el tipo de documento y los PDF en base64
 (`verifactu.representation.submit`); el modelo, de `verifactu.representation.model`, que le pasa al SaaS los datos
 del emisor.
@@ -437,8 +447,8 @@ cuenta de ERPlora para pasar a producción.» (`verifactu.hub_not_active`); con 
 caducado, «No hay ningún certificado válido cargado: súbelo en VeriFactu → Configuración → Mi certificado.»
 (`verifactu.no_own_certificate`). Todos son 409 y el entorno sigue en pruebas. Ya en producción, no hace nada.
 En un negocio de fuera de España se niega como con la app apagada, «VeriFactu solo es para negocios de España.» (404
-`app_inactive`), y en Ajustes la lista de lo que falta dice solo «este negocio no está en España: VeriFactu solo es
-para negocios de España, así que no se envía nada a la AEAT» (`outside_spain`).
+`app_inactive`), y Ajustes lo dice arriba, «VeriFactu solo es para negocios de España.», como único motivo (sin la lista de lo que falta), con
+«Pasar a producción» deshabilitado.
 Si en producción se pierde la ruta (la foto deja de traer el otorgamiento aprobado, o caduca el certificado propio),
 no se vuelve a pruebas (ya hay registros de producción): **no se sella nada nuevo** —la venta o la factura se
 rechazan con 409 y el código de la ruta (`verifactu.representation_not_approved`,
@@ -480,6 +490,7 @@ Pasos:
 2. El Hub comprueba, sin presentar nada a la AEAT, todo lo que hace falta para enviar: el emisor, los datos del
    productor, la vía y su estado y, si la pasarela está configurada, le pregunta si puede presentar ahora.
 3. Debajo sale el resultado, línea a línea, y «Puede enviar» o «No puede enviar: {motivo}».
+4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y «Probar la conexión» va deshabilitado.
 Entra: la configuración del Hub; la respuesta de la sonda de la pasarela.
 Sale: el resultado como evento «Prueba de conexión» (avisa `verifactu.diagnostic.run`), sin crear ningún
 registro ni tocar la cadena.
@@ -498,6 +509,7 @@ Pasos:
 2. VeriFactu pide a Facturación un tique (F2) de una línea «Prueba VeriFactu» de 1,00 € más el 21 % de IVA en
    la serie TICKET, por la misma puerta que el alta manual (INVOICE-F03).
 3. Sale «Factura de prueba {número} creada: su registro está en Registros.».
+4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y «Crear factura de prueba» va deshabilitado.
 Entra: nada que escribir.
 Sale: una factura real de Facturación en pruebas y su registro, que sale como cualquier otro.
 Si falla: el rechazo de Facturación (sin emisor, sin permiso de emitir).

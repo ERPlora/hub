@@ -3,10 +3,13 @@
 // signed the way the SaaS sends it): with VeriFactu on, an invoice is issued without a record («unavailable») and its
 // detail shows no «VeriFactu receipt»; a ticket sealed while the business was in Spain stays unsent, its invoice shows
 // no receipt either, and its record says why it does not leave (never «it goes out by itself», nothing to send);
-// VeriFactu › Settings says why it cannot go live. In
-// 390, 834 and 1440, with the captures `<KEY>-<width>` (the invoice), `<KEY>-record-<width>` and
-// `<KEY>-settings-<width>`. Back in Spain an invoice is sealed and shows its receipt (`<KEY>-es-1440`). What the run
-// creates is deleted after it and `a`'s registration put back. Nothing is sent: no local server has the gateway.
+// VeriFactu › Settings and › Configuration say «VeriFactu is only for businesses in Spain.» as the one reason and offer
+// nothing that leads to the AEAT (the route switch, «Go live» and the live test disabled; neither the authorisation
+// nor a certificate on offer, the certificate only saying its state). In 390, 834 and 1440, with the captures `<KEY>-<width>` (the invoice),
+// `<KEY>-record-<width>`, `<KEY>-settings-<width>` and `<KEY>-config-<width>`. Back in Spain an invoice is sealed and
+// shows its receipt (`<KEY>-es-1440`) and Settings and Configuration offer all of it again (`<KEY>-es-settings-1440`).
+// What the run creates is deleted after it and `a`'s registration put back. Nothing is sent: no local server has the
+// gateway.
 import { createHmac } from 'node:crypto';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -27,6 +30,10 @@ const RUN = Date.now().toString(36).toUpperCase();
 const CUSTOMER = `e2e Kowalski ${RUN}`;
 /** What VeriFactu says of a business outside Spain (the record's wait and what keeps it from going live). */
 const NOT_IN_SPAIN = 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT';
+/** The one reason Settings and Configuration give outside Spain. */
+const ONLY_IN_SPAIN = 'VeriFactu is only for businesses in Spain.';
+/** What in VeriFactu › Settings would lead to the AEAT: the route switch, «Go live» and the live test. */
+const TO_THE_AEAT = ['own', 'go-live', 'test', 'test-invoice'];
 
 interface Registration {
   id: string;
@@ -153,12 +160,28 @@ test(`${KEY}: VERIFACTU-F01 a business in Poland issues its invoices without a V
     await untilStill(page);
     await page.screenshot({ path: shot(`${KEY}-record-${size.name}`), fullPage: true });
 
-    // VeriFactu › Settings: it cannot go live, and says why.
+    // VeriFactu › Settings: that one reason in sight, and nothing that leads to the AEAT on offer.
     await page.goto(`${A}/verifactu/settings`);
-    const blockers = shown(page).locator('[data-testid=verifactu-settings-live-blockers]');
-    await expect(blockers).toContainText(NOT_IN_SPAIN);
+    const settings = shown(page);
+    await expect(settings.locator('[data-testid=verifactu-settings-outside-spain]')).toContainText(ONLY_IN_SPAIN);
+    await expect(settings.locator('[data-testid=verifactu-settings-live-blockers]')).toHaveCount(0);
+    for (const hook of TO_THE_AEAT) {
+      await expect(settings.locator(`[data-testid=verifactu-settings-${hook}]`), hook).toHaveJSProperty('disabled', true);
+    }
     await untilStill(page);
     await page.screenshot({ path: shot(`${KEY}-settings-${size.name}`), fullPage: true });
+
+    // VeriFactu › Configuration: the same one reason; no authorisation to sign, the certificate only says its state.
+    await page.goto(`${A}/verifactu/config`);
+    const config = shown(page);
+    await expect(config.locator('[data-testid=verifactu-config-outside-spain]')).toContainText(ONLY_IN_SPAIN);
+    await expect(config.locator('[data-testid=verifactu-config-grant]')).toHaveCount(0);
+    await expect(config.locator('[data-testid=verifactu-grant-form]')).toHaveCount(0);
+    await untilStill(page);
+    await page.screenshot({ path: shot(`${KEY}-config-${size.name}`), fullPage: true });
+    await config.locator('[data-testid=verifactu-config-tab-own]').click();
+    await expect(config.locator('[data-testid=verifactu-config-cert]')).toBeVisible();
+    await expect(config.locator('[data-testid=verifactu-config-cert-form]')).toHaveCount(0);
   }
 });
 
@@ -172,11 +195,25 @@ test(`${KEY}: VERIFACTU-F13 back in Spain an invoice is sealed and shows its Ver
   const receipt = detail.locator('[data-testid=invoice-verifactu]');
   await expect(receipt).toBeVisible();
   await expect(receipt.locator('[data-testid=invoice-verifactu-status]')).toContainText('Pending');
-  await page.goto(`${A}/verifactu/settings`);
-  await expect(shown(page).locator('[data-testid=verifactu-settings-environment]')).toBeVisible();
-  await expect(shown(page).locator('[data-testid=verifactu-settings-live-blockers]')).not.toContainText(NOT_IN_SPAIN);
-  await page.goto(`${A}/invoice/invoices/${invoice.id}`);
-  await expect(shown(page).locator('[data-testid=invoice-verifactu]')).toBeVisible();
   await untilStill(page);
   await page.screenshot({ path: shot(`${KEY}-es-1440`), fullPage: true });
+
+  // In Spain Settings and Configuration offer all of it, with no word of the reason.
+  await page.goto(`${A}/verifactu/settings`);
+  const settings = shown(page);
+  await expect(settings.locator('[data-testid=verifactu-settings-environment]')).toBeVisible();
+  await expect(settings.locator('[data-testid=verifactu-settings-outside-spain]')).toHaveCount(0);
+  await expect(settings.locator('[data-testid=verifactu-settings-live-blockers]')).not.toContainText(NOT_IN_SPAIN);
+  for (const hook of ['own', 'test', 'test-invoice']) {
+    await expect(settings.locator(`[data-testid=verifactu-settings-${hook}]`), hook).toHaveJSProperty('disabled', false);
+  }
+  await untilStill(page);
+  await page.screenshot({ path: shot(`${KEY}-es-settings-1440`), fullPage: true });
+  await page.goto(`${A}/verifactu/config`);
+  const config = shown(page);
+  await expect(config.locator('[data-testid=verifactu-config-grant]')).toBeVisible();
+  await expect(config.locator('[data-testid=verifactu-config-outside-spain]')).toHaveCount(0);
+  await expect(config.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
+  await config.locator('[data-testid=verifactu-config-tab-own]').click();
+  await expect(config.locator('[data-testid=verifactu-config-cert-form]')).toBeVisible();
 });
