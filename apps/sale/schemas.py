@@ -13,6 +13,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -44,6 +45,12 @@ ONE_SOURCE = _(
     "Charge an open check (order_id) or loose lines (lines, service lines or open-price lines), one of the two."
 )
 COUNTRY_CODE = _("Enter the country's ISO code, e.g. ES, FR or GB.")
+
+# How the Sales screens name the data the models do not (the assistant's card names each datum by its title).
+LINE = gettext_noop("Line")
+OPEN_LINES = gettext_noop("Open-price lines")
+SERVICE_LINES = gettext_noop("Services")
+COMBO_LINES = gettext_noop("Menus")
 
 
 def _text(max_length: int, min_length: int = 0) -> type[str]:
@@ -344,7 +351,7 @@ class QuickNoteIn(Closed):
 class QuickNoteRefIn(Closed):
     id: UUID | None = Field(None, description="The quick note's id.")
     quick_note: _text(80, 1) | None = Field(
-        None, description="Its text, when its id is not known."
+        None, title=gettext_noop("Quick note"), description="Its text, when its id is not known."
     )
 
     @model_validator(mode="after")
@@ -383,11 +390,12 @@ class ProductLineIn(LineFields):
 
     product_id: UUID | None = Field(None, description="The product's id.")
     product: Said | None = Field(
-        None, description="The product's SKU or name, when its id is not known."
+        None, title=gettext_noop("Product"), description="The product's SKU or name, when its id is not known."
     )
     option_ids: list[UUID] = Field(
         default_factory=list,
         max_length=MAX_OPTIONS,
+        title=gettext_noop("Modifiers"),
         description="The options of Modifiers chosen for the product (modifier.group.for_target), in the order "
         "they were chosen; one chosen twice is named twice. Modifiers checks and values them: their price comes "
         "from it and stays frozen on the line.",
@@ -429,6 +437,7 @@ class ComboLineFields(LineFields):
     choices: list[ComboChoiceIn] = Field(
         default_factory=list,
         max_length=MAX_OPTIONS,
+        title=gettext_noop("Dishes"),
         description="The dishes picked, course by course. Menus checks each course (its minimum, maximum and "
         "repeats) and prices the menu: its closed price plus the supplements, frozen on the line.",
     )
@@ -491,6 +500,7 @@ class ServiceLineFields(LineFields):
     )
     booked_price: Cents | None = Field(
         None,
+        title=gettext_noop("Booked price"),
         description="The price the appointment of the check booked for this service, in cents, frozen on the "
         "line whatever the catalog says today. Checked against the appointment (its service at that price; "
         "lower only with the open-price right); without an appointment it is an open price.",
@@ -521,16 +531,19 @@ class OrderOpenIn(Closed):
     open_lines: list[OpenLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=OPEN_LINES,
         description="Open-price lines to start with (needs the open-price permission).",
     )
     service_lines: list[ServiceLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=SERVICE_LINES,
         description="Lines of services of the Services app to start with.",
     )
     combo_lines: list[ComboLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=COMBO_LINES,
         description="Menus of the Menus app to start with, each with its dishes.",
     )
 
@@ -565,11 +578,12 @@ class OrderAddComboLineIn(ComboLineFields):
 
 class OrderLineRefIn(Closed):
     order_id: UUID = Field(description="The open check's id.")
-    line_id: UUID = Field(description="The line's id.")
+    line_id: UUID = Field(title=LINE, description="The line's id.")
 
 
 class OrderApplyVoucherIn(OrderLineRefIn):
     grant_id: UUID = Field(
+        title=gettext_noop("Voucher"),
         description="The voucher sold (Services) whose session pays the line: one of the customer's, read with "
         "service.grant.tender_options."
     )
@@ -603,6 +617,7 @@ class OrderSplitIn(Closed):
     line_ids: list[UUID] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=gettext_noop("Lines to move"),
         description="Lines that move to the new check; none = a blank one.",
     )
     label: Label = Field("", description="The new check's title.")
@@ -610,9 +625,9 @@ class OrderSplitIn(Closed):
 
 class OrderMergeIn(Closed):
     from_order_id: UUID = Field(
-        description="The check that is absorbed (it ends voided)."
+        title=gettext_noop("From check"), description="The check that is absorbed (it ends voided)."
     )
-    to_order_id: UUID = Field(description="The check that stays with every line.")
+    to_order_id: UUID = Field(title=gettext_noop("Into check"), description="The check that stays with every line.")
 
 
 class OrderSetDiscountIn(Closed):
@@ -651,13 +666,14 @@ class OrderFireIn(Closed):
         "", description="What the kitchen reads as the check's name, e.g. Table 4."
     )
     channel: Literal["dine_in", "takeaway", "delivery"] = Field(
-        "dine_in", description="dine_in, takeaway or delivery."
+        "dine_in", title=gettext_noop("Order type"), description="dine_in, takeaway or delivery."
     )
     priority: _text(20) = Field(
-        "", description="Priority the kitchen shows, e.g. urgent."
+        "", title=gettext_noop("Priority"), description="Priority the kitchen shows, e.g. urgent."
     )
     waiter: _text(128) = Field(
         "",
+        title=gettext_noop("Served by"),
         description="Who attends the check as the till names it («Atiende»); empty: who sends it.",
     )
 
@@ -839,6 +855,7 @@ class ChargeLinesIn(Schema):
     line_ids: list[UUID] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=gettext_noop("Lines to charge"),
         description="Only these lines of the check (a partial charge); none = all.",
     )
     lines: list[ProductLineIn] = Field(
@@ -849,16 +866,19 @@ class ChargeLinesIn(Schema):
     open_lines: list[OpenLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=OPEN_LINES,
         description="Loose open-price lines (a counter sale).",
     )
     service_lines: list[ServiceLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=SERVICE_LINES,
         description="Loose lines of services of the Services app (a counter sale).",
     )
     combo_lines: list[ComboLineIn] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=COMBO_LINES,
         description="Loose menus of the Menus app, each with its dishes (a counter sale).",
     )
     discount_percent: Percent = Field(
@@ -914,6 +934,7 @@ class CompleteIn(ChargeLinesIn):
     order_version: int | None = Field(
         None,
         ge=1,
+        title=gettext_noop("Check version"),
         description="The check's version the screen charged; a newer one refuses the charge.",
     )
     payments: list[PaymentIn] = Field(
@@ -1202,6 +1223,7 @@ class SaleRefIn(Closed):
 class SalePrintIn(SaleRefIn):
     duplicate: bool = Field(
         True,
+        title=gettext_noop("Print as duplicate"),
         description="Print it marked «DUPLICATE»: every print from Sales is a copy; only the till's first paper right "
         "after charging, when nothing printed it at checkout, is the original.",
     )
@@ -1387,6 +1409,7 @@ class RefundIn(SaleRefIn):
     allocations: list[AllocationIn] = Field(
         default_factory=list,
         max_length=MAX_PAYMENTS,
+        title=gettext_noop("Refund amount"),
         description="How much goes back on each tender; none = no money (only the session of a voucher).",
     )
     lines: list[RefundLineIn] = Field(

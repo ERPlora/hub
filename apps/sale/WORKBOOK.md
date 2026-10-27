@@ -1648,7 +1648,11 @@ administrador y responsable, los mismos que anulan y devuelven).
   la venta y de la devolución. Una venta se corrige con su anulación o sus devoluciones, como en caja
   (`tests/test_admin.py`). Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en cobrar,
-  anular, devolver y descuentos) y cada campo de `schemas.py` su `description`.
+  anular, devolver y descuentos) y cada campo de `schemas.py` su `description`. La tarjeta de
+  confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
+  «Importe a devolver» para `allocations`, «Línea», «Bono», «Cuenta de origen») o, si no lo tiene, por el
+  `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
+  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
 - **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`, FIX-SALE-POS-NO-SPEAK-KEY; PLAN §30 punto 4,
   PLAN-HUB §8 ronda 2026-10-22b): sin operación propia; reutiliza el dictado del asistente de la plataforma
   (`recordVoice`, `canDictate`, `base64Of` e iconos de `base/frontend/lib/`, la operación
