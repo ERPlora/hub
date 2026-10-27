@@ -14,7 +14,6 @@ from .conftest import ctx_for, make_comment, make_member, make_project, make_tas
 
 pytestmark = pytest.mark.django_db
 
-TODAY = timezone.localdate()
 
 
 def run(name, data=None, ctx=None):
@@ -209,10 +208,10 @@ def test_filters_by_status_priority_and_open(team):
     assert sorted(titles(run("task.task.list", {"open": False}))) == ["C", "D"]
 
 
-def test_overdue_is_open_and_due_before_the_business_today():
-    yesterday = TODAY - dt.timedelta(days=1)
+def test_overdue_is_open_and_due_before_the_business_today(today):
+    yesterday = today - dt.timedelta(days=1)
     make_task("Late", due_date=yesterday)
-    make_task("Today", due_date=TODAY)
+    make_task("Today", due_date=today)
     make_task("Late but done", due_date=yesterday, status="done", completed_at=timezone.now())
     assert titles(run("task.task.list", {"overdue": True})) == ["Late"]
 
@@ -242,17 +241,17 @@ def test_filters_by_parent_top_level_and_tag():
     assert titles(run("task.task.list", {"tag": "opening"})) == ["Parent"]
 
 
-def test_filters_by_due_completed_and_created_ranges():
+def test_filters_by_due_completed_and_created_ranges(today):
     make_task("Early", due_date=dt.date(2026, 10, 1))
     make_task("Late", due_date=dt.date(2026, 10, 31))
     finished = make_task("Finished", status="done", completed_at=timezone.now())
     assert titles(run("task.task.list", {"due_from": "2026-10-15"})) == ["Late"]
     assert titles(run("task.task.list", {"due_to": "2026-10-15"})) == ["Early"]
-    assert titles(run("task.task.list", {"completed_from": str(TODAY), "completed_to": str(TODAY)})) == [
+    assert titles(run("task.task.list", {"completed_from": str(today), "completed_to": str(today)})) == [
         "Finished"
     ]
-    assert finished.id in [row.id for row in run("task.task.list", {"created_from": str(TODAY)}).rows]
-    assert run("task.task.list", {"created_to": str(TODAY - dt.timedelta(days=1))}).total == 0
+    assert finished.id in [row.id for row in run("task.task.list", {"created_from": str(today)}).rows]
+    assert run("task.task.list", {"created_to": str(today - dt.timedelta(days=1))}).total == 0
 
 
 def test_the_newest_first_by_default_and_any_column_both_ways(team):
@@ -314,12 +313,12 @@ def test_ties_go_by_id_in_the_lists_own_direction():
 # My tasks
 
 
-def test_my_tasks_are_my_open_ones_dated_first_then_the_newest(team):
+def test_my_tasks_are_my_open_ones_dated_first_then_the_newest(team, today):
     me = team["worker_member"]
     undated_old = make_task("Undated old", assigned_to=me)
     undated_new = make_task("Undated new", assigned_to=me)
-    soon = make_task("Soon", assigned_to=me, due_date=TODAY + dt.timedelta(days=1))
-    sooner = make_task("Sooner", assigned_to=me, due_date=TODAY)
+    soon = make_task("Soon", assigned_to=me, due_date=today + dt.timedelta(days=1))
+    sooner = make_task("Sooner", assigned_to=me, due_date=today)
     make_task("Done", assigned_to=me, status="done", completed_at=timezone.now())
     make_task("Cancelled", assigned_to=me, status="cancelled")
     make_task("Ana's", assigned_to=team["ana"])
@@ -327,12 +326,12 @@ def test_my_tasks_are_my_open_ones_dated_first_then_the_newest(team):
     assert [row.id for row in page.rows] == [sooner.id, soon.id, undated_new.id, undated_old.id]
 
 
-def test_writing_a_task_does_not_move_its_card_in_my_tasks(team):
+def test_writing_a_task_does_not_move_its_card_in_my_tasks(team, today):
     """tasks#45: «My tasks» ordered by due date alone, so starting a card sent it to the bottom."""
     me = team["worker_member"]
     for title in ("Oldest", "Middle", "Newest"):
         make_task(title, assigned_to=me)
-    make_task("Dated", assigned_to=me, due_date=TODAY)
+    make_task("Dated", assigned_to=me, due_date=today)
     ctx = as_employee(team)
     before = titles(run("task.task.mine", ctx=ctx))
     assert before == ["Dated", "Newest", "Middle", "Oldest"]
@@ -343,10 +342,10 @@ def test_writing_a_task_does_not_move_its_card_in_my_tasks(team):
         assert titles(run("task.task.mine", ctx=ctx)) == before
 
 
-def test_my_tasks_within_a_horizon_leave_the_undated_out(team):
+def test_my_tasks_within_a_horizon_leave_the_undated_out(team, today):
     me = team["worker_member"]
-    make_task("This week", assigned_to=me, due_date=TODAY + dt.timedelta(days=6))
-    make_task("Next month", assigned_to=me, due_date=TODAY + dt.timedelta(days=30))
+    make_task("This week", assigned_to=me, due_date=today + dt.timedelta(days=6))
+    make_task("Next month", assigned_to=me, due_date=today + dt.timedelta(days=30))
     make_task("Undated", assigned_to=me)
     assert titles(run("task.task.mine", {"due_within_days": 7}, ctx=as_employee(team))) == ["This week"]
 

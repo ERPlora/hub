@@ -97,9 +97,12 @@ def test_the_card_names_the_sale_and_the_refund_as_the_record_does():
 # runs by itself and goes back to the model with the rectifying invoice that would be born (no number taken); the
 # rectification is a dangerous write: it waits on its card and issues only after the person types the word.
 
-TODAY = timezone.localdate()
 REASON = "el precio estaba mal"
-ASK = {"role": "user", "content": f"rectifica la factura FACT-{TODAY.year}-000001 porque {REASON}"}
+
+
+def ask():
+    """The person's request, about the first invoice of the year the test runs in."""
+    return {"role": "user", "content": f"rectifica la factura FACT-{timezone.localdate().year}-000001 porque {REASON}"}
 
 
 def call(name, arguments, call_id="c1"):
@@ -120,7 +123,7 @@ def asked(*calls):
 
 def turn(*calls, role="hub_admin", decision=None):
     """A turn of the assistant of a person with ``role``, in Spanish, answering the model's ``calls``."""
-    data = {"messages": [ASK, *([asked(*calls)] if calls else [])], "pending": list(calls), "decision": decision}
+    data = {"messages": [ask(), *([asked(*calls)] if calls else [])], "pending": list(calls), "decision": decision}
     return run("base.assistant.turn", data, ctx_for(role, language="es")).model_dump(mode="json")
 
 
@@ -150,7 +153,7 @@ def test_the_rectification_tells_the_assistant_to_read_its_preview_first_and_to_
     assert (seen.kind, assistant.is_tool(seen), seen.permission) == ("query", True, rectify.permission)
 
 
-def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_be_born(issuer):
+def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_be_born(issuer, today):
     original = an_invoice()
     plan = turn(call("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON}))
     assert plan["confirm"] is None
@@ -162,7 +165,7 @@ def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_b
         original.number,
         "R1",
         REASON,
-        f"RECT-{TODAY.year}-000001",
+        f"RECT-{today.year}-000001",
     )
     assert (told["base_amount"], told["tax_amount"], told["total_amount"]) == (-10000, -2100, -12100)
     assert Invoice.objects.get(pk=original.id).status == "issued"
@@ -204,7 +207,7 @@ def test_the_rectification_waits_on_its_dangerous_card_naming_the_invoice_and_th
     assert not rectifications().exists()
 
 
-def test_typing_the_word_issues_the_rectification_the_preview_said(issuer):
+def test_typing_the_word_issues_the_rectification_the_preview_said(issuer, today):
     original = an_invoice()
     seen = run("invoice.invoice.rectification_preview", {"number": original.number, "reason": REASON})
     rectify = call("invoice.invoice.rectify", {"number": seen.original.number, "reason": REASON})
@@ -216,7 +219,7 @@ def test_typing_the_word_issues_the_rectification_the_preview_said(issuer):
         seen.next_number,
         seen.invoice_type,
         seen.total_amount,
-        TODAY,
+        today,
         "tester",
     )
     assert Invoice.objects.get(pk=original.id).status == "cancelled"
@@ -240,9 +243,9 @@ def test_without_the_word_nothing_is_issued_and_the_original_stays_issued(issuer
     assert not InvoiceSeries.objects.filter(code="RECT").exists()
 
 
-def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(issuer):
+def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(issuer, today):
     original = an_invoice()
-    yesterday = str(TODAY - dt.timedelta(days=1))
+    yesterday = str(today - dt.timedelta(days=1))
     rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON, "issue_date": yesterday})
     plan = turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "invoice.rectify_date_not_allowed")]

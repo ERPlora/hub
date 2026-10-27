@@ -24,8 +24,6 @@ pytestmark = pytest.mark.django_db
 
 WAIT = 1.0
 QUIET = 0.3
-TODAY = timezone.localdate()
-DAY = TODAY.strftime("%Y%m%d")
 
 
 def run(name, data=None, ctx=None):
@@ -68,13 +66,13 @@ def as_manager(team):
 # Create (TASK-F01, F09)
 
 
-def test_a_task_is_born_to_do_with_the_days_number_and_its_creator(team):
+def test_a_task_is_born_to_do_with_the_days_number_and_its_creator(team, today):
     task = run("task.task.create", {"title": "Clean the store room"}, ctx=as_manager(team))
     assert (task.status, task.priority, task.completed_at) == ("todo", "medium", None)
-    assert task.number == f"TSK-{DAY}-0001"
+    assert task.number == f"TSK-{today:%Y%m%d}-0001"
     assert (task.created_by_id, task.created_by_name) == (team["boss"].pk, "Marta Jefa")
     second = run("task.task.create", {"title": "Order dye"}, ctx=as_manager(team))
-    assert second.number == f"TSK-{DAY}-0002"
+    assert second.number == f"TSK-{today:%Y%m%d}-0002"
     assert events() == [
         (
             "task.task.created",
@@ -129,12 +127,12 @@ def test_a_subtask_takes_its_parents_project_unless_told(team):
         ({"assignee": "Zoe"}, "assignee", "That staff member does not exist in this business."),
     ],
 )
-def test_a_reference_that_does_not_exist_is_a_422_and_spends_no_number(team, data, field, message):
+def test_a_reference_that_does_not_exist_is_a_422_and_spends_no_number(team, data, field, message, today):
     with pytest.raises(InvalidPayload) as caught:
         run("task.task.create", {"title": "t", **data})
     assert caught.value.fields == {field: message}
     assert not Task.objects.exists() and events() == []
-    assert run("task.task.create", {"title": "t"}).number == f"TSK-{DAY}-0001"
+    assert run("task.task.create", {"title": "t"}).number == f"TSK-{today:%Y%m%d}-0001"
 
 
 def test_an_inactive_or_terminated_person_is_not_assigned(team):
