@@ -10,7 +10,6 @@ import re
 from decimal import Decimal
 
 import pytest
-from django.utils import timezone
 from live.errors import Conflict
 from live.models import OutboxEvent
 
@@ -23,7 +22,6 @@ from apps.verifactu.models import Record
 
 pytestmark = pytest.mark.django_db
 
-TODAY = timezone.localdate()
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
     "customer_tax_id": "B12345674",
@@ -68,7 +66,7 @@ def newest(name):
 
 
 def test_a_ticket_becomes_one_simplified_invoice_with_the_sales_money_to_the_cent(
-    issuer, shelf, charge
+    issuer, shelf, charge, today
 ):
     sale = charge(
         "inv-0001",
@@ -87,7 +85,7 @@ def test_a_ticket_becomes_one_simplified_invoice_with_the_sales_money_to_the_cen
         )
     assert (ticket.invoice_type, ticket.number, ticket.series_code) == (
         "F2",
-        f"TICKET-{TODAY.year}-000001",
+        f"TICKET-{today.year}-000001",
         "TICKET",
     )
     assert (ticket.status, ticket.source_type, ticket.sale_id, ticket.sale_number) == (
@@ -122,7 +120,7 @@ def test_a_ticket_becomes_one_simplified_invoice_with_the_sales_money_to_the_cen
 
 
 def test_the_same_charge_delivered_twice_is_one_document_and_one_number(
-    issuer, shelf, charge
+    issuer, shelf, charge, today
 ):
     charge("inv-0001")
     first = deliver("sale.sale.completed")
@@ -133,18 +131,18 @@ def test_the_same_charge_delivered_twice_is_one_document_and_one_number(
         first.invoice.id,
     )
     assert Invoice.objects.count() == 1
-    assert InvoiceSeries.objects.get(code="TICKET", year=TODAY.year).current_number == 1
+    assert InvoiceSeries.objects.get(code="TICKET", year=today.year).current_number == 1
 
 
 def test_a_sale_charged_as_an_invoice_is_a_full_invoice_with_the_customers_data(
-    issuer, shelf, charge
+    issuer, shelf, charge, today
 ):
     charge("inv-0002", [{"product": "SHA"}], document_type="invoice", **RECIPIENT)
     invoice = deliver("sale.sale.completed").invoice
     assert (invoice.invoice_type, invoice.series_code, invoice.number) == (
         "F1",
         "FACT",
-        f"FACT-{TODAY.year}-000001",
+        f"FACT-{today.year}-000001",
     )
     assert (
         invoice.customer_name,
@@ -322,7 +320,7 @@ def test_a_partial_refund_rectifies_by_differences_and_two_add_up_to_the_cent(
 
 
 def test_after_a_partial_refund_the_preview_rectifies_what_is_left_of_the_ticket_as_r5(
-    issuer, shelf, charge
+    issuer, shelf, charge, today
 ):
     # INVOICE-F08 asked to the assistant: its preview, on a ticket a partial refund already rectified by differences.
     sale = charge("inv-0031", [{"product": "SHA"}, {"product": "MNU"}])
@@ -336,7 +334,7 @@ def test_after_a_partial_refund_the_preview_rectifies_what_is_left_of_the_ticket
     assert (seen.invoice_type, seen.whole, seen.next_number) == (
         "R5",
         False,
-        f"RECT-{TODAY.year}-000002",
+        f"RECT-{today.year}-000002",
     )
     assert (seen.original.total_amount, seen.original.remaining, seen.total_amount) == (
         ticket.total_amount,

@@ -21,7 +21,6 @@ from apps.sale.models import Sale
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-TODAY = timezone.localdate()
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
     "customer_tax_id": "B12345674",
@@ -99,13 +98,13 @@ def outcome(result) -> str:
     return "already" if getattr(result, "already", False) else "ok"
 
 
-def test_six_documents_at_once_take_six_numbers_in_a_row_without_a_hole():
+def test_six_documents_at_once_take_six_numbers_in_a_row_without_a_hole(today):
     results = at_once(*(manual for _ in range(6)))
     assert [outcome(result) for result in results] == ["ok"] * 6
     assert sorted(result.number for result in results) == [
-        f"FACT-{TODAY.year}-{n:06d}" for n in range(1, 7)
+        f"FACT-{today.year}-{n:06d}" for n in range(1, 7)
     ]
-    assert InvoiceSeries.objects.get(code="FACT", year=TODAY.year).current_number == 6
+    assert InvoiceSeries.objects.get(code="FACT", year=today.year).current_number == 6
 
 
 def charged_without_document(charge, key: str):
@@ -119,7 +118,7 @@ def charged_without_document(charge, key: str):
 
 
 def test_the_same_charge_delivered_twice_at_once_is_one_invoice_and_one_number(
-    product, charge
+    product, charge, today
 ):
     product()
     charged_without_document(charge, "race-0001")
@@ -129,10 +128,10 @@ def test_the_same_charge_delivered_twice_at_once_is_one_invoice_and_one_number(
     assert sorted(outcome(result) for result in results) == ["already", "ok"]
     assert results[0].invoice.id == results[1].invoice.id
     assert Invoice.objects.count() == 1
-    assert InvoiceSeries.objects.get(code="TICKET", year=TODAY.year).current_number == 1
+    assert InvoiceSeries.objects.get(code="TICKET", year=today.year).current_number == 1
 
 
-def test_two_rectifications_of_one_invoice_at_once_are_one_and_spend_one_number():
+def test_two_rectifications_of_one_invoice_at_once_are_one_and_spend_one_number(today):
     invoice = manual()
     results = at_once(
         lambda: run(
@@ -149,10 +148,10 @@ def test_two_rectifications_of_one_invoice_at_once_are_one_and_spend_one_number(
         "ok",
     ]
     assert Invoice.objects.filter(rectifies_id=invoice.id).count() == 1
-    assert InvoiceSeries.objects.get(code="RECT", year=TODAY.year).current_number == 1
+    assert InvoiceSeries.objects.get(code="RECT", year=today.year).current_number == 1
 
 
-def test_the_same_refund_delivered_twice_at_once_is_one_rectification(product, charge):
+def test_the_same_refund_delivered_twice_at_once_is_one_rectification(product, charge, today):
     product()
     Issuer.objects.all().delete()
     sale = charge("race-0002")
@@ -173,7 +172,7 @@ def test_the_same_refund_delivered_twice_at_once_is_one_rectification(product, c
     )
     assert sorted(outcome(result) for result in results) == ["already", "ok"]
     assert Invoice.objects.filter(invoice_type__startswith="R").count() == 1
-    assert InvoiceSeries.objects.get(code="RECT", year=TODAY.year).current_number == 1
+    assert InvoiceSeries.objects.get(code="RECT", year=today.year).current_number == 1
 
 
 # ── The Hub admin's «Delete» of the customer's card while a document names it ────────────────────
@@ -219,20 +218,20 @@ def a_card() -> Customer:
 
 
 def fact_numbers() -> int:
-    series = InvoiceSeries.objects.filter(code="FACT", year=TODAY.year).first()
+    series = InvoiceSeries.objects.filter(code="FACT", year=timezone.localdate().year).first()
     return series.current_number if series else 0
 
 
 @pytest.mark.parametrize("how", HOW)
 @pytest.mark.parametrize("document", sorted(CARD_DOCUMENTS))
-def test_the_hub_admin_cannot_delete_a_card_a_document_names_meanwhile(document, how):
+def test_the_hub_admin_cannot_delete_a_card_a_document_names_meanwhile(document, how, today):
     card = a_card()
     issue = CARD_DOCUMENTS[document](card)
     with card_deleted_on_screen(card, how, writes("invoice_invoice")) as answers:
         issue()
     [answer] = answers
     assert card_protected(answer)
-    assert Invoice.objects.get(customer=card).number == f"FACT-{TODAY.year}-000001"
+    assert Invoice.objects.get(customer=card).number == f"FACT-{today.year}-000001"
 
 
 @pytest.mark.parametrize("how", HOW)
