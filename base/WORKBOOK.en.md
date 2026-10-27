@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2c159c164b929279649f4460beda2cadf172a3ef9b4b2310ee11d4f9e9704030 -->
+<!-- generated from WORKBOOK.md sha256:29e7f6c9c97b54c1d71259753792d7dca50020faf4217a15c4cfabfe687d5048 -->
 
 ## What it is for and who it is for
 
@@ -67,6 +67,13 @@ by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this o
 The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" and "Status", with
 "Search activity…", the filters funnel (method and status), the order, the cards view and "Columns". It
 also opens with the Home's link ending in `#actividad`.
+
+### "erplora.com" of the bar
+At the top right, between "My apps" and the assistant's sparkles: a cloud and "erplora.com" ("Manage on erplora.com"
+on hover). It opens this business on erplora.com's panel: in a new tab in the browser and, in the installed app, in
+the device's browser. Only the owner, the administrator and the manager have it, and only if they came in with their
+account: never in a session opened with a PIN or with the badge. The Google Play app does not have it.
+On a phone it goes inside "More options", the first one, as "Manage on erplora.com".
 
 ### The bell
 At the top right, after "My apps" and the assistant's sparkles; on a phone, both go inside "More options", which
@@ -591,18 +598,24 @@ back.".
 Involved: none
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-Status: partial — a plain link, without the one-time pass, only in the browser (not in the installed app) and without the bar's "erplora.com" button
+Status: partial — without the one-time pass: if the browser has no erplora.com session open, they come in with the account on arriving
 Actor: owner, administrator, manager, employee
-Screen: Side menu
+Screen: Side menu, top bar
 Steps:
   1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Any profile
      sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
-     menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover.
+     menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
+     browser: the installed app does not have it.
   2. They tap it: this business's plan page on erplora.com opens in a new tab.
+  3. The owner, the administrator or the manager who came in with their account also has, at the top right,
+     "erplora.com", with a cloud (on a phone, "Manage on erplora.com", the first one of "More options").
+  4. They tap it: this business opens on erplora.com's panel, in a new tab; in the installed app, in the device's
+     browser. The Hub stays where it was.
 In: the business they are in.
 Out: nothing saved in the hub.
-If it fails: if the hub does not know which business it belongs to, the button does not show (never a
-button that does nothing).
+If it fails: if the hub does not know which business it belongs to, neither of the two shows (never a button that
+does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". An
+employee, a session opened with a PIN or with the badge and the Google Play app do not have "erplora.com".
 Involved: none
 
 ### BASE-F12 Ask the assistant to go over the setup
@@ -2101,8 +2114,9 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles and the bell go together in "More options" (with the bell's number), so the
-     title stays centred: there, "Assistant" opens the panel and "Notifications", the bell.
+     closes it. On a phone, the sparkles and the bell (and "erplora.com", for whoever has it) go together in "More
+     options" (with the bell's number), so the title stays centred: there, "Assistant" opens the panel and
+     "Notifications", the bell.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the
