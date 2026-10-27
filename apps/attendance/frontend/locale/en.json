@@ -149,6 +149,7 @@
       "coordinatesIncomplete": "Fill in both latitude and longitude, or leave both empty.",
       "invalidAutoClose": "Enter a whole number of hours between 1 and 24.",
       "locationDenied": "Location access is denied. Allow location in this browser to read the workplace position, or type the coordinates.",
+      "locationDeniedInApp": "Location access is denied. Allow location in your device settings to read the workplace position, or type the coordinates.",
       "readOnly": "Only a manager or an administrator can change these settings.",
       "loadError": "The settings could not be loaded.",
       "locationPending": "Asking for the location needs to know whether a device is the counter POS or someone's own phone, which this Hub does not tell yet: until it does, every device clocks as the counter and no location is asked for."
