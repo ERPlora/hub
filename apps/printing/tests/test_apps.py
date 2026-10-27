@@ -122,7 +122,7 @@ def test_the_homes_step_is_set_up_your_printer_done_once_a_device_prints_the_rec
         "printer",
         "printing.device.coverage",
         {"usage": "receipt"},
-        [SetupCheck(field="covered", truthy=True)],
+        [SetupCheck(field="configured", truthy=True)],
         "/printing/devices",
         "printing.manage_settings",
         "lucide:receipt",
@@ -130,7 +130,7 @@ def test_the_homes_step_is_set_up_your_printer_done_once_a_device_prints_the_rec
         70,
         False,
     )
-    assert "covered" in registry[step.operation].output.model_fields
+    assert "configured" in registry[step.operation].output.model_fields
     assert home.level_of(f"printing.{step.key}", step.required) == home.LEVEL_RECOMMENDED
 
 

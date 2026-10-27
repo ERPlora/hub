@@ -512,7 +512,7 @@ class CoverageIn(Closed):
 
 class CoverageOut(Schema):
     usage: Usage = Field(description="The function asked about.")
-    covered: bool = Field(
+    configured: bool = Field(
         description="A device set up here (not retired) reaches an active printer of this function on receipt paper: "
         "its papers come out, whether that device is on right now or not."
     )

@@ -229,7 +229,7 @@ def reaches(*printers, name: str = "Counter", retired: bool = False):
 def coverage(usage: str = "receipt", ctx=None):
     out = run("printing.device.coverage", {"usage": usage}, ctx=ctx)
     assert out.usage == usage
-    return out.covered, out.count
+    return out.configured, out.count
 
 
 def test_a_business_without_printers_has_nobody_printing_and_nothing_waiting():

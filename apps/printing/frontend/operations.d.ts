@@ -257,11 +257,11 @@ export interface DevicePrinterOut {
   is_active: boolean;
 }
 
-/** Who prints a function: the Home's «Set up your printer» (`covered`, receipts) and the bell's «Nothing is printing». */
+/** Who prints a function: the Home's «Set up your printer» (`configured`, receipts) and the bell's «Nothing is printing». */
 export interface CoverageOut {
   usage: Usage;
   /** A device set up here reaches an active printer of the function on receipt paper. */
-  covered: boolean;
+  configured: boolean;
   /** Its jobs waiting that no device set up here can print. */
   count: number;
 }

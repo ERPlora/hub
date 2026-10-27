@@ -451,7 +451,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
     for printer in Printer.objects.filter(is_active=True).order_by(_SYSTEM_LAST, Lower("name"), "id"):
         active.setdefault(printer.usage, []).append(printer)
     settings = current_settings()
-    covered = coverage(USAGES)
+    reach = coverage(USAGES)
     usages = []
     for usage in USAGES:
         row = counts.get(usage, {})
@@ -468,7 +468,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
                 "oldest_pending_at": row.get("oldest"),
                 "sent": row.get("sent", 0),
                 "failed": row.get("failed", 0),
-                "unattended": covered[usage][1],
+                "unattended": reach[usage][1],
             }
         )
     return {
@@ -571,6 +571,6 @@ def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
     },
 )
 def device_coverage(ctx: OperationContext, params: CoverageIn) -> dict:
-    """The Home's «Set up your printer» (``covered`` of the receipts) and the bell's «Nothing is printing» (``count``)."""
-    covered, unattended = coverage([params.usage])[params.usage]
-    return {"usage": params.usage, "covered": covered, "count": unattended}
+    """The Home's «Set up your printer» (``configured`` of the receipts) and the bell's «Nothing is printing» (``count``)."""
+    configured, unattended = coverage([params.usage])[params.usage]
+    return {"usage": params.usage, "configured": configured, "count": unattended}

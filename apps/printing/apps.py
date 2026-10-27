@@ -63,7 +63,7 @@ class PrintingConfig(LiveAppConfig):
             key="printer",
             operation="printing.device.coverage",
             params={"usage": "receipt"},
-            configured_when=[SetupCheck(field="covered", truthy=True)],
+            configured_when=[SetupCheck(field="configured", truthy=True)],
             title=_("Set up your printer"),
             description=_("Register the device that prints your customers' receipts, so the first sale comes out on paper."),
             icon="lucide:receipt",
