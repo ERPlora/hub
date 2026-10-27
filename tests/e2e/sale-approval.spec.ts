@@ -7,6 +7,9 @@
 // voided. Screenshots of the dialog over Sales in the three viewports. The owner's PIN exists only while this file
 // runs, after the cashier has entered (a PIN in hub `a` turns every browser's way in into the PIN pad:
 // base-access.spec.ts), and the approvals it records go with it, as everything else this file creates (`afterAll`).
+// FIX-HUB-SALE-APPROVAL-E2E-REUSED-DB: the owner and the cashier are told by their session, not by their email (a hub
+// database kept from a stack whose SaaS was created again holds an older account with each email), and the PIN and
+// the approvals of every account of those emails go before and after, so a run that failed leaves the next one clean.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
@@ -31,22 +34,44 @@ let cashier: { context: BrowserContext; page: Page };
 let toVoid: SaleOut;
 let toRefund: SaleOut;
 let toKeep: SaleOut;
+let ownerName = '';
+let cashierName = '';
 
-const usernameOf = (email: string): string => psql(`SELECT username FROM auth_user WHERE email = '${email}'`);
+/**
+ * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
+ * created again holds an older account with the same email (a new SaaS, new users), and the email names both.
+ */
+async function usernameOf(context: BrowserContext): Promise<string> {
+  const me = await api<{ user: { id: string } | null }>(context, A, 'GET', '/me');
+  expect(me.status, 'GET /api/me').toBe(200);
+  const id = me.data.user?.id ?? '';
+  expect(id, 'the person signed in').not.toBe('');
+  return psql(`SELECT username FROM auth_user WHERE id = '${id}'`);
+}
 
-/** No PIN of the owner's left behind: the business's way in stays erplora.com's. */
-function forgetThePin(): void {
-  const name = usernameOf(OWNER.email);
-  if (name) psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username = '${name}'`);
+/** Every account of `email` in this hub's database: the cleanup leaves none of them with what this file made. */
+const accountsOf = (email: string): string => `SELECT username FROM auth_user WHERE email = '${email}'`;
+
+/**
+ * No PIN of the owner's left behind, in any of their accounts (the business's way in stays erplora.com's), and no
+ * approval of a Sales action the cashier asked for, in any of theirs.
+ */
+function forgetThePinAndTheApprovals(): void {
+  psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username IN (${accountsOf(OWNER.email)})`);
+  psql(`DELETE FROM base_approval WHERE requested_by IN (${accountsOf(EMPLOYEE.email)}) AND operation LIKE 'sale.%'`);
 }
 
 test.beforeAll(async ({ browser }) => {
+  // What a run that failed left: with the owner's PIN still set, the way in to hub `a` asks for a PIN and the logins
+  // below never reach Sales (the cashier's lands on `/pin/setup`).
+  forgetThePinAndTheApprovals();
   // Card charges issue tickets when the hub has an issuer, and a void its rectifying invoice: the cleanup gives
   // their numbers back.
   snapshotSeries();
   const context = await browser.newContext({ baseURL: A });
   owner = { context, page: await context.newPage() };
   await login(owner.page, A, '/sale/sales');
+  ownerName = await usernameOf(context);
   await drawerOff(context);
   await createProduct(context, { name: 'E2E Approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   toVoid = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
@@ -56,16 +81,14 @@ test.beforeAll(async ({ browser }) => {
   const till = await browser.newContext({ baseURL: A });
   cashier = { context: till, page: await till.newPage() };
   await login(cashier.page, A, '/sale/sales', EMPLOYEE);
+  cashierName = await usernameOf(till);
   // Only now the owner chooses a PIN («My profile»): who may approve, on the cashier's device.
-  forgetThePin();
   const pin = await api<{ set: boolean }>(context, A, 'POST', '/me/pin', { pin: OWNER_PIN });
   expect(pin.status, JSON.stringify(pin.data)).toBe(200);
 });
 
 test.afterAll(async () => {
-  forgetThePin();
-  const asked = usernameOf(EMPLOYEE.email);
-  if (asked) psql(`DELETE FROM base_approval WHERE requested_by = '${asked}' AND operation LIKE 'sale.%'`);
+  forgetThePinAndTheApprovals();
   cleanSales();
   cleanInventory();
   restoreDrawer();
@@ -125,9 +148,9 @@ test('SALE-F30: the cashier voids a charged ticket and the owner approves it wit
   await expect(page.locator('ion-toast').filter({ hasText: /Sale voided|Venta anulada/ }).first()).toBeVisible();
   await expect(row(page, toVoid)).toContainText(/Voided|Anulada/);
   const stored = await detail(toVoid);
-  expect([stored.status, stored.void_reason, stored.voided_by]).toEqual(['voided', 'e2e wrong ticket', usernameOf(EMPLOYEE.email)]);
+  expect([stored.status, stored.void_reason, stored.voided_by]).toEqual(['voided', 'e2e wrong ticket', cashierName]);
   // Once: the approval is spent with the void, and Employees › Approvals keeps who approved it.
-  expect(psql(`SELECT count(*) FROM base_approval WHERE operation = 'sale.sale.void' AND used_at IS NOT NULL AND approved_by = '${usernameOf(OWNER.email)}' AND requested_by = '${usernameOf(EMPLOYEE.email)}'`)).toBe('1');
+  expect(psql(`SELECT count(*) FROM base_approval WHERE operation = 'sale.sale.void' AND used_at IS NOT NULL AND approved_by = '${ownerName}' AND requested_by = '${cashierName}'`)).toBe('1');
 });
 
 test('SALE-F31: the cashier refunds a charged ticket and the owner approves it with their PIN', async () => {
