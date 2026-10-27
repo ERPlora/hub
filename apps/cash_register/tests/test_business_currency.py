@@ -4,7 +4,7 @@ Poland counts zlotys with their notes and coins; one in Spain, euros; each hub i
 permission of the operation it opened, and still gets the business's currency."""
 
 import pytest
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import InvalidPayload
 
 from apps.cash_register.tests.conftest import A, B, ctx_for, open_session, run
@@ -64,3 +64,25 @@ def test_the_printed_report_takes_the_decimals_of_the_business_s_currency():
     printed = run("cash_register.session.print", {"session_id": str(session.id)})
     document = PrintJob.objects.get(pk=printed.job_id).document
     assert (document["decimals"], document["opening_balance"]) == (0, 10000.0)
+
+
+@pytest.mark.parametrize(("country", "currency", "decimals", "three_ones"), [("PL", "PLN", 2, 300), ("JP", "JPY", 0, 3)])
+def test_erploras_own_hub_counts_in_the_currency_of_its_issuer_s_country(settings, country, currency, decimals, three_ones):
+    # Phase 1's platform hub has no business on erplora.com (no registry row, create_platform_hub) and every module is on
+    # in it (base.activation.is_platform): its drawer counts and prints in the currency of its issuer's country, as its
+    # sales and invoices do (hub#286), never a 404 because there is no business to read.
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = country
+    platform = ctx_for(scope=Scope("host", "erplora"))
+    read = run("cash_register.currency.get", {}, platform)
+    assert (read.currency, read.decimals) == (currency, decimals)
+    run(
+        "printing.printer.create",
+        {"name": "Till", "kind": "network", "address": "192.168.1.50", "usage": "receipt"},
+        platform,
+    )
+    session = run("cash_register.session.open", {"opening_balance": 10000}, platform)
+    count = run("cash_register.count.add", {"type": "closing", "denominations": {"coins": {"1": 3}}}, platform)
+    assert count.total == three_ones
+    printed = run("cash_register.session.print", {"session_id": str(session.id)}, platform)
+    assert PrintJob.objects.get(pk=printed.job_id).document["decimals"] == decimals

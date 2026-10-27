@@ -726,12 +726,17 @@ cajero del producto actual es un empleado.
   declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`), que corre el worker
   (`base/scheduler.py`, 2026-10-15), y
   `session.open` lo aplica antes de abrir.
-- **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6;
-  `queries.business_currency`, leída como la plataforma: una API key solo tiene el permiso de su operación); en
-  pantalla, `useBusinessMoney()` de `base`. Los decimales, de `babel` (los del servidor, nunca los de Intl: Intl le
-  da 0 al forinto y Babel 2). Mientras Ventas siga fijando `EUR` (su `FIX`), las cifras de las ventas salen con el
-  símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas del
-  producto actual).
+- **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6),
+  y en el hub propio de ERPlora (sin registro en la fase 1, `create_platform_hub`, con todas las apps activas), la del
+  país de su emisor (`PLATFORM_ISSUER_COUNTRY`). En el servidor, `business_currency` de Ventas (`apps.sale.queries`,
+  la misma con la que nace cada venta; leída como la plataforma: una API key solo tiene el permiso de su operación);
+  en pantalla, `useBusinessMoney()` de `base`. Los decimales, de `babel` (los del servidor, nunca los de Intl: Intl le
+  da 0 al forinto y Babel 2). Cada venta guarda su moneda al nacer (`Sale.currency`, hub#286). Caja copia el `amount`
+  de cada cobro, anulación y devolución sin leer `Sale.currency`, y lo suma y lo pinta en la del negocio, que es la de
+  cada venta: el país, y con él la moneda, no cambia desde que el negocio puede vender (`hubs.country_locked` del
+  SaaS). Solo una venta de antes de hub#286 en un negocio sin euro guarda `EUR` y
+  sale con el símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas
+  del producto actual).
   El total de un arqueo lo suma el servidor; un billete o moneda de otra moneda es 422.
 - **Zona horaria (fase 1)**: `Europe/Madrid` (`TIME_ZONE` del Hub) para todos los negocios: día de
   negocio, número de sesión y corte del cierre automático. Cuando el Hub guarde la zona de cada negocio,

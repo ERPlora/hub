@@ -1,5 +1,5 @@
 // The filters of the sessions list (status, number and the four amounts; CASH_REGISTER Pantallas · Caja),
-// as the table's funnel holds them (what is typed, in euros) and as `cash_register.session.list` takes
+// as the table's funnel holds them (what is typed, in the business's money) and as `cash_register.session.list` takes
 // them (cents). A difference may be negative (a short drawer); an amount that is not one never reaches
 // the server (cash_register#103, #107; hub#2271).
 import { describe, expect, it } from 'vitest';
