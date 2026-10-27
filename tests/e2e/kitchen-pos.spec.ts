@@ -10,7 +10,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const RUN = stamp();
 const SKU = `E2E-KPOS-${RUN}`;
@@ -73,12 +73,6 @@ async function tillReady(page: Page): Promise<void> {
   await shown(page).locator(`[data-testid=pos-product-${burger.id}]`).waitFor({ state: 'visible' });
 }
 
-/** On a phone the cart is the drawer behind its button. */
-async function openCart(page: Page): Promise<void> {
-  const fab = shown(page).locator('[data-testid=pos-cart-fab]');
-  if (await fab.isVisible()) await fab.click();
-}
-
 async function still(page: Page): Promise<void> {
   await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
 }
@@ -118,7 +112,9 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
   await expect(view.locator('[data-testid=pos-kitchen-send]')).toContainText('Send RUSH (1)');
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
-    await openCart(page);
+    // On a phone the check is the drawer behind the cart button, opened once the till has laid itself out for the
+    // new size: read straight after the resize, at 390 the button was not there yet and the drawer stayed shut.
+    await openTillCart(page);
     await expect(view.locator('[data-testid=pos-kitchen-send]')).toBeInViewport({ ratio: 1 });
     if ((await flame.getAttribute('aria-pressed')) !== 'true') await flame.click();
     await expect(view.locator('[data-testid=pos-kitchen-send]')).toContainText('Send RUSH (1)');
