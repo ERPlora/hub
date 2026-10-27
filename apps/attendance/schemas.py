@@ -13,6 +13,7 @@ from uuid import UUID
 
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import AfterValidator, StringConstraints, ValidationInfo, field_validator
 
@@ -120,9 +121,14 @@ class MemberRefIn(Schema):
 
 
 class PositionIn(MemberRefIn):
-    lat: Latitude | None = Field(None, description=D_LAT)
-    lng: Longitude | None = Field(None, description=D_LNG, validate_default=True)
-    accuracy_m: Accuracy | None = Field(None, description=D_ACCURACY)
+    # Titles: the names the assistant's card gives these data, the Settings screen's («Latitude», «Longitude»).
+    lat: Latitude | None = Field(None, title=gettext_noop("Latitude"), description=D_LAT)
+    lng: Longitude | None = Field(
+        None, title=gettext_noop("Longitude"), description=D_LNG, validate_default=True
+    )
+    accuracy_m: Accuracy | None = Field(
+        None, title=gettext_noop("Accuracy (m)"), description=D_ACCURACY
+    )
 
     @field_validator("lng")
     @classmethod
