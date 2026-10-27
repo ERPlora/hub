@@ -10,7 +10,6 @@ from decimal import Decimal
 
 import pytest
 from django.db import transaction
-from django.utils import timezone
 from live.errors import Conflict
 from live.operations import registry
 
@@ -79,7 +78,6 @@ def test_two_categories_at_ten_percent_declare_what_the_ticket_charged(issuer, b
 
 # ── The fiscal chain in the same transaction (SALE-F01, F04, F30, F31; INVOICE-F01, F02, F07, F09, F10) ──
 
-YEAR = timezone.localdate().year
 RECIPIENT = {
     "customer_name": "Talleres Pérez SL",
     "customer_tax_id": "B12345674",
@@ -100,12 +98,12 @@ def refund(sale, amount, reason="Broken", **more):
     )
 
 
-def test_a_ticket_is_numbered_by_invoicing_in_the_very_charge(issuer, bar):
+def test_a_ticket_is_numbered_by_invoicing_in_the_very_charge(issuer, bar, today):
     sale = charge("chain-0001", {"product": "TAP"})
     assert (sale.invoice_status, sale.invoice_type, sale.invoice_number) == (
         "issued",
         "F2",
-        f"TICKET-{YEAR}-000001",
+        f"TICKET-{today.year}-000001",
     )
     ticket = Invoice.objects.get(source_sale_id=sale.id)
     assert (ticket.id, ticket.number, ticket.total_amount) == (
@@ -197,12 +195,12 @@ def test_a_refusal_of_the_input_of_a_full_invoice_stops_the_charge(issuer, bar, 
     assert charge("chain-0023", {"product": "TAP"}).invoice_status == "pending"
 
 
-def test_a_sale_charged_as_an_invoice_is_a_full_invoice_in_the_same_commit(issuer, bar):
+def test_a_sale_charged_as_an_invoice_is_a_full_invoice_in_the_same_commit(issuer, bar, today):
     sale = charge("chain-0002", {"product": "TAP"}, document_type="invoice", **RECIPIENT)
     assert (sale.invoice_status, sale.invoice_type, sale.invoice_number) == (
         "issued",
         "F1",
-        f"FACT-{YEAR}-000001",
+        f"FACT-{today.year}-000001",
     )
     invoice = Invoice.objects.get(pk=sale.invoice_id)
     assert (invoice.customer_name, invoice.customer_tax_id) == (
@@ -214,10 +212,10 @@ def test_a_sale_charged_as_an_invoice_is_a_full_invoice_in_the_same_commit(issue
         charge("chain-0003", {"product": "CAN"}, document_type="invoice", **RECIPIENT)
         raise RuntimeError("the charge never commits")
     assert Sale.objects.count() == Invoice.objects.count() == 1
-    assert InvoiceSeries.objects.get(code="FACT", year=YEAR).current_number == 1
+    assert InvoiceSeries.objects.get(code="FACT", year=today.year).current_number == 1
 
 
-def test_each_part_of_a_check_charged_apart_is_its_own_ticket(issuer, bar):
+def test_each_part_of_a_check_charged_apart_is_its_own_ticket(issuer, bar, today):
     order = run("sale.order.open", {"lines": [{"product": "TAP"}, {"product": "CAN"}]})
     first_line = order.lines[0].id
     first = run(
@@ -234,18 +232,18 @@ def test_each_part_of_a_check_charged_apart_is_its_own_ticket(issuer, bar):
         {"idempotency_key": "chain-0005", "order_id": str(order.id), "payments": [{"method": "card"}]},
     )
     assert [first.invoice_number, rest.invoice_number] == [
-        f"TICKET-{YEAR}-000001",
-        f"TICKET-{YEAR}-000002",
+        f"TICKET-{today.year}-000001",
+        f"TICKET-{today.year}-000002",
     ]
 
 
-def test_a_refund_is_rectified_in_the_same_operation(issuer, bar):
+def test_a_refund_is_rectified_in_the_same_operation(issuer, bar, today):
     sale = charge("chain-0006", {"product": "TAP"}, {"product": "CAN"})
     partial = refund(sale, 100)
     assert (partial.invoice_status, partial.invoice_type, partial.invoice_number) == (
         "issued",
         "R5",
-        f"RECT-{YEAR}-000001",
+        f"RECT-{today.year}-000001",
     )
     rectification = Invoice.objects.get(number=partial.invoice_number)
     assert (rectification.total_amount, rectification.rectifies.number) == (
@@ -253,7 +251,7 @@ def test_a_refund_is_rectified_in_the_same_operation(issuer, bar):
         sale.invoice_number,
     )
     rest = refund(sale, 200, idempotency_key="chain-refund-0001")
-    assert rest.invoice_number == f"RECT-{YEAR}-000002" and rest.fully_refunded is True
+    assert rest.invoice_number == f"RECT-{today.year}-000002" and rest.fully_refunded is True
     assert Invoice.objects.get(pk=sale.invoice_id).status == "cancelled"
     # The same refund again answers what it recorded, with its rectification: nothing new is issued.
     replay = refund(sale, 200, idempotency_key="chain-refund-0001")
@@ -271,12 +269,12 @@ def test_a_refund_of_a_full_invoice_is_an_r1(issuer, bar):
     assert (rectified.invoice_type, rectified.invoice_status) == ("R1", "issued")
 
 
-def test_a_voided_ticket_is_rectified_whole_as_r5(issuer, bar):
+def test_a_voided_ticket_is_rectified_whole_as_r5(issuer, bar, today):
     sale = charge("chain-0008", {"product": "TAP"})
     voided = run("sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong table"})
     assert (voided.void_invoice_status, voided.void_invoice_number) == (
         "issued",
-        f"RECT-{YEAR}-000001",
+        f"RECT-{today.year}-000001",
     )
     rectification = Invoice.objects.get(number=voided.void_invoice_number)
     assert (rectification.invoice_type, rectification.total_amount) == ("R5", -sale.total)
@@ -501,7 +499,7 @@ def test_the_seller_without_the_right_to_invoice_still_charges(issuer, bar):
 # ── A document that waits has a way out in phase 1 (no relay): retry, «Issue now», the void ─────────
 
 
-def test_retrying_a_charge_whose_document_waits_issues_it_now(bar):
+def test_retrying_a_charge_whose_document_waits_issues_it_now(bar, today):
     # No issuer at the till: the ticket waits. The same attempt sent again once the issuer exists issues
     # it (the charge itself is not repeated), and a third time changes nothing.
     sale = charge("chain-0030", {"product": "TAP"})
@@ -514,12 +512,12 @@ def test_retrying_a_charge_whose_document_waits_issues_it_now(bar):
         "issued",
         "F2",
     )
-    assert again.invoice_number == f"TICKET-{YEAR}-000001"
+    assert again.invoice_number == f"TICKET-{today.year}-000001"
     assert charge("chain-0030", {"product": "TAP"}).invoice_number == again.invoice_number
     assert Invoice.objects.count() == 1 and Sale.objects.count() == 1
 
 
-def test_issue_now_issues_every_document_that_waits_and_says_so(bar):
+def test_issue_now_issues_every_document_that_waits_and_says_so(bar, today):
     from live.models import OutboxEvent
 
     first = charge("chain-0031", {"product": "TAP"}, {"product": "CAN"})
@@ -534,10 +532,10 @@ def test_issue_now_issues_every_document_that_waits_and_says_so(bar):
     issued = run("sale.sale.issue_documents", {"sale_id": str(first.id)})
     assert (issued.invoice_status, issued.invoice_type, issued.documents_pending) == ("issued", "F2", False)
     (row,) = run("sale.refund.list", {"sale_id": str(first.id)}).rows
-    assert (row.invoice_status, row.invoice_number) == ("issued", f"RECT-{YEAR}-000001")
+    assert (row.invoice_status, row.invoice_number) == ("issued", f"RECT-{today.year}-000001")
     voided = run("sale.sale.issue_documents", {"sale": second.number})
     assert (voided.invoice_status, voided.void_invoice_status) == ("issued", "issued")
-    assert voided.void_invoice_number == f"RECT-{YEAR}-000002"
+    assert voided.void_invoice_number == f"RECT-{today.year}-000002"
     assert Invoice.objects.get(number=voided.void_invoice_number).invoice_type == "R5"
     # One notice per document issued now (the lists and the papers follow them).
     assert OutboxEvent.objects.filter(name="sale.sale.invoiced").count() == 4
@@ -571,12 +569,12 @@ def test_issue_now_of_an_invoice_keeps_the_recipient_the_cashier_typed(bar):
     )
 
 
-def test_voiding_a_sale_whose_ticket_waits_issues_the_ticket_first_then_its_rectification(bar):
+def test_voiding_a_sale_whose_ticket_waits_issues_the_ticket_first_then_its_rectification(bar, today):
     sale = charge("chain-0035", {"product": "TAP"})
     run("invoice.issuer.update", ISSUER)
     voided = run("sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong table"})
-    assert (voided.invoice_status, voided.invoice_number) == ("issued", f"TICKET-{YEAR}-000001")
-    assert (voided.void_invoice_status, voided.void_invoice_number) == ("issued", f"RECT-{YEAR}-000001")
+    assert (voided.invoice_status, voided.invoice_number) == ("issued", f"TICKET-{today.year}-000001")
+    assert (voided.void_invoice_status, voided.void_invoice_number) == ("issued", f"RECT-{today.year}-000001")
     assert voided.documents_pending is False
 
 
@@ -590,12 +588,12 @@ def test_without_an_issuer_a_void_still_goes_through_and_both_documents_wait_in_
 # ── Invoicing failing inside the charge (H5) ─────────────────────────────────────────────────────
 
 
-def test_a_refusal_after_numbering_gives_the_number_back_and_the_document_waits(issuer, bar):
+def test_a_refusal_after_numbering_gives_the_number_back_and_the_document_waits(issuer, bar, today):
     # The ticket series' counter set back by hand: Invoicing numbers TICKET-…-000001 again, finds it taken
     # and refuses (invoice.number_taken) AFTER raising the counter. Its savepoint gives the number back;
     # the sale is charged and its document waits.
     first = charge("chain-0040", {"product": "TAP"})
-    assert first.invoice_number == f"TICKET-{YEAR}-000001"
+    assert first.invoice_number == f"TICKET-{today.year}-000001"
     InvoiceSeries.objects.filter(code="TICKET").update(current_number=0)
     second = charge("chain-0041", {"product": "TAP"})
     assert (second.status, second.invoice_status, second.invoice_number) == ("completed", "pending", "")
