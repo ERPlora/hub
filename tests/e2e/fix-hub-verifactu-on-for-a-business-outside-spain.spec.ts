@@ -119,6 +119,8 @@ test(`${KEY}: VERIFACTU-F01 a business in Poland issues its invoices without a V
   // A ticket sealed while the business was in Spain: its record waits («Pendiente»).
   await registerIn('ES');
   await login(page, A, '/invoice/invoices');
+  // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   const before = await issueInvoice(context);
   expect(before.verifactu_status).toBe('sealed');
   const waiting = recordOf(before.id);
