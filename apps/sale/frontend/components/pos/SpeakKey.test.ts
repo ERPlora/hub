@@ -214,6 +214,30 @@ describe('SpeakKey: dictating into the assistant', () => {
     expect(k.find('pos-speak-status').exists()).toBe(false);
   });
 
+  // The installed app (Android, Windows) has no browser bar: there a refused microphone is allowed again in the
+  // device's settings (as the assistant's composer, BASE-F94). Tauri does not run here: its bridge is simulated.
+  it('a microphone refused inside the installed app is a toast that points to the device settings', async () => {
+    const win = window as unknown as { __TAURI__?: unknown };
+    const refusal = async (locale: 'en' | 'es') => {
+      const voice = { ...microphone(), getUserMedia: vi.fn(async () => Promise.reject(new DOMException('no', 'NotAllowedError'))) };
+      const k = await key({ voice, locale });
+      await k.press();
+      expect(k.find('pos-speak-status').exists()).toBe(false);
+      k.wrapper.unmount();
+    };
+    win.__TAURI__ = { core: { invoke: vi.fn(async () => null) } };
+    try {
+      await refusal('es');
+      expect(toast).toHaveBeenLastCalledWith('El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.', 'warning');
+      await refusal('en');
+      expect(toast).toHaveBeenLastCalledWith('Microphone access is blocked. Allow it in your device settings to speak.', 'warning');
+    } finally {
+      delete win.__TAURI__;
+    }
+    await refusal('en');
+    expect(toast).toHaveBeenLastCalledWith('Microphone access is blocked. Allow it in your browser to speak.', 'warning');
+  });
+
   it('leaving the till while recording frees the microphone and transcribes nothing', async () => {
     const voice = microphone();
     const k = await key({ voice });
