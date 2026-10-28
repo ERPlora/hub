@@ -1431,7 +1431,8 @@
         "system": "System",
         "profile": "My profile",
         "employees": "Employees",
-        "files": "Files"
+        "files": "Files",
+        "report": "Report a problem"
       },
       "setup": {
         "ask": "Ask the assistant"

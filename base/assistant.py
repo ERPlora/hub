@@ -350,40 +350,59 @@ APPS = pgettext_lazy("base", "Apps")
 #: The user menu's «Report a problem» (BASE-F108), a dialog of its own.
 REPORT_A_PROBLEM = pgettext_lazy("base", "Report a problem")
 
+#: The platform's screens by their key, the one a receipt names its screen by (``screen``) and base's catalogue names it
+#: by in each language (``base.assistant.screens.<key>``, the same name: ``test_each_screen_a_receipt_names_…``).
+SCREEN_NAMES = {
+    "home": HOME,
+    "employees": EMPLOYEES,
+    "settings": SETTINGS,
+    "profile": PROFILE,
+    "system": SYSTEM,
+    "files": FILES,
+    "apps": APPS,
+    "report": REPORT_A_PROBLEM,
+}
+
 #: Where a person does each thing of the platform on their own, by the entity of its operation: a card or a receipt
 #: names an action of base by that screen, never by the platform's internal name, «Base» (as Shopify's Sidekick and
 #: Business Central's Copilot name the page of an action, and WooCommerce's assistant its area). Every tool of base and
 #: what is never done from the chat has its entity here (``test_every_action_of_base_names_its_screen``).
 BASE_SCREENS = {
-    "access": SETTINGS,
-    "api_doc": SETTINGS,
-    "app": APPS,
-    "api_key": EMPLOYEES,
-    "approval": EMPLOYEES,
-    "blueprint": SETTINGS,
-    "business": SETTINGS,
-    "dataset": SETTINGS,
-    "device": SETTINGS,
-    "event": SYSTEM,
-    "failed_event": SYSTEM,
-    "file": FILES,
-    "hub": SETTINGS,
-    "import": SETTINGS,
-    "location": SETTINGS,
-    "person": EMPLOYEES,
-    "profile": PROFILE,
-    "role": EMPLOYEES,
-    "setup": HOME,
-    "support": REPORT_A_PROBLEM,
-    "system": SYSTEM,
+    "access": "settings",
+    "api_doc": "settings",
+    "app": "apps",
+    "api_key": "employees",
+    "approval": "employees",
+    "blueprint": "settings",
+    "business": "settings",
+    "dataset": "settings",
+    "device": "settings",
+    "event": "system",
+    "failed_event": "system",
+    "file": "files",
+    "hub": "settings",
+    "import": "settings",
+    "location": "settings",
+    "person": "employees",
+    "profile": "profile",
+    "role": "employees",
+    "setup": "home",
+    "support": "report",
+    "system": "system",
 }
+
+
+def screen(op: Operation) -> str:
+    """The key of the platform's screen where ``op`` happens (``BASE_SCREENS``; another, the Home), or ``""`` for an
+    app's: its receipt names it in the language the person reads it in, never in the one of its turn."""
+    return BASE_SCREENS.get(op.name.split(".")[1], "home") if op.app_label == "base" else ""
 
 
 def app_name(op: Operation) -> str:
     """Where ``op`` happens, as the person knows it, in the active language: its app by its name; one of the platform,
-    the screen where they would do it themselves (``BASE_SCREENS``; another, the Home)."""
+    the screen where they would do it themselves (``screen``)."""
     if op.app_label == "base":
-        return str(BASE_SCREENS.get(op.name.split(".")[1], HOME))
+        return str(SCREEN_NAMES[screen(op)])
     config = active_apps_label(op.app_label)
     return str(config.verbose_name) if config is not None else op.app_label
 

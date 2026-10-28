@@ -1431,7 +1431,8 @@
         "system": "Sistema",
         "profile": "Mi perfil",
         "employees": "Empleados",
-        "files": "Archivos"
+        "files": "Archivos",
+        "report": "Reportar un problema"
       },
       "setup": {
         "ask": "Pedírselo al asistente"

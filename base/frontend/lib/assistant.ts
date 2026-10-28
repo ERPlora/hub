@@ -174,7 +174,7 @@ export function createAssistant(deps: AssistantDeps = {}) {
     if (stopped) bubble.stopped = true;
     bubble.executed = turn.executed
       .filter((row) => row.kind === 'command')
-      .map((row) => ({ name: row.name, app: row.app ?? '', app_name: row.app_name, outcome: row.outcome }));
+      .map((row) => ({ name: row.name, app: row.app ?? '', app_name: row.app_name, screen: row.screen, outcome: row.outcome }));
     if (bubble.text) {
       bubble.notices = groundingNotices({
         answer: bubble.text,
@@ -208,7 +208,7 @@ export function createAssistant(deps: AssistantDeps = {}) {
             spoke = true;
           }
           current.bubble.text += frame.text;
-        } else if (frame.type === 'executed') current.executed.push({ name: frame.name, kind: frame.kind, outcome: frame.outcome, app: frame.app, app_name: frame.app_name });
+        } else if (frame.type === 'executed') current.executed.push({ name: frame.name, kind: frame.kind, outcome: frame.outcome, app: frame.app, app_name: frame.app_name, screen: frame.screen });
         else if (frame.type === 'usage') state.usage = { used: frame.used, limit: frame.limit, resets_at: frame.resets_at, demo: frame.demo };
         else if (frame.type === 'confirm') confirm = { card: frame.card, call: frame.call };
         else if (frame.type === 'error') {

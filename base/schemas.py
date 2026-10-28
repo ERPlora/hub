@@ -1384,6 +1384,11 @@ class AssistantExecutedOut(Schema):
         description="Where it happened, in the person's language, as its card says it: the app's name, or the "
         "platform's screen («Settings»); empty when there was no operation."
     )
+    screen: str = Field(
+        default="",
+        description="The platform's screen it happened on, by its key («settings»), for the receipt to name it in the "
+        "language it is read in; empty for an app's (its menu names it).",
+    )
     kind: Literal["query", "command", ""]
     outcome: Literal["ok", "error", "refused", "cancelled"]
     code: str

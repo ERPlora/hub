@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
+from django.utils import translation
 from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import Operation, get, registry
@@ -234,6 +235,21 @@ def test_every_action_of_base_names_its_screen():
     actions = {op.name for op in registry.values() if op.app_label == "base" and assistant.is_tool(op)}
     actions |= set(assistant.NOT_FROM_CHAT)
     assert sorted(name for name in actions if name.split(".")[1] not in assistant.BASE_SCREENS) == []
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_each_screen_a_receipt_names_by_its_key_is_named_alike_by_the_screen(language):
+    """A receipt names the platform's screen by its key (``screen``), in the language the screen is in
+    (``base.assistant.screens.<key>`` of base's catalogue): the same name the card gives it in that language, for each
+    screen an action of base happens on (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY)."""
+    catalogue = json.loads((Path(settings.BASE_DIR) / f"base/frontend/locale/{language}.json").read_text())
+    names = catalogue["base"]["assistant"]["screens"]
+    with translation.override(language):
+        assert {key: names.get(key) for key in set(assistant.BASE_SCREENS.values())} == {
+            key: str(assistant.SCREEN_NAMES[key]) for key in set(assistant.BASE_SCREENS.values())
+        }
+    pin = get("base.access.settings_update")
+    assert (assistant.screen(pin), assistant.screen(get("demo.item.create"))) == ("settings", "")
 
 
 def named_actions() -> dict[str, dict[str, str]]:

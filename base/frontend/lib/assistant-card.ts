@@ -53,6 +53,14 @@ export function actionKey(action: string): string {
   return `base.assistant.card.actions.${Object.hasOwn(ACTIONS, action) ? action : 'other'}`;
 }
 
+/** The platform's screens a receipt names by their key (`base.assistant.screens.<key>`, base's catalogue: the names
+ *  the server gives them, base/assistant.py `SCREEN_NAMES`). */
+const SCREENS: Readonly<Record<string, string>> = en.base.assistant.screens;
+
+export function screenKey(screen: string | undefined): string | null {
+  return screen && Object.hasOwn(SCREENS, screen) ? `base.assistant.screens.${screen}` : null;
+}
+
 /** The data a card names itself in the person's language (`base.assistant.card.fields.<name>`); another, by the
  *  label the server gives it in that language (base/assistant.py `_label`). */
 const FIELDS = [

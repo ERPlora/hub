@@ -98,6 +98,7 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
             "name": "demo.item.list",
             "app": "demo",
             "app_name": "Demo",
+            "screen": "",
             "kind": "query",
             "outcome": "ok",
             "code": "",
@@ -266,6 +267,18 @@ def test_the_receipt_names_where_it_happened_in_the_persons_language():
     assert (plan["executed"][0]["outcome"], plan["executed"][0]["app_name"]) == ("cancelled", "Ajustes")
     written = turn(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
     assert written["executed"][0]["app_name"] == "Demo"
+
+
+def test_the_receipt_carries_the_platforms_screen_by_its_key_for_the_screen_to_name_it_in_its_own_language():
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY (seen on its e2e): a receipt kept from a turn
+    in English, read once the person had switched to Spanish, said «No se hizo, cancelado: Rectificar en Invoicing» —
+    its name came written in the turn's language. The platform's screen goes by its key too (``screen``), the one the
+    screen names in its own language; an app's, none (its menu names it)."""
+    admin = {"base.view_home", "base.administer_hub"}
+    pin = turn(call("base.access.settings_update", {"pin_length": 6}), decision={"call_id": "c1", "accepted": False}, permissions=admin)
+    assert (pin["executed"][0]["app"], pin["executed"][0]["screen"]) == ("base", "settings")
+    written = turn(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
+    assert (written["executed"][0]["app"], written["executed"][0]["screen"]) == ("demo", "")
 
 
 def test_a_tool_that_does_not_exist_is_refused_with_its_own_name():
