@@ -44,6 +44,8 @@ describe('parseMoney', () => {
   it('says when a text is not an amount', () => {
     expect(parseMoney('12a', { money: PLN })).toEqual({ ok: false, reason: 'not_amount' });
     expect(parseMoney('1,2,3', { money: PLN })).toEqual({ ok: false, reason: 'not_amount' });
+    // More digits than a double keeps exact (16): not an amount, never a rounded one.
+    expect(parseMoney('1234567890123456', { money: PLN })).toEqual({ ok: false, reason: 'not_amount' });
   });
 
   it('does not guess «1.250»: it gives both readings', () => {
