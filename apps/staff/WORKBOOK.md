@@ -137,7 +137,8 @@ panel**. De serie salen «Plantilla activa» (cuántas personas están **Activas
 distintas con una ausencia aprobada que cubre hoy) y «Ausencias de hoy» (quién falta hoy, de día entero
 primero y luego por nombre, con el tipo de ausencia debajo de cada nombre); «Ausencias pendientes» (cuántas
 solicitudes esperan respuesta) y «Empleados por rol» (una barra por rol con sus personas **Activas**, el rol
-con más primero y diez como mucho) se añaden desde **Personalizar panel**. Quien no ve las ausencias no
+con más primero y diez como mucho; cada barra lleva el color de su rol, y la de un rol sin color, el del panel)
+se añaden desde **Personalizar panel**. Quien no ve las ausencias no
 tiene los tres de ausencias, y quien no ve el equipo, ni «Plantilla activa» ni «Empleados por rol». Cambian
 solos, sin recargar. Las mismas cifras siguen dentro de Personal: las tres encima de la tabla de Personal,
 «Ausencias de hoy» encima de la de Ausencias y la columna «Miembros» de Roles (STAFF-F20 y STAFF-F23).
@@ -770,10 +771,6 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - **Alta en lote (STAFF-F07)**: es del asistente y de la API, como en el producto actual; no tiene
   pantalla. Importar el equipo desde un fichero CSV (staff de services#152 del producto actual) no
   existía y no se porta: el alta a mano o por el asistente cubre a un equipo de peluquería o de sala.
-- **El color de cada rol en «Empleados por rol»** del Inicio: el módulo viejo pintaba cada barra con el
-  color del rol (`map.color`), y el panel de barras de `base` (`base/frontend/lib/home.ts`) no lee colores;
-  es de `base`, fuera de esta app (línea `FIX:` de FIX-STAFF-SETUP-HOOKS). Las barras salen con el color del
-  Inicio.
 - **Borrar los ocho ajustes retirados** (STAFF-F22, hub#177): sus columnas (`min_advance_booking`,
   `max_daily_hours`, `overtime_threshold`, `show_staff_photos`, `show_staff_bio`, `allow_staff_selection`,
   `notify_new_appointment`, `notify_cancellation`) y el CHECK `staff_settings_ranges` siguen en
@@ -885,8 +882,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   Empleados por rol) salen en el Inicio, como en el producto actual, y además dentro de Personal. «Ausentes
   hoy» y «Ausencias pendientes» dicen su nombre una sola vez (gh:hub#1105); «Ausencias de hoy» pone el tipo
   traducido debajo de cada nombre en lugar del código; «Empleados por rol» pone primero el rol con más
-  personas y aún no pinta el color del rol (en «Lo que queda fuera»). Los iconos del avión y del reloj de
-  arena no están en el Hub (`UI-REQUESTS.md`).
+  personas y pinta cada barra con el color del rol, como el módulo viejo (`map.color` de `by_role`;
+  `base` lo pinta desde FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR, y un rol sin color deja el del panel:
+  FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-COLOR). Los iconos del avión y del reloj de arena no están en el Hub
+  (`UI-REQUESTS.md`).
 - **Comisiones** (nuevo): el producto actual no tenía pantalla que cruzara lo vendido con la comisión
   (STAFF-F21 «parcial»); el cierre por profesional lo componía cada uno. Ahora Personal da lo ganado por
   cada profesional en un periodo, con lo devuelto restado a quien lo vendió, como el informe de comisiones
