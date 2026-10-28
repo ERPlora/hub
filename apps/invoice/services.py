@@ -1082,6 +1082,12 @@ def _rectify(
         "back in Sales, not here. Read invoice.invoice.rectification_preview first with the same reason and type, tell "
         "the person its preview, then rectify naming the invoice by the number it gave.",
         "risk": "high",
+        # Its card shows the rectifying invoice it issues, not only the number and the reason it sends; the next
+        # number is read, never taken (FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW, BASE-F98).
+        "preview": {
+            "operation": "invoice.invoice.rectification_preview",
+            "fields": ["invoice_type", "next_number", "base_amount", "tax_amount", "total_amount"],
+        },
     },
 )
 def rectify(ctx: OperationContext, data: RectifyIn) -> dict:

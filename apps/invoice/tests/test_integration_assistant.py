@@ -251,3 +251,104 @@ def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(i
     assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "invoice.rectify_date_not_allowed")]
     assert Invoice.objects.get(pk=original.id).status == "issued"
     assert not rectifications().exists()
+
+
+# ── What rectifying will do, on its card (FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW; BASE-F98's hook) ─
+# The card of the rectification listed only what it sends (the number and the reason), never the rectifying invoice it
+# issues. Through base's hook it shows, before the word is typed, what invoice.invoice.rectification_preview answers
+# for the person: the type, the next number of the series (NOT taken) and the amounts in negative, as money.
+
+PREVIEWED = ["invoice_type", "next_number", "base_amount", "tax_amount", "total_amount"]
+
+
+def preview_of(number: str, language: str) -> list[dict]:
+    failure, preview = assistant.preview(
+        ctx_for(language=language), get("invoice.invoice.rectify"), {"number": number, "reason": REASON}
+    )
+    assert failure is None
+    return preview
+
+
+def card_labels(screens: dict) -> list[str]:
+    """The five data by the names the Facturas screens give them: the form of Rectificar, the series and the paper."""
+    return [
+        screens["rectify"]["type"],
+        screens["series"]["form"]["nextNumber"],
+        screens["paper"]["taxBase"],
+        screens["paper"]["tax"],
+        screens["detail"]["totals"]["total"],
+    ]
+
+
+def test_the_rectification_card_shows_the_rectifying_invoice_with_its_amounts_in_negative_as_money(issuer, today):
+    original = an_invoice()
+    preview = preview_of(original.number, "es")
+    assert [(field["name"], field["kind"], field["value"]) for field in preview] == [
+        ("invoice_type", "text", "R1"),
+        ("next_number", "text", f"RECT-{today.year}-000001"),
+        ("base_amount", "money", -10000),
+        ("tax_amount", "money", -2100),
+        ("total_amount", "money", -12100),
+    ]
+    assert [field["label"] for field in preview] == card_labels(SCREENS)
+    assert [field["label"] for field in preview_of(original.number, "en")] == card_labels(SCREENS_EN)
+    assert assistant.preview_of(get("invoice.invoice.rectify"))["fields"] == PREVIEWED
+
+
+def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issuer, today):
+    original = an_invoice()
+    plan = turn(call("invoice.invoice.rectify", {"number": original.number, "reason": REASON}))
+    card = plan["confirm"]
+    assert (card["operation"], card["confirm_word"]) == ("invoice.invoice.rectify", "CONFIRMAR")
+    assert [(field["name"], field["value"]) for field in card["preview"]] == [
+        ("invoice_type", "R1"),
+        ("next_number", f"RECT-{today.year}-000001"),
+        ("base_amount", -10000),
+        ("tax_amount", -2100),
+        ("total_amount", -12100),
+    ]
+    # Numbering is never optimistic: reading it takes no number, nor even creates this year's RECT series.
+    assert not InvoiceSeries.objects.filter(code="RECT").exists()
+    assert not rectifications().exists()
+
+
+def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
+    original = an_invoice()
+    rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
+    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}
+    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    rect = rectifications().get()
+    assert (rect.number, rect.invoice_type, rect.base_amount, rect.tax_amount, rect.total_amount) == (
+        said["next_number"],
+        said["invoice_type"],
+        said["base_amount"],
+        said["tax_amount"],
+        said["total_amount"],
+    )
+
+
+def test_another_rectification_issued_after_the_card_takes_its_number_and_this_one_the_next(issuer, today):
+    """The card says the next number, not one kept for it (INVOICE-F08, «Si falla»)."""
+    original, other = an_invoice(), an_invoice()
+    rectify = call("invoice.invoice.rectify", {"number": original.number, "reason": REASON})
+    said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}["next_number"]
+    first = run("invoice.invoice.rectify", {"number": other.number, "reason": "otro"}).invoice
+    turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    mine = rectifications().get(rectifies_id=original.id)
+    assert (first.number, mine.number) == (said, f"RECT-{today.year}-000002")
+
+
+def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_says_why(issuer):
+    """Without reading the preview first, a rectifying invoice asked to be rectified: the card's preview cannot be read,
+    so no card (nothing is confirmed blind) and the model hears why, in the person's language."""
+    original = an_invoice()
+    rect = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
+    with translation.override("es"):
+        plan = turn(call("invoice.invoice.rectify", {"number": rect.number, "reason": REASON}))
+        why = str(queries.CANNOT_RECTIFY_RECTIFICATION)
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
+        ("invoice.invoice.rectify", "error", "invoice.cannot_rectify_rectification")
+    ]
+    assert json.loads(plan["append"][0]["content"])["error"]["message"] == why
+    assert rectifications().count() == 1
