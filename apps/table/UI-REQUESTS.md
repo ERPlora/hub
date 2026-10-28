@@ -13,10 +13,11 @@ cambia el sustituto en la misma PR del puntero.
 - `ion:restaurant-outline` — icono del módulo en la página de apps y en la tienda (`apps.py` `icon`). Hoy:
   `ion:grid-outline`, el del bloque de ajustes del módulo viejo.
 - `ion:map-outline` — entrada de menú y pestaña **Plano de sala** (la del producto actual). Hoy:
-  `ion:apps-outline`.
+  `ion:apps-outline`. También el paso «Tus mesas» del Inicio (el del módulo viejo). Hoy: `ion:grid-outline`,
+  el del módulo.
 
-Al registrarlos, cambiar a la vez `apps.py` (`icon` y `navigation`), `frontend/tabs.ts` y sus tests
-(`tests/test_apps.py`, `frontend/tabs.test.ts`) y correr `pnpm gen:app-icons`.
+Al registrarlos, cambiar a la vez `apps.py` (`icon`, `navigation` y `setup`), `frontend/tabs.ts` y sus tests
+(`tests/test_apps.py`, `tests/test_integration_home.py`, `frontend/tabs.test.ts`) y correr `pnpm gen:app-icons`.
 
 ## Hechas
 
