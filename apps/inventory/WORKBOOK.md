@@ -1026,7 +1026,7 @@ datos de quien lo provocó.
 | Impuestos | Crear una categoría fiscal o aprender un texto desde la importación | F09 | `tax.category.create`, `tax.alias.create` |
 | Ventas | El número del tique o la factura de una venta, para la Referencia de un movimiento | F16 | `sale.sale.get` |
 | Impresión | Mandar la etiqueta a la impresora con la función «Etiqueta» | F25 | `printing.job.create` |
-| Plataforma | La moneda del negocio (la de su país), para escribir los precios y costes del CSV, leerlos al importar y ponerla en la etiqueta | F09, F11, F25 | `base.business.get` |
+| Plataforma | La moneda del negocio (la de su país; en el hub propio de ERPlora, la del país de su emisor), para escribir los precios y costes del CSV, leerlos al importar y ponerla en la etiqueta | F09, F11, F25 | `base.business.get` |
 
 Inventario no usa nada más de otras apps: el número de una venta le llega en su aviso, y el de su tique o
 factura se lo da Ventas, no Facturación.
@@ -1102,7 +1102,10 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   ensayo. Hasta 100 filas por llamada: el cliente parte el fichero (y con ello «Parar») y detecta los
   SKU repetidos entre trozos. La adivinanza de cabeceras y la ventana fiscal son de la página.
 - **Exportar**: CSV con los formatos CLDR del idioma de la petición (librería `babel`), `;` donde la
-  coma es el decimal (Excel en español) y BOM UTF-8. Los importes van en la moneda del negocio (`base.business.get`, la de su país) y con sus decimales;
+  coma es el decimal (Excel en español) y BOM UTF-8. Los importes van en la moneda del negocio
+  (`base.business.get`, la de su país; `queries.business_currency`, leída como la plataforma) y con sus decimales;
+  en el hub propio de ERPlora, sin negocio en erplora.com (fase 1, sin fila de registro: `create_platform_hub`), la
+  del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como Ventas y Tarifas;
   la importación acepta su código y su símbolo alrededor de la cifra («PLN12.50», «12,50 zł»), no los de otra.
 - **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
@@ -1124,11 +1127,11 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Etiqueta (INVENTORY-F25, 2026-10-21)**: `inventory.product.print_label` (permiso de ver productos) pide
   a Impresión `printing.job.create` por su nombre (sin `requires`): un `barcode_label` con `product_name`,
   `barcode` (el SKU) y `price` en unidades de la moneda del negocio (`currency`, con la que Impresión le pone
-  los decimales). Sin la cola (Impresión no instalada, apagada o sin `printing.print`) responde 409
-  `inventory.label_queue_unavailable` y la ficha imprime desde el navegador; un SKU fuera del ASCII
-  imprimible, 409 `inventory.sku_not_barcode`. La placa dibuja el Code 128 con JsBarcode (renderizador a
-  objeto: las barras las pinta Vue, sin HTML) y la impresión del navegador es una hoja solo para papel
-  (`@media print`), hecha con el DOM.
+  los decimales; en el hub propio de ERPlora, la del país de su emisor, como al exportar). Sin la cola
+  (Impresión no instalada, apagada o sin `printing.print`) responde 409 `inventory.label_queue_unavailable` y la
+  ficha imprime desde el navegador; un SKU fuera del ASCII imprimible, 409 `inventory.sku_not_barcode`. La placa
+  dibuja el Code 128 con JsBarcode (renderizador a objeto: las barras las pinta Vue, sin HTML) y la impresión del
+  navegador es una hoja solo para papel (`@media print`), hecha con el DOM.
 - **Avisos añadidos** a la lista del producto: `inventory.category.*` e `inventory.config.updated`, solo
   para refrescar las consultas vivas.
 - **Administrador de Django**: CRUD completo de todas las tablas para soporte (ronda 12, PLAN §17), el

@@ -73,6 +73,8 @@ from apps.inventory.schemas import (
     UnitListIn,
     UnitPage,
 )
+from base.business import currency_of
+from base.operations import is_platform_hub
 
 PRODUCT_NOT_FOUND = _("This product does not exist in this hub.")
 CATEGORY_NOT_FOUND = _("This category no longer exists.")
@@ -120,7 +122,10 @@ ON_SALE = Q(is_active=True, is_sold_out=False)
 def business_currency(ctx: OperationContext) -> str:
     """The currency of ``ctx``'s business (ISO 4217): the one its prices and costs are in, as ``base.business.get``
     reads it. Read as the platform: an API key holds only the permission of the operation it opened, and every person
-    of the hub may see it anyway."""
+    of the hub may see it anyway. ERPlora's own hub has no business on erplora.com (phase 1: no registry row,
+    ``create_platform_hub``): its catalog keeps the currency of its issuer's country, as its sales do."""
+    if is_platform_hub(ctx.scope):
+        return currency_of(settings.PLATFORM_ISSUER_COUNTRY)
     business = get(BUSINESS)
     return business(system_context(ctx.scope), business.input()).currency
 
