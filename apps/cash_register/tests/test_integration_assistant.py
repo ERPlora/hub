@@ -212,3 +212,126 @@ def test_renaming_a_drawer_names_the_drawer_and_its_new_name_apart():
         SCREENS["registers"]["modal"]["name"],
         SCREENS["registers"]["columns"]["active"],
     ]
+
+
+# ── What closing will do, on its card (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW; BASE-F98's hook) ──
+# The card of the close listed only what it sends (the session and the counted cash), never what closing gives: the
+# expected and the difference were said only in the chat, before the card. Through base's hook it shows, before the
+# word is typed, what cash_register.session.closing_summary answers for the person: the session's number, its drawer,
+# the expected cash and the difference, as money. Whoever a blind count hides the expected from gets neither.
+
+PREVIEWED = ["number", "register_name", "expected_balance", "difference"]
+
+SCREENS_EN = json.loads(
+    (Path(apps.get_app_config("cash_register").path) / "frontend/locale/en.json").read_text()
+)["cash_register"]
+
+
+def close_preview(arguments, *, role="hub_admin", language="es", ctx=None):
+    return assistant.preview(ctx or ctx_for(role, language=language), get("cash_register.session.close"), arguments)
+
+
+def card_labels(screens: dict) -> list[str]:
+    """The four data by the names the Cash register screens give them: the sessions' list, «Open session» and the
+    «Close session» window."""
+    return [
+        screens["sessions"]["columns"]["number"],
+        screens["open"]["register"],
+        screens["close"]["expected"],
+        screens["close"]["difference"],
+    ]
+
+
+def at_the_bar(opening_balance: int = 10000):
+    """A shift open on the drawer «Barra»."""
+    bar = run("cash_register.register.create", {"name": "Barra"})
+    return open_session(opening_balance, register_id=str(bar.id))
+
+
+@pytest.mark.parametrize(("counted", "difference"), [(25000, 14850), (10000, -150)], ids=["over", "short"])
+def test_the_close_card_shows_the_session_its_drawer_the_expected_and_the_difference_as_money(coffee, counted, difference):
+    session = at_the_bar(10000)
+    charge()
+    failure, preview = close_preview({"session": session.number, "closing_balance": counted})
+    assert failure is None
+    # The counted cash is not repeated: the card already lists it from what the close sends.
+    assert [(field["name"], field["kind"], field["value"]) for field in preview] == [
+        ("number", "text", session.number),
+        ("register_name", "text", "Barra"),
+        ("expected_balance", "money", 10150),
+        ("difference", "money", difference),
+    ]
+    assert [field["label"] for field in preview] == card_labels(SCREENS)
+    assert [field["label"] for field in close_preview({"closing_balance": counted}, language="en")[1]] == card_labels(
+        SCREENS_EN
+    )
+    assert assistant.preview_of(get("cash_register.session.close"))["fields"] == PREVIEWED
+
+
+def test_the_card_the_person_sees_carries_that_preview_and_closes_nothing(coffee):
+    session = at_the_bar(10000)
+    charge()
+    plan = turn(call("cash_register.session.close", {"session": session.number, "closing_balance": 25000}))
+    card = plan["confirm"]
+    assert (card["operation"], card["confirm_word"]) == ("cash_register.session.close", "CONFIRMAR")
+    assert [(field["name"], field["value"]) for field in card["preview"]] == [
+        ("number", session.number),
+        ("register_name", "Barra"),
+        ("expected_balance", 10150),
+        ("difference", 14850),
+    ]
+    assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
+
+
+def test_with_a_blind_count_the_cashiers_card_shows_neither_the_expected_nor_the_difference(coffee):
+    # gh:cash_register#24, #84: the card never opens the blind count either.
+    run("cash_register.settings.update", {"require_blind_count": True})
+    session = at_the_bar(10000)
+    charge()
+    failure, preview = close_preview({"session": session.number, "closing_balance": 25000}, role="hub_employee")
+    assert failure is None
+    assert [(field["name"], field["value"]) for field in preview] == [
+        ("number", session.number),
+        ("register_name", "Barra"),
+    ]
+    plan = turn(call("cash_register.session.close", {"closing_balance": 25000}), role="hub_employee")
+    assert [field["name"] for field in plan["confirm"]["preview"]] == ["number", "register_name"]
+    assert "10150" not in json.dumps(plan) and "14850" not in json.dumps(plan)
+    # Whoever may see the expected still gets it on the card.
+    assert [field["name"] for field in close_preview({"closing_balance": 25000}, role="hub_manager")[1]] == PREVIEWED
+
+
+def test_with_the_count_required_a_close_without_a_count_gets_no_card_and_hears_why():
+    open_session(10000)
+    failure, preview = close_preview({})
+    assert (failure.outcome, failure.code, preview) == ("error", "cash_register.closing_balance_required", None)
+    plan = turn(call("cash_register.session.close", {}))
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [
+        ("error", "cash_register.closing_balance_required")
+    ]
+    assert Session.objects.get().status == Session.Status.OPEN
+
+
+def test_a_session_without_a_drawer_shows_no_drawer(coffee):
+    session = open_session(10000)
+    charge()
+    _, preview = close_preview({"closing_balance": 25000})
+    assert [(field["name"], field["value"]) for field in preview] == [
+        ("number", session.number),
+        ("expected_balance", 10150),
+        ("difference", 14850),
+    ]
+
+
+def test_without_the_permission_to_close_there_is_no_preview_nor_card():
+    open_session(10000)
+    cannot = ctx_for("hub_employee", language="es")
+    cannot = cannot.__class__(
+        scope=cannot.scope,
+        actor=cannot.actor,
+        permissions=cannot.permissions - {"cash_register.close_session"},
+        language="es",
+    )
+    failure, preview = close_preview({"closing_balance": 25000}, ctx=cannot)
+    assert (failure.outcome, preview) == ("refused", None)
