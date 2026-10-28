@@ -283,6 +283,9 @@ def test_the_card_the_person_sees_carries_that_preview_and_closes_nothing(coffee
         ("expected_balance", 10150),
         ("difference", 14850),
     ]
+    # The difference reaches the person's card marked signed, the rest not (the turn's schema dropped the mark:
+    # FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN).
+    assert [field["name"] for field in card["preview"] if field["signed"]] == ["difference"]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 

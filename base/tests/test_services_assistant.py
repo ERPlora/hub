@@ -9,13 +9,14 @@ import pytest
 from django.db import connections
 from live.context import OperationContext, Scope
 from live.errors import OperationError, Unauthorized
-from live.operations import get
+from live.operations import get, registry
 
 from base import assistant
 from base.models import Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
+from base.tests.test_assistant import count_preview, declaring
 from base.tests.test_assistant import settle  # noqa: F401 - the fixture: a dangerous write with its preview
 
 pytestmark = pytest.mark.django_db
@@ -168,6 +169,20 @@ def test_a_dangerous_card_carries_what_its_app_says_it_will_do_read_as_the_perso
         ("total_cents", "money", 4200),
     ]
     assert (plan["executed"], plan["append"]) == ([], [])
+
+
+def test_an_amount_its_preview_declares_signed_reaches_the_card_marked_so_and_no_other_does(monkeypatch):
+    """FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN: the turn's card dropped the mark on its way out
+    (its schema had no place for it), so a difference over still came without its «+»."""
+    read = count_preview({"expected_balance": 11210, "difference": 13790})
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, "demo.item.settle", declaring({"operation": read.name, "fields": ["expected_balance", "difference"]}))
+    card = turn(call("demo.item.settle", {"id": "7", "reason": "cierre"}))["confirm"]
+    assert [(field["name"], field["kind"], field["value"], field["signed"]) for field in card["preview"]] == [
+        ("expected_balance", "money", 11210, False),
+        ("difference", "money", 13790, True),
+    ]
+    assert [field["signed"] for field in card["fields"]] == [False, False]
 
 
 def test_a_card_whose_app_declares_no_preview_is_as_before():

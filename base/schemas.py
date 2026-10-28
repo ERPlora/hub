@@ -1394,6 +1394,10 @@ class AssistantFieldOut(Schema):
     label: str
     kind: Literal["text", "money", "bool", "list", "object", "empty"]
     value: Any = None
+    signed: bool = Field(
+        default=False,
+        description="An amount its app declares signed (a difference): written with its sign, «+» over.",
+    )
 
 
 class AssistantMoneyOut(Schema):
