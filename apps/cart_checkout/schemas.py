@@ -17,6 +17,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import AfterValidator, ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -150,6 +151,7 @@ class CartRefIn(In):
     )
     customer: Said | None = Field(
         None,
+        title=gettext_noop("Customer"),
         description="The cart's customer, when neither its id nor its code is known: their exact email "
         "or part of their name (e.g. said aloud).",
     )
@@ -288,7 +290,7 @@ class CartDetailOut(CartOut):
 
 
 class ItemRefIn(In):
-    item_id: UUID = Field(description="The line's id.")
+    item_id: UUID = Field(title=gettext_noop("Cart line"), description="The line's id.")
 
 
 class ItemAddIn(CartRefIn):
@@ -355,7 +357,7 @@ class ItemListIn(PageIn):
 
 
 class OrderRefIn(In):
-    order_id: UUID | None = Field(None, description="The order's id.")
+    order_id: UUID | None = Field(None, title=gettext_noop("Order"), description="The order's id.")
     order_number: Said | None = Field(
         None, description="The order's number (e.g. OS-20261014-0003), when its id is not known."
     )

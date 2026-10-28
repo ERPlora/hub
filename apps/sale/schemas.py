@@ -54,6 +54,8 @@ LINE = gettext_noop("Line")
 OPEN_LINES = gettext_noop("Open-price lines")
 SERVICE_LINES = gettext_noop("Services")
 COMBO_LINES = gettext_noop("Menus")
+# A counter sale's fixed ticket discount, named as an open check's (its model's name is the sale's total, «Discounts»).
+FIXED_DISCOUNT = gettext_noop("Fixed-amount discount")
 
 
 def _text(max_length: int, min_length: int = 0) -> type[str]:
@@ -888,7 +890,7 @@ class ChargeLinesIn(Schema):
         Decimal("0"), description="Counter sale only: ticket discount in %."
     )
     discount_amount: Cents = Field(
-        0, description="Counter sale only: fixed ticket discount in cents."
+        0, title=FIXED_DISCOUNT, description="Counter sale only: fixed ticket discount in cents."
     )
 
     @model_validator(mode="after")
