@@ -667,7 +667,7 @@ class BusinessIn(Schema):
 class BusinessOut(Schema):
     """``base.business.get``: the business as the SaaS registered it, each value named in the person's language."""
 
-    name: str = Field(description="The business's name; empty in a demo.")
+    name: str = Field(description="The business's name (on ERPlora's own hub, its issuer's legal name); empty in a demo.")
     country: str = Field(description="ISO 3166-1 alpha-2; empty in a demo. It no longer changes once the business is ready.")
     country_name: str
     timezone: str = Field(description="IANA time zone: the business's clock (the deployment's when it has none).")
@@ -679,7 +679,7 @@ class BusinessOut(Schema):
     demo: bool = Field(description="A demo has no business on erplora.com: nothing to change there.")
     settings_url: str = Field(
         description="The business's settings on erplora.com, where an owner or an administrator changes its name, time "
-        "zone and language; empty in a demo."
+        "zone and language; empty in a demo and on ERPlora's own hub."
     )
 
 

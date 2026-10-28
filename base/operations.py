@@ -10,7 +10,8 @@ An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The pl
 (``settings.PLATFORM_HOST_LABEL`` on the base domain, ``hubs.erplora.com``: the Hub admin, PLAN §18.1)
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
-:func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it).
+:func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it), and
+:func:`business_currency` the currency its business charges in (``base.business.get``, read as the platform).
 This is the only piece phase 2 replaces (scope = ``use_hub``): from S1, :meth:`HubContextBuilder.enter` gives a live
 re-run its hub's database (the request's own is ``base.middleware.HubDatabaseMiddleware``'s).
 """
@@ -25,8 +26,9 @@ from django.conf import settings
 from django.db import DatabaseError
 from django.http import Http404, HttpRequest
 from django.utils.translation import gettext
-from live.context import OperationContext, Scope
+from live.context import OperationContext, Scope, system_context
 from live.errors import NotFound, Unauthorized
+from live.operations import get as get_operation
 from live.slugs import validate_hub_slug
 
 from base import registry
@@ -82,6 +84,20 @@ def is_platform_hub(scope: Scope) -> bool:
     """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices (PLAN-SAAS §4;
     ``control.Hub.is_platform`` in phase 2). Phase 1 names it by its reserved slug, ``PLATFORM_HUB_SLUG``."""
     return scope.key == settings.PLATFORM_HUB_SLUG
+
+
+#: The operation that answers a hub's business (``business_currency``).
+BUSINESS = "base.business.get"
+
+
+def business_currency(scope: Scope) -> str:
+    """The currency (ISO 4217) ``scope``'s business charges in, as ``base.business.get`` answers it: its country's;
+    on ERPlora's own hub, its issuer's country's (``PLATFORM_ISSUER_COUNTRY``), as its invoices; a demo without a
+    country, the euro. Read as the platform: an API key holds only the permissions of what it charges, and every
+    person of the hub may see it anyway. A scope that is no hub's has none: the operation's ``NotFound``, never a
+    silent euro. The one question every app that charges asks (BASE-F50)."""
+    read = get_operation(BUSINESS)
+    return read(system_context(scope), read.input()).currency
 
 
 def _host_name(request: HttpRequest) -> str:

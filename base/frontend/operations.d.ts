@@ -323,7 +323,7 @@ export interface HubReset {
 
 /** `base.BusinessOut`: the business as erplora.com registered it, each value named in the person's language. */
 export interface Business {
-  /** Empty in a demo. */
+  /** On ERPlora's own hub, its issuer's legal name; empty in a demo. */
   name: string;
   /** ISO 3166-1 alpha-2; empty in a demo. */
   country: string;
@@ -338,7 +338,7 @@ export interface Business {
   currency_label: string;
   currency_decimals: number;
   demo: boolean;
-  /** The business's settings on erplora.com; empty in a demo. */
+  /** The business's settings on erplora.com; empty in a demo and on ERPlora's own hub. */
   settings_url: string;
 }
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:afd6d3b831a756caf4aa1973675a448b59574abf99bc5e1fc6ef61e973d0e631 -->
+<!-- generated from WORKBOOK.md sha256:7d488d2034ee7643f784191677dbe74ee11112b235ea90e85b4ddbe1b9a91526 -->
 
 ## What it is for and who it is for
 
@@ -1358,7 +1358,7 @@ has no country: "—".
 Involved: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 See the business's currency
-Status: partial — the Home already writes its amounts in the business's currency, but the apps (Sales, Cash register, Invoicing, Inventory) still in euros even when the business's country pays in another currency: it fits Spain and Portugal, not a country of another currency
+Status: partial — the Home, Sales & POS, Cash register, Invoicing, Inventory, Price Lists, Printing, Kitchen and Modifiers are already in the business's currency, but Payments, Cart & Checkout, Appointments, Menus and combos and Customers still in euros even when the business's country pays in another currency: it fits Spain and Portugal, not a country of another currency
 Actor: owner, administrator, manager, employee
 Screen: Settings · Business; Home · Summary and Home · Activity
 Steps:
