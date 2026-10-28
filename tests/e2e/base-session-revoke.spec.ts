@@ -141,8 +141,10 @@ async function atEverySize(page: Page, key: string, ready: () => Promise<void>):
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-// Two accounts per run: the SaaS lets 10 sign-ups an hour from one address (`ACCOUNT_RATE_LIMITS`), and an account
-// owns one free business. The role changes first, then the same person is removed: one business, in this order.
+// Two accounts per run, the owner and the employee: an account owns one free business. The SaaS limits sign-ups per
+// address (`ACCOUNT_RATE_LIMITS`): 10 an hour, or no practical limit on a SaaS started with
+// `E2E_RELAX_LOGIN_RATE_LIMIT=True`, as the README's stacks are. The role changes first, then the same person is
+// removed: one business, in this order.
 test.describe.configure({ mode: 'serial' });
 
 let owner: Person;

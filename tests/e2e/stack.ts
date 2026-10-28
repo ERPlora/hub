@@ -3,7 +3,8 @@
 // runserver keeps :8000) starts its own with other ports and its own database, and points the specs
 // at it with the same variables Django and Vite read: `E2E_HUB_PORT` (runserver's port, only the
 // specs need it), `VITE_DEV_PORT` (`config/settings.py`, `vite.config.ts`), `SAAS_URL` and `DB_NAME`
-// (`config/settings.py`). runserver restarted by a spec (`startRunserver`) inherits them.
+// (`config/settings.py`). runserver restarted by a spec (`startRunserver`) inherits them. Its SaaS keeps its accounts
+// in `saasDatabase` (`E2E_SAAS_DB`, by default `saas` on :8000 and `saas_e2e_<port + 1>` beside it).
 //
 // A stack beside the shared one runs on its own e2e database (`hub_e2e_<port>`, `database.ts` creates
 // and migrates it): on 2026-10-16 two stacks (8030 and 8040) ran on the default `hub` and the cash sale
@@ -21,6 +22,9 @@ export interface Stack {
   saas: string;
   /** The hub's database, for `psql` (`DB_NAME`). */
   database: string;
+  /** The SaaS's database, where its demo accounts live: `E2E_SAAS_DB`, else `saas` beside the shared Hub on :8000 and
+   *  `saas_e2e_<hubPort + 1>` for a stack of its own (README «Varias ejecuciones a la vez»). */
+  saasDatabase: string;
   /** `http://127.0.0.1:<hubPort>/healthz`. */
   healthz: string;
   /** Vite's client module: it answers once Vite listens. */
@@ -93,6 +97,7 @@ export function stackFrom(env: Env): Stack {
     vitePort,
     saas: origin(env, 'SAAS_URL', 'http://localhost:8001'),
     database: databaseOf(env, hubPort),
+    saasDatabase: database(env, 'E2E_SAAS_DB', hubPort === SHARED_PORT ? 'saas' : `saas_e2e_${hubPort + 1}`),
     healthz: `http://127.0.0.1:${hubPort}/healthz`,
     viteClient: `http://localhost:${vitePort}/static/spa/@vite/client`,
     hub: (slug: string) => `http://${slug}.localhost:${hubPort}`,
