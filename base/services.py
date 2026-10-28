@@ -1974,6 +1974,8 @@ def _person_answer(ctx: OperationContext, person_id: str) -> dict:
         "description": "Takes a person's PIN away (a forgotten or shared one): they stop entering with it at the "
         "shared tills and keep entering with their erplora.com account. The owner's, only the owner.",
         "risk": "high",
+        # The card names whose PIN goes, not the id the model sends (BASE-F98).
+        "preview": {"operation": "base.person.detail", "fields": ["name", "email"]},
     },
 )
 def person_pin_remove(ctx: OperationContext, data: PersonIn) -> dict:
@@ -2594,7 +2596,8 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.Tool
 
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
     """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card)``: the card when the
-    write still waits for its answer."""
+    write still waits for its answer, with what it will do when its app declares a preview (BASE-F98); one that
+    cannot be read is the write's outcome, and no card is shown."""
     op = assistant.operation_of(call.name, tools)
     if op is None:
         return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None
@@ -2610,7 +2613,12 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
         return assistant.run_tool(ctx, op, call.arguments), None
     card = assistant.card(op, arguments, ctx.language)
     if decision is None or decision.call_id != call.call_id:
-        return None, card
+        if card["blocked"]:
+            return None, card
+        failure, preview = assistant.preview(ctx, op, arguments)
+        if failure is not None:
+            return failure, None
+        return None, {**card, "preview": preview}
     if card["blocked"]:
         return _assistant_refusal("cancelled", "base.assistant_not_from_chat", NOT_FROM_THE_CHAT), None
     if decision.stop:

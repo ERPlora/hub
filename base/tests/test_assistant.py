@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 from live.context import OperationContext, Scope
+from live.errors import OperationError
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
 
@@ -307,6 +308,164 @@ def test_the_typed_confirmation_is_compared_as_the_platforms_dialog_does():
     assert not assistant.confirmed(card, "")
     normal = assistant.card(get("demo.item.create"), {"name": "x"}, "es")
     assert assistant.confirmed(normal, "")
+
+
+# ── What a dangerous write will do, before it is confirmed (BASE-F98) ────────────────────────────────────────────
+# FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what the write sends; the close of
+# the drawer could not show the expected cash, nor a rectification the invoice it issues. A dangerous write may name,
+# in its ``ai=``, a read of its own app that tells what it will do (``preview``): run as the person who asks, with
+# the data of the write its input takes, before the card.
+
+
+class SettleIn(Schema):
+    id: str = Field(min_length=1)
+    reason: str = ""
+
+
+class SettlePreviewIn(Schema):
+    id: str = Field(min_length=1)
+
+
+class SettlePreviewOut(Schema):
+    name: str = Field(title="Owner")
+    total_cents: int
+    expected_balance: int | None = Field(description="The cash there should be, in cents; none when it is hidden.")
+    asked_by: str = Field(title="Person")
+    note: str = ""
+
+
+def settle_preview(ctx, data):
+    if data.id == "gone":
+        raise OperationError("This item is not there any more.", code="demo.item_not_found", status=404)
+    return {"name": f"Item {data.id}", "total_cents": 4200, "expected_balance": None, "asked_by": ctx.actor, "note": ""}
+
+
+PREVIEW_FIELDS = ["name", "total_cents", "expected_balance", "asked_by", "note"]
+SETTLE_PREVIEW = Operation(
+    name="demo.item.settle_preview",
+    kind="query",
+    permission="demo.view",
+    input=SettlePreviewIn,
+    output=SettlePreviewOut,
+    expose_api=False,
+    ai={"description": "What settling a demo item would do."},
+    fn=settle_preview,
+)
+SETTLE = Operation(
+    name="demo.item.settle",
+    kind="command",
+    permission="demo.manage",
+    input=SettleIn,
+    output=SettlePreviewOut,
+    expose_api=False,
+    ai={
+        "description": "Settles a demo item.",
+        "risk": "high",
+        "preview": {"operation": "demo.item.settle_preview", "fields": PREVIEW_FIELDS},
+    },
+    fn=lambda ctx, data: settle_preview(ctx, data),
+)
+
+
+@pytest.fixture
+def settle(monkeypatch):
+    """The write and its preview, registered as an app's would be."""
+    monkeypatch.setitem(registry, SETTLE.name, SETTLE)
+    monkeypatch.setitem(registry, SETTLE_PREVIEW.name, SETTLE_PREVIEW)
+    return SETTLE
+
+
+def shown(fields: list[dict]) -> list[tuple]:
+    return [(field["name"], field["kind"], field["value"]) for field in fields]
+
+
+@pytest.mark.django_db
+def test_a_dangerous_write_shows_what_its_app_says_it_will_do_read_as_the_person(settle):
+    """In the order its app names them, by their names in the person's language, an amount in cents as money; what
+    the read hides from this person (none, as a blind count's expected cash) or leaves empty is not there."""
+    failure, fields = assistant.preview(ctx(language="es"), settle, {"id": "7", "reason": "cierre"})
+    assert failure is None
+    assert shown(fields) == [("name", "text", "Item 7"), ("total_cents", "money", 4200), ("asked_by", "text", "ana")]
+    assert (fields[0]["label"], fields[2]["label"]) == ("Propietario", "Persona")
+    _, english = assistant.preview(ctx(language="en", actor="eva"), settle, {"id": "7"})
+    assert [(field["label"], field["value"]) for field in english if field["name"] == "asked_by"] == [("Person", "eva")]
+
+
+def test_a_write_without_a_preview_reads_nothing_and_its_card_is_as_before():
+    assert assistant.preview(ctx(), get("demo.item.delete"), {"id": "x"}) == (None, None)
+    assert set(assistant.card(get("demo.item.delete"), {"id": "x"}, "es")) == {
+        "operation", "app", "app_name", "action", "risk", "fields", "count", "confirm_word", "blocked",
+    }
+
+
+@pytest.mark.django_db
+def test_a_preview_the_person_may_not_read_is_refused_never_read_for_them(settle):
+    """The read runs with the person's own session and permissions, as its screen would: never with more."""
+    failure, fields = assistant.preview(ctx({"base.view_home", "demo.manage"}), settle, {"id": "7"})
+    assert (failure.outcome, failure.code, fields) == ("refused", "permission_denied", None)
+
+
+@pytest.mark.django_db
+def test_a_preview_that_fails_says_why_never_an_empty_one(settle):
+    failure, fields = assistant.preview(ctx(), settle, {"id": "gone"})
+    assert (failure.outcome, failure.code, fields) == ("error", "demo.item_not_found", None)
+    assert json.loads(failure.content)["error"]["message"] == "This item is not there any more."
+
+
+@pytest.mark.django_db
+def test_a_preview_whose_data_do_not_fit_comes_back_with_the_field(settle):
+    failure, fields = assistant.preview(ctx(), settle, {"reason": "sin id"})
+    assert (failure.outcome, failure.code, fields) == ("error", "invalid_payload", None)
+    assert "id" in json.loads(failure.content)["error"]["fields"]
+
+
+def preview_errors() -> list:
+    from django.core import checks
+
+    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E005"]
+
+
+def declaring(preview, *, risk="high", input=SettleIn) -> Operation:
+    return Operation(
+        name="demo.item.settle",
+        kind="command",
+        permission="demo.manage",
+        input=input,
+        output=SettlePreviewOut,
+        expose_api=False,
+        ai={"description": "Settles a demo item.", "risk": risk, "preview": preview},
+        fn=lambda ctx, data: data,
+    )
+
+
+class NoIdIn(Schema):
+    reason: str = ""
+
+
+@pytest.mark.parametrize(
+    "write, why",
+    [
+        (declaring({"operation": "demo.item.nothing", "fields": ["name"]}), "no operation demo.item.nothing"),
+        (declaring({"operation": "base.business.get", "fields": ["name"]}), "of another app"),
+        (declaring({"operation": "demo.item.create", "fields": ["name"]}), "not a read"),
+        (declaring({"operation": "demo.item.settle_preview", "fields": ["name", "total"]}), "no field total"),
+        (declaring({"operation": "demo.item.settle_preview", "fields": []}), "names no field"),
+        (declaring("demo.item.settle_preview"), "operation and fields"),
+        (declaring({"operation": "demo.item.settle_preview", "fields": ["name"]}, input=NoIdIn), "takes id"),
+        (declaring({"operation": "demo.item.settle_preview", "fields": ["name"]}, risk="normal"), "not dangerous"),
+    ],
+)
+def test_a_preview_is_checked_at_start(monkeypatch, write, why):
+    """Like ``ai=`` itself (live's E017): a preview that names no read of its own app, a datum its read does not give,
+    data its write does not have, or that a normal write's one-line card would never show, is said at start."""
+    monkeypatch.setitem(registry, SETTLE_PREVIEW.name, SETTLE_PREVIEW)
+    monkeypatch.setitem(registry, write.name, write)
+    [error] = preview_errors()
+    assert "demo.item.settle" in error.msg and why in error.msg
+
+
+def test_the_previews_of_today_are_declared_right(settle):
+    assert preview_errors() == []
 
 
 # ── A tool runs as the person, by its own operation (BASE-G115, G118) ────────────────────────────────────────────

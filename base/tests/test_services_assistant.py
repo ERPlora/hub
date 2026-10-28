@@ -12,9 +12,11 @@ from live.errors import OperationError, Unauthorized
 from live.operations import get
 
 from base import assistant
+from base.models import Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
+from base.tests.test_assistant import settle  # noqa: F401 - the fixture: a dangerous write with its preview
 
 pytestmark = pytest.mark.django_db
 
@@ -149,6 +151,52 @@ def test_a_dangerous_write_runs_only_with_the_word_typed():
     right = turn(delete, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     assert right["executed"][0]["outcome"] == "ok"
     assert "Barra" not in items()
+
+
+# ── What a dangerous write will do, on its card (BASE-F98) ───────────────────────────────────────────────────────
+
+
+def test_a_dangerous_card_carries_what_its_app_says_it_will_do_read_as_the_person(settle):
+    """FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the expected cash of a close, the invoice a
+    rectification issues… inside the card, before the word is typed; what the read hides is not there."""
+    plan = turn(call("demo.item.settle", {"id": "7", "reason": "cierre"}))
+    card = plan["confirm"]
+    assert (card["operation"], card["confirm_word"], card["money"]) == ("demo.item.settle", "CONFIRMAR", {"currency": "EUR", "decimals": 2})
+    assert [(field["name"], field["kind"], field["value"]) for field in card["preview"]] == [
+        ("name", "text", "Item 7"),
+        ("total_cents", "money", 4200),
+        ("asked_by", "text", "ana"),
+    ]
+    assert (plan["executed"], plan["append"]) == ([], [])
+
+
+def test_a_card_whose_app_declares_no_preview_is_as_before():
+    created = run("demo.item.create", name="Barra")
+    assert turn(call("demo.item.delete", {"id": created["id"]}))["confirm"]["preview"] is None
+
+
+def test_a_preview_that_cannot_be_read_shows_no_card_does_nothing_and_says_why(settle):
+    """Nothing is confirmed blind: the write is not done, its receipt says it failed, and the model hears why (the
+    read's own error) to tell the person, as when the write itself refuses."""
+    plan = turn(call("demo.item.settle", {"id": "gone"}))
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    [row] = plan["executed"]
+    assert (row["name"], row["kind"], row["outcome"], row["code"]) == ("demo.item.settle", "command", "error", "demo.item_not_found")
+    assert json.loads(plan["append"][0]["content"])["error"]["message"] == "This item is not there any more."
+
+
+def test_a_preview_the_person_may_not_read_shows_no_card(settle):
+    plan = turn(call("demo.item.settle", {"id": "7"}), permissions={"base.view_home", "demo.manage"})
+    assert plan["confirm"] is None
+    assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("refused", "permission_denied")
+
+
+def test_taking_a_pin_away_names_whose_it_is(make_user):
+    """Base's own: the card of «Remove the PIN» named the person by the id the model sent («saas:3»)."""
+    make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil", email="eva@example.com")
+    admin = {"base.view_home", "base.administer_hub"}
+    card = turn(call("base.person.pin_remove", {"person": "saas:3"}), permissions=admin)["confirm"]
+    assert {field["name"]: field["value"] for field in card["preview"]} == {"name": "Eva Gil", "email": "eva@example.com"}
 
 
 def test_each_write_of_a_chain_asks_its_own_yes():
