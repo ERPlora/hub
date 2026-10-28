@@ -2885,7 +2885,14 @@ Implicados: ACCOUNTS-F38
   pantallas en la fase 1 (`erplora` es un slug reservado: 404). La moneda que cobra cada app es
   `base.operations.business_currency(scope)`: la de `base.business.get` leída como la plataforma (`system_context`;
   una API key solo tiene los permisos de lo que cobra) y, en un ámbito que no es de ningún hub, su `NotFound`, nunca un
-  `EUR` por defecto (`base/tests/test_business_currency.py`). Ventas, Facturación, Inventario, Tarifas e Impresión aún
+  `EUR` por defecto (`base/tests/test_business_currency.py`). Un importe con su moneda lo escribe el servidor solo con
+  `base.business.money_text(cents, currency)` (unidad menor → texto con los decimales de la moneda, en el idioma activo
+  o el que se le pase), igual que `Intl.NumberFormat` en el navegador: el patrón de CLDR por Babel más el espaciado de
+  moneda de CLDR, que Babel no aplica («PLN 15.50» con U+00A0, nunca «PLN15.50»; «€15.50»; «15,50 PLN»), y
+  `grouped=False` para la exportación que su importación relee (flujo money-text). Lo usan el aviso y el tique de
+  Ventas, el documento de Facturación, la exportación de Inventario, la web pública y los huecos de las aprobaciones;
+  `tests/test_guardrails_money.py` no deja llamar a `format_currency` ni a `get_currency_symbol` de Babel fuera de él.
+  Ventas, Facturación, Inventario, Tarifas e Impresión aún
   llevan su propia copia, `business_currency(ctx)`, que contesta lo mismo; Pagos, Carrito y pago, Citas, Menús y combos y Clientes
   aún cobran en `EUR` (BASE-F50 `parcial`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.

@@ -8,11 +8,10 @@ the server's; this only lays them out, in units (the renderer prints major-unit 
 
 from decimal import Decimal
 
-from babel.numbers import format_currency
-from django.utils import translation
 from django.utils.translation import gettext
 
 from apps.sale.schemas import PreviewOut, SaleOut
+from base.business import money_text
 
 #: The legal texts of the fiscal QR (Orden HAC/1177/2024 art. 20.1.b and 21.1; RD 1619/2012 art. 6.5.b): the
 #: AEAT fixes them in Spanish, whatever the paper's language.
@@ -35,10 +34,6 @@ def _business(header: str) -> dict:
     if lines[1:]:
         business["business_address"] = "\n".join(lines[1:])
     return business
-
-
-def _money(amount: int, currency: str, decimals: int) -> str:
-    return format_currency(Decimal(amount).scaleb(-decimals), currency, locale=translation.to_locale(translation.get_language() or "en"))
 
 
 def _item(line, decimals: int) -> dict:
@@ -113,7 +108,7 @@ def receipt(
     if sale.discount_amount > 0:
         said.append(
             gettext("Discount of %(amount)s, already applied to the amounts above.")
-            % {"amount": _money(sale.discount_amount, sale.currency, decimals)}
+            % {"amount": money_text(sale.discount_amount, sale.currency)}
         )
     if (footer or "").strip():
         said.append(footer.strip())

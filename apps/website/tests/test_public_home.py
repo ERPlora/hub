@@ -145,7 +145,7 @@ def test_the_page_prices_in_the_business_s_currency_and_follows_a_change_of_its_
     assert "€15.00" in visit(client).content.decode()
     Hub.objects.filter(slug="a").update(country="PL")
     page = visit(client).content.decode()
-    assert "PLN15.00" in page and "€" not in page
+    assert "PLN\xa015.00" in page and "€" not in page
     assert cache.get(page_cache_key("a", 1, "en", local_day(""), "PLN")) is not None
 
 

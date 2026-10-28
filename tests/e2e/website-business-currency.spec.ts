@@ -21,7 +21,7 @@ const WIDE = { width: 1440, height: 900 };
 const TAG = `E2E-WSCUR-${Date.now().toString(36)}`;
 /** The run's service: 1550 in the currency's minor unit, 15.50 in złoty or in euros. */
 const SERVICE = `${TAG} Haircut`;
-/** 15.50 as the page prints it for a visitor speaking English (`babel`: «PLN15.50», «€15.50»). */
+/** 15.50 as the page prints it for a visitor speaking English (as Intl: «PLN 15.50», «€15.50»; flow money-text). */
 const ZLOTY = /PLN\s?15\.50/;
 const EUROS = /€\s?15\.50/;
 
