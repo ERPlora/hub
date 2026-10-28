@@ -97,6 +97,7 @@ for (const viewport of VIEWPORTS) {
       await editor.locator('[data-testid=flow-assistant-prompt-s1-text-0]').fill('E2E-ASK task__task__list {}');
       await pick(page, 'flow-assistant-addtool-s1', 'Look for tasks', 'Look for tasks');
       await expect(editor.locator('[data-testid="flow-assistant-tool-s1-task.task.list"]')).toHaveText('Look for tasks');
+      await expect(editor.locator('[data-testid=flow-assistant-addtool-s1] input')).toHaveValue('');
       await expect(editor.locator('[data-testid=flow-assistant-modehint-s1]')).toHaveText(
         'A change it wants waits for a yes in Automations, under «Waiting for your answer». What it only looks up never waits.',
       );

@@ -6,7 +6,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
 import { asCallText } from '../lib/document';
@@ -48,12 +48,15 @@ function change(patch: Partial<AssistantStep>): void {
   emit('update:step', { ...props.step, ...patch });
 }
 
-/** Bumped on every addition: a fresh search, empty, so what was typed never looks like a value of the step. */
-const added = ref(0);
+/** What the search holds: the option just chosen, then nothing again, so its field empties (the Combo empties it when
+ *  its value goes back to none) and what was added never looks like a value of the field. */
+const chosen = ref<ComboOption | null>(null);
 
-function addTool(option: ComboOption | null): void {
+async function addTool(option: ComboOption | null): Promise<void> {
+  chosen.value = option;
   if (option && !props.step.tools.includes(String(option.id))) change({ tools: [...props.step.tools, String(option.id)] });
-  added.value += 1;
+  await nextTick();
+  chosen.value = null;
 }
 
 function setRounds(text: string | null | undefined): void {
@@ -108,9 +111,8 @@ function setRounds(text: string | null | undefined): void {
         :data-testid="`flow-assistant-notools-${id}`"
       >{{ $t('flow.assistant.noTools') }}</span>
       <Combo
-        :key="added"
         :testid="`flow-assistant-addtool-${id}`"
-        :model-value="null"
+        :model-value="chosen"
         :options="addable"
         :label="$t('flow.assistant.addTool')"
         :placeholder="$t('flow.assistant.chooseTool')"

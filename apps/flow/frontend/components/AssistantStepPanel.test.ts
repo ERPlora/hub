@@ -39,9 +39,13 @@ describe('AssistantStepPanel', () => {
     expect((combo.props('options') as { id: string }[]).map((option) => option.id)).toEqual(['task.task.create']);
     combo.vm.$emit('update:modelValue', { id: 'task.task.create', label: 'Create' });
     expect(s.emitted().at(-1)).toMatchObject({ tools: ['task.task.list', 'task.task.create'] });
-    // Once added, the search starts empty again: what was typed is no value of the step.
+    // Once added, the search holds the choice and then nothing again (the Combo empties its field), the same Combo:
+    // never a new one over the old one's open list.
     await s.wrapper.vm.$nextTick();
-    expect(s.wrapper.findComponent({ name: 'Combo' }).vm.$.uid).not.toBe(combo.vm.$.uid);
+    expect(combo.props('modelValue')).toMatchObject({ id: 'task.task.create' });
+    await new Promise((resolve) => setTimeout(resolve));
+    const after = s.wrapper.findComponent({ name: 'Combo' });
+    expect([after.vm.$.uid, after.props('modelValue')]).toEqual([combo.vm.$.uid, null]);
     await s.find('flow-assistant-tool-remove-s1-task.task.list').trigger('click');
     expect(s.emitted().at(-1)).toMatchObject({ tools: [] });
   });
