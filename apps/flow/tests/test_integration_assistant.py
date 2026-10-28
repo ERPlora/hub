@@ -2,15 +2,22 @@
 base's half is hub#258): in Spanish, by the name the Automations screens give it, never by the title pydantic makes up
 from the field («Actor», «Draft Id», «Event Id»). The card is base's (``base.assistant.card``); the names are flow's: the
 titles of its schemas and the ``verbose_name`` of its models, with their Spanish in its catalog. Where the editor
-already has words for the datum (``flow.fields.<name>``, ``frontend/locale/{en,es}.json``), the card says the same."""
+already has words for the datum (``flow.fields.<name>``, ``frontend/locale/{en,es}.json``), the card says the same.
+
+And which writes are tools at all: what only the platform runs (the outbox relay, the worker, the scheduled tasks,
+under ``flow.system``) is «System only», and a secret's value is never asked for in a chat («Not an assistant tool»:
+the person types it in the automation's step) — not even who may do everything is offered them."""
 
 import gettext
 import json
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from live.operations import get, registry
 
+from apps.flow.queries import SYSTEM
+from apps.flow.tests.conftest import ctx_for
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
@@ -22,6 +29,37 @@ SCREENS_EN = json.loads((APP / "frontend/locale/en.json").read_text())["flow"]
 TOOLS = sorted(
     name for name, op in registry.items() if op.app_label == "flow" and op.kind == "command" and assistant.is_tool(op)
 )
+#: The writes of Automations only the platform runs: the outbox relay, the worker and the scheduled tasks.
+PLATFORM = sorted(
+    name for name, op in registry.items() if op.app_label == "flow" and op.kind == "command" and op.permission == SYSTEM
+)
+#: What the assistant is never offered: the platform's writes and saving a secret, whose value is typed on the screen.
+NEVER_TOOLS = [*PLATFORM, "flow.secret.set"]
+
+
+def test_what_only_the_platform_runs_is_system_only():
+    """A write under ``flow.system`` reacts to the outbox, makes a run's call or runs a scheduled task: in the hands of
+    the assistant it could start automations or make up how a call ended. «System only» keeps it out of every
+    catalogue, the next one too."""
+    assert {"flow.run.react", "flow.run.record_call", "flow.schedule.fire_due"} <= set(PLATFORM)  # positive control
+    assert [name for name in PLATFORM if not assistant.description(get(name)).startswith("System only")] == []
+
+
+def test_a_secrets_value_is_never_asked_for_in_a_chat():
+    """A secret said in a chat has already reached the model and the history: the person types it in the automation's
+    step, on the screen (as ChatGPT's actions, Zapier or Make ask for credentials: in their form, never in the chat)."""
+    secret = get("flow.secret.set")
+    assert assistant.description(secret).startswith("Not an assistant tool")
+    assert not assistant.is_tool(secret)
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("permissions", [None, {"*"}], ids=["owner", "superuser"])
+def test_not_even_who_may_do_everything_is_offered_them(permissions):
+    tools = assistant.catalog(ctx_for("hub_owner", permissions=permissions))
+    assert {"flow.flow.create", "flow.question.answer"} <= set(tools)  # positive control: flow's tools are offered
+    assert sorted(set(NEVER_TOOLS) & set(tools)) == []
+    assert [name for name in NEVER_TOOLS if assistant.is_tool(get(name))] == []
 
 
 def labels(card: dict) -> list[str]:
@@ -46,7 +84,7 @@ def test_no_datum_of_a_write_of_flow_reaches_a_spanish_card_by_its_technical_nam
     """Every write of flow the assistant may ask for, with all its data: each datum by a name of its own in Spanish,
     never the one pydantic makes up. By where the name comes from, not by the word."""
     screen = named_by_the_screen()
-    assert len(TOOLS) >= 20  # positive control: the registry has flow's writes
+    assert len(TOOLS) >= 15  # positive control: the registry has flow's writes
     technical: dict[str, list[str]] = {}
     for name in TOOLS:
         op = get(name)
