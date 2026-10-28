@@ -231,7 +231,8 @@ class Order(UUIDModel):
     discount_percent = models.DecimalField(
         _("discount (%)"), default=Decimal("0"), **PERCENT
     )
-    discount_amount = models.PositiveBigIntegerField(_("discount (cents)"), default=0)
+    # In whole minor units of the business's currency (not always the cent): its name never says the unit.
+    discount_amount = models.PositiveBigIntegerField(_("fixed-amount discount"), default=0)
     discount_approved_by = models.CharField(
         _("discount approved by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )

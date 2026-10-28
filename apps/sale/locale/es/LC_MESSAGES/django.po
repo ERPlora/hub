@@ -215,8 +215,8 @@ msgstr "cita"
 msgid "discount (%)"
 msgstr "descuento (%)"
 
-msgid "discount (cents)"
-msgstr "descuento (céntimos)"
+msgid "fixed-amount discount"
+msgstr "descuento de importe fijo"
 
 msgid "discount approved by"
 msgstr "descuento autorizado por"
