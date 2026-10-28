@@ -12,11 +12,11 @@ from live.errors import OperationError, Unauthorized
 from live.operations import get, registry
 
 from base import assistant
-from base.models import Membership
+from base.models import Hub, Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
-from base.tests.test_assistant import count_preview, declaring
+from base.tests.test_assistant import PricedPreviewOut, count_preview, declaring
 from base.tests.test_assistant import settle  # noqa: F401 - the fixture: a dangerous write with its preview
 
 pytestmark = pytest.mark.django_db
@@ -81,6 +81,19 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "demo__item__create" in names
     assert "Spanish" in plan["instructions"]
     assert (plan["append"], plan["executed"], plan["confirm"], plan["pending"]) == ([], [], None, [])
+    # The business's currency with its decimals: an amount in its minor unit
+    # (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY).
+    assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
+
+
+def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a yen business has no cents, so its turn
+    tells the model «17 JPY → 17» (``base.business.get``'s ``currency_decimals``), never a fixed «.00 → 1700»;
+    the card's money carries the same decimals."""
+    Hub.objects.filter(slug="a").update(country="JP")
+    plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
+    assert "17 JPY → 17" in plan["instructions"]
+    assert plan["confirm"]["money"] == {"currency": "JPY", "decimals": 0}
 
 
 # ── Reads run by themselves (BASE-G115) ──────────────────────────────────────────────────────────────────────────
@@ -98,6 +111,7 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
             "name": "demo.item.list",
             "app": "demo",
             "app_name": "Demo",
+            "screen": "",
             "kind": "query",
             "outcome": "ok",
             "code": "",
@@ -185,6 +199,26 @@ def test_an_amount_its_preview_declares_signed_reaches_the_card_marked_so_and_no
     assert [field["signed"] for field in card["fields"]] == [False, False]
 
 
+def test_an_amount_of_a_preview_reaches_the_card_in_the_currency_its_read_answers(monkeypatch):
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: the turn's card keeps the currency of each
+    amount of the preview (the read's, here złoty) beside the business's (euros) for what the write sends."""
+    read = count_preview(
+        {"note": "R1", "total_cents": -12100, "difference": 4200, "currency": "PLN", "currency_decimals": 2},
+        PricedPreviewOut,
+    )
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, "demo.item.settle", declaring({"operation": read.name, "fields": ["note", "total_cents", "difference"]}))
+    card = turn(call("demo.item.settle", {"id": "7", "reason": "cierre"}))["confirm"]
+    pln = {"currency": "PLN", "decimals": 2}
+    assert card["money"] == {"currency": "EUR", "decimals": 2}
+    assert [(field["name"], field["kind"], field["signed"], field["money"]) for field in card["preview"]] == [
+        ("note", "text", False, None),
+        ("total_cents", "money", False, pln),
+        ("difference", "money", True, pln),
+    ]
+    assert [field["money"] for field in card["fields"]] == [None, None]
+
+
 def test_a_card_whose_app_declares_no_preview_is_as_before():
     created = run("demo.item.create", name="Barra")
     assert turn(call("demo.item.delete", {"id": created["id"]}))["confirm"]["preview"] is None
@@ -246,6 +280,18 @@ def test_the_receipt_names_where_it_happened_in_the_persons_language():
     assert (plan["executed"][0]["outcome"], plan["executed"][0]["app_name"]) == ("cancelled", "Ajustes")
     written = turn(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
     assert written["executed"][0]["app_name"] == "Demo"
+
+
+def test_the_receipt_carries_the_platforms_screen_by_its_key_for_the_screen_to_name_it_in_its_own_language():
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY (seen on its e2e): a receipt kept from a turn
+    in English, read once the person had switched to Spanish, said «No se hizo, cancelado: Rectificar en Invoicing» —
+    its name came written in the turn's language. The platform's screen goes by its key too (``screen``), the one the
+    screen names in its own language; an app's, none (its menu names it)."""
+    admin = {"base.view_home", "base.administer_hub"}
+    pin = turn(call("base.access.settings_update", {"pin_length": 6}), decision={"call_id": "c1", "accepted": False}, permissions=admin)
+    assert (pin["executed"][0]["app"], pin["executed"][0]["screen"]) == ("base", "settings")
+    written = turn(call("demo.item.create", {"name": "Mesa 4"}), decision={"call_id": "c1", "accepted": True})
+    assert (written["executed"][0]["app"], written["executed"][0]["screen"]) == ("demo", "")
 
 
 def test_a_tool_that_does_not_exist_is_refused_with_its_own_name():

@@ -43,6 +43,7 @@ from live.operations import Operation, registry
 
 from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
+from base.business import currency_decimals
 from base.operations import HostScopeResolver
 
 #: The tools a turn offers at most: the gateway takes 256, the model chooses better among a few.
@@ -272,7 +273,9 @@ def _label(op: Operation, name: str, title: str | None) -> str:
     return gettext(title or _generated_title(name))
 
 
-def _field(name: str, label: str, prop: dict, value: Any) -> dict:
+def _field(name: str, label: str, prop: dict, value: Any, money: dict | None = None) -> dict:
+    """One datum of a card; an amount carries ``signed`` when its schema declares it so and ``money`` when it is in a
+    currency of its own (a preview's, as its read answers it): without it, the card paints it in the business's."""
     if value is None or value == "" or value == []:
         kind = "empty"
     elif isinstance(value, bool):
@@ -286,7 +289,11 @@ def _field(name: str, label: str, prop: dict, value: Any) -> dict:
     else:
         kind = "text"
     field = {"name": name, "label": label, "kind": kind, "value": value}
-    return {**field, "signed": True} if kind == "money" and _is_signed(prop) else field
+    if kind == "money" and _is_signed(prop):
+        field["signed"] = True
+    if kind == "money" and money is not None:
+        field["money"] = money
+    return field
 
 
 def card(op: Operation, arguments: dict, language: str) -> dict:
@@ -343,40 +350,59 @@ APPS = pgettext_lazy("base", "Apps")
 #: The user menu's «Report a problem» (BASE-F108), a dialog of its own.
 REPORT_A_PROBLEM = pgettext_lazy("base", "Report a problem")
 
+#: The platform's screens by their key, the one a receipt names its screen by (``screen``) and base's catalogue names it
+#: by in each language (``base.assistant.screens.<key>``, the same name: ``test_each_screen_a_receipt_names_…``).
+SCREEN_NAMES = {
+    "home": HOME,
+    "employees": EMPLOYEES,
+    "settings": SETTINGS,
+    "profile": PROFILE,
+    "system": SYSTEM,
+    "files": FILES,
+    "apps": APPS,
+    "report": REPORT_A_PROBLEM,
+}
+
 #: Where a person does each thing of the platform on their own, by the entity of its operation: a card or a receipt
 #: names an action of base by that screen, never by the platform's internal name, «Base» (as Shopify's Sidekick and
 #: Business Central's Copilot name the page of an action, and WooCommerce's assistant its area). Every tool of base and
 #: what is never done from the chat has its entity here (``test_every_action_of_base_names_its_screen``).
 BASE_SCREENS = {
-    "access": SETTINGS,
-    "api_doc": SETTINGS,
-    "app": APPS,
-    "api_key": EMPLOYEES,
-    "approval": EMPLOYEES,
-    "blueprint": SETTINGS,
-    "business": SETTINGS,
-    "dataset": SETTINGS,
-    "device": SETTINGS,
-    "event": SYSTEM,
-    "failed_event": SYSTEM,
-    "file": FILES,
-    "hub": SETTINGS,
-    "import": SETTINGS,
-    "location": SETTINGS,
-    "person": EMPLOYEES,
-    "profile": PROFILE,
-    "role": EMPLOYEES,
-    "setup": HOME,
-    "support": REPORT_A_PROBLEM,
-    "system": SYSTEM,
+    "access": "settings",
+    "api_doc": "settings",
+    "app": "apps",
+    "api_key": "employees",
+    "approval": "employees",
+    "blueprint": "settings",
+    "business": "settings",
+    "dataset": "settings",
+    "device": "settings",
+    "event": "system",
+    "failed_event": "system",
+    "file": "files",
+    "hub": "settings",
+    "import": "settings",
+    "location": "settings",
+    "person": "employees",
+    "profile": "profile",
+    "role": "employees",
+    "setup": "home",
+    "support": "report",
+    "system": "system",
 }
+
+
+def screen(op: Operation) -> str:
+    """The key of the platform's screen where ``op`` happens (``BASE_SCREENS``; another, the Home), or ``""`` for an
+    app's: its receipt names it in the language the person reads it in, never in the one of its turn."""
+    return BASE_SCREENS.get(op.name.split(".")[1], "home") if op.app_label == "base" else ""
 
 
 def app_name(op: Operation) -> str:
     """Where ``op`` happens, as the person knows it, in the active language: its app by its name; one of the platform,
-    the screen where they would do it themselves (``BASE_SCREENS``; another, the Home)."""
+    the screen where they would do it themselves (``screen``)."""
     if op.app_label == "base":
-        return str(BASE_SCREENS.get(op.name.split(".")[1], HOME))
+        return str(SCREEN_NAMES[screen(op)])
     config = active_apps_label(op.app_label)
     return str(config.verbose_name) if config is not None else op.app_label
 
@@ -455,14 +481,26 @@ def _output_schema(op: Operation) -> dict:
     return op.output.model_json_schema()
 
 
+def _answer_money(answer: dict) -> dict | None:
+    """The currency a read answers its amounts in (``currency``, with its ``currency_decimals`` or else that currency's
+    own: an invoice's, which keeps the one it was issued in), or ``None``: then the card paints them in the business's."""
+    currency = answer.get("currency")
+    if not isinstance(currency, str) or not currency:
+        return None
+    decimals = answer.get("currency_decimals")
+    if not isinstance(decimals, int) or isinstance(decimals, bool):
+        decimals = currency_decimals(currency)
+    return {"currency": currency, "decimals": decimals}
+
+
 def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
     """What the dangerous write ``op`` will do with ``arguments``, as its app says it: the read its ``ai=`` names
     (``"preview": {"operation": <a query of its app>, "fields": [<data of its answer>]}``), run as ``ctx``'s person
     — their permissions, their business — with the data of the write its input takes. The card's data, by their names
     in the person's language and an amount in cents as money (``signed`` when its schema declares it so, as a
-    difference), in the order the app names them; what the read leaves empty or hides from this person (none: a blind
-    count's expected cash) is not there. ``(None, None)`` without a preview; ``(outcome, None)`` when it cannot be read:
-    the write is not confirmed blind."""
+    difference; in the currency the read answers, ``_answer_money``, when it answers one), in the order the app names
+    them; what the read leaves empty or hides from this person (none: a blind count's expected cash) is not there.
+    ``(None, None)`` without a preview; ``(outcome, None)`` when it cannot be read: the write is not confirmed blind."""
     declared = preview_of(op)
     if declared is None:
         return None, None
@@ -474,9 +512,10 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     schema = _output_schema(read)
     defs = schema.get("$defs", {})
     props = schema.get("properties", {})
+    money = _answer_money(answer)
     with translation.override(ctx.language):
         fields = [
-            _field(name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), answer.get(name))
+            _field(name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), answer.get(name), money)
             for name in declared["fields"]
         ]
     return None, [field for field in fields if field["kind"] != "empty"]
@@ -549,14 +588,16 @@ def rounds(messages: list[dict]) -> int:
 # ── The instructions of a turn ───────────────────────────────────────────────────────────────────────────────────
 
 
-def instructions(*, language: str, currency: str, business: str, screens: dict[str, str]) -> str:
+def instructions(*, language: str, currency: str, decimals: int, business: str, screens: dict[str, str]) -> str:
     """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
-    tools and money, and the screens it may link."""
+    tools and money (an amount in the minor unit of its currency, ``decimals`` the business's; said in the currency
+    its result gives, else the business's), and the screens it may link."""
     try:
         language_name = get_language_info(language)["name"]
     except KeyError:
         language_name = language
     links = "\n".join(f"- [{name}]({path})" for path, name in screens.items())
+    example = f"{17:.{decimals}f} {currency} → {17 * 10**decimals}"
     return f"""You are the assistant of the business «{business}» in ERPlora, its point of sale and management app.
 Answer in {language_name}, short and plain, as a colleague who knows the app. Use Markdown: bold, lists and tables.
 
@@ -566,8 +607,9 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   or a date: if no tool returned it, say you do not know or that you could not find it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
-- Amounts: fields «in cents» take whole cents (17.00 {currency} → 1700). To the person, always write amounts in
-  {currency} with two decimals (17.00), never in cents.
+- Amounts: fields «in cents» take the amount in the minor unit of the business's currency ({example}). To the
+  person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals) when
+  it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}
 - If something cannot be done from here (you have no tool for it), say on which screen it is done."""

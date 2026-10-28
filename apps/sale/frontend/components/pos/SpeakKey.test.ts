@@ -3,13 +3,21 @@
 // greyed, and a tap says why. A first tap records («Listening…», the key turns «Stop»), a second one stops; the words
 // are transcribed by erplora.com, land in the assistant's box after what was written and the panel opens: the person
 // sees what was understood and sends it. Nothing is sent by itself. A refusal, an empty or too long dictation and a
-// failure are a toast.
+// failure are a toast. The dictation is base's (`useDictation`, PLAN-HUB §18): the key only says each reason its way
+// and keeps its own offline guard.
 import { type SessionMe, toast } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { computed, ref, toRaw, toValue } from 'vue';
 
 import { type Assistant, createAssistant, installAssistant } from '../../../../../base/frontend/lib/assistant';
 import { ASSISTANT_ICONS } from '../../../../../base/frontend/lib/assistant-icons';
 import type { TurnBody } from '../../../../../base/frontend/lib/assistant-stream';
+import {
+  type Dictation,
+  type DictationOptions,
+  type DictationProblem,
+  useDictation,
+} from '../../../../../base/frontend/lib/dictation';
 import { EMPLOYEE, mountSale, settle } from '../../__tests__/mount-sale';
 import SpeakKey from './SpeakKey.vue';
 
@@ -17,6 +25,12 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
   toast: vi.fn(() => Promise.resolve()),
 }));
+
+// Base's dictation, the real one unless a test swaps it for one it drives (`fakeDictation`).
+vi.mock('../../../../../base/frontend/lib/dictation', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../../../../base/frontend/lib/dictation')>();
+  return { ...real, useDictation: vi.fn(real.useDictation) };
+});
 
 /** A cashier who may use the assistant: it answers to whoever sees the Home. */
 const CASHIER: SessionMe = { ...EMPLOYEE, permissions: [...EMPLOYEE.permissions, 'base.view_home'] };
@@ -54,8 +68,30 @@ beforeEach(() => {
 afterEach(() => {
   installAssistant(undefined);
   vi.mocked(toast).mockClear();
+  // Back to the real dictation, also when a swapped one was never taken.
+  vi.mocked(useDictation).mockReset();
   vi.restoreAllMocks();
 });
+
+/** Base's dictation swapped for one the test drives, for the next key that mounts: its `toggle` and `cancel` are spies,
+ *  `recording` says whether it records, and `problem` says a reason as base would. */
+function fakeDictation(options: { recording?: boolean } = {}) {
+  let given: DictationOptions = {};
+  const recording = ref(options.recording ?? false);
+  const fake = {
+    available: computed(() => true),
+    recording: computed(() => recording.value),
+    transcribing: ref(false),
+    starting: ref(false),
+    toggle: vi.fn(async () => undefined),
+    cancel: vi.fn(),
+  };
+  vi.mocked(useDictation).mockImplementationOnce((options = {}) => {
+    given = options;
+    return fake as Dictation;
+  });
+  return { ...fake, given: () => given, problem: (reason: DictationProblem) => given.onProblem?.(reason) };
+}
 
 class Recorder {
   static isTypeSupported = () => true;
@@ -285,5 +321,74 @@ describe('SpeakKey: without connection', () => {
     await k.press();
     expect(voice.getUserMedia).toHaveBeenCalled();
     await k.press();
+  });
+
+  it('a recording stopped once the connection is gone is thrown away untranscribed, and a toast says why', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    const voice = microphone();
+    const k = await key({ voice });
+    await k.press();
+    online.mockReturnValue(false);
+    window.dispatchEvent(new Event('offline'));
+    await settle();
+    // A recording can always be stopped: the key is not greyed while it records.
+    expect(k.button().attributes('aria-disabled')).toBe('false');
+    await k.press();
+    expect(voice.released).toHaveBeenCalled();
+    expect(k.transcriptions()).toEqual([]);
+    expect(toast).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.', 'warning');
+    expect(k.button().text()).toBe('Hablar');
+    expect(k.button().attributes('aria-disabled')).toBe('true');
+  });
+});
+
+// PLAN-HUB §18: the dictation lives once, in base; the key only says each reason its way and keeps its offline guard.
+describe("SpeakKey: base's dictation", () => {
+  it("is base's useDictation, on the key's microphone: a tap is its toggle", async () => {
+    const dictation = fakeDictation();
+    const voice = microphone();
+    const k = await key({ voice });
+    expect(useDictation).toHaveBeenCalledTimes(1);
+    // The same microphone (the mounted props wrap it in a reactive proxy).
+    expect(toRaw(toValue(dictation.given().voice))).toBe(voice);
+    await k.press();
+    expect(dictation.toggle).toHaveBeenCalledTimes(1);
+    expect(voice.getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("says each of base's reasons with the till's own text", async () => {
+    const dictation = fakeDictation();
+    await key();
+    for (const [reason, text, color] of [
+      ['denied', 'El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.', 'warning'],
+      ['deniedInApp', 'El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.', 'warning'],
+      ['tooLong', 'La grabación es demasiado larga: di algo más corto.', 'warning'],
+      ['empty', 'No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.', 'warning'],
+      ['failed', 'No se ha podido transcribir el audio. Inténtalo de nuevo.', 'danger'],
+    ] as const) {
+      dictation.problem(reason);
+      expect(toast).toHaveBeenLastCalledWith(text, color);
+    }
+    expect(toast).toHaveBeenCalledTimes(5);
+  });
+
+  it("offline, stopping a recording is base's cancel, never its toggle", async () => {
+    const dictation = fakeDictation({ recording: true });
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const k = await key();
+    expect(k.button().attributes('aria-disabled')).toBe('false');
+    await k.press();
+    expect(dictation.cancel).toHaveBeenCalledTimes(1);
+    expect(dictation.toggle).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.', 'warning');
+  });
+
+  it("offline and not recording, a tap reaches neither base's toggle nor its cancel", async () => {
+    const dictation = fakeDictation();
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const k = await key();
+    await k.press();
+    expect([dictation.toggle.mock.calls.length, dictation.cancel.mock.calls.length]).toEqual([0, 0]);
+    expect(toast).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.', 'warning');
   });
 });

@@ -1384,9 +1384,19 @@ class AssistantExecutedOut(Schema):
         description="Where it happened, in the person's language, as its card says it: the app's name, or the "
         "platform's screen («Settings»); empty when there was no operation."
     )
+    screen: str = Field(
+        default="",
+        description="The platform's screen it happened on, by its key («settings»), for the receipt to name it in the "
+        "language it is read in; empty for an app's (its menu names it).",
+    )
     kind: Literal["query", "command", ""]
     outcome: Literal["ok", "error", "refused", "cancelled"]
     code: str
+
+
+class AssistantMoneyOut(Schema):
+    currency: str
+    decimals: int
 
 
 class AssistantFieldOut(Schema):
@@ -1398,11 +1408,11 @@ class AssistantFieldOut(Schema):
         default=False,
         description="An amount its app declares signed (a difference): written with its sign, «+» over.",
     )
-
-
-class AssistantMoneyOut(Schema):
-    currency: str
-    decimals: int
+    money: AssistantMoneyOut | None = Field(
+        default=None,
+        description="The currency of an amount of a preview, as its read answers it (an invoice's); none = the "
+        "business's, the card's own.",
+    )
 
 
 class AssistantCardOut(Schema):

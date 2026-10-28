@@ -1666,13 +1666,16 @@ administrador y responsable, los mismos que anulan y devuelven).
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
   `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
 - **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`, FIX-SALE-POS-NO-SPEAK-KEY; PLAN §30 punto 4,
-  PLAN-HUB §8 ronda 2026-10-22b): sin operación propia; reutiliza el dictado del asistente de la plataforma
-  (`recordVoice`, `canDictate`, `base64Of` e iconos de `base/frontend/lib/`, la operación
-  `base.assistant.transcribe` y `useAssistant()`: el texto va a `state.draft` y `setOpen(true)` abre el
-  panel). Se ve con `base.view_home` (el permiso de `base.assistant.transcribe` y del botón del asistente) y
-  un navegador que graba; sin conexión, `aria-disabled` con su motivo. Con el micrófono denegado, `nativeBridge()` de
-  `@erplora/ui/shell` elige el aviso: en la app instalada, `sale.pos.speak.deniedInApp` (los ajustes del dispositivo),
-  como el compositor del asistente (BASE-F94). El TPV pasa a la disposición del
+  PLAN-HUB §8 ronda 2026-10-22b): sin operación propia ni dictado propio; usa el del asistente de la plataforma,
+  `useDictation` de `base/frontend/lib/dictation.ts` (PLAN-HUB §18, FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION): una
+  grabación por pulsación, dos minutos, hasta 2 MB por `base.assistant.transcribe`, el texto a `state.draft` del
+  asistente y su panel abierto, y la grabación tirada al salir del TPV. La tecla solo dice cada motivo de `onProblem`
+  con su texto, `sale.pos.speak.<motivo>` (`denied`, `deniedInApp` en la app instalada —los ajustes del dispositivo,
+  como el compositor del asistente, BASE-F94—, `tooLong`, `empty` y `failed`, este en rojo), y guarda su propia
+  guardia de sin conexión, que base no tiene: `aria-disabled` con su motivo y, si se para una grabación sin
+  conexión, `cancel()` de base la tira sin transcribir. Se ve con `base.view_home` (el permiso de
+  `base.assistant.transcribe` y del botón del asistente) y un navegador que graba (`available` de base); los iconos
+  son los del asistente (`assistant-icons.ts`). El TPV pasa a la disposición del
   móvil también cuando su propia caja mide menos de 700 px (`NARROW_TILL` de `PosPage.vue`): el panel
   acoplado desde 768 px dejaba la columna del catálogo en unos 90 px en una tableta de 834. Tests:
   `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y las e2e `tests/e2e/sale-speak.spec.ts` y

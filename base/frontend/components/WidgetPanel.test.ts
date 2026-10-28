@@ -213,12 +213,13 @@ describe('WidgetPanel', () => {
       expect(value(m.wrapper).text()).toBe('12,50\u00a0€');
     });
 
-    it('with the decimals of its currency', async () => {
+    it('with the decimals of its currency, the amount being in its minor unit', async () => {
+      // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: ¥123,400 of sales read «¥1,234».
       const m = await panel(money, 'en');
       const call = await m.live();
       await m.result(call, 'base.business.get', business({ country: 'JP', currency: 'JPY', currency_decimals: 0 }));
       await m.result(call, 'demo.item.stats', { total: 123400 });
-      expect(value(m.wrapper).text()).toBe('¥1,234');
+      expect(value(m.wrapper).text()).toBe('¥123,400');
     });
   });
 

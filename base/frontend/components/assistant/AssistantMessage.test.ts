@@ -18,7 +18,8 @@ function mountBubble(bubble: Bubble, extra: Record<string, unknown> = {}, locale
       bubble,
       screenExists: (path: string) => ['/settings', '/customer/customers'].includes(path.split('#')[0]),
       nameOf: (path: string) => ({ '/settings': 'Ajustes', '/customer/customers': 'Clientes' })[path.split('#')[0]],
-      appNameOf: (app: string) => (app === 'demo' ? 'Demo' : app),
+      // The menu's name of an app, in the screen's language; none for an app it does not list.
+      appNameOf: (app: string) => ({ demo: 'Demo', invoice: 'Facturación' })[app],
       canUpgrade: false,
       planUrl: '',
       canSpeak: false,
@@ -91,7 +92,8 @@ describe('AssistantMessage', () => {
     ]);
     es.wrapper.unmount();
     const english = executed.map((row) => ({ ...row, app_name: 'Invoicing' }));
-    const en = await mountBubble(answer({ text: 'Done.', executed: english }), {}, 'en');
+    // The menu in the screen's language, as the shell's is.
+    const en = await mountBubble(answer({ text: 'Done.', executed: english }), { appNameOf: (app: string) => ({ invoice: 'Invoicing' })[app] }, 'en');
     expect(en.wrapper.findAll('[data-testid="assistant-receipt"]').map((row) => row.text())).toEqual([
       'Done: Rectify in Invoicing',
       'Not done, cancelled: Record the payment in Invoicing',
@@ -104,6 +106,24 @@ describe('AssistantMessage', () => {
     const executed = [{ name: 'base.access.settings_update', app: 'base', app_name: 'Ajustes', outcome: 'cancelled' }];
     const { wrapper } = await mountBubble(answer({ text: 'No lo he hecho.', executed }));
     expect(wrapper.find('[data-testid="assistant-receipt"]').text()).toBe('No se hizo, cancelado: Cambiar en Ajustes');
+    wrapper.unmount();
+  });
+
+  it('a receipt kept from a turn in another language is said whole in the screen’s: the app by its menu, the platform by its screen', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY (seen on its e2e): asked in English, read once
+    // the person had switched to Spanish, it said «No se hizo, cancelado: Rectificar en Invoicing».
+    const executed = [
+      { name: 'invoice.invoice.rectify', app: 'invoice', app_name: 'Invoicing', outcome: 'cancelled' },
+      { name: 'base.access.settings_update', app: 'base', app_name: 'Settings', screen: 'settings', outcome: 'ok' },
+      // An app the menu does not list (gone, or not this person's): as the server named it then.
+      { name: 'demo.item.create', app: 'stock', app_name: 'Almacén', outcome: 'ok' },
+    ];
+    const { wrapper } = await mountBubble(answer({ text: 'No lo he hecho.', executed }));
+    expect(wrapper.findAll('[data-testid="assistant-receipt"]').map((row) => row.text())).toEqual([
+      'No se hizo, cancelado: Rectificar en Facturación',
+      'Hecho: Cambiar en Ajustes',
+      'Hecho: Crear en Almacén',
+    ]);
     wrapper.unmount();
   });
 

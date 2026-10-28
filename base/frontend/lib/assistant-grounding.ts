@@ -13,6 +13,8 @@ export interface Executed {
   app?: string;
   /** Where it happened, as the server names it in the person's language (the platform by its screen). */
   app_name?: string;
+  /** The platform's screen it happened on, by its key (`base.assistant.screens.<key>`); none for an app's. */
+  screen?: string;
 }
 
 export type GroundingNotice = 'claimed_change' | 'unread_id' | 'unknown_screen';

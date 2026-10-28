@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
+from django.utils import translation
 from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import Operation, get, registry
@@ -234,6 +235,21 @@ def test_every_action_of_base_names_its_screen():
     actions = {op.name for op in registry.values() if op.app_label == "base" and assistant.is_tool(op)}
     actions |= set(assistant.NOT_FROM_CHAT)
     assert sorted(name for name in actions if name.split(".")[1] not in assistant.BASE_SCREENS) == []
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_each_screen_a_receipt_names_by_its_key_is_named_alike_by_the_screen(language):
+    """A receipt names the platform's screen by its key (``screen``), in the language the screen is in
+    (``base.assistant.screens.<key>`` of base's catalogue): the same name the card gives it in that language, for each
+    screen an action of base happens on (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY)."""
+    catalogue = json.loads((Path(settings.BASE_DIR) / f"base/frontend/locale/{language}.json").read_text())
+    names = catalogue["base"]["assistant"]["screens"]
+    with translation.override(language):
+        assert {key: names.get(key) for key in set(assistant.BASE_SCREENS.values())} == {
+            key: str(assistant.SCREEN_NAMES[key]) for key in set(assistant.BASE_SCREENS.values())
+        }
+    pin = get("base.access.settings_update")
+    assert (assistant.screen(pin), assistant.screen(get("demo.item.create"))) == ("settings", "")
 
 
 def named_actions() -> dict[str, dict[str, str]]:
@@ -462,6 +478,61 @@ def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(
     assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
 
 
+class PricedPreviewOut(Schema):
+    """A read whose amounts are in a currency of its own (an invoice's), as Invoicing's previews answer it."""
+
+    note: str = ""
+    total_cents: int
+    difference: int | None = Field(description="Counted − expected, in cents.", json_schema_extra={"signed": True})
+    currency: str = ""
+    currency_decimals: int | None = None
+
+
+def priced(monkeypatch, answer: dict) -> list[dict]:
+    """The preview of a write whose read answers ``answer``: its data without their labels."""
+    read = count_preview({"note": "R1", "total_cents": -12100, "difference": 4200, **answer}, PricedPreviewOut)
+    write = declaring({"operation": read.name, "fields": ["note", "total_cents", "difference"]})
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, write.name, write)
+    failure, fields = assistant.preview(ctx(), write, {"id": "7"})
+    assert failure is None
+    return [{key: value for key, value in field.items() if key != "label"} for field in fields]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("answer", "money"),
+    [
+        ({"currency": "EUR", "currency_decimals": 2}, {"currency": "EUR", "decimals": 2}),
+        # Its amounts' minor unit, as the read answers it, even where the currency's own says another (ISK: 0).
+        ({"currency": "ISK", "currency_decimals": 2}, {"currency": "ISK", "decimals": 2}),
+        ({"currency": "JPY"}, {"currency": "JPY", "decimals": 0}),
+    ],
+    ids=["its currency and decimals", "decimals as it answers them", "decimals of its currency when it answers none"],
+)
+def test_an_amount_of_a_preview_carries_the_currency_its_read_answers(monkeypatch, answer, money):
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: an invoice issued in EUR, rectified once the
+    business had moved to another currency, showed «-100,00» in the new one on the card. An amount of the preview
+    carries the currency the read answers (``currency``) with its decimals (``currency_decimals``, else the
+    currency's own: no yen with cents), the sign of a difference with it; a datum that is no amount, none; and the
+    amounts a write sends stay in the business's (the card's ``money``)."""
+    assert priced(monkeypatch, answer) == [
+        {"name": "note", "kind": "text", "value": "R1"},
+        {"name": "total_cents", "kind": "money", "value": -12100, "money": money},
+        {"name": "difference", "kind": "money", "value": 4200, "signed": True, "money": money},
+    ]
+    price = next(field for field in assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
+    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
+
+
+@pytest.mark.django_db
+def test_a_preview_whose_read_answers_no_currency_invents_none(monkeypatch):
+    """Without a currency in the read's answer (Cash register's close: the drawer is in the business's), its amounts
+    carry none and the card paints them in the business's, as before."""
+    assert [field.get("money") for field in priced(monkeypatch, {})] == [None, None, None]
+    assert [field.get("money") for field in priced(monkeypatch, {"currency": "", "currency_decimals": 2})] == [None] * 3
+
+
 def preview_errors() -> list:
     from django.core import checks
 
@@ -578,13 +649,29 @@ def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
 
 
 def test_the_instructions_set_the_language_the_money_and_the_screens():
-    text = assistant.instructions(language="es", currency="EUR", business="Bar Pepe", screens={"/settings": "Ajustes"})
+    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
     # gh:hub#1046: the old assistant answered anything (films, cinemas) on the business's allowance.
     assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
     assert "EUR" in text and "cents" in text
     assert "[Ajustes](/settings)" in text
     assert "Bar Pepe" in text
+
+
+@pytest.mark.parametrize(
+    ("currency", "decimals", "example"),
+    [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],
+)
+def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currency, decimals, example):
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a tool's result gives its amounts with their
+    currency (``currency`` and ``currency_decimals``: an invoice keeps the one it was issued in) and the card paints them
+    in it, but the model was told to say every amount in the business's, with two decimals: its text and the card
+    disagreed. An amount goes in the minor unit of its currency (no cents in yen), said in the currency its result
+    gives, else in the business's."""
+    text = assistant.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
+    assert example in text
+    assert "`currency`" in text and "`currency_decimals`" in text
+    assert "two decimals" not in text
 
 
 def test_the_setup_block_carries_what_is_pending_and_who_does_it():
