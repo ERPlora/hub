@@ -10,14 +10,21 @@
 // FIX-HUB-SALE-APPROVAL-E2E-REUSED-DB: the owner and the cashier are told by their session, not by their email (a hub
 // database kept from a stack whose SaaS was created again holds an older account with each email), and the PIN and
 // the approvals of every account of those emails go before and after, so a run that failed leaves the next one clean.
+// FIX-HUB-SALE-OWN-COPY-OF-APPROVED-COMMAND-CONSEQUENCES (SALE-F30, F32; BASE-F84): what the approved void asks of other
+// apps goes with it by the platform's rule: a sale paid with Lucía's voucher and a shampoo by card, voided by the
+// cashier with the owner's PIN, gives its session back to the voucher and its rectifying invoice is issued in the void
+// (the cashier may do neither on their own). Screenshots of that approval in the three viewports.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
-import { snapshotSeries } from './invoice-helpers';
+import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
+import { cleanUp as cleanServices, named, post } from './service-helpers';
 
 const KEY = 'FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL';
+const VOUCHER_KEY = 'FIX-HUB-SALE-OWN-COPY-OF-APPROVED-COMMAND-CONSEQUENCES';
 const SKU = `E2E-APR-${stamp()}`;
 const OWNER_PIN = '2468';
 /** The dialog over Sales at a phone, a tablet and a desk (the SaaS panel's `VIEWPORTS`). */
@@ -90,6 +97,8 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   forgetThePinAndTheApprovals();
   cleanSales();
+  cleanServices();
+  cleanCustomers();
   cleanInventory();
   restoreDrawer();
   // The cashier's session, for a sweep of what they see (as base-employees.spec.ts saves the owner's).
@@ -119,9 +128,48 @@ async function ownerApproves(page: Page): Promise<void> {
   for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
 }
 
-async function detail(sale: SaleOut): Promise<{ status: string; voided_by: string; void_reason: string }> {
-  return (await api<{ status: string; voided_by: string; void_reason: string }>(owner.context, A, 'GET', `/sale/sales/detail?sale_id=${sale.id}`)).data;
+interface Detail {
+  status: string;
+  voided_by: string;
+  void_reason: string;
+  void_invoice_status: string;
 }
+
+async function detail(sale: SaleOut): Promise<Detail> {
+  return (await api<Detail>(owner.context, A, 'GET', `/sale/sales/detail?sale_id=${sale.id}`)).data;
+}
+
+/** The cashier asks to void `sale` from Sales with `reason`: «An approval is needed» opens over the window. */
+async function askToVoid(page: Page, sale: SaleOut, reason: string) {
+  await find(page, sale);
+  await shown(page).locator(`[data-testid=sales-table-row-${sale.id}-void]`).first().click();
+  const modal = page.locator('ion-modal[data-testid=sale-void]');
+  await expect(modal).toBeVisible();
+  await modal.locator('[data-testid=sale-void-reason] textarea').fill(reason);
+  await modal.locator('[data-testid=sale-void-submit]').click();
+  return { modal, dialog: approval(page) };
+}
+
+/** Lucía's sale: a haircut paid with a session of her voucher and the shampoo by card, charged with its ticket. */
+async function paidWithAVoucher(context: BrowserContext): Promise<SaleOut> {
+  await ensureIssuer(context);
+  const haircut = await post<{ id: string }>(context, '/service/services', { name: named('Corte aprobado'), price: 2500, tax_category_key: 'service.generic' });
+  const lucia = await createCard(context, { name: e2eName('Lucía') });
+  const voucher = await post<{ id: string }>(context, '/service/packages', { name: named('Bono aprobado'), max_uses: 2, items: [{ service_id: haircut.id }] });
+  const grant = await post<{ id: string }>(context, '/service/grants', { package_id: voucher.id, customer_id: lucia.id, amount: 9000 });
+  const opened = await post<{ id: string; lines: { id: string; service_id: string | null }[] }>(context, '/sale/orders', {
+    lines: [{ product: SKU }],
+    service_lines: [{ service_id: haircut.id }],
+  });
+  const cut = opened.lines.find((line) => line.service_id === haircut.id);
+  expect(cut, 'the haircut on the check').toBeDefined();
+  await post(context, '/sale/orders/apply_voucher', { order_id: opened.id, line_id: cut?.id, grant_id: grant.id }, 200);
+  return chargeByApi(context, { order_id: opened.id, customer_id: lucia.id, payments: [{ method: 'card' }] });
+}
+
+/** The status of the voucher session that paid a line of `sale`, in Services. */
+const sessionOf = (sale: SaleOut): string =>
+  psql(`SELECT status FROM service_redemption WHERE id = (SELECT voucher_session_id FROM sale_saleline WHERE sale_id = '${sale.id}' AND voucher_session_id IS NOT NULL)`);
 
 test('SALE-F30: the cashier voids a charged ticket and the owner approves it with their PIN', async () => {
   const { page } = cashier;
@@ -192,4 +240,27 @@ test('SALE-F30: «Cancel» on the approval leaves its refusal inside the window,
   expect((await detail(toKeep)).status).toBe('completed');
   await modal.locator('[data-testid=sale-void-cancel]').click();
   await expect(modal).toBeHidden();
+});
+
+test('SALE-F30, SALE-F32: an approved void of a sale paid with a voucher gives the session back and issues its rectifying invoice', async () => {
+  const sale = await paidWithAVoucher(owner.context);
+  expect(sessionOf(sale)).toBe('consumed');
+  const { page } = cashier;
+  const { modal, dialog } = await askToVoid(page, sale, 'e2e wrong customer');
+  await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Void a sale|Se aprueba: Anular una venta)$/);
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await untilStill(page);
+    await page.screenshot({ path: shot(`${VOUCHER_KEY}-${viewport.label}`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
+
+  await ownerApproves(page);
+  await expect(dialog).toBeHidden();
+  await expect(modal).toBeHidden();
+  await expect(row(page, sale)).toContainText(/Voided|Anulada/);
+  // What the cashier may not do on their own went with the approved void, once.
+  const stored = await detail(sale);
+  expect([stored.status, stored.voided_by, stored.void_invoice_status]).toEqual(['voided', cashierName, 'issued']);
+  expect(sessionOf(sale)).toBe('returned');
 });
