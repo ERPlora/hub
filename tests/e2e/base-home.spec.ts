@@ -487,3 +487,119 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
     });
   }
 });
+
+// BASE-F06 — a bar-list with the colour of its row (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR): Staff's «Empleados
+// por rol» painted every role in the panel's colour although each role has its own (the old hub's `renderBarList` gave
+// each bar `color: row[map.color]`). The owner of `a`, in Spanish, with that panel alone on the board and two roles of
+// colours of their own: each role's bar is in its row's colour when the panel maps one (`map.color`, as the server
+// declares it in `base.widget.list`) and in the panel's otherwise. Staff does not map it yet (its own FIX), so today this
+// run checks the panel's colour; Vitest (`home.test.ts`, `WidgetPanel.test.ts`) pins the row's colour, the hex-only rule
+// and the red of a negative. Everything this block creates is named «E2E-ROWCOLOR …» and removed after it.
+test.describe('BASE-F06 — a bar-list with the colour of its row', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  const KEY = 'FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR';
+  const BY_ROLE = 'staff.by_role';
+  const TAG = 'E2E-ROWCOLOR';
+  const RUN = `${Date.now()}`;
+  /** Two roles of colours of their own: two people in the first, one in the second. */
+  const roles = [
+    { name: `${TAG} ${RUN} Estilista`, color: '#2e7d32', people: 2 },
+    { name: `${TAG} ${RUN} Recepción`, color: '#c2185b', people: 1 },
+  ];
+
+  const cleanup = () =>
+    psql(
+      [
+        `delete from staff_member where first_name like '${TAG}%'`,
+        `delete from staff_role where name like '${TAG}%'`,
+      ].join('; '),
+    );
+
+  test.beforeAll(async ({ browser }) => {
+    cleanup();
+    const context = await browser.newContext({ baseURL: A });
+    try {
+      const page = await context.newPage();
+      await login(page, A, '/staff/members');
+      for (const role of roles) {
+        const made = await api<{ id: string; color: string }>(context, A, 'POST', '/staff/roles', { name: role.name, color: role.color });
+        expect(made.status, `${role.name} ${JSON.stringify(made.data)}`).toBe(201);
+        expect(made.data.color).toBe(role.color);
+        for (let person = 0; person < role.people; person += 1) {
+          const member = await api(context, A, 'POST', '/staff/members', { first_name: `${TAG} ${person}`, last_name: RUN, role_id: made.data.id });
+          expect(member.status).toBe(201);
+        }
+      }
+    } finally {
+      await context.close();
+    }
+  });
+
+  test.afterAll(cleanup);
+
+  for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+    test(`BASE-F06 — «Empleados por rol» paints each role's bar in its row's colour when the panel maps one, at ${label}`, async ({ browser }) => {
+      const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+      try {
+        await context.addInitScript(([key, keys]) => localStorage.setItem(key, keys), ['dashboard-hub', JSON.stringify([BY_ROLE])]);
+        const page = await context.newPage();
+        await login(page, A, '/');
+        await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+        await page.goto(`${A}/`);
+        await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+
+        const panel = testid(page, 'widget-board').locator(`[data-testid="widget"][data-key="${BY_ROLE}"]`);
+        await expect(panel.locator('[data-testid="widget-title"]')).toHaveText('Empleados por rol');
+        await expect(panel).toHaveAttribute('aria-busy', 'false');
+        const bar = (name: string) =>
+          panel.locator('[data-testid="widget-bar"]').filter({ has: page.locator('.widget-bar-label').getByText(name, { exact: true }) });
+        for (const role of roles) await expect(bar(role.name).locator('.widget-bar-text')).toHaveText(String(role.people));
+
+        // The panel as the server declares it: whether it maps its rows' colour.
+        const listed = await api<{ widgets: { key: string; map: Record<string, string> }[] }>(context, A, 'GET', '/home/widgets');
+        expect(listed.status).toBe(200);
+        const declared = listed.data.widgets.find((widget) => widget.key === BY_ROLE);
+        expect(declared, `${BY_ROLE} is on the board's catalogue`).toBeDefined();
+        const mapsColour = Boolean(declared?.map.color);
+
+        const painted = await panel.evaluate(
+          (element, wanted) => {
+            const probe = (background: string) => {
+              const span = document.createElement('span');
+              span.style.background = background;
+              element.append(span);
+              const found = getComputedStyle(span).backgroundColor;
+              span.remove();
+              return found;
+            };
+            const rows = [...element.querySelectorAll('[data-testid="widget-bar"]')];
+            const fill = (name: string) => {
+              const row = rows.find((candidate) => candidate.querySelector('.widget-bar-label')?.textContent === name);
+              return getComputedStyle(row?.querySelector('.widget-bar-fill') as Element).backgroundColor;
+            };
+            return {
+              bars: wanted.map((role) => ({ fill: fill(role.name), own: probe(role.color) })),
+              primary: probe('var(--ion-color-primary)'),
+            };
+          },
+          roles.map(({ name, color }) => ({ name, color })),
+        );
+        for (const [index, role] of roles.entries()) {
+          const { fill, own } = painted.bars[index];
+          expect(fill, `${role.name}: ${mapsColour ? "its row's colour" : "the panel's colour"}`).toBe(mapsColour ? own : painted.primary);
+        }
+        // The owner's Spanish session with the panel on, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
+        if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+
+        await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+        await untilStill(page);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+        await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      } finally {
+        await context.close();
+      }
+    });
+  }
+});
