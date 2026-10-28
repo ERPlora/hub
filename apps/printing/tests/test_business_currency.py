@@ -8,9 +8,11 @@ import json
 
 import pytest
 from live.context import OperationContext, Scope
+from live.operations import get
 
 from apps.printing.models import PrintJob
 from apps.printing.tests.conftest import A, B, RECEIPT, ctx_for, enqueue, run
+from base import operations as base_operations
 from base.models import Hub
 
 pytestmark = pytest.mark.django_db
@@ -68,3 +70,24 @@ def test_erploras_own_hub_prints_in_the_currency_of_its_issuer_s_country(setting
     platform = ctx_for(scope=Scope("host", "erplora"))
     queued = run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, platform)
     assert printed(queued)["decimals"] == decimals
+
+
+def test_a_receipt_asks_base_for_the_business_s_currency(monkeypatch):
+    # FIX-HUB-PRINTING-OWN-COPY-OF-BUSINESS-CURRENCY: printing asks the one question every app that charges asks
+    # (``base.operations.business_currency``, BASE-F50), never a copy of its own that drifts in silence from it.
+    business_in("ES")
+    monkeypatch.setattr(base_operations, "business_currency", lambda scope: "KWD")
+    assert printed(enqueue())["decimals"] == 3
+
+
+def test_erploras_own_hub_takes_its_currency_from_base_business_get_too(settings, monkeypatch):
+    # ``base.business.get`` answers ERPlora's own hub (hub#329): printing asks it there as anywhere else, never a second
+    # source of the same currency (here, an answer other than the one of ``PLATFORM_ISSUER_COUNTRY``).
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = "ES"
+    business = get(base_operations.BUSINESS)
+    answer = business.fn
+    monkeypatch.setattr(business, "fn", lambda ctx, data: {**answer(ctx, data), "currency": "JPY"})
+    platform_hub = ctx_for(scope=Scope("host", "erplora"))
+    queued = run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, platform_hub)
+    assert printed(queued)["decimals"] == 0
