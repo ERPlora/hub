@@ -140,6 +140,10 @@ describe('OptionFormModal: in the business’s currency', () => {
     expect(s.sent()).toEqual([]);
     expect(s.field('price_delta').errorText).toBe('This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.');
     await ionValue(s.field('price_delta'), '+2,50 zł', 'ionInput');
+    // Leaving the field rewrites it in the page format: the field reads złoty too, not only the save.
+    s.field('price_delta').dispatchEvent(new CustomEvent('ionBlur'));
+    await settle();
+    expect(s.field('price_delta').value).toBe('2.50');
     await click(s.save());
     expect((s.sent()[0].body as Record<string, unknown>).price_delta).toBe(250);
   });
