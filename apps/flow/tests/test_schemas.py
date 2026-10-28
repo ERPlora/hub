@@ -365,9 +365,51 @@ def test_a_draft_reads_only_what_its_earlier_steps_leave():
     assert found == {"definition.steps": "Value error, Step 1 reads «steps.s2.id», which no earlier step leaves."}
 
 
-def test_a_step_the_hub_cannot_run_yet_is_refused():
-    # FLOW-F31, F37: with no assistant in the Hub or the SaaS and no message gateway, there is no «Ask the
-    # assistant» nor «Send a message» step: a document that names one is refused, never kept to fail later.
-    for kind in ("agent", "assistant", "message"):
+def test_a_step_the_hub_does_not_have_is_refused():
+    # FLOW-F31: «Send a message» is a «Do something» of the WhatsApp inbox, never a kind of its own; nor is the old
+    # module's «agent»: a document that names one is refused, never kept to fail later.
+    for kind in ("agent", "message"):
         with pytest.raises(pydantic.ValidationError):
             schemas.CreateIn.model_validate({"steps": [{"id": "s1", "kind": kind, "prompt": "Answer the customer"}]})
+
+
+ASSISTANT = {"id": "s1", "kind": "assistant", "prompt": "Answer {{input.name}} with the free slots"}
+
+
+def test_an_assistant_step_keeps_its_task_its_tools_how_it_changes_things_and_its_rounds():
+    # FLOW-F37 (was refused while the Hub had no assistant: the test above, before 2026-10-28): «Ask the assistant»
+    # is a step; by default a change it wants waits for a person (old module's policy) and it has 6 rounds.
+    kept = schemas.CreateIn.model_validate({"steps": [ASSISTANT | {"tools": ["task.task.list", "task.task.create"]}]})
+    step = kept.steps[0]
+    assert (step.kind, step.tools, step.mode, step.max_rounds) == (
+        "assistant",
+        ["task.task.list", "task.task.create"],
+        "ask",
+        6,
+    )
+    assert schemas.CreateIn.model_validate({"steps": [ASSISTANT | {"mode": "auto", "max_rounds": 10}]}).steps[0].mode == "auto"
+
+
+@pytest.mark.parametrize(
+    ("more", "field"),
+    [
+        ({"prompt": ""}, "steps.0.assistant.prompt"),
+        ({"max_rounds": 0}, "steps.0.assistant.max_rounds"),
+        ({"max_rounds": 11}, "steps.0.assistant.max_rounds"),
+        ({"mode": "sometimes"}, "steps.0.assistant.mode"),
+        ({"tools": ["not a name"]}, "steps.0.assistant.tools.0"),
+    ],
+)
+def test_an_assistant_step_without_its_task_or_out_of_bounds_is_refused(more, field):
+    assert field in errors(schemas.CreateIn, {"steps": [ASSISTANT | more]})
+
+
+def test_an_assistant_step_never_hands_a_secret_to_the_assistant():
+    # Old HUB-F95: «a secret in the task is not saved»: what the step asks reaches the model.
+    found = errors(schemas.CreateIn, {"steps": [ASSISTANT | {"prompt": "Use {{secret.STRIPE_KEY}}"}]})
+    assert found == {"steps": "Value error, Step 1 reads «secret.STRIPE_KEY»: a secret or the call's key only go in «Call another system»."}
+
+
+def test_what_the_assistant_answered_is_read_by_the_steps_after_it():
+    later = COMMAND | {"id": "s2", "params": {"title": "{{steps.s1.text}}"}}
+    assert schemas.CreateIn.model_validate({"steps": [ASSISTANT, later]}).steps[1].params == {"title": "{{steps.s1.text}}"}
