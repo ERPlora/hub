@@ -18,6 +18,7 @@ started by an event that a run of the same automation caused, or by a chain of m
 """
 
 import datetime as dt
+import json
 import logging
 import uuid
 from functools import partial
@@ -33,7 +34,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.operations import Operation, get, operation
 from live.outbox import record_event
 
-from apps.flow import document, events, http, recipes, vault
+from apps.flow import document, events, gateway, http, recipes, vault
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
     HIGH_RISK,
@@ -65,6 +66,9 @@ from apps.flow.queries import (
 from apps.flow.schemas import (
     AnsweredOut,
     AnswerIn,
+    AssistantRoundIn,
+    AssistantRoundOut,
+    ClaimAssistantOut,
     ClaimCallOut,
     CreateIn,
     DeletedOut,
@@ -81,6 +85,7 @@ from apps.flow.schemas import (
     ReactOut,
     RecipeEnabledOut,
     RecipeRefIn,
+    RecordAssistantIn,
     RecordCallIn,
     RunIn,
     RunOut,
@@ -90,6 +95,7 @@ from apps.flow.schemas import (
     SecretSetIn,
     UpdateIn,
 )
+from base import assistant as hub_assistant
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +167,16 @@ QUESTION_CLOSED = _("This question is closed: its automation no longer waits for
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
 ANSWERED_NO = _("Cancelled: %(who)s answered no to «%(title)s».")
 NOBODY_ANSWERED = _("Cancelled: nobody answered «%(title)s» in time.")
+ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
+ASSISTANT_ROUNDS = _("The assistant took its %(n)s turns without finishing, so it stopped.")
+ASSISTANT_QUOTA = _(
+    "The assistant's messages of this month are spent, so it stopped. They come back on the 1st; for more, "
+    "upgrade the plan."
+)
+ASSISTANT_UNAVAILABLE = _("The assistant could not answer now, so it stopped: resume the run in a while.")
+ASSISTANT_UNREACHABLE = _("It could not reach the assistant on erplora.com, so it stopped: resume the run in a while.")
+ASSISTANT_REFUSED = _("erplora.com's assistant did not take the task, so it stopped.")
+ASSISTANT_GONE = _("«%(name)s» is no longer allowed or available, so the assistant's change was not made.")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
@@ -1040,6 +1056,9 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
             if step["kind"] == "ask":
                 _ask(ctx, run, flow, step, data, now)
                 return
+            if step["kind"] == "assistant":
+                _park_assistant(ctx, run, flow, step, now)
+                return
             try:
                 left, outcome, extras = _operation_step(ctx, run, flow, step, data)
             except StepFailed as failure:
@@ -1097,6 +1116,295 @@ def _go_on(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) ->
 def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, failure: StepFailed, now, left=None) -> None:
     run.resume_at = None
     if _fail(ctx, run, step, failure, now, left):
+        _go_on(ctx, run, flow, now)
+
+
+# --- Asking the assistant (FLOW-F37 to F39) ---------------------------------------------------------
+
+#: Where a step's conversation lives while the assistant thinks: no step id starts with «_» (``StepId``).
+TURN = "_turn"
+#: What the step's instructions add to the assistant's own: nobody is in front, and what a change does.
+UNATTENDED = (
+    "This is a step of the automation «%(name)s» and nobody is watching: never ask a question, decide with your "
+    "tools and answer with what you found or did, in a few words."
+)
+CHANGES = {
+    "ask": "A change you ask for is not made yet: it waits for a person's yes, so say what you proposed.",
+    "auto": "A change you ask for is made at once, for real.",
+}
+
+
+def _park_assistant(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, now: dt.datetime) -> None:
+    """Parks the run on its «Ask the assistant» step and answers: the model is never asked from here (a web request
+    would wait for it). Its ``flow.run.parked`` reaches the worker, which asks it (``flow.run.call``); a step resumed
+    (FLOW-F24) starts its conversation again."""
+    _log(run, step, "thinking", now)
+    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    run.status = FlowRun.Status.CALLING
+    run.resume_at = now
+    run.save()
+    record_event(ctx, events.RUN_PARKED, {"id": str(run.id), "flow_id": str(flow.id), "resume_at": now.isoformat()})
+
+
+def _offered(flow: Flow, step: dict) -> dict[str, Operation]:
+    """The tools of the step: what it names AND the automation was granted, of the active apps, that the assistant
+    may use; never a person's permissions."""
+    catalog = catalog_operations()
+    tools: dict[str, Operation] = {}
+    for name in step.get("tools") or []:
+        op = catalog.get(name)
+        if name in flow.grants and op is not None and hub_assistant.is_tool(op):
+            tools[name] = op
+    return tools
+
+
+def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
+    try:
+        business = get("base.business.get")(ctx, get("base.business.get").input()).model_dump()
+    except OperationError:
+        business = {}
+    currency = business.get("currency") or "EUR"
+    text = hub_assistant.instructions(
+        language=flow.language,
+        currency=currency,
+        decimals=business.get("currency_decimals", 2),
+        business=business.get("name") or "",
+        screens={},
+    )
+    mode = CHANGES.get(step.get("mode", "ask"), CHANGES["ask"])
+    return f"{text}\n\n{UNATTENDED % {'name': flow.name}} {mode}"
+
+
+def _assistant_run(run_id: uuid.UUID) -> tuple[FlowRun | None, dict]:
+    """The run whose «Ask the assistant» step is thinking, locked, and that step; ``None`` for any other."""
+    run = FlowRun.objects.select_for_update(of=("self",)).select_related("flow").filter(pk=run_id).first()
+    if run is None or run.status != FlowRun.Status.CALLING:
+        return None, {}
+    step = run.definition["steps"][run.step_index]
+    return (run, step) if step["kind"] == "assistant" else (None, {})
+
+
+def dispatch_assistant(scope: Scope, run_id: uuid.UUID) -> None:
+    """Asks the assistant a run's step, with no transaction and no lock around a turn: ``flow.run.claim_assistant`` →
+    a turn → ``flow.run.assistant_round`` (its reads and actions, in a transaction of their own) → … →
+    ``flow.run.record_assistant``. A step another process holds, or that ended meanwhile, is left alone."""
+    system = system_context(scope)
+    claimed = get("flow.run.claim_assistant")(system, RunRefIn(id=run_id))
+    if not claimed.claimed:
+        return
+    messages, continuation = claimed.messages, claimed.continuation
+    while True:
+        try:
+            answer = gateway.turn(
+                scope.key, messages=messages, tools=claimed.tools, instructions=claimed.instructions, continuation=continuation
+            )
+        except gateway.Failed as failed:
+            get("flow.run.record_assistant")(system, RecordAssistantIn(id=run_id, failure=failed.code))
+            return
+        if not answer.calls:
+            get("flow.run.record_assistant")(system, RecordAssistantIn(id=run_id, text=answer.text))
+            return
+        went = get("flow.run.assistant_round")(
+            system,
+            AssistantRoundIn(id=run_id, text=answer.text, calls=answer.calls, continuation=answer.continuation),
+        )
+        if not went.go_on:
+            return
+        messages, continuation = went.messages, went.continuation
+
+
+@operation(
+    "flow.run.claim_assistant",
+    kind="command",
+    permission=SYSTEM,
+    input=RunRefIn,
+    output=ClaimAssistantOut,
+    ai={
+        "description": "System only: takes a run's «Ask the assistant» step to ask it (nobody else holds it), with "
+        "its task filled in, the tools it may use and its conversation so far, for CALL_LEASE_MINUTES.",
+        "risk": "normal",
+    },
+)
+def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
+    now = timezone.now()
+    run = (
+        FlowRun.objects.select_for_update(skip_locked=True, of=("self",))
+        .select_related("flow")
+        .filter(pk=data.id, status=FlowRun.Status.CALLING, resume_at__lte=now)
+        .first()
+    )
+    if run is None:
+        return {"claimed": False}
+    flow = run.flow
+    step = run.definition["steps"][run.step_index]
+    if step["kind"] != "assistant":
+        return {"claimed": False}
+    with translation.override(flow.language):
+        if flow.deleted_at is not None:
+            _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.deleted", str(CANCELLED_DELETED))
+            return {"claimed": False}
+        turn = run.outputs.get(TURN) or {
+            "messages": [{"role": "user", "content": document.fill(step["prompt"], {"input": run.input, "steps": run.outputs})}],
+            "rounds": 0,
+            "continuation": None,
+        }
+        instructions = _instructions(ctx, flow, step)
+    run.outputs = {**run.outputs, TURN: turn}
+    run.resume_at = now + dt.timedelta(minutes=CALL_LEASE_MINUTES)
+    run.save(update_fields=["outputs", "resume_at"])
+    return {
+        "claimed": True,
+        "messages": turn["messages"],
+        "tools": [hub_assistant.tool_spec(op) for op in _offered(flow, step).values()],
+        "instructions": instructions,
+        "continuation": turn["continuation"],
+    }
+
+
+def _propose(
+    ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, op: Operation, call: Any, turn: dict, said: str, now
+) -> None:
+    """«Ask me first»: the change waits in «Waiting for your answer» with what it would send, and the run on it; a
+    yes makes it (``answer_question``), a no or silence cancels the run, as a question that stops on a no."""
+    try:
+        arguments = json.loads(call.arguments or "{}")
+    except ValueError:
+        arguments = {}
+    card = hub_assistant.card(op, arguments if isinstance(arguments, dict) else {}, flow.language)
+    lines = [f"{field['label']}: {field['value']}" for field in card["fields"] if field["kind"] != "empty"]
+    question = Question.objects.create(
+        run=run,
+        flow=flow,
+        step_id=step["id"],
+        title=(str(ASSISTANT_WANTS) % {"app": card["app_name"]})[:300],
+        details="\n".join([*([said] if said else []), *lines])[:2000],
+        role="",
+        on_no="stop",
+        on_timeout="no",
+        expires_at=now + dt.timedelta(hours=72),
+        created_at=now,
+    )
+    run.outputs = {**run.outputs, TURN: {**turn, "proposal": {"operation": op.name, "arguments": call.arguments, "text": said}}}
+    _log(run, step, "assistant_proposed", now, operation=op.name, until=question.expires_at.isoformat())
+    run.status = FlowRun.Status.ASKING
+    run.resume_at = question.expires_at
+    run.save()
+    record_event(ctx, events.QUESTION_ASKED, {"id": str(question.id), "run_id": str(run.id), "flow_id": str(flow.id)})
+    record_event(
+        ctx, events.RUN_PARKED, {"id": str(run.id), "flow_id": str(flow.id), "resume_at": question.expires_at.isoformat()}
+    )
+
+
+@operation(
+    "flow.run.assistant_round",
+    kind="command",
+    permission=SYSTEM,
+    input=AssistantRoundIn,
+    output=AssistantRoundOut,
+    ai={
+        "description": "System only: runs the reads and actions the assistant asked for in a run's step, as the "
+        "automation and only those it was offered; with «Ask me first» a change waits for a person's yes instead.",
+        "risk": "normal",
+    },
+)
+def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
+    now = timezone.now()
+    run, step = _assistant_run(data.id)
+    turn = run.outputs.get(TURN) if run is not None else None
+    if run is None or turn is None:
+        return {"go_on": False}
+    flow = run.flow
+    tools = _offered(flow, step)
+    asked = [{"call_id": call.call_id, "name": call.name, "arguments": call.arguments} for call in data.calls]
+    messages = [*turn["messages"], {"role": "assistant", "content": data.text, "tool_calls": [
+        {"id": call["call_id"], "type": "function", "function": {"name": call["name"], "arguments": call["arguments"]}}
+        for call in asked
+    ]}]
+    with translation.override(flow.language):
+        for call in data.calls:
+            op = hub_assistant.operation_of(call.name, tools)
+            if op is None:
+                content = hub_assistant.error_content("not_available", "That tool was not offered in this step.")
+            elif op.kind == "command" and step.get("mode", "ask") == "ask":
+                _propose(ctx, run, flow, step, op, call, {**turn, "messages": messages}, data.text, now)
+                return {"go_on": False}
+            else:
+                outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, call.arguments)
+                _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
+                content = outcome.content
+            messages.append({"role": "tool", "tool_call_id": call.call_id, "content": content})
+        rounds = turn["rounds"] + 1
+        if rounds >= int(step.get("max_rounds", 6)):
+            run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+            failure = StepFailed("flow.assistant_too_many_rounds", str(ASSISTANT_ROUNDS) % {"n": rounds})
+            _call_failed(ctx, run, flow, step, failure, now)
+            return {"go_on": False}
+    run.outputs = {**run.outputs, TURN: {**turn, "messages": messages, "rounds": rounds, "continuation": data.continuation}}
+    run.resume_at = now + dt.timedelta(minutes=CALL_LEASE_MINUTES)
+    run.save()
+    return {"go_on": True, "messages": messages, "continuation": data.continuation}
+
+
+#: How a turn that did not come back ends: the gateway's code → ours and its message.
+_ASSISTANT_FAILURES = {
+    "assistant.quota_exceeded": ("flow.assistant_quota_exceeded", ASSISTANT_QUOTA),
+    "assistant.unreachable": ("flow.assistant_unreachable", ASSISTANT_UNREACHABLE),
+    "assistant.provider_unavailable": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
+    "assistant.internal_error": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
+    "assistant.unavailable": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
+    "rate_limited": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
+}
+
+
+@operation(
+    "flow.run.record_assistant",
+    kind="command",
+    permission=SYSTEM,
+    input=RecordAssistantIn,
+    output=DueOut,
+    ai={
+        "description": "System only: records what the assistant answered in a run's step, for the steps after it, "
+        "and goes on (or stops the run with why it did not answer); an answer for a run no longer thinking changes nothing.",
+        "risk": "normal",
+    },
+)
+def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
+    now = timezone.now()
+    run, step = _assistant_run(data.id)
+    if run is None:
+        return {"count": 0}
+    flow = run.flow
+    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    with translation.override(flow.language):
+        if data.failure:
+            code, message = _ASSISTANT_FAILURES.get(data.failure, ("flow.assistant_refused", ASSISTANT_REFUSED))
+            _call_failed(ctx, run, flow, step, StepFailed(code, str(message), technical=data.failure), now)
+            return {"count": 1}
+        run.outputs = {**run.outputs, step["id"]: {"text": data.text}}
+        _log(run, step, "assistant_answered", now, text=data.text[:2000])
+        run.step_index += 1
+        _go_on(ctx, run, flow, now)
+    return {"count": 1}
+
+
+def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:
+    """A yes to the assistant's change: it is made now, by its own operation, as the automation (what it was granted
+    now, not when it was proposed); then the run goes on, or stops with the operation's refusal."""
+    proposal = (run.outputs.get(TURN) or {}).get("proposal") or {}
+    run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
+    name = str(proposal.get("operation") or "")
+    op = _offered(flow, step).get(name)
+    if op is None:
+        failure = StepFailed("flow.not_allowed", str(ASSISTANT_GONE) % {"name": name})
+    else:
+        outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, str(proposal.get("arguments") or "{}"))
+        _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
+        if outcome.outcome == "ok":
+            _carry_on(ctx, run, flow, step, {"text": proposal.get("text", ""), **left}, now)
+            return
+        error = json.loads(outcome.content).get("error", {})
+        failure = StepFailed(error.get("code") or outcome.code, error.get("message") or "", fields=error.get("fields"))
+    if _fail(ctx, run, step, failure, now):
         _go_on(ctx, run, flow, now)
 
 
@@ -1193,7 +1501,9 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
     step = run.definition["steps"][run.step_index]
     with translation.override(flow.language):
         _log(run, step, "answered", now, approved=data.approve, by=who, note=data.note)
-        if goes_on:
+        if goes_on and step["kind"] == "assistant":
+            _make_proposal(ctx, run, flow, step, {"approved": True, "note": data.note, "answered_by": who}, now)
+        elif goes_on:
             left = {"approved": data.approve, "expired": False, "note": data.note, "answered_by": who}
             _carry_on(ctx, run, flow, step, left, now)
         else:
@@ -1286,10 +1596,17 @@ def dispatch_call(scope: Scope, run_id: uuid.UUID) -> None:
     },
 )
 def call_parked(ctx: OperationContext, data: RunRefIn) -> dict:
-    if not FlowRun.objects.filter(pk=data.id, status=FlowRun.Status.CALLING).exists():
+    parked = FlowRun.objects.filter(pk=data.id, status=FlowRun.Status.CALLING).values("definition", "step_index").first()
+    if parked is None:
         return {"count": 0}
-    transaction.on_commit(partial(dispatch_call, ctx.scope, data.id), robust=True)
+    transaction.on_commit(partial(_dispatcher(parked), ctx.scope, data.id), robust=True)
     return {"count": 1}
+
+
+def _dispatcher(parked: dict):
+    """What a run that waits on something outside the Hub makes, outside any transaction: its call, or its turn."""
+    step = parked["definition"]["steps"][parked["step_index"]]
+    return dispatch_assistant if step["kind"] == "assistant" else dispatch_call
 
 
 @operation(
@@ -1598,15 +1915,15 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
         )
         _advance(ctx, run, flow, now)
         resumed += 1
-    # A call whose lease ran out never answered (the process died): it goes again, with the same key.
+    # A call (or a turn of the assistant) whose lease ran out never answered (the process died): it goes again.
     stuck = (
         FlowRun.objects.filter(status=FlowRun.Status.CALLING, resume_at__lte=now)
         .select_for_update(skip_locked=True)
         .order_by("resume_at", "id")
-        .values_list("pk", flat=True)
+        .values("pk", "definition", "step_index")
     )
-    for run_id in stuck:
-        transaction.on_commit(partial(dispatch_call, ctx.scope, run_id), robust=True)
+    for parked in stuck:
+        transaction.on_commit(partial(_dispatcher(parked), ctx.scope, parked["pk"]), robust=True)
         resumed += 1
     return {"count": resumed}
 

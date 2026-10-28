@@ -530,3 +530,42 @@ msgstr "Valor"
 
 msgid "Answer"
 msgstr "Respuesta"
+
+msgid "The assistant cannot use «%(name)s»."
+msgstr "El asistente no puede usar «%(name)s»."
+
+msgid "The assistant wants to change something in «%(app)s»"
+msgstr "El asistente quiere cambiar algo en «%(app)s»"
+
+msgid "The assistant took its %(n)s turns without finishing, so it stopped."
+msgstr "El asistente ha usado sus %(n)s vueltas sin terminar, así que ha parado."
+
+msgid ""
+"The assistant's messages of this month are spent, so it stopped. They come "
+"back on the 1st; for more, upgrade the plan."
+msgstr ""
+"Los mensajes del asistente de este mes se han acabado, así que ha parado. "
+"Vuelven el día 1; para tener más, sube de plan."
+
+msgid ""
+"The assistant could not answer now, so it stopped: resume the run in a while."
+msgstr ""
+"El asistente no ha podido contestar ahora, así que ha parado: reanuda la "
+"ejecución dentro de un rato."
+
+msgid ""
+"It could not reach the assistant on erplora.com, so it stopped: resume the "
+"run in a while."
+msgstr ""
+"No ha podido llegar al asistente de erplora.com, así que ha parado: reanuda "
+"la ejecución dentro de un rato."
+
+msgid "erplora.com's assistant did not take the task, so it stopped."
+msgstr "El asistente de erplora.com no ha aceptado el encargo, así que ha parado."
+
+msgid ""
+"«%(name)s» is no longer allowed or available, so the assistant's change was "
+"not made."
+msgstr ""
+"«%(name)s» ya no está permitida o disponible, así que el cambio del asistente "
+"no se ha hecho."

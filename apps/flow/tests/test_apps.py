@@ -41,6 +41,9 @@ COMMANDS = {
     "flow.run.call",
     "flow.run.claim_call",
     "flow.run.record_call",
+    "flow.run.claim_assistant",
+    "flow.run.assistant_round",
+    "flow.run.record_assistant",
     "flow.question.answer",
     "flow.question.expire_due",
     "flow.recipe.enable",
@@ -73,6 +76,9 @@ SYSTEM = {
     "flow.run.prune",
     "flow.run.claim_call",
     "flow.run.record_call",
+    "flow.run.claim_assistant",
+    "flow.run.assistant_round",
+    "flow.run.record_assistant",
     "flow.question.expire_due",
 }
 

@@ -599,6 +599,25 @@ class RecordCallIn(In):
     )
 
 
+class ToolCallIn(In):
+    call_id: str = Field(max_length=200, description="The call's id, as the model gave it.")
+    name: str = Field(max_length=200, description="The tool's name, as the gateway names it (`task__task__create`).")
+    arguments: str = Field("{}", max_length=200_000, description="Its data, as JSON text.")
+
+
+class AssistantRoundIn(In):
+    id: UUID = Field(description="The run whose «Ask the assistant» step is thinking.")
+    text: str = Field("", max_length=200_000, description="What the model said with its calls.")
+    calls: list[ToolCallIn] = Field(min_length=1, max_length=64, description="The reads and actions it asked for.")
+    continuation: str | None = Field(None, max_length=4096, description="What the gateway gave with the calls.")
+
+
+class RecordAssistantIn(In):
+    id: UUID = Field(description="The run whose «Ask the assistant» step ended.")
+    text: str = Field("", max_length=200_000, description="What the assistant answered.")
+    failure: str = Field("", max_length=96, description="Why it did not answer: the gateway's code; empty when it did.")
+
+
 class RunListIn(PageIn):
     limit: int = Field(
         20, ge=1, le=100, description="How many runs to return (1 to 100)."
@@ -834,6 +853,8 @@ class CatalogActionOut(Schema):
     description: str
     fields: list[FieldOut]
     outputs: list[str]
+    #: Whether «Ask the assistant» may use it (its ``ai=`` offers it to the assistant).
+    assistant: bool = False
 
 
 class CatalogOut(Schema):
@@ -870,6 +891,7 @@ class TestStepOut(Schema):
         "skipped",
         "would_call",
         "would_ask",
+        "would_ask_assistant",
     ]
     operation: str = ""
     params: dict[str, Any] = {}
@@ -894,6 +916,20 @@ class ReactOut(Schema):
 
 class DueOut(Schema):
     count: int
+
+
+class ClaimAssistantOut(Schema):
+    claimed: bool
+    messages: list[dict[str, Any]] = []
+    tools: list[dict[str, Any]] = []
+    instructions: str = ""
+    continuation: str | None = None
+
+
+class AssistantRoundOut(Schema):
+    go_on: bool
+    messages: list[dict[str, Any]] = []
+    continuation: str | None = None
 
 
 class DeletedOut(Schema):

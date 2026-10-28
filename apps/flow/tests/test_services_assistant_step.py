@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
+from live.context import system_context
 
 from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, FlowRun, Question
@@ -275,14 +276,17 @@ def test_a_turn_left_half_way_is_asked_again_when_its_lease_runs_out(gateway, cl
     ran = start(worker, flow)  # parked, and the worker never ran
     clock(NOON + dt.timedelta(minutes=6))
     gateway.reply(CHAT, json=said("Back"))
-    worker.request("flow.run.resume_due", {})
+    worker.request("flow.run.resume_due", {}, system_context(A))
     assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
 
 
 def test_trying_it_says_what_it_would_ask_and_asks_nothing(gateway):
-    tried = run("flow.flow.test", {"document": {"trigger": {"kind": "manual"}, "steps": [step()]}, "input": {"name": "Ana"}})
+    document = {"trigger": {"kind": "manual"}, "steps": [step(prompt="Find the free slots of tomorrow")]}
+    tried = run("flow.flow.test", {"document": json.dumps(document)})
     assert tried.steps[0].outcome == "would_ask_assistant"
-    assert tried.steps[0].params["prompt"] == "Help Ana"
+    assert tried.steps[0].params == {
+        "prompt": "Find the free slots of tomorrow", "tools": ["task.task.list", "task.task.create"], "mode": "ask",
+    }
     assert gateway.sent(CHAT) == []
 
 
