@@ -81,6 +81,9 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "demo__item__create" in names
     assert "Spanish" in plan["instructions"]
     assert (plan["append"], plan["executed"], plan["confirm"], plan["pending"]) == ([], [], None, [])
+    # The business's currency with its decimals: an amount in its minor unit
+    # (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY).
+    assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
 
 
 # ── Reads run by themselves (BASE-G115) ──────────────────────────────────────────────────────────────────────────

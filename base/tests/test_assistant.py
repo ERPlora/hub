@@ -649,13 +649,29 @@ def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
 
 
 def test_the_instructions_set_the_language_the_money_and_the_screens():
-    text = assistant.instructions(language="es", currency="EUR", business="Bar Pepe", screens={"/settings": "Ajustes"})
+    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
     # gh:hub#1046: the old assistant answered anything (films, cinemas) on the business's allowance.
     assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
     assert "EUR" in text and "cents" in text
     assert "[Ajustes](/settings)" in text
     assert "Bar Pepe" in text
+
+
+@pytest.mark.parametrize(
+    ("currency", "decimals", "example"),
+    [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],
+)
+def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currency, decimals, example):
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a tool's result gives its amounts with their
+    currency (``currency`` and ``currency_decimals``: an invoice keeps the one it was issued in) and the card paints them
+    in it, but the model was told to say every amount in the business's, with two decimals: its text and the card
+    disagreed. An amount goes in the minor unit of its currency (no cents in yen), said in the currency its result
+    gives, else in the business's."""
+    text = assistant.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
+    assert example in text
+    assert "`currency`" in text and "`currency_decimals`" in text
+    assert "two decimals" not in text
 
 
 def test_the_setup_block_carries_what_is_pending_and_who_does_it():

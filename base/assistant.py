@@ -588,14 +588,16 @@ def rounds(messages: list[dict]) -> int:
 # ── The instructions of a turn ───────────────────────────────────────────────────────────────────────────────────
 
 
-def instructions(*, language: str, currency: str, business: str, screens: dict[str, str]) -> str:
+def instructions(*, language: str, currency: str, decimals: int, business: str, screens: dict[str, str]) -> str:
     """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
-    tools and money, and the screens it may link."""
+    tools and money (an amount in the minor unit of its currency, ``decimals`` the business's; said in the currency
+    its result gives, else the business's), and the screens it may link."""
     try:
         language_name = get_language_info(language)["name"]
     except KeyError:
         language_name = language
     links = "\n".join(f"- [{name}]({path})" for path, name in screens.items())
+    example = f"{17:.{decimals}f} {currency} → {17 * 10**decimals}"
     return f"""You are the assistant of the business «{business}» in ERPlora, its point of sale and management app.
 Answer in {language_name}, short and plain, as a colleague who knows the app. Use Markdown: bold, lists and tables.
 
@@ -605,8 +607,9 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   or a date: if no tool returned it, say you do not know or that you could not find it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
-- Amounts: fields «in cents» take whole cents (17.00 {currency} → 1700). To the person, always write amounts in
-  {currency} with two decimals (17.00), never in cents.
+- Amounts: fields «in cents» take the amount in the minor unit of the business's currency ({example}). To the
+  person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals) when
+  it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}
 - If something cannot be done from here (you have no tool for it), say on which screen it is done."""
