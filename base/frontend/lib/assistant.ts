@@ -1,6 +1,7 @@
 // The state of the assistant's panel (APP-BASE-9), one per tab: it outlives the panel's component (remounted when the
 // person changes) and a turn goes on while the panel is closed.
-// - A question (BASE-G111) goes out with the whole conversation; its answer arrives into ONE bubble, from every round.
+// - A question (BASE-G111) goes out with the whole conversation; its answer arrives into ONE bubble, from every round,
+//   each round's text its own paragraph (BASE-F101).
 // - The reads the model asks for go on by themselves (each round is one more request of the turn, BASE-G119); a write
 //   stops on its card (BASE-G115, G116) until `decide` — yes, no, or «Cancel all» (`stop`).
 // - «Stop» (`stop`) aborts the request: what was written stays. A failure ends the bubble with its code (BASE-G124),
@@ -99,6 +100,12 @@ function forGateway(conversation: ChatMessage[]): ChatMessage[] {
   );
 }
 
+/** What a round already wrote, ready for the next one to start its own paragraph (BASE-F101): a blank line, never two. */
+function asNewParagraph(text: string): string {
+  if (!text || text.endsWith('\n\n')) return text;
+  return text.endsWith('\n') ? `${text}\n` : `${text}\n\n`;
+}
+
 function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
@@ -193,9 +200,15 @@ export function createAssistant(deps: AssistantDeps = {}) {
       let doneFrame: Extract<TurnFrame, { type: 'done' }> | null = null;
       let confirm: { card: AssistantCard; call: PendingCall } | null = null;
       let failure: { code: string; details: Record<string, unknown> } | null = null;
+      let spoke = false;
       const onFrame = (frame: TurnFrame) => {
-        if (frame.type === 'text') current.bubble.text += frame.text;
-        else if (frame.type === 'executed') current.executed.push({ name: frame.name, kind: frame.kind, outcome: frame.outcome, app: frame.app, app_name: frame.app_name });
+        if (frame.type === 'text') {
+          if (!spoke && frame.text) {
+            current.bubble.text = asNewParagraph(current.bubble.text);
+            spoke = true;
+          }
+          current.bubble.text += frame.text;
+        } else if (frame.type === 'executed') current.executed.push({ name: frame.name, kind: frame.kind, outcome: frame.outcome, app: frame.app, app_name: frame.app_name });
         else if (frame.type === 'usage') state.usage = { used: frame.used, limit: frame.limit, resets_at: frame.resets_at, demo: frame.demo };
         else if (frame.type === 'confirm') confirm = { card: frame.card, call: frame.call };
         else if (frame.type === 'error') {

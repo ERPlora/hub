@@ -7,7 +7,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { memoryStorage } from '../__tests__/mount-base';
 import { createAssistant, OPEN_KEY } from './assistant';
 import type { AssistantCard } from './assistant-card';
+import { groundingNotices } from './assistant-grounding';
 import { HISTORY_KEY } from './assistant-history';
+import { parseMarkdown } from './assistant-markdown';
 import type { PendingCall, TurnBody, TurnFrame, TurnOptions } from './assistant-stream';
 
 const CREATE: PendingCall = { call_id: 'c1', name: 'demo__item__create', arguments: '{"name":"Mesa 4"}' };
@@ -158,6 +160,99 @@ describe('several things in a row (BASE-G115, G119)', () => {
     await assistant.ask('crea Mesa 4');
     await assistant.decide(false, '', true);
     expect(bodies[1].decision).toEqual({ call_id: 'c1', accepted: false, typed: '', stop: true });
+  });
+});
+
+// BASE-F101 step 2: what each round of a turn says goes to the same bubble, as its own paragraph — never glued to
+// the previous round («… Diferencia: +137.90 €No lo he hecho.»).
+describe('the text of each round, its own paragraph in the same bubble (BASE-F101)', () => {
+  const paragraphs = (text: string) => parseMarkdown(text).map((block) => block.kind);
+
+  it('two rounds with text are two paragraphs of one bubble; the conversation keeps what the server appended', async () => {
+    const { post } = hub(
+      [{ type: 'text', text: 'Miro las mesas.' }, done({ append: [asked(LIST)], pending: [LIST], continuation: 'tok' })],
+      [
+        { type: 'executed', call_id: 'r1', name: 'demo.item.list', app: 'demo', kind: 'query', outcome: 'ok', code: '' },
+        { type: 'text', text: 'Tienes 3.' },
+        done({ append: [{ role: 'tool', tool_call_id: 'r1', content: '{"rows":[]}' }, { role: 'assistant', content: 'Tienes 3.' }] }),
+      ],
+    );
+    const storage = memoryStorage();
+    const assistant = assistantWith(post, storage);
+    await assistant.ask('¿Cuántas mesas?');
+    const answers = assistant.state.thread.bubbles.filter((b) => b.role === 'assistant');
+    expect(answers.map((b) => b.text)).toEqual(['Miro las mesas.\n\nTienes 3.']);
+    expect(paragraphs(answers[0].text)).toEqual(['paragraph', 'paragraph']);
+    // BASE-F102: what goes back to the model is the server's, untouched; the tab keeps the bubble as painted.
+    expect(assistant.state.thread.conversation.slice(1)).toEqual([
+      asked(LIST),
+      { role: 'tool', tool_call_id: 'r1', content: '{"rows":[]}' },
+      { role: 'assistant', content: 'Tienes 3.' },
+    ]);
+    expect(assistantWith(hub().post, storage).state.thread.bubbles.at(-1)!.text).toBe('Miro las mesas.\n\nTienes 3.');
+  });
+
+  it('the pieces of one round are joined as they come, with nothing between them', async () => {
+    const { post } = hub(
+      [{ type: 'text', text: 'Diferencia: +137' }, { type: 'text', text: '.90 €' }, done({ append: [asked(LIST)], pending: [LIST] })],
+      [{ type: 'text', text: 'No lo he ' }, { type: 'text', text: 'hecho.' }, done()],
+    );
+    const assistant = assistantWith(post);
+    await assistant.ask('cierra la caja');
+    expect(assistant.state.thread.bubbles.at(-1)!.text).toBe('Diferencia: +137.90 €\n\nNo lo he hecho.');
+  });
+
+  it('the round after the card the person answered starts its own paragraph', async () => {
+    const { post } = hub(
+      [{ type: 'text', text: 'Diferencia: +137.90 €' }, { type: 'confirm', card: CARD, call: CREATE }, done({ append: [asked(CREATE)], pending: [CREATE] })],
+      [
+        { type: 'executed', call_id: 'c1', name: 'demo.item.create', app: 'demo', kind: 'command', outcome: 'cancelled', code: '' },
+        { type: 'text', text: 'No lo he hecho.' },
+        done(),
+      ],
+    );
+    const assistant = assistantWith(post);
+    await assistant.ask('cierra la caja');
+    await assistant.decide(false);
+    expect(assistant.state.thread.bubbles.at(-1)!.text).toBe('Diferencia: +137.90 €\n\nNo lo he hecho.');
+  });
+
+  it('a round with no text adds nothing, and the bubble never starts with a separator', async () => {
+    const { post } = hub(
+      [done({ append: [asked(LIST)], pending: [LIST] })],
+      [{ type: 'text', text: '' }, { type: 'text', text: 'Tienes 3.' }, done({ append: [asked(LIST)], pending: [LIST] })],
+      [{ type: 'text', text: '' }, done({ append: [asked(LIST)], pending: [LIST] })],
+      [done()],
+    );
+    const assistant = assistantWith(post);
+    await assistant.ask('¿Cuántas?');
+    expect(assistant.state.thread.bubbles.at(-1)!.text).toBe('Tienes 3.');
+  });
+
+  it('a round that already ends on a line break gets just what makes it a paragraph, never a double one', async () => {
+    const { post } = hub(
+      [{ type: 'text', text: '- Mesa 1\n' }, done({ append: [asked(LIST)], pending: [LIST] })],
+      [{ type: 'text', text: 'Hay una.\n\n' }, done({ append: [asked(LIST)], pending: [LIST] })],
+      [{ type: 'text', text: '¿Algo más?' }, done()],
+    );
+    const assistant = assistantWith(post);
+    await assistant.ask('lista');
+    const text = assistant.state.thread.bubbles.at(-1)!.text;
+    expect(text).toBe('- Mesa 1\n\nHay una.\n\n¿Algo más?');
+    expect(paragraphs(text)).toEqual(['list', 'paragraph', 'paragraph']);
+  });
+
+  it('what it says is checked as before (BASE-F99): the paragraph changes no notice', async () => {
+    const rounds = ['Miro.', 'He creado Mesa 4. Ve a [Informes](/reports).'];
+    const { post } = hub(
+      [{ type: 'text', text: rounds[0] }, done({ append: [asked(LIST)], pending: [LIST] })],
+      [{ type: 'text', text: rounds[1] }, done()],
+    );
+    const assistant = assistantWith(post);
+    await assistant.ask('crea Mesa 4');
+    const glued = groundingNotices({ answer: rounds.join(''), executed: [], results: [], question: 'crea Mesa 4', screenExists: (path) => path === '/settings' });
+    expect(glued).toEqual(['claimed_change', 'unknown_screen']);
+    expect(assistant.state.thread.bubbles.at(-1)!.notices).toEqual(glued);
   });
 });
 

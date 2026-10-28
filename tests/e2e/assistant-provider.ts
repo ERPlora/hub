@@ -8,6 +8,8 @@
 // - `E2E-ASK <tool> <JSON>`: asks for any write by its tool's name with those data as written, then says how it went
 //   (the card of a datum outside the screen's own list, FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH);
 // - `E2E-CHAIN <name>`: reads the items (`demo.item.list`), then asks to create one with that name, then says so;
+// - `E2E-STEPS <name>`: the same chain, speaking in every round (`STEPS_SAID` before the read, then before the write):
+//   each round's words, their own paragraph of the one bubble (BASE-F101);
 // - `E2E-CLOSE-CASH <cents>`: closes the drawer as CASH_REGISTER-F09 asks — reads the close's summary
 //   (`cash_register.session.closing_summary`) with that count, then says it (`closeCashSummary`) and, in the same answer,
 //   asks for the dangerous write `cash_register.session.close` of the session it named, then says how it went;
@@ -37,6 +39,8 @@ export const FORMAT_ANSWER = [
   '| Tostada con tomate y aceite de oliva virgen extra | 5 | 12,50 € |',
 ].join('\n');
 export const CLAIM_ANSWER = 'Listo: he creado la mesa 9 y la he guardado.';
+/** What `E2E-STEPS` says before its read and before its write: one round each. */
+export const STEPS_SAID = ['Miro primero qué mesas tienes.', 'Ninguna se llama así: te pido crearla.'];
 
 export interface Seen {
   path: string;
@@ -157,6 +161,13 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
     const results = messages.filter((message) => message.role === 'tool').length;
     if (results === 0) return call('demo__item__list', {});
     if (results === 1) return call('demo__item__create', { name: chain[1].trim() });
+  }
+  const steps = /E2E-STEPS (.+)$/m.exec(question);
+  if (steps) {
+    // The results of this request only: the conversation may have run a chain before.
+    const results = messages.slice(messages.findLastIndex((message) => message.role === 'user') + 1).filter((message) => message.role === 'tool').length;
+    if (results === 0) return call('demo__item__list', {}, STEPS_SAID[0]);
+    if (results === 1) return call('demo__item__create', { name: steps[1].trim() }, STEPS_SAID[1]);
   }
   const closeCash = /E2E-CLOSE-CASH (\d+)/.exec(question);
   if (closeCash) {
