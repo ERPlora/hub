@@ -353,6 +353,7 @@ test('BASE-F101 — several things in a row: what each round says is its own par
     await untilStill(page);
     await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
   }
+  if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
 
 test('BASE-G116 — a dangerous write lists its data and runs only after typing the word', async ({ page, context }) => {
