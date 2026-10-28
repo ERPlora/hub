@@ -117,6 +117,44 @@ def test_a_demo_has_no_business_on_erplora_com_to_change_it(settings):
     assert (demo["country"], demo["currency"], demo["timezone"], demo["language"]) == ("", "EUR", "Europe/Madrid", "en")
 
 
+ERPLORA = Scope("host", "erplora")
+
+
+def test_erplora_s_own_hub_answers_erplora_s_business_from_its_issuer(settings):
+    """Phase 1: ERPlora's own hub has no registry row (``create_platform_hub``), yet its business is ERPlora itself,
+    the issuer of its invoices: its legal name and country, that country's currency, and the deployment's zone and
+    language. Nothing of it is changed on erplora.com, so no address to change it."""
+    settings.LANGUAGE_CODE, settings.TIME_ZONE = "en", "Europe/Madrid"
+    settings.PLATFORM_ISSUER_LEGAL_NAME, settings.PLATFORM_ISSUER_COUNTRY = "ERPLORA CLOUD SL", "ES"
+    assert not Hub.objects.filter(slug="erplora").exists()
+    answer = business(ERPLORA)
+    assert answer == BusinessOut.model_validate(answer).model_dump(mode="json")
+    assert answer == {
+        "name": "ERPLORA CLOUD SL",
+        "country": "ES",
+        "country_name": "España",
+        "timezone": "Europe/Madrid",
+        "language": "en",
+        "language_name": "Inglés",
+        "currency": "EUR",
+        "currency_label": "EUR · Euro",
+        "currency_decimals": 2,
+        "demo": False,
+        "settings_url": "",
+    }
+
+
+def test_erplora_s_own_hub_follows_its_issuer_s_country_and_not_a_registry_row(settings):
+    """Its currency is always the one its invoices and its apps charge in (``business_currency``): the issuer's
+    country's, even once phase 2 gives it a registry row."""
+    settings.PLATFORM_ISSUER_LEGAL_NAME, settings.PLATFORM_ISSUER_COUNTRY = "ERPlora Ltd", "GB"
+    first = business(ERPLORA, language="en")
+    Hub.objects.create(slug="erplora", status="ready", name="Another name", country="JP")
+    assert business(ERPLORA, language="en") == first
+    assert (first["name"], first["country"], first["country_name"]) == ("ERPlora Ltd", "GB", "United Kingdom")
+    assert (first["currency"], first["currency_label"], first["currency_decimals"]) == ("GBP", "GBP · British Pound", 2)
+
+
 def test_a_scope_without_a_business_is_not_found_and_says_so_in_the_person_s_language():
     with translation.override("es"), pytest.raises(NotFound) as refused:
         business(Scope("host", "nobody"))

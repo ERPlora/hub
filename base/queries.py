@@ -36,7 +36,7 @@ from base.models import (
     SessionOwner,
     TrustedDevice,
 )
-from base.operations import hub_id
+from base.operations import hub_id, is_platform_hub
 from base.permissions import ADMINISTER_HUB, FULL_ACCESS_ROLES, VIEW_HOME
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
@@ -584,24 +584,51 @@ def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
     """Settings › Business (BASE-G97…G99) and what the old ``/api/hub/context`` gave (BASE-G43): the business as the
     SaaS registered it, from the registry of this scope, never another's. The currency is its country's
     (``base.business``); a demo has no business on erplora.com, hence no address to change it, and the deployment's
-    zone and language until the SaaS says otherwise."""
+    zone and language until the SaaS says otherwise. ERPlora's own hub (PLAN-SAAS §4) is ERPlora itself, the issuer of
+    its invoices: its legal name and country from ``PLATFORM_ISSUER_*``, row or not (phase 1 has none,
+    ``create_platform_hub``), so its currency is the one its invoices and its apps charge in; nothing of it is changed
+    on erplora.com. Every app asks for that currency through ``base.operations.business_currency``."""
+    if is_platform_hub(ctx.scope):
+        return _business(
+            ctx,
+            name=settings.PLATFORM_ISSUER_LEGAL_NAME,
+            country=settings.PLATFORM_ISSUER_COUNTRY,
+            zone=settings.TIME_ZONE,
+            language=settings.LANGUAGE_CODE,
+            demo=False,
+            settings_url="",
+        )
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     if hub is None:
         raise NotFound(gettext("There is no business here."))
-    language = hub.language or settings.LANGUAGE_CODE
-    currency = business.currency_of(hub.country)
+    return _business(
+        ctx,
+        name=hub.name,
+        country=hub.country,
+        zone=hub.timezone or settings.TIME_ZONE,
+        language=hub.language or settings.LANGUAGE_CODE,
+        demo=hub.is_demo,
+        settings_url="" if hub.is_demo else saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/settings"),
+    )
+
+
+def _business(
+    ctx: OperationContext, *, name: str, country: str, zone: str, language: str, demo: bool, settings_url: str
+) -> dict:
+    """``BusinessOut`` of one business, each value named in ``ctx``'s language."""
+    currency = business.currency_of(country)
     return {
-        "name": hub.name,
-        "country": hub.country,
-        "country_name": business.country_name(hub.country, ctx.language),
-        "timezone": hub.timezone or settings.TIME_ZONE,
+        "name": name,
+        "country": country,
+        "country_name": business.country_name(country, ctx.language),
+        "timezone": zone,
         "language": language,
         "language_name": business.language_name(language, ctx.language),
         "currency": currency,
         "currency_label": business.currency_label(currency, ctx.language),
         "currency_decimals": business.currency_decimals(currency),
-        "demo": hub.is_demo,
-        "settings_url": "" if hub.is_demo else saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/settings"),
+        "demo": demo,
+        "settings_url": settings_url,
     }
 
 
