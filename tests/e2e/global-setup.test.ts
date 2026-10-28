@@ -253,6 +253,8 @@ describe('assertLocalHubsRegistered', () => {
 describe('assertDemoAccountsSeeded', () => {
   const SEEDED: CommandResult = { status: 0, stdout: 'employee@example.com\nowner@example.com\n', stderr: '' };
   const NONE: CommandResult = { status: 0, stdout: '', stderr: '' };
+  /** The local demo hubs `a` and `b` (`seed_local_hubs`), both of which every demo account must reach. */
+  const DEMO_HUBS_COUNT = 2;
 
   /** A psql double on the SaaS's database: one answer, and every statement it got. */
   function fakeSaasSql(answer: CommandResult): { statements: string[]; run: (statement: string) => CommandResult } {
@@ -273,6 +275,15 @@ describe('assertDemoAccountsSeeded', () => {
     for (const word of ["'owner@example.com'", "'employee@example.com'", "'a'", "'b'", 'accounts_user', 'accounts_hubmembership']) {
       expect(saas.statements[0]).toContain(word);
     }
+  });
+
+  // An account with access to one demo hub only is not seeded: the select keeps an email only with every demo hub
+  // (`having count(distinct …) = 2`). A psql double cannot run SQL, so this pins the clause the mutant `>= 1` lost.
+  it('counts an account as seeded only with access to every demo hub, a and b', () => {
+    const saas = fakeSaasSql(SEEDED);
+
+    assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031');
+    expect(saas.statements[0]).toContain(`having count(distinct m.hub_slug) = ${DEMO_HUBS_COUNT}`);
   });
 
   it('stops the run naming the missing accounts and the exact command that seeds them', () => {
