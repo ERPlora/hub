@@ -115,10 +115,11 @@ export async function mountCombo(component: Component, options: MountOptions = {
   await router.isReady();
   const app = createApp({});
   provideSession(ref(options.session ?? MANAGER), ref('live'), { app });
+  const i18n = createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } });
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
+      plugins: [router, i18n],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },
@@ -187,7 +188,13 @@ export async function mountCombo(component: Component, options: MountOptions = {
     return ((root.parentElement ?? root).querySelector(selector) ?? document.querySelector(selector)) as HTMLElement | null;
   };
 
-  return { ...harness, router, wrapper, live, params, subId, result, reopen, sent, answer, answerBy, find, inDoc };
+  /** The person changes the app's language (the shell's selector): what is on screen follows it. */
+  async function setLocale(locale: 'en' | 'es'): Promise<void> {
+    i18n.global.locale.value = locale;
+    await flush();
+  }
+
+  return { ...harness, router, wrapper, live, params, subId, result, reopen, sent, answer, answerBy, find, inDoc, setLocale };
 }
 
 /** Answers each API call of `harness` by its path (a call not listed gets a 404 envelope). */
