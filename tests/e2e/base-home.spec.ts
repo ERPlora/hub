@@ -492,9 +492,10 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
 // por rol» painted every role in the panel's colour although each role has its own (the old hub's `renderBarList` gave
 // each bar `color: row[map.color]`). The owner of `a`, in Spanish, with that panel alone on the board and two roles of
 // colours of their own: each role's bar is in its row's colour when the panel maps one (`map.color`, as the server
-// declares it in `base.widget.list`) and in the panel's otherwise. Staff does not map it yet (its own FIX), so today this
-// run checks the panel's colour; Vitest (`home.test.ts`, `WidgetPanel.test.ts`) pins the row's colour, the hex-only rule
-// and the red of a negative. Everything this block creates is named «E2E-ROWCOLOR …» and removed after it.
+// declares it in `base.widget.list`) and in the panel's otherwise. Staff maps it (FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-
+// COLOR), so this run checks each row's colour; Vitest (`home.test.ts`, `WidgetPanel.test.ts`) pins the panel's colour
+// without `map.color`, the hex-only rule and the red of a negative. Everything this block creates is named
+// «E2E-ROWCOLOR …» and removed after it.
 test.describe('BASE-F06 — a bar-list with the colour of its row', () => {
   test.describe.configure({ mode: 'serial' });
 
