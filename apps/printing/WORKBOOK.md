@@ -92,11 +92,13 @@ di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este o
 
 - **Cola de impresión**: una tarjeta por cada función que tenga alguna impresora o trabajos
   esperando (un negocio nuevo no ve ninguna), con su nombre («Recibo», «Cocina», «Barra»,
-  «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Sin dispositivo», «Con errores»), «En cola: N · el más
+  «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Sin dispositivo», «Dispositivo apagado», «Con errores»), «En cola: N · el más
   antiguo lleva 3 min» o «Nada en cola», los fallidos («Fallidos: N») y por qué impresora sale ahora:
   «Imprime en: Caja.» (la elegida en los ajustes o, si no, la primera activa con esa función). Si
   tiene trabajos en cola que ningún dispositivo dado de alta puede sacar, sale «Sin dispositivo» con
-  «Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.». Una
+  «Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.». Si el dispositivo está dado de alta
+  pero lleva 90 s sin dar señales y algún trabajo espera ya un minuto, sale «Dispositivo apagado» con «El dispositivo
+  que lo imprime no responde: enciéndelo y abre en él la app de ERPlora.». Una
   función con trabajos esperando más de un minuto y sin ninguna impresora activa saca el aviso naranja
   «3 trabajos de impresión de Cocina llevan 3 min esperando. Ninguna impresora activa tiene esta
   función: añade una abajo o dale esta función a una de ellas.» («1 trabajo … lleva …» si es uno). Con
@@ -133,7 +135,7 @@ Cocina.» (en verde); si no está dado de alta, a quien gestiona las impresoras 
 imprime aquí: quien gestiona las impresoras lo da de alta desde él.».
 
 La tabla (o tarjetas en el móvil), por nombre: Nombre (con «Este dispositivo» en el suyo), Impresoras (una
-inactiva, «Cocina (inactiva)»), Último trabajo pedido («hace 3 min» o «Nunca») y Dado de alta por. Quien gestiona
+inactiva, «Cocina (inactiva)»), Visto por última vez («hace 3 min» o «Nunca») y Dado de alta por. Quien gestiona
 las impresoras ve arriba «Imprimir desde este dispositivo» (solo si este no está dado de alta) y en cada fila
 «Editar» y «Retirar». Vacía: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las impresoras
 desde ese dispositivo.». Error al cargar: «No se pudieron cargar los dispositivos.» con «Reintentar».
@@ -215,12 +217,14 @@ Pasos:
    imprime los tiques de tus clientes, para que la primera venta salga en papel.»), «Recomendado», a
    quien gestiona las impresoras. «Configurar» lleva a **Impresión → Dispositivos** (PRINTING-F18); el
    paso queda «Hecho» en cuanto ese dispositivo está dado de alta, encendido o no.
-2. Si una función tiene trabajos en cola que ningún dispositivo dado de alta puede sacar (ninguno llega a
-   su impresora, o esperan impresora y ninguno llega a una de su función), la campana de todos los que
-   ven Impresión enseña una fila por función: «Nadie está imprimiendo «Recibo»» (o «Cocina», «Barra»,
+2. Si una función tiene trabajos que llevan un minuto o más en cola y ningún dispositivo encendido puede
+   sacarlos (ninguno dado de alta llega a su impresora, o esperan impresora y ninguno llega a una de su función,
+   o el que llega lleva 90 s sin dar señales: está apagado o sin la app de ERPlora abierta), la campana de todos
+   los que ven Impresión enseña una fila por función: «Nadie está imprimiendo «Recibo»» (o «Cocina», «Barra»,
    «Etiqueta») con cuántos esperan. Tocarla abre **Impresión → Impresoras**, donde la tarjeta de esa
-   función dice «Sin dispositivo» y «Ningún dispositivo dado de alta lo imprime: dalo de alta en
-   Dispositivos.» (o «En cola, sin impresora» si no tiene ninguna impresora activa).
+   función dice por qué: «Sin dispositivo» y «Ningún dispositivo dado de alta lo imprime: dalo de alta en
+   Dispositivos.», «Dispositivo apagado» y «El dispositivo que lo imprime no responde: enciéndelo y abre en él
+   la app de ERPlora.» o «En cola, sin impresora» si no tiene ninguna impresora activa.
 3. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora y cuál
    la imprime, cuánto espera y desde cuándo.
 4. Abre **Impresión → Cola** para ver cada trabajo con su estado, sus intentos y su último error.
@@ -233,11 +237,15 @@ y un enviado que no contestó a tiempo) se recalcula solo cada 30 s, sin esperar
 día» exige que no haya nada en cola, enviado sin confirmar ni fallido. Las pantallas se refrescan solas al encolarse, enviarse, imprimirse, fallar,
 reintentarse o cancelarse un trabajo. El paso del Inicio y las filas de la campana cambian solos, sin
 recargar, al encolarse, fallar o cancelarse un trabajo, al darse de alta, cambiarse o retirarse un
-dispositivo y al cambiar una impresora; la fila se va sola cuando un dispositivo puede sacar lo que espera
-(no hay «marcar como leído»).
+dispositivo y al cambiar una impresora; lo que mueve el reloj (un trabajo que cumple el minuto, un dispositivo
+que deja de dar señales o vuelve) lo recoge la campana sola cada 30 s, como la del Hub viejo. La fila se va sola
+cuando un dispositivo encendido puede sacar lo que espera (no hay «marcar como leído»).
 Si falla: «No se pudo leer la cola de impresión.» con «Reintentar»; no se pinta «Todo al día» cuando
-la lectura falla. La campana no mira el reloj ni si el dispositivo está encendido: un dispositivo dado de
-alta pero apagado no la hace sonar (la cola lo dice con «Esperando» pasado un minuto).
+la lectura falla. Un dispositivo dado de alta pero apagado sí hace sonar la campana, pasado el minuto: el paso
+del Inicio sigue «Hecho» (dado de alta basta), pero nadie está imprimiendo. Un trabajo que lleva menos de un
+minuto no la hace sonar (un dispositivo que se reinicia no es una alarma). La tarjeta de la función se lee al
+abrir **Impresoras** y con cada cambio de la cola, los dispositivos o las impresoras; si el dispositivo se
+apaga con la pantalla abierta, la campana lo dice a los 30 s y la tarjeta al volver a entrar.
 Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
 
 ### PRINTING-F02 Encontrar una impresora de la red sin escribir su dirección
@@ -579,7 +587,11 @@ Pasos:
    después queda «Fallido».
 4. Si el dispositivo se cae sin contestar, pasado el plazo el trabajo vuelve a la cola y se avisa a los
    dispositivos.
-5. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
+5. Mientras la app de ERPlora del dispositivo está conectada para imprimir, dice que está ahí al conectarse y en
+   cada latido (cada 30 s), con la sesión de quien la usa, también la de un empleado; darlo de alta desde él y
+   pedir un trabajo también cuentan. La lista lo enseña en «Visto por última vez». Si pasa 90 s sin dar señales,
+   cuenta como apagado: sus trabajos hacen sonar la campana pasado el minuto (PRINTING-F01).
+6. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
    un dispositivo («Editar») o lo retira («Retirar», tras confirmarlo): ya no imprime nada, y los trabajos que
    tenía vuelven a la cola cuando vence su plazo. Un dispositivo retirado no vuelve a recibir trabajos, tampoco con
    la sesión de quien gestiona las impresoras: hay que darlo de alta otra vez desde él («Imprimir desde este
@@ -588,7 +600,8 @@ Entra: el nombre del dispositivo y las impresoras a las que llega; al pedir, sus
 resultado.
 Sale: el dispositivo dado de alta, cambiado o retirado (avisa: `printing.device.registered`,
 `printing.device.updated`, `printing.device.retired`) y el trabajo con su estado (avisa: `printing.job.claimed`,
-`printing.job.printed`, `printing.job.failed`).
+`printing.job.printed`, `printing.job.failed`). Que el dispositivo está ahí no avisa a nadie: cada latido cada
+30 s despertaría todas las pantallas; la campana mira el reloj.
 Si falla: un dispositivo que nadie dio de alta, o retirado, no recoge nada aunque la sesión pueda imprimir: «Este
 dispositivo no está dado de alta para imprimir aquí: quien gestiona las impresoras lo da de alta en Impresión →
 Dispositivos.», y la cola no cambia; imprimir desde un dispositivo retirado no lo vuelve a dar de alta, ni
@@ -649,12 +662,12 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Los ajustes de impresión (los de fábrica si nunca se guardaron) | ver | F06 | `printing.settings.get` |
 | Las impresoras, con búsqueda por nombre, filtros (función, conexión, activa) y páginas, cada una con su estado | ver | F03, F04, F19 | `printing.printer.list` |
 | Una impresora por id o por nombre | ver | F04 | `printing.printer.get` |
-| Los dispositivos que imprimen, por nombre, con sus impresoras, quién los dio de alta, cuándo pidieron el último trabajo y cuál es el que pregunta | ver | F18 | `printing.device.list` |
+| Los dispositivos que imprimen, por nombre, con sus impresoras, quién los dio de alta, cuándo se vieron por última vez y cuál es el que pregunta | ver | F18 | `printing.device.list` |
 | El dispositivo dado de alta con un identificador, con sus impresoras (para el canal del dispositivo, al conectarse; sin ruta ni asistente) | imprimir | F18 | `printing.device.get` |
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
-| El resumen de la cola por función, con la impresora por la que sale cada una y cuántos trabajos no puede sacar ningún dispositivo dado de alta | ver | F01 | `printing.job.summary` |
-| Si una función tiene un dispositivo dado de alta que la imprime y cuántos de sus trabajos en cola no puede sacar ninguno (el paso del Inicio y la campana) | ver | F01 | `printing.device.coverage` |
+| El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01 | `printing.job.summary` |
+| Si una función tiene un dispositivo dado de alta que la imprime, encendido o no (el paso del Inicio), y cuántos de sus trabajos llevan un minuto o más en cola sin un dispositivo encendido que los saque (la campana) | ver | F01 | `printing.device.coverage` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -668,6 +681,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Da de alta el dispositivo desde el que se pide, con su nombre y sus impresoras | ajustes | F18 | `printing.device.register` |
 | Cambia el nombre o las impresoras de un dispositivo | ajustes | F18 | `printing.device.update` |
 | Retira un dispositivo: ya no imprime | ajustes | F18 | `printing.device.retire` |
+| Apunta que el dispositivo dado de alta con un identificador está ahí (para el canal del dispositivo, al conectarse y en cada latido; sin ruta, sin asistente y sin aviso) | imprimir | F01, F18 | `printing.device.seen` |
 | Da al dispositivo dado de alta el siguiente trabajo de sus impresoras | imprimir | F18 | `printing.job.claim` |
 | Confirma un trabajo impreso | imprimir | F18 | `printing.job.complete` |
 | Avisa de que un trabajo no salió | imprimir | F18 | `printing.job.fail` |
@@ -807,6 +821,20 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    retirado (`retired: true`), este con cualquier sesión, también la de quien gestiona las impresoras, que solo
    empareja un dispositivo nuevo; un `beat` del retirado contesta `refreshed: 0`
    (FIX-PRINTING-DEVICE-GET-RETIRED-VS-UNREGISTERED).
+6. **Presencia** (el `heartbeat` de `print_hosts.rs` del Hub viejo; FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF):
+   `PrintingConfig.print_presence = "printing.device.seen"` (`base.E006`). `/ws/print` la ejecuta en el `hello` y en
+   cada `beat` de un dispositivo que imprime para alguna impresora, como mucho una vez cada `PRESENCE_SECONDS` (15 s),
+   con el contexto de la sesión del dispositivo: por eso pide `printing.print`, que tiene el empleado (con
+   `printing.manage_settings` la presencia de la caja de un empleado nunca se grabaría: el canal solo deja un aviso
+   en el log). Escribe `last_seen_at` del alta no retirada con ese `deviceId` (`{"seen": true}`; si no, `false`, sin
+   dar de alta nada) y no registra evento. `printing.device.register` y `printing.job.claim` también la escriben.
+   La campana (`printing.device.coverage`, `count`) cuenta los trabajos en cola desde hace `STALLED_AFTER` (60 s,
+   `UNDRAINED_ALERT_SECONDS`) o más que ningún dispositivo con `last_seen_at` en los últimos `SEEN_WITHIN` (90 s,
+   `HOST_TTL_SECONDS`) puede sacar; `configured` (el paso del Inicio) y `unattended` del resumen siguen mirando solo
+   el alta. Como esa cifra cambia sin evento, `bell_refresh_every = {"stalled_<función>": 30}` (`base.E007`): la
+   campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries.py`,
+   `tests/test_services.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
+   `tests/test_integration_home.py`.
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 
