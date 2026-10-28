@@ -24,14 +24,14 @@ from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
+from live.context import OperationContext
 from live.errors import (
     Conflict,
     InvalidPayload,
     NotFound,
     PermissionDenied,
 )
-from live.operations import get, operation
+from live.operations import operation
 
 from apps.sale import pricing
 from apps.sale.models import (
@@ -94,12 +94,11 @@ from apps.tax.queries import (
 )
 from apps.tax.schemas import TAX_KIND_NAMES
 from base.approvals import approval_of, digest
-from base.business import currency_decimals, currency_of
+from base import operations as platform
+from base.business import currency_decimals
 from base.models import Approval
-from base.operations import call, is_platform_hub
+from base.operations import call
 
-#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
-BUSINESS = "base.business.get"
 #: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
 LIMITS_CURRENCY = "EUR"
 #: In a business of Spain, no cash at all from this total on (Ley 7/2012, art. 7), mixed included.
@@ -194,14 +193,10 @@ TYPE_SETTING = {
 
 
 def business_currency(ctx: OperationContext) -> str:
-    """The currency of ``ctx``'s business (ISO 4217), the one a sale charged now keeps, as ``base.business.get`` reads
-    it. Read as the platform: an API key holds only the permissions of what it charges, and every person of the hub may
-    see it anyway. ERPlora's own hub has no business on erplora.com (phase 1: no registry row, ``create_platform_hub``):
-    it charges in the currency of its issuer's country, as its invoices do."""
-    if is_platform_hub(ctx.scope):
-        return currency_of(django_settings.PLATFORM_ISSUER_COUNTRY)
-    business = get(BUSINESS)
-    return business(system_context(ctx.scope), business.input()).currency
+    """The currency of ``ctx``'s business (ISO 4217), the one a sale charged now keeps: the one question every app that
+    charges asks (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub too, never a copy of its own.
+    Sales' public answer: Cash register counts in it (``requires = ["sale"]``)."""
+    return platform.business_currency(ctx.scope)
 
 
 def business_country() -> str:

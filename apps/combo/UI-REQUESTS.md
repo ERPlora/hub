@@ -25,6 +25,10 @@ de aquí y cambia el sustituto en la misma PR del puntero.
   `MoneyInput` con la prop `signed`. Al llegar, se borran las copias.
 - **`useLiveList` / `useServerTable` / `useT`**: copias de las de Impuestos, como en el resto de apps;
   mismo destino (`@erplora/ui/sdk`).
+- **Nombre de un buscador suelto** (`useSearchbarName`, la misma petición que `sale`): Ionic 8 anuncia el campo de
+  todo `ion-searchbar` como «search text», en inglés. Hoy el buscador de «Añadir varios»
+  (`components/BulkAddModal.vue`) llama a `syncSearchbarInputName` de `@erplora/ui/components` con su propio
+  `watch` (al abrirse la ventana y al cambiar el idioma); al llegar el composable, se cambia por él.
 
 ## Cerradas
 

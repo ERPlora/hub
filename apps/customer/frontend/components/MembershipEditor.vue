@@ -5,13 +5,15 @@
 // unticked and has not saved stays so through a live result of the card (its other list saved, someone
 // else's change); the rest follows the card, and what is no longer seen is not sent. A group no
 // longer active is still shown on the cards that have it, marked so. Who cannot manage cards only sees.
+// Past 100 groups (tags) a search box shows, read by its hint in the person's language (not «search text»).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonSearchbar } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import { useCustomerI18n } from '../lib/useCustomerI18n';
+import { useSearchbarName } from '../lib/useSearchbarName';
 
 const props = defineProps<{
   kind: 'groups' | 'tags';
@@ -32,6 +34,8 @@ const query = () => ({ limit: 100, sort: 'name' as const, ...(search.value.trim(
 const source = props.kind === 'groups' ? useLive('customer.group.list', query) : useLive('customer.tag.list', query);
 /** More than one query holds: the search is needed (and stays once it was). */
 const searchable = computed(() => search.value !== '' || (source.data.value?.total ?? 0) > rows.value.length);
+const searchHint = computed(() => (isGroups.value ? t('customer.groups.search') : t('customer.tags.search')));
+useSearchbarName(useTemplateRef('bar'), () => searchHint.value);
 const rows = computed<{ id: string; name: string; is_active: boolean }[]>(() => source.data.value?.rows ?? []);
 
 const setGroups = useCommand('customer.customer.set_groups');
@@ -139,10 +143,11 @@ async function save(): Promise<void> {
     </InlineFeedback>
     <ion-searchbar
       v-if="searchable"
+      ref="bar"
       class="ion-no-border customer-membership__search"
       :data-testid="`${hook}-search`"
       :value="search"
-      :placeholder="isGroups ? $t('customer.groups.search') : $t('customer.tags.search')"
+      :placeholder="searchHint"
       :debounce="250"
       @ion-input="search = String($event.detail.value ?? '')"
     />
