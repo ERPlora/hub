@@ -4,6 +4,9 @@
 // the charge with its change, the ticket and the sale in «Sales» are in złoty, in 390, 834 and 1440 (captures
 // `FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`). Back in Spain the till is in euros and the sale charged in
 // Poland keeps its złoty (`…-es-1440`). What the run creates is deleted after it and `a`'s registration put back.
+// flow: SALE-F01 (FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY): the server charges the sale in the currency Sales asks
+// `base` for (`base.operations.business_currency`, BASE-F50), never a copy of its own: the ticket of the sale charged in
+// złoty (captures `FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY-<width>`).
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
@@ -12,6 +15,7 @@ import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
+const BASE_KEY = 'FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
@@ -91,6 +95,7 @@ async function chargeInCash(page: Page, size: string): Promise<void> {
   await expect(receipt).toContainText(ZLOTY);
   await expect(receipt).not.toContainText(EURO);
   await page.screenshot({ path: shot(`${KEY}-ticket-${size}`) });
+  await page.screenshot({ path: shot(`${BASE_KEY}-${size}`) });
   await page.locator('[data-testid=sale-document-modal] [data-testid=sale-document-close]').click();
   await expect(receipt).toBeHidden();
 }
