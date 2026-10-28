@@ -109,7 +109,7 @@
       "columns": {
         "name": "Name",
         "printers": "Printers",
-        "lastSeen": "Last job asked",
+        "lastSeen": "Last seen",
         "registeredBy": "Set up by"
       },
       "thisDevice": "This device",
@@ -194,6 +194,8 @@
       "stalled": "Waiting, no printer",
       "noDevice": "No device",
       "noDeviceHint": "No device set up here prints it: set one up in Devices.",
+      "deviceOff": "Device off",
+      "deviceOffHint": "The device that prints it is not responding: switch it on and open the ERPlora app on it.",
       "failing": "With errors",
       "waiting": "Waiting: {n}",
       "oldest": "the oldest has waited {age}",

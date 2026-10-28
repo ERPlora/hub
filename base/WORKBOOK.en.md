@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7d488d2034ee7643f784191677dbe74ee11112b235ea90e85b4ddbe1b9a91526 -->
+<!-- generated from WORKBOOK.md sha256:05f3fac543f42bb4d0d86940019ceac4cd64b611b8bfcb6c6cfbbb9c418a884e -->
 
 ## What it is for and who it is for
 
@@ -1987,13 +1987,17 @@ Actor: employee, manager
 Screen: An approval is needed
 Steps:
   1. Somebody tries something their role does not allow and that the app lets a manager approve. Instead of an
-     error, "An approval is needed" shows with "Approving: {action}", in the app's words.
+     error, "An approval is needed" shows with "Approving: {action}", in the app's words and in the language of
+     whoever asks; when the app says it with figures, with those of that very request (the percentage or the amount
+     of a discount, in the business's currency, or the quantity), so the manager knows how much they approve. If a
+     figure is missing or zero, the sentence does not name it.
   2. They read "Ask a manager to enter their PIN to approve it." and "…or to swipe their badge: nothing to press
      first.".
   3. Under "Who approves it?", the faces of those who may do it themselves and have a PIN (with only one, their pad
      shows at once). The manager taps theirs and types their PIN on the pad, whole in view without scrolling, the 0
      and "Erase" too ("Another person" goes back to the faces), or swipes their badge at any moment.
   4. The action is done once and "Approved by {name}" shows. The session of whoever asked is not closed.
+  From the assistant too: the "yes" of its card opens the same dialog, with the figures of what it was asked.
 In: the name and the PIN, or the badge, of whoever approves.
 Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in
 **Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`. It is spent together with the
@@ -2015,10 +2019,12 @@ Steps:
   1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that needed a
      manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or
      delete it.".
-  2. A row per approval, the latest first: "When", "Action" (in words), "Approved by", "Asked by", "With" ("PIN"
-     or "Badge") and "State" ("Used" or "Not used").
-  3. They search with "Search by person or action…" and, in "Filters" (the funnel), filter by "When" (a day or a few
-     days in a row), "Action" (the ones on the record), "With" and "State".
+  2. A row per approval, the latest first: "When", "Action" (in words and in their language; with the figures of
+     what was done with it, when the app gives them: an unused approval did nothing and has no figures), "Approved
+     by", "Asked by", "With" ("PIN" or "Badge") and "State" ("Used" or "Not used").
+  3. They search with "Search by person or action…" (by its figures too) and, in "Filters" (the funnel), filter by
+     "When" (a day or a few days in a row), "Action" (the ones on the record, each once and without figures), "With"
+     and "State".
   4. "Export CSV" downloads a file with the approvals the search and the filters keep, also the older ones the list
      no longer shows, with the same columns in their language; meanwhile it says "Exporting…".
 In: the record of approvals.

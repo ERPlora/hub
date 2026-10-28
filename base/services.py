@@ -2362,7 +2362,8 @@ def approval_spend(ctx: OperationContext, data: ApprovalSpendIn) -> dict:
     if approval is None:
         return {"spent": False, "id": "", "approver": ""}
     approval.used_at = now
-    approval.save(update_fields=["used_at"])
+    approval.figures = data.figures or None
+    approval.save(update_fields=["used_at", "figures"])
     record_event(ctx, events.APPROVAL_USED, {"id": str(approval.pk), "operation": approval.operation})
     return {"spent": True, "id": str(approval.pk), "approver": approval.approved_by_name}
 
@@ -2625,22 +2626,26 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
         return _assistant_refusal("cancelled", "base.assistant_stopped", STOPPED), None
     if not decision.accepted or not assistant.confirmed(card, decision.typed):
         return _assistant_refusal("cancelled", "base.assistant_not_confirmed", NOT_CONFIRMED), None
-    return assistant.run_tool(_assistant_approved(ctx, op), op, call.arguments), None
+    return assistant.run_tool(_assistant_approved(ctx, op, call.arguments), op, call.arguments), None
 
 
-def _assistant_approved(ctx: OperationContext, op) -> OperationContext:
+def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
     """Who runs a write the person said yes to (BASE-G118): the person. When they may not and a manager may approve it
     (APP-BASE-5), the turn asks as the screen does — ``requires_elevation`` for this very request — and, repeated with
     the pass, runs it with that one permission more; the pass is spent in the write's own transaction
-    (``base.approval_spend``), so a write that fails leaves it unspent and one that ran cannot run twice."""
+    (``base.approval_spend``), so a write that fails leaves it unspent and one that ran cannot run twice. The question
+    says the figures of that write, read from its ``arguments`` as the command validates them."""
     request = getattr(ctx, "request", None)
     if ctx.has(op.permission) or request is None or approval_rules.approvable(op.name) is None:
         return ctx
     asked = approval_rules.fingerprint(request, ctx.scope.key)
+    figures = approval_rules.figures_from(op, arguments)
     token = request.headers.get(approval_rules.HEADER, "")
     if not token.startswith(approval_rules.TOKEN_PREFIX):
-        raise approval_rules.refusal(op.name, asked)
-    request.approved = approval_rules.Approved(operation=op.name, permission=op.permission, token=token, fingerprint=asked)
+        raise approval_rules.refusal(op.name, asked, figures, ctx.scope)
+    request.approved = approval_rules.Approved(
+        operation=op.name, permission=op.permission, token=token, fingerprint=asked, figures=figures
+    )
     return dataclasses.replace(ctx, permissions=frozenset(ctx.permissions) | {op.permission})
 
 

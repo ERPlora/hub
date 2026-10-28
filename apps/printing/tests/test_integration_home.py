@@ -1,25 +1,29 @@
 """Printing on the Home (PLAN-HUB round 2026-10-21; FIX-PRINTING-SETUP-HOOKS): base's own queries bring the old hub's
 core item «Set up your printer» (gh:hub#1948), recommended, pending until a device set up here reaches an active
 receipt printer, to whoever sets printers up; and the bell's «Nothing is printing “…”» (old-hub:HUB_SHELL-F63,
-gh:hub#800), one row per function with the jobs that wait and no device set up here can print, to everybody with
-Printing, leading to the printers' state by function (gh:hub#2016). Every change of either records an event they
-are refreshed on, and a change in hub B re-runs B's Home only.
+gh:hub#800), one row per function with the jobs that have waited a minute and no device on can print (set up here and
+seen in the last 90 s, FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF), to everybody with Printing, leading to the
+printers' state by function (gh:hub#2016). Every change of either records an event they are refreshed on, the bell
+reads the clock every 30 s for what time moves, and a change in hub B re-runs B's Home only.
 
 base and printing run for real: the hooks come from PrintingConfig through base's own queries, as the person.
 """
 
 import dataclasses
+import datetime as dt
 import json
 
 import psycopg
 import pytest
 from django.apps import apps
+from django.db.models import F
+from django.utils import timezone
 from live.live_registry import live_registry
 from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
-from apps.printing.models import PrintJob
+from apps.printing.models import PrintDevice, PrintJob
 from apps.printing.tests.conftest import A, B, ctx_for, enqueue, printer, run
 from apps.printing.tests.test_services import SPARE_ID, TILL_ID, answer, on_device, register, take
 from base.permissions import VIEW_HOME
@@ -38,10 +42,17 @@ def step(ctx) -> dict | None:
     return found[0] if found else None
 
 
-def bell(ctx) -> dict[str, dict]:
+def bell_read(ctx, *, waited: dt.timedelta | None = dt.timedelta(minutes=2)) -> dict:
+    """``base.bell.counters`` for the person of ``ctx``, as the SPA receives it. ``waited``: read as if every job waiting
+    had been queued that long before (the bell counts what waited a minute); ``None``: as they are."""
+    if waited is not None:
+        PrintJob.objects.filter(status=PrintJob.Status.PENDING).update(created_at=F("created_at") - waited)
+    return get("base.bell.counters")(ctx, BellCountersIn()).model_dump(mode="json")
+
+
+def bell(ctx, **read) -> dict[str, dict]:
     """Printing's rows of the bell for the person of ``ctx``, by key, as the SPA receives them."""
-    counters = get("base.bell.counters")(ctx, BellCountersIn()).model_dump(mode="json")["counters"]
-    return {row["key"]: row for row in counters if row["app"] == "printing"}
+    return {row["key"]: row for row in bell_read(ctx, **read)["counters"] if row["app"] == "printing"}
 
 
 def counted(ctx=None) -> dict[str, int]:
@@ -184,6 +195,33 @@ def test_a_device_that_prints_them_quiets_the_bell_and_at_zero_nothing_shows():
     enqueue()
     register(till)
     assert bell(ctx_for()) == {}
+
+
+@pytest.mark.django_db
+def test_a_device_set_up_but_off_rings_the_bell_once_the_receipt_waited_a_minute():
+    # FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF: the till set up for the receipts went off (no news for 90 s, the old
+    # hub's HOST_TTL_SECONDS); a minute after a receipt is queued (UNDRAINED_ALERT_SECONDS), nobody is printing it.
+    till = printer("Till")
+    register(till)
+    PrintDevice.objects.update(last_seen_at=timezone.now() - dt.timedelta(seconds=95))
+    job = enqueue().job
+    assert bell(ctx_for("hub_employee"), waited=None) == {}, "not before the minute"
+    PrintJob.objects.filter(pk=job.id).update(created_at=timezone.now() - dt.timedelta(seconds=65))
+    assert counted() == {"printing.stalled_receipt": 1}
+    assert step(ctx_for("hub_owner"))["state"] == "done", "the step asks set up only: off is not undone"
+
+    # The till says it is there (base's /ws/print, at its hello and its beats): nobody waits for it any more.
+    run("printing.device.seen", {"device": TILL_ID}, ctx=ctx_for("hub_employee"))
+    assert bell(ctx_for("hub_employee"), waited=None) == {}
+
+
+@pytest.mark.django_db
+def test_the_bell_reads_its_rows_again_every_30_seconds_for_whoever_sees_printing():
+    # Nothing records an event when a minute passes or a till goes quiet: the SPA's bell asks again (HubBell.vue).
+    assert bell_read(ctx_for("hub_employee"))["refresh_every"] == 30
+    # Printing is the only app whose bell moves with the clock: whoever cannot see it is not asked again.
+    who_sees_the_home_only = dataclasses.replace(ctx_for("hub_employee"), permissions=frozenset({VIEW_HOME}))
+    assert bell_read(who_sees_the_home_only)["refresh_every"] is None
 
 
 @pytest.mark.django_db

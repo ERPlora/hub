@@ -15,6 +15,7 @@ function approval(fields: Partial<ApprovalRow> = {}): ApprovalRow {
     id: '0199aaaa-0000-7000-8000-000000000001',
     at: '2026-10-24T09:30:00Z',
     action: 'Void a sale',
+    operation_label: 'Void a sale',
     operation: 'sale.sale.void',
     requested_by: 'Eva',
     approved_by: 'Adam',
@@ -61,6 +62,28 @@ describe('ApprovalsList', () => {
     expect(rows[1].find('[data-testid="approvals-used"]').text()).toBe('Sin usar');
   });
 
+  // FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE (BASE-F85): each row says the figure of what was done («Discount
+  // a line by 50 %»), and the «Action» filter offers each action once, by its name without figures.
+  it('shows each row with its figure and offers each action once, without figures, behind the funnel', async () => {
+    const m = await open({ locale: 'es' });
+    const line = { operation: 'sale.order.set_line_discount_over_limit', operation_label: 'Descontar una línea por encima del máximo' };
+    await m.result(m.call, 'base.approval.list', {
+      approvals: [
+        approval({ ...line, action: 'Descontar una línea un 50\u00a0%' }),
+        approval({ ...line, id: '0199aaaa-0000-7000-8000-000000000002', action: 'Descontar una línea un 30\u00a0%' }),
+      ],
+    });
+    expect(m.wrapper.findAll('[data-testid="approvals-row"]').map((row) => row.text())).toEqual([
+      expect.stringContaining('Descontar una línea un 50\u00a0%'),
+      expect.stringContaining('Descontar una línea un 30\u00a0%'),
+    ]);
+    const props = m.wrapper.getComponent(DataTable).props() as Record<string, unknown>;
+    const action = (props.columns as { key: string; filter?: { options?: unknown } }[]).find((c) => c.key === 'action');
+    expect(action?.filter?.options).toEqual([
+      { value: 'sale.order.set_line_discount_over_limit', label: 'Descontar una línea por encima del máximo' },
+    ]);
+  });
+
   // The old hub filtered the record by dates, action and level (HUB_SHELL-F93): here by day, action, how and whether it
   // was used, behind the funnel; the actions offered are the ones on the record, in words, each once.
   it('filters by day, action, how and whether it was used behind the funnel', async () => {
@@ -68,7 +91,12 @@ describe('ApprovalsList', () => {
     await m.result(m.call, 'base.approval.list', {
       approvals: [
         approval(),
-        approval({ id: '0199aaaa-0000-7000-8000-000000000002', action: 'Refund a sale', operation: 'sale.sale.refund' }),
+        approval({
+          id: '0199aaaa-0000-7000-8000-000000000002',
+          action: 'Refund a sale',
+          operation_label: 'Refund a sale',
+          operation: 'sale.sale.refund',
+        }),
         approval({ id: '0199aaaa-0000-7000-8000-000000000003', way: 'badge', used: false, used_at: null }),
       ],
     });

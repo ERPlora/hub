@@ -5,6 +5,7 @@ from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
+from django.core import checks
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import BellCounter, Category, LiveAppConfig, SetupCheck, SetupStep, module_configs, permissions_for_role
@@ -12,6 +13,7 @@ from live.operations import registry
 
 from apps.printing import events as E
 from base import home
+from base.ws_print import presence_operation
 
 PERMISSIONS = [
     "printing.view_settings",
@@ -181,6 +183,24 @@ def test_the_bell_says_which_function_nobody_is_printing_one_row_each():
         for usage, english, _spanish in FUNCTIONS
     ]
     assert all(list(counter.refresh_on) == UNATTENDED for counter in counters)
+
+
+def test_the_bell_reads_the_clock_every_30_seconds_for_each_function():
+    """A job starts counting once it has waited a minute, and a device stops counting 90 s after its last news: the
+    number moves with no event, so the bell reads it again every 30 s, the old bell's poll (print-alert.ts, POLL_MS)."""
+    assert config().bell_refresh_every == {f"stalled_{usage}": 30 for usage, _english, _spanish in FUNCTIONS}
+    assert set(config().bell_refresh_every) == {counter.key for counter in config().bell}
+
+
+def test_the_devices_presence_is_printings_own_command_and_base_checks_it_clean():
+    """base's /ws/print tells it at a device's hello and every beat (``print_presence``, base.E006), as the device's
+    user: an employee's till prints, so it asks printing.print only."""
+    assert config().print_presence == "printing.device.seen"
+    op = registry["printing.device.seen"]
+    assert (op.kind, op.permission, "device" in op.input.model_fields) == ("command", "printing.print", True)
+    assert presence_operation() == "printing.device.seen"
+    assert "printing.print" in permissions_for_role([config()], "hub_employee")
+    assert [message.id for message in checks.run_checks(tags=["base"]) if message.id in ("base.E006", "base.E007")] == []
 
 
 def test_the_bell_rows_say_the_old_words_in_spanish():

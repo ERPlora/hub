@@ -239,6 +239,27 @@ def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent
     assert _items() == 1
 
 
+def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(client, make_user, gateway, approvable_create, monkeypatch):
+    """FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE: the chat asks with the figures of the very write the
+    person said yes to, read from its arguments as the command validates them; the pass spent keeps them."""
+    from django.apps import apps
+
+    from base.models import Approval, Credential
+
+    monkeypatch.setattr(apps.get_app_config("demo"), "approval_figures", {"demo.item.create": ["Create the item {name}"]}, raising=False)
+    _employee_and_manager(client, make_user)
+    body = _create_turn()
+    asked = post(client, "/assistant/turn", body).json()["error"]["approval"]
+    assert asked["label"] == "Create the item Mesa 4"
+    manager = str(Credential.objects.get(username="saas:4").pk)
+    approval = {"operation": asked["operation"], "fingerprint": asked["fingerprint"], "person": manager, "pin": "1357"}
+    token = post(client, "/approvals", approval).json()["token"]
+    gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", body, HTTP_X_ELEVATION_TOKEN=token))
+    assert got[0]["outcome"] == "ok"
+    assert Approval.objects.get().figures == {"name": "Mesa 4"}
+
+
 def test_a_pass_for_another_request_does_not_let_this_one_through(client, make_user, gateway, approvable_create):
     from base.models import Credential
 

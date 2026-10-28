@@ -97,6 +97,27 @@ def test_an_employee_reads_but_does_not_write(employee_client):
 
 
 @pytest.mark.django_db
+def test_an_employee_s_line_asks_for_a_manager_s_approval_saying_its_figures(client, make_user):
+    """BASE-F84: the reference app names «add a line» as what a manager approves on the spot, said with the quantity and
+    the text of that very line (``approval_figures``), in the language of who asks; nothing is added meanwhile."""
+    client.force_login(make_user("boss", host="a", role="hub_admin"))
+    item = post(client, "/demo/items", {"name": "Order"}).json()
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    line = {"id": item["id"], "text": "Coffee", "qty": "2.500"}
+    asked = {}
+    for language in ("en", "es"):
+        response = client.post(
+            "/api/demo/items/add_line", json.dumps(line), content_type="application/json",
+            HTTP_HOST="a.localhost", HTTP_ACCEPT_LANGUAGE=language,
+        )
+        assert response.status_code == 403, response.content
+        assert response.json()["error"]["code"] == "requires_elevation"
+        asked[language] = response.json()["error"]["approval"]["label"]
+    assert asked == {"en": "Add a line: 2.5 × Coffee", "es": "Añadir una línea: 2,5 × Coffee"}
+    assert get(client, "/demo/items/detail", id=item["id"]).json()["lines"] == []
+
+
+@pytest.mark.django_db
 def test_a_role_on_a_is_no_role_on_b(admin_client):
     response = get(admin_client, "/demo/items", host="b.localhost")
     assert response.status_code == 403

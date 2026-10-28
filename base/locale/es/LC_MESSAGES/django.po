@@ -1539,6 +1539,10 @@ msgctxt "approval"
 msgid "used at"
 msgstr "usado el"
 
+msgctxt "approval"
+msgid "figures"
+msgstr "cifras"
+
 #: models.py:499
 msgctxt "approval"
 msgid "approval"

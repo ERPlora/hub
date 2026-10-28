@@ -23,6 +23,7 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from base.models import AccessSettings, Approval, Membership
+from base.tenancy.tests.hubs import HUB_DATABASES
 from base.tests.test_people import with_badge, with_pin
 
 pytestmark = pytest.mark.django_db
@@ -273,7 +274,9 @@ class TestTheRecord:
         assert response.status_code == 403
 
 
-def recorded(operation=APPROVABLE, *, way="pin", used=True, at=None, asked="Eva", approver="Adam") -> Approval:
+def recorded(
+    operation=APPROVABLE, *, way="pin", used=True, at=None, asked="Eva", approver="Adam", figures=None
+) -> Approval:
     """An approval on the record, as `base.approval.approve` leaves it (`at`: when it was approved)."""
     row = Approval.objects.create(
         operation=operation,
@@ -287,6 +290,7 @@ def recorded(operation=APPROVABLE, *, way="pin", used=True, at=None, asked="Eva"
         way=way,
         expires_at=timezone.now() + dt.timedelta(minutes=2),
         used_at=timezone.now() if used else None,
+        figures=figures,
     )
     if at is not None:
         Approval.objects.filter(pk=row.pk).update(created_at=at)
@@ -436,3 +440,294 @@ class TestACommandThatTouchesNoDatabase:
 
         monkeypatch.setattr(apps.get_app_config("base"), "approvals", {self.NO_DATABASE: "Report an answer"}, raising=False)
         assert approvable(self.NO_DATABASE) is None
+
+
+# ── What is approved, with the figure of that very request (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE) ─────
+# hub#2180, hub#2186, sales#398, sales#403: the manager sees how much they approve («a 50 % discount»), as Toast and
+# Square print it, not only what kind of action. Beside its words, an app declares in ``approval_figures`` how they are
+# said with the figures of the request: sentences tried in order, whose holes name fields of the command's input
+# (``{field}``, ``{field, percent}``, ``{field, money}``); the first one whose every hole fills is said. The figures are
+# read from the input as the command's own schema validates it, never from the raw body, and only the fields a sentence
+# names; a hole fills with no empty value and no zero; none fills, or no declaration: the words of always.
+
+FIGURED = {APPROVABLE: ["Lock the till after {pin_inactivity_minutes} minutes with {pin_length} digits",
+                        "Lock the till after {pin_inactivity_minutes} minutes"]}
+PERCENT = {APPROVABLE: ["Lock the till at {pin_inactivity_minutes, percent}"]}
+THIRTY = {"pin_policy": "always", "pin_inactivity_minutes": 30}
+
+
+def declare(monkeypatch, figures: dict, config: str = "base") -> None:
+    monkeypatch.setattr(apps.get_app_config(config), "approval_figures", figures, raising=False)
+
+
+def asked_in(client, language: str, body=THIRTY) -> dict:
+    response = client.post(
+        f"/api{SETTINGS}", json.dumps(body), content_type="application/json", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE=language
+    )
+    assert response.status_code == 403, response.content
+    assert code(response) == "requires_elevation"
+    return response.json()["error"]["approval"]
+
+
+class TestTheFigure:
+    def test_the_question_says_the_figure_of_that_very_request_in_the_person_s_language(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, PERCENT)
+        assert asked_in(client, "en")["label"] == "Lock the till at 30%"
+        assert asked_in(client, "es")["label"] == "Lock the till at 30\xa0%"
+
+    def test_the_first_sentence_whose_every_hole_fills_is_said(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, FIGURED)
+        assert asked_in(client, "en", {**THIRTY, "pin_length": 6})["label"] == "Lock the till after 30 minutes with 6 digits"
+        # No ``pin_length`` in this request: its sentence does not fill, the next one does.
+        assert asked_in(client, "en")["label"] == "Lock the till after 30 minutes"
+
+    def test_no_sentence_that_fills_is_the_words_of_always(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, FIGURED)
+        assert asked_in(client, "en", {"pin_policy": "never"})["label"] == "Change how the till asks who is there"
+
+    def test_without_a_declaration_it_is_the_words_of_always(self, client, adam, eva):
+        assert asked_in(client, "en")["label"] == "Change how the till asks who is there"
+
+    def test_an_input_the_command_does_not_take_is_the_words_of_always_and_no_new_error(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, PERCENT)
+        # The raw body says 30, but the command's schema refuses it (an unknown policy): no figure is read from it.
+        asked = asked_in(client, "en", {"pin_policy": "bogus", "pin_inactivity_minutes": 30})
+        assert asked["label"] == "Change how the till asks who is there"
+        # A text where the command takes a number: refused by its schema, so no figure either.
+        assert asked_in(client, "en", {"pin_inactivity_minutes": "30"})["label"] == "Change how the till asks who is there"
+
+    def test_the_figure_is_the_validated_input_s_not_the_body_s(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, FIGURED)
+        # The body says 30.0; the command's schema reads 30, and 30 is what the manager reads.
+        assert asked_in(client, "en", {"pin_inactivity_minutes": 30.0})["label"] == "Lock the till after 30 minutes"
+
+    def test_the_fingerprint_does_not_change_with_the_declaration(self, client, adam, eva, monkeypatch):
+        before = asked_in(client, "en")["fingerprint"]
+        declare(monkeypatch, PERCENT)
+        assert asked_in(client, "en")["fingerprint"] == before
+
+    def test_another_app_cannot_say_the_figures_of_a_command_of_base(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, PERCENT, config="table")
+        assert asked_in(client, "en")["label"] == "Change how the till asks who is there"
+
+
+class TestTheFigureOnTheRecord:
+    """BASE-F85: the record says the figure of what was done with the approval, in the language of who reads it; an
+    approval nobody used says the action without one (nothing was done)."""
+
+    def test_the_pass_spent_keeps_only_the_figures_its_sentences_name(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, FIGURED)
+        asked = asked_in(client, "en")
+        token = approve(client, asked, "saas:2").json()["token"]
+        assert Approval.objects.get().figures is None
+        assert post(client, SETTINGS, THIRTY, **with_pass(token)).status_code == 200
+        assert Approval.objects.get().figures == {"pin_inactivity_minutes": 30, "pin_length": None}
+
+    def test_the_list_says_the_figure_in_the_reader_s_language_and_the_action_without_it_for_its_filter(
+        self, client, adam, eva, monkeypatch
+    ):
+        declare(monkeypatch, PERCENT)
+        token = approve(client, asked_in(client, "en"), "saas:2").json()["token"]
+        post(client, SETTINGS, THIRTY, **with_pass(token))
+        recorded(used=False)
+        client.force_login(adam)
+        rows = client.get("/api/approvals", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es").json()["approvals"]
+        assert [row["action"] for row in rows] == ["Change how the till asks who is there", "Lock the till at 30\xa0%"]
+        assert {row["operation_label"] for row in rows} == {"Change how the till asks who is there"}
+        [_, used] = client.get("/api/approvals", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="en").json()["approvals"]
+        assert used["action"] == "Lock the till at 30%"
+
+    def test_the_export_says_it_and_its_search_finds_it(self, client, adam, eva, monkeypatch):
+        declare(monkeypatch, PERCENT)
+        recorded(asked="Eva", figures={"pin_inactivity_minutes": 30})
+        recorded(asked="Ana", figures={"pin_inactivity_minutes": 5})
+        client.force_login(adam)
+        assert [row[1] for row in lines(exported(client, "es"))[1:]] == ["Lock the till at 5\xa0%", "Lock the till at 30\xa0%"]
+        assert [row[3] for row in lines(exported(client, "en", search="30%"))[1:]] == ["Eva"]
+        assert [row[3] for row in lines(exported(client, "en", search="till"))[1:]] == ["Ana", "Eva"]
+
+class TestTheFigureOfEachHub:
+    """Two hubs with their own databases (phase 2): the figure approved in one is never on the other's record."""
+
+    pytestmark = pytest.mark.django_db(databases=HUB_DATABASES)
+
+    @pytest.fixture(autouse=True)
+    def as_in_production(self, monkeypatch):
+        from base.tenancy import context
+
+        monkeypatch.setattr(context, "_test_fallback", None)
+
+    def test_each_record_says_only_its_own(self, client, hub_a, hub_b, monkeypatch):
+        from django.contrib.auth import get_user_model
+
+        from base.tenancy.context import use_hub
+
+        declare(monkeypatch, PERCENT)
+        with use_hub(hub_a):
+            recorded(figures={"pin_inactivity_minutes": 30})
+        with use_hub(hub_b):
+            recorded(figures={"pin_inactivity_minutes": 5})
+        boss, _ = get_user_model().objects.get_or_create(username="saas:21", defaults={"first_name": "Bea"})
+        for hub in (hub_a, hub_b):
+            Membership.objects.get_or_create(user=boss, host=hub.slug, defaults={"role": Membership.Role.ADMIN})
+        client.force_login(boss)
+
+        def actions(hub) -> list[str]:
+            response = client.get("/api/approvals", HTTP_HOST=f"{hub.slug}.localhost:8000")
+            assert response.status_code == 200, response.content
+            return [row["action"] for row in response.json()["approvals"]]
+
+        assert actions(hub_a) == ["Lock the till at 30%"]
+        assert actions(hub_b) == ["Lock the till at 5%"]
+
+
+class TestTheFiguresOfTheTill:
+    """The sentences Sales will declare (its FIX, ``espera: base``), on its real commands and their schemas: a percent
+    and an amount in the business's currency, and the check's discount that may carry either or both (hub#2186: never
+    «and 0.00 €»)."""
+
+    CHECK = "sale.order.set_discount_over_limit"
+    LINE = "sale.order.set_line_discount_over_limit"
+    SENTENCES = {
+        CHECK: [
+            "Discount the check by {discount_percent, percent} and {discount_amount, money}",
+            "Discount the check by {discount_percent, percent}",
+            "Discount the check by {discount_amount, money}",
+        ],
+        LINE: ["Discount a line by {discount_percent, percent}"],
+    }
+
+    @pytest.fixture(autouse=True)
+    def in_spain(self, monkeypatch):
+        from base.models import Hub
+
+        Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "name": "A", "country": "ES"})
+        declare(monkeypatch, self.SENTENCES, config="sale")
+
+    def said(self, name: str, language: str = "en", **data) -> str:
+        from django.utils import translation
+        from live.context import Scope
+        from live.operations import get as get_operation
+
+        from base.approvals import figures_of, label_of
+
+        op = get_operation(name)
+        with translation.override(language):
+            return label_of(op, figures_of(op, op.input.model_validate(data)), Scope("host", "a"))
+
+    def test_a_line_discount_says_its_percent(self):
+        line = {"order_id": "0190a1b2-0000-7000-8000-000000000001", "line_id": "0190a1b2-0000-7000-8000-000000000002"}
+        assert self.said(self.LINE, discount_percent="50", **line) == "Discount a line by 50%"
+        assert self.said(self.LINE, "es", discount_percent="12.5", **line) == "Discount a line by 12,5\xa0%"
+
+    def test_the_check_s_discount_names_what_it_has_and_never_a_zero(self):
+        order = {"order_id": "0190a1b2-0000-7000-8000-000000000001"}
+        assert self.said(self.CHECK, discount_percent="50", discount_amount=123456, **order) == (
+            "Discount the check by 50% and €1,234.56"
+        )
+        assert self.said(self.CHECK, "es", discount_percent="50", discount_amount=0, **order) == "Discount the check by 50\xa0%"
+        assert self.said(self.CHECK, "es", discount_percent="50", **order) == "Discount the check by 50\xa0%"
+        assert self.said(self.CHECK, "es", discount_percent="0", discount_amount=500, **order) == "Discount the check by 5,00\xa0€"
+
+    def test_the_amount_is_in_the_business_s_currency(self):
+        from base.models import Hub
+
+        Hub.objects.filter(slug="a").update(country="JP")
+        order = {"order_id": "0190a1b2-0000-7000-8000-000000000001"}
+        assert self.said(self.CHECK, discount_percent="0", discount_amount=500, **order) == "Discount the check by ¥500"
+
+    def test_a_business_whose_currency_is_unknown_says_the_words_of_always(self):
+        from base.models import Hub
+
+        Hub.objects.filter(slug="a").delete()
+        order = {"order_id": "0190a1b2-0000-7000-8000-000000000001"}
+        assert self.said(self.CHECK, discount_percent="0", discount_amount=500, **order) == "Discount the check above the maximum"
+
+
+class TestTheFiguresAreCheckedAtStart:
+    """``base.E008``: a sentence names a command of its own app that it names in ``approvals``, fields its input has, and
+    a format it knows (``percent`` and ``money`` of a number; ``money`` of whole minor units), the same in every language."""
+
+    def errors(self) -> list:
+        from django.core import checks
+
+        return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E008"]
+
+    def test_the_apps_of_today_declare_well(self):
+        assert self.errors() == []
+
+    def test_a_field_its_input_does_not_have(self, monkeypatch):
+        declare(monkeypatch, {APPROVABLE: ["Lock after {minutes}"]})
+        [error] = self.errors()
+        assert "minutes" in error.msg and APPROVABLE in error.msg
+
+    def test_a_command_its_approvals_do_not_name(self, monkeypatch):
+        declare(monkeypatch, {"base.device.prune": ["Prune {older_than}"]})
+        [error] = self.errors()
+        assert "base.device.prune" in error.msg
+
+    def test_another_app_s_command(self, monkeypatch):
+        declare(monkeypatch, {APPROVABLE: ["Lock after {pin_inactivity_minutes}"]}, config="table")
+        [error] = self.errors()
+        assert APPROVABLE in error.msg and "table" in error.msg
+
+    def test_a_format_it_does_not_know_or_a_figure_that_is_no_number(self, monkeypatch):
+        declare(monkeypatch, {APPROVABLE: ["Lock on {pin_inactivity_minutes, date}", "As {pin_policy, percent}"]})
+        assert len(self.errors()) == 2
+
+    def test_a_sentence_with_a_brace_that_closes_no_hole(self, monkeypatch):
+        declare(monkeypatch, {APPROVABLE: ["Lock after {pin_inactivity_minutes minutes"]})
+        assert len(self.errors()) == 1
+
+    def test_a_translation_that_names_other_holes(self, monkeypatch):
+        from django.utils import translation
+
+        class Translated(str):
+            """A sentence whose Spanish names another field, as a translator's slip would."""
+
+            def __str__(self) -> str:
+                return "Bloquear tras {pin_length}" if translation.get_language() == "es" else "Lock after {pin_inactivity_minutes}"
+
+        declare(monkeypatch, {APPROVABLE: [Translated("Lock after {pin_inactivity_minutes}")]})
+        [error] = self.errors()
+        assert "es" in error.msg
+
+
+class TestTheFiguresTheReviewAdded:
+    """Three holes the review found (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE): the record says an amount in
+    the business's currency (the list and the CSV ask it only when a row has figures); a currency written in letters
+    never touches its figure («PLN 1.00»); and ``base.E008`` refuses the sentences of another app's command even when
+    that app's ``approvals`` name it too."""
+
+    CHECK = "sale.order.set_discount_over_limit"
+
+    @pytest.fixture(autouse=True)
+    def in_spain(self, monkeypatch):
+        from base.models import Hub
+
+        Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "name": "A", "country": "ES"})
+        declare(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]}, config="sale")
+
+    def test_the_record_says_the_amount_in_the_business_s_currency(self, client, adam, eva):
+        recorded(operation=self.CHECK, figures={"discount_amount": 500})
+        client.force_login(adam)
+        rows = client.get("/api/approvals", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es").json()["approvals"]
+        assert [row["action"] for row in rows] == ["Discount the check by 5,00\xa0€"]
+        assert [row[1] for row in lines(exported(client, "en"))[1:]] == ["Discount the check by €5.00"]
+
+    def test_a_currency_of_letters_never_touches_its_figure(self):
+        from decimal import Decimal
+
+        from base.approvals import _money
+
+        assert _money(Decimal(100), "PLN", "en") == "PLN\xa01.00"
+        assert _money(Decimal(100), "PLN", "es") == "1,00\xa0PLN"
+        assert _money(Decimal(1234), "KWD", "en") == "KWD\xa01.234"
+
+    def test_another_app_s_command_is_refused_even_when_its_approvals_name_it(self, monkeypatch):
+        from django.core import checks
+
+        monkeypatch.setattr(apps.get_app_config("table"), "approvals", {APPROVABLE: "Lock the till"}, raising=False)
+        declare(monkeypatch, {APPROVABLE: ["Lock after {pin_inactivity_minutes}"]}, config="table")
+        errors = [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E008"]
+        assert [error.msg for error in errors] == [f"table says {APPROVABLE} with figures, but it is a command of base."]

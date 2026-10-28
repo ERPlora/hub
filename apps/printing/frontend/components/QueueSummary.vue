@@ -1,31 +1,59 @@
 <script setup lang="ts">
 // «Print queue» (PRINTING-F01; the old screen's queue zone): one card per role that has an active printer
 // or jobs (a new business sees none), with its state — «Ready», «Waiting, no printer», «No device» (jobs no
-// device set up here can print: where the bell's «Nothing is printing “…”» leads, it says why), «With errors» —,
+// device set up here can print: where the bell's «Nothing is printing “…”» leads, it says why), «Device off» (jobs
+// that waited a minute while the device set up for them gave no news for 90 s: the bell's too), «With errors» —,
 // «Waiting: N · the oldest has waited 3 min» or «Nothing waiting», the failed ones and the printer it prints
 // on now (the chosen one, else the first active one: named, never counted — hub#1527). A role with jobs waiting for over a minute and no active printer raises the orange alert
 // with its cause. Nothing waiting, sent unconfirmed or failed: «All clear». Live: every job that changes re-runs
-// it; the ages and the alert move on by themselves every 30 s (`useNow`). A failed read says so, with «Retry», and never «All clear».
+// it; the ages and the alert move on by themselves every 30 s (`useNow`). «Device off» moves with the clock on the server
+// (a job reaching its minute, a device quiet for 90 s) with no event: while something waits and the page is in sight, the
+// summary is read once again every 30 s, the bell's pace (HubBell.vue), without reopening the stream; a reading older than
+// a live result that came meanwhile is dropped, and one that fails keeps the last (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF).
+// A failed read says so, with «Retry», and never «All clear».
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
+import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed, watch } from 'vue';
+import { computed, onScopeDispose, shallowRef, watch } from 'vue';
 
-import { useNow } from '../composables/useNow';
+import { NOW_TICK_MS, useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import { waited } from '../lib/format';
-import type { UsageSummary } from '../operations';
+import type { JobSummaryOut, UsageSummary } from '../operations';
 
 /** A job waiting longer than this on a role nobody prints is worth an alert (the old screen's minute). */
 const ALERT_AFTER_MS = 60_000;
 
 const t = useT();
+const client = useLiveClient();
 const live = useLive('printing.job.summary', {});
-const { data, status, refresh } = live;
+const { data: liveData, status, refresh } = live;
 
+/** The newest summary: the live result, or the clock's reading when it came after it. */
+const data = shallowRef<JobSummaryOut | undefined>();
+/** How many live results came: a reading that started before the last one is older than it. */
+let pushes = 0;
 const now = useNow();
+watch(liveData, (value) => {
+  pushes += 1;
+  if (value !== undefined) data.value = value;
+});
 // A new result is measured against the moment it arrived.
 watch(data, () => (now.value = new Date()));
+
+async function readAgain(): Promise<void> {
+  // Nothing waiting, nothing the clock can change; out of sight, nobody to tell.
+  if (!data.value?.pending || document.visibilityState === 'hidden') return;
+  const before = pushes;
+  try {
+    const result = await client.api.call('printing.job.summary', {});
+    if (pushes === before) data.value = result;
+  } catch (error) {
+    console.warn('printing: the queue summary could not be read again', error);
+  }
+}
+const clock = setInterval(() => void readAgain(), NOW_TICK_MS);
+onScopeDispose(() => clearInterval(clock));
 
 const cards = computed(() => (data.value?.usages ?? []).filter((u) => u.printers > 0 || u.pending > 0 || u.failed > 0));
 const alerts = computed(() =>
@@ -42,6 +70,7 @@ const failed = computed(() => status.value === 'error');
 function stateOf(u: UsageSummary): { tone: 'success' | 'warning' | 'danger'; label: string } {
   if (u.printers === 0) return { tone: 'warning', label: t('printing.summary.stalled') };
   if (u.unattended > 0) return { tone: 'warning', label: t('printing.summary.noDevice') };
+  if (u.stalled > 0) return { tone: 'warning', label: t('printing.summary.deviceOff') };
   if (u.failed > 0) return { tone: 'danger', label: t('printing.summary.failing') };
   return { tone: 'success', label: t('printing.summary.ready') };
 }
@@ -137,6 +166,12 @@ function alertText(u: UsageSummary): string {
           :data-testid="`printing-summary-no-device-${u.usage}`"
         >
           {{ $t('printing.summary.noDeviceHint') }}
+        </p>
+        <p
+          v-if="u.printers > 0 && u.unattended === 0 && u.stalled > 0"
+          :data-testid="`printing-summary-device-off-${u.usage}`"
+        >
+          {{ $t('printing.summary.deviceOffHint') }}
         </p>
         <p
           v-if="u.prints_on"

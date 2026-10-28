@@ -398,8 +398,8 @@ msgstr "nombre del dispositivo"
 msgid "key"
 msgstr "clave"
 
-msgid "last asked for a job at"
-msgstr "último trabajo pedido el"
+msgid "last seen at"
+msgstr "visto por última vez el"
 
 msgid "printing device"
 msgstr "dispositivo de impresión"
