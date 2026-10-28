@@ -2370,12 +2370,14 @@ Pantalla: Tarjeta de confirmación del asistente
 Pasos:
   1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»).
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
-     línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe sale en la moneda del negocio (nunca
-     en céntimos), un sí o un no como «Sí» o «No» y una lista por cuántos elementos lleva. Todo sale en el idioma de
-     la persona, también el nombre de cada dato cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que
-     lo llama su app, nunca un nombre técnico. Una acción de la propia plataforma se nombra por la pantalla donde
-     se hace, por ejemplo «Cambiar en Ajustes» o «Borrar en Archivos». Cada acción sale con su propio verbo, nunca
-     con uno genérico: rectificar una factura dice «Rectificar en Facturación».
+     línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe sale en la moneda del negocio (nunca en
+     céntimos); una diferencia, con su signo como en la pantalla de su app, para ver de un vistazo si sobra o falta (el
+     cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no,
+     como «Sí» o «No», y una lista, por cuántos elementos lleva. Todo sale en el idioma de la persona, también el nombre
+     de cada dato cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
+     técnico. Una acción de la propia plataforma se nombra por la pantalla donde se hace, por ejemplo «Cambiar en
+     Ajustes» o «Borrar en Archivos». Cada acción sale con su propio verbo, nunca con uno genérico: rectificar una
+     factura dice «Rectificar en Facturación».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
