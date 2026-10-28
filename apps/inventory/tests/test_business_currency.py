@@ -15,9 +15,10 @@ from apps.inventory.models import Product
 from apps.inventory.schemas import ProductFiltersIn, ProductImportIn
 from apps.printing.models import PrintJob
 from apps.tax.models import TaxCategory
+from base import operations as base_operations
 from base.models import Hub
 
-from .conftest import B, ctx_for
+from .conftest import B, ctx_for, ctx_with
 
 pytestmark = pytest.mark.django_db
 
@@ -140,3 +141,69 @@ def test_erploras_own_hub_labels_in_the_currency_of_its_issuer_s_country(erplora
     out = run("inventory.product.print_label", {"id": str(created.id)}, platform)
     document = PrintJob.objects.get(pk=out.job_id).document
     assert (document["price"], document["decimals"]) == label
+
+
+# One way to the currency (FIX-HUB-INVENTORY-OWN-COPY-OF-BUSINESS-CURRENCY): inventory asks the one question every app
+# that charges asks (``base.operations.business_currency``, BASE-F50), never a copy of its own that drifts in silence.
+
+
+def export_with(ctx) -> list[str]:
+    """The price and cost the export (INVENTORY-F11) writes for a product of 1250 and 820 minor units."""
+    tax = TaxCategory.objects.create(key="product.general", name="Product — general")
+    Product.objects.create(name="Gambas", sku="GAM", tax_category=tax, price=1250, cost=820)
+    return exported("en", ctx)
+
+
+def import_with(ctx) -> tuple:
+    """What the import (INVENTORY-F09) makes of a price typed «¥1250»: created, failed and the price it stored."""
+    row = {"line": 2, "name": "Gambas", "sku": "GAM", "price": "¥1250", "tax_category_key": TAX}
+    report = run("inventory.product.bulk_create", ProductImportIn(rows=[row]), ctx)
+    return report.created, report.failed, Product.objects.filter(sku="GAM").values_list("price", flat=True).first()
+
+
+def label_with(ctx) -> tuple:
+    """The price and decimals the label (INVENTORY-F25) of a product of 1250 minor units carries."""
+    admin = ctx_for(scope=ctx.scope)
+    run("printing.printer.create", {"name": "Labels", "kind": "network", "address": "192.168.1.50", "usage": "label"}, admin)
+    created = run("inventory.product.create", {"name": "Gambas", "sku": "GAM", "price": 1250, "tax_category_key": TAX}, admin)
+    out = run("inventory.product.print_label", {"id": str(created.id)}, ctx)
+    document = PrintJob.objects.get(pk=out.job_id).document
+    return document["price"], document["decimals"]
+
+
+#: The three operations that put an amount in the business's currency, what each gives in yen (no cents), and the only
+#: permissions an API key needs to call it (the label also queues in Printing).
+IN_YEN = {
+    "export": (export_with, ["¥1250", "¥820"], ("inventory.export_product",)),
+    "import": (import_with, (1, 0, 1250), ("inventory.import_product",)),
+    "label": (label_with, (1250.0, 0), ("inventory.view_product", "printing.print")),
+}
+
+
+@pytest.mark.parametrize("caller", sorted(IN_YEN))
+def test_each_amount_takes_the_currency_base_answers(caller, monkeypatch):
+    business_in("ES")
+    monkeypatch.setattr(base_operations, "business_currency", lambda scope: "JPY")
+    through, in_yen, _permissions = IN_YEN[caller]
+    assert through(ctx_for()) == in_yen
+
+
+@pytest.mark.parametrize("caller", sorted(IN_YEN))
+def test_erploras_own_hub_takes_its_currency_from_base_business_get_too(caller, settings, monkeypatch):
+    # ``base.business.get`` answers ERPlora's own hub (hub#329): inventory asks it there as anywhere else, never a second
+    # source of the same currency (here, an answer other than the one of ``PLATFORM_ISSUER_COUNTRY``).
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = "ES"
+    business = get(base_operations.BUSINESS)
+    answer = business.fn
+    monkeypatch.setattr(business, "fn", lambda ctx, data: {**answer(ctx, data), "currency": "JPY"})
+    through, in_yen, _permissions = IN_YEN[caller]
+    assert through(ctx_for(scope=Scope("host", "erplora"))) == in_yen
+
+
+@pytest.mark.parametrize("caller", sorted(IN_YEN))
+def test_an_api_key_with_only_the_operation_s_permission_gets_the_business_s_currency(caller):
+    # The key holds no permission of ``base.business.get``: the currency is read as the platform, never with its rights.
+    business_in("JP")
+    through, in_yen, permissions = IN_YEN[caller]
+    assert through(ctx_with(*permissions)) == in_yen

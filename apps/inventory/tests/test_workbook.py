@@ -3,8 +3,9 @@
 Every operation of another app the table names is named by Inventory's code (the server calls it through
 ``live.operations.get``, the screens through ``useLive``, ``useCommand`` or the typed client; by name or
 through a constant) and every model it names is read; the other way round, nothing Inventory calls or reads
-of another app is missing from the table. A comment is not code (a commented-out call is no call), and
-tests, migrations and the screens' tests are not Inventory's code.
+of another app is missing from the table. Calling a helper of ``base.operations`` is calling the operation it
+asks (``business_currency`` reads ``base.business.get``). A comment is not code (a commented-out call is no
+call), and tests, migrations and the screens' tests are not Inventory's code.
 """
 
 import ast
@@ -14,6 +15,8 @@ from pathlib import Path
 from django.apps import apps
 from live.operations import UnknownOperation, get
 
+from base import operations as base_operations
+
 APP = Path(apps.get_app_config("inventory").path)
 SECTION = "### Lo que necesita de otras apps"
 OPERATION = re.compile(r"(?P<app>[a-z][a-z_]*)\.[a-z_]+\.[a-z_]+")
@@ -22,6 +25,8 @@ MODELS_MODULE = re.compile(r"apps\.(?P<app>[a-z_]+)\.models")
 # A one-line string of the screens' code, or a comment to skip (``//``, ``/* */``, ``<!-- -->``): a comment
 # only starts outside a string, so the ``//`` of a URL stays in its string.
 SCREEN_TOKEN = re.compile(r"(['\"`])(?P<text>(?:\\.|(?!\1)[^\\\n])*)\1|/\*.*?\*/|<!--.*?-->|//[^\n]*", re.S)
+#: The helpers of ``base.operations`` an app calls instead of naming an operation, and the operation each asks.
+PLATFORM_ASKS = {"business_currency": base_operations.BUSINESS}
 
 
 def needs_table(workbook: str) -> list[dict[str, str]]:
@@ -64,12 +69,38 @@ def is_operation(name: str) -> bool:
     return True
 
 
+def asked_through_platform(tree: ast.Module) -> set[str]:
+    """The operations a module asks through a helper of ``base.operations`` it calls, reached through the module
+    (``from base import operations as platform``, ``platform.business_currency(…)``) or imported by name."""
+    modules, helpers = set(), {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "base":
+            modules |= {alias.asname or alias.name for alias in node.names if alias.name == "operations"}
+        elif isinstance(node, ast.ImportFrom) and node.module == "base.operations":
+            helpers |= {alias.asname or alias.name: alias.name for alias in node.names if alias.name in PLATFORM_ASKS}
+    asked = set()
+    for node in ast.walk(tree):
+        func = node.func if isinstance(node, ast.Call) else None
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id in modules:
+            helper = func.attr
+        elif isinstance(func, ast.Name):
+            helper = helpers.get(func.id)
+        else:
+            continue
+        if helper in PLATFORM_ASKS:
+            asked.add(PLATFORM_ASKS[helper])
+    return asked
+
+
 def server_uses() -> set[str]:
-    """The operations the server names in a string (``get("<op>")`` or a constant it calls) and the models of
-    apps it reads: imported from their ``models`` or named by a foreign key (``"<app>.<Model>"``)."""
+    """The operations the server names in a string (``get("<op>")`` or a constant it calls) or asks through a
+    helper of ``base.operations``, and the models of apps it reads: imported from their ``models`` or named by a
+    foreign key (``"<app>.<Model>"``)."""
     used = set()
     for path in sources(".py"):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        used |= asked_through_platform(tree)
+        for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and (found := MODELS_MODULE.fullmatch(node.module or "")):
                 used.update(f"{found['app']}.{alias.name}" for alias in node.names)
             elif isinstance(node, ast.Constant) and isinstance(node.value, str):
