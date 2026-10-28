@@ -97,8 +97,8 @@ def test_the_page_speaks_the_visitors_language_and_each_language_is_kept_apart(c
     assert "Log in" in visit(client, language="en-GB").content.decode()
     # A language the Hub does not speak gets the source.
     assert "Log in" in visit(client, language="de").content.decode()
-    assert cache.get(page_cache_key("a", 1, "es", local_day(""))) is not None
-    assert cache.get(page_cache_key("a", 1, "en", local_day(""))) is not None
+    assert cache.get(page_cache_key("a", 1, "es", local_day(""), "EUR")) is not None
+    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "EUR")) is not None
 
 
 def test_the_page_is_rendered_once_per_publication_and_a_new_one_shows_at_once(client, django_capture_on_commit_callbacks):
@@ -127,9 +127,24 @@ def test_a_new_deploy_renders_the_page_again_for_its_bundle(client, settings):
     publish()
     settings.APP_VERSION = "abc"
     visit(client)
-    assert cache.get(page_cache_key("a", 1, "en", local_day(""))) is not None
+    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "EUR")) is not None
     settings.APP_VERSION = "def"
-    assert cache.get(page_cache_key("a", 1, "en", local_day(""))) is None
+    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "EUR")) is None
+
+
+def test_the_page_prices_in_the_business_s_currency_and_follows_a_change_of_its_country(client):
+    # flow: website-business-currency — the kept page is the currency's too: a business whose country (hence its
+    # currency) changes on erplora.com is never shown the old one until the page expires.
+    from apps.service.models import Service
+
+    Service.objects.create(name="Cut", price=1500, duration_minutes=30)
+    Hub.objects.filter(slug="a").update(country="ES")
+    publish()
+    assert "€15.00" in visit(client).content.decode()
+    Hub.objects.filter(slug="a").update(country="PL")
+    page = visit(client).content.decode()
+    assert "PLN15.00" in page and "€" not in page
+    assert cache.get(page_cache_key("a", 1, "en", local_day(""), "PLN")) is not None
 
 
 def today_row(page: str) -> str:
@@ -144,8 +159,8 @@ def test_the_page_marks_today_in_the_hubs_time_zone_and_keeps_each_day_apart(cli
     assert "Sunday" in today_row(visit(client).content.decode())
     monkeypatch.setattr("django.utils.timezone.now", lambda: datetime(2026, 10, 19, 14, 0, tzinfo=UTC))
     assert "Monday" in today_row(visit(client).content.decode())
-    assert cache.get(page_cache_key("a", 1, "en", "sun")) is not None
-    assert cache.get(page_cache_key("a", 1, "en", "mon")) is not None
+    assert cache.get(page_cache_key("a", 1, "en", "sun", "EUR")) is not None
+    assert cache.get(page_cache_key("a", 1, "en", "mon", "EUR")) is not None
 
 
 def test_without_a_publication_the_root_jumps_to_the_login(client):
