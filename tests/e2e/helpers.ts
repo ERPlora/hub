@@ -47,25 +47,48 @@ export async function iconStates(page: Page): Promise<{ name: string; painted: b
   );
 }
 
+/** How long `untilStill` waits for the page to stop moving: Ionic's overlays enter in well under a second. */
+const STILL_TIMEOUT_MS = 10_000;
+
 /**
- * Waits until nothing animates on screen, in the page nor in a shadow root (an `ion-progress-bar` slides its bar
- * there, an `ion-segment` its indicator), a shimmer that never ends aside: a capture taken mid-animation shows a
- * state the screen is leaving.
+ * What moves on the page now (run in the page, so self-contained): every finite animation running in the document
+ * and in every open shadow root under it, however deep. `document.getAnimations()` leaves shadow roots out, and Ionic
+ * animates its overlays (`ion-toast`, `ion-modal`, `ion-popover`), an `ion-progress-bar`'s bar or an `ion-segment`'s
+ * indicator inside theirs. Endless ones (spinners, a shimmer) never stop, so they never count.
+ */
+function movingInPage(): string[] {
+  const roots: Array<Document | ShadowRoot> = [document];
+  const moving: string[] = [];
+  for (const root of roots) {
+    for (const element of root.querySelectorAll('*')) if (element.shadowRoot) roots.push(element.shadowRoot);
+    for (const animation of root.getAnimations()) {
+      if (animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity) continue;
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      moving.push(`${root instanceof ShadowRoot ? `${root.host.localName} › ` : ''}${target?.localName ?? '?'}`);
+    }
+  }
+  return moving;
+}
+
+/** A page that navigates while `untilStill` asks what moves: it asks the new page next. Anything else fails the spec. */
+function navigating(error: unknown): string[] {
+  if (error instanceof Error && /Execution context was destroyed/.test(error.message)) return ['(navigating)'];
+  throw error;
+}
+
+/**
+ * Waits until nothing moves on screen (`movingInPage`): a capture taken mid-animation shows a state the screen is
+ * leaving. A page that reloads meanwhile is asked again; one that still moves after `STILL_TIMEOUT_MS` fails the spec,
+ * naming what moves.
  */
 export async function untilStill(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const animations = [...document.getAnimations()];
-    const walk = (root: Document | ShadowRoot) => {
-      for (const el of root.querySelectorAll('*')) {
-        if (el.shadowRoot) {
-          animations.push(...el.shadowRoot.getAnimations());
-          walk(el.shadowRoot);
-        }
-      }
-    };
-    walk(document);
-    return animations.every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity);
-  });
+  await expect
+    .poll(() => page.evaluate(movingInPage).catch(navigating), {
+      message: 'untilStill(): still moving',
+      timeout: STILL_TIMEOUT_MS,
+      intervals: [16],
+    })
+    .toEqual([]);
 }
 
 /** Path of a screenshot under `.artifacts/` (created on demand). */
@@ -125,6 +148,17 @@ export async function painted(page: Page): Promise<void> {
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
 }
 
+/**
+ * Settled: nothing moving (`untilStill`: an overlay of Ionic entering included, endless spinners aside) and the page
+ * painted as it is now (`painted`): the capture shows the state the flow reached, not a frame of Ionic's transition nor,
+ * right after `setViewportSize`, the previous size's. The one wait of every spec (service-helpers.ts and
+ * schedule-helpers.ts hand it out too).
+ */
+export async function settled(page: Page): Promise<void> {
+  await untilStill(page);
+  await painted(page);
+}
+
 /** How many screenshots `capture` takes at most while each one repeats the top of the page at its bottom. */
 const CAPTURE_TRIES = 10;
 
@@ -133,7 +167,7 @@ const CAPTURE_TRIES = 10;
  * e2e goes through here (`raw-screenshots.test.ts` keeps it so). It waits for a painted frame, and a screenshot that
  * still repeats the top of the page at its bottom (`repeatedTop`) is taken again, a frame later, up to
  * `CAPTURE_TRIES` times; if every one does, it fails saying so and writes nothing. What is on screen (data, a dialog,
- * no animation running: `settled` of service-helpers.ts, `untilStill`) is the spec's to wait for before.
+ * nothing moving: `settled`, `untilStill`) is the spec's to wait for before.
  */
 export async function capture(page: Page, name: string, options: CaptureOptions = {}): Promise<Buffer> {
   let rows = 0;

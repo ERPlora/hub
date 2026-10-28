@@ -233,8 +233,16 @@ parte de abajo (87 filas; en `main`, 5 de 24 capturas de la lista de la demo sin
 captura es la prueba de una pantalla que nadie vio. Toda captura de la e2e pasa por `capture(page, name)` (`helpers.ts`):
 espera a un fotograma pintado, repite la captura mientras repite la franja de arriba (`repeatedTop`, la del SaaS) y, si
 no deja de hacerlo, falla diciéndolo y no escribe nada; si no, la deja en `.artifacts/<name>.png` y la devuelve. Lo que
-tiene que estar en pantalla antes (datos, un diálogo, ninguna animación en curso: `settled` de `service-helpers.ts`, que
-también espera al fotograma pintado, o `untilStill`) lo espera la spec. `helpers-capture.spec.ts` falla si vuelve a pasar.
+tiene que estar en pantalla antes (datos, un diálogo, nada moviéndose: `settled` o `untilStill`) lo espera la spec.
+`helpers-capture.spec.ts` falla si vuelve a pasar.
+
+`settled(page)` (`helpers.ts`; `service-helpers.ts` y `schedule-helpers.ts` reparten el mismo, sin copias) espera a que
+nada se mueva (`untilStill`) y a un fotograma pintado. «Nada se mueve» se lee en el documento **y en cada shadow root
+abierto, a cualquier profundidad** (`movingInPage`): `document.getAnimations()` no ve los shadow roots, y Ionic anima ahí
+sus avisos, diálogos y popovers (con el `settled` de antes, un `ion-toast` aún entrando daba 0 animaciones en el
+documento y 1 en su shadow root). Las infinitas (spinners, un brillo de carga) no cuentan; si algo sigue moviéndose a los
+10 s, la spec falla diciendo qué; y si la página navega a mitad de espera, mira la página nueva. Lo cubre
+`settled.spec.ts` (la misma corrección que la e2e del SaaS, saas#147).
 
 `raw-screenshots.test.ts` (Vitest) es el trinquete: ningún fichero de `tests/e2e` hace más `.screenshot(` crudos de los
 que lista `raw-screenshots.json` (los que quedaban al llegar `capture`), y una spec nueva no hace ninguno. Al pasar
