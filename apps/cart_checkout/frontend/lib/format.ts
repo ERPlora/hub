@@ -1,38 +1,54 @@
 // How the cart_checkout screens paint money, quantities and statuses (pages never format by hand), always
 // in the page language's own format (Intl), and how a range filter typed in the unit the column shows
-// reaches the server. An amount is whole minor units of the row's own currency: its scale comes from
-// Intl (2 decimals in EUR, 0 in JPY, 3 in KWD). A quantity is a decimal string from the server
-// (`"2.500"`), painted without decorative zeros.
+// reaches the server. An amount is whole minor units of a currency with the decimals the server counts it in
+// (`currency_decimals`: 2 in PLN and in HUF, 0 in JPY), never the browser's Intl (which gives the forint none): a
+// cart or an order in its own currency (a record is never rewritten), what a person types in the business's
+// (`useBusinessMoney`, the platform's: its country's; flow cart-checkout-business-currency). Until the business
+// answers an amount is a figure without a symbol, never the euro by default. A quantity is a decimal string from
+// the server (`"2.500"`), painted without decorative zeros.
 import type { StatusPillTone } from '@erplora/ui/components';
 
+import type { Money } from '../../../../base/frontend/lib/home';
 import type { CartStatus, OrderStatus } from '../operations';
 
-/** The business's currency until the Hub keeps its own (the server's `business_currency()`). */
-export const CURRENCY = 'EUR';
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+/** The decimals of an amount while its currency is unknown. */
+const UNKNOWN_DECIMALS = 2;
 
 const money = new Map<string, Intl.NumberFormat>();
 const quantities = new Map<string, Intl.NumberFormat>();
 
-function moneyFormat(locale: string, currency: string): Intl.NumberFormat {
-  const key = `${locale}|${currency}`;
+function moneyFormat(locale: string, of: Money | undefined, symbol = true): Intl.NumberFormat {
+  const decimals = of?.decimals ?? UNKNOWN_DECIMALS;
+  const key = `${locale}|${symbol ? (of?.currency ?? '') : ''}|${decimals}`;
   let found = money.get(key);
   if (!found) {
+    // The symbol a till of that country prints («zł», «¥»); until the currency is known, the figure alone.
+    const style: Intl.NumberFormatOptions = of && symbol ? { style: 'currency', currency: of.currency, currencyDisplay: 'narrowSymbol' } : {};
     // `always`: Spanish CLDR leaves a four-digit amount ungrouped («1234,56 €» above «12.345,60 €»);
     // Odoo and Business Central group it, and so did the old hub (hub#1090).
-    found = new Intl.NumberFormat(locale, { style: 'currency', currency, useGrouping: 'always' });
+    found = new Intl.NumberFormat(locale, { ...style, minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' });
     money.set(key, found);
   }
   return found;
 }
 
-/** How many decimals the minor unit of `currency` has (2 in EUR, 0 in JPY, 3 in KWD). */
-export function currencyDecimals(currency: string = CURRENCY): number {
-  return moneyFormat('en', currency).resolvedOptions().maximumFractionDigits ?? 2;
+/** Whole minor units in `of`, in `locale` («42,50 zł», «€31.50», «¥1,999»; «31,50» while it is unknown). */
+export function formatMoney(minor: number, locale: string, of?: Money): string {
+  return moneyFormat(locale, of).format(minor / 10 ** (of?.decimals ?? UNKNOWN_DECIMALS));
 }
 
-/** Whole minor units of `currency` in `locale` («31,50 €», «€31.50», «¥1,999»). */
-export function formatMoney(minor: number, locale: string, currency: string = CURRENCY): string {
-  return moneyFormat(locale, currency).format(minor / 10 ** currencyDecimals(currency));
+/** The money of a cart or an order: its own currency, with the decimals the server counts it in. */
+export function recordMoney(record: { currency: string; currency_decimals: number }): Money {
+  return { currency: record.currency, decimals: record.currency_decimals };
+}
+
+/** The amount the hint under an unreadable Total shows, with the decimals of `of` («12.50», «12», «12,500»). */
+export function amountExample(locale: string, of?: Money): string {
+  const decimals = of?.decimals ?? UNKNOWN_DECIMALS;
+  return moneyFormat(locale, of, false).format(decimals === 0 ? 12 : 12.5);
 }
 
 /** A quantity in `locale`, without decorative zeros («2», «0,5»); anything else as is. */
@@ -61,15 +77,44 @@ function grouped(raw: string, mark: string): string | undefined {
   return head + groups.join('');
 }
 
-/** A money bound typed or pasted in the major unit («12», «12,5», «1.250,50», «1.234,56 €») → minor
- *  units of `currency`; nothing when it is not an amount (never «from 0»). The same reading as a money
- *  field (pm#521): with both marks the rightmost is the decimal one; one mark repeated groups
- *  thousands; one mark and three digits are thousands unless the currency has three decimals, and when
- *  they end in 0 in a currency with decimals («1.250»: 1.250 € or 1,25 €) the bound is not guessed. */
-export function toMinor(text: string | undefined, currency: string = CURRENCY): number | undefined {
-  const raw = (text ?? '').replace(/[\s  €]/g, '').replace(new RegExp(currency, 'gi'), '');
+const marks = new Map<string, string[]>();
+
+/** How `currency` is written around an amount: its code, its symbol and its narrow symbol («PLN», «zł»), longest
+ *  first. */
+function currencyMarks(currency: string): string[] {
+  let found = marks.get(currency);
+  if (!found) {
+    const written = (['code', 'symbol', 'narrowSymbol'] as const).map(
+      (currencyDisplay) =>
+        new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay }).formatToParts(1).find((part) => part.type === 'currency')?.value ??
+        currency,
+    );
+    found = [...new Set(written)].sort((a, b) => b.length - a.length);
+    marks.set(currency, found);
+  }
+  return found;
+}
+
+/** `raw` without the code or symbol of `of` before or after the figure; another currency's stays (no amount). */
+function withoutMark(raw: string, of: Money | undefined): string {
+  const upper = raw.toUpperCase();
+  for (const mark of of ? currencyMarks(of.currency) : []) {
+    if (upper.startsWith(mark.toUpperCase())) return raw.slice(mark.length);
+    if (upper.endsWith(mark.toUpperCase())) return raw.slice(0, -mark.length);
+  }
+  return raw;
+}
+
+/** A money bound typed or pasted in the major unit of `of` («12», «12,5», «1.250,50», «12,50 zł») → its minor
+ *  units; nothing when it is not an amount of it (never «from 0»), another currency's symbol included. The same
+ *  reading as a money field (pm#521): with both marks the rightmost is the decimal one; one mark repeated groups
+ *  thousands; one mark and three digits are thousands unless the currency has three decimals, and when they end in
+ *  0 in a currency with decimals («1.250»: 1.250 zł or 1,25 zł) the bound is not guessed. While the business has
+ *  not answered, two decimals and no symbol. */
+export function toMinor(text: string | undefined, of?: Money): number | undefined {
+  const raw = withoutMark((text ?? '').replace(/[\s\u00a0\u202f]/g, ''), of);
   if (!/^\d[\d.,]*$/.test(raw) || raw.replace(/\D/g, '').length > MAX_DIGITS) return undefined;
-  const decimals = currencyDecimals(currency);
+  const decimals = of?.decimals ?? UNKNOWN_DECIMALS;
   const decimal = (whole: string, fraction: string): number | undefined =>
     fraction.length >= 1 && fraction.length <= decimals && /^\d+$/.test(fraction) ? minor(whole, fraction, decimals) : undefined;
   const at = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
@@ -95,11 +140,11 @@ export function toMinor(text: string | undefined, currency: string = CURRENCY): 
 /** The two ends of the Total filter, as the table names them. */
 export const TOTAL_BOUNDS = ['total_amount_from', 'total_amount_to'] as const;
 
-/** The ends of the Total filter typed but not readable as an amount: they filter nothing and say so. */
-export function unreadableTotals(filters: Readonly<Record<string, unknown>>): string[] {
+/** The ends of the Total filter typed but not readable as an amount of `of`: they filter nothing and say so. */
+export function unreadableTotals(filters: Readonly<Record<string, unknown>>, of?: Money): string[] {
   return TOTAL_BOUNDS.filter((name) => {
     const text = filters[name];
-    return typeof text === 'string' && text.trim() !== '' && toMinor(text) === undefined;
+    return typeof text === 'string' && text.trim() !== '' && toMinor(text, of) === undefined;
   });
 }
 

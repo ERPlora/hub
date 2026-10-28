@@ -14,10 +14,10 @@ from .conftest import make_cart, make_item, make_order
 pytestmark = pytest.mark.django_db
 
 
-def test_a_cart_is_born_active_empty_and_in_euros():
-    cart = make_cart("sess_1")
+def test_a_cart_is_born_active_and_empty_in_the_currency_it_is_given():
+    cart = make_cart("sess_1", currency="PLN")
     assert cart.status == Cart.Status.ACTIVE
-    assert (cart.total_items, cart.total_amount, cart.currency) == (Decimal("0"), 0, "EUR")
+    assert (cart.total_items, cart.total_amount, Cart.objects.get(pk=cart.pk).currency) == (Decimal("0"), 0, "PLN")
     assert (cart.customer_email, cart.customer_name, cart.notes) == ("", "", "")
     assert (cart.expires_at, cart.last_activity_at, cart.deleted_at) == (None, None, None)
     assert cart.abandon_reason == ""
@@ -71,10 +71,10 @@ def test_the_database_refuses_a_line_without_quantity_or_with_a_negative_price()
         make_item(cart, line_total=-1)
 
 
-def test_an_order_is_initiated_in_euros_by_default():
-    order = make_order()
+def test_an_order_is_initiated_in_the_currency_it_is_given():
+    order = make_order(make_cart(currency="PLN"), currency="PLN")
     assert order.status == Order.Status.INITIATED
-    assert order.currency == "EUR"
+    assert Order.objects.get(pk=order.pk).currency == "PLN"
     assert (order.shipping_address, order.billing_address) == ({}, {})
     assert (order.shipping_method, order.payment_method, order.notes) == ("", "", "")
     assert order.failure_reason == ""

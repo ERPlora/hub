@@ -45,8 +45,8 @@ mismo alcance que el producto actual.
 
 1. Carrito y pago no viene encendida con ningún tipo de negocio: se enciende desde la tienda de apps.
    No enciende ninguna otra app ni la necesita: se puede encender y apagar sola.
-2. No tiene ajustes. La moneda de un carrito nuevo es la del negocio (euros mientras el Hub no guarde
-   otra), salvo que quien lo crea por el asistente o la API diga otra.
+2. No tiene ajustes. La moneda de un carrito nuevo es la del negocio, la de su país (la que dice
+   **Ajustes › Negocio**), salvo que quien lo crea por el asistente o la API diga otra.
 3. Un carrito puede llevar fecha de caducidad; sin ella no caduca nunca.
 
 ## Pantallas
@@ -61,11 +61,15 @@ Una tabla con las columnas **Sesión**, **Email**, **Estado** (Activo, Abandonad
 Expirado), **Ítems** y **Total**. Buscador «Buscar sesión o email…» (busca en el código de sesión, el
 email y el nombre), filtros por columna tras el embudo de la barra, que abre «Filtros» — sesión y email
 por un trozo del texto, el estado por lista, los ítems y el total «desde / hasta» —, orden por columna, vista de lista o de tarjetas y 50 filas por
-página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito;
-el filtro de Total se escribe en la moneda del negocio (en euros: «12» son 12,00 €) y compara el importe
-tal cual, sin convertir monedas. Se puede pegar con sus puntos de miles («1.250,50») o con el símbolo
-(«12,50 €»); un importe que no se entiende («1.250», que puede ser 1.250 € o 1,25 €) se avisa debajo de
-su caja, «Escribe un importe, como 12,50», y no filtra.
+página. Va ordenada por fecha de alta, el más reciente arriba. El total sale en la moneda del carrito
+(uno creado en euros sigue en euros aunque el negocio cambie de país); el filtro de Total se escribe en
+la moneda del negocio («12» son 12,00 zł en un negocio de Polonia y 12 ¥ en uno de Japón, donde no hay
+céntimos) y compara el importe tal cual, sin convertir monedas. Se puede pegar con sus puntos de miles
+(«1.250,50») o con el símbolo o el código de esa moneda («12,50 zł», «PLN 12,50»); un importe que no se
+entiende («1.250», que puede ser mil doscientos cincuenta o uno con veinticinco, o uno con el símbolo de
+otra moneda) se avisa debajo de su caja, «Escribe un importe, como 12,50» (con los decimales de la moneda
+del negocio: «como 12» en yenes), y no filtra. Mientras el negocio no ha contestado, un importe se lee
+con dos decimales y, cuando contesta, el filtro se vuelve a leer en su moneda desde la primera página.
 
 El botón **Nuevo carrito** abre el formulario «Nuevo carrito»: **Sesión** (obligatoria; «Guardar» no se
 activa sin ella), **Email** y **Nombre**. Cada fila ofrece **Abandonar** (solo un carrito activo) y
@@ -95,8 +99,8 @@ del flujo CART_CHECKOUT-F08.
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
-Importes con el formato del idioma de quien mira y en la moneda de cada fila; cantidades sin ceros de
-adorno («2», «0,5»).
+Importes con el formato del idioma de quien mira y en la moneda de cada fila, con los decimales de esa
+moneda (el yen no tiene céntimos); cantidades sin ceros de adorno («2», «0,5»).
 
 ## Flujos
 
@@ -156,7 +160,8 @@ Si falla: carrito que no existe («Ese carrito no existe en este negocio.»); va
 dicho (los nombra y pide cuál); carrito que no está activo, también uno vencido («Este carrito ya no
 admite cambios: está Abandonado.»); referencia o nombre vacíos, cantidad cero, negativa o de más de
 1 000 000, precio negativo: cada uno en su campo; un total de la línea, o del carrito con ella, por encima
-de lo que cabe en un carrito (99 999 999 999,99 €), debajo de la cantidad. No se guarda nada.
+de lo que cabe en un carrito (casi cien mil millones en una moneda con céntimos), debajo de la cantidad.
+No se guarda nada.
 Implicados: ninguno
 
 ### CART_CHECKOUT-F03 Cambiar la cantidad de una línea o quitarla
@@ -327,8 +332,8 @@ Pasos:
    el asistente o la API: un carrito por su sesión o por el email o el nombre de su cliente, un pedido
    por su número.
 Entra: permiso «ver carritos» (el empleado lo tiene).
-Sale: listas de 50 filas (hasta 100 por petición). Cantidades con sus decimales, importes en céntimos
-con la moneda de la fila.
+Sale: listas de 50 filas (hasta 100 por petición). Cantidades con sus decimales, importes en la unidad
+menor de la moneda de la fila (los céntimos; el yen no tiene) con la moneda y sus decimales.
 Si falla: error de carga con «Reintentar»; sin permiso, «No tienes permiso»; un importe de Total que no
 se entiende, «Escribe un importe, como 12,50» debajo de su caja, sin filtrar.
 Implicados: ninguno
@@ -482,7 +487,8 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   si son de clientes distintos («ana» es un trozo de «Mariana») o hay varios activos, 409
   `cart_checkout.cart_ambiguous` con sus sesiones, aunque solo uno esté activo. Un pedido, por su número.
 - Topes: una línea lleva como mucho 1 000 000 unidades (422 en el esquema) y ni su total ni el del
-  carrito pasan de `MAX_AMOUNT` (99 999 999 999,99 €; 422 bajo `quantity` antes de escribir): un producto
+  carrito pasan de `MAX_AMOUNT` (9 999 999 999 999 unidades menores, 99 999 999 999,99 con dos decimales;
+  422 bajo `quantity` antes de escribir): un producto
   mayor desbordaba el `bigint` de la base (un 500).
 - Asistente: toda operación declara `ai` con `description` y `risk` (`high` en marcar pagado, fallar,
   borrar y borrar los datos de un cliente) y todo campo de entrada su `description`. `expose_api=True` en
@@ -505,8 +511,17 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   añade el shell.
 - Los importes agrupan los millares también con cuatro cifras (`useGrouping: 'always'`: el CLDR del
   español deja «1234,56 €»; hub#1090). El filtro de Total es `{ type: 'range', amount: true }`: `toMinor`
-  lee lo que se pega («1.250,50», «12,50 €»; lo ambiguo, «1.250», no se adivina) y `unreadableTotals` da
-  los `filterErrors` (pm#521).
+  lee lo que se pega («1.250,50», «12,50 zł», «PLN 12,50»; lo ambiguo, «1.250», no se adivina; el símbolo de
+  otra moneda tampoco) y `unreadableTotals` da los `filterErrors` (pm#521).
+- Moneda (flujo `cart-checkout-business-currency`, BASE-F50): `queries.business_currency(ctx)` es
+  `base.operations.business_currency(ctx.scope)` (la del país del negocio; en el hub propio de ERPlora, la del
+  país de su emisor) y solo la usa el alta de un carrito sin `currency`; el modelo no tiene valor por defecto
+  (migración 0003, solo de estado). Cada fila de carrito y de pedido lleva `currency_decimals`
+  (`base.business.currency_decimals`, CLDR: 2 en HUF, que `Intl` da sin decimales) y la pantalla la pinta con
+  `formatMoney(…, recordMoney(row))`. El filtro de Total se lee con `useBusinessMoney()` de
+  `base/frontend/lib/money` (sin símbolo y con dos decimales mientras no contesta); un `watch` de su moneda
+  y sus decimales vuelve a leer un Total ya tecleado desde la primera página, y el ejemplo del aviso sale de
+  `amountExample` con los decimales de esa moneda.
 - La columna del número de pedido tiene ancho mínimo (`minmax(10.5rem, 1fr)`) y el motivo de un pedido
   fallido parte en líneas dentro de su celda: cortados, dos pedidos del día se leían iguales.
 - Lo que falta de `@erplora/ui` está en `UI-REQUESTS.md` (iconos y piezas copiadas).
@@ -552,7 +567,7 @@ Tests:
 
 | Producto actual | Ahora |
 |---|---|
-| `cart_currency.hub` / `.postgres` | `tests/test_services.py` (moneda del negocio, explícita, nula, inválida) |
+| `cart_currency.hub` / `.postgres` | `tests/test_services.py` (moneda del negocio, explícita, nula, inválida), `tests/test_business_currency.py` (la del país del negocio, cada hub la suya, decimales del servidor) |
 | `handler` (Rust): cantidad × precio, HALF_UP, precio de la fila al cambiar cantidad | `tests/test_services.py` |
 | `erp-cart-checkout-carts.test.ts` (alta dentro de la tabla, estado con lista, moneda del carrito) | `frontend/pages/CartsPage.test.ts`, `components/CartFormModal.test.ts` |
 | `erp-cart-checkout-orders.test.ts` (total en céntimos con formato) | `frontend/pages/OrdersPage.test.ts` |
@@ -602,6 +617,8 @@ Tests:
 - **El buscador de Carritos encuentra por sesión** (antes solo por email y nombre, aunque lo decía).
 - **El pedido guarda su moneda** (la del carrito) y su total se pinta en ella (antes, en la del
   negocio).
+- **La moneda del negocio es la de su país** (la de **Ajustes › Negocio**), la de un carrito nuevo y la
+  del filtro de Total; antes, la que guardaba el hub en sus ajustes.
 - **Borrar un carrito deja libre su sesión** para otro carrito (antes la sesión de un carrito borrado
   no se podía volver a usar).
 - **Cantidades con tres decimales** (`0,5`), como el resto del Hub; antes, enteros con escala 10⁶.
@@ -612,4 +629,4 @@ Tests:
   forma de hacerlo; se adopta lo de Shopify y WooCommerce («erase personal data») y lo que ya hacen
   `service`, `reservation`, `appointment` y `table` con sus textos libres.
 - **Topes de cantidad y de importe**: una línea de más de 1 000 000 unidades o un total por encima de
-  99 999 999 999,99 € se rechazan en su campo (antes, error genérico).
+  99 999 999 999,99 (con dos decimales) se rechazan en su campo (antes, error genérico).

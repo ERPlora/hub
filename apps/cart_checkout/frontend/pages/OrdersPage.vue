@@ -2,7 +2,8 @@
 // Cart & Checkout → Orders (WORKBOOK «Pantallas · Pedidos»; CART_CHECKOUT-F09 to F12): the live
 // `cart_checkout.order.list` in a server-side DataTable with the old table's Order, Email, Status, Payment
 // and Total (in the order's own currency), «Search order or email…», filters per column behind the toolbar's
-// funnel (as the old one), newest first, 50 a page, list or cards. Each row offers the step it can take —
+// funnel (as the old one; the total typed in the business's currency, its country's: flow
+// cart-checkout-business-currency), newest first, 50 a page, list or cards. Each row offers the step it can take —
 // «Mark paid», «Complete», «Fail» (asks for the reason) —, only to whoever may; a refusal shows above the
 // table. No «add»: an order is born from a cart (CART_CHECKOUT-F08). «Paid» is a mark: nothing here charges
 // or is fiscal.
@@ -17,14 +18,14 @@ import {
 } from '@erplora/ui/components';
 import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import FailOrderModal from '../components/FailOrderModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, ORDER_TONE, toMinor, unreadableTotals } from '../lib/format';
+import { amountExample, formatMoney, ORDER_TONE, recordMoney, TOTAL_BOUNDS, toMinor, unreadableTotals, useBusinessMoney } from '../lib/format';
 import type { OrderListIn, OrderOut, OrderStatus } from '../operations';
 import { cartCheckoutTabs } from '../tabs';
 
@@ -39,8 +40,11 @@ const canCheckout = computed(() => session.can('cart_checkout.checkout'));
 
 const table = useServerTable({ sort: '-created_at' });
 const filters = ref<DataTableFilters>({});
+/** The business's currency (its country's): the Total filter is typed in it. Unknown until it answers. */
+const money = useBusinessMoney();
 
-/** The table's filters as the query takes them: fragments, the status and the total in minor units. */
+/** The table's filters as the query takes them: fragments, the status and the total in minor units of the
+ *  business's currency. */
 const query = computed<Partial<OrderListIn>>(() => {
   const f = filters.value;
   const out: Partial<OrderListIn> = {
@@ -49,8 +53,8 @@ const query = computed<Partial<OrderListIn>>(() => {
     ...(f.status ? { status: f.status as OrderStatus } : {}),
     ...(f.payment_method ? { payment_method: f.payment_method } : {}),
   };
-  const min = toMinor(f.total_amount_from);
-  const max = toMinor(f.total_amount_to);
+  const min = toMinor(f.total_amount_from, money.value);
+  const max = toMinor(f.total_amount_to, money.value);
   if (min !== undefined) out.total_amount_min = min;
   if (max !== undefined) out.total_amount_max = max;
   return out;
@@ -58,13 +62,20 @@ const query = computed<Partial<OrderListIn>>(() => {
 
 /** An end of «Total» it cannot read as an amount, said under its box (it filters nothing). */
 const filterErrors = computed<Record<string, string>>(() =>
-  Object.fromEntries(unreadableTotals(filters.value).map((name) => [name, t('cart_checkout.amountInvalid')])),
+  Object.fromEntries(
+    unreadableTotals(filters.value, money.value).map((name) => [name, t('cart_checkout.amountInvalid', { example: amountExample(locale.value, money.value) })]),
+  ),
 );
 
 function onFilters(now: DataTableFilters): void {
   filters.value = now;
   table.restart({ narrowed: Object.keys(now).length > 0 });
 }
+
+// A Total typed before the business answered is read again in its currency when it does, from the first page.
+watch([() => money.value?.currency, () => money.value?.decimals], () => {
+  if (TOTAL_BOUNDS.some((name) => filters.value[name])) onFilters(filters.value);
+});
 
 const { data: result, status, error, refresh } = useLiveList(
   'cart_checkout.order.list',
@@ -104,7 +115,7 @@ const columns = computed<DataTableColumn<OrderOut>[]>(() => [
     label: t('cart_checkout.orders.columns.total'),
     sortable: true,
     align: 'right',
-    format: (_, row) => formatMoney(row.total_amount, locale.value, row.currency),
+    format: (_, row) => formatMoney(row.total_amount, locale.value, recordMoney(row)),
     // Typed as an amount (pm#521): a text box with the decimal keyboard, so «1.250,50» can be pasted.
     filter: { type: 'range', amount: true },
   },
