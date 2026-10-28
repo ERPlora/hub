@@ -3077,7 +3077,8 @@ Implicados: ACCOUNTS-F38
   quien ya tiene el permiso sigue con su contexto tal cual. Solo las llamadas directas de la orden aprobada: lo que
   esa otra orden llame a su vez va con el contexto que recibió. La huella y el gasto del pase no cambian
   (`base/tests/test_approved_calls.py`). Ventas aún lleva su copia (`approval_of`, `consequence_context` y `call_app`
-  de `apps/sale/queries.py`), y Reservas y Mesas su `call_app` propio: pasan a `call` en su FIX. En el cliente, `withApproval(() => command.run(input))` de
+  de `apps/sale/queries.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
+  `call_app` propio, al que no llega ninguna aprobación. En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
   `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
