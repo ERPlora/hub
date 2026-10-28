@@ -1,7 +1,17 @@
-"""The service app declares its module metadata, its menu, its permissions and what each role gets."""
+"""The service app declares its module metadata, its menu, its permissions, what each role gets and its hook of the
+Home."""
+
+from pathlib import Path
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.conf import settings
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.operations import registry
+
+from apps.service import events as E
+from base import home
 
 PERMISSIONS = [
     "service.view_service",
@@ -153,3 +163,77 @@ def test_the_holds_nobody_charged_expire_every_hour_as_the_system():
     from live.operations import get
 
     assert get("service.session.expire").permission == "service.system"
+
+
+# The Home's hook (PLAN-HUB round 2026-10-21; FIX-SERVICE-SETUP-HOOKS): the old module's own item «Your service
+# catalogue» (module.json `setup`, services#26), which reads the catalog's status. The old module declared no panel and
+# no bell row.
+
+
+def test_the_homes_step_is_your_service_catalogue_done_once_one_service_can_be_charged():
+    """The old module's item, same order and words: functional, as it declared it (`required: true`), done once one
+    offered service can be charged (its tax category alive), for whoever adds services, leading to the list of
+    services (the old `/m/services/services`)."""
+    (step,) = service().setup
+    assert isinstance(step, SetupStep)
+    assert (
+        step.key,
+        step.operation,
+        dict(step.params),
+        list(step.configured_when),
+        step.route,
+        step.permission,
+        step.icon,
+        list(step.countries),
+        step.order,
+        step.required,
+    ) == (
+        "catalog",
+        "service.catalog.status",
+        {},
+        [SetupCheck(field="sellable_services", truthy=True)],
+        "/service/services",
+        "service.add_service",
+        "ion:briefcase-outline",
+        [],
+        31,
+        True,
+    )
+    assert "sellable_services" in registry[step.operation].output.model_fields
+    assert home.level_of(f"service.{step.key}", step.required) == home.LEVEL_FUNCTIONAL
+
+
+def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
+    (step,) = service().setup
+    with translation.override("en"):
+        english = (str(step.title), str(step.description))
+    with translation.override("es"):
+        spanish = (str(step.title), str(step.description))
+    assert english == ("Your service catalogue", "Add the services you sell, with their price and duration.")
+    assert spanish == ("Tu catálogo de servicios", "Añade los servicios que vendes, con su precio y su duración.")
+
+
+def test_the_step_is_refreshed_on_what_changes_the_services_on_offer():
+    # A service added (one or many), changed (its tax category), archived or restored. Never a category or a
+    # voucher: neither decides whether a service can be charged.
+    (step,) = service().setup
+    assert list(step.refresh_on) == E.SERVICE_EVENTS
+    assert set(E.SERVICE_EVENTS) == {
+        "service.service.created",
+        "service.service.updated",
+        "service.service.archived",
+        "service.service.restored",
+    }
+    assert set(step.refresh_on) <= set(live_registry.subscribable[step.operation])
+
+
+def test_the_steps_icon_is_registered():
+    # The app's own icon, the old module's `briefcase`.
+    (step,) = service().setup
+    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    assert f"'{step.icon.removeprefix('ion:')}'" in icons
+
+
+def test_services_brings_no_panels_and_no_bell_rows_to_the_home():
+    # The old module declared neither (its module.json has `widgets` and `bell` null).
+    assert (service().widgets, service().bell) == ([], [])

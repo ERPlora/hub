@@ -555,3 +555,9 @@ msgstr "Ficha duplicada"
 
 msgid "Refund or void"
 msgstr "Devolución o anulación"
+
+msgid "Your service catalogue"
+msgstr "Tu catálogo de servicios"
+
+msgid "Add the services you sell, with their price and duration."
+msgstr "Añade los servicios que vendes, con su precio y su duración."
