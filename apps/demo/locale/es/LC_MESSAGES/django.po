@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hub-next demo\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 06:42+0200\n"
+"POT-Creation-Date: 2026-10-28 07:39+0100\n"
 "PO-Revision-Date: 2026-10-13 23:05+0200\n"
 "Last-Translator: ERPlora\n"
 "Language-Team: Spanish\n"
@@ -41,21 +41,31 @@ msgstr ""
 "en las demás pantallas, las líneas al instante y los permisos aplicados. Es "
 "la app de la que se copian todas las demás."
 
-#: apps.py:46
+#: apps.py:42
+msgid "Add a line to an item"
+msgstr "Añadir una línea a un elemento"
+
+#: apps.py:43
+#, python-brace-format
+msgid "Add a line: {qty} × {text}"
+msgstr "Añadir una línea: {qty} × {text}"
+
+#: apps.py:53
 msgid "Create your first item"
 msgstr "Crea tu primer elemento"
 
-#: apps.py:47
+#: apps.py:54
 msgid ""
 "Add an item and watch it appear on every screen of the business at once."
 msgstr ""
-"Añade un elemento y míralo aparecer a la vez en todas las pantallas del negocio."
+"Añade un elemento y míralo aparecer a la vez en todas las pantallas del "
+"negocio."
 
-#: apps.py:58
+#: apps.py:65
 msgid "Open items"
 msgstr "Elementos abiertos"
 
-#: apps.py:74
+#: apps.py:81
 msgid "Open demo items"
 msgstr "Elementos de demo abiertos"
 

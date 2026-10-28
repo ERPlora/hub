@@ -475,7 +475,8 @@ class Approval(UUIDModel):
     The pass handed back is kept as its SHA-256 only, and works once, until ``expires_at``, for the person who asked
     (``requested_by``), that command (``operation``) and that very request of this business (``fingerprint``,
     ``base.approvals.fingerprint``). The names are kept as they were then: the record still reads when a person left.
-    Nobody edits or deletes a row.
+    When the pass is spent, the figures of what it let through that its app's sentences name (``figures``, JSON; none
+    before, or for a command said without figures), so the record says «a 50 % discount». Nobody edits or deletes a row.
     """
 
     class Way(models.TextChoices):
@@ -494,6 +495,7 @@ class Approval(UUIDModel):
     created_at = models.DateTimeField(pgettext_lazy("approval", "approved at"), auto_now_add=True)
     expires_at = models.DateTimeField(pgettext_lazy("approval", "valid until"))
     used_at = models.DateTimeField(pgettext_lazy("approval", "used at"), null=True, blank=True)
+    figures = models.JSONField(pgettext_lazy("approval", "figures"), null=True, blank=True)
 
     class Meta:
         verbose_name = pgettext_lazy("approval", "approval")

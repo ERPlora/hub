@@ -16,15 +16,28 @@ and of two at once only one runs. A pass that is spent, late, forged, another pe
 request's is the same question again, never a way in. Whoever is not of the business gets the refusal of always.
 """
 
+import functools
 import hashlib
 import json
+import re
 import secrets
-from dataclasses import dataclass
+import types
+import typing
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
+from typing import Any
 
+import pydantic
+from babel.numbers import format_currency, format_decimal, format_percent, get_currency_precision, get_currency_symbol
 from django.apps import apps
+from django.conf import settings
 from django.core import checks
 from django.http import HttpRequest
+from django.utils import translation
+from django.utils.functional import Promise
 from django.utils.translation import gettext
+from live.context import Scope
 from live.errors import OperationError
 from live.meta import all_live_app_configs
 from live.operations import Operation, get
@@ -50,9 +63,19 @@ def digest(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def label_of(op: Operation | None) -> str | None:
+#: A hole of a sentence of ``approval_figures``: ``{field}`` or ``{field, format}``.
+HOLE = re.compile(r"\{\s*([a-z_][a-z0-9_]*)\s*(?:,\s*([a-z]+)\s*)?\}")
+#: The formats a hole knows besides a bare text or number: a percentage and an amount of money.
+FORMATS = ("percent", "money")
+
+
+def label_of(
+    op: Operation | None, figures: dict | None = None, scope: Scope | None = None, *, currency: str | None = None
+) -> str | None:
     """What approving ``op`` approves, in words, when its own app names it and it is a command with a permission that
-    opens its transaction: the pass is spent in it (``base.approval_spend``), so a ``database=False`` one never is."""
+    opens its transaction: the pass is spent in it (``base.approval_spend``), so a ``database=False`` one never is.
+    With the ``figures`` of a request (:func:`figures_of`), the first of its app's sentences that they fill, in the
+    active language, in ``currency`` (else ``scope``'s business's, asked only for an amount)."""
     if op is None or op.kind != "command" or not op.permission or not op.database:
         return None
     try:
@@ -61,7 +84,145 @@ def label_of(op: Operation | None) -> str | None:
         return None
     named = getattr(config, "approvals", None)
     label = named.get(op.name) if isinstance(named, dict) else None
-    return str(label) if label else None
+    if not label:
+        return None
+    if figures:
+        money = functools.cache(lambda: currency if currency is not None else currency_of(scope))
+        for sentence in sentences_of(op):
+            said = _filled(op, str(sentence), figures, money)
+            if said:
+                return said
+    return str(label)
+
+
+def currency_of(scope: Scope | None) -> str | None:
+    """The currency ``scope``'s business charges in (BASE-F50); ``None`` when it has none known: no amount is said."""
+    if scope is None:
+        return None
+    from base.operations import business_currency
+
+    try:
+        return business_currency(scope)
+    except OperationError:
+        return None
+
+
+def sentences_of(op: Operation) -> list:
+    """The sentences ``op``'s own app declares to say it with its figures (``approval_figures``); none, ``[]``."""
+    try:
+        config = apps.get_app_config(op.app_label)
+    except LookupError:
+        return []
+    named = getattr(config, "approval_figures", None)
+    sentences = named.get(op.name) if isinstance(named, dict) else None
+    if isinstance(sentences, str | Promise):
+        return [sentences]
+    return list(sentences) if isinstance(sentences, list | tuple) else []
+
+
+def holes(sentence: str) -> list[tuple[str, str | None]] | None:
+    """The holes of ``sentence``, in order, as ``(field, format)``; ``None`` when a brace opens or closes none."""
+    rest = HOLE.sub("", sentence)
+    if "{" in rest or "}" in rest:
+        return None
+    return [(found.group(1), found.group(2)) for found in HOLE.finditer(sentence)]
+
+
+def figures_of(op: Operation, data: pydantic.BaseModel | None) -> dict:
+    """The figures of ``data``, ``op``'s input as its schema validated it, that ``op``'s sentences name: only those
+    fields, as JSON (a decimal as its text); none named, ``{}``."""
+    if data is None:
+        return {}
+    named = {name for sentence in sentences_of(op) for name, _ in holes(str(sentence)) or ()}
+    named &= set(type(data).model_fields)
+    if not named:
+        return {}
+    dumped = data.model_dump(mode="json", include=named)
+    return {name: dumped.get(name) for name in sorted(named)}
+
+
+def figures_from(op: Operation, raw: bytes | str | None) -> dict:
+    """The figures of a request's body or a tool's arguments (JSON), validated as the command validates them (a route
+    and the assistant parse it, then ``op.input``); an input the command does not take has none."""
+    if not sentences_of(op):
+        return {}
+    try:
+        data = json.loads(raw or b"{}")
+        validated = op.input.model_validate(data) if isinstance(data, dict) else None
+    except ValueError:
+        # Not JSON, or refused by the command's schema (pydantic's ValidationError is a ValueError): the command says it.
+        return {}
+    return figures_of(op, validated)
+
+
+def _filled(op: Operation, sentence: str, figures: dict, money: Callable[[], str | None]) -> str:
+    """``sentence`` with its holes filled from ``figures``, or ``""`` when one does not fill: never half a sentence."""
+    parts = holes(sentence)
+    if not parts:
+        return ""
+    said: dict[tuple[str, str | None], str] = {}
+    for name, how in parts:
+        text = _figure(op, name, how, figures.get(name), money)
+        if not text:
+            return ""
+        said[(name, how)] = text
+    return HOLE.sub(lambda found: said[(found.group(1), found.group(2))], sentence).strip()
+
+
+def _figure(op: Operation, name: str, how: str | None, value: Any, money: Callable[[], str | None]) -> str:
+    """One figure as the Hub writes it in the active language; ``""`` when empty, zero or not what the hole asks."""
+    if how is None and not _numeric(op, name):
+        return value.strip() if isinstance(value, str) else ""
+    number = _number(value)
+    if number is None or number == 0:
+        return ""
+    locale = translation.to_locale(translation.get_language() or settings.LANGUAGE_CODE)
+    if how == "percent":
+        return format_percent(number.normalize() / 100, locale=locale, decimal_quantization=False)
+    if how == "money":
+        return _money(number, money(), locale)
+    return format_decimal(number.normalize(), locale=locale) if how is None else ""
+
+
+def _money(cents: Decimal, currency: str | None, locale: str) -> str:
+    """Minor units of ``currency``, as every screen writes them («1.234,56 €», «€1,234.56», «PLN 1.00»)."""
+    if currency is None or cents != cents.to_integral_value():
+        return ""
+    text = format_currency(cents.scaleb(-get_currency_precision(currency)), currency, locale=locale)
+    # CLDR's currency spacing, which Babel skips: a sign of letters before the figure never touches it («PLN 1.00»).
+    symbol = get_currency_symbol(currency, locale=locale)
+    if symbol[-1:].isalpha() and text.startswith(symbol) and text[len(symbol) : len(symbol) + 1].isdigit():
+        return f"{symbol}\xa0{text[len(symbol):]}"
+    return text
+
+
+def _number(value: Any) -> Decimal | None:
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        return None
+    try:
+        number = Decimal(str(value))
+    except InvalidOperation:
+        return None
+    return number if number.is_finite() else None
+
+
+def _numeric(op: Operation, name: str) -> bool:
+    """Whether ``op``'s input takes ``name`` as a number (an integer, a decimal or a choice of numbers)."""
+    found = op.input.model_fields.get(name)
+    return found is not None and _is_number(found.annotation)
+
+
+def _is_number(annotation: Any, kinds: tuple[type, ...] = (int, float, Decimal)) -> bool:
+    """Whether ``annotation`` (optional or not) only takes numbers of ``kinds``: an integer, a decimal, a choice of them."""
+    origin = typing.get_origin(annotation)
+    if origin is typing.Union or origin is types.UnionType:
+        some = [arg for arg in typing.get_args(annotation) if arg is not type(None)]
+        return bool(some) and all(_is_number(arg, kinds) for arg in some)
+    if origin is typing.Literal:
+        return all(isinstance(arg, kinds) and not isinstance(arg, bool) for arg in typing.get_args(annotation))
+    if origin is typing.Annotated:
+        return _is_number(typing.get_args(annotation)[0], kinds)
+    return isinstance(annotation, type) and issubclass(annotation, kinds) and annotation is not bool
 
 
 def approvable(name: str) -> tuple[Operation, str] | None:
@@ -109,12 +270,14 @@ class Approved:
     permission: str
     token: str
     fingerprint: str
+    #: The figures of that request its app's sentences name (:func:`figures_of`): the record keeps them.
+    figures: dict = field(default_factory=dict, compare=False)
 
 
-def refusal(operation: str, fingerprint_: str) -> ApprovalRequired:
-    """The approval's question for ``operation`` on the request of ``fingerprint_``."""
+def refusal(operation: str, fingerprint_: str, figures: dict | None = None, scope: Scope | None = None) -> ApprovalRequired:
+    """The approval's question for ``operation`` on the request of ``fingerprint_``, said with its ``figures``."""
     found = approvable(operation)
-    label = found[1] if found is not None else operation
+    label = (label_of(found[0], figures, scope) or found[1]) if found is not None else operation
     return ApprovalRequired(gettext("This needs a manager's approval."), operation=operation, label=label, fingerprint=fingerprint_)
 
 
@@ -141,12 +304,18 @@ class ApprovalDoor:
             # Somebody who may, or somebody who is not of the business: the command's own refusal of always.
             return user
         asked = fingerprint(request, ctx.scope.key)
+        figures = figures_from(op, request.body)
         token = request.headers.get(HEADER, "")
         if token.startswith(TOKEN_PREFIX):
-            request.approved = Approved(operation=op.name, permission=op.permission, token=token, fingerprint=asked)
+            request.approved = Approved(
+                operation=op.name, permission=op.permission, token=token, fingerprint=asked, figures=figures
+            )
             return user
         raise ApprovalRequired(
-            gettext("This needs a manager's approval."), operation=op.name, label=label, fingerprint=asked
+            gettext("This needs a manager's approval."),
+            operation=op.name,
+            label=label_of(op, figures, ctx.scope) or label,
+            fingerprint=asked,
         )
 
 
@@ -195,3 +364,73 @@ def check_approvals(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
                     )
                 )
     return errors
+
+
+@checks.register("base")
+def check_approval_figures(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E008``: an app says with figures only a command of its own that its ``approvals`` name, in sentences whose
+    holes are fields of that command's input, with a format the Hub knows (``percent`` and ``money`` of a number,
+    ``money`` of whole minor units), and the same holes in every language of the Hub."""
+    errors: list[checks.CheckMessage] = []
+    for config in all_live_app_configs():
+        named = getattr(config, "approval_figures", None)
+        if named is None:
+            continue
+        if not isinstance(named, dict):
+            errors.append(_figures_error(config, f"{config.label}.approval_figures is not a dict of command → sentences."))
+            continue
+        for name, sentences in named.items():
+            errors += [_figures_error(config, problem) for problem in _figures_problems(config, name, sentences)]
+    return errors
+
+
+def _figures_error(config, message: str) -> checks.Error:
+    return checks.Error(
+        message,
+        hint="approval_figures says a command of the app's own approvals with the figures of its input: "
+        '{"<command>": [_("… {field} …"), …]}, holes {field}, {field, percent} or {field, money}.',
+        obj=config,
+        id="base.E008",
+    )
+
+
+def _figures_problems(config, name: str, sentences: Any) -> list[str]:
+    own = getattr(config, "approvals", None)
+    if not isinstance(own, dict) or name not in own:
+        return [f"{config.label} says {name} with figures, but its approvals do not name it."]
+    try:
+        op = get(name)
+    except Exception:
+        return [f"{config.label} says {name} with figures, but no command is called so."]
+    if op.app_label != config.label:
+        return [f"{config.label} says {name} with figures, but it is a command of {op.app_label}."]
+    if not isinstance(sentences, str | Promise | list | tuple):
+        return [f"{config.label} says {name} with {type(sentences).__name__}, not a list of sentences."]
+    problems: list[str] = []
+    for sentence in [sentences] if isinstance(sentences, str | Promise) else sentences:
+        with translation.override(None):
+            source = str(sentence)
+        found = holes(source)
+        if found is None:
+            problems.append(f"{config.label}: a sentence of {name} has a brace that opens or closes no hole: {source!r}.")
+            continue
+        for field_name, how in found:
+            problems += _hole_problems(config, op, field_name, how)
+        for language, _ in settings.LANGUAGES:
+            with translation.override(language):
+                translated = holes(str(sentence))
+            if translated is None or set(translated) != set(found):
+                problems.append(f"{config.label}: the {language} of {source!r} ({name}) does not have the same holes.")
+    return problems
+
+
+def _hole_problems(config, op: Operation, field_name: str, how: str | None) -> list[str]:
+    declared = op.input.model_fields.get(field_name)
+    if declared is None:
+        return [f"{config.label}: {op.name}'s input has no field {field_name}."]
+    if how is not None and how not in FORMATS:
+        return [f"{config.label}: {{{field_name}, {how}}} of {op.name} is no format the Hub knows ({', '.join(FORMATS)})."]
+    if how is not None and not _is_number(declared.annotation, (int,) if how == "money" else (int, float, Decimal)):
+        kind = "whole minor units" if how == "money" else "a number"
+        return [f"{config.label}: {{{field_name}, {how}}} of {op.name} is not {kind}."]
+    return []

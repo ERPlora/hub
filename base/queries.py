@@ -1367,11 +1367,13 @@ def holds(user, scope, permission: str) -> bool:
     return OperationContext(scope=scope, actor=user, permissions=permissions_for(user, scope)).has(permission)
 
 
-def approval_action(operation: str) -> str:
-    """What an approval approved, in words: the app's own, else «An action of <app>», else that nobody names it now."""
+def approval_action(operation: str, figures: dict | None = None, currency: str | None = None) -> str:
+    """What an approval approved, in words: the app's own (with the ``figures`` of what it let through, in the active
+    language and in ``currency``, when its app says it with them), else «An action of <app>», else that nobody names
+    it now."""
     found = approval_rules.approvable(operation)
     if found is not None:
-        return found[1]
+        return approval_rules.label_of(found[0], figures, currency=currency) or found[1]
     config = next((c for c in all_live_app_configs() if c.label == operation.split(".", 1)[0]), None)
     if config is not None:
         return gettext("An action of %(app)s") % {"app": config.verbose_name}
@@ -1391,13 +1393,15 @@ def approval_action(operation: str) -> str:
 )
 def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
     """Employees › Approvals (BASE-G145): the record of approvals, read only."""
-    rows = Approval.objects.order_by("-created_at", "-id")[:APPROVALS_SHOWN]
+    rows = list(Approval.objects.order_by("-created_at", "-id")[:APPROVALS_SHOWN])
+    currency = approval_rules.currency_of(ctx.scope) if any(row.figures for row in rows) else None
     return {
         "approvals": [
             {
                 "id": row.id,
                 "at": row.created_at,
-                "action": approval_action(row.operation),
+                "action": approval_action(row.operation, row.figures, currency),
+                "operation_label": approval_action(row.operation),
                 "operation": row.operation,
                 "requested_by": row.requested_by_name,
                 "approved_by": row.approved_by_name,
@@ -1410,9 +1414,9 @@ def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
     }
 
 
-def _approvals_kept(data: ApprovalExportIn):
+def _approvals_kept(data: ApprovalExportIn, currency: str | None):
     """The record with the list's search and filters: the days in the business's time zone, the search on what the list
-    shows (the action in words and the two names), in any case."""
+    shows (the action in words, with its figures, and the two names), in any case."""
     rows = Approval.objects.order_by("-created_at", "-id")
     if data.at_from:
         rows = rows.filter(created_at__date__gte=data.at_from)
@@ -1431,8 +1435,16 @@ def _approvals_kept(data: ApprovalExportIn):
             for name in rows.order_by().values_list("operation", flat=True).distinct()
             if needle.lower() in approval_action(name).lower()
         ]
+        figured = [
+            pk
+            for pk, name, figures in rows.filter(figures__isnull=False).values_list("id", "operation", "figures")
+            if needle.lower() in approval_action(name, figures, currency).lower()
+        ]
         rows = rows.filter(
-            Q(requested_by_name__icontains=needle) | Q(approved_by_name__icontains=needle) | Q(operation__in=named)
+            Q(requested_by_name__icontains=needle)
+            | Q(approved_by_name__icontains=needle)
+            | Q(operation__in=named)
+            | Q(id__in=figured)
         )
     return rows
 
@@ -1470,11 +1482,12 @@ def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
         ]
     )
     count = 0
-    for row in _approvals_kept(data):
+    currency = approval_rules.currency_of(ctx.scope) if Approval.objects.filter(figures__isnull=False).exists() else None
+    for row in _approvals_kept(data, currency):
         writer.writerow(
             [
                 timezone.localtime(row.created_at).strftime("%Y-%m-%d %H:%M"),
-                _approval_cell(approval_action(row.operation)),
+                _approval_cell(approval_action(row.operation, row.figures, currency)),
                 _approval_cell(row.approved_by_name),
                 _approval_cell(row.requested_by_name),
                 str(Approval.Way(row.way).label),
