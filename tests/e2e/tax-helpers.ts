@@ -4,7 +4,7 @@
 // `ion-select` popover, a row action inline or behind the row's «⋮»).
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, capture, psql, shown } from './helpers';
 
 /** 390×844, 834×1112 and 1440×900: a phone, a tablet and a desk. */
 export const FLOW_VIEWPORTS = [
@@ -52,7 +52,7 @@ export async function threeShots(page: Page, key: string, target: () => Locator)
       await expect(seen).toBeInViewport({ timeout: 1000 });
     }, `${key} at ${vp.label}`).toPass();
     await expect.poll(() => horizontalOverflow(page), `${key} at ${vp.label}: sideways scroll`).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: shot(`APP-TAX-${key}-${vp.label}`) });
+    await capture(page, `APP-TAX-${key}-${vp.label}`);
   }
 }
 

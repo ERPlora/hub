@@ -6,7 +6,7 @@
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown, untilStill } from './helpers';
+import { A, exposeMovingInPage, login, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 
@@ -102,6 +102,7 @@ type Size = { width: number; height: number };
  * Never a fixed wait; `settled` is false when 600 frames go by without that.
  */
 async function toolbarAt(page: Page, size: Size): Promise<Toolbar> {
+  await exposeMovingInPage(page);
   await page.evaluate((target) => {
     const read = () => {
       const row = [...document.querySelectorAll('.data-table__bar-main')].find((el) =>
@@ -138,18 +139,8 @@ async function toolbarAt(page: Page, size: Size): Promise<Toolbar> {
       if (!pane || typeof pane.when !== 'string') return true;
       return pane.classList.contains('split-pane-visible') === matchMedia(breakpoints[pane.when] ?? pane.when).matches;
     };
-    const animating = () => {
-      const animations = [...document.getAnimations()];
-      const walk = (root: Document | ShadowRoot) => {
-        for (const el of root.querySelectorAll('*')) {
-          if (!el.shadowRoot) continue;
-          animations.push(...el.shadowRoot.getAnimations());
-          walk(el.shadowRoot);
-        }
-      };
-      walk(document);
-      return animations.some((a) => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity);
-    };
+    // helpers.ts's `movingInPage`, put in the page by `exposeMovingInPage`: the one detector of the e2e.
+    const animating = () => (window as unknown as { __movingInPage: () => string[] }).__movingInPage().length > 0;
     (window as unknown as { __toolbar: Promise<unknown> }).__toolbar = new Promise((resolve) => {
       let last: string | undefined;
       let frames = 0;

@@ -27,15 +27,8 @@ export const FLOW_VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
-/** Waits until no finite animation runs (a modal opening, a popover closing): the capture shows the state
- *  the flow reached, not a frame of Ionic's transition; spinners (infinite) do not count. */
-export async function settled(page: Page): Promise<void> {
-  await page.waitForFunction(() =>
-    document
-      .getAnimations()
-      .every((animation) => animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity),
-  );
-}
+/** Waits until nothing moves and the page is painted: helpers.ts's, the one every spec takes. */
+export { settled } from './helpers';
 
 /** The page does not scroll sideways: everything fits its width. */
 export async function noHorizontalScroll(page: Page, label: string): Promise<void> {

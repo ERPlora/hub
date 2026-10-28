@@ -19,11 +19,9 @@
 // reconnecting», the inbox's notice leads to Settings, «Reconnect» opens the same window and connects the number
 // again, and the inbox's notice goes by itself (disconnecting: whatsapp-inbox-connect.spec.ts).
 // Captures, three sizes: FIX-HUB-WHATSAPP-INBOX-LOCAL-HTTP-RETURN-PAGE-REFUSED[-F01|-F02]-390|834|1440.
-import { writeFileSync } from 'node:fs';
-
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, login, SAAS, shot, shown } from './helpers';
+import { A, capture, login, SAAS, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { BUSINESS_ID, CODE, EXPIRED_CODE, type GraphCall, type GraphThread, NUMBER_ID, SHOWN_NAME, WABA_ID } from './whatsapp-graph';
 import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
@@ -83,44 +81,8 @@ async function pressAndFinish(page: Page, label: string): Promise<void> {
   if (!window.isClosed()) await window.waitForEvent('close', { timeout: 15_000 });
 }
 
-/** How many rows at the bottom of `png` repeat its first rows (0: none): what a capture taken before the browser
- *  painted the page at its new size shows (erplora.com's e2e, `repeatedTop` of its tests/e2e/panel/fixtures.ts). A
- *  stripe of one flat colour does not count. Decoded in the page's browser: the e2e has no image library. */
-async function repeatedTop(page: Page, png: Buffer): Promise<number> {
-  return page.evaluate(async (base64) => {
-    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-    const { width, height } = bitmap;
-    const context = new OffscreenCanvas(width, height).getContext('2d');
-    if (!context) throw new Error('repeatedTop: no 2d context to read the screenshot');
-    context.drawImage(bitmap, 0, 0);
-    const pixels = new Uint32Array(context.getImageData(0, 0, width, height).data.buffer);
-    const sameRow = (a: number, b: number) => {
-      for (let x = 0; x < width; x++) if (pixels[a * width + x] !== pixels[b * width + x]) return false;
-      return true;
-    };
-    const flatRow = (row: number) => {
-      for (let x = 1; x < width; x++) if (pixels[row * width + x] !== pixels[row * width]) return false;
-      return true;
-    };
-    for (let rows = Math.floor(height / 2); rows >= 8; rows--) {
-      let repeated = true;
-      let flat = true;
-      for (let row = 0; row < rows && repeated; row++) {
-        repeated = sameRow(height - rows + row, row);
-        flat &&= flatRow(row);
-      }
-      if (repeated && !flat) return rows;
-    }
-    return 0;
-  }, png.toString('base64'));
-}
-
-const nextFrames = (page: Page) =>
-  page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-
-/** `page` in the three sizes once `ready` holds in each: painted at that size (taken again until it is) and without
- *  sideways scroll. */
+/** `page` in the three sizes once `ready` holds in each: painted at that size (`capture`) and without sideways
+ *  scroll. */
 async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>): Promise<void> {
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -129,13 +91,7 @@ async function shots(page: Page, name: string, ready: (page: Page) => Promise<vo
     await ready(page);
     await settled(page);
     await noHorizontalScroll(page, `${name} ${viewport.label}`);
-    let png = await page.screenshot();
-    for (let tries = 0; tries < 10 && (await repeatedTop(page, png)) > 0; tries++) {
-      await nextFrames(page);
-      png = await page.screenshot();
-    }
-    expect(await repeatedTop(page, png), `${name} ${viewport.label} painted at its size`).toBe(0);
-    writeFileSync(shot(`${name}-${viewport.label}`), png);
+    await capture(page, `${name}-${viewport.label}`);
   }
   await page.setViewportSize({ width: 1280, height: 860 });
 }

@@ -6,7 +6,7 @@
 // (`E2E…` codes) or the ids it recorded.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, psql, shot } from './helpers';
+import { A, api, capture, psql } from './helpers';
 
 /** The three sizes of a flow's evidence (the migration's: 390×844, 834×1112, 1440×900). */
 export const FLOW_VIEWPORTS = [
@@ -22,7 +22,7 @@ export async function flowShots(page: Page, flow: string, ready: (page: Page) =>
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await ready(page);
-    await page.screenshot({ path: shot(`APP-INVOICE-${flow}-${viewport.label}`) });
+    await capture(page, `APP-INVOICE-${flow}-${viewport.label}`);
   }
   await page.setViewportSize(restore);
 }

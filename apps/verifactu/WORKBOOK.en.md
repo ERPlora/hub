@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:791b5a44108afac71b0a594f8a6a7f132e2269ea375943ae684b3f6becff5525 -->
+<!-- generated from WORKBOOK.md sha256:53b084bae135231cb0c65fa08f4fbfa443e702853221feccb7ec227c46abbd76 -->
 
 ## What it is for and who it is for
 
@@ -928,7 +928,10 @@ Involved: VERIFACTU-F22, VERIFACTU-F23, VERIFACTU-F27
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own session)
-and the API, with the same rules and permissions. Designed for voice: a record is named by the **number of its
+and the API, with the same rules and permissions, except uploading the business's own certificate and sending the
+signed authorisation: they carry files and the certificate's password, which are not said or written in a
+conversation, so the assistant does not offer them and they are done in **VeriFactu → Configuration** ("My certificate"
+and "ERPlora files for you") or through the API. Designed for voice: a record is named by the **number of its
 invoice** (`TICKET-2026-000012`) or by its sequence; an issuer, by its tax ID.
 
 ### What it offers: queries (they read, they change nothing)

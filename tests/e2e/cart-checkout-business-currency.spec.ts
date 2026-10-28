@@ -11,7 +11,7 @@
 // deleted before and after the run, and `a`'s registration is put back, also when a test fails.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { A, psql, registerBusinessIn, registrationOf, type Registration, settled, shot, shown } from './helpers';
 import { type Cart, cleanUp, code, FLOW_VIEWPORTS, listShown, type Order, post, rowOf, signedIn } from './cart-checkout-helpers';
 
 const KEY = 'FIX-HUB-CART_CHECKOUT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
@@ -51,9 +51,9 @@ async function totalFrom(page: Page, value: string): Promise<void> {
   await expect(panel).toBeHidden();
 }
 
-/** Waits until no modal or popover is moving and nothing scrolls sideways, then captures `name`. */
+/** Waits until nothing moves (`settled`) and nothing scrolls sideways, then captures `name`. */
 async function capture(page: Page, name: string): Promise<void> {
-  await page.waitForFunction(() => ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0);
+  await settled(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(name) });
