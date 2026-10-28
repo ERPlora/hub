@@ -273,9 +273,46 @@ def _label(op: Operation, name: str, title: str | None) -> str:
     return gettext(title or _generated_title(name))
 
 
-def _field(name: str, label: str, prop: dict, value: Any, money: dict | None = None) -> dict:
-    """One datum of a card; an amount carries ``signed`` when its schema declares it so and ``money`` when it is in a
-    currency of its own (a preview's, as its read answers it): without it, the card paints it in the business's."""
+#: What a card shows of a secret instead of its value: the same in every language.
+HIDDEN = "••••••••"
+
+
+def _is_secret(prop: dict) -> bool:
+    """Whether the schema declares the datum secret: a password, a certificate, a key (pydantic's ``SecretStr``:
+    ``format: password``, ``writeOnly``)."""
+    return prop.get("format") == "password" or prop.get("writeOnly") is True
+
+
+def _hidden(value: Any, prop: dict, defs: dict) -> Any:
+    """``value`` with each secret its schema ``prop`` declares, at any depth, as ``HIDDEN``; an empty one hides
+    nothing. A card never carries a secret as typed: neither on the screen nor in what the browser receives."""
+    if value is None or value == "":
+        return value
+    ref = prop.get("$ref")
+    if ref:
+        prop = {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
+    if _is_secret(prop):
+        return HIDDEN
+    # Each branch of a union hides its own: what any of them declares secret is hidden.
+    for branch in [*prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]:
+        value = _hidden(value, branch, defs)
+    if isinstance(value, dict):
+        props = prop.get("properties", {})
+        extra = prop.get("additionalProperties")
+        extra = extra if isinstance(extra, dict) else {}
+        return {key: _hidden(inner, props.get(key, extra), defs) for key, inner in value.items()}
+    if isinstance(value, list):
+        items, prefix = prop.get("items"), prop.get("prefixItems", [])
+        items = items if isinstance(items, dict) else {}
+        return [_hidden(item, prefix[i] if i < len(prefix) else items, defs) for i, item in enumerate(value)]
+    return value
+
+
+def _field(name: str, label: str, prop: dict, defs: dict, value: Any, money: dict | None = None) -> dict:
+    """One datum of a card, a secret hidden (``_hidden``); an amount carries ``signed`` when its schema declares it so
+    and ``money`` when it is in a currency of its own (a preview's, as its read answers it): without it, the card
+    paints it in the business's."""
+    value = _hidden(value, prop, defs)
     if value is None or value == "" or value == []:
         kind = "empty"
     elif isinstance(value, bool):
@@ -316,7 +353,7 @@ def card(op: Operation, arguments: dict, language: str) -> dict:
     with translation.override(language):
         fields = [
             # The title of the property itself: a ``$ref``'s own is its schema class's name.
-            _field(name, _label(op, name, prop.get("title")), _resolved(prop, defs), arguments[name])
+            _field(name, _label(op, name, prop.get("title")), _resolved(prop, defs), defs, arguments[name])
             for name, prop in props.items()
             if name in arguments
         ]
@@ -515,7 +552,9 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     money = _answer_money(answer)
     with translation.override(ctx.language):
         fields = [
-            _field(name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), answer.get(name), money)
+            _field(
+                name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), defs, answer.get(name), money
+            )
             for name in declared["fields"]
         ]
     return None, [field for field in fields if field["kind"] != "empty"]

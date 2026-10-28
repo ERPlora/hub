@@ -3,6 +3,7 @@ asked for, shows a write's card and runs it only with the person's yes, as the p
 ``base.assistant.report`` and ``base.assistant.transcribe`` go to erplora.com's gateway (``fake_gateway``).
 """
 
+import dataclasses
 import json
 
 import pytest
@@ -16,7 +17,7 @@ from base.models import Hub, Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
-from base.tests.test_assistant import PricedPreviewOut, count_preview, declaring
+from base.tests.test_assistant import SECRET_SET, PricedPreviewOut, count_preview, declaring
 from base.tests.test_assistant import settle  # noqa: F401 - the fixture: a dangerous write with its preview
 
 pytestmark = pytest.mark.django_db
@@ -166,6 +167,23 @@ def test_a_dangerous_write_runs_only_with_the_word_typed():
     right = turn(delete, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     assert right["executed"][0]["outcome"] == "ok"
     assert "Barra" not in items()
+
+
+def test_a_secret_reaches_the_browser_hidden_on_its_card_and_its_write_as_typed(monkeypatch):
+    """FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-SECRETSTR-IN-CLEAR: the card the browser receives (and keeps while it waits)
+    never carries a secret as typed; the yes runs the write with it."""
+    received = []
+    secret_set = dataclasses.replace(
+        SECRET_SET, fn=lambda ctx, data: received.append(data.value.get_secret_value()) or {"name": data.name}
+    )
+    monkeypatch.setitem(registry, secret_set.name, secret_set)
+    write = call(secret_set.name, {"name": "Banco", "value": "hunter2"})
+    asked_card = turn(write)["confirm"]
+    assert asked_card["operation"] == secret_set.name
+    assert "hunter2" not in json.dumps(asked_card, ensure_ascii=False)
+    plan = turn(write, decision={"call_id": "c1", "accepted": True})
+    assert plan["executed"][0]["outcome"] == "ok"
+    assert received == ["hunter2"]
 
 
 # ── What a dangerous write will do, on its card (BASE-F98) ───────────────────────────────────────────────────────

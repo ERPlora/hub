@@ -18,6 +18,7 @@ from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
+from pydantic import SecretStr
 
 from base import assistant, entitlement
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
@@ -190,6 +191,116 @@ def test_a_title_its_app_wrote_names_the_datum_in_its_translation_or_in_english(
     arguments = {"first_name": "Ana", "last_name": "Gil"}
     assert labels(assistant.card(TITLED, arguments, "es")) == ["Propietario", "Apellidos"]
     assert labels(assistant.card(TITLED, arguments, "en")) == ["Owner", "Family name"]
+
+
+# FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-SECRETSTR-IN-CLEAR: the card painted a secret (a certificate's password, an
+# automation's secret: ``SecretStr``) as typed, on the screen and in what the browser receives. Its schema says so
+# (``format: password``, ``writeOnly``): at any depth, the card shows it hidden; the write still receives it.
+
+HIDDEN = "••••••••"
+
+
+class LoginIn(Schema):
+    user: str
+    password: SecretStr
+    backup: SecretStr | None = None
+
+
+class SecretSetIn(Schema):
+    name: str = ""
+    value: SecretStr | None = None
+    login: LoginIn | None = None
+    logins: list[LoginIn] = []
+    tokens: dict[str, SecretStr] = {}
+    pair: tuple[str, SecretStr] | None = None
+    # Declared secret by one mark of the two alone.
+    api_key: str = Field("", json_schema_extra={"writeOnly": True})
+    pin: str = Field("", json_schema_extra={"format": "password"})
+
+
+class SecretSetOut(Schema):
+    name: str
+
+
+SECRET_SET = Operation(
+    name="demo.item.secret_set",
+    kind="command",
+    permission="demo.manage",
+    input=SecretSetIn,
+    output=SecretSetOut,
+    expose_api=False,
+    ai={"description": "Keeps a secret of a demo item."},
+    fn=lambda ctx, data: {"name": data.name},
+)
+
+
+def test_a_secret_reaches_the_card_hidden_at_any_depth_and_the_rest_as_sent():
+    arguments = {
+        "name": "Banco",
+        "value": "hunter2",
+        "login": {"user": "ana", "password": "hunter3", "backup": "hunter4"},
+        "logins": [{"user": "eva", "password": "hunter5"}],
+        "tokens": {"main": "hunter6"},
+        "pair": ["ana", "hunter7"],
+        "api_key": "hunter8",
+        "pin": "hunter9",
+    }
+    card = assistant.card(SECRET_SET, arguments, "es")
+    assert "hunter" not in json.dumps(card, ensure_ascii=False)
+    assert shown(card["fields"]) == [
+        ("name", "text", "Banco"),
+        ("value", "text", HIDDEN),
+        ("login", "object", {"user": "ana", "password": HIDDEN, "backup": HIDDEN}),
+        ("logins", "list", [{"user": "eva", "password": HIDDEN}]),
+        ("tokens", "object", {"main": HIDDEN}),
+        ("pair", "list", ["ana", HIDDEN]),
+        ("api_key", "text", HIDDEN),
+        ("pin", "text", HIDDEN),
+    ]
+
+
+def test_an_empty_secret_is_said_empty_nothing_to_hide():
+    card = assistant.card(SECRET_SET, {"value": "", "login": None}, "es")
+    assert shown(card["fields"]) == [("value", "empty", ""), ("login", "empty", None)]
+
+
+SENTINEL = "s3cr3t-in-clear"
+
+
+def with_secrets(prop: dict, defs: dict, depth: int = 0) -> object:
+    """A value of the schema ``prop`` with ``SENTINEL`` in each secret it declares (``format: password`` or
+    ``writeOnly``), at any depth, and nothing else; ``None`` when it declares none."""
+    ref = prop.get("$ref")
+    if ref:
+        prop = {**defs.get(ref.rsplit("/", 1)[-1], {}), **{k: v for k, v in prop.items() if k != "$ref"}}
+    if prop.get("format") == "password" or prop.get("writeOnly") is True:
+        return SENTINEL
+    if depth > 8:  # a schema that names itself
+        return None
+    for branch in [*prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]:
+        if (value := with_secrets(branch, defs, depth + 1)) is not None:
+            return value
+    if isinstance(prop.get("properties"), dict):
+        found = {name: with_secrets(inner, defs, depth + 1) for name, inner in prop["properties"].items()}
+        return {name: value for name, value in found.items() if value is not None} or None
+    for key, wrap in (("items", lambda value: [value]), ("additionalProperties", lambda value: {"key": value})):
+        if isinstance(prop.get(key), dict) and (value := with_secrets(prop[key], defs, depth + 1)) is not None:
+            return wrap(value)
+    return None
+
+
+def test_no_operation_lets_a_secret_reach_its_card_in_clear():
+    """Every operation of every app, tool of the assistant or not (one may become one): what its schema declares
+    secret never reaches its card as sent."""
+    checked = []
+    for name, op in sorted({**registry, SECRET_SET.name: SECRET_SET}.items()):
+        schema = op.input.model_json_schema()
+        arguments = with_secrets(schema, schema.get("$defs", {}))
+        if arguments:
+            checked.append(name)
+            assert SENTINEL not in json.dumps(assistant.card(op, arguments, "es"), ensure_ascii=False), name
+    # Not an empty sweep: today's secrets are among them (a certificate and its password, an automation's secret).
+    assert {"verifactu.certificate.upload", "flow.secret.set", SECRET_SET.name} <= set(checked)
 
 
 def named_by_the_screen() -> set[str]:
@@ -610,7 +721,7 @@ def test_a_preview_marks_signed_only_an_amount(monkeypatch):
 def test_only_an_amount_declared_signed_carries_the_mark(prop, value):
     """The mark is for the card to write a sign on an amount: a datum that is no amount in cents, an amount left empty
     (a difference hidden from this person) or a declaration that is not ``True`` carry none, whatever the schema says."""
-    assert "signed" not in assistant._field("difference", "Diferencia", prop, value)
+    assert "signed" not in assistant._field("difference", "Diferencia", prop, {}, value)
 
 
 def test_the_previews_of_today_are_declared_right(settle):
