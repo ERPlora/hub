@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:429bb5f6d1adc825930a95e185a52bdce77783fa6646af117ac4b7c2c562b5d0 -->
+<!-- generated from WORKBOOK.md sha256:ec5bc58313345c510ba6b6271415114c632ff462db880dd713a9909f6b913a61 -->
 
 ## What it is for and who it is for
 
@@ -517,7 +517,8 @@ Steps:
      of whoever is looking. In a list with bars, each bar measures how big its figure is against the biggest
      one of the list, whatever its sign; a negative figure, such as a cash discrepancy where money was missing
      or a product with stock below zero, shows in red and with its sign (-€0.40), and the others keep the
-     panel's colour.
+     panel's colour or, if its app gives each row a colour, their own row's (each role of Staff in its own).
+     The red of a negative figure always wins over its row's colour.
   3. In a chart of days, each bar has its weekday under it (or its date, if it spans more than a week) and
      above them show the day and its amount: the last bar's until you tap another. A day below zero has its
      bar as tall as its figure, in red; the others keep their colour.
