@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2a7f34c9b390bd4c679c131469fdedf61ce0641e8de4516067628bb5c660dd28 -->
+<!-- generated from WORKBOOK.md sha256:464f434379e70bcad675f3e57e44ada4af5152a7c4007d609f6828584ad3a18b -->
 
 ## What it is for and who it is for
 
@@ -2343,7 +2343,8 @@ Screen: Assistant
 Steps:
   1. The person asks for a chain ("create the category Drinks and the product Draught beer at €2.50").
   2. The assistant solves it in rounds: it reads what it needs without asking, asks for an action, it is done and it
-     goes on. All it says goes to the same bubble.
+     goes on. All it says goes to the same bubble, and what each round says in its own paragraph: never glued to the
+     previous one.
   3. Each action that changes something asks for its own card (BASE-F97), one after the other: accepting the first
      does not accept the next ones. If more wait behind it, the card carries "Cancel all", which cancels this one and
      those left.
