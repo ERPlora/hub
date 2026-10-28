@@ -32,7 +32,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import pydantic
-from babel.numbers import format_currency, format_decimal, format_percent, get_currency_precision, get_currency_symbol
+from babel.numbers import format_decimal, format_percent
 from django.apps import apps
 from django.conf import settings
 from django.core import checks
@@ -48,6 +48,7 @@ from ninja import NinjaAPI
 from ninja.security import django_auth
 
 from base.api_keys import KeyDoor
+from base.business import money_text
 
 TOKEN_PREFIX = "elev_"
 #: The header a pass travels in (the SDK's ``ELEVATION_TOKEN_HEADER``).
@@ -191,12 +192,7 @@ def _money(cents: Decimal, currency: str | None, locale: str) -> str:
     """Minor units of ``currency``, as every screen writes them («1.234,56 €», «€1,234.56», «PLN 1.00»)."""
     if currency is None or cents != cents.to_integral_value():
         return ""
-    text = format_currency(cents.scaleb(-get_currency_precision(currency)), currency, locale=locale)
-    # CLDR's currency spacing, which Babel skips: a sign of letters before the figure never touches it («PLN 1.00»).
-    symbol = get_currency_symbol(currency, locale=locale)
-    if symbol[-1:].isalpha() and text.startswith(symbol) and text[len(symbol) : len(symbol) + 1].isdigit():
-        return f"{symbol}\xa0{text[len(symbol):]}"
-    return text
+    return money_text(cents, currency, language=locale)
 
 
 def _number(value: Any) -> Decimal | None:

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fe3341da7e0a01d88b46ef66348e57df07370737cf93f98b1b292d8f25e565f8 -->
+<!-- generated from WORKBOOK.md sha256:1123e24f3d0b2e9f7afa89c1b1bcda6d248d8aa73f2bf0d4ff14f81193aa3906 -->
 
 ## What it is for and who it is for
 
@@ -48,7 +48,8 @@ Research and links in the Spanish WORKBOOK, "Para quien lo mantiene · Decisión
    no other app and needs none: it can be turned on and off on its own.
 2. When it is turned on **there is no payment method**. Go to **Payments → Methods** and create at least
    one (PAYMENT-F01), for example "BBVA account" (Bank transfer) or "Till" (Cash).
-3. The currency of the payments is the business's (euros while the Hub keeps no other).
+3. The currency of the payments is that of the business's country, the one "Settings › Business" shows (in
+   Spain, euros; in Poland, złoty). A payment already recorded keeps its own.
 
 ## Screens
 
@@ -61,7 +62,7 @@ Title "Outgoing payments". A table with the columns **Reference**, **Date**, **B
 **Amount** and **Status** (and **Method**, which can be shown with the column picker). Search box
 "Search reference or beneficiary…" (it also searches the supplier invoice reference), column filters
 behind the toolbar's funnel — reference and beneficiary by a piece of the text, the date "from / to", the
-amount "from / to" in euros, the status from a list; they apply with "Apply" and the funnel counts the ones
+amount "from / to" in the business's currency, the status from a list; they apply with "Apply" and the funnel counts the ones
 in use —, sorting by column, list or card view and 50 rows per page. It is sorted by the
 **payment date**, the most recent on top (not by the date it was entered).
 
@@ -72,8 +73,8 @@ status; an approved one (and later sent or completed), who approved it ("Approve
 action is working, its button spins and a second tap does nothing.
 
 The **New payment** button opens the "New payment" form: **Method**, **Date** (today's comes filled
-in), **Amount**, **Beneficiary**, **Concept** and, if wanted, **Beneficiary IBAN** and **Supplier
-invoice** (its number).
+in), **Amount** (it says the business's currency: "Amount (EUR)", "Amount (PLN)"), **Beneficiary**,
+**Concept** and, if wanted, **Beneficiary IBAN** and **Supplier invoice** (its number).
 
 ### Methods
 
@@ -136,22 +137,27 @@ Screen: Payments
 Steps:
 1. In **Payments** tap **New payment**.
 2. Pick the **Method** (only the active ones show), leave today's **Date** or set another, type the
-   **Amount** as you would write it by hand (12.50; 1,250.00; €12.50), the **Beneficiary** and, if
+   **Amount** in the business's currency, as you would write it by hand (12.50; 1,250.00; €12.50; in
+   Poland, 12.50 zł), the **Beneficiary** and, if
    wanted, the **Concept**, the **Beneficiary IBAN** and the **Supplier invoice**.
 3. Tap **Record payment**.
 4. The form closes and the payment shows in the list as **Draft**, with its reference. The list goes by
    the payment date: one with an old date does not show on top.
 5. If the connection drops and you tap **Record payment** again in the same form, the payment is
    recorded only once.
-In: the form's data; the business's currency. Through the assistant or the API, the method is given by
-its id or by its name, the amount goes in cents and, if wanted, an attempt key: repeating the same call
-with the same key answers the payment already recorded instead of recording another.
+In: the form's data; the business's currency, its country's (a payment that does not say its currency is
+recorded in it, also through the assistant or the API). While the app does not know the business's
+currency yet, the field says "Amount" and "Record payment" waits. Through the assistant or the API, the
+method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
+and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
+recorded instead of recording another.
 Out: a draft payment with reference `PAY-YYYYMMDD-NNNN` — the date is that of the business day on which
 it is recorded, not the payment's; the number counts per day and never repeats — and the notice
 `payment.payment.created` (it carries the reference, the beneficiary, the amount and the currency).
 If it fails: nothing is saved and no number is spent. Inside the form, under its field: an empty, 0 or
 negative amount ("The amount of a payment must be greater than 0."), one that is not a figure ("This is
-not an amount. Type a figure, for example 12.50.") or that can be read in two ways ("1.250" can be
+not an amount. Type a figure, for example 12.50."; also an amount with another currency's symbol, such as
+€13.50 in a business in Poland) or that can be read in two ways ("1.250" can be
 €1,250 or €1.25: the decimals must be written); an empty beneficiary; an IBAN that is not valid ("That
 IBAN is not valid: check the country, the check digits and the length."); a method that does not exist
 ("That payment method does not exist in this business.") or is deactivated ("That payment method is
@@ -217,7 +223,8 @@ Steps:
 1. Open **Payments**.
 2. Type in the search box a piece of the reference (the last digits, the date), of the beneficiary or of
    the supplier invoice, or open the filters with the toolbar's funnel: the **Date** from one day, up to
-   another or between the two; the **Amount** from / to in euros; the **Status** from the list; and press
+   another or between the two; the **Amount** from / to in the business's currency; the **Status** from
+   the list; and press
    "Apply".
 3. Sort by the column you need.
 In: what the person types.

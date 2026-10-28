@@ -112,7 +112,8 @@ def test_the_catalog_comes_from_the_snapshot_in_a_block_the_bundle_refreshes(tem
 @pytest.mark.parametrize(
     ("currency", "lang", "labels"),
     [
-        ("PLN", "en", ("PLN15.00", "From PLN40.00")),
+        # A code in letters keeps off the figure by a no-break space, as the browser writes it (CLDR currency spacing).
+        ("PLN", "en", ("PLN\xa015.00", "From PLN\xa040.00")),
         ("PLN", "es", ("15,00\xa0PLN", "Desde 40,00\xa0PLN")),
         # The price is in the currency's minor unit: the yen has none, the Kuwaiti dinar has three.
         ("JPY", "en", ("¥1,500", "From ¥4,000")),

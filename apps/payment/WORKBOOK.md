@@ -58,7 +58,8 @@ Investigación y enlaces en «Para quien lo mantiene · Decisión: Pagos no es V
    enciende ninguna otra app ni la necesita: se puede encender y apagar sola.
 2. Al encenderla **no hay ningún método de pago**. Entra en **Pagos → Métodos** y crea al menos uno
    (PAYMENT-F01), por ejemplo «Cuenta BBVA» (Transferencia) o «Caja» (Efectivo).
-3. La moneda de los pagos es la del negocio (euros mientras el Hub no guarde otra).
+3. La moneda de los pagos es la del país del negocio, la que dice «Ajustes › Negocio» (en España, euros;
+   en Polonia, złoty). Un pago ya registrado conserva la suya.
 
 ## Pantallas
 
@@ -72,7 +73,7 @@ Título «Pagos salientes». Una tabla con las columnas **Referencia**, **Fecha*
 **Importe** y **Estado** (y **Método**, que se puede mostrar con el selector de columnas). Buscador
 «Buscar referencia o beneficiario…» (busca también en la referencia de la factura del proveedor),
 filtros por columna tras el embudo de la barra — referencia y beneficiario por un trozo del texto, la fecha
-«desde / hasta», el importe «desde / hasta» en euros, el estado por lista; se aplican con «Aplicar» y el
+«desde / hasta», el importe «desde / hasta» en la moneda del negocio, el estado por lista; se aplican con «Aplicar» y el
 embudo cuenta los que están en uso —, orden por columna, vista de lista o de tarjetas y 50 filas por página. Va ordenada por la **fecha del pago**, la más reciente arriba (no por la de alta).
 
 Cada fila ofrece la acción que le toca, con el nombre de lo que hace: **Aprobar** (Borrador),
@@ -83,8 +84,8 @@ aprobó («Aprobado por …»). Mientras una acción de fila trabaja, su botón 
 hace nada.
 
 El botón **Nuevo pago** abre el formulario «Nuevo pago»: **Método**, **Fecha** (viene la de hoy),
-**Importe**, **Beneficiario**, **Concepto** y, si se quieren, **IBAN del beneficiario** y **Factura
-del proveedor** (su número).
+**Importe** (dice la moneda del negocio: «Importe (EUR)», «Importe (PLN)»), **Beneficiario**,
+**Concepto** y, si se quieren, **IBAN del beneficiario** y **Factura del proveedor** (su número).
 
 ### Métodos
 
@@ -149,22 +150,27 @@ Pantalla: Pagos
 Pasos:
 1. En **Pagos** pulsa **Nuevo pago**.
 2. Elige el **Método** (solo salen los activos), deja la **Fecha** de hoy o pon otra, escribe el
-   **Importe** como lo escribiría a mano (12,50; 1.250,00; 12,50 €), el **Beneficiario** y, si quiere,
+   **Importe** en la moneda del negocio, como lo escribiría a mano (12,50; 1.250,00; 12,50 €; en
+   Polonia, 12,50 zł), el **Beneficiario** y, si quiere,
    el **Concepto**, el **IBAN del beneficiario** y la **Factura del proveedor**.
 3. Pulsa **Registrar pago**.
 4. El formulario se cierra y el pago sale en la lista como **Borrador**, con su referencia. La lista
    va por la fecha del pago: uno con una fecha antigua no sale arriba.
 5. Si se corta la conexión y vuelves a pulsar **Registrar pago** en el mismo formulario, el pago se
    registra una sola vez.
-Entra: los datos del formulario; la moneda del negocio. Por el asistente o la API, el método se dice
-por su id o por su nombre, el importe va en céntimos y, si se quiere, una clave del intento: repetir
-la misma llamada con la misma clave responde el pago ya registrado en vez de registrar otro.
+Entra: los datos del formulario; la moneda del negocio, la de su país (un pago que no dice su moneda se
+registra en ella, también por el asistente o la API). Mientras la app no sabe todavía la moneda del
+negocio, el campo dice «Importe» y «Registrar pago» espera. Por el asistente o la API, el método se dice
+por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
+quiere, una clave del intento: repetir la misma llamada con la misma clave responde el pago ya registrado
+en vez de registrar otro.
 Sale: un pago en borrador con referencia `PAY-AAAAMMDD-NNNN` — la fecha es la del día del negocio en
 que se registra, no la del pago; el número cuenta por día y nunca se repite — y el aviso
 `payment.payment.created` (lleva la referencia, el beneficiario, el importe y la moneda).
 Si falla: nada se guarda y no se gasta número. Dentro del formulario, debajo de su campo: un importe
 vacío, 0 o negativo («El importe de un pago tiene que ser mayor que 0.»), uno que no es una cifra
-(«Esto no es un importe. Escribe una cifra, por ejemplo 12,50.») o que se lee de dos maneras («1.250»
+(«Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»; también un importe con el símbolo de
+otra moneda, como 13,50 € en un negocio de Polonia) o que se lee de dos maneras («1.250»
 puede ser 1.250 € o 1,25 €: hay que escribir los decimales); un beneficiario vacío; un IBAN que no es
 válido («Ese IBAN no es válido: revisa el país, los dígitos de control y la longitud.»); un método
 que no existe («Ese método de pago no existe en este negocio.») o desactivado («Ese método de pago
@@ -234,7 +240,8 @@ Pasos:
 1. Abre **Pagos**.
 2. Escribe en el buscador un trozo de la referencia (los últimos dígitos, la fecha), del beneficiario
    o de la factura del proveedor, o abre los filtros con el embudo de la barra: la **Fecha** desde un día,
-   hasta otro o entre los dos; el **Importe** desde / hasta en euros; el **Estado** de la lista; y pulsa
+   hasta otro o entre los dos; el **Importe** desde / hasta en la moneda del negocio; el **Estado** de la
+   lista; y pulsa
    «Aplicar».
 3. Ordena por la columna que necesite.
 Entra: lo que teclea la persona.
@@ -397,9 +404,14 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
 - **Transiciones**: cada una bloquea la fila del pago (`select_for_update`) y comprueba el estado de
   origen; si no casa, 409 `payment.invalid_transition` (cancelar: `payment.not_cancellable`), sin
   cambio y sin aviso.
-- **Importe**: la API y el asistente lo dan en céntimos (entero > 0, ≤ 9.999.999.999.999); la
-  pantalla lo lee como se escribe a mano y nunca adivina un «1.250». La moneda, si no se da, es la del
-  negocio (`EUR` mientras el Hub no guarde otra); si se da, un código ISO 4217 que exista (pycountry).
+- **Importe**: la API y el asistente lo dan en la unidad menor de su moneda (céntimos en euros; entero
+  > 0, ≤ 9.999.999.999.999); la pantalla lo lee como se escribe a mano, en la moneda del negocio y con sus
+  decimales, y nunca adivina un «1.250». La moneda, si no se da, es la del negocio
+  (`base.operations.business_currency(ctx.scope)`, la de su país: BASE-F50; nunca un euro fijo, payments#35 y #38); si se da, un código ISO 4217 que exista
+  (pycountry). `Payment.currency` no tiene valor por defecto (migración 0004, sin datos). La salida de
+  `payment.payment.list`/`get` lleva `currency_decimals` (los decimales que cuenta el servidor, CLDR/babel:
+  2 en el forinto, que Intl deja en 0), con los que la pantalla pinta cada pago en su moneda; lo tecleado
+  se lee con los de `useBusinessMoney()` y, mientras no contesta, una cifra sin símbolo y nunca un euro.
 - **IBAN**: opcional; si se da, se valida y se guarda compacto y en mayúsculas (`python-stdnum`).
 - **Cuentas tapadas**: una lista y su flujo vivo nunca llevan un IBAN ni una cuenta enteros
   (`queries.mask_account`: el país y los últimos cuatro de un IBAN, en grupos de cuatro; de otro texto,
@@ -440,7 +452,7 @@ Operaciones:
 | `payments.payments.list` | `payment.payment.list` | mismos filtros; fecha por rango con `payment_date_from/to` |
 | `payments.payments.get` | `payment.payment.get` | también por referencia |
 | `payments.methods.list` | `payment.method.list` | filtro `is_active` declarado (ya no hay `f_is_active`) |
-| `payments.hub_currency` | función interna `business_currency()` | no es una operación: nadie la pedía de fuera |
+| `payments.hub_currency` | `base.operations.business_currency(scope)` (BASE-F50) | no es una operación de la app: la moneda del país del negocio es de la plataforma |
 | `payments.payments.create` (WASM) | `payment.payment.create` | método por id o por nombre; rechaza método inexistente o inactivo |
 | `payments._bump_counter`, `payments._insert_payment` | dentro de `payment.payment.create` | eran intenciones internas del WASM |
 | `payments.payments.approve` | `payment.payment.approve` | 409 en vez de no-op mudo |
@@ -456,7 +468,7 @@ Tests:
 |---|---|
 | `every_string_has_its_translation.contract` | `tests/test_i18n.py` y `frontend/locale/locale.test.ts` |
 | `filter_boxes_match_the_manifest.contract` | `tests/test_queries.py` (cada filtro de la página existe en `PaymentListIn`) y `PaymentsPage.test.ts` |
-| `payment_currency.hub` / `.postgres` | `tests/test_services.py` (moneda del negocio, explícita, inválida) |
+| `payment_currency.hub` / `.postgres` | `tests/test_services.py` (moneda explícita, inválida) y `tests/test_business_currency.py` (la del país del negocio, por la operación, la ruta y una API key; cada hub la suya) |
 | `text_filters_narrow_by_fragment.pg` | `tests/test_queries.py` (referencia y beneficiario por trozo, sin cruzar de negocio) |
 | `handler` (Rust): importe en céntimos, ≤ 0 rechazado, HALF_UP | `tests/test_schemas.py` y `frontend/lib/money.test.ts` |
 | `erp-payments-list.test.ts`, `list-paging.test.ts`, `form-error-in-panel.test.ts`, `list-load-error.test.ts`, `amount-filter.test.ts` | `frontend/pages/PaymentsPage.test.ts`, `components/PaymentFormModal.test.ts`, `components/CancelPaymentModal.test.ts` |

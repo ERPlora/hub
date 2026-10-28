@@ -1,6 +1,7 @@
 // Test helper of the payment app's pages and components, as `mount-service.ts` is the service app's: the SDK's
 // live harness (fake clock, fake network serving the stream and the API) on the hub's op → route map,
-// the shell's i18n with the payment catalogues merged in, a session and a memory router.
+// the shell's i18n with the payment catalogues merged in, a session, a memory router and the hub's business
+// (`base.business.get`: one in Spain unless a test says another).
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
 // (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
@@ -16,6 +17,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -23,6 +25,37 @@ import es from '../locale/es.json';
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+
+/** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another
+ *  (a new payment, the amount typed and the amount filter are in the business's currency; PAYMENT-F02). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Taller Norte',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/taller-norte/settings',
+    ...fields,
+  };
+}
+
+/** A business in Poland: it pays in złoty. */
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
+/** A business in Japan: the yen has no minor units. */
+export const JAPANESE: Partial<Business> = {
+  country: 'JP',
+  country_name: 'Japan',
+  currency: 'JPY',
+  currency_label: 'JPY · Japanese Yen',
+  currency_decimals: 0,
+};
 
 /** Owner, admin or manager: `payment.*` (apps.py `role_permissions`), listed one by one. */
 export const OWNER: SessionMe = {
@@ -55,6 +88,8 @@ export interface MountOptions {
   stubs?: Record<string, Component | boolean>;
   /** API answers by path, in place before the component mounts (what it reads when it opens). */
   answers?: Record<string, [number, unknown]>;
+  /** What `base.business.get` answers when the stream opens; `null`: it never answers (the currency unknown). */
+  business?: Business | null;
 }
 
 type Params = Record<string, unknown>;
@@ -87,8 +122,13 @@ export async function mountPayment(component: Component, options: MountOptions =
     },
   });
 
-  /** Opens the stream; returns the call to push frames into. */
-  const live = (): Promise<StreamCall> => harness.goLive();
+  /** Opens the stream and answers the business, if a piece follows it; returns the call to push frames into. */
+  async function live(): Promise<StreamCall> {
+    const call = await harness.goLive();
+    const answer = options.business === undefined ? business() : options.business;
+    if (answer && harness.client.stream.subscriptions('base.business.get').length) await result('base.business.get', answer);
+    return call;
+  }
 
   /** The params of every live subscription to `op`. */
   const params = (op: OpName): Params[] => harness.client.stream.subscriptions(op).map((s) => s.params as Params);

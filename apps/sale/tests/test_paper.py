@@ -10,6 +10,7 @@ from django.utils import translation
 from apps.printing import documents
 from apps.sale import paper
 from apps.sale.tests.conftest import run
+from base.models import Hub
 
 pytestmark = pytest.mark.django_db
 
@@ -134,3 +135,13 @@ def test_the_bill_of_a_check_lists_what_is_owed_without_number_or_payment(bar):
     ]
     assert document["total"] == 7.5
     assert not {"receipt_id", "payment_method", "paid", "change", "qr_data"} & set(document)
+
+
+def test_a_discount_in_a_currency_written_in_letters_keeps_the_code_off_the_figure(bar):
+    # flow: money-text — the paper writes the amount as the screen does: «PLN 0.75» (no-break space), never «PLN0.75».
+    Hub.objects.filter(slug="a").update(country="PL")
+    sale = charged(payments=[{"method": "card"}], discount_percent="10")
+    assert sale.currency == "PLN"
+    with translation.override("en"):
+        _, document = paper.receipt(sale, header=HEADER, footer="", decimals=2, duplicate=False)
+    assert document["receipt_footer"] == "Discount of PLN\xa00.75, already applied to the amounts above."

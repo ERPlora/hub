@@ -1,18 +1,30 @@
 // Payments → Payments (WORKBOOK «Pantallas · Pagos»; PAYMENT-F02 to F06): «Outgoing payments», the live
 // `payment.payment.list` with the old table's Reference, Date, Beneficiary, Amount and Status (and
 // Method in the column chooser), «Search reference or beneficiary…», filters per column (the
-// reference and the beneficiary by fragment, the date from / to, the amount from / to in euros, the
-// status by list), newest payment date first, 50 a page. Each row offers the step it can take, named
+// reference and the beneficiary by fragment, the date from / to, the amount from / to in the business's currency,
+// the status by list), newest payment date first, 50 a page. Each row offers the step it can take, named
 // by what it does (Approve, Mark as sent, Mark as completed), and «Cancel payment» while not finished;
 // none on a finished one, and only what the person may do. «New payment» opens the form; a payment
-// recorded from a later page brings the list back to the first one (the old payments#40).
+// recorded from a later page brings the list back to the first one (the old payments#40). Each amount is painted in
+// its payment's own currency with the decimals the server says for it (never the browser's Intl: the forint).
 import { DataTable, type DataTableAction, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { PaymentOut, PaymentStatus } from '../operations';
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountPayment, page, RECORDER } from '../__tests__/mount-payment';
+import {
+  business,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  JAPANESE,
+  type MountOptions,
+  mountPayment,
+  page,
+  POLISH,
+  RECORDER,
+} from '../__tests__/mount-payment';
 import CancelPaymentModal from '../components/CancelPaymentModal.vue';
 import PaymentFormModal from '../components/PaymentFormModal.vue';
 import PaymentsPage from './PaymentsPage.vue';
@@ -32,6 +44,7 @@ const payment = (id: string, status: PaymentStatus, over: Partial<PaymentOut> = 
   payment_date: '2026-07-13',
   amount: 25000,
   currency: 'EUR',
+  currency_decimals: 2,
   beneficiary_name: 'Proveedor Norte SL',
   beneficiary_iban: '',
   concept: '',
@@ -53,7 +66,7 @@ const payment = (id: string, status: PaymentStatus, over: Partial<PaymentOut> = 
 const DRAFT = payment('1', 'draft');
 const APPROVED = payment('2', 'approved', { approved_by: 'Boss', approved_at: '2026-10-14T11:00:00Z' });
 const SENT = payment('3', 'sent');
-const COMPLETED = payment('4', 'completed', { amount: 1999, currency: 'JPY' });
+const COMPLETED = payment('4', 'completed', { amount: 1999, currency: 'JPY', currency_decimals: 0 });
 const CANCELLED = payment('5', 'cancelled', { cancel_reason: 'Duplicated' });
 const ROWS = [DRAFT, APPROVED, SENT, COMPLETED, CANCELLED];
 
@@ -190,6 +203,25 @@ describe('PaymentsPage', () => {
     expect(s.prop<{ retry: string }>('labels').retry).toBe('Retry');
     expect(s.prop('rows')).toEqual([]);
     expect(s.wrapper.text()).not.toContain('No payments.');
+  });
+
+  it('paints each amount in its payment’s currency with the decimals the server says: the forint has two (Intl: none)', async () => {
+    const s = await setup({ business: business(POLISH) });
+    await s.show(page([payment('6', 'draft', { amount: 125050, currency: 'HUF', currency_decimals: 2 }), payment('7', 'draft', { amount: 1250, currency: 'PLN' })]));
+    expect(s.cells(0)[3].replace(/[\u00a0\u202f]/g, ' ')).toBe('Ft 1,250.50');
+    expect(s.cells(1)[3].replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 12.50');
+  });
+
+  it('the amount filter reads in the business’s currency: «12,50 zł» in Poland, «1.500» yen in Japan; a euro in Poland is left out', async () => {
+    const pl = await setup({ business: business(POLISH) });
+    pl.table().vm.$emit('filtersChange', { amount_from: '12,50 zł', amount_to: '13,50 €' });
+    await flush();
+    expect(pl.list()).toEqual([{ amount_min: 1250, sort: '-payment_date', limit: 50, offset: 0 }]);
+
+    const jp = await setup({ business: business(JAPANESE) });
+    jp.table().vm.$emit('filtersChange', { amount_from: '1.500' });
+    await flush();
+    expect(jp.list()).toEqual([{ amount_min: 1500, sort: '-payment_date', limit: 50, offset: 0 }]);
   });
 
   it('an amount bound that is not an amount is left out, never «from 0»', async () => {

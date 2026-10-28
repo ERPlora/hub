@@ -110,6 +110,8 @@ export interface PaymentOut {
   payment_date: string;
   amount: number;
   currency: string;
+  /** The decimals of its currency as the server counts them (2 in EUR and HUF, 0 in JPY). */
+  currency_decimals: number;
   beneficiary_name: string;
   /** Masked in a list (`ES** **** **** **** **** 1332`); whole only from `payment.payment.get`. */
   beneficiary_iban: string;

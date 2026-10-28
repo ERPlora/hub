@@ -6,7 +6,8 @@
 // first, 50 a page, list or cards. Each row offers the step it can take
 // (Approve, Mark as sent, Mark as completed) and «Cancel payment» while it is not finished, only to
 // whoever may; a refusal shows above the table. «New payment» opens the form; changes come back
-// through the stream.
+// through the stream. Each amount is painted in its payment's own currency with the decimals the server says for it;
+// the amount filter is typed in the business's currency (PAYMENT-F02).
 import {
   DataTable,
   type DataTableAction,
@@ -26,7 +27,7 @@ import PaymentFormModal from '../components/PaymentFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatDay, formatMoney, STATUS_TONE } from '../lib/format';
+import { formatDay, formatMoney, paymentMoney, STATUS_TONE, useBusinessMoney } from '../lib/format';
 import { parseMoney } from '../lib/money';
 import type { PaymentListIn, PaymentOut, PaymentStatus } from '../operations';
 import { paymentTabs } from '../tabs';
@@ -44,20 +45,21 @@ const FINISHED: readonly PaymentStatus[] = ['completed', 'cancelled'];
 const session = useSession();
 const t = useT();
 const locale = useLocale();
+const money = useBusinessMoney();
 const canAdd = computed(() => session.can('payment.add_payment'));
 const canApprove = computed(() => session.can('payment.approve_payment'));
 
 const table = useServerTable({ sort: '-payment_date' });
 const filters = ref<DataTableFilters>({});
 
-/** Cents of a typed amount bound; nothing when it is not an amount (never «from 0»). */
+/** Minor units of a typed amount bound, in the business's currency; nothing when it is not an amount (never «from 0»). */
 function cents(text: string | undefined): number | undefined {
   if (!text) return undefined;
-  const read = parseMoney(text);
+  const read = parseMoney(text, money.value);
   return read.ok && read.cents !== null ? read.cents : undefined;
 }
 
-/** The table's filters as the query takes them: each end of the dates as sent, amounts in cents. */
+/** The table's filters as the query takes them: each end of the dates as sent, amounts in minor units. */
 const query = computed<Partial<PaymentListIn>>(() => {
   const f = filters.value;
   const out: Partial<PaymentListIn> = {
@@ -102,7 +104,7 @@ const columns = computed<DataTableColumn<PaymentOut>[]>(() => [
     label: t('payment.payments.columns.amount'),
     sortable: true,
     align: 'right',
-    format: (_, row) => formatMoney(row.amount, locale.value, row.currency),
+    format: (_, row) => formatMoney(row.amount, locale.value, paymentMoney(row)),
     filter: { type: 'range' },
   },
   {

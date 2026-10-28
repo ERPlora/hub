@@ -43,7 +43,7 @@ def test_a_business_in_poland_invoices_in_zlotys(issuer):
     assert invoice.currency == "PLN"
     assert Invoice.objects.get(pk=invoice.id).currency == "PLN"
     html = document(invoice)
-    assert "PLN121.00" in html and "€" not in html
+    assert "PLN\xa0121.00" in html and "PLN121" not in html and "€" not in html
 
 
 def test_a_business_in_spain_still_invoices_in_euros(issuer):
