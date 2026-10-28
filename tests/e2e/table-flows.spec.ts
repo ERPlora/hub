@@ -101,6 +101,19 @@ function madrid(minutes = 0): { date: string; time: string; weekday: number } {
   return { date, time, weekday };
 }
 
+/** A wall-clock time («20:00») as the plan paints it (`clock` of `apps/table/frontend/lib/format.ts`): the
+ *  browser's own Intl in the page's language («8:00 PM» in English), never a 24-hour string by hand. */
+function painted(page: Page, time: string): Promise<string> {
+  const [hours, minutes] = time.split(':').map(Number);
+  return page.evaluate(
+    ([h, m]) =>
+      new Intl.DateTimeFormat(document.documentElement.lang, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(
+        Date.UTC(2000, 0, 1, h, m),
+      ),
+    [hours, minutes] as const,
+  );
+}
+
 /** The outbox relay as the worker runs it on every tick (`base.relay.run`), on this run's database, tick after
  *  tick until a pass finds nothing to do: the e2e stack runs no worker, so what other specs recorded waits too. */
 function relayPass(): void {
@@ -685,24 +698,35 @@ test('TABLE-F25, F26, F27, F28: a reservation holds its table, moves it, frees i
     const one = await tableNo(context, '1');
     const two = await tableNo(context, '2');
     const soon = madrid(30);
-    const reserve = async (guest: string, tableId: string, phone: string) => {
+    const reserve = async (guest: string, tableId: string, phone: string, at = soon) => {
       const made = await post<{ id: string }>(context, '/reservation/reservations', {
         guest_name: guest,
         guest_phone: phone,
-        date: soon.date,
-        time: soon.time,
+        date: at.date,
+        time: at.time,
         party_size: 2,
         table_id: tableId,
       });
       await post(context, '/reservation/reservations/confirm', { id: made.id }, 200);
       return made.id;
     };
+    const hour = tile(page, one.id).locator('.table-tile__hold-time');
+
+    // TABLE-F25: a reservation of tonight paints its hour on the plan in the page's language («8:00 PM» in
+    // English). Always an afternoon one, whatever the time of the run (before noon an hour reads the same in
+    // 24 h and in 12 h): soon itself, else 20:00.
+    const evening = soon.time >= '12:00' ? soon : { ...soon, time: '20:00' };
+    const tonight = await painted(page, evening.time);
+    expect(tonight).toContain('PM');
+    const noa = await reserve(`${TAG} Noa`, one.id, `6${RUN.slice(-8).replace(/\D/g, '6').padStart(8, '6')}`, evening);
+    await expect(hour).toContainText(tonight);
+    await post(context, '/reservation/reservations/cancel', { id: noa }, 200);
+    await expect(hour).toHaveCount(0);
 
     // TABLE-F25: confirmed, the table is Reserved (within the hour) with the name — a long one — and the hour.
     const marta = await reserve(`${TAG} Marta de la Concepción Fernández-Villaverde`, one.id, `6${RUN.slice(-8).replace(/\D/g, '2').padStart(8, '2')}`);
     await expect(tile(page, one.id)).toContainText('Reserved');
-    const hour = tile(page, one.id).locator('.table-tile__hold-time');
-    await expect(hour).toContainText(soon.time.replace(/^0/, ''));
+    await expect(hour).toContainText(await painted(page, soon.time));
     await flowShots(page, ['TABLE-F25'], async () => {
       await expect(hour).toBeVisible();
     });
