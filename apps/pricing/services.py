@@ -31,7 +31,6 @@ from apps.pricing import events
 from apps.pricing.models import ACTOR_MAX_LENGTH, DiscountRule, PriceItem, PriceList
 from apps.pricing.queries import (
     ITEM_NOT_FOUND,
-    business_currency,
     call_service,
     find_list,
     find_rule,
@@ -66,6 +65,7 @@ from apps.pricing.schemas import (
     RuleRefIn,
     rule_problems,
 )
+from base import operations as platform
 
 DUPLICATE_LIST_CODE = _("A price list with that code already exists. Pick a different code.")
 DUPLICATE_RULE_CODE = _("A discount rule with that code already exists. Pick a different code.")
@@ -209,7 +209,7 @@ def _default_changed(ctx: OperationContext, price_list: PriceList, previous: Pri
 )
 def create_price_list(ctx: OperationContext, data: PriceListIn) -> dict:
     """Without a currency, the list is in the business's (its country's); the general one, only in that one."""
-    business = business_currency(ctx)
+    business = platform.business_currency(ctx.scope)
     currency = data.currency or business
     if data.is_default and currency != business:
         message = str(DEFAULT_CURRENCY) % {"currency": business}
@@ -267,7 +267,7 @@ def update_price_list(ctx: OperationContext, data: PriceListPatchIn) -> dict:
             field = "customer_group" if "customer_group" in sent else "customer_group_id"
             raise InvalidPayload(str(DEFAULT_HAS_GROUP), code="invalid_field", fields={field: str(DEFAULT_HAS_GROUP)})
     if price_list.is_default and "currency" in changes:
-        business = business_currency(ctx)
+        business = platform.business_currency(ctx.scope)
         if changes["currency"] != business:
             message = str(DEFAULT_CURRENCY) % {"currency": business}
             raise InvalidPayload(message, code="invalid_field", fields={"currency": message})
@@ -308,7 +308,7 @@ def set_default_price_list(ctx: OperationContext, data: PriceListDefaultIn) -> d
             raise Conflict(str(LIST_INACTIVE), code="pricing.price_list_inactive")
         if price_list.customer_group_id is not None:
             raise Conflict(str(DEFAULT_HAS_GROUP), code="pricing.default_has_group")
-        business = business_currency(ctx)
+        business = platform.business_currency(ctx.scope)
         if price_list.currency != business:
             raise Conflict(str(DEFAULT_CURRENCY) % {"currency": business}, code="pricing.default_currency")
         price_list.updated_by = _actor(ctx)

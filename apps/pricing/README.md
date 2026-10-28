@@ -67,7 +67,8 @@ pnpm e2e tests/e2e/pricing-flows.spec.ts tests/e2e/pricing-lists.spec.ts tests/e
 - `pricing-flows.spec.ts` recorre PRICING-F01 a F12 en 390, 834 y 1440; `pricing-lists.spec.ts`, de la
   tarifa al precio de una línea (PRICING-F13); `pricing-business-currency.spec.ts`, el negocio en Polonia
   (tarifas y precios en eslotis) y de vuelta en España. `tests/test_business_currency.py`: la divisa del
-  negocio en el precio de una línea, la tarifa general y una tarifa nueva, con dos negocios y el hub de ERPlora.
+  negocio en el precio de una línea, la tarifa general y una tarifa nueva, con dos negocios y el hub de ERPlora,
+  y que cada una la pregunta a `base` (`base.operations.business_currency`), también en el hub de ERPlora.
 
 ## Qué queda fuera
 

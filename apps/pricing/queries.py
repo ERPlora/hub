@@ -18,12 +18,11 @@ from typing import Any
 from uuid import UUID
 
 import pydantic
-from django.conf import settings as django_settings
 from django.db.models import CharField, Count, F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
+from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
 from live.operations import UnknownOperation, get, operation
 
@@ -44,8 +43,7 @@ from apps.pricing.schemas import (
     RuleListIn,
     RuleOut,
 )
-from base.business import currency_of
-from base.operations import is_platform_hub
+from base import operations as platform
 
 #: Candidates named when a text matches several.
 MAX_CANDIDATES = 5
@@ -59,19 +57,6 @@ ITEM_NOT_FOUND = _("That price no longer exists.")
 SERVICES_UNAVAILABLE = _("Services is not active in this business.")
 
 SERVICE_GET = "service.service.get"
-#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
-BUSINESS = "base.business.get"
-
-
-def business_currency(ctx: OperationContext) -> str:
-    """The currency of ``ctx``'s business (ISO 4217), the one its general list and its sales are in, as
-    ``base.business.get`` reads it. Read as the platform: an API key holds only the permission of the operation it
-    opened, and every person of the hub may see it anyway. ERPlora's own hub has no business on erplora.com (phase 1:
-    no registry row, ``create_platform_hub``): it keeps the currency of its issuer's country, as its sales do."""
-    if is_platform_hub(ctx.scope):
-        return currency_of(django_settings.PLATFORM_ISSUER_COUNTRY)
-    business = get(BUSINESS)
-    return business(system_context(ctx.scope), business.input()).currency
 
 
 def business_today() -> dt.date:
@@ -570,7 +555,7 @@ def resolve_line(ctx: OperationContext, data: ResolveIn) -> dict:
     on = business_day(data.when)
     article = article_of(ctx, data)
     groups = _customer_groups(data)
-    currency = business_currency(ctx)
+    currency = platform.business_currency(ctx.scope)
     lists = candidate_lists(data, on, groups, currency)
     item, price_list = best_list_price(article, data.quantity, lists)
     unit_price = item.price if item else article.base_price
