@@ -6,16 +6,19 @@
 // can be made general. Back in Spain «New price list» proposes EUR, the zloty list keeps its złoty (nothing stored is
 // rewritten) and the catalog price reads in euros (`…-es-1440`). Editing an amount-per-unit rule in złoty (PRICING-F11)
 // shows its amount in złoty and «Save» keeps it (captures `FIX-HUB-PRICING-MONEY-FIELD-OPENED-BEFORE-THE-BUSINESS-ANSWERS-
-// <width>`; the business answering after the dialog opened is the race `RuleFormModal.test.ts` proves). What the run
-// creates is deleted after it and `a`'s registration put back, also when a test fails.
+// <width>`; the business answering after the dialog opened is the race `RuleFormModal.test.ts` proves). The server
+// prices a line (PRICING-F13) in złoty, the currency Pricing asks `base` for (captures `FIX-HUB-PRICING-OWN-COPY-OF-
+// BUSINESS-CURRENCY-<width>`). What the run creates is deleted after it and `a`'s registration put back, also when a
+// test fails.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { createProduct, dialog, post, ready, row, rowAction, search, stamp } from './pricing-helpers';
 import { settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const RULE_KEY = 'FIX-HUB-PRICING-MONEY-FIELD-OPENED-BEFORE-THE-BUSINESS-ANSWERS';
+const LINE_KEY = 'FIX-HUB-PRICING-OWN-COPY-OF-BUSINESS-CURRENCY';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
@@ -138,6 +141,38 @@ test(`${KEY}: pricing-business-currency in Poland a price list's detail reads it
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(await itemRow(page)).toContainText(ZLOTY_CATALOG);
   await expect(shown(page).locator('[data-testid=pricing-detail-default]')).toBeVisible();
+});
+
+test(`${LINE_KEY}: PRICING-F13 in Poland the server prices a line in złoty, the currency base answers`, async ({
+  page,
+  context,
+}) => {
+  // flow: PRICING-F13
+  // Pricing asks `base` for the business's currency (`base.operations.business_currency`, BASE-F50), never a copy of
+  // its own: with `a` registered in Poland, a line without a list is the catalog's 15,00 in złoty, and one from the
+  // run's list its 12,50 in złoty.
+  await login(page, A, '/pricing/lists');
+  type Line = { unit_price: number; price_list_code: string | null; currency: string; total: number };
+  const catalog = await api<Line>(context, A, 'GET', `/pricing/prices/resolve?product=${encodeURIComponent(SKU)}`);
+  expect(catalog.status, JSON.stringify(catalog.data)).toBe(200);
+  expect(catalog.data).toMatchObject({ unit_price: 1500, price_list_code: null, currency: 'PLN', total: 1500 });
+  const listed = await api<Line>(
+    context,
+    A,
+    'GET',
+    `/pricing/prices/resolve?product=${encodeURIComponent(SKU)}&price_list=${encodeURIComponent(CODE)}`,
+  );
+  expect(listed.status, JSON.stringify(listed.data)).toBe(200);
+  expect(listed.data).toMatchObject({ unit_price: 1250, price_list_code: CODE, currency: 'PLN', total: 1250 });
+  for (const size of SIZES) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const found = await itemRow(page);
+    await expect(found, size.name).toContainText(ZLOTY_PRICE);
+    await expect(found, size.name).not.toContainText('€');
+    await found.scrollIntoViewIfNeeded();
+    await settled(page);
+    await page.screenshot({ path: shot(`${LINE_KEY}-${size.name}`) });
+  }
 });
 
 test(`${RULE_KEY}: PRICING-F11 editing an amount-per-unit rule in złoty shows it in złoty and «Save» keeps it`, async ({ page }) => {

@@ -613,9 +613,11 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `precio × (cantidad en la unidad del precio) ÷ price_quantity` con las fracciones exactas de
   `apps.inventory.models.UNIT_SPECS`, como Ventas. Divisa ISO 4217 de dos decimales (`pycountry` y
   `babel`, ya dependencias).
-- **La divisa del negocio** es la de su país, la de `base.business.get` (el registro de este hub, nunca una
-  llamada a erplora.com; `queries.business_currency`, leída como la plataforma); en el hub propio de ERPlora,
-  sin negocio en erplora.com, la del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como Ventas. Una tarifa
+- **La divisa del negocio** es la de su país, y Tarifas la pregunta a `base` como Inventario y Facturas:
+  `base.operations.business_currency(ctx.scope)` (BASE-F50), que lee `base.business.get` como la plataforma
+  (el registro de este hub, nunca una llamada a erplora.com) y en el hub propio de ERPlora, sin negocio en
+  erplora.com, contesta la del país de su emisor (`PLATFORM_ISSUER_COUNTRY`). Tarifas no guarda copia propia
+  de esa pregunta (FIX-HUB-PRICING-OWN-COPY-OF-BUSINESS-CURRENCY). Una tarifa
   sin divisa se guarda en la del negocio; el `default="EUR"` de la columna se queda (una columna no sabe el
   negocio) y nada guardado se reescribe. La pantalla la lee con `useBusinessMoney` de `base` (los decimales
   del servidor, nunca los de `Intl`; mientras no contesta, una cifra sin símbolo y sin «Hacer general»)
