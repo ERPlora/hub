@@ -25,7 +25,10 @@ opening hours, slots and tables bind everybody, and nobody books a time gone. A 
 (``kind="waitlist"``) is the staff acting, often for right now: like any staff booking it skips the party
 limits, the notice and the days ahead (the old module's promotion), never the clock.
 
-Times are the business's wall clock, naive: the day and time a reservation keeps.
+Times are the business's wall clock, naive: the day and time a reservation keeps. Given the business's
+zone (``Request.zone``), what lasts — a stay, the minimum notice — counts real time and a time gone is
+judged by the instant: the night the clocks change, a stay of 90 minutes holds its table 90 minutes, not 30
+or 150. A time the clocks repeat is the first of the two; one they skip moves forward by the gap.
 """
 
 import datetime as dt
@@ -48,16 +51,34 @@ class Rules:
     require_email: bool = False
 
 
+def instant(moment: dt.datetime, zone: dt.tzinfo | None) -> dt.datetime:
+    """A wall-clock ``moment`` as the instant it is in ``zone``, in UTC (a time the clocks repeat is the
+    occurrence its ``fold`` says — a reservation's: the first; one they skip moves forward by the gap);
+    without a zone, the wall clock as it is."""
+    return moment if zone is None else moment.replace(tzinfo=zone).astimezone(dt.UTC)
+
+
+def wall(moment: dt.datetime, zone: dt.tzinfo | None) -> dt.datetime:
+    """An instant back on the wall clock of ``zone`` (naive); a naive ``moment`` as it is."""
+    if zone is None or moment.tzinfo is None:
+        return moment
+    return moment.astimezone(zone).replace(tzinfo=None)
+
+
 @dataclass(frozen=True)
 class Window:
-    """From ``start`` to ``end`` (excluded) on the wall clock."""
+    """From ``start`` to ``end`` (excluded): instants in UTC when built in the business's zone, the wall
+    clock without one."""
 
     start: dt.datetime
     end: dt.datetime
 
     @classmethod
-    def of(cls, day: dt.date, at: dt.time, minutes: int) -> "Window":
-        start = dt.datetime.combine(day, at)
+    def of(
+        cls, day: dt.date, at: dt.time, minutes: int, zone: dt.tzinfo | None = None
+    ) -> "Window":
+        """``day`` at ``at`` in ``zone`` for ``minutes`` of real time."""
+        start = instant(dt.datetime.combine(day, at), zone)
         return cls(start, start + dt.timedelta(minutes=minutes))
 
     def overlaps(self, other: "Window") -> bool:
@@ -150,10 +171,12 @@ class Request:
     overbook: bool = False
     phone: str = ""
     email: str = ""
+    # The business's zone: what lasts counts real time (none: the naive wall clock).
+    zone: dt.tzinfo | None = None
 
     @property
     def window(self) -> Window:
-        return Window.of(self.date, self.time, self.duration_minutes)
+        return Window.of(self.date, self.time, self.duration_minutes, self.zone)
 
 
 @dataclass(frozen=True)
@@ -167,8 +190,8 @@ def slot_for(slots, at: dt.time) -> Slot | None:
     return next((slot for slot in slots if slot.covers_time(at)), None)
 
 
-def _hhmm(moment: dt.datetime) -> str:
-    return f"{moment:%H:%M}"
+def _hhmm(moment: dt.datetime, zone: dt.tzinfo | None) -> str:
+    return f"{wall(moment, zone):%H:%M}"
 
 
 def verdict(
@@ -181,7 +204,8 @@ def verdict(
     slots,
     table: TableFacts | None,
 ) -> Refusal | None:
-    """The first reason that refuses ``request``, or ``None`` when it can be taken."""
+    """The first reason that refuses ``request``, or ``None`` when it can be taken. ``now`` is on the
+    business's wall clock (naive; its ``fold`` tells the two passes of a repeated hour apart)."""
     guest = request.source in GUEST_SOURCES and request.kind != "waitlist"
     if request.check_contact:
         if rules.require_phone and not request.phone.strip():
@@ -195,12 +219,13 @@ def verdict(
             {"min": rules.min_party_size, "max": rules.max_party_size},
         )
     if request.check_when:
+        begins, current = instant(start, request.zone), instant(now, request.zone)
         if guest:
-            if start < now + dt.timedelta(hours=rules.min_advance_hours):
+            if begins < current + dt.timedelta(hours=rules.min_advance_hours):
                 return Refusal("too_soon", {"hours": rules.min_advance_hours})
             if (request.date - now.date()).days > rules.max_advance_days:
                 return Refusal("too_far", {"days": rules.max_advance_days})
-        elif start < now.replace(second=0, microsecond=0):
+        elif begins < current.replace(second=0, microsecond=0):
             return Refusal("in_past")
     if any(block.blocks(request.time) for block in blocks):
         return Refusal("date_blocked")
@@ -221,8 +246,8 @@ def verdict(
                 "table_taken",
                 {
                     "table": table.label,
-                    "start": _hhmm(clash.start),
-                    "end": _hhmm(clash.end),
+                    "start": _hhmm(clash.start, request.zone),
+                    "end": _hhmm(clash.end, request.zone),
                 },
             )
     return None

@@ -6,6 +6,7 @@ already booked, the covers of a slot, and the notice that only binds the guest w
 """
 
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 from apps.reservation import engine
 from apps.reservation.engine import (
@@ -261,3 +262,95 @@ def test_a_change_that_keeps_the_day_and_time_is_not_judged_on_the_clock_again()
     online = request(check_when=False, party_size=40, source="online")
     assert code(online, now=now) == "party_size_exceeded"
     assert code(request(), now=now) == "in_past"
+
+
+# ── The nights the clocks change (Europe/Madrid: 25 October 2026 back, 29 March 2026 forward) ─────
+
+MADRID = ZoneInfo("Europe/Madrid")
+BACK = dt.date(2026, 10, 25)  # 03:00 summer time is 02:00 again: 02:00–02:59 happen twice
+FORWARD = dt.date(2026, 3, 29)  # 02:00 winter time is 03:00: 02:00–02:59 never happen
+ALL_NIGHT = Slot(id="night", start=dt.time(0), end=dt.time(5), max_reservations=9)
+
+
+def on_madrid(moment: dt.datetime) -> tuple[dt.time, dt.timedelta]:
+    """The wall-clock time an instant reads in Madrid, and its offset (+1 h winter, +2 h summer)."""
+    # A naive moment would be read in the machine's zone: the window must hold instants.
+    assert moment.tzinfo is not None
+    local = moment.astimezone(MADRID)
+    return local.time(), local.utcoffset()
+
+
+def at_night(day: dt.date, hour: int, minute: int = 0, **fields) -> Request:
+    return request(
+        date=day,
+        time=dt.time(hour, minute),
+        duration_minutes=fields.pop("duration_minutes", 60),
+        zone=MADRID,
+        **fields,
+    )
+
+
+def test_a_stay_lasts_its_minutes_of_real_time_the_night_the_clocks_go_back():
+    window = Window.of(BACK, dt.time(1, 37), 90, MADRID)
+    assert window.end - window.start == dt.timedelta(minutes=90)
+    # 01:37 summer time plus 90 real minutes is 02:07 of the second pass (winter time), not 03:07.
+    assert on_madrid(window.end) == (dt.time(2, 7), dt.timedelta(hours=1))
+
+
+def test_a_stay_lasts_its_minutes_of_real_time_the_night_the_clocks_go_forward():
+    window = Window.of(FORWARD, dt.time(1, 30), 90, MADRID)
+    assert window.end - window.start == dt.timedelta(minutes=90)
+    assert on_madrid(window.end) == (dt.time(4, 0), dt.timedelta(hours=2))
+
+
+def test_a_time_the_clocks_repeat_is_the_first_and_one_they_skip_moves_forward():
+    repeated = Window.of(BACK, dt.time(2, 30), 60, MADRID)
+    assert on_madrid(repeated.start) == (dt.time(2, 30), dt.timedelta(hours=2))
+    skipped = Window.of(FORWARD, dt.time(2, 30), 60, MADRID)
+    assert on_madrid(skipped.start) == (dt.time(3, 30), dt.timedelta(hours=2))
+
+
+def test_the_table_clashes_by_real_time_the_night_the_clocks_go_back():
+    booked = TableFacts(
+        label="5", in_service=True, booked=(Window.of(BACK, dt.time(1, 37), 90, MADRID),)
+    )
+    # It ends at 02:07 of the second pass: 03:00 is free, 02:30 (the first one) is not.
+    assert code(at_night(BACK, 3), now=NOW, slots=(ALL_NIGHT,), table=booked) is None
+    refusal = verdict(at_night(BACK, 2, 30), now=NOW, slots=(ALL_NIGHT,), table=booked)
+    assert (refusal.code, refusal.params) == (
+        "table_taken",
+        {"table": "5", "start": "01:37", "end": "02:07"},
+    )
+
+
+def test_the_table_clashes_by_real_time_the_night_the_clocks_go_forward():
+    now = dt.datetime(2026, 3, 20, 12, 0)
+    booked = TableFacts(
+        label="5", in_service=True, booked=(Window.of(FORWARD, dt.time(1), 90, MADRID),)
+    )
+    # 01:00 plus 90 real minutes is 03:30 summer time: 03:00 clashes, 03:30 is back to back.
+    refusal = verdict(at_night(FORWARD, 3), now=now, slots=(ALL_NIGHT,), table=booked)
+    assert (refusal.code, refusal.params["end"]) == ("table_taken", "03:30")
+    assert code(at_night(FORWARD, 3, 30), now=now, slots=(ALL_NIGHT,), table=booked) is None
+
+
+def test_the_minimum_notice_counts_real_time_the_night_the_clocks_change():
+    online = dict(source="online", phone="1")
+    # 01:30 winter time: an hour of notice reaches 03:30 summer time, so 03:10 is too soon.
+    spring = dt.datetime(2026, 3, 29, 1, 30)
+    assert code(at_night(FORWARD, 3, 10, **online), now=spring, slots=(ALL_NIGHT,)) == "too_soon"
+    assert code(at_night(FORWARD, 3, 30, **online), now=spring, slots=(ALL_NIGHT,)) is None
+    # 02:20 of the first pass: 03:00 winter time is 100 real minutes away.
+    autumn = dt.datetime(2026, 10, 25, 2, 20)
+    assert code(at_night(BACK, 3, **online), now=autumn, slots=(ALL_NIGHT,)) is None
+
+
+def test_a_time_gone_is_judged_by_real_time_the_night_the_clocks_change():
+    # 02:20 of the second pass: the 02:40 a reservation keeps (the first) went an hour ago.
+    second_pass = dt.datetime(2026, 10, 25, 2, 20, fold=1)
+    assert code(at_night(BACK, 2, 40), now=second_pass, slots=(ALL_NIGHT,)) == "in_past"
+    assert code(at_night(BACK, 3), now=second_pass, slots=(ALL_NIGHT,)) is None
+    # 03:10 summer time: 02:30 never happens and moves forward to 03:30, still to come.
+    spring = dt.datetime(2026, 3, 29, 3, 10)
+    assert code(at_night(FORWARD, 2, 30), now=spring, slots=(ALL_NIGHT,)) is None
+    assert code(at_night(FORWARD, 3, 5), now=spring, slots=(ALL_NIGHT,)) == "in_past"
