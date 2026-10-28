@@ -481,7 +481,8 @@
         "failed": "Stopped by an error",
         "cancelled": "Cancelled",
         "calling": "Calling another system",
-        "asking": "Waiting for an answer"
+        "asking": "Waiting for an answer",
+        "thinking": "Waiting for the assistant"
       },
       "log": {
         "done": "Did: {action}",

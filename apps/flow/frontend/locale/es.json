@@ -481,7 +481,8 @@
         "failed": "Se paró por un error",
         "cancelled": "Cancelada",
         "calling": "Llamando a otro sistema",
-        "asking": "Esperando una respuesta"
+        "asking": "Esperando una respuesta",
+        "thinking": "Esperando al asistente"
       },
       "log": {
         "done": "Hizo: {action}",

@@ -172,7 +172,7 @@ export function describeStep(step: Step, steps: readonly Step[], catalog: Catalo
 }
 
 /** How a run ended, with the tone of what it means (a condition that stopped it is no error). */
-export function runStatusPill(status: RunStatus, p: Phrasing): { tone: StatusPillTone; label: string } {
+export function runStatusPill(status: RunStatus, p: Phrasing, log: readonly LogEntry[] = []): { tone: StatusPillTone; label: string } {
   const tones: Record<RunStatus, StatusPillTone> = {
     running: 'info',
     waiting: 'warning',
@@ -183,6 +183,8 @@ export function runStatusPill(status: RunStatus, p: Phrasing): { tone: StatusPil
     failed: 'danger',
     cancelled: 'neutral',
   };
+  // A run parked on «Ask the assistant» waits for the assistant, not for another system (FLOW-F38).
+  if (status === 'calling' && log.at(-1)?.outcome === 'thinking') return { tone: tones.calling, label: p.t('flow.history.statuses.thinking') };
   return { tone: tones[status], label: p.t(`flow.history.statuses.${status}`) };
 }
 

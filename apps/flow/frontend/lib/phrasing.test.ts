@@ -281,6 +281,11 @@ describe('«Ask the assistant» in words (FLOW-F37, F38)', () => {
     expect(describeStep({ ...step, prompt: '' }, [step], null, en)).toBe('Ask the assistant');
   });
 
+  it('a run that waits for the assistant says so, not that it calls another system', () => {
+    expect(runStatusPill('calling', en, [entry({})])).toEqual({ tone: 'info', label: 'Waiting for the assistant' });
+    expect(runStatusPill('calling', en, [entry({ kind: 'http', outcome: 'calling' })]).label).toBe('Calling another system');
+  });
+
   it('tells in the history what the assistant did', () => {
     expect(describeLog(entry({}), [step], null, en)).toBe('Asked the assistant; it answers in a moment.');
     expect(describeLog(entry({ outcome: 'assistant_used', operation: 'task.task.create', ok: true }), [step], null, en)).toBe('The assistant used «Create a task».');
