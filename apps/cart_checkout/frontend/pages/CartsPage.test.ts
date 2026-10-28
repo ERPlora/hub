@@ -5,14 +5,25 @@
 // form; each row offers «Abandon» (an active cart only) and «Delete» (confirmed), only to whoever may.
 // The old tests kept here: the create form lives behind the table's «+» (erp-cart-checkout-carts), the
 // status filters by list, the total paints in the cart's own currency (cart_checkout#32), the range
-// filters compare in the unit shown (cart_checkout#26) and a failed load offers Retry.
+// filters compare in the unit shown (cart_checkout#26) and a failed load offers Retry. The Total filter is typed
+// in the business's currency, its country's (flow cart-checkout-business-currency), never in euros by default.
 import { DataTable, type DataTableAction, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { CartOut, CartStatus } from '../operations';
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCartCheckout, page } from '../__tests__/mount-cart-checkout';
+import {
+  business,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  JAPANESE,
+  type MountOptions,
+  mountCartCheckout,
+  page,
+  POLISH,
+} from '../__tests__/mount-cart-checkout';
 import CartFormModal from '../components/CartFormModal.vue';
 import CartsPage from './CartsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -39,6 +50,7 @@ const cart = (id: string, status: CartStatus, over: Partial<CartOut> = {}): Cart
   total_items: '2.000',
   total_amount: 3150,
   currency: 'EUR',
+  currency_decimals: 2,
   expires_at: null,
   last_activity_at: null,
   notes: '',
@@ -51,7 +63,7 @@ const cart = (id: string, status: CartStatus, over: Partial<CartOut> = {}): Cart
 });
 const ACTIVE = cart('a1', 'active');
 const ABANDONED = cart('a2', 'abandoned', { customer_email: '' });
-const CONVERTED = cart('a3', 'converted', { total_items: '0.500', total_amount: 1999, currency: 'JPY' });
+const CONVERTED = cart('a3', 'converted', { total_items: '0.500', total_amount: 1999, currency: 'JPY', currency_decimals: 0 });
 const EXPIRED = cart('a4', 'expired');
 const ROWS = [ACTIVE, ABANDONED, CONVERTED, EXPIRED];
 
@@ -335,7 +347,7 @@ describe('CartsPage: the column filters wait behind the funnel, as the old table
     );
   });
 
-  it('the panel filters on «Apply», by status and by the total in euros, and the funnel counts them', async () => {
+  it('the panel filters on «Apply», by status and by the total, and the funnel counts them', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     await openFunnel(s);
@@ -360,5 +372,62 @@ describe('CartsPage: the column filters wait behind the funnel, as the old table
     expect(s.find(`${ID}-filters-toggle`).attributes('data-invalid')).toBe('true');
     await openFunnel(s);
     expect(field(s, 'total_amount_from').errorText).toBe('Type an amount, like 12.50');
+  });
+});
+
+describe('CartsPage: the business’s currency (cart-checkout-business-currency)', () => {
+  const BUSINESS = 'base.business.get';
+  const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
+  type Setup = Awaited<ReturnType<typeof setup>>;
+  const totals = (s: Setup) => s.rows().map((_, i) => plain(s.cells(i)[4]));
+  const filter = async (s: Setup, filters: Record<string, string>) => {
+    s.table().vm.$emit('filtersChange', filters);
+    await flush();
+  };
+
+  it('a business in Poland sees each cart in its own currency: a new one in złoty, an older one in euros', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.result(BUSINESS, business(POLISH));
+    await s.show(page([cart('p1', 'active', { currency: 'PLN', total_amount: 4250 }), cart('e1', 'converted')]));
+    expect(totals(s)).toEqual(['42,50 zł', '31,50 €']);
+  });
+
+  it('a cart is painted with the decimals the server counts, never the browser’s: the forint has two', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show(page([cart('h1', 'active', { currency: 'HUF', currency_decimals: 2, total_amount: 125000 })]));
+    expect(totals(s)).toEqual(['1.250,00 Ft']);
+  });
+
+  it('the Total filter is typed in the business’s currency: złoty with its symbol, yen without decimals', async () => {
+    const s = await setup();
+    await s.result(BUSINESS, business(POLISH));
+    await filter(s, { total_amount_from: '12,50 zł', total_amount_to: 'PLN 100' });
+    expect(s.list()).toEqual([{ total_amount_min: 1250, total_amount_max: 10000, sort: '-created_at', limit: 50, offset: 0 }]);
+
+    const yen = await setup();
+    await yen.result(BUSINESS, business(JAPANESE));
+    await filter(yen, { total_amount_from: '12', total_amount_to: '12,5' });
+    expect(yen.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
+    expect(yen.prop('filterErrors')).toEqual({ total_amount_to: 'Type an amount, like 12' });
+  });
+
+  it('a symbol of another currency is no amount of the business’s: it filters nothing and says so', async () => {
+    const s = await setup();
+    await s.result(BUSINESS, business(POLISH));
+    await filter(s, { total_amount_from: '12 €' });
+    expect(s.list()).toEqual([{ sort: '-created_at', limit: 50, offset: 0 }]);
+    expect(s.prop('filterErrors')).toEqual({ total_amount_from: 'Type an amount, like 12.50' });
+  });
+
+  it('an amount typed before the business answers is read again in its currency when it does, from the first page', async () => {
+    const s = await setup();
+    await s.show(page(ROWS, 200));
+    await filter(s, { total_amount_from: '12' });
+    expect(s.list()).toEqual([{ total_amount_min: 1200, sort: '-created_at', limit: 50, offset: 0 }]);
+    s.table().vm.$emit('pageChange', 2);
+    await flush();
+    expect(s.list()).toEqual([{ total_amount_min: 1200, sort: '-created_at', limit: 50, offset: 100 }]);
+    await s.result(BUSINESS, business(JAPANESE));
+    expect(s.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
   });
 });

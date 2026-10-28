@@ -175,7 +175,7 @@ def create_cart(ctx: OperationContext, data: CartIn) -> dict:
         session_token=data.session_token,
         customer_email=data.customer_email,
         customer_name=data.customer_name,
-        currency=data.currency or business_currency(),
+        currency=data.currency or business_currency(ctx),
         expires_at=data.expires_at,
         last_activity_at=timezone.now(),
         created_by=actor,

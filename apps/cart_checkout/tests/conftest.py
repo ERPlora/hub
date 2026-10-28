@@ -96,8 +96,11 @@ def db_dsn(django_db_setup):
 
 
 def make_cart(session_token: str = "sess_a1b2c3", **fields):
+    """A cart in euros unless the test says another currency (the model has no default: the operation gives a
+    new cart the business's)."""
     from apps.cart_checkout.models import Cart
 
+    fields.setdefault("currency", "EUR")
     return Cart.objects.create(session_token=session_token, **fields)
 
 
@@ -135,8 +138,10 @@ def make_order(
 ):
     from apps.cart_checkout.models import Order
 
+    cart = cart or make_cart()
+    fields.setdefault("currency", cart.currency)
     return Order.objects.create(
-        cart=cart or make_cart(),
+        cart=cart,
         order_number=order_number,
         customer_email=customer_email,
         total_amount=total_amount,
