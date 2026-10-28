@@ -658,7 +658,10 @@ Pantalla: ninguna (se ve en el Plano de sala)
 Pasos:
 1. En Reservas, una reserva con mesa pasa a Confirmada (o nace ya confirmada).
 2. En esa misma operación, Mesas aparta esa mesa para la reserva desde su fecha y hora (del negocio) hasta que acaba su
-   duración (120 minutos si no trae), con sus comensales, su nombre y su ficha de cliente.
+   duración (120 minutos si no trae), con sus comensales, su nombre y su ficha de cliente. La noche del cambio de hora la
+   duración es la real: una reserva de 90 minutos aparta la mesa 90 minutos, ni una hora más ni una menos. Una hora que se
+   repite (las 02:30 de la noche de octubre) es la primera, aún en horario de verano; una que no existe (las 02:30 de la
+   noche de marzo) pasa a las 03:30.
 3. Desde 60 minutos antes de su hora la mesa sale Reservada; antes, Disponible con «Ana · 21:00».
 4. Una mesa puede tener varias reservas retenidas; el plano enseña la más temprana de hoy.
 Entra: de Reservas, la reserva con su mesa, fecha, hora, duración, comensales, nombre y ficha.
@@ -676,8 +679,8 @@ Pantalla: ninguna (se ve en el Plano de sala)
 Pasos:
 1. En Reservas se cambia la mesa, la fecha, la hora, la duración, los comensales o el nombre de una
    reserva retenida.
-2. En esa misma operación, Mesas mueve la retención a la mesa nueva y a la hora nueva; si a la reserva se le quita la mesa,
-   suelta la retención.
+2. En esa misma operación, Mesas mueve la retención a la mesa nueva y a la hora nueva, con la misma duración real (también
+   la noche del cambio de hora); si a la reserva se le quita la mesa, suelta la retención.
 Entra: de Reservas, la reserva cambiada.
 Sale: la retención movida o soltada (avisa: `table.table.held` o `table.table.hold_released`).
 Si falla: una mesa nueva borrada, desactivada o fuera de servicio no recibe la retención: Reservas no
