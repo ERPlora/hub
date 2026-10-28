@@ -24,6 +24,24 @@ export function business(fields: Partial<Business> = {}): Business {
 /** A business in Poland: it sells in złoty. */
 export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
 
+/** A business in Japan: the yen has no decimals. */
+export const JAPANESE: Partial<Business> = {
+  country: 'JP',
+  country_name: 'Japan',
+  currency: 'JPY',
+  currency_label: 'JPY · Japanese Yen',
+  currency_decimals: 0,
+};
+
+/** A business in Kuwait: the dinar has three decimals. */
+export const KUWAITI: Partial<Business> = {
+  country: 'KW',
+  country_name: 'Kuwait',
+  currency: 'KWD',
+  currency_label: 'KWD · Kuwaiti Dinar',
+  currency_decimals: 3,
+};
+
 export function priceList(overrides: Partial<PriceListOut> = {}): PriceListOut {
   return {
     id: 'l1',

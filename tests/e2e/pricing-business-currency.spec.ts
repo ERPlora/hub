@@ -4,15 +4,18 @@
 // the list is created in złoty (its Currency column says PLN); its detail reads its price and the catalog's in złoty
 // and no «€», in 390, 834 and 1440 (captures `FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY-<width>`), and it
 // can be made general. Back in Spain «New price list» proposes EUR, the zloty list keeps its złoty (nothing stored is
-// rewritten) and the catalog price reads in euros (`…-es-1440`). What the run creates is deleted after it and `a`'s
-// registration put back, also when a test fails.
+// rewritten) and the catalog price reads in euros (`…-es-1440`). Editing an amount-per-unit rule in złoty (PRICING-F11)
+// shows its amount in złoty and «Save» keeps it (captures `FIX-HUB-PRICING-MONEY-FIELD-OPENED-BEFORE-THE-BUSINESS-ANSWERS-
+// <width>`; the business answering after the dialog opened is the race `RuleFormModal.test.ts` proves). What the run
+// creates is deleted after it and `a`'s registration put back, also when a test fails.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
-import { createProduct, dialog, post, ready, row, search, stamp } from './pricing-helpers';
+import { createProduct, dialog, post, ready, row, rowAction, search, stamp } from './pricing-helpers';
 import { settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
+const RULE_KEY = 'FIX-HUB-PRICING-MONEY-FIELD-OPENED-BEFORE-THE-BUSINESS-ANSWERS';
 const SIZES = [
   { name: '390', width: 390, height: 844 },
   { name: '834', width: 834, height: 1112 },
@@ -27,6 +30,8 @@ const PRODUCT = `E2E Pricing currency ${RUN} Shampoo`;
 const ZLOTY_PRICE = /zł\s?12[.,]50|12[.,]50\s?zł/;
 const ZLOTY_CATALOG = /zł\s?15[.,]00|15[.,]00\s?zł/;
 const EURO_CATALOG = /€\s?15[.,]00|15[.,]00\s?€/;
+/** 0,50 per unit as a business in Poland reads it. */
+const ZLOTY_PER_UNIT = /(zł\s?0[.,]50|0[.,]50\s?zł) per unit/;
 
 /** `a`'s registration as the run found it (put back after). */
 let original: Registration;
@@ -41,6 +46,7 @@ function cleanUp(): void {
     [
       `delete from pricing_priceitem where price_list_id in (${lists}) or product_id in (${products})`,
       `delete from pricing_pricelist where code like '${PREFIX}%'`,
+      `delete from pricing_discountrule where code like '${PREFIX}%'`,
       `delete from inventory_stockmovement where product_id in (${products})`,
       `delete from inventory_productcategory where product_id in (${products})`,
       `delete from inventory_product where sku like '${PREFIX}-%'`,
@@ -132,6 +138,33 @@ test(`${KEY}: pricing-business-currency in Poland a price list's detail reads it
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(await itemRow(page)).toContainText(ZLOTY_CATALOG);
   await expect(shown(page).locator('[data-testid=pricing-detail-default]')).toBeVisible();
+});
+
+test(`${RULE_KEY}: PRICING-F11 editing an amount-per-unit rule in złoty shows it in złoty and «Save» keeps it`, async ({ page }) => {
+  // flow: PRICING-F11
+  await login(page, A, '/pricing/lists');
+  const code = `${CODE}R`;
+  const name = `E2E Pricing currency ${RUN} rule`;
+  const made = await post<{ id: string }>(page.context(), '/pricing/rules', { code, name, rule_type: 'fixed', amount: 50, applies_to: 'all' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await ready(page, 'pricing-rules');
+  await search(page, 'pricing-rules', code);
+  await expect(row(page, 'pricing-rules', code)).toContainText(ZLOTY_PER_UNIT);
+  await rowAction(page, 'pricing-rules', made.id, 'edit');
+  const form = dialog(page, 'pricing-rule-form');
+  await expect(form).toContainText(`Editing rule — ${name}`);
+  await expect(form.locator('[data-testid=pricing-rule-form-amount] input')).toHaveValue('0.50');
+  await form.locator('[data-testid=pricing-rule-form-name] input').fill(`${name} edited`);
+  for (const size of SIZES) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await settled(page);
+    await page.screenshot({ path: shot(`${RULE_KEY}-${size.name}`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await form.locator('[data-testid=pricing-rule-form-submit]').click();
+  await expect(form).toBeHidden();
+  expect(psql(`select amount || '@' || name from pricing_discountrule where id = '${made.id}'`)).toBe(`50@${name} edited`);
+  await expect(row(page, 'pricing-rules', code)).toContainText(ZLOTY_PER_UNIT);
 });
 
 test(`${KEY}: pricing-business-currency back in Spain «New price list» proposes EUR and the zloty list keeps its złoty`, async ({
