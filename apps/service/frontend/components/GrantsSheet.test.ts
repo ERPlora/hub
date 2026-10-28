@@ -6,7 +6,8 @@
 import { StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, flush, MANAGER, EMPLOYEE, mountService, page, settle } from '../__tests__/mount-service';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, click, flush, MANAGER, EMPLOYEE, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import { PACKAGE } from '../__tests__/package';
 import GrantAdjustModal from './GrantAdjustModal.vue';
@@ -25,8 +26,8 @@ const ROWS = [
   grant({ id: 'g3', status: 'voided', voided_at: '2026-10-05T10:00:00Z', voided_by: 'boss', void_reason: 'wrong customer', can_adjust: false, uses_removed: 1 }),
 ];
 
-async function setup(session = MANAGER, locale: 'en' | 'es' = 'en') {
-  const m = await mountService(GrantsSheet, { props: { open: true, pkg: PACKAGE }, session, locale });
+async function setup(session = MANAGER, locale: 'en' | 'es' = 'en', answer: Business | null = business()) {
+  const m = await mountService(GrantsSheet, { props: { open: true, pkg: PACKAGE }, session, locale, business: answer });
   await settle();
   await m.live();
   const text = (id: string) => m.inDoc(`service-grants-row-${id}`)?.textContent ?? '';
@@ -34,6 +35,14 @@ async function setup(session = MANAGER, locale: 'en' | 'es' = 'en') {
 }
 
 describe('GrantsSheet', () => {
+  // flow service-business-currency: what was paid is the business's currency, never a euro fixed in the app.
+  it('paints the amount paid in złoty for a business in Poland', async () => {
+    const s = await setup(MANAGER, 'en', business(POLISH));
+    await s.show(page(ROWS));
+    expect(s.text('g1').replace(/\s/g, ' ')).toContain('zł 90.00');
+    expect(s.text('g1')).not.toContain('€');
+  });
+
   it('follows the sales of the package, 20 first, named after it', async () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ package_id: 'p1', limit: 20, offset: 0 }]);
