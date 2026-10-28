@@ -289,6 +289,14 @@ def test_the_computers_own_printer_prints_a4_pages_not_the_receipt():
     assert coverage() == (False, 0)
 
 
+def test_a_receipt_waiting_for_a_printer_is_not_printed_by_a_device_that_reaches_its_function_on_a4_only():
+    # A device reaching the computer's printer of the receipts prints their A4 pages, not their paper: a receipt
+    # queued with no receipt printer waits for nobody (the paper of printing.job.claim), on the bell too.
+    reaches(printer("Office", kind="system", address=""))
+    enqueue()
+    assert coverage() == (False, 1)
+
+
 def test_a_job_waits_for_nobody_when_its_own_printer_is_reached_by_no_device():
     # The device asks for the jobs of its printers: one sent to the other receipt printer is not its own.
     till, spare = printer("Till"), printer("Spare", address="10.0.0.9")
