@@ -1463,7 +1463,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   ajenas. **Inventario no es requisito** (PLAN §20.5): la línea guarda una copia del producto (id como
   UUID sin clave ajena, nombre, SKU, unidad, precio, coste y categoría fiscal) y el producto se lee con
   las operaciones de Inventario (`inventory.product.get`, `inventory.unit.list`) al añadir la línea,
-  con la sesión de quien vende. Inventario apagado → `sale.catalog_unavailable`; el precio libre sigue.
+  con la sesión de quien vende, por la misma puerta `call_app`. Inventario apagado → `sale.catalog_unavailable`;
+  el precio libre sigue.
   El equipo de Personal y la cita son UUID opacos (`staff_id`, `appointment_id`).
 - **Servicios no es requisito** (como Inventario): la línea de un servicio guarda una copia (id como
   UUID sin clave ajena, `service_id`, nombre, precio y categoría fiscal), leída con
@@ -1676,7 +1677,10 @@ administrador y responsable, los mismos que anulan y devuelven).
   Facturación (`invoice.invoice.create_from_sale`, `.rectify_from_void`, `.rectify_from_refund`), Caja
   (`cash_register.session.current`), Servicios (`service.service.*`, `service.session.*`,
   `service.assignment.list`) y Citas (`appointment.appointment.get`, validación del precio reservado),
-  con la sesión de quien vende, su permiso y su app activa, por la única puerta `call_app`. Mesas (que
+  con la sesión de quien vende, su permiso y su app activa, por la única puerta `call_app`: la de la plataforma
+  (`base.operations.call`, BASE-F84) con el 409 propio de Ventas cuando esa app no está en el negocio
+  (`sale.services_unavailable`, `sale.invoice_unavailable`…); lo que la otra app no acepta es el 422 de Ventas y,
+  dentro de una escritura, corre en un savepoint. Ventas no lleva regla de permisos propia. Mesas (que
   requiere Ventas) solo desde la pantalla «Elegir mesa», también por el nombre de sus operaciones
   (`useLive`/`useCommand`), sin importar nada de `apps/table`. Todo señalado para una ronda nueva de
   PLAN-HUB (este WORKBOOK no edita los planes).
@@ -1687,11 +1691,14 @@ administrador y responsable, los mismos que anulan y devuelven).
   Shopify «Approval required», Odoo, LS Central, Clover, StoreHub). Eliminar una cuenta con algo pedido
   tiene su propia puerta, `sale.order.void_ordered` (permiso `sale.void_sale`): la de `sale.order.void`
   es `sale.add_sale`, porque la vacía la elimina quien monta cuentas (TABLE-F21), y la plataforma aprueba
-  el permiso declarado de la orden. Lo que la orden aprobada pide a otras apps por `call_app`
-  (`consequence_context`: la rectificativa de Facturación, las sesiones que devuelve Servicios) lleva el
-  permiso de esa orden de la otra app, como cuando la hace el responsable; una consulta nunca. Quien
+  el permiso declarado de la orden. Lo que la orden aprobada pide a otras apps por `call_app` (la
+  rectificativa de Facturación, las sesiones que devuelve Servicios) lleva el permiso de esa orden de la
+  otra app, como cuando la hace el responsable, por la regla de la plataforma
+  (`base.approvals.consequence_context`): solo mientras corre la orden aprobada y solo a lo que ella llama
+  directamente; una consulta nunca, una orden de la propia Ventas nunca y otra orden del TPV con la misma
+  marca de aprobación (la del turno del asistente) tampoco. Quien
   autorizó un descuento por encima del máximo o una línea anulada (`discount_approved_by`, `voided_by` de
-  la línea) es el responsable que aprobó (`authoriser`); la venta anulada guarda quién la anuló y el
+  la línea) es el responsable que aprobó (`authoriser`, con `base.approvals.approval_of`); la venta anulada guarda quién la anuló y el
   registro de aprobaciones, quién la aprobó.
 
 ### Cambios frente al producto actual
