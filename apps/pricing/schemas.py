@@ -17,6 +17,7 @@ from uuid import UUID
 import pycountry
 from babel.numbers import get_currency_precision
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     AfterValidator,
@@ -56,6 +57,10 @@ TARGET_REQUIRED = _("Say which one the rule applies to.")
 TARGET_OF_ANOTHER_SCOPE = _("This only goes with a rule that applies to it.")
 TIERS_RISING = _("Each tier starts at a higher quantity than the one before.")
 TOO_MANY_TIERS = _("At most %(count)s tiers.")
+
+# How the Price lists screens name the data the models do not (the assistant's card names each datum by its title).
+CUSTOMER_GROUP = gettext_noop("Customer group")
+DISCOUNT_RULE = gettext_noop("Discount rule")
 
 RuleType = Literal[*DiscountRule.Type.values]
 RuleScope = Literal[*DiscountRule.Scope.values]
@@ -216,7 +221,7 @@ class PriceListIn(_ListFields):
     currency: Currency = Field("EUR", description=D_CURRENCY)
     tax_included: bool | None = Field(None, description=D_TAX_INCLUDED)
     customer_group_id: UUID | None = Field(None, description=D_GROUP_ID)
-    customer_group: Said | None = Field(None, description=D_GROUP)
+    customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description=D_GROUP)
     valid_from: dt.date | None = Field(None, description=D_FROM)
     valid_until: dt.date | None = Field(None, description=D_UNTIL)
     is_default: bool = Field(False, description=D_DEFAULT)
@@ -239,7 +244,7 @@ class PriceListPatchIn(PriceListRefIn, _ListFields):
     currency: Currency | None = Field(None, description=D_CURRENCY)
     tax_included: bool | None = Field(None, description=D_TAX_INCLUDED)
     customer_group_id: UUID | None = Field(None, description=D_GROUP_ID)
-    customer_group: Said | None = Field(None, description=D_GROUP)
+    customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description=D_GROUP)
     valid_from: dt.date | None = Field(None, description=D_FROM)
     valid_until: dt.date | None = Field(None, description=D_UNTIL)
 
@@ -386,7 +391,7 @@ class RuleListIn(PageIn):
 
 class RuleRefIn(In):
     id: UUID | None = Field(None, description=D_RULE_ID)
-    rule: Said | None = Field(None, validate_default=True, description=D_RULE)
+    rule: Said | None = Field(None, validate_default=True, title=DISCOUNT_RULE, description=D_RULE)
 
     @field_validator("rule")
     @classmethod
@@ -425,7 +430,7 @@ class RuleIn(In):
     service_id: UUID | None = Field(None, description="service: " + D_SERVICE_ID)
     service: Said | None = Field(None, description="service: " + D_SERVICE)
     customer_group_id: UUID | None = Field(None, description="Only for the members of this group. " + D_GROUP_ID)
-    customer_group: Said | None = Field(None, description="Only for the members of this group. " + D_GROUP)
+    customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description="Only for the members of this group. " + D_GROUP)
     min_quantity: Quantity | None = Field(None, description="Only from this quantity of the line on, in the unit of its price (kg of an article priced per kg).")
     valid_from: dt.date | None = Field(None, description=D_FROM)
     valid_until: dt.date | None = Field(None, description=D_UNTIL)
@@ -451,7 +456,7 @@ class RulePatchIn(RuleRefIn):
     service_id: UUID | None = Field(None, description="service: " + D_SERVICE_ID)
     service: Said | None = Field(None, description="service: " + D_SERVICE)
     customer_group_id: UUID | None = Field(None, description="Only for the members of this group. " + D_GROUP_ID)
-    customer_group: Said | None = Field(None, description="Only for the members of this group. " + D_GROUP)
+    customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description="Only for the members of this group. " + D_GROUP)
     min_quantity: Quantity | None = Field(None, description="Only from this quantity of the line on, in the unit of its price (kg of an article priced per kg).")
     valid_from: dt.date | None = Field(None, description=D_FROM)
     valid_until: dt.date | None = Field(None, description=D_UNTIL)
