@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:66a3da4a3b45eff565daab033eb2b68e67cfb395c1eb859653672c2e1f21d049 -->
+<!-- generated from WORKBOOK.md sha256:351f682a4310ea6629ab9c371fab8508002ebdff6fbe305b44467d66f15a4c36 -->
 
 ## What it is for and who it is for
 
@@ -79,7 +79,10 @@ Phone, Employee ID, Role** ("No role"), **Hub user** ("No Hub access"), **Status
 Active, Inactive, On leave), **Bookable**, **Buffer between appointments (min)**, **Hire date**,
 **Color**, **Specialties**, **Bio** and, for whoever can see the pay, **Hourly rate** and **Commission
 (%)**. Row actions for the owner and the administrator: **Deactivate** and **Terminate**, both with a
-confirmation.
+confirmation. The rate (in the column, in the form and in "My record") is in the business's currency, its
+country's in Settings → Business (euros in Spain, złoty in Poland), with its decimals (the yen has none) and
+its symbol at the end of the field; while the business has not answered, a figure without a symbol, never
+euros.
 
 ### Roles
 Table with the search "Search role…" and columns **Role, Description, Members** (how many **Active**
@@ -106,7 +109,8 @@ working day of **Settings** already in place.
 At the top, the period: "Today" (on entering), "Yesterday", "This week" (since Monday), "This month"
 (since the 1st) or "Custom", which opens "From" and "To" with the days that were on screen; next to it,
 the days it counts. On a phone, the period is chosen in the "Period" drop-down, with the same options.
-Below, two figures: **Sold** and **Commissions** of the period. Then the list with the search "Search
+Below, two figures: **Sold** and **Commissions** of the period, in the business's currency, like every
+amount of the list. Then the list with the search "Search
 professional…" and columns **Name, Role, Sold, Commission %** and **Commission**: each person who can earn
 a commission (Active or On leave), also without sales and with commission 0, and whoever sold in the
 period even if they are no longer here ("No longer works here" or "Inactive" next to the name). It sorts by
@@ -180,8 +184,9 @@ Steps:
    ID, Role, Hub user (STAFF-F03), Hire date, Color (#RRGGBB), Specialties, Bio, Buffer between
    appointments and, with the pay permission, Hourly rate and Commission (%). **Bookable** comes on.
 3. Tap Save: the person shows in the table as **Active**.
-In: the form; the active roles (STAFF-F04), by id or by their name. The rate is saved in whole cents; the
-commission is a percentage from 0 to 100 with two decimals. Through the API or the assistant the initial
+In: the form; the active roles (STAFF-F04), by id or by their name. The rate is typed in the business's
+currency and saved in its smallest unit (cents in euros; in yen, whole yen); the commission is a percentage
+from 0 to 100 with two decimals. Through the API or the assistant the initial
 status and the HR notes can also be given.
 Out: the record; Staff announces there is a new record (`staff.member.created`).
 If it fails: under each field and without saving anything: first name or last name empty, an email that
@@ -475,8 +480,9 @@ Steps:
    and commission, also those with commission 0.
 3. To know what each professional has earned, open **Staff → Commissions**. "Today" shows: what each person
    has sold in the business's day, with what was refunded already taken off, their commission and what is
-   due to them (sold × commission ÷ 100, rounded to the cent only once per person; half a cent rounds up).
-   At the top, the total sold and the total of commissions.
+   due to them (sold × commission ÷ 100, rounded to the smallest unit of the business's currency, the cent
+   in euros, only once per person; half a unit rounds up). At the top, the total sold and the total of
+   commissions.
 4. For another period, choose "Yesterday", "This week", "This month" or "Custom" and set "From" and "To".
 5. It counts what was attributed to each person in Sales: the line they did (an appointment's, to the
    appointment's professional) or, if the line does not say who, whoever served the check. With «Me» at

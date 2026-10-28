@@ -69,3 +69,13 @@ def test_the_card_names_a_members_bio_and_colour_as_the_record_does():
         record["color"],
         record["bio"],
     ]
+
+
+def test_the_card_paints_a_members_hourly_rate_as_money():
+    """staff-business-currency: the hourly rate a write sends is an amount in the minor unit of the business's currency
+    (the platform reads «in cents» so), and the card paints it as money in that currency with its decimals, never as
+    the bare figure («1250» for 12,50 zł)."""
+    for name in ("staff.member.create", "staff.member.update"):
+        card = assistant.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "es")
+        rate = next(field for field in card["fields"] if field["name"] == "hourly_rate")
+        assert (name, rate["kind"], rate["value"]) == (name, "money", 1250)
