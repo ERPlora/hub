@@ -15,6 +15,7 @@ from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from live.operations import NAME_RE
 from ninja import Field, Schema
 from pydantic import (
@@ -78,6 +79,9 @@ Reference = _text(NAME_MAX_LENGTH, 1)
 Note = _text(500, 1)
 StepId = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,23}$")]
 Time = Annotated[str, StringConstraints(pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")]
+
+#: How the Automations list names how an automation starts (the assistant's card names each datum by its title).
+STARTS_WITH = gettext_noop("Starts with")
 
 # Field descriptions shared by several schemas (the assistant reads them).
 D_FLOW_ID = "The automation's id. Give it, or its name in `flow`."
@@ -482,11 +486,12 @@ class CreateIn(In):
         description="What the owner reads in the list; empty: «Untitled automation».",
     )
     trigger: Trigger = Field(
-        default_factory=lambda: ManualTrigger(kind="manual"), description=D_TRIGGER
+        default_factory=lambda: ManualTrigger(kind="manual"), title=STARTS_WITH, description=D_TRIGGER
     )
     steps: Steps = Field(default_factory=list, description=D_STEPS)
     draft_id: UUID | None = Field(
         None,
+        title=gettext_noop("Draft"),
         description="The assistant's draft it is created from: it is marked as used in the same step.",
     )
 
@@ -495,7 +500,7 @@ class UpdateIn(FlowRefIn):
     name: Name | None = Field(
         None, description="A new name; empty: «Untitled automation»."
     )
-    trigger: Trigger | None = Field(None, description=D_TRIGGER)
+    trigger: Trigger | None = Field(None, title=STARTS_WITH, description=D_TRIGGER)
     steps: Steps | None = Field(None, description=D_STEPS)
 
 
@@ -506,6 +511,7 @@ class EnabledIn(FlowRefIn):
 class GrantIn(FlowRefIn):
     operations: list[Annotated[str, StringConstraints(max_length=96)]] = Field(
         max_length=100,
+        title=gettext_noop("Permissions"),
         description="The whole list of actions and reads it may run, by name; what is not here is withdrawn.",
     )
 
@@ -550,11 +556,15 @@ class RecordCallIn(In):
     """How a call of a run ended (``apps.flow.http.Reply``), its secrets already hidden."""
 
     id: UUID = Field(description="The run's id.")
-    kind: Literal["ok", "status", "blocked", "invalid", "failed", "timeout"] = Field(description="How it ended.")
+    kind: Literal["ok", "status", "blocked", "invalid", "failed", "timeout"] = Field(
+        title=gettext_noop("How it ended"), description="How it ended."
+    )
     status: int | None = Field(None, description="The HTTP status it answered.")
-    body: Any = Field(None, description="What it answered: data for JSON, text otherwise.")
-    truncated: bool = Field(False, description="Whether the answer was cut at 1 MiB.")
-    detail: str = Field("", max_length=2000, description="What went wrong, technically.")
+    body: Any = Field(None, title=gettext_noop("Body"), description="What it answered: data for JSON, text otherwise.")
+    truncated: bool = Field(False, title=gettext_noop("Truncated"), description="Whether the answer was cut at 1 MiB.")
+    detail: str = Field(
+        "", max_length=2000, title=gettext_noop("Technical text"), description="What went wrong, technically."
+    )
 
 
 class RunListIn(PageIn):
@@ -616,15 +626,19 @@ class ReactIn(In):
     """An event of the outbox, as the relay hands it over."""
 
     event_id: UUID = Field(
-        description="The outbox event's id: one run per automation and event."
+        title=gettext_noop("Reference of what happened"),
+        description="The outbox event's id: one run per automation and event.",
     )
-    event: str = Field(max_length=EVENT_MAX_LENGTH, description="The event's name.")
+    event: str = Field(
+        max_length=EVENT_MAX_LENGTH, title=gettext_noop("What happened"), description="The event's name."
+    )
     payload: dict[str, Any] = Field(
-        default_factory=dict, description="What the event brought."
+        default_factory=dict, title=gettext_noop("What brought it"), description="What the event brought."
     )
     actor: str = Field(
         "",
         max_length=128,
+        title=gettext_noop("Actor"),
         description="Who caused it (`flow_run:<id>` when a run did).",
     )
 
@@ -649,6 +663,7 @@ class SecretSetIn(In):
 
     name: SecretName = Field(description=D_SECRET_NAME)
     value: Annotated[SecretStr, Field(min_length=1, max_length=4096)] = Field(
+        title=gettext_noop("Value"),
         description="The value, typed by the person on the screen; it is never shown again."
     )
 
@@ -666,7 +681,10 @@ class QuestionListIn(In):
 
 class AnswerIn(In):
     id: UUID = Field(description="The question's id, from `flow.question.list`.")
-    approve: bool = Field(description="true: yes, the automation goes on; false: no, it does what its step says.")
+    approve: bool = Field(
+        title=gettext_noop("Answer"),
+        description="true: yes, the automation goes on; false: no, it does what its step says.",
+    )
     note: _text(500) = Field("", description="A note for the history, optional.")
 
 
