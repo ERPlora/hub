@@ -7,6 +7,7 @@ from pathlib import Path
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from live.operations import registry
 
 from apps.pricing import queries, schemas, services
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
@@ -55,7 +56,8 @@ def module_texts(module) -> list[Promise]:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
+    its schemas."""
     config = apps.get_app_config("pricing")
     lazies = [
         config.verbose_name,
@@ -76,7 +78,19 @@ def visible_texts() -> set[str]:
     for choices in (DiscountRule.Type, DiscountRule.Scope):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {str(text) for text in lazies} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles pricing's operations give their input data (``gettext_noop``): the assistant's card names each datum
+    by them, so each one needs its Spanish. Only the ones pricing wrote: pydantic leaves ``title`` empty otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "pricing"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():
