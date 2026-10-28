@@ -15,6 +15,7 @@ import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, openTillCart, stamp } from './sale-helpers';
 import { ownerPage, post, rowAction, settled } from './service-helpers';
+import { bookingDays, bookingTimes, type BookingTimes, untilMidnight } from './table-clock';
 
 const RUN = stamp();
 const TAG = `E2E Tbf ${RUN}`;
@@ -77,28 +78,18 @@ async function flowShots(page: Page, flows: string[], ready: () => Promise<void>
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-/** The business's wall clock (Madrid in phase 1), `now + minutes`, rounded up to 5 minutes. */
-function madrid(minutes = 0): { date: string; time: string; weekday: number } {
-  const at = new Date(Date.now() + minutes * 60_000);
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Europe/Madrid',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(at)
-      .map((part) => [part.type, part.value]),
-  );
-  const date = `${parts.year}-${parts.month}-${parts.day}`;
-  const weekday = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
-  const [hours, mins] = [Number(parts.hour), Number(parts.minute)];
-  const total = Math.min(hours * 60 + Math.ceil(mins / 5) * 5, 23 * 60 + 55);
-  const time = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-  return { date, time, weekday };
+/** The times of a test's reservations (table-clock.ts). In the last minutes of the day none of today is left: the
+ *  test waits for midnight first (less than ten minutes), its timeout stretched by exactly that wait. */
+async function reservationTimes(): Promise<BookingTimes> {
+  const now = new Date();
+  const times = bookingTimes(now);
+  if (times) return times;
+  const wait = untilMidnight(now) + 1_000;
+  test.setTimeout(test.info().timeout + wait);
+  await new Promise((done) => setTimeout(done, wait));
+  const after = bookingTimes(new Date());
+  expect(after, 'a time of the new day after midnight').not.toBeNull();
+  return after!;
 }
 
 /** A wall-clock time («20:00») as the plan paints it (`clock` of `apps/table/frontend/lib/format.ts`): the
@@ -212,15 +203,15 @@ test.beforeAll(async ({ browser }) => {
     coffee = await createProduct(context, { name: `${TAG} coffee`, sku: SKU, price: 150, tax_category_key: 'restaurant.drink' });
     const settings = await api<Record<string, unknown>>(context, A, 'GET', '/table/settings');
     for (const key of ['prompt_guests_on_seat', 'timer_warning_minutes', 'timer_critical_minutes']) settingsBefore[key] = settings.data[key];
-    // The book open all day today (a slot each day of the run and a change of Schedules open 24 h).
-    const today = madrid();
-    const soon = madrid(30);
-    for (const weekday of new Set([today.weekday, soon.weekday])) {
-      await post(context, '/reservation/time_slots', { day_of_week: weekday, start_time: '00:00', end_time: '23:59', max_reservations: SENTINEL });
+    // The book open all day today and tomorrow, where a run that waits for midnight books (a slot each day and a
+    // change of Schedules open 24 h).
+    const [today, tomorrow] = bookingDays(new Date());
+    for (const day of [today, tomorrow]) {
+      await post(context, '/reservation/time_slots', { day_of_week: day.weekday, start_time: '00:00', end_time: '23:59', max_reservations: SENTINEL });
     }
     await post(context, '/schedule/overrides', {
       start_date: today.date,
-      end_date: soon.date,
+      end_date: tomorrow.date,
       reason: `${TAG} open`,
       is_closed: false,
       intervals: [{ open_time: '00:00', close_time: '00:00' }],
@@ -692,12 +683,12 @@ test('TABLE-F21, F22, F23, F13, F24: the checks of the room in Sessions', async 
 });
 
 test('TABLE-F25, F26, F27, F28: a reservation holds its table, moves it, frees it and is seated', async ({ browser }) => {
+  const { soon, evening } = await reservationTimes();
   const { context, page } = await ownerPage(browser, '/table/floor-plan');
   try {
     await floor(page);
     const one = await tableNo(context, '1');
     const two = await tableNo(context, '2');
-    const soon = madrid(30);
     const reserve = async (guest: string, tableId: string, phone: string, at = soon) => {
       const made = await post<{ id: string }>(context, '/reservation/reservations', {
         guest_name: guest,
@@ -713,9 +704,8 @@ test('TABLE-F25, F26, F27, F28: a reservation holds its table, moves it, frees i
     const hour = tile(page, one.id).locator('.table-tile__hold-time');
 
     // TABLE-F25: a reservation of tonight paints its hour on the plan in the page's language («8:00 PM» in
-    // English). Always an afternoon one, whatever the time of the run (before noon an hour reads the same in
-    // 24 h and in 12 h): soon itself, else 20:00.
-    const evening = soon.time >= '12:00' ? soon : { ...soon, time: '20:00' };
+    // English). Always an afternoon one of today, whatever the time of the run (before noon an hour reads the
+    // same in 24 h and in 12 h).
     const tonight = await painted(page, evening.time);
     expect(tonight).toContain('PM');
     const noa = await reserve(`${TAG} Noa`, one.id, `6${RUN.slice(-8).replace(/\D/g, '6').padStart(8, '6')}`, evening);
@@ -770,11 +760,11 @@ test('TABLE-F25, F26, F27, F28: a reservation holds its table, moves it, frees i
 });
 
 test('TABLE-F31: a customer whose data is erased leaves the plan without her name', async ({ browser }) => {
+  const { soon } = await reservationTimes();
   const { context, page } = await ownerPage(browser, '/table/floor-plan');
   try {
     await floor(page);
     const one = await tableNo(context, '1');
-    const soon = madrid(30);
     const card = await post<{ id: string; name: string }>(context, '/customer/customers', { name: `${TAG} Sara`, phone: `6${RUN.slice(-8).replace(/\D/g, '5').padStart(8, '5')}` });
     const made = await post<{ id: string }>(context, '/reservation/reservations', {
       customer_id: card.id,
