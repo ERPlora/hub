@@ -10,6 +10,7 @@ from live.errors import Conflict, InvalidPayload
 from live.operations import get
 
 from apps.pricing.models import PriceList
+from base import operations as base_operations
 from base.models import Hub
 
 from .conftest import B, ctx_for, make_customer, make_group, make_item, make_list, make_product
@@ -149,3 +150,65 @@ def test_erploras_own_hub_prices_in_the_currency_of_its_issuer_s_country(setting
     product = make_product("Shampoo", "SH-1", price=1250)
     assert resolve(platform, product_id=str(product.id)).currency == currency
     assert run("pricing.price_list.create", {"code": "VIP", "name": "VIP"}, platform).currency == currency
+
+
+# One way to the currency (FIX-HUB-PRICING-OWN-COPY-OF-BUSINESS-CURRENCY): pricing asks the one question every app that
+# charges asks (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub too, never a copy of its own that
+# drifts in silence (here, an answer other than the one of the business's or the issuer's country).
+
+
+def line_with(ctx) -> tuple:
+    """The price of a line (PRICING-F13) with a general list in zlotys: its price, its list and its currency."""
+    product = make_product("Shampoo", "SH-1", price=1250)
+    make_item(make_list("GEN", currency="PLN", is_default=True), product, price=900)
+    line = resolve(ctx, product_id=str(product.id))
+    return line.unit_price, line.price_list_code, line.currency
+
+
+def new_list_with(ctx) -> str:
+    """The currency a list created without one (PRICING-F02) is stored in."""
+    run("pricing.price_list.create", {"code": "VIP", "name": "VIP"}, ctx)
+    return PriceList.objects.get(code="VIP").currency
+
+
+def general_list_with(ctx) -> list[str]:
+    """The general lists after making a zloty list the general one (PRICING-F04), or the refusal's code."""
+    make_list("ZLOTY", currency="PLN")
+    try:
+        run("pricing.price_list.set_default", {"price_list": "ZLOTY"}, ctx)
+    except Conflict as refusal:
+        return [refusal.code]
+    return list(PriceList.objects.filter(is_default=True).values_list("code", flat=True))
+
+
+def moved_general_list_with(ctx) -> str:
+    """The currency of a general list in euros moved to zlotys (PRICING-F03), or the refused field."""
+    make_list("GEN", currency="EUR", is_default=True)
+    try:
+        run("pricing.price_list.update", {"price_list": "GEN", "currency": "PLN"}, ctx)
+    except InvalidPayload as refusal:
+        return ",".join(refusal.fields)
+    return PriceList.objects.get(code="GEN").currency
+
+
+#: Each operation that asks the business's currency, and what it gives when the business charges in zlotys.
+IN_ZLOTYS = {
+    "line": (line_with, (900, "GEN", "PLN")),
+    "new-list": (new_list_with, "PLN"),
+    "general-list": (general_list_with, ["ZLOTY"]),
+    "moved-general-list": (moved_general_list_with, "PLN"),
+}
+
+
+@pytest.mark.parametrize("platform_hub", [False, True], ids=["a-business-s-hub", "erploras-own-hub"])
+@pytest.mark.parametrize("caller", sorted(IN_ZLOTYS))
+def test_each_operation_takes_the_currency_base_answers(caller, platform_hub, settings, monkeypatch):
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = "ES"
+    business_in("ES")
+    scope = Scope("host", "erplora") if platform_hub else ctx_for().scope
+    asked = []
+    monkeypatch.setattr(base_operations, "business_currency", lambda scope: asked.append(scope) or "PLN")
+    through, in_zlotys = IN_ZLOTYS[caller]
+    assert through(ctx_for(scope=scope)) == in_zlotys
+    assert asked and set(asked) == {scope}
