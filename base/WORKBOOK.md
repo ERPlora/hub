@@ -2666,6 +2666,23 @@ Implicados: ACCOUNTS-F38
 - `base/live.py`: cada consulta se re-ejecuta tras los eventos de `refresh_on` de su gancho más
   `base.hub.state_applied` (la foto del SaaS puede encender o apagar apps). Escribir en el hub B no avisa
   al A (test de dos hubs en `base/tests/test_queries_home.py`).
+- Campana por reloj (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): un contador cuya cifra cambia porque pasa el
+  tiempo, sin evento (un trabajo que lleva un minuto en cola sin dispositivo vivo), lo dice su módulo en
+  `bell_refresh_every` de su `LiveAppConfig` (clave del contador → segundos; la forma de `scheduled_tasks` y
+  `approvals`, que también lee y comprueba `base`). `base.E007` (`base/home.py`) exige claves de su propio `bell` y
+  segundos enteros desde `MIN_BELL_REFRESH_SECONDS` (30, el ritmo de la campana vieja). `base.bell.counters` devuelve
+  `refresh_every`, el menor de los contadores que la persona puede ver de las apps encendidas (también a cero: es el
+  tiempo el que los sube), y `HubBell.vue` vuelve a leer `GET /api/home/bell` cada tantos segundos mientras la página
+  está a la vista; una lectura más vieja que un resultado vivo llegado mientras tanto se descarta, y una que falla deja
+  lo último. Sin `refresh_every`, la campana solo se mueve por eventos, como antes. Tests: `test_home.py`,
+  `test_queries_home.py` y `HubBell.test.ts`.
+- Presencia del dispositivo que imprime (misma tarea; el `heartbeat` de `print_hosts.rs` del hub viejo): la app que
+  lleva los dispositivos declara en su `LiveAppConfig` `print_presence`, el nombre de una orden suya cuya entrada lleva
+  `device`; `/ws/print` (`base/ws_print.py`) la ejecuta con el contexto del dispositivo en su `hello` y en cada `beat`
+  mientras imprime para alguna impresora, como mucho una vez cada `PRESENCE_SECONDS` (15 s, medio latido). Si falla,
+  se anota en el log y el socket sigue (contesta el latido y sigue sacando trabajos). `base.E006` comprueba al arrancar
+  que es una orden de la propia app, con `device`, y que solo una app la declara. Sin declarar, el socket no avisa a
+  nadie. Tests: `base/tests/test_ws_print.py` (sección «The device's presence»).
 - Un panel con `operation` viva (está en un `live.py`) se sigue con `useLive`; si no, se pide una vez
   (`live` en `WidgetOut`). Un panel con `component` monta `apps/<app>/frontend/components/<Nombre>.vue`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
