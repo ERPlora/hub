@@ -14,11 +14,15 @@ caja ni de stock. Para cobrar está Ventas.
 ## Qué hace hoy
 
 - **Carritos** (F01, F05, F06): alta con sesión (única entre los no borrados), email, nombre, moneda (la
-  del negocio si no se dice) y caducidad; abandonar uno activo y borrarlo (lógico: sus pedidos siguen y la
+  del negocio, la de su país, si no se dice: `base.operations.business_currency`) y caducidad; abandonar uno activo y borrarlo (lógico: sus pedidos siguen y la
   sesión queda libre).
 - **Líneas, por el asistente o la API** (F02, F03, F04): añadir, cambiar la cantidad (0 la quita), quitar y
   vaciar; producto y precio son texto y números libres, cantidades con tres decimales y totales redondeados
-  al céntimo (la mitad hacia arriba), con topes de 1 000 000 unidades y 99 999 999 999,99 €.
+  a la unidad menor de su moneda (la mitad hacia arriba), con topes de 1 000 000 unidades y 99 999 999 999,99
+  (con dos decimales).
+- **Moneda**: cada carrito y pedido se pinta en la suya con los decimales que cuenta el servidor
+  (`currency_decimals`); el filtro de Total se teclea en la del negocio (`useBusinessMoney`), sin euro por
+  defecto (flujo `cart-checkout-business-currency`).
 - **Caducidad** (F07): un carrito vencido se lee como Expirado en el acto, y la tarea de cada 15 minutos lo
   guarda.
 - **Pedidos** (F08–F11): iniciar desde un carrito activo con número `OS-AAAAMMDD-NNNN` sin huecos por día del

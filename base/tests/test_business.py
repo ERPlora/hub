@@ -6,8 +6,10 @@ fix it by the merchant's country. A business without a country (a demo) is in eu
 """
 
 import datetime as dt
+from decimal import Decimal
 
 import pytest
+from django.utils import translation
 
 from base import business
 
@@ -62,3 +64,61 @@ def test_another_currency_is_named_in_the_person_s_language():
 def test_a_code_it_does_not_know_is_shown_as_it_is():
     assert (business.country_name("QQ", "es"), business.language_name("xx", "es")) == ("QQ", "xx")
     assert (business.country_name("", "es"), business.language_name("", "es")) == ("", "")
+
+
+#: What the browser writes for the same amount (``new Intl.NumberFormat(language, {style: "currency", currency})``, Node
+#: 26), copied as it prints: a currency written in letters is kept off the figure by a no-break space (U+00A0, CLDR's
+#: currency spacing), a sign of its own («€», «¥», «$») touches it. Babel's ``format_currency`` skips that spacing and
+#: glues «PLN15.50». In Spanish the thousands are grouped from four digits, as every screen of the Hub paints them
+#: (hub#1090), where Intl's default would not.
+AS_INTL = [
+    (1550, "PLN", "en", "PLN\xa015.50"),
+    (1550, "CHF", "en", "CHF\xa015.50"),
+    (1550, "EUR", "en", "€15.50"),
+    (1550, "EUR", "es", "15,50\xa0€"),
+    (1550, "PLN", "es", "15,50\xa0PLN"),
+    (1500, "JPY", "en", "¥1,500"),
+    (-1550, "PLN", "en", "-PLN\xa015.50"),
+    (123456, "PLN", "en", "PLN\xa01,234.56"),
+    (-123456, "CHF", "en", "-CHF\xa01,234.56"),
+    (-123456, "PLN", "es", "-1.234,56\xa0PLN"),
+    (-1550, "USD", "en", "-$15.50"),
+    (1550, "MXN", "en", "MX$15.50"),
+    # A locale whose code follows the figure with no space in its pattern (Khmer, Luba-Katanga): spaced too.
+    (1550, "PLN", "km", "15.50\xa0PLN"),
+    (1550, "PLN", "lu", "15,50\xa0PLN"),
+]
+
+
+@pytest.mark.parametrize(("cents", "currency", "language", "text"), AS_INTL)
+def test_an_amount_is_written_as_the_browser_writes_it(cents, currency, language, text):
+    # flow: money-text — the server and the app in the browser write the same amount the same way.
+    assert business.money_text(cents, currency, language=language) == text
+
+
+def test_an_amount_is_written_in_the_active_language_by_default():
+    with translation.override("en"):
+        assert business.money_text(1550, "PLN") == "PLN\xa015.50"
+    with translation.override("es"):
+        assert business.money_text(1550, "PLN") == "15,50\xa0PLN"
+
+
+def test_a_locale_that_already_spaces_the_code_is_not_spaced_twice():
+    assert business.money_text(1550, "CHF", language="de-ch") == "CHF\xa015.50"
+
+
+@pytest.mark.parametrize("language", ["es-es", "es_ES", "es"])
+def test_the_language_is_read_as_django_or_as_babel_writes_it(language):
+    assert business.money_text(1550, "PLN", language=language) == "15,50\xa0PLN"
+
+
+def test_an_amount_to_read_back_is_written_without_grouping():
+    assert business.money_text(123456, "PLN", language="en", grouped=False) == "PLN\xa01234.56"
+    assert business.money_text(123456, "EUR", language="es", grouped=False) == "1234,56\xa0€"
+
+
+def test_a_fraction_of_a_minor_unit_keeps_its_decimals():
+    # A unit price without VAT (0.8264 €) is not rounded to the cent; a whole number of cents keeps the currency's.
+    assert business.money_text(Decimal("82.64"), "EUR", language="es") == "0,8264\xa0€"
+    assert business.money_text(Decimal("82.64"), "PLN", language="en") == "PLN\xa00.8264"
+    assert business.money_text(Decimal("8200"), "EUR", language="en") == "€82.00"

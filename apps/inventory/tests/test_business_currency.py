@@ -58,7 +58,7 @@ def gambas(db):
 
 def test_a_business_in_poland_exports_its_prices_in_zlotys(gambas):
     business_in("PL")
-    assert exported("en") == ["PLN12.50", "PLN8.20"]
+    assert exported("en") == ["PLN\xa012.50", "PLN\xa08.20"]
     assert exported("es") == ["12,50\xa0PLN", "8,20\xa0PLN"]
 
 
@@ -69,7 +69,8 @@ def test_a_business_in_spain_still_exports_in_euros(gambas):
 
 def test_a_business_in_poland_imports_its_own_export_and_the_zloty_it_types():
     business_in("PL")
-    assert imported("PLN12.50", "12,50\xa0PLN", "12,50 zł", "zł 7", "3.40") == [1250, 1250, 1250, 700, 340]
+    # Its export (code off the figure), the glued one an older export wrote, and what a person types.
+    assert imported("PLN\xa012.50", "PLN12.50", "12,50\xa0PLN", "12,50 zł", "zł 7", "3.40") == [1250, 1250, 1250, 1250, 700, 340]
 
 
 def test_a_business_in_poland_does_not_take_a_euro_amount_for_a_zloty_one():
@@ -104,7 +105,7 @@ def test_the_label_takes_the_price_in_the_business_s_currency_with_its_decimals(
 #: ERPlora's own hub by its issuer's country: the price and cost its export writes and its import reads back (en,
 #: ungrouped), and the label's price with its decimals (the yen has none).
 ISSUER_COUNTRIES = {
-    "PL": (["PLN12.50", "PLN8.20"], (12.5, 2)),
+    "PL": (["PLN\xa012.50", "PLN\xa08.20"], (12.5, 2)),
     "JP": (["¥1250", "¥820"], (1250.0, 0)),
 }
 

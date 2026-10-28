@@ -78,7 +78,8 @@ class Cart(Audited):
     # The sum of the lines: their quantities, and their totals in the minor unit of ``currency``.
     total_items = models.DecimalField(_("items"), default=Decimal("0"), **QUANTITY)
     total_amount = models.BigIntegerField(_("total"), default=0)
-    currency = models.CharField(_("currency"), max_length=3, default="EUR")
+    # The business's when it was created (services.py), or the one the customer asked for: never a fixed euro.
+    currency = models.CharField(_("currency"), max_length=3)
     expires_at = models.DateTimeField(_("expires at"), null=True, blank=True)
     last_activity_at = models.DateTimeField(_("last activity"), null=True, blank=True)
     notes = models.TextField(_("notes"), blank=True)
@@ -169,7 +170,8 @@ class Order(Audited):
     )
     # The cart's total when the order was initiated, in the minor unit of ``currency``.
     total_amount = models.BigIntegerField(_("total"), default=0)
-    currency = models.CharField(_("currency"), max_length=3, default="EUR")
+    # Its cart's (services.py): an order is never in another currency than the cart it was made from.
+    currency = models.CharField(_("currency"), max_length=3)
     notes = models.TextField(_("notes"), blank=True)
     failure_reason = models.TextField(_("failure reason"), blank=True)
     placed_at = models.DateTimeField(_("placed at"), null=True, blank=True)

@@ -16,6 +16,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -185,6 +186,37 @@ export async function click(el: Element | null): Promise<void> {
   el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   await settle();
 }
+
+/** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another
+ *  (the Total filter is typed in the business's currency; flow cart-checkout-business-currency). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+/** A business in Poland: it sells in złoty. */
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
+/** A business in Japan: the yen has no minor units. */
+export const JAPANESE: Partial<Business> = {
+  country: 'JP',
+  country_name: 'Japan',
+  currency: 'JPY',
+  currency_label: 'JPY · Japanese Yen',
+  currency_decimals: 0,
+};
 
 /** A page of a list, as the server answers it. */
 export function page<T>(rows: T[], total = rows.length, limit = 50, offset = 0) {

@@ -4,14 +4,26 @@
 // newest first, 50 a page, list or cards. Each row offers the step it can take — «Mark paid» (Initiated),
 // «Complete» (Paid), «Fail» (Initiated or Paid, with its reason in a form) —, only to whoever may; a
 // failed order shows its reason. No «add»: orders are born from a cart (CART_CHECKOUT-F08). The total
-// paints in the order's own currency (the old screen used the business's), in minor units (the old #9).
+// paints in the order's own currency (the old screen used the business's), in minor units (the old #9), with the
+// decimals the server counts; the Total filter is typed in the business's currency, its country's (flow
+// cart-checkout-business-currency), never in euros by default.
 import { DataTable, type DataTableAction, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { OrderOut, OrderStatus } from '../operations';
-import { CART_KEEPER, EMPLOYEE, flush, type MountOptions, mountCartCheckout, page } from '../__tests__/mount-cart-checkout';
+import {
+  business,
+  CART_KEEPER,
+  EMPLOYEE,
+  flush,
+  JAPANESE,
+  type MountOptions,
+  mountCartCheckout,
+  page,
+  POLISH,
+} from '../__tests__/mount-cart-checkout';
 import FailOrderModal from '../components/FailOrderModal.vue';
 import OrdersPage from './OrdersPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -35,6 +47,7 @@ const order = (id: string, status: OrderStatus, over: Partial<OrderOut> = {}): O
   status,
   total_amount: 3150,
   currency: 'EUR',
+  currency_decimals: 2,
   notes: '',
   failure_reason: '',
   placed_at: '2026-10-14T10:00:00Z',
@@ -50,7 +63,7 @@ const order = (id: string, status: OrderStatus, over: Partial<OrderOut> = {}): O
 const INITIATED = order('1', 'initiated');
 const PAID = order('2', 'paid', { payment_method: '' });
 const FAILED = order('3', 'failed', { failure_reason: 'Card declined' });
-const COMPLETED = order('4', 'completed', { total_amount: 1999, currency: 'JPY' });
+const COMPLETED = order('4', 'completed', { total_amount: 1999, currency: 'JPY', currency_decimals: 0 });
 const ROWS = [INITIATED, PAID, FAILED, COMPLETED];
 const NUMBER_WIDTH = 'minmax(10.5rem, 1fr)';
 
@@ -116,7 +129,7 @@ describe('OrdersPage', () => {
     expect(s.cells(2)[2]).toContain('Reason: Card declined');
   });
 
-  it('filters on the server: fragments, the status by list, the total in euros', async () => {
+  it('filters on the server: fragments, the status by list, the total', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     const columns = s.prop<Array<{ key: string; filter?: { type: string; options?: Array<{ value: string }> } }>>('columns');
@@ -284,7 +297,7 @@ describe('OrdersPage: the column filters wait behind the funnel, as the old tabl
     );
   });
 
-  it('the panel filters on «Apply», by status and by the total in euros, and the funnel counts them', async () => {
+  it('the panel filters on «Apply», by status and by the total, and the funnel counts them', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     await openFunnel(s);
@@ -318,5 +331,53 @@ describe('OrdersPage: the column filters wait behind the funnel, as the old tabl
     await flush();
     await openFunnel(s);
     expect(field(s, 'total_amount_from').errorText).toBe('Escribe un importe, como 12,50');
+  });
+});
+
+describe('OrdersPage: the business’s currency (cart-checkout-business-currency)', () => {
+  const BUSINESS = 'base.business.get';
+  const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
+  type Setup = Awaited<ReturnType<typeof setup>>;
+  const totals = (s: Setup) => s.rows().map((_, i) => plain(s.cells(i)[4]));
+  const filter = async (s: Setup, filters: Record<string, string>) => {
+    s.table().vm.$emit('filtersChange', filters);
+    await flush();
+  };
+
+  it('a business in Poland sees each order in its own currency: a new one in złoty, an older one in euros', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.result(BUSINESS, business(POLISH));
+    await s.show(page([order('p1', 'initiated', { currency: 'PLN', total_amount: 4250 }), order('e1', 'paid')]));
+    expect(totals(s)).toEqual(['42,50 zł', '31,50 €']);
+  });
+
+  it('an order is painted with the decimals the server counts, never the browser’s: the forint has two', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show(page([order('h1', 'initiated', { currency: 'HUF', currency_decimals: 2, total_amount: 125000 })]));
+    expect(totals(s)).toEqual(['1.250,00 Ft']);
+  });
+
+  it('the Total filter is typed in the business’s currency: złoty with its symbol, yen without decimals', async () => {
+    const s = await setup();
+    await s.result(BUSINESS, business(POLISH));
+    await filter(s, { total_amount_from: '12,50 zł', total_amount_to: 'PLN 100' });
+    expect(s.list()).toEqual([{ total_amount_min: 1250, total_amount_max: 10000, sort: '-created_at', limit: 50, offset: 0 }]);
+
+    const yen = await setup();
+    await yen.result(BUSINESS, business(JAPANESE));
+    await filter(yen, { total_amount_from: '12', total_amount_to: '12,5' });
+    expect(yen.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
+    expect(yen.prop('filterErrors')).toEqual({ total_amount_to: 'Type an amount, like 12' });
+  });
+
+  it('an amount typed before the business answers is read again in its currency when it does, from the first page', async () => {
+    const s = await setup();
+    await s.show(page(ROWS, 200));
+    await filter(s, { total_amount_from: '12' });
+    s.table().vm.$emit('pageChange', 2);
+    await flush();
+    expect(s.list()).toEqual([{ total_amount_min: 1200, sort: '-created_at', limit: 50, offset: 100 }]);
+    await s.result(BUSINESS, business(JAPANESE));
+    expect(s.list()).toEqual([{ total_amount_min: 12, sort: '-created_at', limit: 50, offset: 0 }]);
   });
 });
