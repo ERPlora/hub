@@ -3,7 +3,8 @@
 // row «Nadie está imprimiendo «…»», old-hub:HUB_SHELL-F63; docs/reference/old-hub/dashboard-*.png), as the owner of hub
 // `a` reads them in Spanish: «Configura la impresora» pending and «Recomendado» in «Termina de configurar tu negocio»
 // while no device set up prints the receipts, its «Configurar» leading to Printing → Devices; a receipt queued on a
-// receipt printer no device reaches rings the bell without a reload, its row «Nadie está imprimiendo «Recibo» (N)»
+// receipt printer no device reaches rings the bell without a reload once it has waited a minute (`psql()` moves it
+// back; the bell reads the clock every 30 s, FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF), its row «Nadie está imprimiendo «Recibo» (N)»
 // leads to Printing → Printers, whose receipts' card says «Sin dispositivo» and where to set one up; the device set up
 // from it quiets the bell and the card and ticks the step, live; retired, the step is pending again. In each of the three sizes, leaving the capture `FIX-PRINTING-SETUP-HOOKS-<width>` with the bell
 // open. What it makes is «e2e Hooks …», deleted before and after; the devices set up before it are parked (retired)
@@ -125,9 +126,9 @@ async function unfolded(page: Page): Promise<void> {
   await expect(step(page)).toBeVisible();
 }
 
-async function badgeSays(page: Page, total: number): Promise<void> {
-  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total));
-  else await expect(bellBadge(page)).toHaveCount(0);
+async function badgeSays(page: Page, total: number, options = {}): Promise<void> {
+  if (total > 0) await expect(bellBadge(page)).toHaveText(String(total), options);
+  else await expect(bellBadge(page)).toHaveCount(0, options);
 }
 
 FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
@@ -167,7 +168,9 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
         printer,
       });
       expect(queued.status, JSON.stringify(queued.data)).toBe(201);
-      await badgeSays(page, before.total + 1);
+      // The bell counts what has waited a minute (the old hub's 60 s): the receipt waited 2 min.
+      psql(`update printing_printjob set created_at = now() - interval '2 minutes' where id = '${queued.data.job.id}'`);
+      await badgeSays(page, before.total + 1, { timeout: 45_000 });
       expect(streams.length, 'the queued receipt reached the bell without a new /api/live').toBe(onTheHome);
 
       // The capture: the Home with the bell open, the row naming the function as Printing does.
