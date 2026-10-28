@@ -98,6 +98,8 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        # The Home's step (FIX-SERVICE-SETUP-HOOKS).
+        *(text for step in config.setup for text in (step.title, step.description)),
     ]
     lazies += (
         lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
