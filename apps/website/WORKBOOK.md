@@ -130,7 +130,8 @@ si el sistema pide menos movimiento). La pestaña del navegador lleva el logotip
 el color principal. Se adapta a móvil, tableta y ordenador (Bootstrap 5.3) sin desplazamiento lateral, con la paleta
 elegida en claro o en oscuro; en automático, sigue el dispositivo del visitante y cambia si este cambia con la página
 abierta (sin JavaScript, se ve en claro). El catálogo se pinta con lo publicado y, al abrir la página, se refresca con
-los productos o servicios de ese momento y sus precios en el idioma del visitante. El resto de textos de la página
+los productos o servicios de ese momento y sus precios en el idioma del visitante y en la moneda del negocio (la de su
+país). El resto de textos de la página
 (Entrar, los días, los encabezados por defecto) sale en el idioma del navegador (inglés o español); lo que escribe el
 propietario, tal cual.
 
@@ -255,9 +256,11 @@ Pasos:
    precios**. Se guarda como en WEBSITE-F01.
 Entra: la fuente, las categorías elegidas y si se ven los precios.
 Sale: en la vista previa y, al publicar, en la página: el catálogo agrupado por categoría en su orden (lo que no tiene
-categoría, al final), hasta 200 elementos, con píldoras para saltar de categoría si hay dos o más. Precios: «15,00 €»,
-«Desde 40,00 €», «20,00 € / hora» o «Gratis»; un precio variable no se muestra. Al publicar se guarda una copia, y la
-página la refresca al abrirse con los productos o servicios de ese momento. Aviso `website.site.updated`.
+categoría, al final), hasta 200 elementos, con píldoras para saltar de categoría si hay dos o más. Precios, en la
+moneda del negocio (la de su país) con sus decimales; en un negocio de España: «15,00 €», «Desde 40,00 €», «20,00 € /
+hora» o «Gratis»; un precio variable no se muestra. Al publicar se guarda una copia, y la página la refresca al abrirse
+con los productos o servicios de ese momento; si el país del negocio cambia, la página y la vista previa salen ya en la
+nueva moneda, sin volver a publicar. Aviso `website.site.updated`.
 Si falla: sin Inventario ni Servicios activos, la nota «Activa Inventario o Servicios para mostrar aquí tus productos
 o servicios.»; si la fuente guardada es de una app que se ha apagado, «Inventario no está activa en este negocio: tu
 página no muestra el catálogo hasta que la actives o elijas otra fuente.» (o Servicios) y la página no lleva catálogo,
@@ -407,7 +410,7 @@ las mismas reglas y los mismos permisos.
 | Las categorías de Inventario o de Servicios para elegir | gestionar | F05 | `website.catalog.categories` |
 | El QR de la dirección pública, en PNG o SVG | ver | F09 | `website.qr.get` |
 | Lo publicado, sin las secciones ocultas (sin sesión) | cualquiera | F10 | `website.public.site` |
-| El catálogo publicado, leído en ese momento y con los precios en el idioma de quien pregunta (sin sesión) | cualquiera | F05, F10 | `website.public.catalog` |
+| El catálogo publicado, leído en ese momento y con los precios en el idioma de quien pregunta y en la moneda del negocio (sin sesión) | cualquiera | F05, F10 | `website.public.catalog` |
 | Las reseñas de Google guardadas del sitio publicado, con sus textos en el idioma de quien pregunta (sin sesión; nunca pregunta a Google) | cualquiera | F10, F12 | `website.public.reviews` |
 
 Las tres públicas responden solo con la página en línea (si no, 404 `website.not_published`) y cuentan a cada
@@ -504,11 +507,15 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   imágenes). Los enlaces solo `https://`.
 - **Render y caché**: `public_home.respond` pinta la plantilla con lo publicado, en el idioma de `Accept-Language`
   (nunca una cookie), y guarda el HTML una hora en
-  `website:home:<slug>:<versión>:<idioma>:<día>:<APP_VERSION>` (el día es el del negocio, `render.local_day` con la
-  zona horaria del hub o `Europe/Madrid` si no tiene: el horario resalta hoy, así que cada día tiene su página; la
-  vista previa usa el mismo día, `queries.business_day`): publicar cambia la versión y un despliegue cambia los
-  ficheros del paquete, así que nunca se sirve una página rancia; tras el COMMIT de publicar o desconectar se borran
-  las entradas de la versión anterior. `Cache-Control: public, max-age=60`, sin cookies, y `Vary: Accept-Language,
+  `website:home:<slug>:<versión>:<idioma>:<día>:<moneda>:<APP_VERSION>` (la moneda es la del negocio,
+  `base.operations.business_currency`, que también pone precio a la vista previa y al catálogo público, guardado un
+  minuto en `website:catalog:<slug>:<versión>:<idioma>:<moneda>`; la copia publicada guarda el precio sin formato, en la
+  unidad menor de la moneda, y `render.price_label` lo divide entre `10 ** decimales` de esa moneda: si el país del
+  negocio cambia, la clave cambia y la página se repinta en la nueva sin volver a publicar; el día es el del negocio,
+  `render.local_day` con la zona horaria del hub o `Europe/Madrid` si no tiene: el horario resalta hoy, así que cada
+  día tiene su página; la vista previa usa el mismo día, `queries.business_day`): publicar cambia la versión y un
+  despliegue cambia los ficheros del paquete, así que nunca se sirve una página rancia; tras el COMMIT de publicar o
+  desconectar se borran las entradas de la versión anterior en la moneda del negocio. `Cache-Control: public, max-age=60`, sin cookies, y `Vary: Accept-Language,
   Cookie`: «Entrar» vuelve a `/` con sesión, y el navegador no puede servirle la página que guardó para el visitante
   (con sesión, `/` es la SPA).
 - **Límite por visitante**: 60 lecturas públicas por minuto por hub y dirección (`base.throttle`). La dirección es la

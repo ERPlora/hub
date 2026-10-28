@@ -22,13 +22,13 @@ producto actual no tenía página por negocio.
   almacén del hub; galería de hasta 12 fotos en su orden; enlace de Google Maps o Place ID para las reseñas; vista
   previa pintada por el mismo código que la página pública.
 - **El catálogo** (F05): los productos a la venta de Inventario o los servicios ofrecidos de Servicios, por categoría y
-  con su precio, solo si esa app está activa en el hub (si no, vacío y el editor lo dice, nunca un error); copia al
-  publicar y refresco al abrir la página.
+  con su precio en la moneda del negocio (la de su país, con sus decimales), solo si esa app está activa en el hub (si
+  no, vacío y el editor lo dice, nunca un error); copia al publicar y refresco al abrir la página.
 - **Publicar y desconectar** (F07, F08): publicar copia el borrador y sube la versión; desconectar devuelve la
   dirección al acceso del equipo sin perder nada.
 - **Compartir** (F09): la dirección, **Copiar enlace** y el QR en PNG y SVG.
 - **La página pública** (F10): plantilla de Django con Bootstrap 5.3, en el idioma del navegador, sin cookies, con su
-  propia CSP sin nonce, caché de una hora en el servidor por versión, idioma y día y un minuto en el navegador; sus tres
+  propia CSP sin nonce, caché de una hora en el servidor por versión, idioma, día y moneda y un minuto en el navegador; sus tres
   lecturas públicas (`website.public.*`) admiten 60 por minuto por hub y visitante; las reseñas de Google las pide el
   servidor (Places API (New)), nunca el navegador.
 
@@ -39,7 +39,7 @@ producto actual no tenía página por negocio.
 | `LiveAppConfig` | `kind = "app"`, icono `ion:globe-outline`, categoría `organization`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` (entra en sus plantillas) |
 | `requires` | `[]` |
-| Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.relay.active_apps`). De la plataforma: `base.operations.hub_id`, `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
+| Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.relay.active_apps`). De la plataforma: `base.operations.hub_id`, `base.operations.business_currency` y `base.business.currency_decimals` (la moneda de los precios y sus decimales), `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
 | La usa | `base.public_home`: la entrada `/` del host del hub carga `apps/website/public_home.py` (`is_published`, `respond`) por `import_module`; ninguna app de negocio la lee |
 | Pantallas | `/website` (editor, vista previa y «Compartir y QR») y la página pública en `/` |
 | Operaciones | 7 consultas (`queries.py`) y 4 acciones (`services.py`), todas con su ruta en `/api/website/…` (11; las 3 `website.public.*` sin sesión) y `expose_api`; 5 con `ai=` (las que usa el asistente) |
