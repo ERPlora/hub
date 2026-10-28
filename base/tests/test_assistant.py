@@ -340,7 +340,8 @@ def settle_preview(ctx, data):
     return {"name": f"Item {data.id}", "total_cents": 4200, "expected_balance": None, "asked_by": ctx.actor, "note": ""}
 
 
-PREVIEW_FIELDS = ["name", "total_cents", "expected_balance", "asked_by", "note"]
+# Not the order of the read's answer: the card follows the order the app names them in.
+PREVIEW_FIELDS = ["asked_by", "name", "total_cents", "expected_balance", "note"]
 SETTLE_PREVIEW = Operation(
     name="demo.item.settle_preview",
     kind="query",
@@ -385,8 +386,8 @@ def test_a_dangerous_write_shows_what_its_app_says_it_will_do_read_as_the_person
     the read hides from this person (none, as a blind count's expected cash) or leaves empty is not there."""
     failure, fields = assistant.preview(ctx(language="es"), settle, {"id": "7", "reason": "cierre"})
     assert failure is None
-    assert shown(fields) == [("name", "text", "Item 7"), ("total_cents", "money", 4200), ("asked_by", "text", "ana")]
-    assert (fields[0]["label"], fields[2]["label"]) == ("Propietario", "Persona")
+    assert shown(fields) == [("asked_by", "text", "ana"), ("name", "text", "Item 7"), ("total_cents", "money", 4200)]
+    assert (fields[0]["label"], fields[1]["label"]) == ("Persona", "Propietario")
     _, english = assistant.preview(ctx(language="en", actor="eva"), settle, {"id": "7"})
     assert [(field["label"], field["value"]) for field in english if field["name"] == "asked_by"] == [("Person", "eva")]
 

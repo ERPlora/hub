@@ -163,9 +163,9 @@ def test_a_dangerous_card_carries_what_its_app_says_it_will_do_read_as_the_perso
     card = plan["confirm"]
     assert (card["operation"], card["confirm_word"], card["money"]) == ("demo.item.settle", "CONFIRMAR", {"currency": "EUR", "decimals": 2})
     assert [(field["name"], field["kind"], field["value"]) for field in card["preview"]] == [
+        ("asked_by", "text", "ana"),
         ("name", "text", "Item 7"),
         ("total_cents", "money", 4200),
-        ("asked_by", "text", "ana"),
     ]
     assert (plan["executed"], plan["append"]) == ([], [])
 
