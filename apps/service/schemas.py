@@ -16,6 +16,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -50,6 +51,8 @@ ADJUST_EMPTY = _("Add or remove at least one session, or add at least one day.")
 GRANTED_IN_THE_FUTURE = _("A voucher cannot be bought in the future.")
 SAY_WHOSE_VOUCHERS = _("Say whose vouchers: the customer's id, name or phone.")
 MOMENT_WITHOUT_ZONE = _("Give the moment with its time zone.")
+#: How the Services screens name the data the models do not (the assistant's card names each datum by its title).
+TAX_CATEGORY = gettext_noop("Tax category")
 #: How far ahead of this server's clock a purchase may be dated (the till's clock may run fast).
 CLOCK_SKEW = timedelta(minutes=5)
 
@@ -266,6 +269,7 @@ class ServiceIn(In):
     )
     tax_category_key: Code | None = Field(
         None,
+        title=TAX_CATEGORY,
         description="Key of the tax category (Taxes app) the service is charged with; without it, the settings' "
         "default tax category. Without either, the service is created but cannot be charged.",
     )
@@ -331,7 +335,7 @@ class ServicePatchIn(ServiceRefIn):
 
     name: Name | None = Field(None, description="New name.")
     tax_category_key: Code | None = Field(
-        None, description="Key of the new tax category; it cannot be emptied."
+        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied."
     )
     pricing_type: PricingType | None = Field(None, description="New pricing.")
     price: Cents | None = Field(None, description="New price in cents (minor units of the business's currency).")
@@ -540,6 +544,7 @@ class SettingsIn(In):
     )
     default_tax_category_key: Code | None = Field(
         None,
+        title=gettext_noop("Default tax category"),
         description="Key of the tax category a new service takes; null or empty removes it.",
     )
     show_prices: bool | None = Field(
@@ -751,6 +756,7 @@ class PackageIn(In):
     items: list[PackageLineIn] = Field(
         min_length=1,
         max_length=MAX_LINES,
+        title=gettext_noop("Services included"),
         description="Its lines: the services it covers, each once.",
     )
 
@@ -1042,7 +1048,9 @@ class ReassignIn(In):
     """The payload of ``customer.customer.merged``."""
 
     id: UUID = Field(description="The customer's card that stays.")
-    absorbed_id: UUID = Field(description="The card merged into it.")
+    absorbed_id: UUID = Field(
+        title=gettext_noop("Duplicate customer"), description="The card merged into it."
+    )
 
 
 class ReassignedOut(Schema):
@@ -1176,7 +1184,8 @@ class ReturnIn(In):
         description="The sessions spent in the sale that come back.",
     )
     reference: UUID = Field(
-        description="The refund, or the sale voided, that gives them back (Sales)."
+        title=gettext_noop("Refund or void"),
+        description="The refund, or the sale voided, that gives them back (Sales).",
     )
     reason: Note = Field("", description="Why, as the refund or the void says it.")
 
