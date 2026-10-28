@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2395aace94513f447da014d5af558ecc1e6b4674263f0ea9826b39789f8ea1ef -->
+<!-- generated from WORKBOOK.md sha256:9db2f3f12c779dcf6e0fd3c2cbe759faa45700749e6d8cec0c62fec80c00562b -->
 
 ## What it is for and who it is for
 
@@ -35,8 +35,8 @@ the current product.
 
 1. Cart & Checkout does not come turned on with any type of business: it is turned on from the app store.
    It turns on no other app and needs none: it can be turned on and off on its own.
-2. It has no settings. The currency of a new cart is the business's (euros while the Hub keeps no
-   other), unless whoever creates it through the assistant or the API says another one.
+2. It has no settings. The currency of a new cart is the business's, its country's (the one
+   **Settings › Business** shows), unless whoever creates it through the assistant or the API says another one.
 3. A cart may carry an expiry date; without one it never expires.
 
 ## Screens
@@ -52,11 +52,16 @@ Expired), **Items** and **Total**. A search box "Search session or email…" (it
 code, the email and the name), filters per column behind the funnel of the bar, which opens "Filters" —
 session and email by a piece of the text, the status from a list, the items and the total "from / to" —,
 sorting per column, a list or card view and 50 rows
-per page. It is sorted by creation date, the most recent on top. The total shows in the cart's currency;
-the Total filter is typed in the business's currency (in euros: "12" is €12.00) and compares the amount
-as it is, without converting currencies. It can be pasted with its thousands separators ("1,250.50")
-or with the symbol ("€12.50"); an amount that cannot be read ("1,250", which may be €1,250 or €1.25) is
-warned under its box, "Type an amount, like 12.50", and does not filter.
+per page. It is sorted by creation date, the most recent on top. The total shows in the cart's currency
+(one created in euros stays in euros even if the business changes country); the Total filter is typed in
+the business's currency ("12" is zł 12.00 in a business in Poland and ¥12 in one in Japan, where there are
+no cents) and compares the amount as it is, without converting currencies. It can be pasted with its
+thousands separators ("1,250.50") or with that currency's symbol or code ("zł 12.50", "PLN 12.50"); an
+amount that cannot be read ("1,250", which may be one thousand two hundred and fifty or one and a quarter,
+or one with another currency's symbol) is warned under its box, "Type an amount, like 12.50" (with the
+decimals of the business's currency: "like 12" in yen), and does not filter. While the business has not
+answered, an amount is read with two decimals and, when it answers, the filter is read again in its
+currency from the first page.
 
 The **New cart** button opens the "New cart" form: **Session** (required; "Save" is not enabled
 without it), **Email** and **Name**. Each row offers **Abandon** (only an active cart) and
@@ -86,8 +91,8 @@ born from the flow CART_CHECKOUT-F08.
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they get there another way, "You do not have permission". |
 
-Amounts in the format of the language of whoever looks and in the currency of each row; quantities
-without decorative zeros ("2", "0.5").
+Amounts in the format of the language of whoever looks and in the currency of each row, with that
+currency's decimals (the yen has no cents); quantities without decorative zeros ("2", "0.5").
 
 ## Flows
 
@@ -145,7 +150,8 @@ If it fails: a cart that does not exist ("That cart does not exist in this busin
 what was said (it names them and asks which one); a cart that is not active, also an overdue one ("This
 cart no longer takes changes: it is Abandoned."); an empty reference or name, a quantity of zero, negative or over
 1 000 000, a negative price: each one in its field; a total of the line, or of the cart with it, above
-what fits in a cart (€99,999,999,999.99), under the quantity. Nothing is saved.
+what fits in a cart (almost one hundred billion in a currency with cents), under the quantity.
+Nothing is saved.
 Involved: none
 
 ### CART_CHECKOUT-F03 Change the quantity of a line or remove it
@@ -306,8 +312,8 @@ Steps:
    the assistant or the API: a cart by its session or by its customer's email or name, an order
    by its number.
 In: the "view carts" permission (the employee has it).
-Out: lists of 50 rows (up to 100 per request). Quantities with their decimals, amounts in cents
-with the row's currency.
+Out: lists of 50 rows (up to 100 per request). Quantities with their decimals, amounts in the minor
+unit of the row's currency (cents; the yen has none) with the currency and its decimals.
 If it fails: a loading error with "Retry"; without permission, "You do not have permission"; a Total amount that
 cannot be read, "Type an amount, like 12.50" under its box, without filtering.
 Involved: none

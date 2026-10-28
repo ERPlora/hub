@@ -1,7 +1,7 @@
 """Input and output schemas of the cart_checkout app's operations (OpenAPI, live params, 422 per field).
 
 They are also the JSON Schema of the assistant's tools, so every field says what it is. Money travels in
-whole minor units of the cart's currency (cents in euros) and quantities as decimals with up to three
+whole minor units of the cart's currency (as many decimals as it has: 1250 is 12.50 zł, ¥1,250) and quantities as decimals with up to three
 places. A cart is named by its id or, as a person says it (assistant, voice), by its session code or its
 customer's email or name; an order by its id or its number (``OS-20261014-0003``); a line by its id.
 Every input refuses a field it does not declare.
@@ -31,7 +31,7 @@ from apps.cart_checkout.models import (
 
 T = TypeVar("T")
 
-#: Ninety-nine billion euros in cents: far above any cart, inside a bigint.
+#: Ninety-nine billion units of a currency with two decimals: far above any cart, inside a bigint.
 MAX_AMOUNT = 9_999_999_999_999
 #: The most units one line may carry: a million, far above any cart, so a sum never leaves a bigint.
 MAX_QUANTITY = 1_000_000
@@ -225,8 +225,8 @@ class CartListIn(PageIn):
     notes: str | None = Field(None, max_length=200, description="Part of the notes.")
     total_items_min: Decimal | None = Field(None, ge=0, description="Fewest items (sum of the quantities).")
     total_items_max: Decimal | None = Field(None, ge=0, description="Most items (sum of the quantities).")
-    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units (cents in euros).")
-    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units (cents in euros).")
+    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
+    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
     expires_from: dt.datetime | None = Field(None, description="Expiring at this moment or later.")
     expires_to: dt.datetime | None = Field(None, description="Expiring at this moment or earlier.")
     last_activity_from: dt.datetime | None = Field(None, description="Last changed at this moment or later.")
@@ -299,7 +299,8 @@ class ItemAddIn(CartRefIn):
         description="How many units, above 0 and at most 1 000 000, up to three decimals (0.5 is half a unit)."
     )
     unit_price: Money = Field(
-        description="The price of one unit in minor units of the cart's currency (12,50 € = 1250), never "
+        description="The price of one unit in minor units of the cart's currency (as many as its currency_decimals: "
+        "12.50 is 1250 with two, ¥1,250 is 1250), never "
         "negative; the caller says it."
     )
     variant_attributes: FreeFields = Field(
@@ -414,8 +415,8 @@ class OrderListIn(PageIn):
     )
     currency: str | None = Field(None, max_length=3, description="Only this currency (ISO 4217, e.g. EUR).")
     notes: str | None = Field(None, max_length=200, description="Part of the notes.")
-    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units (cents in euros).")
-    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units (cents in euros).")
+    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
+    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
     placed_from: dt.datetime | None = Field(None, description="Initiated at this moment or later.")
     placed_to: dt.datetime | None = Field(None, description="Initiated at this moment or earlier.")
     paid_from: dt.datetime | None = Field(None, description="Marked as paid at this moment or later.")
