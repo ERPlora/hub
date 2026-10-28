@@ -14,6 +14,7 @@ from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     BeforeValidator,
@@ -40,6 +41,10 @@ CEILING_BELOW_FLOOR = _(
     "The maximum (%(max)s) is below the minimum (%(min)s): nobody could ever satisfy this course."
 )
 REPEATED_ID = _("Each one goes once in the list.")
+
+# How the Menus screens name the data the models do not (the assistant's card names each datum by its title).
+VAT_CATEGORY = gettext_noop("VAT category")
+NEW_PRODUCT = gettext_noop("New product")
 
 #: Ninety-nine billion euros in cents: far above any price, inside a bigint (Inventory's bound).
 MAX_CENTS = 9_999_999_999_999
@@ -250,7 +255,9 @@ class ComboIn(In):
     )
     price: Cents = Field(0, description=D_PRICE)
     supply_kind: SupplyKind = Field("service", description=D_SUPPLY)
-    tax_category_key: TaxKey | None = Field(None, description=D_TAX)
+    tax_category_key: TaxKey | None = Field(
+        None, title=VAT_CATEGORY, description=D_TAX
+    )
     sort_order: Order = Field(
         0, description="Position on the list of menus and on the till."
     )
@@ -269,7 +276,9 @@ class ComboPatchIn(ComboRefIn):
     price: Cents | None = Field(None, description="New closed price, in cents.")
     supply_kind: SupplyKind | None = Field(None, description=D_SUPPLY)
     tax_category_key: TaxKey | None = Field(
-        None, description=D_TAX + " Empty clears it (only to take away)."
+        None,
+        title=VAT_CATEGORY,
+        description=D_TAX + " Empty clears it (only to take away).",
     )
     sort_order: Order | None = Field(None, description="New position on the list.")
     is_active: bool | None = Field(
@@ -315,7 +324,8 @@ class GroupPatchIn(GroupRefIn):
 
 class GroupReorderIn(ComboRefIn):
     group_ids: GroupIds = Field(
-        description="Every course of the menu, by id, in the new order."
+        title=gettext_noop("Courses"),
+        description="Every course of the menu, by id, in the new order.",
     )
 
 
@@ -339,7 +349,8 @@ class OptionIn(_GroupOfIn):
 
 class OptionBulkIn(_GroupOfIn):
     product_ids: OptionIds = Field(
-        description="The products to add, by id, in the order they go in (no supplement)."
+        title=gettext_noop("Products"),
+        description="The products to add, by id, in the order they go in (no supplement).",
     )
 
     @model_validator(mode="after")
@@ -352,10 +363,14 @@ class OptionPatchIn(OptionRefIn):
     """Only the fields sent change; the choice keeps its position."""
 
     new_product_id: UUID | None = Field(
-        None, description="Id of the product that replaces the current one."
+        None,
+        title=NEW_PRODUCT,
+        description="Id of the product that replaces the current one.",
     )
     new_product: Reference | None = Field(
-        None, description="SKU or name of the product that replaces the current one."
+        None,
+        title=NEW_PRODUCT,
+        description="SKU or name of the product that replaces the current one.",
     )
     price_delta: Delta | None = Field(None, description=D_DELTA)
     is_available: bool | None = Field(
@@ -365,7 +380,8 @@ class OptionPatchIn(OptionRefIn):
 
 class OptionReorderIn(_GroupOfIn):
     option_ids: OptionIds = Field(
-        description="Every choice of the course, by id, in the new order."
+        title=gettext_noop("Choices"),
+        description="Every choice of the course, by id, in the new order.",
     )
 
     @model_validator(mode="after")
@@ -378,7 +394,7 @@ class DropProductIn(Schema):
     """The payload of Inventory's ``inventory.product.deleted`` (the rest of it is ignored)."""
 
     id: UUID = Field(description="The product deleted from the catalogue.")
-    sku: str = Field("", description="Its SKU, as it was.")
+    sku: str = Field("", title=gettext_noop("SKU"), description="Its SKU, as it was.")
     name: str = Field("", description="Its name, as it was.")
 
 
