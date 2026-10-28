@@ -144,12 +144,13 @@ function numberFormat(locale: string, format: string, money?: Money): Intl.Numbe
   return found;
 }
 
-/** A value of a panel as text: money in cents (the server's) in the business's currency (`money`; without it, the
- *  amount alone), a percentage as 0–100, else the number. */
+/** A value of a panel as text: money in the minor unit of its currency (the server's: 1250 is 12.50 €, ¥1,250 has no
+ *  cents) in the business's currency (`money`; without it, the amount alone, in cents), a percentage as 0–100, else
+ *  the number. */
 export function formatValue(value: unknown, format: unknown, locale: string, money?: Money): string {
   const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
   if (Number.isNaN(number)) return String(value);
-  if (format === 'currency') return numberFormat(locale, 'currency', money).format(number / 100);
+  if (format === 'currency') return numberFormat(locale, 'currency', money).format(number / 10 ** (money?.decimals ?? 2));
   if (format === 'percent') return numberFormat(locale, 'percent').format(number / 100);
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);
 }

@@ -80,6 +80,14 @@ describe('each datum', () => {
     expect(fieldText(card().fields[1], { ...opts, money: PLN })).toBe('15,00 zł');
   });
 
+  it('an amount is in the minor unit of its currency: a yen invoice’s total is not a hundred times less', () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: Invoicing answers ¥12,100 as 12100.
+    const JPY = { currency: 'JPY', decimals: 0 };
+    const total = { name: 'total_amount', label: 'Total', kind: 'money' as const, value: -12100, money: JPY };
+    expect(fieldText(total, { ...opts, locale: 'en' })).toBe('-¥12,100');
+    expect(fieldText(card().fields[1], { locale: 'en', money: JPY, t })).toBe('¥1,500');
+  });
+
   it('what is not marked as money stays a number', () => {
     expect(fieldText({ name: 'duration', label: 'Duration', kind: 'text', value: 1500 }, opts)).toBe('1500');
   });

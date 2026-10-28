@@ -162,15 +162,19 @@ const PLN = { currency: 'PLN', decimals: 2 };
 // its decimals and the symbol a till of that country prints — a Polish business reads «zł», a Spanish one «€» —,
 // never a fixed euro; until the business is known, the amount without a symbol, never another currency's.
 describe('formatValue: the business currency (BASE-G98)', () => {
-  it("writes an amount (the server's cents) in the business's currency, by its local symbol", () => {
+  it("writes an amount (the server's minor unit of the currency) in the business's currency, by its local symbol", () => {
     expect(formatValue(1250, 'currency', 'es', EUR)).toBe('12,50\u00a0€');
     expect(formatValue(1250, 'currency', 'es', PLN)).toBe('12,50\u00a0zł');
     expect(formatValue(1250, 'currency', 'en', PLN)).toBe('zł\u00a012.50');
   });
 
-  it('with as many decimals as the currency has', () => {
-    expect(formatValue(123400, 'currency', 'en', { currency: 'JPY', decimals: 0 })).toBe('¥1,234');
-    expect(formatValue(123456, 'currency', 'en', { currency: 'KWD', decimals: 3 })).toBe('KWD\u00a01,234.560');
+  it('with as many decimals as the currency has, the amount being in its minor unit', () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: every amount the server sends is in the minor
+    // unit of its currency (`currency_decimals`: 0 in JPY, 3 in KWD), as Sales, Cash register and Inventory paint the
+    // same figures; this test said «¥1,234» for ¥123,400, a hundred times less, by dividing every currency by 100.
+    expect(formatValue(123400, 'currency', 'en', { currency: 'JPY', decimals: 0 })).toBe('¥123,400');
+    expect(formatValue(123456, 'currency', 'en', { currency: 'KWD', decimals: 3 })).toBe('KWD\u00a0123.456');
+    expect(formatValue(123456, 'currency', 'en', EUR)).toBe('€1,234.56');
   });
 
   it('without the business yet, the amount alone, never in a currency it is not', () => {
