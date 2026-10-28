@@ -450,7 +450,10 @@ test('WEBSITE-F07: «Publish» asks first, saves what is unsaved and puts the pa
   await openSection(page, 'hero');
   await field(page, 'website-field-hero-tagline').fill('Open every day');
   await page.getByTestId('website-publish').click();
-  await expect(page.locator('ion-modal.ep-form-modal')).toContainText(`Whoever opens ${PUBLIC_URL} will see this version`);
+  // The shell keeps its own dialogs (the assistant's, «Report a problem») mounted and hidden: this one by its title.
+  await expect(page.locator('ion-modal.ep-form-modal').filter({ hasText: 'Publish your website?' })).toContainText(
+    `Whoever opens ${PUBLIC_URL} will see this version`,
+  );
   await confirmDialog(page, 'Publish your website?');
   await expect(page.getByTestId('website-status-live')).toHaveText(`Your website is online at ${PUBLIC_URL}`, { timeout: 15_000 });
   await expect(page.getByTestId('website-status-changes')).toHaveCount(0);
@@ -486,7 +489,9 @@ test('WEBSITE-F08: «Take offline» asks first, and the address goes back to the
   await expect(page.getByTestId('website-status-live')).toBeVisible({ timeout: 15_000 });
   const version = (await getSite()).published_version;
   await page.getByTestId('website-unpublish').click();
-  await expect(page.locator('ion-modal.ep-form-modal')).toContainText(`${PUBLIC_URL} will go back to your team's sign-in page`);
+  await expect(page.locator('ion-modal.ep-form-modal').filter({ hasText: 'Take your website offline?' })).toContainText(
+    `${PUBLIC_URL} will go back to your team's sign-in page`,
+  );
   await confirmDialog(page, 'Take your website offline?');
   await expect(page.getByTestId('website-status-offline')).toHaveText('Your website is offline. Publish it to put it back online.', {
     timeout: 15_000,
