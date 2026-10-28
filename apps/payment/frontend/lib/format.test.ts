@@ -16,7 +16,7 @@ describe('formatMoney', () => {
     expect(nbsp(formatMoney(25000, 'es', EUR))).toBe('250,00 €');
     expect(formatMoney(25000, 'en', EUR)).toBe('€250.00');
     expect(nbsp(formatMoney(1250, 'es', { currency: 'PLN', decimals: 2 }))).toBe('12,50 zł');
-    expect(formatMoney(1250, 'en', { currency: 'PLN', decimals: 2 })).toBe('zł 12.50');
+    expect(nbsp(formatMoney(1250, 'en', { currency: 'PLN', decimals: 2 }))).toBe('zł 12.50');
   });
 
   it('while the money is unknown, a figure without a symbol: never the euro by default', () => {

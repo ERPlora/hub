@@ -44,10 +44,10 @@ def test_methods_read_by_name():
     assert [m.name for m in PaymentMethod.objects.all()] == ["Alpha", "Zeta"]
 
 
-def test_a_payment_is_a_draft_in_euros_by_default():
+def test_a_payment_is_a_draft_by_default():
+    # Its currency has no default (test_business_currency.py): who records it says it.
     payment = make_payment()
     assert payment.status == Payment.Status.DRAFT
-    assert payment.currency == "EUR"
     assert payment.beneficiary_iban == ""
     assert payment.concept == ""
     assert payment.supplier_invoice_ref == ""

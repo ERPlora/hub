@@ -209,7 +209,7 @@ describe('PaymentsPage', () => {
     const s = await setup({ business: business(POLISH) });
     await s.show(page([payment('6', 'draft', { amount: 125050, currency: 'HUF', currency_decimals: 2 }), payment('7', 'draft', { amount: 1250, currency: 'PLN' })]));
     expect(s.cells(0)[3].replace(/[\u00a0\u202f]/g, ' ')).toBe('Ft 1,250.50');
-    expect(s.cells(1)[3]).toBe('zł 12.50');
+    expect(s.cells(1)[3].replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 12.50');
   });
 
   it('the amount filter reads in the business’s currency: «12,50 zł» in Poland, «1.500» yen in Japan; a euro in Poland is left out', async () => {

@@ -88,6 +88,7 @@ def make_payment(
     amount: int = 12_50,
     beneficiary_name: str = "Proveedor Norte SL",
     payment_date: dt.date = dt.date(2026, 10, 14),
+    currency: str = "EUR",
     **fields,
 ):
     from apps.payment.models import Payment
@@ -98,5 +99,6 @@ def make_payment(
         amount=amount,
         beneficiary_name=beneficiary_name,
         payment_date=payment_date,
+        currency=currency,
         **fields,
     )
