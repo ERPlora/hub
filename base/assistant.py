@@ -43,6 +43,7 @@ from live.operations import Operation, registry
 
 from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
+from base.business import currency_decimals
 from base.operations import HostScopeResolver
 
 #: The tools a turn offers at most: the gateway takes 256, the model chooses better among a few.
@@ -272,7 +273,9 @@ def _label(op: Operation, name: str, title: str | None) -> str:
     return gettext(title or _generated_title(name))
 
 
-def _field(name: str, label: str, prop: dict, value: Any) -> dict:
+def _field(name: str, label: str, prop: dict, value: Any, money: dict | None = None) -> dict:
+    """One datum of a card; an amount carries ``signed`` when its schema declares it so and ``money`` when it is in a
+    currency of its own (a preview's, as its read answers it): without it, the card paints it in the business's."""
     if value is None or value == "" or value == []:
         kind = "empty"
     elif isinstance(value, bool):
@@ -286,7 +289,11 @@ def _field(name: str, label: str, prop: dict, value: Any) -> dict:
     else:
         kind = "text"
     field = {"name": name, "label": label, "kind": kind, "value": value}
-    return {**field, "signed": True} if kind == "money" and _is_signed(prop) else field
+    if kind == "money" and _is_signed(prop):
+        field["signed"] = True
+    if kind == "money" and money is not None:
+        field["money"] = money
+    return field
 
 
 def card(op: Operation, arguments: dict, language: str) -> dict:
@@ -455,14 +462,26 @@ def _output_schema(op: Operation) -> dict:
     return op.output.model_json_schema()
 
 
+def _answer_money(answer: dict) -> dict | None:
+    """The currency a read answers its amounts in (``currency``, with its ``currency_decimals`` or else that currency's
+    own: an invoice's, which keeps the one it was issued in), or ``None``: then the card paints them in the business's."""
+    currency = answer.get("currency")
+    if not isinstance(currency, str) or not currency:
+        return None
+    decimals = answer.get("currency_decimals")
+    if not isinstance(decimals, int) or isinstance(decimals, bool):
+        decimals = currency_decimals(currency)
+    return {"currency": currency, "decimals": decimals}
+
+
 def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
     """What the dangerous write ``op`` will do with ``arguments``, as its app says it: the read its ``ai=`` names
     (``"preview": {"operation": <a query of its app>, "fields": [<data of its answer>]}``), run as ``ctx``'s person
     — their permissions, their business — with the data of the write its input takes. The card's data, by their names
     in the person's language and an amount in cents as money (``signed`` when its schema declares it so, as a
-    difference), in the order the app names them; what the read leaves empty or hides from this person (none: a blind
-    count's expected cash) is not there. ``(None, None)`` without a preview; ``(outcome, None)`` when it cannot be read:
-    the write is not confirmed blind."""
+    difference; in the currency the read answers, ``_answer_money``, when it answers one), in the order the app names
+    them; what the read leaves empty or hides from this person (none: a blind count's expected cash) is not there.
+    ``(None, None)`` without a preview; ``(outcome, None)`` when it cannot be read: the write is not confirmed blind."""
     declared = preview_of(op)
     if declared is None:
         return None, None
@@ -474,9 +493,10 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     schema = _output_schema(read)
     defs = schema.get("$defs", {})
     props = schema.get("properties", {})
+    money = _answer_money(answer)
     with translation.override(ctx.language):
         fields = [
-            _field(name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), answer.get(name))
+            _field(name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), answer.get(name), money)
             for name in declared["fields"]
         ]
     return None, [field for field in fields if field["kind"] != "empty"]

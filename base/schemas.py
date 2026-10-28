@@ -1389,6 +1389,11 @@ class AssistantExecutedOut(Schema):
     code: str
 
 
+class AssistantMoneyOut(Schema):
+    currency: str
+    decimals: int
+
+
 class AssistantFieldOut(Schema):
     name: str
     label: str
@@ -1398,11 +1403,11 @@ class AssistantFieldOut(Schema):
         default=False,
         description="An amount its app declares signed (a difference): written with its sign, «+» over.",
     )
-
-
-class AssistantMoneyOut(Schema):
-    currency: str
-    decimals: int
+    money: AssistantMoneyOut | None = Field(
+        default=None,
+        description="The currency of an amount of a preview, as its read answers it (an invoice's); none = the "
+        "business's, the card's own.",
+    )
 
 
 class AssistantCardOut(Schema):

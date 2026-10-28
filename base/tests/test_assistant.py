@@ -462,6 +462,61 @@ def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(
     assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
 
 
+class PricedPreviewOut(Schema):
+    """A read whose amounts are in a currency of its own (an invoice's), as Invoicing's previews answer it."""
+
+    note: str = ""
+    total_cents: int
+    difference: int | None = Field(description="Counted − expected, in cents.", json_schema_extra={"signed": True})
+    currency: str = ""
+    currency_decimals: int | None = None
+
+
+def priced(monkeypatch, answer: dict) -> list[dict]:
+    """The preview of a write whose read answers ``answer``: its data without their labels."""
+    read = count_preview({"note": "R1", "total_cents": -12100, "difference": 4200, **answer}, PricedPreviewOut)
+    write = declaring({"operation": read.name, "fields": ["note", "total_cents", "difference"]})
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, write.name, write)
+    failure, fields = assistant.preview(ctx(), write, {"id": "7"})
+    assert failure is None
+    return [{key: value for key, value in field.items() if key != "label"} for field in fields]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("answer", "money"),
+    [
+        ({"currency": "EUR", "currency_decimals": 2}, {"currency": "EUR", "decimals": 2}),
+        # Its amounts' minor unit, as the read answers it, even where the currency's own says another (ISK: 0).
+        ({"currency": "ISK", "currency_decimals": 2}, {"currency": "ISK", "decimals": 2}),
+        ({"currency": "JPY"}, {"currency": "JPY", "decimals": 0}),
+    ],
+    ids=["its currency and decimals", "decimals as it answers them", "decimals of its currency when it answers none"],
+)
+def test_an_amount_of_a_preview_carries_the_currency_its_read_answers(monkeypatch, answer, money):
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: an invoice issued in EUR, rectified once the
+    business had moved to another currency, showed «-100,00» in the new one on the card. An amount of the preview
+    carries the currency the read answers (``currency``) with its decimals (``currency_decimals``, else the
+    currency's own: no yen with cents), the sign of a difference with it; a datum that is no amount, none; and the
+    amounts a write sends stay in the business's (the card's ``money``)."""
+    assert priced(monkeypatch, answer) == [
+        {"name": "note", "kind": "text", "value": "R1"},
+        {"name": "total_cents", "kind": "money", "value": -12100, "money": money},
+        {"name": "difference", "kind": "money", "value": 4200, "signed": True, "money": money},
+    ]
+    price = next(field for field in assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
+    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
+
+
+@pytest.mark.django_db
+def test_a_preview_whose_read_answers_no_currency_invents_none(monkeypatch):
+    """Without a currency in the read's answer (Cash register's close: the drawer is in the business's), its amounts
+    carry none and the card paints them in the business's, as before."""
+    assert [field.get("money") for field in priced(monkeypatch, {})] == [None, None, None]
+    assert [field.get("money") for field in priced(monkeypatch, {"currency": "", "currency_decimals": 2})] == [None] * 3
+
+
 def preview_errors() -> list:
     from django.core import checks
 

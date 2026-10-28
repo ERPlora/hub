@@ -16,7 +16,7 @@ from base.models import Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
-from base.tests.test_assistant import count_preview, declaring
+from base.tests.test_assistant import PricedPreviewOut, count_preview, declaring
 from base.tests.test_assistant import settle  # noqa: F401 - the fixture: a dangerous write with its preview
 
 pytestmark = pytest.mark.django_db
@@ -183,6 +183,26 @@ def test_an_amount_its_preview_declares_signed_reaches_the_card_marked_so_and_no
         ("difference", "money", 13790, True),
     ]
     assert [field["signed"] for field in card["fields"]] == [False, False]
+
+
+def test_an_amount_of_a_preview_reaches_the_card_in_the_currency_its_read_answers(monkeypatch):
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: the turn's card keeps the currency of each
+    amount of the preview (the read's, here złoty) beside the business's (euros) for what the write sends."""
+    read = count_preview(
+        {"note": "R1", "total_cents": -12100, "difference": 4200, "currency": "PLN", "currency_decimals": 2},
+        PricedPreviewOut,
+    )
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, "demo.item.settle", declaring({"operation": read.name, "fields": ["note", "total_cents", "difference"]}))
+    card = turn(call("demo.item.settle", {"id": "7", "reason": "cierre"}))["confirm"]
+    pln = {"currency": "PLN", "decimals": 2}
+    assert card["money"] == {"currency": "EUR", "decimals": 2}
+    assert [(field["name"], field["kind"], field["signed"], field["money"]) for field in card["preview"]] == [
+        ("note", "text", False, None),
+        ("total_cents", "money", False, pln),
+        ("difference", "money", True, pln),
+    ]
+    assert [field["money"] for field in card["fields"]] == [None, None]
 
 
 def test_a_card_whose_app_declares_no_preview_is_as_before():

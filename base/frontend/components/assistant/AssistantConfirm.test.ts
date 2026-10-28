@@ -149,6 +149,43 @@ describe('AssistantConfirm', () => {
     expect(english).toContain('Diferencia: +$20.00');
   });
 
+  it('what it will do is in the currency its read answers; what it sends, in the business’s', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: rectifying an invoice issued in euros, with the
+    // business moved to Poland since, said «Total: -121,00 zł».
+    const EUR = { currency: 'EUR', decimals: 2 };
+    const rectify: AssistantCard = {
+      ...HIGH,
+      operation: 'invoice.invoice.rectify',
+      app: 'invoice',
+      app_name: 'Facturación',
+      action: 'rectify',
+      fields: [
+        { name: 'number', label: 'Número', kind: 'text', value: 'F2026-0001' },
+        { name: 'refund_cents', label: 'Devolución', kind: 'money', value: 500 },
+      ],
+      count: null,
+      confirm_word: 'CONFIRMAR',
+      preview: [
+        { name: 'next_number', label: 'Siguiente número', kind: 'text', value: 'RECT2026-0001' },
+        { name: 'total_amount', label: 'Total', kind: 'money', value: -12100, money: EUR },
+        { name: 'balance', label: 'Saldo', kind: 'money', value: 300, money: null },
+      ],
+    };
+    const m = await mountBase(AssistantConfirm, {
+      locale: 'es',
+      props: { card: rectify, more: false, money: { currency: 'PLN', decimals: 2 } },
+    });
+    await flush();
+    const dialog = m.wrapper.findComponent(ConfirmDialog);
+    const preview = document.querySelector<HTMLElement>('[data-testid="assistant-confirm-preview"]');
+    expect([...preview!.querySelectorAll('li')].map((item) => item.textContent?.trim())).toEqual([
+      'Siguiente número: RECT2026-0001',
+      'Total: -121,00 €',
+      'Saldo: 3,00 zł',
+    ]);
+    expect(dialog.props('consequences')).toEqual(['Número: F2026-0001', 'Devolución: 5,00 zł']);
+  });
+
   it('a card whose app declares no preview shows none', async () => {
     await card(HIGH);
     expect(document.querySelector('[data-testid="assistant-confirm-preview"]')).toBeNull();
