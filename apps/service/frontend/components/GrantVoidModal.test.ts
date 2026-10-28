@@ -3,7 +3,7 @@
 // stays off without it); Void sends `service.grant.void` and closes; a refusal stays in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountService, settle } from '../__tests__/mount-service';
+import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { grant } from '../__tests__/grant';
 import GrantVoidModal from './GrantVoidModal.vue';
 
@@ -14,15 +14,24 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 type Control = HTMLElement & { label?: string; disabled?: boolean; helperText?: string };
 
-async function setup(over = {}, locale: 'en' | 'es' = 'en') {
-  const m = await mountService(GrantVoidModal, { props: { open: false, grant: grant({ used: 0, can_void: true, ...over }) }, locale });
+async function setup(over = {}, locale: 'en' | 'es' = 'en', options: MountOptions = {}) {
+  const m = await mountService(GrantVoidModal, { props: { open: false, grant: grant({ used: 0, can_void: true, ...over }) }, locale, ...options });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
+  await m.live();
   return { ...m, el: (id: string) => m.inDoc(id) as Control };
 }
 
 describe('GrantVoidModal', () => {
+  // flow service-business-currency: the amount paid is the business's currency.
+  it('says the amount paid in the business currency: złoty in Poland, yen without decimals in Japan', async () => {
+    const polish = await setup({}, 'en', { business: business(POLISH) });
+    expect(polish.el('service-grant-void-message')?.textContent?.replace(/\s/g, ' ')).toContain('(zł 90.00)');
+    const japanese = await setup({ amount: 9000 }, 'en', { business: business(JAPANESE) });
+    expect(japanese.el('service-grant-void-message')?.textContent).toContain('(¥9,000)');
+  });
+
   it('says whose voucher and for how much, and that the money is refunded in Sales', async () => {
     const s = await setup();
     expect(s.inDoc('service-grant-void')?.getAttribute('aria-label')).toBe('Void this voucher?');

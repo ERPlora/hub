@@ -6,7 +6,7 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountService, settle } from '../__tests__/mount-service';
+import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { PACKAGE, pkg } from '../__tests__/package';
 import PackageFormModal from './PackageFormModal.vue';
 
@@ -17,11 +17,12 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; helperText?: string };
 
-async function setup(current: typeof PACKAGE | null = null, locale: 'en' | 'es' = 'en') {
-  const m = await mountService(PackageFormModal, { props: { open: false, pkg: current }, locale, path: '/service/packages' });
+async function setup(current: typeof PACKAGE | null = null, locale: 'en' | 'es' = 'en', options: MountOptions = {}) {
+  const m = await mountService(PackageFormModal, { props: { open: false, pkg: current }, locale, path: '/service/packages', ...options });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
+  await m.live();
   const field = (name: string) => m.inDoc(`service-package-form-${name}`) as Control;
   const save = () => m.inDoc('service-package-form-submit') as Control;
   const lines = () => m.wrapper.findAllComponents(Combo);
@@ -38,7 +39,7 @@ describe('PackageFormModal: New package', () => {
       'Discount (%)',
     ]);
     expect([s.field('fixed_price').label, s.field('fixed_price').helperText]).toEqual([
-      'Closed price',
+      'Closed price (EUR)',
       'Leave empty to price it as the sum of its lines minus the discount.',
     ]);
     expect([s.field('validity_days').helperText, s.field('max_uses').helperText]).toEqual([
@@ -94,7 +95,7 @@ describe('PackageFormModal: New package', () => {
     s.answer(201, PACKAGE);
     await ionValue(s.field('name'), 'Bono', 'ionInput');
     await ionValue(s.field('discount_type'), 'fixed', 'ionChange');
-    expect(s.field('discount_amount').label).toBe('Discount (amount)');
+    expect(s.field('discount_amount').label).toBe('Discount (EUR)');
     await ionValue(s.field('discount_amount'), '5', 'ionInput');
     await click(s.field('add-line'));
     s.lines()[1].vm.$emit('update:modelValue', { id: 's2', label: 'Colour' });
@@ -148,6 +149,45 @@ describe('PackageFormModal: New package', () => {
     await settle();
     await click(s.save());
     expect(s.field('name').errorText).toBe(message);
+  });
+});
+
+// flow service-business-currency: a voucher's closed price and its amount off are the business's currency.
+describe('PackageFormModal: in the business currency (service-business-currency)', () => {
+  it('a business in Japan saves «9000» as a closed price of 9000 yen and «500» off as 500 yen', async () => {
+    const s = await setup(null, 'en', { business: business(JAPANESE) });
+    expect(s.field('fixed_price').label).toBe('Closed price (JPY)');
+    s.answer(201, PACKAGE);
+    await ionValue(s.field('name'), 'Bono', 'ionInput');
+    await ionValue(s.field('discount_type'), 'fixed', 'ionChange');
+    expect(s.field('discount_amount').label).toBe('Discount (JPY)');
+    await ionValue(s.field('discount_amount'), '500', 'ionInput');
+    await ionValue(s.field('fixed_price'), '9000', 'ionInput');
+    s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await settle();
+    await click(s.save());
+    const [body] = s.sent().map((call) => call.body as { discount_amount: number; fixed_price: number });
+    expect([body.discount_amount, body.fixed_price]).toEqual([500, 9000]);
+  });
+
+  it('a business in Poland edits the closed price in złoty', async () => {
+    const s = await setup(PACKAGE, 'en', { business: business(POLISH) });
+    expect([s.field('fixed_price').label, s.field('fixed_price').value]).toEqual(['Closed price (PLN)', '90.00']);
+    s.answer(200, PACKAGE);
+    await ionValue(s.field('fixed_price'), '95 zł', 'ionInput');
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', fixed_price: 9500 }]);
+  });
+
+  it('the business answers with the form open: the untouched closed price is rewritten in its decimals and not sent', async () => {
+    const s = await setup({ ...PACKAGE, fixed_price: 9000 }, 'en', { business: null });
+    expect([s.field('fixed_price').label, s.field('fixed_price').value]).toEqual(['Closed price', '90.00']);
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('fixed_price').value).toBe('9000');
+    s.answer(200, PACKAGE);
+    await ionValue(s.field('max_uses'), '10', 'ionInput');
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', max_uses: 10 }]);
   });
 });
 

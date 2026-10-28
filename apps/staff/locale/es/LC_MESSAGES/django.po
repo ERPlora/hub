@@ -133,8 +133,8 @@ msgstr "especialidades"
 msgid "bio"
 msgstr "bio"
 
-msgid "hourly rate (cents)"
-msgstr "tarifa por hora (céntimos)"
+msgid "hourly rate"
+msgstr "tarifa por hora"
 
 msgid "commission (%)"
 msgstr "comisión (%)"

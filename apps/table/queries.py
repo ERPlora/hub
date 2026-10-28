@@ -67,6 +67,7 @@ from apps.table.schemas import (
     ZonePage,
     ZoneRefIn,
 )
+from base.business import currency_decimals
 
 #: A reservation paints its table Reserved this long before it starts (WORKBOOK «Referencia adoptada»).
 RESERVED_LEAD = dt.timedelta(minutes=60)
@@ -489,12 +490,14 @@ def table_out(table: Table) -> dict:
 
 def sessions_now():
     """The checks of the room (never the deleted ones), each with its status as Sales leaves it: an open
-    or parked check whose check of Sales ended reads closed, at the hour Sales closed it."""
+    or parked check whose check of Sales ended reads closed, at the hour Sales closed it; and what it charged,
+    in the currency its sales were charged in (the business's then: its country does not change once it sells)."""
     order = Order.objects.filter(pk=OuterRef("order_id"))
+    charges = Sale.objects.filter(order_id=OuterRef("order_id")).exclude(
+        status=Sale.Status.VOIDED
+    )
     paid = (
-        Sale.objects.filter(order_id=OuterRef("order_id"))
-        .exclude(status=Sale.Status.VOIDED)
-        .order_by()
+        charges.order_by()
         .values("order_id")
         .annotate(total=Sum("total"))
         .values("total")[:1]
@@ -508,6 +511,10 @@ def sessions_now():
                 order.values("closed_at")[:1], output_field=DateTimeField()
             ),
             paid_total=Subquery(paid, output_field=IntegerField()),
+            paid_currency=Subquery(
+                charges.order_by("pk").values("currency")[:1],
+                output_field=CharField(),
+            ),
         )
         .annotate(
             status_now=Case(
@@ -555,6 +562,12 @@ def session_rows(sessions: list[TableSession]) -> list[dict]:
                 "transferred_from_id": session.transferred_from_id,
                 "merged_into_id": session.merged_into_id,
                 "paid_total": session.paid_total,
+                "currency": session.paid_currency,
+                "currency_decimals": (
+                    currency_decimals(session.paid_currency)
+                    if session.paid_currency
+                    else None
+                ),
                 "customer_id": customer_id,
                 "customer_name": customer_name,
             }

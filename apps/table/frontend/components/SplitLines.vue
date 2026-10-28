@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // «Split check» (WORKBOOK TABLE-F17): the lines of the table's check in Sales (`sale.order.get`, live
 // while open), each with a checkbox; the ones marked move to the new check, none marked = a blank one.
-// The page sends `table.session.split`, which divides the check in Sales in the same operation.
+// The page sends `table.session.split`, which divides the check in Sales in the same operation. Each amount in the
+// business's currency (an open check is not charged yet; flow table-business-currency).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonSpinner } from '@ionic/vue';
@@ -9,12 +10,13 @@ import { computed } from 'vue';
 
 import { formatQuantity } from '../../../sale/frontend/lib/format';
 import { useLocale } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 
 const props = withDefaults(defineProps<{ orderId: string; marked: string[]; pending?: boolean }>(), { pending: false });
 const emit = defineEmits<{ toggle: [lineId: string]; confirm: []; back: [] }>();
 
 const locale = useLocale();
+const money = useBusinessMoney();
 const { data, status, error } = useLive('sale.order.get', () => ({ order_id: props.orderId }));
 const lines = computed(() => data.value?.lines ?? []);
 </script>
@@ -58,7 +60,7 @@ const lines = computed(() => data.value?.lines ?? []);
           justify="start"
           @ion-change="emit('toggle', line.id)"
         >
-          {{ formatQuantity(line.quantity, line.unit, locale) }} × {{ line.name }} · {{ formatMoney(line.line_total, locale) }}
+          {{ formatQuantity(line.quantity, line.unit, locale) }} × {{ line.name }} · {{ formatMoney(line.line_total, locale, money) }}
         </ion-checkbox>
       </li>
     </ul>

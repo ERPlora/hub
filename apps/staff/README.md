@@ -46,7 +46,7 @@ sus ausencias (las pide el empleado y las aprueba un responsable) y lo que ha ga
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18); el borrado de una ficha bloquea antes las fichas (`lock_members`, hub#66) |
 
 Las decisiones de diseño (una cuenta y una ficha viva, el único «Por defecto», los bloqueos por persona, el
-dinero en céntimos, los avisos sin datos personales, los ajustes retirados) están en «Para quien lo mantiene»
+dinero en la unidad más pequeña de la moneda del negocio, los avisos sin datos personales, los ajustes retirados) están en «Para quien lo mantiene»
 del WORKBOOK; las de la migración, en la ronda 2026-10-22 (CLOSE-STAFF) de `PLAN-HUB.md` (raíz de erplora-next).
 
 ## Tests

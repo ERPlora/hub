@@ -89,8 +89,8 @@ class Member(UUIDModel):
     color = models.CharField(_("colour"), max_length=7, blank=True)
     specialties = models.TextField(_("specialties"), blank=True)
     bio = models.TextField(_("bio"), blank=True)
-    # Money in whole cents, never negative; the commission is a percentage, not money.
-    hourly_rate = models.PositiveIntegerField(_("hourly rate (cents)"), default=0)
+    # Money in whole minor units of the business's currency, never negative; the commission is a percentage, not money.
+    hourly_rate = models.PositiveIntegerField(_("hourly rate"), default=0)
     commission_rate = models.DecimalField(
         _("commission (%)"), max_digits=5, decimal_places=2, default=0
     )

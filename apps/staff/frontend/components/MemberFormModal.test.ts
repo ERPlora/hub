@@ -12,7 +12,21 @@ import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MemberOut, RoleOut } from '../operations';
-import { click, ionChecked, ionValue, MANAGER, EMPLOYEE, mountStaff, type MountOptions, page, settle } from '../__tests__/mount-staff';
+import {
+  BUSINESS,
+  business,
+  click,
+  EMPLOYEE,
+  ionChecked,
+  ionValue,
+  JAPANESE,
+  MANAGER,
+  mountStaff,
+  type MountOptions,
+  page,
+  POLISH,
+  settle,
+} from '../__tests__/mount-staff';
 import MemberFormModal from './MemberFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -57,9 +71,17 @@ const ROUTES = {
   '/api/staff/members/update': [200, DETAIL],
 } as Record<string, [number, unknown]>;
 
-async function setup(member: MemberOut | null = null, options: MountOptions & { routes?: Record<string, [number, unknown]> } = {}) {
+async function setup(
+  member: MemberOut | null = null,
+  options: MountOptions & { routes?: Record<string, [number, unknown]>; business?: Parameters<typeof business>[0] } = {},
+) {
   const m = await mountStaff(MemberFormModal, { props: { open: false, member }, ...options });
   m.answerBy({ ...ROUTES, ...options.routes });
+  // The business answered before the dialog opens (`options.business`).
+  if (options.business) {
+    await m.live();
+    await m.result(BUSINESS, business(options.business));
+  }
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -362,6 +384,75 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Sin rol', 'Sin acceso al Hub']);
     expect((await s.choices('role_id'))[0]).toEqual(['', 'Sin rol']);
     expect(s.combo('role_id')?.props('emptyLabel')).toBe('Sin resultados');
+  });
+});
+
+describe('MemberFormModal: the business\'s currency (staff-business-currency)', () => {
+  const YEN_PAY = { '/api/staff/members/compensation': [200, page([{ ...PAY, hourly_rate: 1500 }])] } as Record<string, [number, unknown]>;
+  /** What the end of the Hourly rate field says (the currency's symbol), `null` when it says nothing. */
+  const symbol = (s: Awaited<ReturnType<typeof setup>>) => s.inDoc('staff-member-form-hourly_rate-currency')?.textContent?.trim() ?? null;
+  async function answer(s: Awaited<ReturnType<typeof setup>>, fields: Parameters<typeof business>[0]) {
+    await s.live();
+    await s.result(BUSINESS, business(fields));
+    await settle();
+  }
+
+  it('a business in Poland types the rate in złoty: «zł» at the end of the field, never «€»', async () => {
+    const s = await setup(ROW, { locale: 'es' });
+    await answer(s, POLISH);
+    expect(symbol(s)).toBe('zł');
+    expect(s.field('hourly_rate').value).toBe('12,50');
+    await ionValue(s.field('hourly_rate'), '13,75', 'ionInput');
+    await click(s.save());
+    expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', hourly_rate: 1375 }]);
+  });
+
+  it('a business in Spain still types it in euros', async () => {
+    const s = await setup(null);
+    await answer(s, {});
+    expect(symbol(s)).toBe('€');
+  });
+
+  it('until the business answers, the field shows no symbol, never «€»', async () => {
+    const s = await setup(null);
+    expect(symbol(s)).toBeNull();
+  });
+
+  // gh:staff#64: in yen what is typed is yen: «1500» is 1500, not 150000.
+  it('a business in Japan types whole yen: «1500» goes as 1500', async () => {
+    const s = await setup(null);
+    await answer(s, JAPANESE);
+    expect(symbol(s)).toBe('¥');
+    await ionValue(s.field('first_name'), 'Bea', 'ionInput');
+    await ionValue(s.field('last_name'), 'Ruiz', 'ionInput');
+    await ionValue(s.field('hourly_rate'), '1500', 'ionInput');
+    await click(s.save());
+    expect(s.posts()[0].body).toMatchObject({ hourly_rate: 1500 });
+  });
+
+  it('a rate read before the business answers is rewritten in its decimals when it does, and saving it unchanged sends nothing', async () => {
+    const s = await setup(ROW, { routes: YEN_PAY });
+    expect(s.field('hourly_rate').value).toBe('15.00');
+    await answer(s, JAPANESE);
+    expect(s.field('hourly_rate').value).toBe('1500');
+    await click(s.save());
+    expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1' }]);
+  });
+
+  it('with the business known when the record opens, its rate comes in its decimals at once', async () => {
+    const s = await setup(ROW, { routes: YEN_PAY, business: JAPANESE });
+    expect(s.field('hourly_rate').value).toBe('1500');
+    await click(s.save());
+    expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1' }]);
+  });
+
+  it('a rate typed before the business answers stays as typed and is read in its currency when saving', async () => {
+    const s = await setup(ROW, { routes: YEN_PAY });
+    await ionValue(s.field('hourly_rate'), '1600', 'ionInput');
+    await answer(s, JAPANESE);
+    expect(s.field('hourly_rate').value).toBe('1600');
+    await click(s.save());
+    expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', hourly_rate: 1600 }]);
   });
 });
 

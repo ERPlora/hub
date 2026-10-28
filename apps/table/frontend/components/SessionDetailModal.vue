@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // «Details» of a check (WORKBOOK «Sesiones»; TABLE-F22): zone, server, status, guests, opened, closed, time,
-// charged (what its check of Sales charged; «—» when nothing was), customer and notes. Hours are the
+// charged (what its check of Sales charged, in the currency it was charged in; «—» when nothing was), customer and
+// notes. Hours are the
 // business's; a parked check says it has no table.
 import { FormModal } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { clockTime, durationMinutes, formatMoney } from '../lib/format';
+import { clockTime, durationMinutes, formatMoney, recordMoney } from '../lib/format';
 import type { SessionOut, SettingsOut } from '../operations';
 
 const props = defineProps<{ session: SessionOut | null; settings: SettingsOut; now: Date }>();
@@ -29,7 +30,7 @@ const rows = computed(() => {
     ['opened', t('table.sessions.columns.openedAt'), clockTime(s.opened_at, props.now, locale.value, zone)],
     ['closed', t('table.sessions.columns.closedAt'), clockTime(s.closed_at, props.now, locale.value, zone)],
     ['duration', t('table.sessions.columns.duration'), t('table.minutes', { minutes: durationMinutes(s.opened_at, s.closed_at, props.now) })],
-    ['paid', t('table.sessions.columns.paid'), formatMoney(s.paid_total, locale.value)],
+    ['paid', t('table.sessions.columns.paid'), formatMoney(s.paid_total, locale.value, recordMoney(s))],
     ['customer', t('table.sessions.detail.customer'), s.customer_name || NONE],
     ['notes', t('table.sessions.detail.notes'), s.notes || NONE],
   ] as const;

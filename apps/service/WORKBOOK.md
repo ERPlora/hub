@@ -71,6 +71,13 @@ depende de él.
 6. En **Ajustes** elige la duración, el margen y la categoría fiscal que toma un servicio nuevo cuando
    no se dicen (SERVICE-F11).
 
+Los importes (el precio de un servicio y el de cada profesional, el precio cerrado y el descuento en importe
+de un bono, lo pagado por un bono) van en **la moneda del negocio**, la de su país, la que dice **Ajustes →
+Negocio** (euros en España, złoty en Polonia, yenes en Japón), con sus decimales (el yen no tiene), escritos
+con coma o punto: «1500» es un precio de 1500 yenes en Japón y de 1500,00 € en España, y Ventas lo cobra igual.
+Mientras el negocio no contesta, un importe sale como una cifra sin símbolo, nunca en euros. Los ejemplos de
+este documento son de un negocio de España, en euros.
+
 ## Pantallas
 
 Servicios se abre desde el menú **Servicios** y tiene tres pestañas: **Servicios**, **Categorías** y
@@ -79,14 +86,16 @@ no aparece, y la app lo rechaza aunque lo intente por la API o por el asistente.
 
 ### Servicios
 Tabla con buscador «Buscar servicio…», columnas **Nombre, Categoría, Tarifa** (Precio fijo, Por hora,
-Desde, Variable, Gratis), **Precio, Duración (min)** y **Estado**: **Activo**, **Sin configurar** (con
+Desde, Variable, Gratis), **Precio** (en la moneda del negocio), **Duración (min)** y **Estado**: **Activo**, **Sin configurar** (con
 el motivo debajo, «Sin categoría fiscal: no se puede cobrar») o **Archivado**. Se ordena por
 cualquier columna y, con el botón **Filtros**, se filtra por Nombre, Categoría, Tarifa, Precio
-(desde–hasta), Duración y Estado (el filtro de Estado en **Archivado** cambia a la vista de
+(desde–hasta, en la moneda del negocio), Duración y Estado (el filtro de Estado en **Archivado** cambia a la vista de
 archivados); vista de lista o de tarjetas; 50 por página.
 
-**Nuevo servicio** abre el formulario: **Nombre, Tarifa, Precio** (en euros, «22,50»; al salir del
-campo se reescribe con la notación del idioma), **Duración (min)**, **Categoría** («Sin categoría» o
+**Nuevo servicio** abre el formulario: **Nombre, Tarifa, Precio (<moneda>)** (en la moneda del negocio y
+con sus decimales: «Precio (EUR)» y «22,50» en España, «Precio (JPY)» y «1500» en Japón; solo «Precio»
+mientras el negocio no contesta; al salir del campo se reescribe con la notación del idioma, y no antes de
+que conteste), **Duración (min)**, **Categoría** («Sin categoría» o
 una de la lista) y **Categoría fiscal** (sin opción vacía; viene elegida la de los Ajustes) y el
 botón **Crear servicio**. Tocar una fila (o su **Editar**) abre «Editando servicio — <nombre>» con el
 botón **Guardar cambios** y, debajo, **Profesionales que lo hacen** (SERVICE-F31, F32). Por fila:
@@ -110,8 +119,9 @@ Arriba, **Bonos sin cliente** (solo responsable, propietario y administrador). T
 Archivado o Eliminado). En **Filtros**, el filtro de Estado en **Eliminado** cambia a la vista de los bonos
 eliminados del catálogo que alguien compró: por fila solo **Movimientos** y **Bonos vendidos**.
 **Nuevo paquete** abre el formulario: **Nombre, Tipo de descuento** (Porcentaje o Importe fijo),
-**Descuento (%)** o **Descuento (importe)**, **Precio cerrado** («Déjalo vacío para que valga la suma
-de sus líneas menos el descuento.»), **Vigencia (días)** («Días canjeables desde la compra; vacío = no
+**Descuento (%)** o **Descuento (<moneda>)**, **Precio cerrado (<moneda>)** (en la moneda del negocio:
+«Precio cerrado (PLN)» en Polonia; sin el código, «Descuento (importe)» y «Precio cerrado», mientras el
+negocio no contesta; «Déjalo vacío para que valga la suma de sus líneas menos el descuento.»), **Vigencia (días)** («Días canjeables desde la compra; vacío = no
 caduca.»), **Usos** («Usos que concede el bono; vacío = ilimitados.») y **Servicios incluidos**: una
 fila por servicio con **Servicio** y, debajo, **Sesiones** y «Quitar línea»; **Añadir servicio**; botón **Crear
 paquete**. Al editar, en lugar de las líneas sale «Los servicios incluidos no se cambian una vez
@@ -210,8 +220,8 @@ Sale: el servicio en oferta y reservable (`service.service.created`); desde ese 
 agenda y el TPV y, si se reserva online, la página de Reservas online. Lo que no se dice toma los Ajustes: duración, margen antes y después,
 reserva online y categoría fiscal; sin Ajustes, 60 min, sin margen y con reserva online.
 Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que no se entiende
-(«Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»), uno que se lee de dos maneras o uno
-negativo; una categoría eliminada («Esa categoría no está disponible: no existe en este negocio o se
+(«Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», también con el símbolo de otra moneda:
+«22,50 €» en un negocio de Polonia), uno que se lee de dos maneras o uno negativo; una categoría eliminada («Esa categoría no está disponible: no existe en este negocio o se
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
 tecleado se conserva.
@@ -758,7 +768,8 @@ Pasos:
 1. Abre el servicio: en «Profesionales que lo hacen» sale la lista o «Nadie asignado todavía: lo
    puede hacer todo el equipo reservable.».
 2. En «Añadir profesional…» elige a alguien de Personal (salen los que aún no lo tienen) y, si
-   quieres, sus «Minutos (opcional)» y «Precio (opcional)» propios.
+   quieres, sus «Minutos (opcional)» y su precio propio, «Precio (<moneda>, opcional)» (en la moneda del
+   negocio: «Precio (EUR, opcional)» en España; «Precio (opcional)» mientras el negocio no contesta).
 3. Pulsa **Asignar**.
 Entra: el servicio y la ficha del profesional (Personal).
 Sale: la asignación, activa y no principal (`service.assignment.assigned`). Citas la lee para filtrar
@@ -777,8 +788,8 @@ Estado: hecho
 Actor: responsable, asistente
 Pantalla: Servicios (Editando servicio)
 Pasos:
-1. En «Profesionales que lo hacen», cambia los «Minutos (opcional)» o el «Precio (opcional)» de una
-   persona y pulsa **Guardar**.
+1. En «Profesionales que lo hacen», cambia los «Minutos (opcional)» o el «Precio (<moneda>, opcional)» de
+   una persona y pulsa **Guardar**.
 2. Pulsa «Hacerlo su servicio principal»: sale «Servicio principal» (uno por persona, el anterior deja
    de serlo).
 3. Apaga «Lo hace» para que deje de hacerlo sin quitarla, o pulsa «Quitar».
@@ -973,7 +984,9 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   sin clave ajena: Ventas y Citas no son requisito (como `sale` guarda `staff_id`).
 - Modelos: `ServiceSettings` (una fila, restricción `service_settings_singleton`), `Category`,
   `Service`, `Assignment`, `Package`, `PackageItem`, `Grant`, `GrantAdjustment` y `Redemption`.
-  UUIDv7, sin `hub_id`. Dinero en céntimos enteros, nunca negativo; el descuento en porcentaje, en
+  UUIDv7, sin `hub_id`. Dinero en unidades menores enteras de la moneda del negocio (céntimos en euros; el
+  yen no tiene), nunca negativo, la misma unidad que cobra Ventas (service-business-currency: la pantalla la
+  lee y la escribe con `useBusinessMoney` de `base`); el descuento en porcentaje, en
   puntos básicos (1050 = 10,50 %).
 - **Archivar y eliminar son lógicos**: un servicio archivado (`is_active = False`, `archived_at`),
   una categoría o un bono eliminados (`is_deleted`) siguen en la base de datos. Una categoría
@@ -1093,8 +1106,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
    de sus hijas (antes solo de sí misma).
 5. **«Categoría fiscal por defecto»** es una categoría de Impuestos que el formulario trae elegida y
    que toma el alta sin categoría fiscal (antes «Tipo de IVA por defecto» era un texto que nadie
-   leía). Salen de los ajustes «Precios con IVA incluido» (es de Ventas) y «Moneda» (el Hub factura en
-   euros), que nadie leía.
+   leía). Salen de los ajustes «Precios con IVA incluido» (es de Ventas) y «Moneda» (la del negocio es
+   la de su país, que da la plataforma), que nadie leía.
 6. **Un nombre de bono se puede reutilizar** cuando el anterior se eliminó (antes se rechazaba sin
    decir por qué), y un nombre repetido se dice («Ya hay un paquete con ese nombre.»).
 7. **Gastar una sesión fuera del cobro comprueba el servicio** si se dice cuál (antes no).

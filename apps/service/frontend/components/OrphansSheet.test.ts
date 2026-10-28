@@ -4,7 +4,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OrphanOut } from '../operations';
-import { mountService, page, settle } from '../__tests__/mount-service';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, JAPANESE, mountService, page, settle } from '../__tests__/mount-service';
 import OrphansSheet from './OrphansSheet.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -27,8 +28,8 @@ const orphan = (id: string, over: Partial<OrphanOut> = {}): OrphanOut => ({
 });
 const ROWS = [orphan('o1'), orphan('o2', { remaining: null, customer_id: 'cust-2' }), orphan('o3', { remaining: 0, is_expired: true })];
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountService(OrphansSheet, { props: { open: true }, locale });
+async function setup(locale: 'en' | 'es' = 'en', answer: Business | null = business()) {
+  const m = await mountService(OrphansSheet, { props: { open: true }, locale, business: answer });
   await settle();
   await m.live();
   const text = (id: string) => m.inDoc(`service-orphans-row-${id}`)?.textContent ?? '';
@@ -36,6 +37,13 @@ async function setup(locale: 'en' | 'es' = 'en') {
 }
 
 describe('OrphansSheet', () => {
+  // flow service-business-currency: the amount paid is the business's currency (the yen without decimals).
+  it('paints the amount paid in yen for a business in Japan', async () => {
+    const s = await setup('en', business(JAPANESE));
+    await s.show(page(ROWS, 30));
+    expect(s.text('o1')).toContain('¥9,000');
+  });
+
   it('follows the vouchers whose card was deleted, 20 first', async () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ limit: 20, offset: 0 }]);

@@ -1,15 +1,47 @@
-// How the service screens paint money, rates and dates, with the page language's own format (Intl):
-// euros from cents, a discount in basis points as the language writes a percentage, and a day.
+// How the service screens paint money, rates and dates, with the page language's own format (Intl): minor
+// units in the business's currency (flow service-business-currency: its country's, with the decimals the
+// server counts it in, never the browser's Intl; a figure without a symbol until it answers, never the euro by
+// default), a discount in basis points as the language writes a percentage, and a day.
 import { describe, expect, it } from 'vitest';
 
-import { decimalMark, formatDate, formatMoney, formatPercentBp, percentFieldText, readPercentBp } from './format';
+import { decimalMark, formatDate, formatMoney, formatPercentBp, type Money, moneyDecimals, percentFieldText, readPercentBp } from './format';
+
+const plain = (text: string) => text.replace(/[  ]/g, ' ');
+
+const EUR: Money = { currency: 'EUR', decimals: 2 };
+const PLN: Money = { currency: 'PLN', decimals: 2 };
+/** The yen, without minor units on the server. */
+const JPY: Money = { currency: 'JPY', decimals: 0 };
+/** The forint: two decimals on the server, none in the browser's Intl. */
+const HUF: Money = { currency: 'HUF', decimals: 2 };
 
 describe('formatMoney', () => {
   it('paints whole cents as euros in the page language', () => {
-    expect(formatMoney(2250, 'es')).toMatch(/^22,50\s€$/);
-    expect(formatMoney(123456, 'es')).toMatch(/^1\.?234,56\s€$/);
-    expect(formatMoney(2250, 'en')).toBe('€22.50');
-    expect(formatMoney(0, 'en')).toBe('€0.00');
+    expect(plain(formatMoney(2250, 'es', EUR))).toBe('22,50 €');
+    expect(formatMoney(123456, 'es', EUR)).toMatch(/^1\.?234,56\s€$/);
+    expect(formatMoney(2250, 'en', EUR)).toBe('€22.50');
+    expect(formatMoney(0, 'en', EUR)).toBe('€0.00');
+  });
+
+  it('paints minor units in the business currency it is given', () => {
+    expect(plain(formatMoney(2250, 'es', PLN))).toBe('22,50 zł');
+    expect(plain(formatMoney(2250, 'en', PLN))).toBe('zł 22.50');
+    expect(formatMoney(1500, 'en', JPY)).toBe('¥1,500');
+  });
+
+  it('counts the minor units with the decimals the server gives, never Intl’s', () => {
+    expect(plain(formatMoney(1350, 'es', HUF))).toBe('13,50 Ft');
+  });
+
+  it('is a figure without a symbol until the business answers: never a euro by default', () => {
+    expect(formatMoney(2250, 'es')).toBe('22,50');
+    expect(formatMoney(2250, 'en')).toBe('22.50');
+  });
+});
+
+describe('moneyDecimals', () => {
+  it('is the business currency’s, two while it is unknown', () => {
+    expect([moneyDecimals(PLN), moneyDecimals(JPY), moneyDecimals(undefined)]).toEqual([2, 0, 2]);
   });
 });
 

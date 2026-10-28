@@ -91,7 +91,10 @@ Email, Teléfono, Nº de empleado, Rol** («Sin rol»), **Usuario del Hub** («S
 **Estado** (solo al editar: Activo, Inactivo, De baja), **Reservable**, **Margen entre citas (min)**,
 **Fecha de alta**, **Color**, **Especialidades**, **Bio** y, para quien puede ver la compensación,
 **Tarifa por hora** y **Comisión (%)**. Acciones de fila para el propietario y el administrador:
-**Desactivar** y **Dar de baja**, las dos con confirmación.
+**Desactivar** y **Dar de baja**, las dos con confirmación. La tarifa (en la columna, en el formulario y en
+«Mi ficha») va en la moneda del negocio, la de su país en Ajustes → Negocio (euros en España, złoty en
+Polonia), con sus decimales (el yen no tiene) y su símbolo al final del campo; mientras el negocio no
+contesta, una cifra sin símbolo, nunca euros.
 
 ### Roles
 Tabla con buscador «Buscar rol…» y columnas **Rol, Descripción, Miembros** (cuántas personas
@@ -118,7 +121,8 @@ descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Aju
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
 día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
 días que cuenta. En el móvil, el periodo se elige en el desplegable «Periodo», con las mismas opciones.
-Debajo, dos cifras: **Vendido** y **Comisiones** del periodo. Después, la lista con
+Debajo, dos cifras: **Vendido** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
+de la lista. Después, la lista con
 buscador «Buscar profesional…» y columnas **Nombre, Rol, Vendido, Comisión %** y **Comisión**: cada
 persona que puede cobrar comisión (Activa o De baja), también sin ventas y con comisión 0, y quien vendió
 en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto al nombre). Se ordena por
@@ -195,8 +199,9 @@ Pasos:
    Especialidades, Bio, Margen entre citas y, con permiso de compensación, Tarifa por hora y
    Comisión (%). **Reservable** viene encendido.
 3. Pulsa Guardar: la persona sale en la tabla como **Activa**.
-Entra: el formulario; los roles activos (STAFF-F04), por id o por su nombre. La tarifa se guarda en
-céntimos enteros; la comisión es un porcentaje de 0 a 100 con dos decimales. Por la API o el
+Entra: el formulario; los roles activos (STAFF-F04), por id o por su nombre. La tarifa se escribe en la
+moneda del negocio y se guarda en su unidad más pequeña (céntimos en euros; en yenes, yenes enteros); la
+comisión es un porcentaje de 0 a 100 con dos decimales. Por la API o el
 asistente también se pueden dar el estado inicial y las notas de RRHH.
 Sale: la ficha; Personal avisa de que hay una ficha nueva (`staff.member.created`).
 Si falla: debajo de cada campo y sin guardar nada: nombre o apellidos vacíos, un email que no lo es,
@@ -512,8 +517,9 @@ Pasos:
    también las de comisión 0.
 3. Para saber lo que ha ganado cada profesional, abre **Personal → Comisiones**. Sale «Hoy»: lo que ha
    vendido cada persona en el día del negocio, con lo devuelto ya restado, su comisión y lo que le
-   corresponde (vendido × comisión ÷ 100, redondeado al céntimo una sola vez por persona; medio céntimo
-   sube). Arriba, el total vendido y el total de comisiones.
+   corresponde (vendido × comisión ÷ 100, redondeado a la unidad más pequeña de la moneda del negocio, el
+   céntimo en euros, una sola vez por persona; media unidad sube). Arriba, el total vendido y el total de
+   comisiones.
 4. Para otro periodo, elige «Ayer», «Esta semana», «Este mes» o «Personalizado» y pon «Desde» y
    «Hasta».
 5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella (la de una cita, a la
@@ -728,9 +734,15 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - El «hoy» es `timezone.localdate()` (`business_today()` de `queries.py`; en la fase 1, `TIME_ZONE`),
   aunque `control.Hub.timezone` ya guarda la zona de cada hub (hub#63): la contradicción está señalada
   en las rondas CLOSE-SCHEDULE y CLOSE-STAFF de `PLAN-HUB.md`.
-- Dinero en céntimos enteros (`hourly_rate`); la comisión es `Decimal(5, 2)` de 0 a 100. El importe
+- Dinero en unidades menores enteras de la moneda del negocio (`hourly_rate`; céntimos en euros); la
+  comisión es `Decimal(5, 2)` de 0 a 100. La pantalla pinta y lee los importes con `useBusinessMoney` de
+  `base` (`base.business.get`: la moneda del país y los decimales que cuenta el servidor, nunca los de
+  `Intl`) desde `frontend/lib/format.ts`; si el negocio contesta con el formulario abierto, la tarifa sin
+  tocar se reescribe en sus decimales. Las descripciones de los campos dicen «in cents» a propósito: es como
+  `base.assistant` reconoce un importe para pintarlo como dinero en la tarjeta del asistente
+  (`test_integration_assistant.py`). El importe
   de la comisión (`staff.commission.report`) es `vendido × comisión ÷ 100` en `Decimal`, redondeado a
-  céntimos enteros con `ROUND_HALF_UP` una sola vez por persona, sobre lo que Ventas le atribuye
+  unidades menores enteras con `ROUND_HALF_UP` una sola vez por persona, sobre lo que Ventas le atribuye
   (`total_revenue`, que ya resta lo devuelto). Una venta nombra a su profesional por el id de su ficha
   (UUID); la cuenta (`user_id`, un entero) nunca llega a una venta, así que no hay dos identidades que
   sumar.

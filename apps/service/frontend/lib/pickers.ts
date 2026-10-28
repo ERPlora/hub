@@ -1,11 +1,12 @@
 // The searches behind the service forms' pickers (`Combo` of @erplora/ui): each asks the server for what
 // the person types, 20 at a time, and turns every row into an option. A tax category is chosen by its
-// key (what the service saves), named by its translated name and its rate in force; the rest by id.
+// key (what the service saves), named by its translated name and its rate in force; the rest by id. A
+// service shows its price in the business's currency (a bare figure until it answers).
 // The required apps' lists are read through their own operations (Taxes, Staff), never their models.
 import type { ComboOption, ComboSearch } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
 
-import { formatMoney, formatPercentBp } from './format';
+import { formatMoney, formatPercentBp, type Money } from './format';
 
 /** Options asked at once: the person narrows them by typing. */
 const PAGE = 20;
@@ -42,10 +43,10 @@ export function searchServiceCategories(client: LiveClient): ComboSearch {
   };
 }
 
-export function searchServices(client: LiveClient, locale: string): ComboSearch {
+export function searchServices(client: LiveClient, locale: string, money?: Money): ComboSearch {
   return async (query) => {
     const page = await client.api.call('service.service.list', { ...search(query), limit: PAGE });
-    return page.rows.map((row) => withHint(row.id, row.name, formatMoney(row.price, locale)));
+    return page.rows.map((row) => withHint(row.id, row.name, formatMoney(row.price, locale, money)));
   };
 }
 

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { EMPLOYEE, flush, type MountOptions, mountTable, page } from '../__tests__/mount-table';
-import { NOW, sessionRow, SETTINGS, zoneRow } from '../__tests__/tables';
+import { charged, NOW, sessionRow, SETTINGS, zoneRow } from '../__tests__/tables';
 import RestoreModal from '../components/RestoreModal.vue';
 import SessionDetailModal from '../components/SessionDetailModal.vue';
 import SessionsPage from './SessionsPage.vue';
@@ -22,7 +22,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 const OP = 'table.session.list';
 const OPEN = sessionRow({ id: 's1', opened_at: '2026-10-14T18:30:00Z' }); // 70 min: amber
 const LATE = sessionRow({ id: 's2', table_number: '7', opened_at: '2026-10-14T18:00:00Z' }); // 100 min: red
-const CLOSED = sessionRow({ id: 's3', status: 'closed', closed_at: '2026-10-14T19:00:00Z', paid_total: 4250 });
+const CLOSED = sessionRow({ id: 's3', status: 'closed', closed_at: '2026-10-14T19:00:00Z', ...charged(4250) });
 const PARKED = sessionRow({ id: 's4', status: 'parked', table_id: null, table_number: null, zone_name: null });
 
 async function setup(options: MountOptions = {}) {
@@ -81,6 +81,19 @@ describe('SessionsPage', () => {
     expect(s.list()).toEqual([{ sort: '-opened_at', limit: 50, offset: 0 }]);
     await s.result(OP, page([PARKED]));
     expect(s.cells(0)[0]).toBe('No table (parked)');
+  });
+
+  it('«Charged» goes in the currency each check was charged in, never a euro fixed in the app', async () => {
+    // flow table-business-currency: a business in Poland charges in złoty; one charged in euros before stays in euros.
+    const s = await setup();
+    await s.show([OPEN]);
+    await s.segment('closed');
+    await s.result(OP, page([
+      sessionRow({ id: 's5', status: 'closed', closed_at: '2026-10-14T19:00:00Z', ...charged(4250, 'PLN') }),
+      sessionRow({ id: 's6', status: 'closed', closed_at: '2026-10-14T19:00:00Z', ...charged(1250, 'JPY', 0) }),
+      CLOSED,
+    ]));
+    expect([0, 1, 2].map((i) => s.cells(i)[1].replace(/[\u00a0\u202f]/g, ' '))).toEqual(['zł 42.50', '¥1,250', '€42.50']);
   });
 
   it('searches the table and filters by zone, server and status on the server', async () => {

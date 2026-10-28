@@ -163,7 +163,10 @@ D_BUFFER = "Minutes to leave between two appointments of this person (0 to 240).
 D_COLOR = "Colour of the person in the agenda, as #RRGGBB; empty for none."
 D_SPECIALTIES = "Specialties, as free text."
 D_BIO = "Short biography."
-D_HOURLY_RATE = "Hourly rate in whole cents of the business's currency (1250 = 12.50). Needs the pay permission."
+D_HOURLY_RATE = (
+    "Hourly rate in cents: the minor unit of the business's currency (1250 = 12.50 in euros or złoty, ¥1,250 in yen). "
+    "Needs the pay permission."
+)
 D_COMMISSION = "Commission as a percentage from 0 to 100, with up to two decimals. Needs the pay permission."
 D_HR_NOTES = "Private HR notes; only shown with the pay. Needs the pay permission."
 

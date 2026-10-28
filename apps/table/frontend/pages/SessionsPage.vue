@@ -2,7 +2,8 @@
 // Tables → Sessions (WORKBOOK «Pantallas · Sesiones»; TABLE-F21 to F24): the checks of the room, live
 // (`table.session.list`), «Open», «Closed» and «All» (Toast's segment), newest first, 50 a page. Columns:
 // Table («No table (parked)»), Charged and Closed (not in Open), Zone, Server, Guests, Opened, Time — an
-// open check's turns amber and red after the room settings' minutes and keeps counting — and Status.
+// open check's turns amber and red after the room settings' minutes and keeps counting — and Status. Charged goes in
+// the currency each check was charged in (flow table-business-currency).
 // «Search table…», filters by zone, server and status. Row actions: Details; Close session on an open one
 // (asks first; Sales refuses a check with something ordered and the reason shows in the dialog); Seat
 // again on a parked one; Delete on a finished one (owner and admin). Hours are the business's.
@@ -26,7 +27,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useNow } from '../composables/useNow';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { clockTime, durationMinutes, durationTone, formatMoney } from '../lib/format';
+import { clockTime, durationMinutes, durationTone, formatMoney, recordMoney } from '../lib/format';
 import type { SessionListIn, SessionOut, SessionStatus, SettingsOut } from '../operations';
 import { tableTabs } from '../tabs';
 
@@ -97,7 +98,7 @@ const columns = computed<DataTableColumn<SessionOut>[]>(() => {
     },
     ...(finished
       ? ([
-          { key: 'paid_total', label: t('table.sessions.columns.paid'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.paid_total, locale.value) },
+          { key: 'paid_total', label: t('table.sessions.columns.paid'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.paid_total, locale.value, recordMoney(row)) },
           { key: 'closed_at', label: t('table.sessions.columns.closedAt'), sortable: true, width: 'minmax(8.5rem,1fr)', format: (_, row) => when(row.closed_at) },
         ] as DataTableColumn<SessionOut>[])
       : []),

@@ -3,7 +3,7 @@
 // `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
 // One input per operation (ninja's parity): no path parameters, an id travels in the input.
 // On the wire: dates `YYYY-MM-DD`, times `HH:MM:SS`, decimals (commission) as strings («12.50»),
-// money in whole cents, a business user's id as a number.
+// money in whole minor units of the business's currency (cents in euros), a business user's id as a number.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type MemberStatus = 'active' | 'inactive' | 'on_leave';

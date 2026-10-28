@@ -1,4 +1,5 @@
 // Rows of the table app's lists, as the server answers them, for the page and component tests.
+import type { Business } from '../../../../base/frontend/operations';
 import type { SessionOut, TableOut, ZoneOut } from '../operations';
 
 export function tableRow(overrides: Partial<TableOut> = {}): TableOut {
@@ -83,11 +84,40 @@ export function sessionRow(overrides: Partial<SessionOut> = {}): SessionOut {
     transferred_from_id: null,
     merged_into_id: null,
     paid_total: null,
+    currency: null,
+    currency_decimals: null,
     customer_id: null,
     customer_name: null,
     ...overrides,
   };
 }
+
+/** What a check charged, in the currency its sales were charged in (`currency`, `currency_decimals`). */
+export const charged = (paid_total: number, currency = 'EUR', currency_decimals = 2): Partial<SessionOut> => ({ paid_total, currency, currency_decimals });
+
+/** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another. */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+/** A business in Poland: it sells in złoty. */
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
+/** A business in Japan: the yen has no minor units. */
+export const JAPANESE: Partial<Business> = { country: 'JP', country_name: 'Japan', currency: 'JPY', currency_label: 'JPY · Japanese Yen', currency_decimals: 0 };
 
 export const SETTINGS = {
   prompt_guests_on_seat: true,

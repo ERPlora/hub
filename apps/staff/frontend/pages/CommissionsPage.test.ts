@@ -10,7 +10,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, errorFrame, type MountOptions, mountStaff } from '../__tests__/mount-staff';
+import { BUSINESS, business, EMPLOYEE, errorFrame, JAPANESE, type MountOptions, mountStaff, POLISH } from '../__tests__/mount-staff';
 import type { CommissionReportOut } from '../operations';
 import CommissionsPage from './CommissionsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -63,6 +63,7 @@ describe('CommissionsPage', () => {
   it('follows today to begin with and paints each one: name, role, sold, rate and commission', async () => {
     // flow: STAFF-F21 (paso 3: la comisión del día)
     const s = await setup();
+    await s.result(BUSINESS, business());
     expect(s.report()).toEqual([{ period: 'today' }]);
     await s.show(REPORT);
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
@@ -100,6 +101,7 @@ describe('CommissionsPage', () => {
 
   it('above the list, what the period sold and its commissions, and the days it counts', async () => {
     const s = await setup();
+    await s.result(BUSINESS, business());
     expect(s.find('staff-commissions-total-sold').text()).toContain('…');
     await s.show({ ...REPORT, date_from: '2026-08-17' });
     expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Sold\s*€37\.33$/);
@@ -202,6 +204,7 @@ describe('CommissionsPage', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
+    await s.result(BUSINESS, business());
     await s.show(REPORT);
     expect(CHOICES.map((value) => s.chip(value))).toEqual(['Hoy', 'Ayer', 'Esta semana', 'Este mes', 'Personalizado']);
     expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Vendido\s*37,33\s€$/);
@@ -211,6 +214,34 @@ describe('CommissionsPage', () => {
     // Intl puts a no-break space before the euro sign.
     expect(s.cells(0).slice(2)).toEqual(['27,21\u00a0€', '15 %', '4,08\u00a0€']);
     expect(s.cells(2)[0]).toContain('Ya no trabaja aquí');
+  });
+});
+
+describe('CommissionsPage: the business\'s currency (staff-business-currency)', () => {
+  const plain = (text: string) => text.replace(/\s/g, ' ');
+
+  it('a business in Poland sees what each one sold and earned, and the totals, in złoty', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.result(BUSINESS, business(POLISH));
+    await s.show(REPORT);
+    expect(s.cells(0).slice(2).map(plain)).toEqual(['27,21 zł', '15 %', '4,08 zł']);
+    expect(plain(s.find('staff-commissions-total-sold').text())).toMatch(/^Vendido\s*37,33 zł$/);
+    expect(plain(s.find('staff-commissions-total-commission').text())).toMatch(/^Comisiones\s*5,35 zł$/);
+    expect(s.wrapper.text()).not.toContain('€');
+  });
+
+  it('a business in Japan sees whole yen', async () => {
+    const s = await setup();
+    await s.result(BUSINESS, business(JAPANESE));
+    await s.show({ ...REPORT, rows: [{ ...REPORT.rows[0], sold: 2721, commission: 408 }], total_sold: 2721, total_commission: 408 });
+    expect(s.cells(0).slice(2)).toEqual(['¥2,721', '15 %', '¥408']);
+  });
+
+  it('until the business answers, figures without a symbol, never euros', async () => {
+    const s = await setup();
+    await s.show(REPORT);
+    expect(s.cells(0).slice(2)).toEqual(['27.21', '15 %', '4.08']);
+    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Sold\s*37\.33$/);
   });
 });
 

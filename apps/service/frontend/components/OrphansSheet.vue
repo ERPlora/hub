@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // SERVICE-F30 «Rescatar los bonos sin cliente»: «Vouchers with no customer» follows
 // `service.grant.list_orphans` live, the most recent first, 20 at a time: what is left («{n}
-// session(s) left», «No session limit» or «Fully used»), the voucher, the amount, when the card was
+// session(s) left», «No session limit» or «Fully used»), the voucher, the amount (in the business's currency), when the card was
 // deleted, «Expired» if it is, and the customer's reference — no name, email or phone.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 
 import { useSheetList } from '../composables/useSheetList';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney } from '../lib/format';
+import { formatDate, formatMoney, useBusinessMoney } from '../lib/format';
 import type { OrphanOut } from '../operations';
 import SheetModal from './SheetModal.vue';
 
@@ -15,6 +15,7 @@ const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
 const locale = useLocale();
+const money = useBusinessMoney();
 const list = useSheetList('service.grant.list_orphans', () => ({}));
 
 function left(orphan: OrphanOut): string {
@@ -68,7 +69,7 @@ function left(orphan: OrphanOut): string {
             :label="left(orphan)"
           />
           <strong>{{ orphan.package_name }}</strong>
-          <span>{{ formatMoney(orphan.amount, locale) }}</span>
+          <span>{{ formatMoney(orphan.amount, locale, money) }}</span>
           <StatusPill
             v-if="orphan.is_expired"
             size="sm"

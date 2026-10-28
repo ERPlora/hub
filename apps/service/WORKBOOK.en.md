@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6756d1f96929c5656f3c0b0edd42851ea6c258afa6a446820eb580c44f7bcb49 -->
+<!-- generated from WORKBOOK.md sha256:4e4844f12fc50b93ae0e2b8599b5c8477500653fd65ddaefb5ad9ba8eba53e00 -->
 
 ## What it is for and who it is for
 
@@ -59,6 +59,13 @@ on it.
 6. In **Settings** choose the duration, the buffer and the tax category a new service takes when they are
    not given (SERVICE-F11).
 
+Amounts (the price of a service and that of each professional, the closed price and the amount off of a
+voucher, what was paid for a voucher) are in **the business's currency**, its country's, the one **Settings →
+Business** shows (euros in Spain, złoty in Poland, yen in Japan), with its decimals (the yen has none), written
+with a comma or a point: "1500" is a price of 1500 yen in Japan and of €1,500.00 in Spain, and Sales charges it
+the same. While the business has not answered, an amount shows as a figure without a symbol, never in euros. The
+examples in this document are from a business in Spain, in euros.
+
 ## Screens
 
 Services opens from the **Services** menu and has three tabs: **Services**, **Categories** and
@@ -67,13 +74,16 @@ the app refuses it even if they try through the API or the assistant.
 
 ### Services
 Table with the search box "Search service…", columns **Name, Category, Pricing** (Fixed price, Hourly,
-From, Variable, Free), **Price, Duration (min)** and **Status**: **Active**, **Not configured** (with the
+From, Variable, Free), **Price** (in the business's currency), **Duration (min)** and **Status**: **Active**, **Not configured** (with the
 reason below, "No tax category: it cannot be charged") or **Archived**. It sorts by any column and, with
-the **Filters** button, it filters by Name, Category, Pricing, Price (from–to), Duration and Status (the
+the **Filters** button, it filters by Name, Category, Pricing, Price (from–to, in the business's currency),
+Duration and Status (the
 Status filter on **Archived** switches to the archived view); list or card view; 50 per page.
 
-**New service** opens the form: **Name, Pricing, Price** (in euros, "22.50"; on leaving the field it is
-rewritten in the language's notation), **Duration (min)**, **Category** ("No category" or one of the
+**New service** opens the form: **Name, Pricing, Price (<currency>)** (in the business's currency and with
+its decimals: "Price (EUR)" and "22.50" in Spain, "Price (JPY)" and "1500" in Japan; just "Price" while the
+business has not answered; on leaving the field it is rewritten in the language's notation, and not before
+it answers), **Duration (min)**, **Category** ("No category" or one of the
 list) and **Tax category** (with no empty option; the one from the Settings comes chosen) and the
 **Create service** button. Tapping a row (or its **Edit**) opens "Editing service — <name>" with the
 **Save changes** button and, below, **Professionals who perform it** (SERVICE-F31, F32). Per row:
@@ -97,8 +107,9 @@ box "Search package…", columns **Name, Discount, Closed price, Lines** and **S
 Deleted). In **Filters**, the Status filter on **Deleted** switches to the view of the vouchers deleted
 from the catalogue that someone bought: per row only **Movements** and **Sold vouchers**.
 **New package** opens the form: **Name, Discount type** (Percentage or Fixed amount), **Discount (%)** or
-**Discount (amount)**, **Closed price** ("Leave empty to price it as the sum of its lines minus the
-discount."), **Validity (days)** ("Days redeemable from the purchase; empty = never expires."), **Uses**
+**Discount (<currency>)**, **Closed price (<currency>)** (in the business's currency: "Closed price (PLN)" in
+Poland; without the code, "Discount (amount)" and "Closed price", while the business has not answered; "Leave
+empty to price it as the sum of its lines minus the discount."), **Validity (days)** ("Days redeemable from the purchase; empty = never expires."), **Uses**
 ("Uses the voucher grants; empty = unlimited.") and **Services included**: one row per service with
 **Service** and, below, **Sessions** and "Remove line"; **Add service**; **Create package** button. When
 editing, instead of the lines it shows "The services included cannot be changed once created: delete
@@ -196,7 +207,8 @@ till see it and, if it is booked online, the Online booking page too. What is no
 Settings: duration, buffer before and after, online booking and tax category; without Settings, 60 min,
 no buffer and with online booking.
 If it fails: inside the form, each reason below its field: an amount that cannot be understood ("This is
-not an amount. Type a figure, for example 12.50."), one that reads two ways or a negative one; a deleted
+not an amount. Type a figure, for example 12.50.", also with another currency's symbol: "€22.50" in a
+business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
 Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept.
@@ -724,7 +736,8 @@ Steps:
 1. Open the service: in "Professionals who perform it" the list shows, or "Nobody assigned yet: the whole
    bookable team may perform it.".
 2. In "Add professional…" choose someone from Staff (the ones who do not have it yet show) and, if you
-   want, their own "Minutes (optional)" and "Price (optional)".
+   want, their own "Minutes (optional)" and their own price, "Price (<currency>, optional)" (in the business's
+   currency: "Price (EUR, optional)" in Spain; "Price (optional)" while the business has not answered).
 3. Tap **Assign**.
 In: the service and the card of the professional (Staff).
 Out: the assignment, active and not main (`service.assignment.assigned`). Appointments reads it to filter
@@ -742,8 +755,8 @@ Status: done
 Actor: manager, assistant
 Screen: Services (Editing service)
 Steps:
-1. In "Professionals who perform it", change the "Minutes (optional)" or the "Price (optional)" of a
-   person and tap **Save**.
+1. In "Professionals who perform it", change the "Minutes (optional)" or the "Price (<currency>, optional)" of
+   a person and tap **Save**.
 2. Tap "Make it their main service": "Main service" shows (one per person, the previous one stops being
    it).
 3. Turn off "Performs it" so that they stop doing it without removing them, or tap "Remove".
