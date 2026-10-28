@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2769757e347dc69887765e39bbec82eb3584915d28421681737957a7bc7ad865 -->
+<!-- generated from WORKBOOK.md sha256:63db275392eec8f6867b3cc8ccf8b3349adcd1f6430d81ad9db718ebb17725ff -->
 
 ## What it is for and who it is for
 
@@ -150,7 +150,8 @@ and red according to the Settings. Search box "Search table…", filters behind 
 and status. Per row "Details" (window with zone, server, status, guests, opening, closing, time, charged
 and notes), on the open ones "Close session" (with confirmation), on the parked ones "Seat again" (pick
 the free table) and, on the finished ones, "Delete" (the administrator only). The times are in the
-business's time.
+business's time. What was charged goes in the currency it was charged in: the business's (its country's,
+with its decimals), never in euros if the business charges in another.
 
 ### Settings
 Menu **Tables → Settings**: "Ask for the guests when seating a table", "Amber warning (minutes)" and
@@ -512,8 +513,8 @@ Actor: employee, manager
 Screen: Floor plan (Service)
 Steps:
 1. In the window of the occupied table tap "Split check".
-2. Mark the lines that go to the new check (those of its check in Sales) and tap "Split". With nothing
-   marked, the new one is born empty.
+2. Mark the lines that go to the new check (those of its check in Sales, each with its amount in the
+   business's currency) and tap "Split". With nothing marked, the new one is born empty.
 3. Tables opens a second check at the same table (1 guest) and Sales moves the marked lines to it, in
    the same operation. Charging one closes only that one: the table stays Occupied with the other. It
    can be split even if the table is blocked or deactivated: nobody new is seated.
@@ -592,8 +593,8 @@ Actor: manager, employee
 Screen: Sessions
 Steps:
 1. Open **Tables → Sessions**: it starts in "Open", the most recent first.
-2. "Closed" shows the closed ones with "Charged" and "Closed"; "All", also the transferred, merged and
-   parked ones.
+2. "Closed" shows the closed ones with "Charged" (in the currency it was charged in: the business's) and
+   "Closed"; "All", also the transferred, merged and parked ones.
 3. Filter by zone, server or status, or search by table number.
 4. "Details" shows zone, server, status, guests, opening, closing, time, charged and notes.
 In: the table checks and what was charged in Sales.
