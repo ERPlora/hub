@@ -66,6 +66,8 @@ from apps.customer.schemas import (
     TagPage,
 )
 from apps.customer.search import normalize, search_term
+from base import operations as platform
+from base.business import currency_decimals
 
 CUSTOMER_UNAVAILABLE = _("This customer is no longer available.")
 NO_CUSTOMER_MATCHES = _("No customer matches “%(reference)s”.")
@@ -440,6 +442,8 @@ def _cell(value) -> str:
 )
 def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
     cards = _customers(params).prefetch_related("groups", "tags")
+    # «Spent» with the decimals of the business's currency (its country's: 0 in JPY), never two fixed.
+    decimals = currency_decimals(platform.business_currency(ctx.scope))
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(EXPORT_COLUMNS)
@@ -447,7 +451,7 @@ def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
     for customer in cards:
         values = {
             **{column: getattr(customer, column, None) for column in EXPORT_COLUMNS},
-            "total_spent": f"{Decimal(customer.total_spent) / 100:.2f}",
+            "total_spent": f"{Decimal(customer.total_spent).scaleb(-decimals):.{decimals}f}",
             "groups": "; ".join(sorted(group.name for group in customer.groups.all())),
             "tags": "; ".join(sorted(tag.name for tag in customer.tags.all())),
         }

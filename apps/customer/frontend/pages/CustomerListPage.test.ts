@@ -10,14 +10,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import {
+  business,
   BYE,
   EMPLOYEE,
   errorFrame,
   flush,
+  JAPANESE,
   json,
   MANAGER,
   type MountOptions,
   mountCustomer,
+  POLISH,
   sent,
   subId,
   VIEWER,
@@ -421,6 +424,65 @@ describe('CustomerListPage: import (F08)', () => {
     await flush();
     await flush();
     expect(s.testid('customer-list-import-problem').text()).toContain('The file has no customers');
+  });
+});
+
+describe('CustomerListPage: the business\'s currency (customer-business-currency)', () => {
+  const BUSINESS = 'base.business.get';
+  const plain = (text: string) => text.replace(/\s/g, ' ');
+  const spent = (s: Awaited<ReturnType<typeof setup>>) =>
+    s.wrapper.findAll('[data-testid="customer-list-spent"]').map((c) => plain(c.text()));
+
+  it('a business in Poland sees «Spent» in złoty, never in euros', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.result(s.call, BUSINESS, business(POLISH));
+    await s.show(PAGE);
+    expect(spent(s)).toEqual(['45,50 zł', '45,50 zł']);
+    expect(s.wrapper.text()).not.toContain('€');
+  });
+
+  it('a business in Spain still sees euros', async () => {
+    const s = await setup();
+    await s.result(s.call, BUSINESS, business());
+    await s.show(PAGE);
+    expect(spent(s)).toEqual(['€45.50', '€45.50']);
+  });
+
+  it('until the business answers, «Spent» is a figure without a symbol, never euros', async () => {
+    const s = await setup();
+    await s.show(PAGE);
+    expect(spent(s)).toEqual(['45.50', '45.50']);
+  });
+
+  it('«Spent» is typed in the business\'s currency: złoty with its symbol, yen without decimals', async () => {
+    const s = await setup();
+    await s.result(s.call, BUSINESS, business(POLISH));
+    await s.show(PAGE);
+    await s.filter({ spent_from: '12,50 zł', spent_to: 'PLN 100' });
+    expect(s.params(LIST)).toEqual([{ spent_min: 1250, spent_max: 10000, sort: 'name', descending: false, limit: 50, offset: 0 }]);
+
+    const yen = await setup();
+    await yen.result(yen.call, BUSINESS, business(JAPANESE));
+    await yen.show(PAGE);
+    await yen.filter({ spent_from: '1250', spent_to: '12,5' });
+    expect(yen.params(LIST)).toEqual([{ spent_min: 1250, sort: 'name', descending: false, limit: 50, offset: 0 }]);
+    expect(yen.prop('filterErrors')).toEqual({ spent_to: 'Write an amount, like 1.000,50.' });
+    expect(spent(yen)).toEqual(['¥4,550', '¥4,550']);
+  });
+
+  it('an amount typed before the business answers is read again in its currency when it does, from the first page', async () => {
+    const s = await setup();
+    await s.show({ ...PAGE, total: 200 });
+    await s.filter({ spent_from: '1250' });
+    expect(s.params(LIST)).toEqual([{ spent_min: 125000, sort: 'name', descending: false, limit: 50, offset: 0 }]);
+    await s.showOnNewStream({ ...PAGE, total: 200 });
+    s.table().vm.$emit('pageChange', 2);
+    await flush();
+    expect(s.params(LIST)).toEqual([{ spent_min: 125000, sort: 'name', descending: false, limit: 50, offset: 100 }]);
+    await s.clock.advance(150);
+    await s.result(s.net.lastStream(), BUSINESS, business(JAPANESE));
+    await s.showOnNewStream(PAGE);
+    expect(s.params(LIST)).toEqual([{ spent_min: 1250, sort: 'name', descending: false, limit: 50, offset: 0 }]);
   });
 });
 

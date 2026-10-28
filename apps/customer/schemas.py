@@ -21,7 +21,8 @@ from pydantic import (
     field_validator,
 )
 
-from apps.customer.models import Activity
+from apps.customer.models import Activity, Purchase
+from base.business import currency_decimals
 
 T = TypeVar("T")
 
@@ -911,6 +912,12 @@ class ErasedOut(Schema):
     )
 
 
+def _decimals(currency: object) -> int | None:
+    """The decimals the server counts ``currency`` in (CLDR: 2 in EUR, 0 in JPY); none without one, so the screen
+    paints the amount in the business's currency (a record keeps the currency it was paid in)."""
+    return currency_decimals(currency) if isinstance(currency, str) and currency else None
+
+
 class ActivityRow(Schema):
     id: UUID = Field(description="The entry's id.")
     customer_id: UUID = Field(description="The customer's id.")
@@ -922,10 +929,18 @@ class ActivityRow(Schema):
     data: dict[str, Any] = Field(
         description="Its data: amounts, channel, the merged card…"
     )
+    currency_decimals: int | None = Field(
+        description="The decimals of the currency its data carries, as the server counts them (2 in EUR, 0 in "
+        "JPY); empty when it carries none."
+    )
     related_id: str = Field(description="The id of what it is about.")
     related_type: str = Field(description="The type of what it is about.")
     actor: str = Field(description="Who did it.")
     created_at: datetime = Field(description="When.")
+
+    @staticmethod
+    def resolve_currency_decimals(entry: Activity) -> int | None:
+        return _decimals((entry.data or {}).get("currency"))
 
 
 ActivityPage = Page[ActivityRow]
@@ -982,12 +997,19 @@ class PurchaseRow(Schema):
     sale_id: UUID | None = Field(description="The sale's id; empty for a manual entry.")
     amount: int = Field(description="The amount, in cents; negative on a refund line.")
     currency: str = Field(description="The currency.")
+    currency_decimals: int | None = Field(
+        description="The decimals of its currency as the server counts them (0 in JPY); empty without a currency."
+    )
     status: Literal["confirmed", "voided", "refunded"] = Field(
         description="Paid (confirmed), voided, or a refund of the sale (refunded)."
     )
     recorded_at: datetime = Field(description="When it was paid.")
     voided_at: datetime | None = Field(description="When it was voided.")
     void_reason: str = Field(description="Why it was voided.")
+
+    @staticmethod
+    def resolve_currency_decimals(purchase: Purchase) -> int | None:
+        return _decimals(purchase.currency)
 
 
 PurchasePage = Page[PurchaseRow]

@@ -26,7 +26,7 @@ import CustomerStats from '../components/CustomerStats.vue';
 import ImportReport from '../components/ImportReport.vue';
 import { STAGES } from '../lib/customerForm';
 import { filterParams, filtersInUse, SOURCES, unreadableAmounts } from '../lib/customerFilters';
-import { formatMoney } from '../lib/money';
+import { formatMoney, useBusinessMoney } from '../lib/money';
 import { formatPhone } from '../lib/phoneDisplay';
 import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
@@ -43,13 +43,18 @@ const canDelete = computed(() => session.can('customer.delete'));
 const { t, locale } = useCustomerI18n();
 
 const list = useListState({ sort: 'name' });
-/** The table's filters (its funnel), as typed: «Spent» in euros. A filter not in use is absent. */
+/** The business's currency (its country's): «Spent» is painted and typed in it (customer-business-currency). */
+const money = useBusinessMoney();
+/** The table's filters (its funnel), as typed: «Spent» in the business's money. A filter not in use is absent. */
 const filters = ref<DataTableFilters>({});
-// Only the filters that really apply narrow the list (an amount it cannot read does not).
-watch(filters, (now) => list.restart({ narrowed: filtersInUse(now) > 0 }));
+// Only the filters that really apply narrow the list (an amount it cannot read does not); an amount typed before
+// the business answered is read again in its currency when it does.
+watch([filters, () => money.value?.currency, () => money.value?.decimals], () =>
+  list.restart({ narrowed: filtersInUse(filters.value, money.value) > 0 }),
+);
 
 /** The search, sort and filters of every window of the list (≤ 100 rows each: `useLiveList`). */
-const query = computed(() => ({ ...filterParams(filters.value), ...list.base.value }) as CustomerListIn);
+const query = computed(() => ({ ...filterParams(filters.value, money.value), ...list.base.value }) as CustomerListIn);
 const { data: result, status, error, refresh } = useLiveList('customer.customer.list', () => query.value, list.windows);
 list.followResult(result);
 
@@ -99,7 +104,7 @@ const filterFields = computed<DataTableFilterField[]>(() => [
 
 /** An amount of «Spent» it cannot read, said under its field (it does not filter). */
 const filterErrors = computed(() =>
-  Object.fromEntries(unreadableAmounts(filters.value).map((name) => [name, t('customer.filters.amountInvalid')])),
+  Object.fromEntries(unreadableAmounts(filters.value, money.value).map((name) => [name, t('customer.filters.amountInvalid')])),
 );
 
 const actions = computed<DataTableAction<CustomerRow>[]>(() => [
@@ -234,7 +239,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
           <span data-testid="customer-list-stage">{{ $t(`customer.stage.${row.lifecycle_stage}`) }}</span>
         </template>
         <template #spent="{ row }">
-          <span data-testid="customer-list-spent">{{ formatMoney(row.total_spent, locale) }}</span>
+          <span data-testid="customer-list-spent">{{ formatMoney(row.total_spent, locale, money) }}</span>
         </template>
         <template #empty>
           <EmptyState

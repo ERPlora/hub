@@ -1,8 +1,9 @@
 // The four figures above the customer list (WORKBOOK «Pantallas · Clientes»): Customers, Active,
-// VIP and Revenue (what the live cards spent), followed live from `customer.customer.stats`.
+// VIP and Revenue (what the live cards spent, in the business's currency: customer-business-currency), followed
+// live from `customer.customer.stats`.
 import { describe, expect, it } from 'vitest';
 
-import { errorFrame, flush, mountCustomer, subId } from '../__tests__/mount-customer';
+import { business, errorFrame, flush, JAPANESE, mountCustomer, POLISH, subId } from '../__tests__/mount-customer';
 import { formatMoney } from '../lib/money';
 import CustomerStats from './CustomerStats.vue';
 import source from './CustomerStats.vue?raw';
@@ -15,6 +16,28 @@ async function setup(locale: 'en' | 'es' = 'en') {
   const kpi = (id: string) => m.wrapper.get(`[data-testid="customer-stats-${id}"]`);
   return { ...m, call, kpi };
 }
+
+describe('CustomerStats: «Revenue» in the business\'s currency (customer-business-currency)', () => {
+  const revenue = (s: Awaited<ReturnType<typeof setup>>) => s.kpi('revenue').find('.customer-kpi__value').text().replace(/\s/g, ' ');
+
+  it('in Poland in złoty, in Japan in yen without decimals, never in euros', async () => {
+    const pl = await setup('es');
+    await pl.result(pl.call, 'base.business.get', business(POLISH));
+    await pl.result(pl.call, 'customer.customer.stats', STATS);
+    expect(revenue(pl)).toBe('1234,56 zł');
+
+    const jp = await setup();
+    await jp.result(jp.call, 'base.business.get', business(JAPANESE));
+    await jp.result(jp.call, 'customer.customer.stats', STATS);
+    expect(revenue(jp)).toBe('¥123,456');
+  });
+
+  it('a figure without a symbol until the business answers', async () => {
+    const s = await setup();
+    await s.result(s.call, 'customer.customer.stats', STATS);
+    expect(revenue(s)).toBe('1,234.56');
+  });
+});
 
 describe('CustomerStats', () => {
   it('follows customer.customer.stats and shows «…» until the first result', async () => {
