@@ -15,6 +15,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -45,6 +46,12 @@ SAY_WHICH_TARGET = _(
 )
 HOLD_ENDS_BEFORE = _("A hold has to end after it starts.")
 MOMENT_WITHOUT_ZONE = _("Give the moment with its time zone.")
+
+# How the Tables screens name the data the models do not (the assistant's card names each datum by its title).
+ZONE_COLOUR = gettext_noop("Zone colour")
+DESTINATION_TABLE = gettext_noop("Destination table")
+DESTINATION_ZONE = gettext_noop("Destination zone")
+MOVE_TO_ZONE = gettext_noop("Move to zone")
 
 Color = Literal[
     "primary", "secondary", "tertiary", "success", "warning", "danger", "medium"
@@ -245,7 +252,9 @@ class ZoneIn(In):
     description: Description = Field(
         "", description="A description of the zone (optional)."
     )
-    color: Color = Field("primary", description="Its colour in the list of zones.")
+    color: Color = Field(
+        "primary", title=ZONE_COLOUR, description="Its colour in the list of zones."
+    )
     sort_order: int | None = Field(
         None,
         ge=0,
@@ -257,7 +266,7 @@ class ZoneIn(In):
 class ZonePatchIn(ZoneRefIn):
     name: Name | None = Field(None, description="The new name.")
     description: Description | None = Field(None, description="The new description.")
-    color: Color | None = Field(None, description="The new colour.")
+    color: Color | None = Field(None, title=ZONE_COLOUR, description="The new colour.")
     sort_order: int | None = Field(
         None, ge=0, le=1_000_000, description="The new place among the zones."
     )
@@ -353,9 +362,17 @@ class TableBulkIn(In):
         ge=1, le=MAX_BULK, description=f"How many tables (1 to {MAX_BULK})."
     )
     prefix: _text(10) = Field(
-        "", description="What goes before each number, e.g. T for T1, T2…"
+        "",
+        title=gettext_noop("Number prefix"),
+        description="What goes before each number, e.g. T for T1, T2…",
     )
-    start_number: int = Field(1, ge=0, le=100_000, description="The first number.")
+    start_number: int = Field(
+        1,
+        ge=0,
+        le=100_000,
+        title=gettext_noop("First number"),
+        description="The first number.",
+    )
     capacity: Seats = Field(4, description="Seats of each one.")
     shape: Shape = Field("square", description="square, round or rectangle.")
 
@@ -372,9 +389,11 @@ class TablePatchIn(TableRefIn):
     )
     capacity: Seats | None = Field(None, description="The new seats.")
     shape: Shape | None = Field(None, description="The new shape.")
-    move_to_zone_id: UUID | None = Field(None, description="The zone it moves to.")
+    move_to_zone_id: UUID | None = Field(
+        None, title=MOVE_TO_ZONE, description="The zone it moves to."
+    )
     move_to_zone: Said | None = Field(
-        None, description="The name of the zone it moves to."
+        None, title=MOVE_TO_ZONE, description="The name of the zone it moves to."
     )
     blocked: bool | None = Field(
         None,
@@ -551,10 +570,13 @@ class SessionOpenIn(In):
     )
     customer_id: UUID | None = Field(None, description="The customer of the check.")
     customer: Said | None = Field(
-        None, description="The customer's name or phone, when the id is not known."
+        None,
+        title=gettext_noop("Customer"),
+        description="The customer's name or phone, when the id is not known.",
     )
     reservation_id: UUID | None = Field(
         None,
+        title=gettext_noop("Reservation"),
         description="The reservation whose party sits: only its hold of the table is spent; empty = every hold "
         "already showing the table Reserved.",
     )
@@ -574,12 +596,16 @@ class SessionCloseIn(SessionRefIn):
 
 
 class SessionTransferIn(SessionRefIn):
-    to_table_id: UUID | None = Field(None, description="The table it goes to.")
+    to_table_id: UUID | None = Field(
+        None, title=DESTINATION_TABLE, description="The table it goes to."
+    )
     to_table: Said | None = Field(
-        None, description="The number of the table it goes to."
+        None, title=DESTINATION_TABLE, description="The number of the table it goes to."
     )
     to_zone: Said | None = Field(
-        None, description="That table's zone, when its number repeats."
+        None,
+        title=DESTINATION_ZONE,
+        description="That table's zone, when its number repeats.",
     )
 
     @model_validator(mode="after")
@@ -590,14 +616,22 @@ class SessionTransferIn(SessionRefIn):
 
 class SessionMergeIn(SessionRefIn):
     into_session_id: UUID | None = Field(
-        None, description="The check that stays (another one of the same table too)."
+        None,
+        title=gettext_noop("Into check"),
+        description="The check that stays (another one of the same table too).",
     )
-    into_table_id: UUID | None = Field(None, description="The table whose check stays.")
+    into_table_id: UUID | None = Field(
+        None, title=DESTINATION_TABLE, description="The table whose check stays."
+    )
     into_table: Said | None = Field(
-        None, description="The number of the table whose check stays."
+        None,
+        title=DESTINATION_TABLE,
+        description="The number of the table whose check stays.",
     )
     into_zone: Said | None = Field(
-        None, description="That table's zone, when its number repeats."
+        None,
+        title=DESTINATION_ZONE,
+        description="That table's zone, when its number repeats.",
     )
 
     @model_validator(mode="after")
@@ -611,6 +645,7 @@ class SessionSplitIn(SessionRefIn):
     line_ids: list[UUID] = Field(
         default_factory=list,
         max_length=MAX_LINES,
+        title=gettext_noop("Lines to move"),
         description="The lines of its check of Sales that move to the new check; none = a blank one.",
     )
     guests_count: Guests = Field(1, description="Guests of the new check.")
@@ -782,7 +817,10 @@ class ReservationStatusIn(Reaction):
     )
     party_size: int | None = Field(None, ge=0, le=MAX_GUESTS, description="Its guests.")
     guest_name: str = Field(
-        "", max_length=200, description="The name on the reservation."
+        "",
+        max_length=200,
+        title=gettext_noop("Guest's name"),
+        description="The name on the reservation.",
     )
     customer_id: UUID | None = Field(None, description="Its customer's card, if any.")
 
