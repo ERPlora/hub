@@ -232,20 +232,20 @@ Pasos:
    sigue por PRINTING-F04 (dar la función a una impresora) o PRINTING-F14 (sacar el trabajo del
    atasco).
 Entra: la cola, las impresoras y los dispositivos del negocio.
-Sale: nada guardado. Lo que depende del reloj (cuánto lleva esperando, el aviso naranja, «Esperando»
-y un enviado que no contestó a tiempo) se recalcula solo cada 30 s, sin esperar a otro cambio; «Todo al
+Sale: nada guardado. Lo que depende del reloj (cuánto lleva esperando, el aviso naranja, «Esperando»,
+«Dispositivo apagado» en la tarjeta de la función y un enviado que no contestó a tiempo) se recalcula solo cada
+30 s, sin esperar a otro cambio ni recargar; «Todo al
 día» exige que no haya nada en cola, enviado sin confirmar ni fallido. Las pantallas se refrescan solas al encolarse, enviarse, imprimirse, fallar,
 reintentarse o cancelarse un trabajo. El paso del Inicio y las filas de la campana cambian solos, sin
 recargar, al encolarse, fallar o cancelarse un trabajo, al darse de alta, cambiarse o retirarse un
 dispositivo y al cambiar una impresora; lo que mueve el reloj (un trabajo que cumple el minuto, un dispositivo
-que deja de dar señales o vuelve) lo recoge la campana sola cada 30 s, como la del Hub viejo. La fila se va sola
+que deja de dar señales o vuelve) lo recogen solas cada 30 s la campana, como la del Hub viejo, y la tarjeta de la
+función mientras hay algo en cola (una lectura que falla deja lo último). La fila se va sola
 cuando un dispositivo encendido puede sacar lo que espera (no hay «marcar como leído»).
 Si falla: «No se pudo leer la cola de impresión.» con «Reintentar»; no se pinta «Todo al día» cuando
 la lectura falla. Un dispositivo dado de alta pero apagado sí hace sonar la campana, pasado el minuto: el paso
 del Inicio sigue «Hecho» (dado de alta basta), pero nadie está imprimiendo. Un trabajo que lleva menos de un
-minuto no la hace sonar (un dispositivo que se reinicia no es una alarma). La tarjeta de la función se lee al
-abrir **Impresoras** y con cada cambio de la cola, los dispositivos o las impresoras; si el dispositivo se
-apaga con la pantalla abierta, la campana lo dice a los 30 s y la tarjeta al volver a entrar.
+minuto no la hace sonar (un dispositivo que se reinicia no es una alarma).
 Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
 
 ### PRINTING-F02 Encontrar una impresora de la red sin escribir su dirección

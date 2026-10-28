@@ -3,9 +3,11 @@
 // and its bell row, old-hub:HUB_SHELL-F63): a device set up for the receipt printer that gave no news for 90 s is off,
 // and a receipt that has waited a minute on it rings «Nadie está imprimiendo «Recibo» (N)» for the owner of hub `a`,
 // in Spanish, with no event and no reload: the bell reads its rows again by the clock (`bell_refresh_every`, 30 s).
-// Its row leads to Printing → Printers, whose receipts' card says «Dispositivo apagado» and what to do. The device
-// comes back (its hello on /ws/print, the presence Printing declares) and the bell quiets by itself. The minute and the
-// 90 s are not waited for: `psql()` moves the receipt and the device's last news back. In each of the three sizes,
+// Its row leads to Printing → Printers, whose receipts' card says «Dispositivo apagado» and what to do. With Printers
+// open, the device comes back (its hello on /ws/print, the presence Printing declares): the bell quiets and the card says
+// «Listo» by themselves; it goes quiet again and both say so again, with no event and no reload (the card reads the
+// summary every 30 s while something waits). The minute and the 90 s are not waited for: `psql()` moves the receipt and
+// the device's last news back. In each of the three sizes,
 // leaving the capture `FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF-<width>` with the bell open. What it makes is
 // «e2e Off …», deleted before and after.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
@@ -22,6 +24,8 @@ const TAG = 'e2e Off';
 const RUN = stamp();
 /** The bell's own reading of its rows, which Printing's clock makes it do. */
 const READ_AGAIN = '/api/home/bell';
+/** The receipts' card's own reading of the summary by the clock, while something waits. */
+const CARD_READ = '/api/printing/jobs/summary';
 /** Longer than the bell's period (30 s) and a read: what the bell takes to notice by itself. */
 const BY_THE_CLOCK = { timeout: 45_000 };
 
@@ -115,16 +119,18 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
   const streams: number[] = [];
   const reads: number[] = [];
   const loads: number[] = [];
+  const cardReads: number[] = [];
   page.on('load', () => loads.push(Date.now()));
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname;
     if (path === '/api/live') streams.push(Date.now());
     if (path === READ_AGAIN) reads.push(Date.now());
+    if (path === CARD_READ) cardReads.push(Date.now());
   });
   await page.goto(`${A}/`);
   await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
   await expect(shown(page).locator('[data-testid="home-my-apps"]')).toBeVisible();
-  return { context, page, streams, reads, loads };
+  return { context, page, streams, reads, loads, cardReads };
 }
 
 /** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
@@ -142,7 +148,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
     const device = `${TAG} device ${RUN} ${label}`;
     let job = '';
     // The device set up from itself is there; a receipt queued on its printer is its: nothing rings.
-    const { context, page, streams, reads, loads } = await spanishOwner(browser, { width, height }, async (context) => {
+    const { context, page, streams, reads, loads, cardReads } = await spanishOwner(browser, { width, height }, async (context) => {
       await setUpDevice(context, device);
       const queued = await api<{ job: { id: string } }>(context, A, 'POST', '/printing/jobs', {
         document_type: 'receipt',
@@ -189,15 +195,28 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       );
       await expect(shown(page).locator('[data-testid=printing-summary-no-device-receipt]')).toHaveCount(0);
 
-      // The device comes back (its hello, which tells no event): the bell quiets by itself, by the clock again.
+      // With Printers open, the device comes back (its hello, which tells no event): the bell quiets and the card says
+      // «Listo» by themselves, by the clock.
       await settled(streams);
       const onThePrinters = loads.length;
       await comesBack(page, device);
       const readsBack = reads.length;
+      const cardReadsBack = cardReads.length;
       await badgeSays(page, before.total, BY_THE_CLOCK);
+      await expect(card).toContainText('Listo', BY_THE_CLOCK);
+      await expect(shown(page).locator('[data-testid=printing-summary-device-off-receipt]')).toHaveCount(0);
       await expect.poll(() => reads.length, { ...BY_THE_CLOCK, message: 'the bell reads its rows again by itself' }).toBeGreaterThan(readsBack);
-      expect(loads.length, 'without a reload').toBe(onThePrinters);
+      expect(cardReads.length, 'the card read the summary again by itself').toBeGreaterThan(cardReadsBack);
       expect((await counters(context)).stalled).toBe(before.stalled);
+
+      // It goes quiet again (no news for 2 min): still on Printers, the card and the bell say so, with no event.
+      wentOff(device, job);
+      const cardReadsOff = cardReads.length;
+      await expect(card).toContainText('Dispositivo apagado', BY_THE_CLOCK);
+      await expect(shown(page).locator('[data-testid=printing-summary-device-off-receipt]')).toBeVisible();
+      await badgeSays(page, before.total + 1, BY_THE_CLOCK);
+      expect(cardReads.length, 'the card read the summary again by itself').toBeGreaterThan(cardReadsOff);
+      expect(loads.length, 'without a reload').toBe(onThePrinters);
     } finally {
       await page.evaluate(() => (window as unknown as { printSocket?: WebSocket }).printSocket?.close()).catch(() => undefined);
       await context.close();
