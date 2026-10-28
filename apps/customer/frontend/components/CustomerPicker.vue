@@ -3,14 +3,17 @@
 // over the first 20 cards by name, followed live; typing searches as the list does (name, phone
 // however typed, email, tax id, company). It tells «searching», «no matches», «down» (with Retry,
 // the text kept) and «no permission» apart, as the product's till search did (customers#18). A tap
-// hands the card up (`pick`); `v-model:term` lets the parent offer «+ New customer «…»».
+// hands the card up (`pick`); `v-model:term` lets the parent offer «+ New customer «…»». A screen reader
+// reads the search box by its hint, in the person's language, never Ionic's English «search text».
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonSearchbar } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 
 import { formatPhone } from '../lib/phoneDisplay';
+import { useCustomerI18n } from '../lib/useCustomerI18n';
+import { useSearchbarName } from '../lib/useSearchbarName';
 import type { CustomerRow } from '../operations';
 
 const props = withDefaults(
@@ -29,6 +32,10 @@ const props = withDefaults(
 
 const term = defineModel<string>('term', { default: '' });
 const emit = defineEmits<{ pick: [customer: CustomerRow] }>();
+
+const { t } = useCustomerI18n();
+const hint = computed(() => props.placeholder ?? t('customer.picker.search'));
+useSearchbarName(useTemplateRef('bar'), () => hint.value);
 
 const FIRST = 20;
 const { data, status, error, refresh } = useLive('customer.customer.list', () => ({
@@ -50,10 +57,11 @@ function onInput(event: Event): void {
 <template>
   <div class="customer-picker">
     <ion-searchbar
+      ref="bar"
       class="ion-no-border customer-picker__search"
       data-testid="customer-picker-search"
       :value="term"
-      :placeholder="placeholder ?? $t('customer.picker.search')"
+      :placeholder="hint"
       :aria-label="$t('customer.picker.searchLabel')"
       :debounce="250"
       @ion-input="onInput"

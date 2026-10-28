@@ -6,8 +6,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { customerRow, pageOf } from '../__tests__/fixtures';
 import { errorFrame, flush, type MountOptions, mountCustomer, subId } from '../__tests__/mount-customer';
+import { namesGiven } from '../__tests__/searchbar-name';
 import CustomerPicker from './CustomerPicker.vue';
 import source from './CustomerPicker.vue?raw';
+
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../__tests__/searchbar-name')).recordSearchbarName,
+}));
 
 const LIST = 'customer.customer.list';
 const ROWS = pageOf([customerRow('c1', 'Ana García'), customerRow('c2', 'Luis', { phone: '', email: 'luis@x.es' }), customerRow('c3', 'Eva')]);
@@ -102,6 +108,25 @@ describe('CustomerPicker', () => {
     const s = await setup({}, { locale: 'es' });
     await s.result(s.call, LIST, pageOf([]));
     expect(s.testid('empty').text()).toBe('No hay clientes.');
+  });
+
+  // flow: customer-searchbar — Ionic 8 names the field of an `ion-searchbar` «search text», in English, whatever its
+  // hint says, so a screen reader read «search text» in «Merge with…» and in the till's customer search.
+  it('its search box is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
+    const s = await setup({}, { locale: 'es' });
+    const bar = s.testid('search').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar por nombre, teléfono, email…');
+    await s.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search by name, phone, email…');
+  });
+
+  it('a hint it is given («Merge with…») names its search box, and again when it changes', async () => {
+    const s = await setup({ placeholder: 'Buscar la ficha duplicada' }, { locale: 'es' });
+    const bar = s.testid('search').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar la ficha duplicada');
+    await s.wrapper.setProps({ placeholder: 'Search the duplicate' });
+    await flush();
+    expect(namesGiven(bar).at(-1)).toBe('Search the duplicate');
   });
 
   it('has no OutfitKit tag', () => {

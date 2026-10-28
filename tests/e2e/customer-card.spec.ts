@@ -2,7 +2,7 @@
 // without reloading (CUSTOMER-F05, live); a group and a tag created in their lists are ticked on the
 // card and their «Customers» count follows (F06, F27, F28); «Merge with…» folds a duplicate into the
 // open card (F13); «Erase personal data» asks first and erases (F16); «Delete» on a row asks first
-// and deletes (F07).
+// and deletes (F07); in Spanish, every search box of Customers is read by its hint (customer-searchbar).
 import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cardOf, cleanUp, createCard, customersReady, e2eName, FLOW_VIEWPORTS, inputOf, rowNamed, searchList, spanishMobile } from './customer-helpers';
@@ -190,3 +190,50 @@ test('«Delete» on a row asks in a dialog, then deletes', async ({ page, contex
   await expect(shown(page).locator('[data-testid=customer-list-empty]')).toBeVisible();
   expect((await cardOf(context, card.id)).status).toBe(404);
 });
+
+// flow: customer-searchbar — Ionic 8 names the field of an `ion-searchbar` «search text», in English, whatever its hint
+// says, so a screen reader read «search text» on the card's tag search (past 100 tags), in «Merge with…» and in the
+// till's customer search. More than 100 tags make the card offer its search: they are made once per run of the file,
+// and `cleanUp` takes them away.
+let manyTags: Promise<void> | undefined;
+function ensureManyTags(context: BrowserContext): Promise<void> {
+  manyTags ??= (async () => {
+    for (let i = 0; i <= 100; i++) {
+      const made = await api(context, A, 'POST', '/customer/tags', { name: e2eName(`Tag ${String(i).padStart(3, '0')}`) });
+      expect(made.status).toBe(201);
+    }
+  })();
+  return manyTags;
+}
+
+for (const viewport of FLOW_VIEWPORTS) {
+  test(`customer-searchbar at ${viewport.label}: in Spanish the search boxes of Customers are named by their hint, never «search text»`, async ({ page, context }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await login(page, A, '/customer/customers');
+    await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    await ensureManyTags(context);
+    const card = await createCard(context, { name: e2eName('Searchbars') });
+    await page.goto(`${A}/customer/customers/${card.id}`);
+    await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+
+    // The card's «Etiquetas», past 100 tags: its search.
+    const tags = shown(page).locator('[data-testid=customer-tags]');
+    await expect(tags.locator('[data-testid=customer-tags-search] input')).toHaveAttribute('aria-label', 'Buscar etiqueta…');
+    await expect(tags.getByRole('searchbox', { name: 'Buscar etiqueta…', exact: true })).toBeVisible();
+
+    // «Fusionar con…»: the customer picker, with the hint the panel gives it.
+    await shown(page).locator('[data-testid=customer-detail-merge]').click();
+    const panel = shown(page).locator('[data-testid=customer-merge]');
+    await expect(panel.locator('[data-testid=customer-picker-search] input')).toHaveAttribute('aria-label', 'Buscar la ficha duplicada');
+    await expect(panel.getByRole('searchbox', { name: 'Buscar la ficha duplicada', exact: true })).toBeVisible();
+    await panel.locator('[data-testid^=customer-picker-result-], [data-testid=customer-picker-empty]').first().waitFor({ state: 'visible' });
+    await panel.locator('[data-testid=customer-picker-search]').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: shot(`FIX-HUB-CUSTOMER-SEARCHBARS-NAMED-IN-ENGLISH-${viewport.label}`) });
+
+    // The till's customer search (its preview page): the picker with its own hint.
+    await page.goto(`${A}/customer/preview/customer-search`);
+    await shown(page).locator('[data-testid=customer-search-trigger]').click();
+    const modal = page.locator('ion-modal[data-testid=customer-search-modal]');
+    await expect(modal.getByRole('searchbox', { name: 'Buscar por nombre, teléfono, email…', exact: true })).toBeVisible();
+  });
+}

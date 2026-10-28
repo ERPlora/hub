@@ -33,6 +33,11 @@ Lo que la app necesita de `@erplora/ui` y todavía no está. Mientras tanto usa 
   `EntityDeleteDialog.vue`). Propuesta: `testid?: string` en `ConfirmOptions`.
 - **`useI18n` exportado desde `@erplora/ui/shell`** — el Hub no depende de `vue-i18n`; la app lee `$t` y
   `$i18n` de las propiedades globales (`lib/useCustomerI18n.ts`).
+- **Nombre de un buscador suelto** (`useSearchbarName`, la misma petición que `sale`) — Ionic 8 anuncia el campo
+  de todo `ion-searchbar` como «search text», en inglés; `@erplora/ui` ya trae `syncSearchbarInputName`, pero cada
+  pantalla tiene que volver a llamarlo al cambiar el idioma o el texto de ayuda y al crearse de nuevo el buscador.
+  Hoy ese `watch` lo lleva la app en `lib/useSearchbarName.ts` (el selector de cliente, `CustomerPicker.vue`, y la
+  búsqueda de grupos y etiquetas de la ficha, `MembershipEditor.vue`).
 
 ## Formateadores (`@erplora/ui/components/format`)
 
