@@ -243,7 +243,7 @@ permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas
 | SALE-F11 | Elegir los suplementos de un artículo | común | hecho |
 | SALE-F12 | Componer un menú | restaurante | hecho |
 | SALE-F13 | Poner una nota en una línea | común | hecho |
-| SALE-F14 | Aplicar un descuento a una línea o a la cuenta | común | parcial |
+| SALE-F14 | Aplicar un descuento a una línea o a la cuenta | común | hecho |
 | SALE-F15 | Invitar una línea | común | hecho |
 | SALE-F16 | Atribuir la cuenta o una línea a quien atiende | común | hecho |
 | SALE-F17 | Aparcar una cuenta y recuperarla | común | hecho |
@@ -500,8 +500,9 @@ Pasos:
 3. Pulsa «Añadir <importe>»: entra una línea con el nombre de la sección y ese importe. Nunca se
    suma a otra línea.
 4. Si no tienes el permiso de precio libre, al pulsar «Añadir <importe>» sale encima «Hace falta una
-   aprobación» con «Se aprueba: Vender a precio libre»: un responsable la aprueba con su PIN (o su placa)
-   en ese mismo dispositivo (BASE-F84) y la línea entra. Si aún no había cuenta, se abre vacía y la línea
+   aprobación» con «Se aprueba: Vender a precio libre por {unit_price, money}» (el importe marcado, en la
+   moneda del negocio): un responsable la aprueba con su PIN (o su placa) en ese mismo dispositivo
+   (BASE-F84) y la línea entra. Si aún no había cuenta, se abre vacía y la línea
    espera a la aprobación.
 Entra: las secciones del negocio (SALE-F35) o, si no hay, las categorías de IVA de Impuestos.
 Sale: una línea sin artículo de catálogo, con su importe y su categoría de IVA, que se cobra como
@@ -624,7 +625,7 @@ Implicados: ninguno
 
 ### SALE-F14 Aplicar un descuento a una línea o a la cuenta
 <!-- origen: old:sales/workflow/la-cuenta.md#sales-f14 qa:modules/sales/apply-discount -->
-Estado: parcial — «Hace falta una aprobación» dice qué se aprueba, pero no el porcentaje ni el importe del descuento: la frase la pone la plataforma, fija por acción
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable; por encima del máximo, el cajero con la aprobación de un responsable
 Pantalla: Vender, Hace falta una aprobación
@@ -636,11 +637,17 @@ Pasos:
 3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
    la fila «Descuento del ticket».
 4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, lo da un responsable: quien
-   no puede darlo ve encima «Hace falta una aprobación» con «Se aprueba: Descontar una línea por encima
-   del máximo» (o «Se aprueba: Descontar la cuenta por encima del máximo»), y un responsable lo aprueba
-   con su PIN (o su placa) en ese mismo dispositivo (BASE-F84). La cuenta guarda quién lo autorizó y no
-   lo vuelve a comprobar al cobrar; si al cobrar el descuento pasa del máximo sin autorizar, se pregunta
-   igual, con «Se aprueba: Cobrar con un descuento por encima del máximo».
+   no puede darlo ve encima «Hace falta una aprobación» con lo que se aprueba y su cifra, la de ese mismo
+   descuento: «Se aprueba: Descontar una línea un {discount_percent, percent}» (el porcentaje marcado) o,
+   en la cuenta, «Se aprueba: Descontar la cuenta un {discount_percent, percent}» o, con importe fijo,
+   «Se aprueba: Descontar {discount_amount, money} de la cuenta» (en la moneda del negocio), y un
+   responsable lo aprueba con su PIN (o su placa) en ese mismo dispositivo (BASE-F84). Sin cifra que
+   decir (un cero), la frase de siempre: «Se aprueba: Descontar la cuenta por encima del máximo». La
+   cuenta guarda quién lo autorizó y no lo vuelve a comprobar al cobrar; si al cobrar el descuento pasa
+   del máximo sin autorizar, se pregunta igual, con «Se aprueba: Cobrar con un descuento por encima del
+   máximo» (una venta sin cuenta, la del asistente, dice el suyo: «Se aprueba: Cobrar con un descuento
+   del {discount_percent, percent}» o «Se aprueba: Cobrar con un descuento de {discount_amount, money}»).
+   Empleados › Aprobaciones guarda lo aprobado con su cifra (BASE-F85).
 Entra: «Permitir descuentos» y el descuento máximo de los ajustes.
 Sale: el descuento en la cuenta o en la línea; al cobrar se reparte entre las líneas, la base y el IVA
 declarados ya lo llevan descontado, y la venta guarda el importe descontado.
@@ -649,9 +656,7 @@ permite descuentos.». Por encima del máximo, si en «Hace falta una aprobació
 cuenta sigue como estaba y se lee «Esto necesita la aprobación de un encargado.». Un importe mayor
 que la cuenta no se puede aplicar. Si otro dispositivo está cobrando esa cuenta, gana el primero
 (SALE-F01).
-Implicados: BASE-F84
-Pendiente: que «Hace falta una aprobación» diga la cifra que se aprueba («un 50 % en la línea»): la
-frase de la acción la pone la plataforma, igual para cada petición.
+Implicados: BASE-F84, BASE-F85
 
 ### SALE-F15 Invitar una línea
 <!-- origen: old:sales/workflow/la-cuenta.md#sales-f15 -->
@@ -1688,7 +1693,15 @@ administrador y responsable, los mismos que anulan y devuelven).
   `approvals` nombra toda orden del TPV cuyo permiso no tiene el empleado (`sale.sale.void`, `.refund`,
   `.complete_over_limit`, `sale.order.void_line`, `.void_ordered`, `.add_open_line`,
   `.set_discount_over_limit`, `.set_line_discount_over_limit`; mercado: Square, Toast, Lightspeed,
-  Shopify «Approval required», Odoo, LS Central, Clover, StoreHub). Eliminar una cuenta con algo pedido
+  Shopify «Approval required», Odoo, LS Central, Clover, StoreHub). `approval_figures`
+  (FIX-HUB-SALE-APPROVAL-WITHOUT-FIGURE-DECLARATION; sales#398, sales#403, hub#2180) dice lo aprobado con la cifra de esa
+  misma petición, como Square, Toast y Lightspeed («Discount 50% requires manager»): el porcentaje de
+  `.set_line_discount_over_limit`; el porcentaje, el importe o los dos de `.set_discount_over_limit` y de
+  `.complete_over_limit` (solo la venta sin cuenta los trae en la entrada: cobrar una cuenta dice la frase fija); el
+  `unit_price` de `.add_open_line`. Gana la primera frase cuyos huecos se llenan todos (ni vacío ni cero); si ninguna,
+  la de `approvals`. Anular, devolver, anular una línea y eliminar una cuenta no tienen cifra en el primer nivel de su
+  entrada (el importe de una devolución va en sus medios de pago) y dicen la frase fija. Lo comprueba `base.E008` al
+  arrancar; tests `apps/sale/tests/test_approvals.py::TestWhatIsApprovedWithItsFigure`. Eliminar una cuenta con algo pedido
   tiene su propia puerta, `sale.order.void_ordered` (permiso `sale.void_sale`): la de `sale.order.void`
   es `sale.add_sale`, porque la vacía la elimina quien monta cuentas (TABLE-F21), y la plataforma aprueba
   el permiso declarado de la orden. Lo que la orden aprobada pide a otras apps por `call_app` (la
