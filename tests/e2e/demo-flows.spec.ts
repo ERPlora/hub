@@ -223,8 +223,9 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
             await expect(detail.locator(`[data-testid=${hook}]`), hook).toHaveCount(0);
           }
           await snap(employee.page, 'DEMO-F06', width);
+          // A line asks for a manager's approval instead (BASE-F84), said with its figures; nothing is added meanwhile.
           const refused = await api<Envelope>(employee.context, A, 'POST', '/demo/items/add_line', { id, text: 'Employee', qty: 1 });
-          expect([refused.status, refused.data.error?.code]).toEqual([403, 'permission_denied']);
+          expect([refused.status, refused.data.error?.code]).toEqual([403, 'requires_elevation']);
         } finally {
           await employee.context.close();
         }

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ad915a833a2438da0a8fe8ce680ae64bb84b68656ea29a8675ee6c41bf89af27 -->
+<!-- generated from WORKBOOK.md sha256:edd64b15355bb1bc8f51bdada980e951fa70defa18a8e8e67992b886edea663f -->
 
 ## What it is for and who it is for
 
@@ -181,8 +181,12 @@ Steps:
    "Mark done", "Delete", "Save note", "Add line" or figures; the note is read-only.
 2. If they open the create or edit form by hand, they see "You do not have permission"; if they try
    through the API or the assistant, it is rejected.
+3. A line, though, they can add with a manager's approval (through the assistant or the API): instead
+   of the rejection, "An approval is needed" shows with what is approved and its figures, "Add a line:
+   {qty} × {text}" (the quantity and the text of that very line), and with the manager's PIN or badge
+   the line is added once.
 In: their role in that business.
-Out: nothing changes.
+Out: nothing changes, except the line a manager approves (it stays in **Employees › Approvals**).
 If it fails: "You do not have permission". Without a session, it takes them to the sign-in. If their
 permission is removed with the screen open, at the next refresh the item page stops showing the item
 and says "You do not have permission".

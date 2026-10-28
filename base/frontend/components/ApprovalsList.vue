@@ -34,9 +34,10 @@ const exportQuery = computed<ApprovalExportQuery>(() => {
   return { ...(words ? { search: words } : {}), ...filters.value };
 });
 
-/** The actions on the record, in words, each once and in alphabetical order: what the «Action» filter offers. */
+/** The actions on the record, by their names without figures (a row says «… 50 %»), each once and in alphabetical
+ *  order: what the «Action» filter offers. */
 const actions = computed<DataTableFilterOption[]>(() =>
-  [...new Map(rows.value.map((row) => [row.operation, row.action])).entries()]
+  [...new Map(rows.value.map((row) => [row.operation, row.operation_label])).entries()]
     .map(([value, label]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label, locale.value)),
 );

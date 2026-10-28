@@ -195,8 +195,12 @@ Pasos:
    hecho», «Eliminar», «Guardar nota», «Añadir línea» ni cifras; la nota solo se lee.
 2. Si abre a mano el formulario de crear o de editar, ve «No tienes permiso»; si lo intenta por la API
    o el asistente, se rechaza.
+3. Una línea, en cambio, la puede añadir con la aprobación de un responsable (por el asistente o la
+   API): en lugar del rechazo sale «Hace falta una aprobación» con lo que se aprueba y sus cifras,
+   «Añadir una línea: {qty} × {text}» (la cantidad y el texto de esa misma línea), y con el PIN o la
+   placa del responsable la línea se añade una vez.
 Entra: su papel en ese negocio.
-Sale: nada cambia.
+Sale: nada cambia, salvo la línea que aprueba un responsable (queda en **Empleados › Aprobaciones**).
 Si falla: «No tienes permiso». Sin sesión, lleva a la entrada. Si le quitan el permiso con la
 pantalla abierta, en el siguiente refresco la ficha deja de enseñar el elemento y dice «No tienes
 permiso».

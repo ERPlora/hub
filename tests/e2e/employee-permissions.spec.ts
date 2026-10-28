@@ -2,7 +2,8 @@
 // `employee@example.com` of `demo_seed`) sees Demo's list and detail, but none of what managing
 // takes: no «New item», figures, «Edit», «Delete» nor «Add line»; reached by its address, a form says
 // «You do not have permission»; the API refuses every management operation with 403
-// `permission_denied` and nothing changes. Without a session the API answers 401 `unauthorized`;
+// `permission_denied` but a line, which asks for a manager's approval (403 `requires_elevation`, said
+// with its figures: BASE-F84), and nothing changes. Without a session the API answers 401 `unauthorized`;
 // with the permission taken away while the screen is open, the next refresh ends in «You do not have
 // permission» and the item is no longer on screen.
 // The owner's screens are the positive control: the same hooks are there for who may manage.
@@ -14,7 +15,7 @@ const OWNER_LINE = 'Owner line';
 /** The Hub's local copy of the SaaS's employee (`saas:<id>`), never the staff one. */
 const EMPLOYEE_USER = `(select id from auth_user where email = '${EMPLOYEE.email}' and username like 'saas:%')`;
 
-type Envelope = { error?: { code: string; message: string } };
+type Envelope = { error?: { code: string; message: string; approval?: { operation: string; label: string } } };
 
 async function addLine(context: BrowserContext, id: string, text: string): Promise<void> {
   const res = await api(context, A, 'POST', '/demo/items/add_line', { id, text, qty: 1 });
@@ -70,7 +71,6 @@ test('DEMO-F06: an employee sees Demo but cannot manage it, by the screens or by
       ['GET', '/demo/items/stats'],
       ['POST', '/demo/items', { name: 'Created by the employee' }],
       ['POST', '/demo/items/update', { id: item.id, name: 'Changed by the employee' }],
-      ['POST', '/demo/items/add_line', { id: item.id, text: 'Employee line', qty: 1 }],
       ['POST', '/demo/items/delete', { id: item.id }],
     ];
     for (const [method, path, body] of attempts) {
@@ -78,6 +78,11 @@ test('DEMO-F06: an employee sees Demo but cannot manage it, by the screens or by
       expect(res.status, `${method} ${path}`).toBe(403);
       expect(res.data.error?.code, `${method} ${path}`).toBe('permission_denied');
     }
+    // A line is the one a manager may approve on the spot: the question, with what it approves and its figures.
+    const line = await api<Envelope>(employee.context, A, 'POST', '/demo/items/add_line', { id: item.id, text: 'Employee line', qty: 1 });
+    expect(line.status).toBe(403);
+    expect(line.data.error?.code).toBe('requires_elevation');
+    expect(line.data.error?.approval).toMatchObject({ operation: 'demo.item.add_line', label: 'Add a line: 1 × Employee line' });
     // What the employee may do, it does: read.
     expect((await api(employee.context, A, 'GET', `/demo/items/detail?id=${item.id}`)).status).toBe(200);
 

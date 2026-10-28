@@ -602,7 +602,10 @@ export interface ApiKeyInput {
 export interface ApprovalRow {
   id: string;
   at: string;
+  /** What was approved, in words, with the figures of what was done («Discount a line by 50 %»). */
   action: string;
+  /** What the action is called, without figures: what the «Action» filter offers. */
+  operation_label: string;
   operation: string;
   requested_by: string;
   approved_by: string;
