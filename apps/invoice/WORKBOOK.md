@@ -414,9 +414,12 @@ Pasos:
    siguiente número de la serie «RECT» del año (no queda reservado: lo toma al emitirse), la fecha de
    hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura ya tenía rectificativas
    por diferencias, también lo que queda por rectificar de ella.
-5. Después sale «¿Ejecutar esta acción?» con el «Número» de la factura y el «Motivo»: escribe
-   «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa, a tu nombre, igual que desde la
-   ventana: en **Facturas** la original sale «Cancelada» y hay una «Rectificativa» nueva fechada hoy.
+5. Después sale «¿Ejecutar esta acción?» con el «Número» de la factura y el «Motivo» y, en
+   «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa», el «Siguiente número»
+   de la serie (tampoco queda reservado) y la «Base imponible», el «Impuesto» y el «Total» en negativo,
+   con la moneda del negocio. Escribe «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa,
+   a tu nombre, igual que desde la ventana: en **Facturas** la original sale «Cancelada» y hay una
+   «Rectificativa» nueva fechada hoy.
 6. Si pulsas «Cancelar», no se emite nada: la factura sigue «Emitida» y el asistente dice que no se hizo.
 Entra: la factura elegida, el tipo y el motivo, en la ventana o dichos al asistente. La fecha la pone el
 servidor: el día del negocio.
@@ -762,7 +765,7 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | Una factura con sus líneas, desglose y enlaces, por su id o su número | ver | F17 | `invoice.invoice.get` |
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
-| La rectificativa que emitiría rectificar una factura, sin emitirla ni gastar número (lo que el asistente enseña antes de su confirmación) | rectificar | F08 | `invoice.invoice.rectification_preview` |
+| La rectificativa que emitiría rectificar una factura, sin emitirla ni gastar número (lo que el asistente enseña antes de su confirmación y dentro de ella) | rectificar | F08 | `invoice.invoice.rectification_preview` |
 | El tipo con que empieza una línea tecleada: el general del territorio, de su propia regla en Impuestos (vacío sin ella) | emitir | F03 | `invoice.invoice.line_defaults` |
 | Las series, con búsqueda, filtros y páginas | ver | F12, F13 | `invoice.series.list` |
 | El siguiente número de una serie, sin gastarlo | ver | F13 | `invoice.series.peek_next` |
