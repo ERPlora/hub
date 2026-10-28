@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
+from live.operations import registry
 
 from apps.table import queries, schemas, services
 from apps.table.models import (
@@ -72,7 +73,8 @@ def lazy_constants(module) -> list:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
+    its schemas."""
     config = apps.get_app_config("table")
     lazies = [
         config.verbose_name,
@@ -103,7 +105,19 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | {"Table %(number)s"}
+        return {str(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles table's operations give their input data (``gettext_noop``): the assistant's card names each datum
+    by them, so each one needs its Spanish. Only the ones table wrote: pydantic leaves ``title`` empty otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "table"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():
