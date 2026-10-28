@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d019e54fed4d9dbac692a00ac55c060d6483b598582ea3373f4c1245c5ac0125 -->
+<!-- generated from WORKBOOK.md sha256:66a3da4a3b45eff565daab033eb2b68e67cfb395c1eb859653672c2e1f21d049 -->
 
 ## What it is for and who it is for
 
@@ -123,8 +123,9 @@ The Hub's **Home** shows the five panels of Staff, grouped as "Staff" in **Custo
 "Active staff" (how many people are **Active**), "On leave today" (different people with approved time off
 that covers today) and "Today’s time off" (who is away today, full days first and then by name, with the
 type of time off under each name) show; "Pending time off" (how many requests are waiting for an answer) and
-"Staff by role" (a bar per role with its **Active** people, the role with the most first and ten at most)
-are added from **Customize panel**. Whoever does not see the time off does not get the three time-off ones,
+"Staff by role" (a bar per role with its **Active** people, the role with the most first and ten at most;
+each bar has its role's colour, and the one of a role without a colour, the panel's) are added from
+**Customize panel**. Whoever does not see the time off does not get the three time-off ones,
 and whoever does not see the team, neither "Active staff" nor "Staff by role". They change by themselves,
 without reloading. The same figures stay inside Staff: the three above the Staff table, "Today’s time off"
 above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F23).
