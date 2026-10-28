@@ -6,7 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { business, POLISH, rule } from '../__tests__/fixtures';
+import { business, JAPANESE, KUWAITI, POLISH, rule } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import RuleFormModal from './RuleFormModal.vue';
 
@@ -180,5 +180,62 @@ describe('RuleFormModal', () => {
     const s = await setup({}, 'es');
     expect(s.inDoc('pricing-rule-form')?.getAttribute('aria-label')).toBe('Nueva regla de descuento');
     expect([s.field('percent').label, s.field('applies_to').label]).toEqual(['Porcentaje (%)', 'Se aplica a']);
+  });
+});
+
+describe('RuleFormModal: the business answers after the form opened', () => {
+  const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 12.50.';
+  const FIXED = { rule_type: 'fixed' as const, percent: null };
+
+  it('an untouched amount per unit is rewritten from the rule with the yen’s decimals, and «Save» keeps its scale', async () => {
+    const s = await setup({ rule: rule({ ...FIXED, amount: 150 }) });
+    expect(s.field('amount').value).toBe('1.50');
+    await s.live();
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('amount').value).toBe('150');
+    s.answer(200, rule({ ...FIXED, amount: 150, name: 'Ten yen off' }));
+    await ionValue(s.field('name'), 'Ten yen off', 'ionInput');
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/rules/update', query: {}, body: { id: 'r1', name: 'Ten yen off' } }]);
+  });
+
+  it('with three decimals an untouched amount per unit is rewritten in that scale, never saved ten times bigger', async () => {
+    const s = await setup({ rule: rule({ ...FIXED, amount: 1500 }) });
+    expect(s.field('amount').value).toBe('15.00');
+    await s.live();
+    await s.result('base.business.get', business(KUWAITI));
+    expect(s.field('amount').value).toBe('1.500');
+    s.answer(200, rule({ ...FIXED, amount: 1500, name: 'Dinar off' }));
+    await ionValue(s.field('name'), 'Dinar off', 'ionInput');
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/rules/update', query: {}, body: { id: 'r1', name: 'Dinar off' } }]);
+  });
+
+  it('what the person already typed stays and is read in the business’s currency: «2,50» in Poland is 250 grosze', async () => {
+    const s = await setup();
+    s.answer(201, rule());
+    await named(s, 'FIX', 'Fifty off');
+    await ionValue(s.field('rule_type'), 'fixed');
+    await ionValue(s.field('amount'), '2,50', 'ionInput');
+    await s.live();
+    await s.result('base.business.get', business(POLISH));
+    expect(s.field('amount').value).toBe('2,50');
+    await click(s.save());
+    expect(s.sent()[0].body).toMatchObject({ rule_type: 'fixed', amount: 250 });
+  });
+
+  it('what the person typed that the yen cannot read stays as typed: «Save» waits, nothing is sent (never a 0) and the field says why', async () => {
+    const s = await setup({ rule: rule({ ...FIXED, amount: 150 }) });
+    await ionValue(s.field('amount'), '1,75', 'ionInput');
+    await s.live();
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('amount').value).toBe('1,75');
+    expect(s.save().disabled).toBe(true);
+    await click(s.save());
+    expect(s.sent()).toEqual([]);
+    s.field('amount').dispatchEvent(new CustomEvent('ionBlur'));
+    await settle();
+    expect(s.field('amount').value).toBe('1,75');
+    expect(s.field('amount').errorText).toBe(NOT_AMOUNT);
   });
 });
