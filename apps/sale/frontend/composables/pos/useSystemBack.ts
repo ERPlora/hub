@@ -5,12 +5,17 @@
 // `preventDefault()`, and the shell keeps the screen. With nothing open the event is left alone: the shell's Back.
 //
 // Topmost is the last opened («Open checks» from inside the drawer goes first, the drawer on the next press), so the
-// layers open now are kept in one stack, and one listener on `window` lives while it is not empty.
-import { onScopeDispose, watch, type WatchSource } from 'vue';
+// layers open now are kept in one stack, and one listener on `window` lives while it is not empty. Only the layers of
+// the screen on view count: a screen pushed over the till (another app from the ⠿) leaves it mounted under it, hidden
+// by Ionic, with whatever was open, and that one must not take the Back of the screen on top.
+import { getCurrentInstance, onScopeDispose, watch, type WatchSource } from 'vue';
 
 import { SHELL_BACK_EVENT } from '../../../../../base/frontend/lib/system-back';
 
-type Layer = () => void;
+/** Ionic's class on a page of its stack that is not on view. */
+const HIDDEN_PAGE = '.ion-page-hidden';
+
+type Layer = { close: () => void; onView: () => boolean };
 
 /** The own layers open now, bottom first. */
 const layers: Layer[] = [];
@@ -23,15 +28,28 @@ function drop(layer: Layer): void {
 }
 
 function onBack(event: Event): void {
-  const top = layers.at(-1);
-  if (!top || event.defaultPrevented) return;
-  event.preventDefault();
-  top();
+  if (event.defaultPrevented) return;
+  for (let at = layers.length - 1; at >= 0; at--) {
+    const layer = layers[at];
+    if (!layer.onView()) continue;
+    event.preventDefault();
+    layer.close();
+    return;
+  }
 }
 
 /** While `open` is true, the system Back calls `close` — one press, one layer, the topmost first. */
 export function useSystemBack(open: WatchSource<boolean>, close: () => void): void {
-  const layer: Layer = () => close();
+  const instance = getCurrentInstance();
+  const layer: Layer = {
+    close: () => close(),
+    onView: () => {
+      // The component's root, or the parent of its anchor when it renders a fragment or nothing.
+      const node = instance?.proxy?.$el as Node | null | undefined;
+      const element = node instanceof Element ? node : node?.parentElement;
+      return !element?.closest(HIDDEN_PAGE);
+    },
+  };
   watch(
     open,
     (isOpen) => {

@@ -1693,6 +1693,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   `erplora:back` de `base/frontend/lib/system-back.ts` con `useSystemBack` (`frontend/composables/pos/`): una pila de
   las capas abiertas (en el orden en que se abrieron, `flush: 'sync'`) y un solo escuchador en `window` mientras no
   está vacía; cada pulsación cierra la de arriba y llama a `preventDefault()`, y un atrás que otro ya tomó se deja.
+  Solo cuentan las capas de la pantalla a la vista: otra app abierta desde ⠿ con el cajón o el ⋮ abiertos deja el TPV
+  montado debajo (Ionic lo oculta con `ion-page-hidden`), y esa capa no se queda el atrás de la pantalla de encima.
   Una capa propia nueva del TPV se suma con `useSystemBack(abierta, cerrar)`. Tests: `useSystemBack.test.ts`,
   `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.test.ts` (bloque `the phone`) y la e2e
   `tests/e2e/sale-pos-system-back.spec.ts` (el puente de la app simulado como en `shell-nav.spec.ts`).

@@ -7,7 +7,7 @@
 // does. Hub, SaaS and the till are the real ones; nothing is written.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown } from './helpers';
+import { A, login, openApps, shot, shown } from './helpers';
 import { openTillCart } from './sale-helpers';
 
 const VIEWPORTS = [
@@ -107,5 +107,23 @@ test('SALE-F01 390: Back closes «Open checks» first, then the check drawer, an
 
   await pressBack(page);
   await expect(page).toHaveURL(`${A}/`);
+  expect(await leftTheApp(page)).toBe(false);
+});
+
+test('SALE-F01 390: a check drawer left open under another app does not take its Back: the root of that app goes Home', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await tillInsideTheApp(page);
+  await openTillCart(page);
+  // The ⠿ of the topbar stays in reach over the drawer; the app it opens is pushed over the till, which Ionic keeps
+  // mounted under it with its drawer open.
+  const sheet = await openApps(page);
+  await sheet.locator('[data-testid=apps-launcher-app]:not([disabled])').filter({ hasNotText: /^\s*(Ventas|Sales|Demo)\b/ }).first().click();
+  await expect(page).not.toHaveURL(/\/sale\/pos/);
+  await expect(page.locator('ion-modal[data-testid=apps-launcher]:not(.overlay-hidden)')).toHaveCount(0);
+  await expect(page.locator('.ion-page-hidden [data-testid=pos-till].pos-till--cart-open')).toHaveCount(1);
+
+  await pressBack(page);
+  await expect(page).toHaveURL(`${A}/`);
+  await expect(shown(page).locator('[data-testid=home-my-app]').first()).toBeVisible();
   expect(await leftTheApp(page)).toBe(false);
 });
