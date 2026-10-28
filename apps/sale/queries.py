@@ -3,21 +3,20 @@
 The helpers that freeze a line (``freeze_product_line``, ``freeze_open_line``, ``freeze_service_line``)
 read Inventory's product and units, and Services' service, through those apps' own operations, with
 the caller's session: neither is a requirement of the sale app (PLAN §20.5), so their tables are never
-read here. ``call_app`` is the one door to an app sale does not require (Services' catalog and voucher sessions,
-Invoicing's documents, Cash register's drawer, Appointments' bookings), by the name of its operation. ``valuate`` is the one
+read here. ``call_app`` is the one door to an app sale does not require (Inventory's catalog, Services' catalog and
+voucher sessions, Invoicing's documents, Cash register's drawer, Appointments' bookings), by the name of its operation:
+the platform's ``base.operations.call``, with this app's own 409 when that app is not in the business. ``valuate`` is the one
 valuation of a charge (``pricing.value`` over tax's closing), shared by the preview and the checkout.
 """
 
 import datetime as dt
 from collections.abc import Iterable
-from dataclasses import replace
 from decimal import Decimal
 from fractions import Fraction
 from itertools import groupby
 from operator import attrgetter
 from uuid import UUID
 
-import pydantic
 from babel.numbers import format_currency, get_currency_symbol
 from django.conf import settings as django_settings
 from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, QuerySet, Sum
@@ -27,13 +26,12 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, system_context
 from live.errors import (
-    AppInactive,
     Conflict,
     InvalidPayload,
     NotFound,
     PermissionDenied,
 )
-from live.operations import Operation, UnknownOperation, get, operation
+from live.operations import get, operation
 
 from apps.sale import pricing
 from apps.sale.models import (
@@ -95,10 +93,10 @@ from apps.tax.queries import (
     current_rates,
 )
 from apps.tax.schemas import TAX_KIND_NAMES
-from base.approvals import Approved, digest
+from base.approvals import approval_of, digest
 from base.business import currency_decimals, currency_of
 from base.models import Approval
-from base.operations import is_platform_hub
+from base.operations import call, is_platform_hub
 
 #: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
 BUSINESS = "base.business.get"
@@ -216,13 +214,6 @@ def actor(ctx: OperationContext) -> str:
     return str(ctx.actor)[:128] if ctx.actor is not None else ""
 
 
-def approval_of(ctx: OperationContext) -> Approved | None:
-    """The manager's approval the request of ``ctx`` came with (BASE-F84): the command it is for, spent in that
-    command's own transaction before its body runs; ``None`` without one."""
-    marked = getattr(getattr(ctx, "request", None), "approved", None)
-    return marked if isinstance(marked, Approved) else None
-
-
 def authoriser(ctx: OperationContext) -> str:
     """Who authorised what ``ctx`` does (a discount above the maximum): the manager who approved this very request
     with their PIN on the cashier's device (BASE-F84), else the caller."""
@@ -236,16 +227,6 @@ def authoriser(ctx: OperationContext) -> str:
         if approved_by:
             return approved_by[:128]
     return actor(ctx)
-
-
-def consequence_context(ctx: OperationContext, op: Operation) -> OperationContext:
-    """The context the command ``op`` of another app runs with as part of the caller's command (``call_app``). When a
-    manager approved that command with their PIN (BASE-F84), what it does on the way goes with it, as when the manager
-    does it themselves: the rectifying invoice in the void or the refund, the voucher's sessions it gives back. Without
-    an approval, or for a read, the caller's own: an approval never opens a query (``base.approvals``)."""
-    if op.kind != "command" or not op.permission or ctx.has(op.permission) or approval_of(ctx) is None:
-        return ctx
-    return replace(ctx, permissions=ctx.permissions | {op.permission})
 
 
 @operation(
@@ -637,25 +618,9 @@ def list_quick_notes(ctx: OperationContext, params: QuickNoteListIn) -> dict:
 # ── Freezing a line ──────────────────────────────────────────────────────────────────────────────
 
 
-def _inventory(ctx: OperationContext, name: str, data: dict):
-    """Runs Inventory's operation ``name`` for the caller; Inventory off or absent → catalog unavailable."""
-    try:
-        op = get(name)
-    except UnknownOperation:
-        raise Conflict(
-            str(CATALOG_UNAVAILABLE), code="sale.catalog_unavailable"
-        ) from None
-    try:
-        return op(ctx, op.input.model_validate(data))
-    except AppInactive:
-        raise Conflict(
-            str(CATALOG_UNAVAILABLE), code="sale.catalog_unavailable"
-        ) from None
-
-
 def inventory_units(ctx: OperationContext) -> dict:
     """``{code: (factor_num, factor_den, increment)}`` of Inventory's units of measure."""
-    page = _inventory(ctx, "inventory.unit.list", {"limit": 100})
+    page = call_app(ctx, "inventory.unit.list", {"limit": 100}, "sale.catalog_unavailable")
     return {
         unit.code: (unit.factor_num, unit.factor_den, Decimal(unit.increment))
         for unit in page.rows
@@ -664,6 +629,7 @@ def inventory_units(ctx: OperationContext) -> dict:
 
 #: What a 409 of an app sale does not require says when that app is not in this business.
 UNAVAILABLE = {
+    "sale.catalog_unavailable": CATALOG_UNAVAILABLE,
     "sale.services_unavailable": SERVICES_UNAVAILABLE,
     "sale.invoice_unavailable": INVOICE_UNAVAILABLE,
     "sale.cash_register_unavailable": CASH_REGISTER_UNAVAILABLE,
@@ -681,27 +647,12 @@ WHOLE = Decimal("1")
 
 
 def call_app(ctx: OperationContext, name: str, data: dict, unavailable_code: str):
-    """Runs the operation ``name`` of an app sale does not require, for the caller (its permission and
-    its active-app check apply): the app off or absent (``UnknownOperation``, ``app_inactive``) → 409
-    ``unavailable_code``. Its own refusals reach the caller as they are; nested in a write, it runs in a
-    savepoint, so a refusal caught by the caller leaves nothing of it behind."""
-    unavailable = Conflict(str(UNAVAILABLE[unavailable_code]), code=unavailable_code)
-    try:
-        op = get(name)
-    except UnknownOperation:
-        raise unavailable from None
-    try:
-        payload = op.input.model_validate(data)
-    except pydantic.ValidationError as invalid:
-        # What the other app does not accept is a 422 of the caller, as a route would answer it.
-        fields = {".".join(map(str, error["loc"])): error["msg"] for error in invalid.errors()}
-        raise InvalidPayload(
-            next(iter(fields.values()), str(invalid)), code="invalid_payload", fields=fields
-        ) from None
-    try:
-        return op(consequence_context(ctx, op), payload)
-    except AppInactive:
-        raise unavailable from None
+    """Runs the operation ``name`` of an app sale does not require, for the caller, through the platform's one door
+    (``base.operations.call``, BASE-F84): its permission and its active-app check apply, its refusals reach the caller
+    as they are, an input it does not take is the caller's 422, and nested in a write it runs in a savepoint. Inside a
+    command a manager approved, a command of another app goes with it, by the platform's rule. The app off or absent →
+    409 ``unavailable_code``, said as this app says it."""
+    return call(ctx, name, data, unavailable=Conflict(str(UNAVAILABLE[unavailable_code]), code=unavailable_code))
 
 
 def call_services(ctx: OperationContext, name: str, data: dict):
@@ -1116,10 +1067,11 @@ def freeze_product_line(
     """An unsaved row for a product of Inventory: its price, unit and category frozen from the catalog. Only a
     new line goes through here, so an article sold out since it was ordered is still charged (COMBO-F08)."""
     try:
-        product = _inventory(
+        product = call_app(
             ctx,
             "inventory.product.get",
             {"id": data.product_id, "product": data.product},
+            "sale.catalog_unavailable",
         )
     except NotFound:
         raise Conflict(
