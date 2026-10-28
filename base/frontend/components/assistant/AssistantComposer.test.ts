@@ -234,6 +234,19 @@ describe('AssistantComposer', () => {
     );
   });
 
+  it('the line about a refused microphone stays until the next tap, which records once it is allowed', async () => {
+    const voice = microphone();
+    voice.getUserMedia.mockRejectedValueOnce(new DOMException('no', 'NotAllowedError'));
+    const m = await composer({ voice });
+    await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+    for (let i = 0; i < 3; i += 1) await flush();
+    expect(m.wrapper.find('[data-testid="assistant-composer-problem"]').exists()).toBe(true);
+    await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+    for (let i = 0; i < 3; i += 1) await flush();
+    expect(m.wrapper.find('[data-testid="assistant-composer-problem"]').exists()).toBe(false);
+    expect(accessibleName(m.wrapper.get('[data-testid="assistant-mic"]').element)).toBe('Detener la grabación');
+  });
+
   // BASE-F94: the installed app (Android, Windows) has no browser bar, so a refused microphone is allowed again in the
   // device's settings; in a browser, in the browser.
   it('a microphone refused inside the installed app points to the device settings, in a browser to the browser', async () => {
