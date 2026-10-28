@@ -155,6 +155,17 @@ def test_erplora_s_own_hub_follows_its_issuer_s_country_and_not_a_registry_row(s
     assert (first["currency"], first["currency_label"], first["currency_decimals"]) == ("GBP", "GBP · British Pound", 2)
 
 
+def test_the_decimals_are_the_currency_s_own_never_a_fixed_two(hubs, settings):
+    """What every app counts with (``currency_decimals``) is the currency's own (CLDR), on a business's hub and on
+    ERPlora's: the yen has none, the Kuwaiti dinar three."""
+    Hub.objects.filter(slug="a").update(country="JP")
+    Hub.objects.filter(slug="b").update(country="KW")
+    assert (business(A)["currency"], business(A)["currency_decimals"]) == ("JPY", 0)
+    assert (business(B)["currency"], business(B)["currency_decimals"]) == ("KWD", 3)
+    settings.PLATFORM_ISSUER_COUNTRY = "JP"
+    assert (business(ERPLORA)["currency"], business(ERPLORA)["currency_decimals"]) == ("JPY", 0)
+
+
 def test_a_scope_without_a_business_is_not_found_and_says_so_in_the_person_s_language():
     with translation.override("es"), pytest.raises(NotFound) as refused:
         business(Scope("host", "nobody"))
