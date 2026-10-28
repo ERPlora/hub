@@ -11,7 +11,7 @@ import { execSync } from 'node:child_process';
 
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider } from './assistant-provider';
+import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
 import { A, api, compactBar, EMPLOYEE, login, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
@@ -331,6 +331,28 @@ test('BASE-G119 — several things in a row: the read runs by itself, the write 
   const made = await api<{ rows: { name: string }[] }>(context, A, 'GET', `/demo/items?search=${encodeURIComponent(name)}`);
   expect(made.data.rows.map((row) => row.name)).toEqual([name]);
   await shots(page, 'BASE-G119');
+});
+
+// flow: BASE-F101 (Pedirle varias cosas seguidas): el texto de cada ronda de un turno, párrafo aparte en la misma burbuja
+test('BASE-F101 — several things in a row: what each round says is its own paragraph of the one bubble, never glued to the previous one', async ({ page }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-ROUNDS-TEXT-RUN-TOGETHER';
+  await login(page, A, '/');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  await ask(page, `E2E-STEPS Mesa pasos ${Date.now().toString(36)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  await decide(page, 'cancel');
+  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
+  // Three rounds (before the read, before the write, after the card), one bubble, one paragraph each.
+  await expect(answers(page)).toHaveCount(1);
+  await expect(lastAnswer(page).locator('.assistant-md > p')).toHaveText([...STEPS_SAID, 'No lo he hecho.']);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(lastAnswer(page)).toBeVisible();
+    await untilStill(page);
+    await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
+  }
 });
 
 test('BASE-G116 — a dangerous write lists its data and runs only after typing the word', async ({ page, context }) => {

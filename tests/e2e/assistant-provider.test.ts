@@ -6,7 +6,7 @@ import { request } from 'node:http';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { answerTo, CLAIM_ANSWER, closeCashSummary, DICTATION, FORMAT_ANSWER, GREETING, type Provider, rectifyPreview, startProvider } from './assistant-provider';
+import { answerTo, CLAIM_ANSWER, closeCashSummary, DICTATION, FORMAT_ANSWER, GREETING, type Provider, rectifyPreview, startProvider, STEPS_SAID } from './assistant-provider';
 
 type Frame = { choices: { delta: { content?: string; tool_calls?: { function: { name?: string; arguments?: string } }[] }; finish_reason: string | null }[] };
 
@@ -63,6 +63,20 @@ describe('answerTo', () => {
     expect(toolOf(answerTo(read).frames)).toEqual({ name: 'demo__item__create', arguments: '{"name":"Mesa 7"}' });
     const written = [...read, asked('demo__item__create'), { role: 'tool', content: '{"id": "1"}' }];
     expect(textOf(answerTo(written).frames)).toBe('Hecho.');
+  });
+
+  it('a chain that speaks in every round (BASE-F101): its words before the read, before the write, then the outcome', () => {
+    const question = user('E2E-STEPS Mesa 7');
+    const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
+    const first = answerTo([question]).frames;
+    expect(textOf(first)).toBe(STEPS_SAID[0]);
+    expect(toolOf(first)).toEqual({ name: 'demo__item__list', arguments: '{}' });
+    const read = [question, asked('demo__item__list'), { role: 'tool', content: '{"rows": []}' }];
+    const second = answerTo(read).frames;
+    expect(textOf(second)).toBe(STEPS_SAID[1]);
+    expect(toolOf(second)).toEqual({ name: 'demo__item__create', arguments: '{"name":"Mesa 7"}' });
+    const cancelled = [...read, asked('demo__item__create'), { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed"}}' }];
+    expect(textOf(answerTo(cancelled).frames)).toBe('No lo he hecho.');
   });
 
   it('closing the drawer (CASH_REGISTER-F09): the summary first, then its words and the close of that session, then the outcome', () => {
