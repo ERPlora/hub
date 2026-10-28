@@ -817,9 +817,9 @@ class RectifiedOut(Schema):
     invoice_type: str = Field(description="Its type: F1, F2 ticket or F3.")
     issue_date: dt.date = Field(description="Its issue date.")
     customer_name: str = Field(description="Its recipient; empty on a ticket without one.")
-    total_amount: int = Field(description="Its total, cents.")
+    total_amount: int = Field(description="Its total, in cents.")
     remaining: int = Field(
-        description="What is left of it before this rectification, cents (less than its total after a partial "
+        description="What is left of it before this rectification, in cents (less than its total after a partial "
         "rectification by differences)."
     )
 
@@ -828,18 +828,24 @@ class PreviewLineOut(Schema):
     description: str
     quantity: Decimal = Field(description="Negative: the quantity carries the sign, the price does not.")
     tax_rate: Decimal = Field(description="Its rate, %.")
-    base_amount: int = Field(description="Its base, cents (negative).")
-    total_amount: int = Field(description="Its total with tax, cents (negative).")
+    base_amount: int = Field(description="Its base, in cents (negative).")
+    total_amount: int = Field(description="Its total with tax, in cents (negative).")
 
 
 class RectificationPreviewOut(Schema):
-    """The rectifying invoice that rectifying would issue now, before it is issued (INVOICE-F08): nothing is written."""
+    """The rectifying invoice that rectifying would issue now, before it is issued (INVOICE-F08): nothing is written.
+    ``invoice.invoice.rectify`` shows its type, next number and amounts on its card (BASE-F98): their titles are the
+    names the Facturas screens give them, and an amount says «in cents» to be shown as money."""
 
     original: RectifiedOut = Field(description="The invoice it rectifies.")
-    invoice_type: str = Field(description="The rectification's type: R1–R4 for an invoice, R5 for a ticket.")
+    invoice_type: str = Field(
+        title=gettext_noop("Type of rectifying invoice"),
+        description="The rectification's type: R1–R4 for an invoice, R5 for a ticket.",
+    )
     reason: str = Field(description="Its reason, printed on it.")
     series_code: str = Field(description="Its series: this year's rectifying one (RECT).")
     next_number: str = Field(
+        title=NEXT_NUMBER,
         description="The number it would carry if issued now: the series' next one, NOT reserved — it is taken only "
         "when the rectification is issued, so another one issued before takes it. Say it as the next number, never as "
         "its own."
@@ -848,9 +854,9 @@ class RectificationPreviewOut(Schema):
     whole: bool = Field(
         description="True: the whole original negated, line by line. False: what is left of it, one line per tax rate."
     )
-    base_amount: int = Field(description="Its base, cents (negative).")
-    tax_amount: int = Field(description="Its tax, cents (negative).")
-    total_amount: int = Field(description="Its total, cents (negative).")
+    base_amount: int = Field(title=gettext_noop("Tax base"), description="Its base, in cents (negative).")
+    tax_amount: int = Field(title=gettext_noop("Tax"), description="Its tax, in cents (negative).")
+    total_amount: int = Field(description="Its total, in cents (negative).")
     currency: str
     currency_decimals: int = Field(description="The decimals of its currency (2 in EUR): its amounts' minor unit.")
     lines: list[PreviewLineOut] = Field(description="Its lines.")
