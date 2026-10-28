@@ -1072,6 +1072,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   ocho unidades son un registro en código (`models.UNIT_SPECS`: tipo, factor como fracción exacta y
   escalón), no una tabla: el negocio nunca crea unidades. Una cantidad fuera del escalón es 409
   `inventory.off_grid_quantity` con su campo; nunca se redondea. Dinero en céntimos enteros.
+- **Campos de importe** (precio, coste, coste unitario; F01, F02, F13): se escriben y se leen con los decimales de
+  la moneda del negocio (`useBusinessMoney`, los del servidor, nunca los del navegador). Si el panel se abre antes de
+  que `base.business.get` conteste, el precio y el coste que la persona no ha tocado se reescriben desde lo guardado
+  en cuanto llega la moneda (o cambia), y con ellos lo que el editar compara para mandar solo lo cambiado; lo ya
+  escrito se queda tal cual y se lee en esa moneda al guardar (si no se puede, lo dice el campo), y salir del campo
+  no lo reformatea mientras la moneda no se sabe.
 - **Referencias de persona**: `find_product` busca por SKU (sin mayúsculas), luego por nombre exacto y
   luego por el único nombre que lo contiene; varios → 409 `inventory.product_ambiguous` con los
   candidatos. Igual `find_category` por nombre o slug.
