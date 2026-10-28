@@ -65,6 +65,11 @@ SPANISH_CATALOG = PurePosixPath("locale/es/LC_MESSAGES/django.mo")
 TEXT_LIMITS = {"verbose_name": 80, "summary": 120}
 
 _HEADER_FORMAT = "<!-- generated from WORKBOOK.md sha256:{} -->"
+#: What prints that first line for an app, in its Hub's checkout (PLAN-MIGRATIONS §24-D).
+_HEADER_COMMAND = (
+    'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
+    "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
+)
 _HEADER_RE = re.compile(
     r"\A<!-- generated from WORKBOOK\.md sha256:([0-9a-f]{64}) -->[ \t]*\n+"
 )
@@ -170,12 +175,7 @@ def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:
             if fence is not None or match:
                 if fence is None:
                     fence = match.group(1)
-                elif (
-                    match
-                    and match.group(1)[0] == fence[0]
-                    and len(match.group(1)) >= len(fence)
-                    and not line.strip().lstrip(fence[0])
-                ):
+                elif _closes(fence, line):
                     fence = None
                 last_blank, collapse = not line.strip(), False
                 yield line, True
@@ -195,6 +195,31 @@ def _uncommented_lines(text: str) -> Iterator[tuple[str, bool]]:
         raise WorkbookError(
             f"the HTML comment opened on line {opened} never closes: end it with «{_COMMENT_END}»."
         )
+
+
+def _closes(fence: str, line: str) -> bool:
+    """Whether ``line`` closes the fenced code block ``fence`` (its opening run of backticks or tildes) opened."""
+    match = _FENCE_RE.match(line)
+    return (
+        match is not None
+        and match.group(1)[0] == fence[0]
+        and len(match.group(1)) >= len(fence)
+        and not line.strip().lstrip(fence[0])
+    )
+
+
+def prose_lines(text: str) -> Iterator[tuple[int, str]]:
+    """Each line of ``text`` outside its fenced code blocks, with its number (the first is 1)."""
+    fence = None
+    for number, line in enumerate(text.splitlines(), start=1):
+        if fence is None:
+            match = _FENCE_RE.match(line)
+            if match:
+                fence = match.group(1)
+            else:
+                yield number, line
+        elif _closes(fence, line):
+            fence = None
 
 
 def _uncomment(line: str, opened: int | None, number: int) -> tuple[str, int | None]:
@@ -252,6 +277,19 @@ def en_header(digest: str) -> str:
     return _HEADER_FORMAT.format(digest)
 
 
+def translate_by_hand(label: str) -> str:
+    """How to bring app ``label``'s stale ``WORKBOOK.en.md`` up to date, for the errors that find it.
+
+    By hand: ERPlora uses no ``ANTHROPIC_API_KEY`` (PLAN-MIGRATIONS §24-D), so no error sends to
+    ``translate_workbooks`` without ``--check``, which calls the Claude API. The header the command
+    prints (``en_header`` of the current Spanish part) is what makes the translation current.
+    """
+    return (
+        f"translate by hand the part of {WORKBOOK} that changed into {WORKBOOK_EN} and make its first "
+        f"line the header this prints: {_HEADER_COMMAND.format(label)}"
+    )
+
+
 @dataclass(frozen=True)
 class Translation:
     """A module's WORKBOOK and the state of its English translation."""
@@ -300,7 +338,8 @@ def stale_translations(configs: Iterable | None = None) -> list[str]:
                     stale.append(config.label)
             except WorkbookError:
                 # A module's: build_registry reports the WORKBOOK itself. A platform app's (base) no
-                # registry reads, so it counts here and ``translate_workbooks --app`` names the error.
+                # registry reads, so it counts here, and the header command of ``translate_by_hand``
+                # (or ``translate_workbooks --app``, before any call) names the error.
                 if config.kind != "app":
                     stale.append(config.label)
     return stale
@@ -406,8 +445,8 @@ def _documents(config, problems: list[str]) -> dict[str, str]:
     docs = {"es": state.source}
     if state.state == "stale":
         problems.append(
-            f"{config.label}: {WORKBOOK_EN}: out of date with {WORKBOOK}: run "
-            f"`python manage.py translate_workbooks --app {config.label}` and review the diff."
+            f"{config.label}: {WORKBOOK_EN}: out of date with {WORKBOOK}: "
+            f"{translate_by_hand(config.label)}"
         )
     elif state.state == "current":
         try:
