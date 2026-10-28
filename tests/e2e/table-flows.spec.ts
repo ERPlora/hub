@@ -463,8 +463,23 @@ test('TABLE-F12: the till brings its open check to a table («Choose table»)', 
       await expect(picker).toBeHidden();
       // On a phone the check lives behind the cart's button; the till lays itself out for a new size a frame late.
       await openTillCart(page);
+      // The sheet slides in after its tables render: wait for Ionic to say it presented (its animation over).
+      const presented = page.evaluate(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            document.addEventListener('ionModalDidPresent', () => resolve(), { once: true });
+            setTimeout(() => reject(new Error('«Choose table» did not present within 10 s')), 10_000);
+          }),
+      );
       await till.locator('[data-testid=pos-table-trigger]').filter({ visible: true }).click();
+      await presented;
       await expect(option).toContainText('Available');
+      // The shot shows the sheet in place, not on its way up: read now, not retried, its table lies inside the window.
+      const inside = await option.evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        return box.top >= 0 && box.bottom <= window.innerHeight;
+      });
+      expect(inside, '«Choose table» has presented: its table lies inside the window').toBe(true);
     };
     // Each size opens «Choose table» afresh: a new size may relay the page out under an open window.
     await flowShots(page, ['TABLE-F12'], choose);
