@@ -1,7 +1,8 @@
 """Input and output schemas of the service app's operations (OpenAPI, live params, 422 per field).
 
 They are also the JSON Schema of the assistant's tools, so every field says what it is. Money travels
-in cents (integers, never negative); a percentage discount in basis points (1050 = 10.50 %). A
+in minor units of the business's currency, its country's (cents in euros, whole yen in Japan; integers,
+never negative; service-business-currency); a percentage discount in basis points (1050 = 10.50 %). A
 service, a category or a package is named by its id or, as a person says it (assistant, voice), by
 its name; a professional by their name; a customer by their name, phone or email. Every input refuses
 a field it does not declare. An edit changes only the fields it sends; on a field that may be empty
@@ -18,7 +19,8 @@ from pydantic import ConfigDict, StringConstraints, field_validator, model_valid
 
 T = TypeVar("T")
 
-#: Ninety-nine billion euros in cents: far above any price, inside a bigint.
+#: Just under ten trillion minor units of the business's currency (ninety-nine billion with two decimals):
+#: far above any price, inside a bigint.
 MAX_CENTS = 9_999_999_999_999
 #: Services of one bulk create, as the old module (500).
 MAX_BULK = 500
@@ -231,8 +233,8 @@ class ServiceListIn(PageIn):
     pricing_type: PricingType | None = Field(
         None, description="Only this pricing: fixed, hourly, from, variable or free."
     )
-    price_min: Cents | None = Field(None, description="Lowest price, in cents.")
-    price_max: Cents | None = Field(None, description="Highest price, in cents.")
+    price_min: Cents | None = Field(None, description="Lowest price, in minor units of the business's currency.")
+    price_max: Cents | None = Field(None, description="Highest price, in minor units of the business's currency.")
     duration_min: int | None = Field(
         None, ge=0, description="Shortest duration, in minutes."
     )
@@ -270,14 +272,14 @@ class ServiceIn(In):
         description="fixed (its price), hourly, from or variable (the till asks the amount, the price is a "
         "suggestion) or free.",
     )
-    price: Cents = Field(0, description="Price in cents.")
+    price: Cents = Field(0, description="Price in minor units of the business's currency.")
     min_price: Cents | None = Field(
-        None, description="Lowest price of a 'from' or 'variable' service, in cents."
+        None, description="Lowest price of a 'from' or 'variable' service, in minor units of the business's currency."
     )
     max_price: Cents | None = Field(
-        None, description="Highest price of a 'from' or 'variable' service, in cents."
+        None, description="Highest price of a 'from' or 'variable' service, in minor units of the business's currency."
     )
-    cost: Cents = Field(0, description="Internal cost in cents.")
+    cost: Cents = Field(0, description="Internal cost in minor units of the business's currency.")
     duration_minutes: Minutes | None = Field(
         None, description="Duration in minutes; without it, the settings' default."
     )
@@ -330,14 +332,14 @@ class ServicePatchIn(ServiceRefIn):
         None, description="Key of the new tax category; it cannot be emptied."
     )
     pricing_type: PricingType | None = Field(None, description="New pricing.")
-    price: Cents | None = Field(None, description="New price in cents.")
+    price: Cents | None = Field(None, description="New price in minor units of the business's currency.")
     min_price: Cents | None = Field(
-        None, description="New lowest price in cents; null removes it."
+        None, description="New lowest price in minor units of the business's currency; null removes it."
     )
     max_price: Cents | None = Field(
-        None, description="New highest price in cents; null removes it."
+        None, description="New highest price in minor units of the business's currency; null removes it."
     )
-    cost: Cents | None = Field(None, description="New cost in cents.")
+    cost: Cents | None = Field(None, description="New cost in minor units of the business's currency.")
     duration_minutes: Minutes | None = Field(
         None, description="New duration in minutes."
     )
@@ -604,7 +606,7 @@ class AssignIn(In):
         None, description="Their own duration in minutes; none = the service's."
     )
     custom_price: Cents | None = Field(
-        None, description="Their own price in cents; none = the service's."
+        None, description="Their own price in minor units of the business's currency; none = the service's."
     )
     is_primary: bool = Field(
         False, description="Whether it is their main service (one per professional); assigning again without it keeps it."
@@ -624,7 +626,7 @@ class AssignmentPatchIn(ByIdIn):
         None, description="Own duration in minutes; null = the service's."
     )
     custom_price: Cents | None = Field(
-        None, description="Own price in cents; null = the service's."
+        None, description="Own price in minor units of the business's currency; null = the service's."
     )
     is_primary: bool | None = Field(
         None, description="Make it (true) or stop it being (false) their main service."
@@ -723,11 +725,11 @@ class PackageIn(In):
         description="Percent off in basis points (1050 = 10.50 %), for a percentage discount.",
     )
     discount_amount: Cents = Field(
-        0, description="Amount off in cents, for a fixed discount."
+        0, description="Amount off in minor units of the business's currency, for a fixed discount."
     )
     fixed_price: Cents | None = Field(
         None,
-        description="Closed price in cents; none = the sum of its lines minus the discount.",
+        description="Closed price in minor units of the business's currency; none = the sum of its lines minus the discount.",
     )
     validity_days: int | None = Field(
         None,
@@ -769,9 +771,9 @@ class PackagePatchIn(PackageRefIn):
     discount_percent_bp: int | None = Field(
         None, ge=0, le=10000, description="New percent off, in basis points."
     )
-    discount_amount: Cents | None = Field(None, description="New amount off, in cents.")
+    discount_amount: Cents | None = Field(None, description="New amount off, in minor units of the business's currency.")
     fixed_price: Cents | None = Field(
-        None, description="New closed price in cents; null removes it."
+        None, description="New closed price in minor units of the business's currency; null removes it."
     )
     validity_days: int | None = Field(
         None, ge=1, le=36600, description="New validity in days; null = never expires."
@@ -853,9 +855,9 @@ class GrantIn(In):
     customer: Said | None = Field(
         None, description="The customer who owns it, by name, phone or email."
     )
-    amount: Cents = Field(0, description="Amount paid for it, VAT included, in cents.")
-    net_amount: Cents = Field(0, description="Taxable base of that amount, in cents.")
-    tax_amount: Cents = Field(0, description="VAT of that amount, in cents.")
+    amount: Cents = Field(0, description="Amount paid for it, VAT included, in minor units of the business's currency.")
+    net_amount: Cents = Field(0, description="Taxable base of that amount, in minor units of the business's currency.")
+    tax_amount: Cents = Field(0, description="VAT of that amount, in minor units of the business's currency.")
     sale_id: UUID | None = Field(
         None, description="The sale that paid it (Sales), if any."
     )

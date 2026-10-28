@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // SERVICE-F16 «Ver quién ha comprado un bono»: «Sold vouchers — {package}» follows `service.grant.list`
 // live, the most recent first, 20 at a time: Active or Voided, the customer (their reference when the
-// card is gone), the date, the amount, sessions used and left (or «no limit»), the sale, the expiry,
+// card is gone), the date, the amount (in the business's currency), sessions used and left (or «no limit»), the sale, the expiry,
 // what was given or corrected afterwards and, on a voided one, who, when and why. Adjust (SERVICE-F18)
 // and Void (SERVICE-F17) show where they apply and for whoever may, and open their dialogs.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
@@ -11,7 +11,7 @@ import { ref } from 'vue';
 
 import { useSheetList } from '../composables/useSheetList';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney } from '../lib/format';
+import { formatDate, formatMoney, useBusinessMoney } from '../lib/format';
 import type { GrantOut, PackageOut } from '../operations';
 import GrantAdjustModal from './GrantAdjustModal.vue';
 import GrantVoidModal from './GrantVoidModal.vue';
@@ -22,6 +22,7 @@ const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
 const locale = useLocale();
+const money = useBusinessMoney();
 const session = useSession();
 const list = useSheetList('service.grant.list', () => ({ package_id: props.pkg.id }));
 
@@ -88,7 +89,7 @@ const day = (value: string | null) => formatDate(value, locale.value);
           <strong>{{
             grant.customer_name ? t('service.grants.customer', { name: grant.customer_name }) : t('service.grants.customerRef', { id: grant.customer_id })
           }}</strong>
-          <span>{{ day(grant.granted_at) }} · {{ formatMoney(grant.amount, locale) }}</span>
+          <span>{{ day(grant.granted_at) }} · {{ formatMoney(grant.amount, locale, money) }}</span>
         </div>
         <div class="service-sheet-list__line">
           {{

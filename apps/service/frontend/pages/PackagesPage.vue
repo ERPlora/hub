@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Services → «Bonos y paquetes» (WORKBOOK «Pantallas · Bonos y paquetes»; SERVICE-F12 to F19, F30): the
-// live `service.package.list` in a server-side DataTable — Name, Discount, Closed price, Lines and
+// live `service.package.list` in a server-side DataTable — Name, Discount, Closed price (amounts in the business's
+// currency, service-business-currency), Lines and
 // Status (Active, Archived, Deleted) —, «Search package…», by order then name, 50 a page; the Status
 // filter on Deleted is the view of the deleted vouchers somebody bought. Above, «Vouchers with no
 // customer» for whoever may see them. A row offers Edit, Movements, Sold vouchers and Delete (with its
@@ -27,7 +28,7 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, formatPercentBp } from '../lib/format';
+import { formatMoney, formatPercentBp, useBusinessMoney } from '../lib/format';
 import type { PackageListIn, PackageOut, PackageStatus } from '../operations';
 import { serviceTabs } from '../tabs';
 
@@ -37,6 +38,8 @@ const TONE: Record<PackageStatus, 'success' | 'neutral' | 'danger'> = { active: 
 const session = useSession();
 const t = useT();
 const locale = useLocale();
+/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+const money = useBusinessMoney();
 const canAdd = computed(() => session.can('service.add_package'));
 const canChange = computed(() => session.can('service.change_package'));
 const canDelete = computed(() => session.can('service.delete_package'));
@@ -61,7 +64,7 @@ table.followResult(result);
 const blocked = computed(() => blockingError(error.value));
 
 function discount(row: PackageOut): string {
-  if (row.discount_type === 'fixed') return row.discount_amount ? formatMoney(row.discount_amount, locale.value) : t('service.none');
+  if (row.discount_type === 'fixed') return row.discount_amount ? formatMoney(row.discount_amount, locale.value, money.value) : t('service.none');
   return row.discount_percent_bp ? formatPercentBp(row.discount_percent_bp, locale.value) : t('service.none');
 }
 
@@ -73,7 +76,7 @@ const columns = computed<DataTableColumn<PackageOut>[]>(() => [
     label: t('service.packages.columns.fixedPrice'),
     sortable: true,
     align: 'right',
-    format: (_, row) => (row.fixed_price === null ? t('service.none') : formatMoney(row.fixed_price, locale.value)),
+    format: (_, row) => (row.fixed_price === null ? t('service.none') : formatMoney(row.fixed_price, locale.value, money.value)),
   },
   { key: 'item_count', label: t('service.packages.columns.lines'), sortable: true, align: 'right', format: (_, row) => String(row.item_count) },
   {

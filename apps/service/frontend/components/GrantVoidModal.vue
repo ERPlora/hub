@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // SERVICE-F17 «Anular un bono vendido por error»: «Void this voucher?» says whose voucher and for how
-// much (a customer whose card is gone, by its reference), that it stays in the list as voided and that
+// much (in the business's currency; a customer whose card is gone, by its reference), that it stays in the list as voided and that
 // the money is refunded in Sales. The Reason is required; Void sends `service.grant.void` and closes.
 // A refusal (used meanwhile, already voided) stays in the dialog.
 import { FormModal } from '@erplora/ui/components';
@@ -9,7 +9,7 @@ import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import type { GrantOut } from '../operations';
 
 const props = defineProps<{ grant: GrantOut | null }>();
@@ -17,6 +17,7 @@ const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
 const locale = useLocale();
+const money = useBusinessMoney();
 const voiding = useCommand('service.grant.void');
 const reason = ref('');
 
@@ -30,7 +31,7 @@ const message = computed(() =>
   props.grant
     ? t('service.void.message', {
         customer: props.grant.customer_name ?? props.grant.customer_id,
-        amount: formatMoney(props.grant.amount, locale.value),
+        amount: formatMoney(props.grant.amount, locale.value, money.value),
       })
     : '',
 );

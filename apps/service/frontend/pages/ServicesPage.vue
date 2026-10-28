@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Services → Services (WORKBOOK «Pantallas · Servicios»; SERVICE-F01 to F05): the live
-// `service.service.list` in a server-side DataTable — Name, Category, Pricing, Price, Duration (min)
-// and Status (Active, Not configured with its reason, Archived) —, «Search service…», column filters
+// `service.service.list` in a server-side DataTable — Name, Category, Pricing, Price (in the business's currency,
+// service-business-currency), Duration (min) and Status (Active, Not configured with its reason, Archived) —,
+// «Search service…», column filters
 // (Status on Archived is the archived view), list or cards, 50 a page. «New service» (whoever may add)
 // and a row (whoever may edit) open the form. A row offers Edit and Archive (with its confirmation);
 // the archived view only Restore. Changes come back through the stream.
@@ -17,14 +18,14 @@ import {
 } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import { parseMoney } from '../lib/money';
 import type { PricingType, ServiceListIn, ServiceOut, ServiceStatus } from '../operations';
 import { serviceTabs } from '../tabs';
@@ -36,6 +37,8 @@ const TONE: Record<ServiceStatus, 'success' | 'danger' | 'neutral'> = { active: 
 const session = useSession();
 const t = useT();
 const locale = useLocale();
+/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+const money = useBusinessMoney();
 const canAdd = computed(() => session.can('service.add_service'));
 const canChange = computed(() => session.can('service.change_service'));
 const canArchive = computed(() => session.can('service.delete_service'));
@@ -46,15 +49,15 @@ const table = useServerTable({ sort: 'name' });
 const filters = ref<DataTableFilters>({});
 const archivedView = computed(() => filters.value.status === 'archived');
 
-/** Cents of a typed price filter; nothing when it is not an amount. */
+/** Minor units of the business's currency of a typed price filter; nothing when it is not an amount. */
 function cents(text: string | undefined): number | undefined {
   if (!text) return undefined;
-  const read = parseMoney(text);
+  const read = parseMoney(text, money.value);
   return read.ok && read.cents !== null ? read.cents : undefined;
 }
 const minutes = (text: string | undefined): number | undefined => (text && /^\d+$/.test(text.trim()) ? Number(text.trim()) : undefined);
 
-/** The table's filters as the query takes them: prices in cents, minutes as numbers. */
+/** The table's filters as the query takes them: prices in minor units, minutes as numbers. */
 const query = computed<Partial<ServiceListIn>>(() => {
   const f = filters.value;
   const out: Partial<ServiceListIn> = {
@@ -77,6 +80,12 @@ function onFilters(now: DataTableFilters): void {
   filters.value = now;
   table.restart({ narrowed: Object.keys(now).length > 0 });
 }
+
+// A price typed in a filter before the business answered is read again in its currency when it does, from the
+// first page (the rows it narrows change).
+watch([() => money.value?.currency, () => money.value?.decimals], () => {
+  if (filters.value.price_from || filters.value.price_to) table.restart({ narrowed: true });
+});
 
 const { data: result, status, error, refresh } = useLiveList('service.service.list', () => ({ ...query.value, ...table.query.value }), () => table.windows.value);
 table.followResult(result);
@@ -106,7 +115,7 @@ const columns = computed<DataTableColumn<ServiceOut>[]>(() => [
     label: t('service.services.columns.price'),
     sortable: true,
     align: 'right',
-    format: (_, row) => formatMoney(row.price, locale.value),
+    format: (_, row) => formatMoney(row.price, locale.value, money.value),
     filter: { type: 'range' },
   },
   {

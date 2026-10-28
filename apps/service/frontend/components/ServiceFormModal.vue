@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // SERVICE-F01, F02, F03: the old table's side panel as a dialog. «New service» asks for Name, Pricing
-// (Fixed price by default), Price, Duration (min; empty = the settings'), Category (searched; empty =
+// (Fixed price by default), «Price (PLN)» (in the business's currency, its country's, with its decimals; just
+// «Price» until the business answers; service-business-currency), Duration (min; empty = the settings'), Category (searched; empty =
 // «No category») and Tax category (searched in Taxes; the settings' default comes chosen; no empty
 // option). «Create service» needs a name and a tax category; with no tax category in Taxes at all it
 // says where to make them. A row opens «Editing service — {name}»: «Save changes» sends only what
@@ -11,6 +12,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
+import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchServiceCategories, searchTaxCategories } from '../lib/pickers';
 import type { PricingType, ServiceOut, ServicePatchIn } from '../operations';
@@ -43,6 +45,7 @@ interface Form {
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
+const money = useBusinessMoney();
 const searchCategories = searchServiceCategories(client);
 const searchTaxes = computed(() => searchTaxCategories(client, t, locale.value));
 
@@ -76,7 +79,7 @@ function fromService(service: ServiceOut): Form {
   return {
     name: service.name,
     pricing: service.pricing_type,
-    price: moneyFieldText(service.price, locale.value),
+    price: moneyFieldText(service.price, locale.value, money.value),
     duration: String(service.duration_minutes),
     category: service.category_id ? { id: service.category_id, label: service.category_name ?? '' } : null,
     tax: service.tax_category_key ? { id: service.tax_category_key, label: service.tax_category_name ?? service.tax_category_key } : null,
@@ -95,6 +98,15 @@ watch(
   },
   { immediate: true },
 );
+
+// The business answers (or its currency changes) with the dialog open: a price the person has not touched is
+// rewritten from the service with the currency's decimals («15.00» → «1500» in yen); what they typed stays as
+// typed, read in the new currency when they save (the field says so when it cannot be).
+watch(money, (now, before) => {
+  if (!open.value || !props.service) return;
+  if (form.value.price !== moneyFieldText(props.service.price, locale.value, before)) return;
+  form.value = { ...form.value, price: moneyFieldText(props.service.price, locale.value, now) };
+});
 
 // The settings may arrive after the dialog opened: a new service takes their tax category until one is picked.
 watch(settings, () => {
@@ -126,7 +138,7 @@ function patch(service: ServiceOut, price: number): ServicePatchIn {
 async function save(): Promise<void> {
   tried.value = true;
   const f = form.value;
-  const read = parseMoney(f.price);
+  const read = parseMoney(f.price, money.value);
   if (!read.ok || !f.tax) return;
   const price = read.cents ?? 0;
   try {
@@ -194,7 +206,7 @@ async function save(): Promise<void> {
         <MoneyInput
           testid="service-form-price"
           :model-value="form.price"
-          :label="t('service.services.form.price')"
+          :label="money ? t('service.services.form.priceIn', { currency: money.currency }) : t('service.services.form.price')"
           :error-text="fieldErrors.price"
           :show-error="tried"
           @update:model-value="form = { ...form, price: $event }"
