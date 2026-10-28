@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d7314dd7e192e065d50dd6adea5886b2356536d7f6d626774d48a8e80988dd58 -->
+<!-- generated from WORKBOOK.md sha256:aa69c809a1d63fae737ef7e0cece5b2495b2c2b3a71cc9efdba3fe139b4c9c06 -->
 
 ## What it is for and who it is for
 
@@ -299,8 +299,8 @@ Steps:
    so there is nothing to add up the expected cash with (Square and Lightspeed hide the expected cash the
    same way in the blind close). The manager, the owner and the administrator see everything: the table,
    the detail, the list and the close window. Nor does the assistant tell it to whoever may not see it:
-   the close's summary (F09) reaches them without expected nor difference, and the assistant does not know
-   them.
+   the close's summary (F09) and its confirmation reach them without expected nor difference, and the
+   assistant does not know them.
 3. The cashier counts (F06) and closes (F09) without seeing the expected cash.
 4. On closing, expected, counted and difference appear for everyone.
 In: the "Blind count" setting and the permission to see the expected cash (manager, owner and
@@ -351,8 +351,11 @@ Steps:
    blind count it does not tell them to whoever may not see them: the assistant does not know them
    either, F07), and whatever the shift review finds still open (F08).
 6. Then "Run this action?" shows with "Close in Cash register. Check each datum before going on.", the
-   session and the counted cash: type "CONFIRM" and tap "Run it". That very session closes, in your name
-   and with the three amounts, just as from the screen.
+   session and the counted cash and, in "What will happen", what closing gives: the "Session", the
+   "Drawer" (if the session has one), the "Expected in the drawer" and the "Difference", in the business's
+   currency (with the blind count, whoever may not see the expected cash does not get those two, F07).
+   Type "CONFIRM" and tap "Run it". That very session closes, in your name and with the three amounts,
+   just as from the screen.
 7. If you tap "Cancel", nothing closes: the session stays open and the assistant says so ("Not done,
    cancelled: Close in Cash register").
 In: the counted cash and the notes, typed in the window or said to the assistant.

@@ -5,9 +5,12 @@
 // The SaaS must be seeded with that provider (README of this folder, «El asistente»).
 // The owner, with a shift open and a cash sale in it, asks «cierra la caja con 250 € contados»: the summary comes
 // first (session, counted, expected, difference), then the dangerous card; «Cancel» leaves the shift open, typing the
-// word closes it and «Caja» shows it closed with its three amounts. A cashier with the blind count on gets the summary
-// without the expected nor the difference, and the model never received them.
-// What this file creates is deleted after it (its sessions, its sale and its product); the settings go back.
+// word closes it and «Caja» shows it closed with its three amounts. The dangerous card carries, in «What will happen»,
+// what closing gives: the session's number, its drawer, the expected cash and the difference, as money in the business's
+// currency (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW, through base's preview, BASE-F98). A cashier
+// with the blind count on gets the summary and the card without the expected nor the difference, and the model never
+// received them.
+// What this file creates is deleted after it (its sessions, its drawer, its sale and its product); the settings go back.
 // flow: CASH_REGISTER-F09
 // flow: CASH_REGISTER-F07
 import { execSync } from 'node:child_process';
@@ -21,8 +24,11 @@ import { cleanDocumentsOf, stamp } from './sale-helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-CASH_REGISTER-NO-VOICE-CLOSE-WITH-ASSISTANT';
+const PREVIEW_KEY = 'FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW';
 const RUN = stamp();
 const SKU = `E2E-CRA-${RUN}`;
+/** The drawer this file opens its shifts on: the card names it. */
+const DRAWER = `E2E Barra ${RUN}`;
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },
@@ -34,12 +40,19 @@ const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `s
 
 let provider: Provider;
 let shirt: Product;
+let drawerId = '';
+/** Money as the card shows it to an English reader: the business's currency and decimals (base's `formatValue`). */
+let cardMoney: (cents: number) => string;
 /** The sessions this file opened: the only ones its cleanup deletes. */
 const mine = new Set<string>();
 const settingsBefore: Record<string, unknown> = {};
 
 interface Current {
   session: { id: string; number: string; expected_balance: number | null } | null;
+}
+interface Currency {
+  currency: string;
+  decimals: number;
 }
 interface Detail {
   id: string;
@@ -94,10 +107,13 @@ async function closeLeftOpen(context: BrowserContext): Promise<void> {
   expect(closed.status, JSON.stringify(closed.data)).toBe(200);
 }
 
-/** A shift open with `float` and a 12.10 € shirt charged in cash through Sales. */
+/** A shift open with `float` on this file's drawer and a 12.10 € shirt charged in cash through Sales. */
 async function shiftWithACashSale(context: BrowserContext, float: number): Promise<Current['session'] & object> {
   await closeLeftOpen(context);
-  const opened = await api<{ id: string; number: string }>(context, A, 'POST', '/cash_register/sessions/open', { opening_balance: float });
+  const opened = await api<{ id: string; number: string }>(context, A, 'POST', '/cash_register/sessions/open', {
+    opening_balance: float,
+    register_id: drawerId,
+  });
   expect(opened.status, JSON.stringify(opened.data)).toBe(201);
   mine.add(opened.data.id);
   const sale = await api(context, A, 'POST', '/sale/sales', {
@@ -117,6 +133,18 @@ test.beforeAll(async ({ browser }) => {
   shirt = await createProduct(context, { name: `E2E Shirt ${RUN}`, sku: SKU, price: 1210, tax_category_key: 'product.generic' });
   const read = await api<Record<string, unknown>>(context, A, 'GET', '/cash_register/settings');
   for (const key of ['require_blind_count', 'require_closing_balance']) settingsBefore[key] = read.data[key];
+  const drawer = await api<{ id: string }>(context, A, 'POST', '/cash_register/registers', { name: DRAWER });
+  expect(drawer.status, JSON.stringify(drawer.data)).toBe(201);
+  drawerId = drawer.data.id;
+  const { currency, decimals } = (await api<Currency>(context, A, 'GET', '/cash_register/currency')).data;
+  const format = new Intl.NumberFormat('en', {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  cardMoney = (cents) => format.format(cents / 10 ** decimals);
   await context.close();
 });
 
@@ -131,6 +159,11 @@ test.afterAll(async ({ browser }) => {
     psql(`delete from cash_register_count where session_id in (${ids})`);
     psql(`delete from cash_register_movement where session_id in (${ids})`);
     psql(`delete from cash_register_session where id in (${ids})`);
+  }
+  // Its drawer goes too, unless a shift of another file was opened on it meanwhile (then it stays, inactive).
+  if (drawerId) {
+    psql(`update cash_register_register set is_active = false where id = '${drawerId}'`);
+    psql(`delete from cash_register_register r where r.id = '${drawerId}' and not exists (select 1 from cash_register_session s where s.register_id = r.id)`);
   }
   cleanSaleAndProduct();
   unspend();
@@ -170,6 +203,7 @@ const answers = (page: Page): Locator => panel(page).locator('[data-testid="assi
 const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
 const receipts = (page: Page): Locator => panel(page).locator('[data-testid="assistant-receipt"]');
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
+const previewBlock = (page: Page): Locator => card(page).locator('[data-testid="assistant-confirm-preview"]');
 const opener = (page: Page): Locator =>
   shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
 
@@ -231,13 +265,26 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await expect(card(page)).toContainText('Close in Cash register. Check each datum before going on.');
   await expect(card(page)).toContainText(`Session: ${shift.number}`);
   await expect(card(page)).toContainText('Counted cash: €250.00');
+  // And what closing gives (the close's summary, read as the owner): the session, its drawer, the expected and the
+  // difference, as money in the business's currency; the counted cash is not repeated.
+  const willHappen = [
+    `Session: ${shift.number}`,
+    `Drawer: ${DRAWER}`,
+    `Expected in the drawer: ${cardMoney(expected)}`,
+    `Difference: ${cardMoney(25000 - expected)}`,
+  ];
   const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
   await expect(submit).toBeDisabled();
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toBeVisible();
+    await expect(previewBlock(page)).toContainText('What will happen');
+    await expect(previewBlock(page).locator('li')).toHaveText(willHappen);
+    // Each line wraps inside the card, never past it (390 wide).
+    expect(await previewBlock(page).evaluate((el) => el.scrollWidth <= el.clientWidth), `${PREVIEW_KEY}-${vp.label} overflows`).toBe(true);
     await untilStill(page);
     await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
+    await page.screenshot({ path: shot(`${PREVIEW_KEY}-${vp.label}`) });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -258,6 +305,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   // Asked again, the word typed: it closes, as the person, with the three amounts frozen.
   await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
   await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await expect(previewBlock(page).locator('li')).toHaveText(willHappen);
   await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
   await expect(submit).toBeEnabled();
   await decide(page, 'submit');
@@ -308,7 +356,13 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   expect(told.summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: null, difference: null, expected_hidden: true });
   expect(told.raw).not.toContain(String(expected));
   await expect(card(page)).toContainText('Counted cash: €250.00');
+  // Nor does the card: what will happen names the session and its drawer, never the expected nor the difference.
+  await expect(previewBlock(page).locator('li')).toHaveText([`Session: ${shift.number}`, `Drawer: ${DRAWER}`]);
+  await expect(card(page)).not.toContainText('Expected');
+  await expect(card(page)).not.toContainText('Difference');
+  await expect(card(page)).not.toContainText(cardMoney(expected));
   await page.screenshot({ path: shot(`${KEY}-blind-1440`) });
+  await page.screenshot({ path: shot(`${PREVIEW_KEY}-blind-1440`) });
   await decide(page, 'cancel');
   expect((await detailOf(boss.context, shift.id)).status).toBe('open');
   await context.close();
