@@ -7,7 +7,7 @@ import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney, formatPercent } from '../lib/format';
+import { formatDate, formatMoney, formatPercent, useBusinessMoney } from '../lib/format';
 import type { MemberMineOut } from '../operations';
 
 const props = defineProps<{
@@ -18,6 +18,8 @@ const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
 const locale = useLocale();
+/** The business's currency (its country's): the rate is painted in it (staff-business-currency). */
+const money = useBusinessMoney();
 
 const dash = (value: string | null | undefined): string => (value && value.trim() ? value : '—');
 
@@ -33,7 +35,7 @@ const fields = computed<Array<[string, string]>>(() => {
     [t('staff.members.columns.status'), t(`staff.memberStatus.${r.status}`)],
     [t('staff.members.form.bookable'), r.is_bookable ? t('staff.yes') : t('staff.no')],
     [t('staff.members.form.hireDate'), formatDate(r.hire_date, locale.value)],
-    [t('staff.members.form.hourlyRate'), formatMoney(r.hourly_rate, locale.value)],
+    [t('staff.members.form.hourlyRate'), formatMoney(r.hourly_rate, locale.value, money.value)],
     [t('staff.members.form.commission'), formatPercent(r.commission_rate, locale.value)],
   ];
 });
