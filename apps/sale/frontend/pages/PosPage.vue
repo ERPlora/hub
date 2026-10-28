@@ -2,7 +2,8 @@
 // Sales & POS → Sell (WORKBOOK «Vender»; SALE-F01, F05, F09, F13–F22, F27, F38). The till: the catalogue
 // and the check side by side (23–24.5rem on a desktop); on a phone (narrower than 821px or 500px tall or
 // less), and wherever the till itself is narrower than both need (beside the docked assistant on a tablet), the
-// check is a drawer from the right that the cart button opens. The page wires the pieces:
+// check is a drawer from the right that the cart button opens (Escape, a tap outside or Android's Back closes it). The
+// page wires the pieces:
 // the till settings, the check and its writes (`useTill`), the live check and its preview (mounted
 // only while there is one), the customer (the Customers app's search; linked to the check by
 // `customer.order.link`, read back on resuming), who serves, the sheets, the pre-bill, the checkout
@@ -43,6 +44,7 @@ import TablePicker from '../components/pos/TablePicker.vue';
 import { shortTime } from '../components/pos/till';
 import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
+import { useSystemBack } from '../composables/pos/useSystemBack';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
 import { useLocale, useT } from '../composables/useT';
 import type { SaleComboOut } from '../../../combo/frontend/operations';
@@ -538,6 +540,7 @@ const drawerOpen = computed(() => phone.value && cartOpen.value);
 const drawer = useTemplateRef<HTMLElement>('drawer');
 const fab = useTemplateRef<{ $el: HTMLElement }>('fab');
 const drawerFocus = useDrawerFocus({ container: drawer, open: cartOpen, enabled: phone, returnTo: () => fab.value?.$el });
+useSystemBack(drawerOpen, () => (cartOpen.value = false));
 let media: MediaQueryList | undefined;
 const onMedia = () => (phoneWindow.value = !!media?.matches);
 const resize =

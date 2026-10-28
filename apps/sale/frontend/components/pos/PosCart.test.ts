@@ -1,9 +1,10 @@
 // The check column (WORKBOOK «Vender» — «Cuenta»): the bar (park, customer, open checks, close), the
 // heading (title and chips), the lines and the foot, from what the page knows of the check. It paints and
-// asks; the page writes. «Open checks» opens its dropdown here.
+// asks; the page writes. «Open checks» opens its dropdown here, and Android's Back closes it (base's `erplora:back`).
 import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
+import { SHELL_BACK_EVENT } from '../../../../../base/frontend/lib/system-back';
 import { click, mountSale, settle } from '../../__tests__/mount-sale';
 import { line, order, settings } from './__tests__/fixtures';
 import CartFooter from './CartFooter.vue';
@@ -98,6 +99,22 @@ describe('PosCart', () => {
     m.wrapper.findComponent(OpenChecksPopover).vm.$emit('close');
     await m.wrapper.vm.$nextTick();
     expect(m.wrapper.findComponent(OpenChecksPopover).exists()).toBe(false);
+  });
+
+  it('Android’s Back closes the open checks and the check stays; closed, Back is the shell’s', async () => {
+    const m = await setup();
+    const pressBack = () => {
+      const ask = new CustomEvent(SHELL_BACK_EVENT, { cancelable: true });
+      window.dispatchEvent(ask);
+      return ask.defaultPrevented;
+    };
+    m.wrapper.findComponent(CartToolbar).vm.$emit('toggleChecks');
+    await m.wrapper.vm.$nextTick();
+    expect(pressBack()).toBe(true);
+    await m.wrapper.vm.$nextTick();
+    expect(m.wrapper.findComponent(OpenChecksPopover).exists()).toBe(false);
+    expect(m.find('pos-cart').exists()).toBe(true);
+    expect(pressBack()).toBe(false);
   });
 
   it('passes every request up', async () => {

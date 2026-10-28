@@ -115,7 +115,8 @@ Ventas / TPV se abre desde el menú **Ventas / TPV** y tiene cinco entradas: **V
 
 ### Vender
 Se abre a pantalla completa de la aplicación; el menú ⋮ de la tira de categorías tiene «Pantalla
-completa» / «Salir de pantalla completa» (la del navegador, cuando el dispositivo la permite). Dos
+completa» / «Salir de pantalla completa» (la del navegador, cuando el dispositivo la permite) y se
+cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos
 zonas:
 
 - **Catálogo**: la tira de categorías de Inventario con su número de artículos, los que enseña la
@@ -144,6 +145,10 @@ BASE-F97). Sin conexión la tecla sale apagada y, al pulsarla, dice «Sin conexi
 asistente hace falta internet.». Con el asistente abierto al lado en una tableta, el catálogo se queda
 solo y la cuenta pasa a ser el cajón del botón flotante, como en el móvil.
 
+**El botón atrás del móvil** (en la app instalada de Android) cierra primero lo que está abierto encima,
+de uno en uno y empezando por lo último que se abrió (una hoja, «Cuentas abiertas», el cajón de la cuenta,
+el menú ⋮), y la pantalla se queda en Vender; con nada abierto, lleva al Inicio.
+
 Hojas que se abren encima: precio libre, importe de un servicio sin precio fijo, nota, descuento,
 «Anular «<artículo>»», «Aparcar cuenta»,
 «Quién atiende esta cuenta», «Tienes una cuenta a medias» y el buscador de clientes. Vacía: «Toca un
@@ -165,7 +170,7 @@ efectivo, o «Importe exacto» y «Cobra <importe> en el datáfono y confirma.»
 Desplegable del icono de tique de la cuenta: «Aparcar esta cuenta» con su explicación, «Cuentas
 abiertas» y «Toca una cuenta para retomarla.», y una fila por cuenta abierta del negocio (título o
 importe, hora e importe) con su papelera. Vacía: «No hay cuentas abiertas». Un fallo se pinta encima
-de las filas.
+de las filas. Se cierra tocando fuera, con Esc o con el botón atrás del móvil.
 
 ### Cuenta (precuenta)
 Ventana «Cuenta» que abre la impresora del pie: el papel que se lleva a la mesa, con el aviso «Cuenta
@@ -1681,6 +1686,18 @@ administrador y responsable, los mismos que anulan y devuelven).
   `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y las e2e `tests/e2e/sale-speak.spec.ts` y
   `tests/e2e/sale-speak-microphone.spec.ts` (el micrófono denegado: Chrome lo bloquea con una opción de
   lanzamiento, así que va en un fichero propio).
+- **El atrás del sistema** (FIX-HUB-SALE-POS-MORE-MENU-ANDROID-BACK-GOES-HOME; BASE-F05, hub#302): las hojas de Ionic
+  (`ion-modal`, como `PosSheet`) las cierra la shell; las capas propias del TPV, que la shell no ve —el menú ⋮
+  (`ScreenMenu.vue`), «Cuentas abiertas» (`OpenChecksPopover`, abierto desde `PosCart.vue`) y el cajón de la cuenta
+  del móvil (`PosPage.vue`, solo con la disposición del móvil: en columna no es una capa)— contestan al contrato
+  `erplora:back` de `base/frontend/lib/system-back.ts` con `useSystemBack` (`frontend/composables/pos/`): una pila de
+  las capas abiertas (en el orden en que se abrieron, `flush: 'sync'`) y un solo escuchador en `window` mientras no
+  está vacía; cada pulsación cierra la de arriba y llama a `preventDefault()`, y un atrás que otro ya tomó se deja.
+  Solo cuentan las capas de la pantalla a la vista: otra app abierta desde ⠿ con el cajón o el ⋮ abiertos deja el TPV
+  montado debajo (Ionic lo oculta con `ion-page-hidden`), y esa capa no se queda el atrás de la pantalla de encima.
+  Una capa propia nueva del TPV se suma con `useSystemBack(abierta, cerrar)`. Tests: `useSystemBack.test.ts`,
+  `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.test.ts` (bloque `the phone`) y la e2e
+  `tests/e2e/sale-pos-system-back.spec.ts` (el puente de la app simulado como en `shell-nav.spec.ts`).
 
 ### Decisiones de plataforma
 
