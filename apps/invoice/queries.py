@@ -12,7 +12,6 @@ import datetime as dt
 from decimal import Decimal
 
 from babel.numbers import format_currency, format_decimal, format_percent, get_currency_precision
-from django.conf import settings
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum, Window
 from django.db.models.functions import Coalesce, Lag
 from django.template.loader import render_to_string
@@ -20,7 +19,7 @@ from django.utils import timezone, translation
 from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
+from live.context import OperationContext
 from live.errors import AppInactive, Conflict, NotFound
 from live.operations import UnknownOperation, operation
 from live.operations import get as get_operation
@@ -66,8 +65,6 @@ from apps.invoice.schemas import (
 )
 from apps.sale.queries import find_sale
 from apps.tax.queries import business_tax_kind, resolve_tax
-from base.business import currency_of
-from base.operations import is_platform_hub
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
@@ -1013,23 +1010,6 @@ def allocations(ctx: OperationContext, params: AllocationsIn) -> dict:
     return _page(
         documents.order_by("series_code", "year", "sequence", "id"), params, _allocation
     )
-
-
-# ── The business's currency ─────────────────────────────────────────────────────────────────────
-
-#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
-BUSINESS = "base.business.get"
-
-
-def business_currency(ctx: OperationContext) -> str:
-    """The currency of ``ctx``'s business (ISO 4217), the one a document issued now keeps, as ``base.business.get``
-    reads it. Read as the platform: an API key holds only the permission of the operation it opened, and every person
-    of the hub may see it anyway. ERPlora's own hub has no business on erplora.com (phase 1: no registry row,
-    ``create_platform_hub``): its invoices keep the currency of its issuer's country."""
-    if is_platform_hub(ctx.scope):
-        return currency_of(settings.PLATFORM_ISSUER_COUNTRY)
-    business = get_operation(BUSINESS)
-    return business(system_context(ctx.scope), business.input()).currency
 
 
 # ── The issuer ──────────────────────────────────────────────────────────────────────────────────

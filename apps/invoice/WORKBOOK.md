@@ -916,12 +916,13 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
     recomendado, mientras se puede (antes del primer documento: luego la serie congela su prefijo y su formato), y
     queda hecho para siempre en cuanto el negocio tiene su numeración (la serie de un año nuevo hereda la del
     anterior). La respuesta de la API (`configured`: una ordinaria y una rectificativa del año) no cambia.
-- **Moneda** (FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY, 2026-10-25): la factura hecha a mano guarda la moneda
-  del negocio, la de su país (`queries.business_currency`, que lee `base.business.get` como la plataforma: una API key
-  solo tiene el permiso de su operación); la nacida de una venta, la de la venta; una rectificativa, la de su original;
-  la de ERPlora (hub de plataforma), la que manda el SaaS en `currency` (EUR, su contrato), y una hecha a mano en ese
-  hub, la del país de su emisor (`PLATFORM_ISSUER_COUNTRY`: en la fase 1 no tiene negocio registrado, y
-  `base.business.get` contesta «There is no business here.»). Decisión de mercado: un
+- **Moneda** (FIX-HUB-APPS-CHARGE-IN-EUR-WHATEVER-THE-COUNTRY, 2026-10-25; FIX-HUB-INVOICE-OWN-COPY-OF-BUSINESS-CURRENCY,
+  2026-10-28): la factura hecha a mano guarda la moneda del negocio, que Facturas pregunta a
+  `base.operations.business_currency` como toda app que cobra (BASE-F50), sin copia propia: la de su país, que contesta
+  `base.business.get` leído como la plataforma (una API key solo tiene el permiso de su operación); la nacida de una
+  venta, la de la venta; una rectificativa, la de su original; la de ERPlora (hub de plataforma), la que manda el SaaS
+  en `currency` (EUR, su contrato), y una hecha a mano en ese hub, la que contesta `base` también allí: la del país de
+  su emisor (`PLATFORM_ISSUER_COUNTRY`, hub#329). Decisión de mercado: un
   negocio no español emite y guarda su moneda (Odoo, Business Central, Shopify, WooCommerce, Square, Toast, Lightspeed,
   Holded y SumUp emiten en la moneda local del negocio; ninguno deja de emitir por el país). Un negocio español sigue
   en euros, y lo que se manda a la AEAT no cambia (las mismas cifras). El campo `currency` ya no tiene valor por
