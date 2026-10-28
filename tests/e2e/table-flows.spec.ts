@@ -13,7 +13,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
-import { chargeByApi, cleanSales, stamp } from './sale-helpers';
+import { chargeByApi, cleanSales, openTillCart, stamp } from './sale-helpers';
 import { ownerPage, post, rowAction, settled } from './service-helpers';
 
 const RUN = stamp();
@@ -461,9 +461,8 @@ test('TABLE-F12: the till brings its open check to a table («Choose table»)', 
     const choose = async () => {
       if (await picker.isVisible()) await page.keyboard.press('Escape');
       await expect(picker).toBeHidden();
-      // On a phone the check lives behind the cart's button.
-      const fab = till.locator('[data-testid=pos-cart-fab]');
-      if (await fab.isVisible()) await fab.click();
+      // On a phone the check lives behind the cart's button; the till lays itself out for a new size a frame late.
+      await openTillCart(page);
       await till.locator('[data-testid=pos-table-trigger]').filter({ visible: true }).click();
       await expect(option).toContainText('Available');
     };
