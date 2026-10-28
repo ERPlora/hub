@@ -12,31 +12,20 @@
 // one are refused untouched. A drop is never forced: with a connection open (its runserver) it fails and says so.
 // Postgres is compose.yaml's (`COMPOSE_FILE` points at it from a checkout elsewhere), reached as its superuser `hub`,
 // like the specs' `psql()`.
-import { spawnSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 import { ENV_FILE, ensureFernetKeys, type FernetKeyName, type KeySource } from './fernet-keys.ts';
-import { type CommandResult, type ManagePy, managePy, type Spawn } from './global-setup.ts';
+import { type CommandResult, type ManagePy, managePy, psqlOn, type Spawn } from './global-setup.ts';
 import { isE2eDatabase, STACK } from './stack.ts';
 
-const REPO_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const USAGE = 'Usage: node tests/e2e/database.ts [--drop]';
 
 /** Runs one SQL statement on Postgres's maintenance database `postgres`. */
 export type AdminSql = (statement: string) => CommandResult;
 
 /** `psql` in compose's Postgres, as `hub`, on `postgres`, stopping at the first error. */
-export function adminSql(spawn: Spawn = spawnSync, env: NodeJS.ProcessEnv = process.env): AdminSql {
-  return (statement) => {
-    const args = ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'hub', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-At', '-c', statement];
-    const result = spawn('docker', args, { cwd: REPO_DIR, encoding: 'utf8', env });
-    return {
-      status: result.status,
-      stdout: result.stdout ?? '',
-      stderr: [result.stderr, result.error?.message].filter(Boolean).join('\n'),
-    };
-  };
+export function adminSql(spawn?: Spawn, env?: NodeJS.ProcessEnv): AdminSql {
+  return psqlOn('postgres', spawn, env);
 }
 
 function refuseUnlessE2e(name: string): void {

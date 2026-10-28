@@ -67,6 +67,27 @@ describe('stackFrom', () => {
       expect(stackFrom({ DB_NAME: 'hub_branch' }).database).toBe('hub_branch');
     });
   });
+
+  // flow: ninguno — arnés e2e del Hub (FIX-HUB-E2E-README-PARALLEL-STACK-MISSES-DEMO-SEED)
+  // Where the stack's SaaS keeps its accounts, for the start's check of the demo accounts (global-setup.ts): the rule
+  // the assistant's specs already follow (README «Varias ejecuciones a la vez»: the SaaS on the Hub's port + 1).
+  describe("the SaaS's database", () => {
+    const beside = { E2E_HUB_PORT: '8030', SAAS_URL: 'http://localhost:8031', DB_NAME: 'hub_e2e_8030' };
+
+    it('is the shared `saas` beside the shared Hub on :8000', () => {
+      expect(stackFrom({}).saasDatabase).toBe('saas');
+    });
+
+    it("is the SaaS's own e2e database `saas_e2e_<Hub port + 1>` for a stack of its own", () => {
+      expect(stackFrom(beside).saasDatabase).toBe('saas_e2e_8031');
+    });
+
+    it('is E2E_SAAS_DB when that SaaS runs on another database, a name psql takes as is', () => {
+      expect(stackFrom({ E2E_SAAS_DB: 'saas_branch' }).saasDatabase).toBe('saas_branch');
+      expect(stackFrom({ ...beside, E2E_SAAS_DB: 'saas_fix_e2e_a' }).saasDatabase).toBe('saas_fix_e2e_a');
+      expect(() => stackFrom({ E2E_SAAS_DB: 'saas; drop database saas' })).toThrow(/E2E_SAAS_DB/);
+    });
+  });
 });
 
 describe('isE2eDatabase', () => {
