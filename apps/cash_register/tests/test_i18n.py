@@ -94,15 +94,22 @@ def visible_texts() -> set[str]:
 
 
 def schema_titles() -> set[str]:
-    """The titles cash_register's operations give their input data: the assistant's card names each datum by them,
-    so each one needs its Spanish. A title pydantic makes up from the field is not one."""
+    """The titles cash_register's operations give their input data, and the data of the answer a write's preview shows
+    (BASE-F98): the assistant's card names each datum by them, so each one needs its Spanish. A title pydantic makes up
+    from the field is not one."""
     titles = set()
     for op in registry.values():
         if op.app_label == "cash_register":
-            for name, prop in op.input.model_json_schema().get("properties", {}).items():
-                title = prop.get("title")
-                if title and title != name.title().replace("_", " "):
-                    titles.add(title)
+            shown = [op.input.model_json_schema().get("properties", {})]
+            preview = (op.ai or {}).get("preview") if isinstance(op.ai, dict) else None
+            if preview:
+                answer = registry[preview["operation"]].output.model_json_schema().get("properties", {})
+                shown.append({name: answer[name] for name in preview["fields"]})
+            for props in shown:
+                for name, prop in props.items():
+                    title = prop.get("title")
+                    if title and title != name.title().replace("_", " "):
+                        titles.add(title)
     return titles
 
 

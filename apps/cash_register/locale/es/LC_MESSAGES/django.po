@@ -289,6 +289,12 @@ msgstr "Efectivo contado"
 msgid "Closing notes"
 msgstr "Notas de cierre"
 
+msgid "Session"
+msgstr "Sesión"
+
+msgid "Expected in the drawer"
+msgstr "Esperado en el cajón"
+
 msgid "There is already an open cash session. Close it before opening another one."
 msgstr "Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra."
 

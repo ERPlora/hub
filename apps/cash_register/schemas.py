@@ -391,9 +391,17 @@ class ShiftReviewOut(Schema):
 
 
 class ClosingSummaryOut(Schema):
+    """What closing a session would give, before it closes (CASH_REGISTER-F09): nothing is written.
+    ``cash_register.session.close`` shows its number, drawer, expected and difference on its card (BASE-F98): their
+    titles are the names the Cash register screens give them (the difference's is its model's), and an amount says
+    «in cents» to be shown as money."""
+
     session_id: UUID = Field(description="The session that would close.")
-    number: str = Field(description="Its number, S-AAMMDD-NNNN: name it to close exactly this one.")
-    register_name: str = Field(description="Its drawer's name; empty = no drawer.")
+    number: str = Field(
+        title=gettext_noop("Session"),
+        description="Its number, S-AAMMDD-NNNN: name it to close exactly this one.",
+    )
+    register_name: str = Field(title=DRAWER, description="Its drawer's name; empty = no drawer.")
     opened_at: datetime = Field(description="When it opened.")
     opened_by: str = Field(description="Who opened it.")
     opening_balance: int = Field(description="Its opening float, in cents.")
@@ -401,7 +409,8 @@ class ClosingSummaryOut(Schema):
         description="The counted cash said, in cents; none = closing without a count."
     )
     expected_balance: int | None = Field(
-        description="The cash there should be now, in cents; none when a blind count hides it from the reader."
+        title=gettext_noop("Expected in the drawer"),
+        description="The cash there should be now, in cents; none when a blind count hides it from the reader.",
     )
     difference: int | None = Field(
         description="Counted − expected, in cents (positive = over, negative = short); none without a count or "

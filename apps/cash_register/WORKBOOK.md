@@ -316,7 +316,8 @@ Pasos:
    devoluciones, así que no hay con qué sumar el esperado (Square y Lightspeed ocultan igual el esperado
    en el cierre ciego). El responsable, el propietario y el administrador lo ven todo: la tabla, el
    detalle, la lista y la ventana de cierre. El asistente tampoco se lo dice a quien no puede verlo: el
-   resumen del cierre (F09) le llega sin esperado ni diferencia, y el asistente no los conoce.
+   resumen del cierre (F09) y su confirmación le llegan sin esperado ni diferencia, y el asistente no los
+   conoce.
 3. El cajero cuenta (F06) y cierra (F09) sin ver el esperado.
 4. Al cerrar aparecen esperado, contado y diferencia para todos.
 Entra: el ajuste «Arqueo ciego» y el permiso de ver el esperado (responsable, propietario y
@@ -370,8 +371,11 @@ Pasos:
    quien no lo ve no se lo dice: el asistente tampoco lo conoce, F07), y lo que la revisión del turno
    encuentre pendiente (F08).
 6. Después sale «¿Ejecutar esta acción?» con «Cerrar en Caja. Revisa cada dato antes de seguir.», la
-   sesión y el efectivo contado: escribe «CONFIRMAR» y pulsa «Ejecutar». Se cierra esa misma sesión, a tu
-   nombre y con los tres importes, igual que desde la pantalla.
+   sesión y el efectivo contado y, en «Lo que va a pasar», lo que da el cierre: la «Sesión», el «Cajón»
+   (si la sesión tiene uno), el «Esperado en el cajón» y la «Diferencia», con la moneda del negocio (con
+   el arqueo ciego, a quien no ve el esperado no le salen esos dos, F07). Escribe «CONFIRMAR» y pulsa
+   «Ejecutar». Se cierra esa misma sesión, a tu nombre y con los tres importes, igual que desde la
+   pantalla.
 7. Si pulsas «Cancelar», no se cierra nada: la sesión sigue abierta y el asistente lo dice («No se hizo,
    cancelado: Cerrar en Caja»).
 Entra: el efectivo contado y las notas, escritos en la ventana o dichos al asistente.
@@ -763,7 +767,8 @@ cajero del producto actual es un empleado.
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Cajón» para `register_name`, «Efectivo contado», «Notas de cierre») o, si no lo tiene, por el
   `verbose_name` de su campo en el modelo; un dato sin ninguno sale con el nombre técnico y lo para
-  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
+  `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`, también el de los
+  datos que enseña una vista previa).
 - **El cierre por el asistente** (F09; PLAN §30, la primera de las cinco acciones de IA pulidas): la
   descripción de `session.close` le pide leer antes `session.closing_summary` con el mismo contado,
   decir su resumen y cerrar nombrando la sesión por el número que dio (así nunca cierra otra que se
@@ -774,7 +779,13 @@ cajero del producto actual es un empleado.
   pregunta: una app que no está encendida no tiene nada pendiente y una lectura rechazada deja la revisión
   incompleta. Su nombre no lleva el verbo de una acción (`close_…`): la plataforma nombra la acción de cada
   recibo por su verbo y una lectura no puede decir «Hecho: Cerrar». La confirmación es la tarjeta de riesgo
-  alto de la plataforma (escribir la palabra, que el servidor vuelve a comprobar).
+  alto de la plataforma (escribir la palabra, que el servidor vuelve a comprobar), con su bloque «Lo que va
+  a pasar» (BASE-F98): `session.close` declara en su `ai` el `preview` `session.closing_summary` con
+  `number`, `register_name`, `expected_balance` y `difference`, que la plataforma lee como la persona
+  (sus permisos, su negocio) con lo que el cierre envía. Lo que el arqueo ciego deja vacío no sale, y si la
+  lectura no se puede hacer (recuento obligatorio sin contado: 409) no sale la tarjeta. Cada dato se
+  nombra por el `title` de `ClosingSummaryOut` («Sesión», «Cajón», «Esperado en el cajón»; la diferencia,
+  por el `verbose_name` del modelo) y los importes, que dicen «in cents», salen como dinero.
 
 ### Cambios frente al producto actual
 
@@ -816,8 +827,9 @@ cajero del producto actual es un empleado.
 18. **Las cifras de la caja están en Caja y en el Inicio**: la sesión actual y los descuadres recientes salen
     encima de la tabla de sesiones y, como en el producto actual, en los paneles del Inicio.
 19. **Cerrar la caja pidiéndoselo al asistente enseña antes el resumen** (sesión, contado y, a quien puede
-    verlos, esperado y diferencia, y lo pendiente) y pide escribir la palabra; antes el asistente cerraba
-    la sesión abierta con el contado, sin resumen previo.
+    verlos, esperado y diferencia, y lo pendiente) y pide escribir la palabra en una confirmación que
+    repite lo que va a pasar; antes el asistente cerraba la sesión abierta con el contado, sin resumen
+    previo.
 20. **«Tu caja» se da por hecho al guardar los ajustes una vez**, también sin cambiar nada: los de fábrica
     valen desde el principio (cambio 3), así que el paso pide la decisión del negocio, no una fila.
 
