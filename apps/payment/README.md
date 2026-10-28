@@ -19,9 +19,12 @@ con ningún banco.
 - **Pagos** (F02–F05): registrar un pago en borrador con su referencia del día (un reintento del mismo
   formulario no lo duplica), aprobarlo (permiso aparte), marcarlo como enviado y como completado, y
   cancelarlo con motivo mientras no esté terminado. Un paso fuera de orden se rechaza con su motivo y no
-  avisa.
+  avisa. Un pago que no dice su moneda se registra en la del país del negocio (`base.business.get`), nunca
+  en un euro fijo; uno guardado conserva la suya.
 - **La lista** (F06): búsqueda por referencia, beneficiario o factura del proveedor, filtros de columna
-  (fecha e importe por rango), orden y vista viva; un pago se lee entero por su referencia.
+  (fecha e importe por rango, el importe en la moneda del negocio), orden y vista viva; cada importe en la
+  moneda de su pago con los decimales que dice el servidor (`currency_decimals`); un pago se lee entero por
+  su referencia.
 - **Los avisos** (F07): cada paso de un pago y cada cambio de un método deja su evento; Automatizaciones
   los ofrece como disparadores y corre una vez por aviso.
 
@@ -32,13 +35,13 @@ con ningún banco.
 | `LiveAppConfig` | `kind = "app"`, icono `lucide:send` (el `ion:send-outline` pedido espera en `UI-REQUESTS.md`), categoría `sales`, gratuita (`premium = False`) |
 | Verticales | ninguna (`verticals = []`): no viene en ninguna plantilla; se enciende desde la tienda (`listed`) |
 | `requires` | `[]`: no necesita ninguna app; las formas de cobro del TPV son de Ventas y aquí no se leen |
-| Usa de otras apps | nada |
+| Usa de otras apps | nada; de la plataforma, la moneda del negocio (`base.operations.business_currency`, BASE-F50, y `useBusinessMoney` en la pantalla) |
 | Quién la lee | Automatizaciones: oye sus nueve avisos (FLOW-F21) y sus pasos pueden usar las consultas y las acciones sin riesgo alto (FLOW-F11: registrar un pago y crear, cambiar, desactivar o activar un método). Ninguna otra app |
 | Pantallas | `/payment/payments` (Pagos) y `/payment/methods` (Métodos) |
 | Operaciones | 4 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=` (`risk = "high"` en aprobar, enviar, completar y cancelar); 13 rutas en `/api/payment/…` |
 | Eventos | 9, `payment.payment.{created,approved,sent,completed,cancelled}` y `payment.method.{created,updated,deactivated,activated}` (`events.py`); no reacciona a ninguno de otra app |
 | Tarea programada | ninguna |
-| Migraciones | `0001_initial`, `0002_payment_trail`, `0003_payment_idempotency_key` |
+| Migraciones | `0001_initial`, `0002_payment_trail`, `0003_payment_idempotency_key`, `0004_payment_currency_without_default` |
 | Admin | Django admin con CRUD de métodos, pagos y contadores en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (Pagos no es Ventas, referencia con `UPDATE … RETURNING`, idempotencia del alta,
@@ -52,6 +55,7 @@ cd hub   # o tu worktree
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/payment
 pnpm test apps/payment
 CI=1 pnpm e2e tests/e2e/payment-flow.spec.ts
+CI=1 pnpm e2e tests/e2e/payment-business-currency.spec.ts
 ```
 
 - `tests/test_integration_sale.py` va contra Ventas real (los dos catálogos no se mezclan); `test_relay.py`,
@@ -59,6 +63,8 @@ CI=1 pnpm e2e tests/e2e/payment-flow.spec.ts
   `test_concurrency.py`, con hilos (referencias, aprobaciones, el mismo intento dos veces a la vez).
 - `payment-flow.spec.ts` recorre los flujos con pantalla (F01–F06 y F08) en 390, 834 y 1440; F07 no tiene
   pantalla y su evidencia es `test_relay.py`.
+- `test_business_currency.py` y `payment-business-currency.spec.ts`: un negocio en Polonia registra, ve y
+  filtra sus pagos en złoty (PAYMENT-F02), por la pantalla, la ruta y una API key; cada hub la suya.
 
 ## Qué queda fuera
 

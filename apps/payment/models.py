@@ -91,7 +91,8 @@ class Payment(UUIDModel):
     payment_date = models.DateField(_("payment date"))
     # In the minor unit of ``currency`` (cents in euros), always above 0.
     amount = models.BigIntegerField(_("amount"))
-    currency = models.CharField(_("currency"), max_length=3, default="EUR")
+    # Who records it says it: the business's (its country's) unless the payment names another; no euro by default.
+    currency = models.CharField(_("currency"), max_length=3)
     beneficiary_name = models.CharField(
         _("beneficiary"), max_length=BENEFICIARY_MAX_LENGTH
     )

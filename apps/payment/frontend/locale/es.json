@@ -68,6 +68,7 @@
         "methodPlaceholder": "Método…",
         "date": "Fecha",
         "amount": "Importe",
+        "amountIn": "Importe ({currency})",
         "beneficiary": "Beneficiario",
         "concept": "Concepto",
         "iban": "IBAN del beneficiario",
