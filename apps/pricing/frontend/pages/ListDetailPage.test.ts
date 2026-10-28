@@ -85,6 +85,13 @@ describe('ListDetailPage', () => {
     expect(s.find('pricing-detail-default').exists()).toBe(true);
   });
 
+  it('a list with a customer group in the business’s currency cannot be made general (PRICING-F04)', async () => {
+    const s = await setup({}, business(POLISH));
+    await s.result(LIST, priceList({ currency: 'PLN' }));
+    expect(s.summary()[1]).toBe('VIP');
+    expect(s.find('pricing-detail-default').exists()).toBe(false);
+  });
+
   it('in Poland a list in euros keeps its euros but cannot be made general', async () => {
     const s = await setup({}, business(POLISH));
     await s.result(LIST, priceList({ customer_group_id: null, customer_group_name: null, currency: 'EUR' }));

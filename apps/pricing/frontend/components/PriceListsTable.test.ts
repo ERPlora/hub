@@ -159,6 +159,12 @@ describe('PriceListsTable', () => {
     expect(before.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate']);
   });
 
+  it('an inactive list in the business’s currency is not offered «Make general» (PRICING-F04)', async () => {
+    const s = await setup({}, business(POLISH));
+    await s.show(page([GENERAL]));
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN', is_active: false }))).toEqual(['open', 'edit', 'activate']);
+  });
+
   it('offers each action where it applies, and opens a list by its row or «Open»', async () => {
     const s = await setup();
     await s.show(page([GENERAL, VIP, OLD]));
