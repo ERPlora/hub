@@ -12,6 +12,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     ConfigDict,
@@ -34,6 +35,10 @@ SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
 SAY_ONE_TARGET = _("Say one product or one category: its id, or its name.")
 SAY_WHICH_LINK = _("Say which link: its id, or the group and the product or category.")
 MAX_BELOW_MIN = _("The maximum cannot be below the minimum (0 = no ceiling).")
+
+# How the Modifiers screens name the data the models do not (the assistant's card names each datum by its title).
+OPTION = gettext_noop("Option")
+OWN_TAX_CATEGORY = gettext_noop("Own tax category")
 
 GroupSort = Literal[
     "name",
@@ -232,6 +237,7 @@ class OptionRefIn(_Input):
     id: UUID | None = Field(None, description="The option's id.")
     option: Said | None = Field(
         None,
+        title=OPTION,
         description="The option's name, when its id is not known (e.g. «No onion»).",
     )
     group_id: UUID | None = Field(
@@ -264,6 +270,7 @@ class OptionIn(_OwningGroup):
     )
     tax_category_key: TaxKey = Field(
         "",
+        title=OWN_TAX_CATEGORY,
         description="Only when it taxes differently from the dish: the key (e.g. product.generic) or the name of "
         "its own tax category, billed on a line of its own; empty = the dish's.",
     )
@@ -287,6 +294,7 @@ class OptionPatchIn(OptionRefIn):
     )
     tax_category_key: TaxKey | None = Field(
         None,
+        title=OWN_TAX_CATEGORY,
         description="New own tax category (key or name); empty = back to the dish's.",
     )
     is_default: bool | None = Field(

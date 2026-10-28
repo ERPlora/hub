@@ -168,3 +168,10 @@ msgstr "Este grupo ya se aplica ahí."
 
 msgid "This group does not apply there."
 msgstr "Este grupo no se aplica ahí."
+
+# How the assistant's card names the data of modifier's writes (titles of the schemas).
+msgid "Option"
+msgstr "Opción"
+
+msgid "Own tax category"
+msgstr "Categoría fiscal propia"
