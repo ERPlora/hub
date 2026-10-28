@@ -8,7 +8,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { business, BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice, POLISH } from '../__tests__/mount-invoice';
+import { answerIssuer, business, BYE, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountInvoice, POLISH, redNotices, said } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from '../components/InvoiceCreateModal.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import { plain } from '../lib/format';
@@ -340,15 +340,41 @@ describe('InvoicesPage: who may do what', () => {
 });
 
 describe('InvoicesPage: the states of the screen', () => {
-  it('says above the list that nothing can be invoiced while the issuer is not set up (INVOICE-F21)', async () => {
-    const s = await setup();
-    expect(s.subId('invoice.issuer.get')).toBeTruthy();
-    await s.result('invoice.issuer.get', { configured: false });
+  // INVOICE-F21: without an issuer the screen says ONCE that nothing can be invoiced — the platform's strip over it
+  // (base's «Todavía no puedes facturar»), never a second notice of Invoicing's own saying the same under it.
+  it('without an issuer, says once that nothing can be invoiced, with «Configurar» to the issuer, and nothing once it is set', async () => {
+    const s = await setup({ platformNotice: true, locale: 'es' });
+    await answerIssuer(s, false, { locale: 'es' });
     await s.show(PAGE);
-    expect(s.find('invoice-issuer-notice').text()).toContain('You cannot invoice yet');
+    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
+    expect(redNotices(s)).toBe(1);
+    expect(said(s.wrapper.text(), 'Los datos de tu negocio')).toBe(1);
+    const setUp = s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar');
+    expect(setUp).toHaveLength(1);
     expect(s.rows()).toHaveLength(3);
-    await s.result('invoice.issuer.get', { configured: true }, {}, 2);
-    expect(s.find('invoice-issuer-notice').exists()).toBe(false);
+    await setUp[0].trigger('click');
+    await flush();
+    expect(s.router.currentRoute.value.path).toBe('/invoice/issuer');
+  });
+
+  it('once the issuer is saved anywhere, says it no more', async () => {
+    const s = await setup({ platformNotice: true, locale: 'es' });
+    await answerIssuer(s, false, { locale: 'es' });
+    await answerIssuer(s, true, { locale: 'es', rev: 2 });
+    expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(0);
+    expect(redNotices(s)).toBe(0);
+  });
+
+  it('to whoever may not change the issuer, says once that an administrator has to, with no «Configurar» (gh:hub#435)', async () => {
+    for (const session of [EMPLOYEE, MANAGER]) {
+      const s = await setup({ platformNotice: true, locale: 'es', session });
+      await answerIssuer(s, false, { locale: 'es', actionable: false });
+      expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
+      expect(redNotices(s)).toBe(1);
+    expect(redNotices(s)).toBe(1);
+      expect(said(s.wrapper.text(), 'Esto lo tiene que configurar un administrador.')).toBe(1);
+      expect(s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar')).toHaveLength(0);
+    }
   });
 
   it('on an error the table says so with Retry', async () => {
