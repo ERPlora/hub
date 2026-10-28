@@ -280,7 +280,8 @@
       "ranWaiting": "It ran and is waiting: see it in History.",
       "runSaveFirst": "Save it first: «Run now» runs what is saved.",
       "ranCalling": "It ran and is calling another system: see it in History.",
-      "ranAsking": "It ran and is waiting for an answer in «Waiting for your answer»."
+      "ranAsking": "It ran and is waiting for an answer in «Waiting for your answer».",
+      "ranThinking": "It ran and the assistant is on it: see it in History."
     },
     "trigger": {
       "when": "When this happens…",
@@ -333,7 +334,8 @@
         "delay": "Wait",
         "message": "Send a message",
         "http": "Call another system",
-        "ask": "Ask someone first"
+        "ask": "Ask someone first",
+        "assistant": "Ask the assistant"
       },
       "remove": "Remove this step",
       "reorder": "Drag to reorder",
@@ -398,7 +400,9 @@
         "http": "Call {host}",
         "noHttp": "Call another system",
         "ask": "Ask: {title}",
-        "noAsk": "Ask someone first"
+        "noAsk": "Ask someone first",
+        "assistant": "Ask the assistant: {prompt}",
+        "noAssistant": "Ask the assistant"
       },
       "options": {
         "toggle": "More options",
@@ -441,7 +445,8 @@
         "high_risk": "«{action}» needs a person in front: an automation cannot do it",
         "skipped": "Would be skipped: its «Only if…» does not hold",
         "would_call": "Would call {host} with this",
-        "would_ask": "Would ask {who} and wait up to {hours} hours"
+        "would_ask": "Would ask {who} and wait up to {hours} hours",
+        "would_ask_assistant": "Would ask the assistant: {prompt}"
       },
       "empty": "Would arrive empty: {fields}",
       "unknown": "Comes from an earlier step that has not run: {fields}",
@@ -495,7 +500,12 @@
         "asking": "Asked {who}; waiting for an answer until {date}",
         "answeredYes": "{who} answered yes",
         "answeredNo": "{who} answered no",
-        "expired": "Nobody answered in time"
+        "expired": "Nobody answered in time",
+        "thinking": "Asked the assistant; it answers in a moment.",
+        "assistantUsed": "The assistant used «{action}».",
+        "assistantRefused": "The assistant tried «{action}», which did not take it.",
+        "assistantAnswered": "The assistant answered: «{text}»",
+        "assistantProposed": "The assistant wants to «{action}»: it waits for a yes until {date}."
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",
@@ -2639,6 +2649,26 @@
       "reject": "No",
       "approved": "Approved: the automation carries on.",
       "rejected": "Answered no."
+    },
+    "assistant": {
+      "prompt": "What to ask it",
+      "tools": "What it may use",
+      "toolsHint": "Only reads and actions the assistant can use; each one is a permission you give in «Permissions».",
+      "addTool": "Add a read or an action",
+      "chooseTool": "Choose one",
+      "noTools": "Nothing yet: it can only answer with words.",
+      "removeTool": "Remove «{action}»",
+      "mode": "Changes",
+      "modes": {
+        "ask": "Ask me first",
+        "auto": "On its own"
+      },
+      "modeHints": {
+        "ask": "A change it wants waits for a yes in Automations, under «Waiting for your answer». What it only looks up never waits.",
+        "auto": "It makes the changes on its own, as this automation, with the permissions you gave it."
+      },
+      "rounds": "Most turns",
+      "answerHint": "The steps after it can insert «Text», what it answered."
     }
   }
 }

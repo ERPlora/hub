@@ -83,6 +83,8 @@ function blankStep(id: string, kind: StepKind): Step {
   if (kind === 'http') return { id, kind, method: 'POST', url: '', headers: {}, body: '', timeout: 10 };
   // Whoever runs the business, three days, and a no stops it: the old module's defaults.
   if (kind === 'ask') return { id, kind, title: '', details: '', role: '', hours: 72, on_no: 'stop', on_timeout: 'no' };
+  // A change waits for a yes, and six turns: the old hub's defaults.
+  if (kind === 'assistant') return { id, kind, prompt: '', tools: [], mode: 'ask', max_rounds: 6 };
   return { id, kind: 'command', operation: '', params: {} };
 }
 
@@ -188,6 +190,8 @@ export function requiredGrants(steps: readonly Step[]): string[] {
     } else if (step.kind === 'http') {
       const grant = httpGrant(step.url);
       if (grant && !names.includes(grant)) names.push(grant);
+    } else if (step.kind === 'assistant') {
+      for (const tool of step.tools) if (tool.trim() && !names.includes(tool)) names.push(tool);
     }
   }
   return names;
@@ -248,7 +252,7 @@ export function rowsToCondition(rows: readonly ConditionRow[]): Condition {
 export function fieldErrors(fields: Readonly<Record<string, string>> | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, message] of Object.entries(fields ?? {})) {
-    let normal = key.replace(/^steps\.(\d+)\.(command|query|condition|delay|http|ask)\./, 'steps.$1.');
+    let normal = key.replace(/^steps\.(\d+)\.(command|query|condition|delay|http|ask|assistant)\./, 'steps.$1.');
     normal = normal === 'trigger.schedule' ? 'trigger' : normal.replace(/^trigger\.(event|schedule|at|manual)\./, 'trigger.');
     out[normal] = message;
   }
@@ -279,7 +283,9 @@ export function dataChoices(steps: readonly Step[], index: number, sample: Recor
         ? ['status', 'body']
         : step.kind === 'ask'
           ? ['approved', 'expired', 'note', 'answered_by']
-          : (catalog?.actions.find((candidate) => candidate.name === step.operation)?.outputs ?? []);
+          : step.kind === 'assistant'
+            ? ['text', 'approved', 'note', 'answered_by']
+            : (catalog?.actions.find((candidate) => candidate.name === step.operation)?.outputs ?? []);
     for (const field of outputs) out.push({ path: `steps.${step.id}.${field}`, group: step.id, example: undefined });
     // FLOW-F25: whether it was skipped, or failed and carried on.
     if (step.run_if) out.push({ path: `steps.${step.id}.skipped`, group: step.id, example: undefined });

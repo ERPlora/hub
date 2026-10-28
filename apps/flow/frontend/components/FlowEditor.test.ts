@@ -320,19 +320,32 @@ describe('FlowEditor: review 2026-10-15', () => {
     expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is calling another system: see it in History.');
   });
 
-  // FLOW-F31, F37: without the WhatsApp inbox in the business, «Send a message» is not offered, and without an
-  // assistant in the Hub, «Ask the assistant» never is: these are all the steps there are.
-  it('offers exactly the steps the Hub can run, none it cannot yet', async () => {
+  // FLOW-F31: without the WhatsApp inbox in the business, «Send a message» is not offered. FLOW-F37: «Ask the
+  // assistant» is (until 2026-10-28 this test proved it was not, while the Hub had no assistant): these are all the
+  // steps there are.
+  it('offers exactly the steps the Hub can run', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
     const adders = s.wrapper.findAll('[data-testid^="flow-editor-add-"]').map((button) => button.attributes('data-testid'));
-    expect(adders).toEqual(['command', 'query', 'condition', 'delay', 'http', 'ask'].map((kind) => `flow-editor-add-${kind}`));
+    expect(adders).toEqual(['command', 'query', 'condition', 'delay', 'http', 'ask', 'assistant'].map((kind) => `flow-editor-add-${kind}`));
+  });
+
+  it('«Ask the assistant» has its own button and adds its step, open (FLOW-F37)', async () => {
+    const s = await setup({ flow: null, initial: emptyDocument() });
+    expect(s.find('flow-editor-add-assistant').text()).toBe('Ask the assistant');
+    await click(s.find('flow-editor-add-assistant').element);
+    const [node] = s.wrapper.findAllComponents(StepNode);
+    expect([node.props('step'), node.props('open')]).toEqual([
+      { id: 's1', kind: 'assistant', prompt: '', tools: [], mode: 'ask', max_rounds: 6 },
+      true,
+    ]);
+    expect(s.find('flow-assistant-s1').exists()).toBe(true);
   });
 
   it('with the WhatsApp inbox, «Send a message» adds the narrow send, open (FLOW-F31)', async () => {
     const withInbox: CatalogOut = { ...CATALOG, actions: [...CATALOG.actions, NOTIFY_ACTION] };
     const s = await setup({ flow: null, initial: emptyDocument() }, { '/api/flow/catalog': [200, withInbox] });
     const adders = s.wrapper.findAll('[data-testid^="flow-editor-add-"]').map((button) => button.attributes('data-testid'));
-    expect(adders).toEqual(['command', 'query', 'condition', 'delay', 'message', 'http', 'ask'].map((kind) => `flow-editor-add-${kind}`));
+    expect(adders).toEqual(['command', 'query', 'condition', 'delay', 'message', 'http', 'ask', 'assistant'].map((kind) => `flow-editor-add-${kind}`));
     expect(s.find('flow-editor-add-message').text()).toBe('Send a message');
     await click(s.find('flow-editor-add-message').element);
     const [node] = s.wrapper.findAllComponents(StepNode);

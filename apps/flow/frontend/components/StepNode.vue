@@ -18,6 +18,7 @@ import { type DataChoice, delayParts, type DelayUnit, NOTIFY_OPERATION, secondsO
 import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, Step } from '../operations';
 import AskStepPanel from './AskStepPanel.vue';
+import AssistantStepPanel from './AssistantStepPanel.vue';
 import ConditionRows from './ConditionRows.vue';
 import HttpStepPanel from './HttpStepPanel.vue';
 import MessageStepPanel from './MessageStepPanel.vue';
@@ -147,7 +148,7 @@ const summary = computed(() => {
     );
     parts.push(t('flow.steps.options.summaryRunIf', { clauses: clauses.join('; ') }));
   }
-  if ((step.kind === 'command' || step.kind === 'query' || step.kind === 'http') && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
+  if ((step.kind === 'command' || step.kind === 'query' || step.kind === 'http' || step.kind === 'assistant') && step.on_error === 'continue') parts.push(t('flow.steps.options.summaryOnError'));
   return parts.join(' · ');
 });
 </script>
@@ -393,6 +394,67 @@ const summary = computed(() => {
         :data-testid="`flow-step-panel-${id}`"
       >
         <AskStepPanel
+          :step="step"
+          :index="index"
+          :steps="steps"
+          :catalog="catalog"
+          :errors="errors"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
+        <StepOptions
+          :step="step"
+          :steps="steps"
+          :catalog="catalog"
+          :choices="choices"
+          :pick="pick"
+          @update:step="emit('update:step', $event)"
+        />
+      </div>
+    </div>
+
+    <!-- A task for the assistant (FLOW-F37): a card named by what it is asked. -->
+    <div
+      v-else-if="step.kind === 'assistant'"
+      class="flow-card"
+    >
+      <div class="flow-card__row">
+        <IonReorder
+          class="flow-handle"
+          :aria-label="$t('flow.steps.reorder')"
+        >
+          ⠿
+        </IonReorder>
+        <button
+          type="button"
+          class="flow-card__open"
+          :aria-expanded="open ? 'true' : 'false'"
+          :data-testid="`flow-step-open-${id}`"
+          @click="emit('toggle')"
+        >
+          <span class="flow-card__title"><HubIcon name="ion:sparkles-outline" /> {{ title }}</span>
+          <span
+            v-if="summary && !open"
+            class="flow-card__hint flow-step__summary"
+            :data-testid="`flow-step-summary-${id}`"
+          >{{ summary }}</span>
+        </button>
+        <button
+          type="button"
+          class="flow-icon-btn"
+          :aria-label="$t('flow.steps.remove')"
+          :data-testid="`flow-step-remove-${id}`"
+          @click="emit('remove')"
+        >
+          <HubIcon name="ion:close-outline" />
+        </button>
+      </div>
+      <div
+        v-if="open"
+        class="flow-card__panel"
+        :data-testid="`flow-step-panel-${id}`"
+      >
+        <AssistantStepPanel
           :step="step"
           :index="index"
           :steps="steps"

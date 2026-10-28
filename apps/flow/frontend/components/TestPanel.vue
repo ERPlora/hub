@@ -56,6 +56,8 @@ function stepOf(id: string) {
 
 /** What a step would send; a call's host is already in its verdict. */
 function shownParams(step: TestStepOut): Record<string, unknown> {
+  // What it would ask is its verdict; the names of what it may use are not words for a person.
+  if (step.outcome === 'would_ask_assistant') return {};
   if (step.outcome === 'would_ask') return Object.fromEntries(Object.entries(step.params).filter(([field]) => field === 'title' || field === 'details'));
   if (step.kind !== 'http') return step.params;
   // A call in words: its host is in the verdict, each header is «Name: value», nothing empty.
@@ -71,6 +73,7 @@ function outcome(step: TestStepOut): string {
   const own = stepOf(step.id);
   const action = own?.kind === 'http' ? describeStep(own, props.document.steps, props.catalog, phrasing.value) : step.operation ? actionLabel(step.operation, props.catalog, phrasing.value) : '';
   if (step.outcome === 'would_call') return phrasing.value.t('flow.test.outcomes.would_call', { host: String(step.params.host ?? '') });
+  if (step.outcome === 'would_ask_assistant') return phrasing.value.t('flow.test.outcomes.would_ask_assistant', { prompt: String(step.params.prompt ?? '') });
   if (step.outcome === 'would_ask') {
     const who = phrasing.value.t(`flow.ask.roles.${String(step.params.role || 'admin')}`);
     return phrasing.value.t('flow.test.outcomes.would_ask', { who, hours: Number(step.params.hours ?? 72) });
@@ -213,6 +216,7 @@ const names = (fields: readonly string[]): string => fields.map((field) => field
 .flow-test__step[data-outcome='would_run'],
 .flow-test__step[data-outcome='would_call'],
 .flow-test__step[data-outcome='would_ask'],
+.flow-test__step[data-outcome='would_ask_assistant'],
 .flow-test__step[data-outcome='waits'] {
   border-left-color: var(--ion-color-success);
 }
