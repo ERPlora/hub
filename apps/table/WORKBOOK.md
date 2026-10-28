@@ -83,6 +83,7 @@ Configuración inicial, paso a paso:
 
 1. En **Mesas → Zonas** (o con el «+» del **Plano de sala**) crea las zonas del local (TABLE-F01).
 2. En **Mesas → Plano de sala**, en «Editar plano», con el «+» añade las mesas de cada zona (TABLE-F02).
+   Hasta que haya una mesa en uso, el Inicio te lo recuerda con «Tus mesas».
 3. Arrástralas hasta que el plano se parezca a la sala y ajusta en cada una su aforo y su forma
    (TABLE-F03, TABLE-F04).
 4. En **Mesas → Ajustes** (solo el administrador) decide si al sentar se preguntan los comensales y a
@@ -236,25 +237,31 @@ ese nombre.». Un empleado no ve el «+»; si lo pide por la API, se rechaza por
 Implicados: TABLE-F06, TABLE-F09
 
 ### TABLE-F02 Añadir mesas
-<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-create old:tables/workflow/plano.md#tables-f02 -->
+<!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-create old:tables/workflow/plano.md#tables-f02 old-hub:HUB_SHELL-F27 gh:tables#24 -->
 Estado: hecho
 Actor: responsable, administrador
-Pantalla: Plano de sala (Editar plano), Mesas
+Pantalla: Inicio, Plano de sala (Editar plano), Mesas
 Pasos:
-1. En **Plano de sala → Editar plano**, elige la zona y pulsa «+».
-2. En «Número de mesa» escribe el número o nombre (S1, Terraza A) o déjalo vacío: «Se numera sola»
+1. En el **Inicio**, mientras no haya ninguna mesa en uso, «Termina de configurar tu negocio» trae
+   «Tus mesas» («Añade las mesas de tu sala: sin ellas no hay comanda por mesa, ni dividir ni
+   transferir.»), «Recomendado», a quien puede crear mesas. «Configurar» lleva a **Mesas → Mesas**
+   (paso 6).
+2. En **Plano de sala → Editar plano**, elige la zona y pulsa «+».
+3. En «Número de mesa» escribe el número o nombre (S1, Terraza A) o déjalo vacío: «Se numera sola»
    con el primer número libre de esa zona.
-3. Pulsa «Añadir mesa» (apagado mientras no haya ninguna zona).
-4. La mesa aparece en la zona, en el primer hueco libre, cuadrada, para 4 y Disponible.
-5. Otra puerta: en **Mesas → Mesas**, «+» con Número, Aforo y Zona y «Añadir mesa»; también nace en el
+4. Pulsa «Añadir mesa» (apagado mientras no haya ninguna zona).
+5. La mesa aparece en la zona, en el primer hueco libre, cuadrada, para 4 y Disponible.
+6. Otra puerta: en **Mesas → Mesas**, «+» con Número, Aforo y Zona y «Añadir mesa»; también nace en el
    primer hueco libre de su zona.
 Entra: número (o ninguno), y en la lista también aforo y zona.
 Sale: la mesa (avisa: `table.table.created`). Con una mesa en uso, «Elegir mesa» del TPV deja de decir
-«Aún no hay mesas. Créalas en Mesas → Plano de sala.» (`table.floor.status`).
+«Aún no hay mesas. Créalas en Mesas → Plano de sala.» (`table.floor.status`), y «Tus mesas» queda
+«Hecho» en el Inicio sin recargar. Una mesa ocupada o bloqueada sigue contando; si se apagan o se borran
+todas (TABLE-F04), el paso vuelve a pendiente solo. Una zona sin mesas no lo da por hecho.
 Si falla: número repetido en la zona (sin distinguir mayúsculas ni espacios), por cualquier puerta:
 «Ya hay una mesa con ese número en esta zona.». Zona borrada mientras tanto: «Esa zona no existe en
 este negocio.».
-Implicados: TABLE-F03, TABLE-F04, TABLE-F07
+Implicados: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Colocar las mesas en el plano
 <!-- origen: wf:restaurante-dia#rec_restaurante-f02 qa:modules/tables/floor-plan-zones-and-tables qa:verticals/restaurant/04-floor-plan fi:modules/tables#command-tables-tables-move old:tables/workflow/plano.md#tables-f03 -->
@@ -808,7 +815,7 @@ nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 | Una cuenta de mesa | ver cuentas | F21, F22 | `table.session.get` |
 | Las cuentas de mesa de una cuenta de Ventas (para el TPV: la mesa de la cuenta en pantalla) | ver cuentas | F12, F13, F24 | `table.session.by_order` |
 | Los camareros que han abierto cuentas (para el filtro) | ver cuentas | F22 | `table.waiter.list` |
-| Si el plano está montado (mesas en uso y zonas), para «Elegir mesa» del TPV | ver mesas | F02 | `table.floor.status` |
+| Si el plano está montado (mesas en uso y zonas), para «Elegir mesa» del TPV y el paso «Tus mesas» del Inicio | ver mesas | F02 | `table.floor.status` |
 | Los ajustes de sala | ver ajustes | F08 | `table.settings.get` |
 
 Las zonas, las mesas, las cuentas, los camareros, el estado del plano y los ajustes se pueden seguir
@@ -899,6 +906,7 @@ Lo que Reservas manda al llamar (los mismos nombres que sus avisos `status_chang
 |---|---|---|
 | Ventas | «Elegir mesa» del TPV (SALE-F19): las mesas y su estado, sentar o volver a sentar la cuenta de pantalla, quitarle la mesa y seguir la mesa de una cuenta | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
 | Reservas | Retener, mover y soltar la mesa de una reserva y sentarla, dentro de su operación | `table.hold.sync_reservation`, `table.hold.move_reservation`, `table.hold.release`, `table.session.open` |
+| Plataforma (Inicio) | El paso «Tus mesas» de «Termina de configurar tu negocio» (TABLE-F02) | `table.floor.status` |
 
 Cocina no llama a Mesas: la comanda lleva el título de su cuenta, el que Mesas le pone en Ventas («Mesa 4»).
 Reservas, además, repinta sus pantallas con los avisos de las mesas y las zonas (`table.table.created`,
@@ -1058,7 +1066,8 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   propósito».
 - Los dos iconos de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`ion:restaurant-outline` para la app y
   `ion:map-outline` para el Plano de sala) siguen sin registrarse en `@erplora/ui`; mientras, la app usa
-  `ion:grid-outline` y el plano `ion:apps-outline`.
+  `ion:grid-outline` (también en el paso «Tus mesas» del Inicio, que en el producto actual llevaba el del
+  plano) y el plano `ion:apps-outline`.
 
 Las dudas del producto actual quedan cerradas: la 1, la 6 y la 7, por mercado («Referencia adoptada» y
 «Cambios frente al producto actual»); la 4 ya estaba resuelta (tables#124, TABLE-F21); la 5, con pantalla

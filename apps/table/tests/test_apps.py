@@ -1,7 +1,17 @@
-"""The table app declares its module metadata, its menu, its permissions and what each role gets."""
+"""The table app declares its module metadata, its menu, its permissions, what each role gets and its hook of the
+Home."""
+
+from pathlib import Path
 
 from django.apps import apps
-from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from django.conf import settings
+from django.utils import translation
+from live.live_registry import live_registry
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.operations import registry
+
+from apps.table import events as E
+from base import home
 
 PERMISSIONS = [
     "table.view_zone",
@@ -165,3 +175,76 @@ def test_the_expired_holds_are_swept_every_hour_as_the_system():
     from live.operations import get
 
     assert get("table.hold.expire").permission == "table.system"
+
+
+# The Home's hook (PLAN-HUB round 2026-10-21; FIX-TABLE-SETUP-HOOKS): the old module's own item «Your tables»
+# (module.json `setup`, tables#24), which reads the floor's status. The old module declared no panel and no bell row.
+
+
+def test_the_homes_step_is_your_tables_done_once_one_table_is_in_use():
+    """The old module's item, same order and words: recommended, as it declared it (`required: false`), done once one
+    table is in use (not deleted, active: an occupied or blocked one still counts), for whoever adds tables, leading to
+    the list of tables (the old `/m/tables/tables`)."""
+    (step,) = table().setup
+    assert isinstance(step, SetupStep)
+    assert (
+        step.key,
+        step.operation,
+        dict(step.params),
+        list(step.configured_when),
+        step.route,
+        step.permission,
+        step.icon,
+        list(step.countries),
+        step.order,
+        step.required,
+    ) == (
+        "tables",
+        "table.floor.status",
+        {},
+        [SetupCheck(field="usable_tables", truthy=True)],
+        "/table/tables",
+        "table.add_table",
+        "ion:grid-outline",
+        [],
+        100,
+        False,
+    )
+    assert "usable_tables" in registry[step.operation].output.model_fields
+    assert home.level_of(f"table.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+
+
+def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
+    (step,) = table().setup
+    with translation.override("en"):
+        english = (str(step.title), str(step.description))
+    with translation.override("es"):
+        spanish = (str(step.title), str(step.description))
+    assert english == (
+        "Your tables",
+        "Add the tables of your dining room: without them there is no order per table, no split and no transfer.",
+    )
+    assert spanish == (
+        "Tus mesas",
+        "Añade las mesas de tu sala: sin ellas no hay comanda por mesa, ni dividir ni transferir.",
+    )
+
+
+def test_the_step_is_refreshed_on_what_changes_the_tables_in_use():
+    # A table added (one or many), changed (switched off or on) or deleted. Never a zone: one with tables is not
+    # deleted, and a zone does not decide whether its tables are in use.
+    (step,) = table().setup
+    assert list(step.refresh_on) == E.TABLE_EVENTS
+    assert set(step.refresh_on) <= set(live_registry.subscribable[step.operation])
+
+
+def test_the_steps_icon_is_registered():
+    # The old `map-outline` waits in UI-REQUESTS.md, as the menu's.
+    (step,) = table().setup
+    icons = (Path(settings.BASE_DIR) / "packages/ui/src/shell/icons.ts").read_text()
+    assert f"'{step.icon.removeprefix('ion:')}'" in icons
+
+
+def test_tables_brings_no_panels_and_no_bell_rows_to_the_home():
+    # The old module declared neither (its module.json has `widgets` and `bell` null).
+    assert (table().widgets, table().bell) == ([], [])
