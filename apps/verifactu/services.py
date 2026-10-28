@@ -1948,7 +1948,8 @@ def _certificate_event(ctx, key: str, row: OwnCertificate) -> None:
     input=CertificateUploadIn,
     output=ConfigOut,
     ai={
-        "description": "Upload the business's own certificate (.p12/.pfx in base64, with its password) to file its "
+        "description": "Not an assistant tool (a certificate and its password are secrets, given on the screen and "
+        "never in a chat): upload the business's own certificate (.p12/.pfx in base64, with its password) to file its "
         "VeriFactu records with it (the «own» route). It must belong to Invoicing's issuer, allow client "
         "authentication and be in force; it replaces the one uploaded before and is kept encrypted, never shown again.",
         "risk": "high",
@@ -2222,9 +2223,11 @@ def _representation_payload(
     input=RepresentationSubmitIn,
     output=ConfigOut,
     ai={
-        "description": "Send the signed representation authorisation (Anexo I of the AEAT's Convenio 17) for ERPlora "
-        "to file on the business's behalf: the signed model and a copy of the signer's identity document, plus a "
-        "signature sample with a NIE and the proof of representation for a company, each a PDF of 5 MB at most. "
+        "description": "Not an assistant tool (it takes signed PDFs and a copy of an identity document, picked on the "
+        "screen and never sent through a chat): send the signed representation authorisation (Anexo I of the AEAT's "
+        "Convenio 17) for ERPlora to file on the business's behalf: the signed model and a copy of the signer's "
+        "identity document, plus a signature sample with a NIE and the proof of representation for a company, each a "
+        "PDF of 5 MB at most. "
         "A person at ERPlora reviews it; until then it is under review. This Hub keeps none of the documents.",
         "risk": "high",
     },

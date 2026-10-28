@@ -966,7 +966,10 @@ Implicados: VERIFACTU-F22, VERIFACTU-F23, VERIFACTU-F27
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia persona)
-y la API, con las mismas reglas y permisos. Pensado para la voz: un registro se nombra por el **número de su
+y la API, con las mismas reglas y permisos, salvo subir el certificado propio y enviar el otorgamiento firmado:
+llevan ficheros y la contraseña del certificado, que no se dicen ni se escriben en una conversación, así que el
+asistente no los ofrece y se hacen en **VeriFactu → Configuración** («Mi certificado» y «Lo remite ERPlora») o por
+la API. Pensado para la voz: un registro se nombra por el **número de su
 factura** (`TICKET-2026-000012`) o por su secuencia; un emisor, por su NIF.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
