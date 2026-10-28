@@ -893,6 +893,9 @@ msgstr "Servicios"
 msgid "Menus"
 msgstr "Menús"
 
+msgid "Fixed-amount discount"
+msgstr "Descuento de importe fijo"
+
 msgid "Quick note"
 msgstr "Nota rápida"
 

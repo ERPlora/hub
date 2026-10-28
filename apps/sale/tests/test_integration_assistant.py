@@ -105,21 +105,31 @@ def test_no_label_of_a_write_of_sale_names_the_internal_unit_of_its_money():
     assert named_by_unit == {}
 
 
-def test_the_card_names_a_checks_fixed_discount_apart_from_its_percentage_and_paints_it_as_money():
-    """SALE-F14: the check's discount is a percentage or a fixed amount («importe fijo») in the business's currency;
-    the card paints the amount as money and names it so, never «Descuento (céntimos)», and never as the
-    percentage («Descuento (%)») beside it."""
-    arguments = {"order_id": "x", "discount_percent": "10", "discount_amount": 1250}
-    for name in ("sale.order.set_discount", "sale.order.set_discount_over_limit"):
+def test_every_write_of_sale_names_the_tickets_fixed_discount_alike_apart_from_its_percentage_and_as_money():
+    """SALE-F14: the ticket's discount is a percentage or a fixed amount («importe fijo») in the business's currency,
+    on an open check and on a counter sale alike: every write of sale that asks for it paints the amount as money and
+    names it so, never «Descuento (céntimos)», never «Descuentos» (the sale's total of every discount given) and never
+    as the percentage («Descuento (%)») beside it."""
+    asking = [op for op in sale_writes() if "discount_amount" in op.input.model_json_schema().get("properties", {})]
+    names = {op.name for op in asking}
+    # positive control: an open check's discount and a counter sale's, each with its over-the-limit twin
+    assert names >= {
+        "sale.order.set_discount",
+        "sale.order.set_discount_over_limit",
+        "sale.sale.complete",
+        "sale.sale.complete_over_limit",
+    }
+    for op in asking:
         for language, percent, amount in (
             ("es", "Descuento (%)", "Descuento de importe fijo"),
             ("en", "Discount (%)", "Fixed-amount discount"),
         ):
-            card = assistant.card(get(name), arguments, language)
+            card = assistant.card(op, {"discount_percent": "10", "discount_amount": 1250}, language)
             fields = {field["name"]: field for field in card["fields"]}
-            assert (name, fields["discount_percent"]["label"]) == (name, percent)
-            assert (name, fields["discount_amount"]["label"], fields["discount_amount"]["kind"], fields["discount_amount"]["value"]) == (
-                name,
+            assert (op.name, language, fields["discount_percent"]["label"]) == (op.name, language, percent)
+            assert (op.name, language, fields["discount_amount"]["label"], fields["discount_amount"]["kind"], fields["discount_amount"]["value"]) == (
+                op.name,
+                language,
                 amount,
                 "money",
                 1250,
