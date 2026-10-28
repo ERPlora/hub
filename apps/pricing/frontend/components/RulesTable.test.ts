@@ -6,7 +6,8 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { rule } from '../__tests__/fixtures';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, POLISH, rule } from '../__tests__/fixtures';
 import { click, EMPLOYEE, errorFrame, flush, mountPricing, type MountOptions, page, settle } from '../__tests__/mount-pricing';
 import RuleFormModal from './RuleFormModal.vue';
 import RulesTable from './RulesTable.vue';
@@ -23,9 +24,11 @@ const OFF = rule({ id: 'r3', code: 'OFF', name: 'Old', rule_type: 'buy_x_get_y',
 
 type Action = { id: string; hidden?: (row: unknown) => boolean };
 
-async function setup(options: MountOptions = {}) {
+/** The table live, with the hub's business answered. */
+async function setup(options: MountOptions = {}, owner: Business = business()) {
   const m = await mountPricing(RulesTable, options);
   await m.live();
+  await m.result('base.business.get', owner);
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
   const rows = () => m.wrapper.findAll('[data-testid="pricing-rules-row"]');
@@ -162,5 +165,12 @@ describe('RulesTable', () => {
     const s = await setup({ locale: 'es' });
     await s.show(page([FIX]));
     expect(s.cells(0).slice(2, 4)).toEqual(['Importe por unidad', '0,50 € por unidad']);
+  });
+
+  it('an amount per unit is in the business’s currency: in Poland, zlotys and no euro', async () => {
+    const s = await setup({ locale: 'es' }, business(POLISH));
+    await s.show(page([FIX]));
+    expect(s.cells(0).slice(2, 4)).toEqual(['Importe por unidad', '0,50 zł por unidad']);
+    expect(s.wrapper.text()).not.toContain('€');
   });
 });

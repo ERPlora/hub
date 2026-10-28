@@ -1,11 +1,28 @@
 // How the pricing screens paint money, quantities, percents and days (pages never format by hand), always
-// with the page language's own format (Intl). Money is whole cents of the list's currency (euros unless
-// it says another; every currency of a list has two decimals, as the server checks). A day is a calendar
-// day (`YYYY-MM-DD`), painted as it is whatever the device's time zone.
+// with the page language's own format (Intl). Money is whole minor units: a list's prices in its currency
+// (`listMoney`: two decimals, the only ones the server takes for a list), the catalog's prices and a rule's
+// amount in the business's (`useBusinessMoney`, the platform's: its country's currency with the decimals the
+// server counts it in, never the browser's Intl, which gives none to the forint). Until the business answers an
+// amount is a figure without a symbol, never the euro by default. A day is a calendar day (`YYYY-MM-DD`), painted
+// as it is whatever the device's time zone.
+import type { Money } from '../../../../base/frontend/lib/home';
+
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
 type Translate = (key: string, named?: Record<string, unknown>) => string;
 
-/** The currency the business sells in (phase 1: euros, as the server's `BUSINESS_CURRENCY`). */
-export const BUSINESS_CURRENCY = 'EUR';
+/** The decimals of every currency of a list (the server takes no other), and of an amount while the currency is
+ *  unknown. */
+const LIST_DECIMALS = 2;
+
+/** The money of a list's prices: its currency, with two decimals; none while the list is unknown. */
+export function listMoney(currency: string | null | undefined): Money | undefined {
+  return currency ? { currency, decimals: LIST_DECIMALS } : undefined;
+}
+
+/** The decimals of an amount in `money`; two while it is unknown. */
+export const moneyDecimals = (money?: Money): number => money?.decimals ?? LIST_DECIMALS;
 
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
@@ -31,10 +48,15 @@ function numberFormat(locale: string, key: string, options: Intl.NumberFormatOpt
   return found;
 }
 
-/** Whole cents in `currency` (euros by default), in `locale` («12,50 €», «€12.50», «$12.50»), with the
+/** Minor units in `money`, in `locale` («12,50 zł», «€12.50», «¥2,450»; «12,50» while it is unknown), with the
  *  thousands grouped from four digits on in every language (Spanish CLDR waits for five: hub#1090). */
-export function formatMoney(cents: number, locale: string, currency = 'EUR'): string {
-  return numberFormat(locale, `money:${currency}`, { style: 'currency', currency, useGrouping: 'always' }).format(cents / 100);
+export function formatMoney(cents: number, locale: string, money?: Money): string {
+  const decimals = moneyDecimals(money);
+  const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' as const };
+  const options: Intl.NumberFormatOptions = money
+    ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits }
+    : digits;
+  return numberFormat(locale, `money:${money?.currency ?? ''}:${decimals}`, options).format(cents / 10 ** decimals);
 }
 
 /** A quantity as the server sends it («10.000») without its trailing zeros, in `locale`. */

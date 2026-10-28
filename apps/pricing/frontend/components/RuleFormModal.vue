@@ -5,13 +5,15 @@
 // Inventory or Services), and Customer group (empty = every customer), Minimum quantity, From, Until and
 // Priority (100). A row's Edit opens «Editing rule — {name}» and «Save» sends only what changed: a new
 // type with its value, a new scope with its target (the server empties the old ones). Refusals stay in
-// the dialog, under their field.
+// the dialog, under their field. The amount, and the catalog prices beside the products and services, are in
+// the business's currency (its country's; a bare figure until it answers).
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
+import { useBusinessMoney } from '../lib/format';
 import { quantityFieldText, readDecimal } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchCategories, searchGroups, searchProducts, searchServices } from '../lib/pickers';
@@ -58,11 +60,12 @@ interface Form {
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
+const money = useBusinessMoney();
 const searchGroup = searchGroups(client);
 const searchTarget = computed(() => {
   if (form.value.scope === 'category') return searchCategories(client);
-  if (form.value.scope === 'product') return searchProducts(client, locale.value);
-  return searchServices(client, locale.value);
+  if (form.value.scope === 'product') return searchProducts(client, locale.value, money.value);
+  return searchServices(client, locale.value, money.value);
 });
 const creation = useCommand('pricing.rule.create');
 const update = useCommand('pricing.rule.update');
@@ -104,7 +107,7 @@ function fromRule(rule: RuleOut): Form {
     name: rule.name,
     type: rule.rule_type,
     percent: decimalText(rule.percent),
-    amount: rule.amount === null ? '' : moneyFieldText(rule.amount, locale.value),
+    amount: rule.amount === null ? '' : moneyFieldText(rule.amount, locale.value, money.value),
     buy: rule.buy_quantity === null ? '' : String(rule.buy_quantity),
     get: rule.get_quantity === null ? '' : String(rule.get_quantity),
     tiers: rule.tiers.length
@@ -143,7 +146,7 @@ const decimal = (value: string, places: number): string => readDecimal(value, pl
 const whole = (value: string): number => (/^\d+$/.test(value.trim()) ? Number(value.trim()) : (value.trim() as unknown as number));
 const day = (value: string): string | null => value.trim() || null;
 const cents = (value: string): number | null => {
-  const read = parseMoney(value);
+  const read = parseMoney(value, money.value);
   return read.ok ? read.cents : null;
 };
 
@@ -300,6 +303,7 @@ async function save(): Promise<void> {
           v-else-if="form.type === 'fixed'"
           testid="pricing-rule-form-amount"
           :model-value="form.amount"
+          :money="money"
           :label="t('pricing.rules.form.amount')"
           :error-text="fieldErrors.amount"
           :show-error="tried"

@@ -6,6 +6,9 @@ import type { LiveClient } from '@erplora/ui/sdk';
 
 import { searchCategories, searchGroups, searchProducts, searchServices } from './pickers';
 
+const EUR = { currency: 'EUR', decimals: 2 };
+const PLN = { currency: 'PLN', decimals: 2 };
+
 function client(answer: unknown) {
   const call = vi.fn(async () => answer);
   return { client: { api: { call } } as unknown as LiveClient, call };
@@ -14,14 +17,22 @@ function client(answer: unknown) {
 describe('pickers', () => {
   it('searches products by name or SKU, with the SKU and the catalog price as hint', async () => {
     const { client: c, call } = client({ rows: [{ id: 'p1', name: 'Shampoo', sku: 'SH-1', price: 1500 }], total: 1 });
-    expect(await searchProducts(c, 'es')(' sham ')).toEqual([{ id: 'p1', label: 'Shampoo', hint: 'SH-1 · 15,00\u00a0€' }]);
+    expect(await searchProducts(c, 'es', EUR)(' sham ')).toEqual([{ id: 'p1', label: 'Shampoo', hint: 'SH-1 · 15,00\u00a0€' }]);
     expect(call).toHaveBeenCalledWith('inventory.product.list', { search: 'sham', limit: 20 });
   });
 
   it('searches services, with their catalog price as hint', async () => {
     const { client: c, call } = client({ rows: [{ id: 's1', name: 'Haircut', price: 1800 }], total: 1 });
-    expect(await searchServices(c, 'en')('')).toEqual([{ id: 's1', label: 'Haircut', hint: '€18.00' }]);
+    expect(await searchServices(c, 'en', EUR)('')).toEqual([{ id: 's1', label: 'Haircut', hint: '€18.00' }]);
     expect(call).toHaveBeenCalledWith('service.service.list', { limit: 20 });
+  });
+
+  it('the catalog price is in the business’s currency: in Poland, zlotys; a bare figure until it answers', async () => {
+    const products = client({ rows: [{ id: 'p1', name: 'Shampoo', sku: 'SH-1', price: 1500 }], total: 1 });
+    expect(await searchProducts(products.client, 'es', PLN)('')).toEqual([{ id: 'p1', label: 'Shampoo', hint: 'SH-1 · 15,00\u00a0zł' }]);
+    const services = client({ rows: [{ id: 's1', name: 'Haircut', price: 1800 }], total: 1 });
+    expect(await searchServices(services.client, 'en', PLN)('')).toEqual([{ id: 's1', label: 'Haircut', hint: 'zł\u00a018.00' }]);
+    expect(await searchServices(services.client, 'en')('')).toEqual([{ id: 's1', label: 'Haircut', hint: '18.00' }]);
   });
 
   it('searches the active customer groups and the categories', async () => {

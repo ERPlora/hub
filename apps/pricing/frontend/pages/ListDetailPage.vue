@@ -5,7 +5,9 @@
 // its «Prices», the live `pricing.price_item.list` of this list in a server-side DataTable: Item, Type,
 // SKU, From (with the product's unit), Price (in the list's currency) and Catalog price, «Search product
 // or service…», a Type filter, 50 a page by item. «+» adds a price; a row is edited or removed (asking
-// first). A list that does not exist says so, with Back.
+// first). A list that does not exist says so, with Back. Its prices are in its own currency; the catalog's,
+// in the business's (its country's; a bare figure until it answers), and only a list in the business's
+// currency can be made general.
 import {
   ConfirmDialog,
   DataTable,
@@ -28,7 +30,7 @@ import PriceListFormModal from '../components/PriceListFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { BUSINESS_CURRENCY, formatMoney, formatQuantity, validityLabel } from '../lib/format';
+import { formatMoney, formatQuantity, listMoney, useBusinessMoney, validityLabel } from '../lib/format';
 import { groupName, taxBasisLabel } from '../lib/rules';
 import type { Kind, PriceItemListIn, PriceItemOut } from '../operations';
 
@@ -44,7 +46,8 @@ const canManage = computed(() => session.can('pricing.manage'));
 // The list
 const { data: list, status: listStatus, error: listError } = useLive('pricing.price_list.get', () => ({ id: props.id }));
 const missing = computed(() => listError.value?.code === 'pricing.price_list_not_found' || listError.value?.code === 'not_found');
-const currency = computed(() => list.value?.currency ?? 'EUR');
+const money = computed(() => listMoney(list.value?.currency));
+const business = useBusinessMoney();
 
 // Its prices
 const table = useServerTable({ sort: 'name' });
@@ -80,13 +83,13 @@ const columns = computed<DataTableColumn<PriceItemOut>[]>(() => [
   },
   { key: 'sku', label: t('pricing.items.columns.sku'), priority: 'low', format: (_, row) => row.sku ?? t('pricing.none') },
   { key: 'min_quantity', label: t('pricing.items.columns.minQuantity'), sortable: true, align: 'right', format: (_, row) => quantityLabel(row) },
-  { key: 'price', label: t('pricing.items.columns.price'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.price, locale.value, currency.value) },
+  { key: 'price', label: t('pricing.items.columns.price'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.price, locale.value, money.value) },
   {
     key: 'base_price',
     label: t('pricing.items.columns.basePrice'),
     align: 'right',
     priority: 'low',
-    format: (_, row) => (row.base_price === null ? t('pricing.none') : formatMoney(row.base_price, locale.value)),
+    format: (_, row) => (row.base_price === null ? t('pricing.none') : formatMoney(row.base_price, locale.value, business.value)),
   },
 ]);
 
@@ -117,7 +120,7 @@ const canMakeDefault = computed(
     list.value.is_active &&
     !list.value.is_default &&
     list.value.customer_group_id === null &&
-    list.value.currency === BUSINESS_CURRENCY,
+    list.value.currency === business.value?.currency,
 );
 
 async function activateList(): Promise<void> {
@@ -346,6 +349,7 @@ function onAction({ actionId, row }: { actionId: string; row: PriceItemOut }): v
       <PriceItemFormModal
         v-model:open="itemFormOpen"
         :price-list-id="id"
+        :currency="list?.currency"
         :item="editingItem"
       />
       <ConfirmDialog

@@ -8,7 +8,8 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { priceItem, priceList } from '../__tests__/fixtures';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, POLISH, priceItem, priceList } from '../__tests__/fixtures';
 import { click, EMPLOYEE, errorFrame, flush, mountPricing, type MountOptions, page, settle } from '../__tests__/mount-pricing';
 import ListConfirm from '../components/ListConfirm.vue';
 import PriceItemFormModal from '../components/PriceItemFormModal.vue';
@@ -27,9 +28,11 @@ const SHAMPOO = priceItem();
 const BULK = priceItem({ id: 'i2', min_quantity: '10.000', price: 1000 });
 const HAIRCUT = priceItem({ id: 'i3', kind: 'service', product_id: null, service_id: 's1', name: 'Haircut', sku: null, unit: null, base_price: null, price: 1500 });
 
-async function setup(options: MountOptions = {}) {
+/** The page live, with the hub's business answered (`null`: it has not answered yet). */
+async function setup(options: MountOptions = {}, owner: Business | null = business()) {
   const m = await mountPricing(ListDetailPage, { path: '/pricing/lists/l1', props: { id: 'l1' }, ...options });
   await m.live();
+  if (owner) await m.result('base.business.get', owner);
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
   const rows = () => m.wrapper.findAll('[data-testid="pricing-items-row"]');
@@ -70,6 +73,38 @@ describe('ListDetailPage', () => {
     await s.result(LIST, priceList({ currency: 'USD' }));
     await s.result(ITEMS, page([SHAMPOO]));
     expect(s.cells(0)[4]).toBe('$12.00');
+  });
+
+  it('in Poland a list in zlotys paints its prices and the catalog’s in złoty, never in euros, and can be general', async () => {
+    const s = await setup({}, business(POLISH));
+    await s.result(LIST, priceList({ customer_group_id: null, customer_group_name: null, currency: 'PLN' }));
+    await s.result(ITEMS, page([BULK]));
+    expect(s.cells(0).slice(4, 6)).toEqual(['zł\u00a010.00', 'zł\u00a015.00']);
+    expect(s.summary()[2]).toBe('PLN');
+    expect(s.wrapper.text()).not.toContain('€');
+    expect(s.find('pricing-detail-default').exists()).toBe(true);
+  });
+
+  it('in Poland a list in euros keeps its euros but cannot be made general', async () => {
+    const s = await setup({}, business(POLISH));
+    await s.result(LIST, priceList({ customer_group_id: null, customer_group_name: null, currency: 'EUR' }));
+    await s.result(ITEMS, page([BULK]));
+    expect(s.cells(0).slice(4, 6)).toEqual(['€10.00', 'zł\u00a015.00']);
+    expect(s.find('pricing-detail-default').exists()).toBe(false);
+  });
+
+  it('until the business answers, the catalog price is a bare figure and the list cannot be made general', async () => {
+    const s = await setup({}, null);
+    await s.result(LIST, priceList({ customer_group_id: null, customer_group_name: null }));
+    await s.result(ITEMS, page([BULK]));
+    expect(s.cells(0).slice(4, 6)).toEqual(['€10.00', '15.00']);
+    expect(s.find('pricing-detail-default').exists()).toBe(false);
+  });
+
+  it('a new price is typed in the list’s currency', async () => {
+    const s = await setup({}, business(POLISH));
+    await s.result(LIST, priceList({ currency: 'PLN' }));
+    expect(s.wrapper.findComponent(PriceItemFormModal).props('currency')).toBe('PLN');
   });
 
   it('filters by type and searches and sorts on the server', async () => {

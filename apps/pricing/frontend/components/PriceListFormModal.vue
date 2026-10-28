@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // PRICING-F02, F03: the old table's side panel as a dialog. «New price list» asks for Code and Name
-// (required), Currency (EUR), Tax (Business default by default), Customer group (searched in Customers;
-// empty = no group), From and Until, and «General list» (for everybody and in euros: off and disabled
-// while a group or another currency is chosen). A row's Edit opens «Editing price list — {name}» without
+// (required), Currency (the business's, its country's, as `base.business.get` says it: empty until it
+// answers, then filled unless the person typed one; emptied, none is sent and the server takes the
+// business's), Tax (Business default by default), Customer group (searched in Customers; empty = no group),
+// From and Until, and «General list» (for everybody and in the business's currency: off and disabled while a
+// group or another currency is chosen, or the business has not answered). A row's Edit opens «Editing price list — {name}» without
 // the general switch (its own action) and «Save» sends only what changed (no group =
 // `customer_group_id: null`, an emptied day = `null`).
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
@@ -11,7 +13,7 @@ import { IonInput, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useT } from '../composables/useT';
-import { BUSINESS_CURRENCY } from '../lib/format';
+import { useBusinessMoney } from '../lib/format';
 import { searchGroups } from '../lib/pickers';
 import { groupName } from '../lib/rules';
 import type { PriceListIn, PriceListOut, PriceListPatchIn } from '../operations';
@@ -34,6 +36,9 @@ interface Form {
 }
 
 const t = useT();
+const money = useBusinessMoney();
+/** The business's currency (its country's); unknown until it answers. */
+const businessCurrency = computed(() => money.value?.currency);
 const search = searchGroups(useLiveClient());
 const creation = useCommand('pricing.price_list.create');
 const update = useCommand('pricing.price_list.update');
@@ -47,7 +52,7 @@ const basisOf = (value: boolean | null): Basis => (value === null ? 'business' :
 const taxOf = (basis: Basis): boolean | null => (basis === 'business' ? null : basis === 'included');
 
 function blank(): Form {
-  return { code: '', name: '', currency: 'EUR', basis: 'business', group: null, validFrom: '', validUntil: '', isDefault: false };
+  return { code: '', name: '', currency: businessCurrency.value ?? '', basis: 'business', group: null, validFrom: '', validUntil: '', isDefault: false };
 }
 
 function fromList(list: PriceListOut): Form {
@@ -76,12 +81,19 @@ watch(
   { immediate: true },
 );
 
+// A new list takes the business's currency when it answers after the dialog opened, unless one was typed.
+watch(businessCurrency, (currency) => {
+  if (currency && open.value && !props.priceList && !form.value.currency.trim()) form.value = { ...form.value, currency };
+});
+
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 const day = (value: string): string | null => value.trim() || null;
 
 /** A general list is for everybody and in the business's currency. */
-const canBeGeneral = computed(() => !form.value.group && form.value.currency.trim().toUpperCase() === BUSINESS_CURRENCY);
+const canBeGeneral = computed(
+  () => !form.value.group && !!businessCurrency.value && form.value.currency.trim().toUpperCase() === businessCurrency.value,
+);
 
 function pickGroup(option: ComboOption | null): void {
   // A general list is for everybody: choosing a group takes the mark off.
@@ -89,7 +101,7 @@ function pickGroup(option: ComboOption | null): void {
 }
 
 function setCurrency(value: string): void {
-  const general = value.trim().toUpperCase() === BUSINESS_CURRENCY;
+  const general = !!businessCurrency.value && value.trim().toUpperCase() === businessCurrency.value;
   form.value = { ...form.value, currency: value, isDefault: general ? form.value.isDefault : false };
 }
 
@@ -108,10 +120,12 @@ function patch(list: PriceListOut): PriceListPatchIn {
 
 function created(): PriceListIn {
   const f = form.value;
+  const currency = f.currency.trim().toUpperCase();
   return {
     code: f.code.trim(),
     name: f.name.trim(),
-    currency: f.currency.trim().toUpperCase(),
+    // Empty: none sent, the server takes the business's.
+    ...(currency ? { currency } : {}),
     tax_included: taxOf(f.basis),
     customer_group_id: f.group?.id ?? null,
     valid_from: day(f.validFrom),

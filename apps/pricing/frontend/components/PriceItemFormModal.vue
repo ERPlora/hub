@@ -3,19 +3,23 @@
 // Services, by name or SKU), From quantity (1 by default, in the product's unit) and Price (typed as a
 // person does); «Add» needs an article and a price. A row's Edit opens «Editing price — {name}» with its
 // quantity and price, and «Save» sends only what changed. Refusals stay in the dialog, under their field.
+// The price is typed in the list's `currency`; the catalog prices beside the articles, in the business's.
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { quantityFieldText, readDecimal } from '../lib/format';
+import { listMoney, quantityFieldText, readDecimal, useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchProducts, searchServices } from '../lib/pickers';
 import type { Kind, PriceItemIn, PriceItemOut, PriceItemPatchIn } from '../operations';
 import MoneyInput from './MoneyInput.vue';
 
-const props = withDefaults(defineProps<{ priceListId: string; item?: PriceItemOut | null }>(), { item: null });
+const props = withDefaults(defineProps<{ priceListId: string; currency?: string; item?: PriceItemOut | null }>(), {
+  currency: undefined,
+  item: null,
+});
 const open = defineModel<boolean>('open', { default: false });
 
 interface Form {
@@ -28,7 +32,12 @@ interface Form {
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
-const search = computed(() => (form.value.kind === 'product' ? searchProducts(client, locale.value) : searchServices(client, locale.value)));
+const business = useBusinessMoney();
+/** The list's prices: its currency, two decimals. */
+const money = computed(() => listMoney(props.currency));
+const search = computed(() =>
+  form.value.kind === 'product' ? searchProducts(client, locale.value, business.value) : searchServices(client, locale.value, business.value),
+);
 const addition = useCommand('pricing.price_item.add');
 const update = useCommand('pricing.price_item.update');
 const pending = computed(() => addition.pending.value || update.pending.value);
@@ -46,7 +55,7 @@ watch(
     if (!isOpen) return;
     const item = props.item;
     form.value = item
-      ? { kind: item.kind, article: null, quantity: quantityFieldText(item.min_quantity, locale.value), price: moneyFieldText(item.price, locale.value) }
+      ? { kind: item.kind, article: null, quantity: quantityFieldText(item.min_quantity, locale.value), price: moneyFieldText(item.price, locale.value, money.value) }
       : { kind: 'product', article: null, quantity: '1', price: '' };
     tried.value = false;
     addition.error.value = null;
@@ -58,7 +67,7 @@ watch(
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 const cents = computed(() => {
-  const read = parseMoney(form.value.price);
+  const read = parseMoney(form.value.price, money.value);
   return read.ok ? read.cents : null;
 });
 /** What the quantity field holds as the server reads it; as typed when unreadable (the server says why). */
@@ -150,6 +159,7 @@ async function save(): Promise<void> {
         <MoneyInput
           testid="pricing-item-form-price"
           :model-value="form.price"
+          :money="money"
           :label="t('pricing.items.form.price')"
           :error-text="fieldErrors.price"
           :show-error="tried"
