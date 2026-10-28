@@ -110,7 +110,8 @@ nadie a propósito y deja sin promociones a una charcutería.
 3. Sin ninguna tarifa ni regla, todo se cobra al precio de la ficha: instalar Tarifas no cambia nada
    hasta que creas la primera.
 4. «Hoy» y las fechas de las tarifas y las reglas son el día del negocio: en la fase 1, la zona horaria
-   del Hub, **Europe/Madrid**. La divisa del negocio es el **euro**.
+   del Hub, **Europe/Madrid**. La divisa del negocio es la de su país, la que dice **Ajustes → Negocio**
+   (el euro en España, el esloti en Polonia).
 
 ## Pantallas
 
@@ -129,12 +130,12 @@ incluido»), **Vigencia** («Siempre», «Desde 1 jul 2026», «Hasta…» o las
 texto que contienen), Grupo de clientes, Impuesto y Estado (al abrir, **Activas** ya elegido;
 **Inactivas**, o **Todos** para las dos); 50 por página, en lista o en tarjetas.
 
-- **+** abre **Nueva tarifa**: **Código** y **Nombre** (obligatorios), **Divisa** (EUR), **Impuesto**
-  (Según el negocio por defecto), **Grupo de clientes** (buscador; vacío = ninguno), **Desde** y
+- **+** abre **Nueva tarifa**: **Código** y **Nombre** (obligatorios), **Divisa** (la del negocio),
+  **Impuesto** (Según el negocio por defecto), **Grupo de clientes** (buscador; vacío = ninguno), **Desde** y
   **Hasta**, y **Tarifa general** (un interruptor; no se puede con grupo).
 - Acciones de fila: **Abrir** (también pulsando la fila), **Editar**, **Hacer general** (en el menú «⋮»;
-  solo en una activa, sin grupo, en euros y que no lo sea; pide confirmación), **Desactivar** (en el
-  menú «⋮»; pide confirmación; no en la general) o **Activar** (en las inactivas). El empleado solo ve
+  solo en una activa, sin grupo, en la divisa del negocio y que no lo sea; pide confirmación),
+  **Desactivar** (en el menú «⋮»; pide confirmación; no en la general) o **Activar** (en las inactivas). El empleado solo ve
   **Abrir**.
 
 **Reglas de descuento**: buscador «Buscar código o nombre…», columnas **Código**, **Nombre**, **Tipo**
@@ -157,7 +158,8 @@ Activar** (lo que corresponda; con las mismas confirmaciones que en la tabla).
 
 Debajo, **Precios**: buscador «Buscar producto o servicio…», columnas **Artículo** (nombre),
 **Tipo** (Producto o Servicio), **SKU**, **Desde** (la cantidad mínima, con su unidad), **Precio** y
-**Precio de ficha** (el de Inventario; «—» en un servicio). Los precios, en la divisa de la tarifa. Orden
+**Precio de ficha** (el de Inventario; «—» en un servicio). Los precios, en la divisa de la tarifa; el de
+ficha, en la del negocio. Orden
 por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 
 - **+** abre **Nuevo precio**: **Tipo** (Producto o Servicio), el buscador del artículo (un producto por
@@ -219,7 +221,8 @@ Pasos:
 1. Pulsa **+** en «Listas de precios»: se abre **Nueva tarifa**.
 2. Escribe el **Código** (hasta 50 caracteres; único, sin distinguir mayúsculas: «VIP» y «vip» son el
    mismo) y el **Nombre** (hasta 200).
-3. Si quieres: la **Divisa** (código ISO de tres letras con dos decimales: EUR, USD, GBP…), el
+3. Si quieres: la **Divisa** (la del negocio, ya puesta; otra, por su código ISO de tres letras con dos
+   decimales: EUR, USD, GBP…; si la dejas vacía, la del negocio), el
    **Impuesto** (Según el negocio, Impuesto incluido, Impuesto no incluido), el **Grupo de clientes**,
    **Desde** y **Hasta** (las dos incluidas), y **Tarifa general**.
 4. Pulsa **Crear**: la tarifa sale en la tabla, activa y sin precios.
@@ -229,8 +232,8 @@ de serlo en la misma operación: nunca hay dos.
 Si falla: debajo de su campo y sin crear nada: «Ya existe una tarifa con ese código. Elige otro.»
 (también si la que lo tiene está desactivada), una divisa que no existe o que no tiene dos decimales,
 «Hasta» antes que «Desde», un grupo que no existe, «La tarifa general vale para todos: quítale el
-grupo.» o «La tarifa general va en la divisa del negocio (EUR), la que cobra la caja.» (el interruptor se
-apaga solo con un grupo o con otra divisa).
+grupo.» o «La tarifa general va en la divisa del negocio ({divisa}), la que cobra la caja.» (el interruptor
+se apaga solo con un grupo o con otra divisa).
 Implicados: Clientes
 
 ### PRICING-F03 Editar una tarifa
@@ -254,14 +257,14 @@ Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
 Pasos:
-1. **Hacer general** en una tarifa activa, sin grupo y en euros (en otra no se ofrece).
+1. **Hacer general** en una tarifa activa, sin grupo y en la divisa del negocio (en otra no se ofrece).
 2. Confirma «{nombre} pasa a ser la tarifa general: valdrá para todos los clientes y la actual dejará de
    serlo.».
 Entra: la tarifa. Por el asistente o la API también se puede **quitar** la marca (ninguna general).
 Sale: la tarifa general nueva y `pricing.price_list.default_changed` (con la anterior). Si dos personas
 eligen a la vez, queda una sola: la última.
 Si falla: «Una tarifa desactivada no puede ser la general.», «La tarifa general vale para todos: quítale
-el grupo.», «La tarifa general va en la divisa del negocio (EUR)…» y, si otras elecciones ganan la carrera
+el grupo.», «La tarifa general va en la divisa del negocio ({divisa})…» y, si otras elecciones ganan la carrera
 tres veces seguidas, «Otra persona está cambiando la tarifa general en este momento. Vuelve a intentarlo
 en un instante.» (409 `pricing.default_busy`, nunca un error del servidor).
 Implicados: ninguno
@@ -307,8 +310,9 @@ Pasos:
 3. **Desde la cantidad**: la cantidad mínima a partir de la que vale (1 por defecto; en la unidad del
    producto, «0,5» kg, y en su escalón). Para precios por volumen, repite el producto con otra cantidad
    mínima.
-4. **Precio**: en euros, como lo escribe una persona («12,50»). Es el precio por la misma cantidad que el
-   de la ficha (si la ficha dice «0,37 € por 100 ud», el de la tarifa también es por 100 ud).
+4. **Precio**: en la divisa de la tarifa, como lo escribe una persona («12,50»; también con su símbolo o su
+   código, «12,50 zł» en una tarifa en eslotis, nunca con el de otra divisa). Es el precio por la misma
+   cantidad que el de la ficha (si la ficha dice «0,37 € por 100 ud», el de la tarifa también es por 100 ud).
 5. Pulsa **Añadir**.
 Entra: la tarifa (activa), el artículo y su precio. El asistente nombra la tarifa por su código o su
 nombre y el artículo por su nombre o su SKU.
@@ -361,7 +365,7 @@ Pasos:
 3. **Tipo** y su valor (las unidades son las del precio de cada artículo: kg en un café a 20 €/kg
    vendido en gramos; una unidad en lo que se vende por unidades y en los servicios):
    - **Porcentaje**: el % que se quita a la línea (hasta 100, dos decimales).
-   - **Importe por unidad**: los euros que se quitan por cada unidad del precio vendida.
+   - **Importe por unidad**: lo que se quita, en la divisa del negocio, por cada unidad del precio vendida.
    - **Compra X, llévate Y**: «Compra» y «Gratis» (2 y 1 = cada 3 unidades, 1 gratis, hacia abajo).
    - **Por tramos**: hasta 10 tramos, cada uno con **Desde la cantidad** y **Porcentaje (%)** («Añadir
      tramo», «Quitar tramo»).
@@ -415,8 +419,8 @@ Pasos:
 1. Quien pregunta da el **producto** o el **servicio** (por id, nombre o SKU), y si quiere el
    **cliente**, la **cantidad** (1 por defecto), el **momento** (ahora por defecto) o una **tarifa**
    concreta.
-2. Las tarifas candidatas son las activas, vigentes ese día, en euros y **de la base fiscal de la venta**
-   (`tax_included`; con impuesto incluido si no lo dice, como en una caja) o que siguen al negocio, que
+2. Las tarifas candidatas son las activas, vigentes ese día, en la divisa del negocio y **de la base
+   fiscal de la venta** (`tax_included`; con impuesto incluido si no lo dice, como en una caja) o que siguen al negocio, que
    valen para ese cliente: la general y las de sus grupos activos. Nunca se comparan precios de bases
    distintas (una general a 10,00 € con IVA no pierde contra una de empresa a 9,00 € sin IVA, 10,89 € con
    él). Con una tarifa concreta, solo esa (tiene que estar activa y vigente).
@@ -553,8 +557,8 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
    una línea de precio libre, con `booked_price` de una cita o con un precio puesto a mano (Odoo).
 4. El descuento manual de línea y el de la cuenta van **encima** (Shopify, Toast, Odoo), con el límite
    `max_discount_percent` de Ventas.
-5. Las tarifas automáticas ya llegan de la base de la venta y en euros. Solo una tarifa pedida por su
-   nombre puede venir en otra base o divisa: si `tax_included` de la respuesta no es `null` y no
+5. Las tarifas automáticas ya llegan de la base de la venta y en la divisa del negocio. Solo una tarifa
+   pedida por su nombre puede venir en otra base o divisa: si `tax_included` de la respuesta no es `null` y no
    coincide con el de la venta, o la divisa no es la de la venta, no usar ese precio (409 propio de
    Ventas): Tarifas no convierte bases ni divisas.
 6. En un servicio, el precio de la tarifa vale solo si el servicio es de precio fijo (los demás se
@@ -609,6 +613,13 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   `precio × (cantidad en la unidad del precio) ÷ price_quantity` con las fracciones exactas de
   `apps.inventory.models.UNIT_SPECS`, como Ventas. Divisa ISO 4217 de dos decimales (`pycountry` y
   `babel`, ya dependencias).
+- **La divisa del negocio** es la de su país, la de `base.business.get` (el registro de este hub, nunca una
+  llamada a erplora.com; `queries.business_currency`, leída como la plataforma); en el hub propio de ERPlora,
+  sin negocio en erplora.com, la del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como Ventas. Una tarifa
+  sin divisa se guarda en la del negocio; el `default="EUR"` de la columna se queda (una columna no sabe el
+  negocio) y nada guardado se reescribe. La pantalla la lee con `useBusinessMoney` de `base` (los decimales
+  del servidor, nunca los de `Intl`; mientras no contesta, una cifra sin símbolo y sin «Hacer general»)
+  (FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY).
 - El «hoy» es `timezone.localdate()` (fase 1: `TIME_ZONE` = Europe/Madrid); `pricing.price.resolve`
   toma `when` y los tests nunca leen el reloj real.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones: `high` en
@@ -689,7 +700,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 |---|---|---|
 | Segmento de la tarifa (particular, empresa, mayorista, minorista), que nadie enviaba | **Grupo de clientes** de Clientes | Es lo que hacen Business Central, Lightspeed y Shopify; Clientes ya tiene grupos y el segmento nunca se enlazó |
 | La tarifa por defecto no influía en nada | **Tarifa general**: vale para todos | Business Central «todos los clientes», Odoo «por defecto del TPV» |
-| Gana el precio más bajo de todas las tarifas activas, sin fechas, comparando divisas sin convertir | El más bajo de las que valen para ese cliente, **vigentes** y en euros | Las fechas se guardaban y no se miraban; 90 USD «ganaban» a 100 EUR |
+| Gana el precio más bajo de todas las tarifas activas, sin fechas, comparando divisas sin convertir | El más bajo de las que valen para ese cliente, **vigentes** y en la divisa del negocio | Las fechas se guardaban y no se miraban; 90 USD «ganaban» a 100 EUR |
 | Tramos con mínimo y máximo en millonésimas | **Cantidad mínima** decimal, en la unidad del producto; el tramo acaba donde empieza el siguiente | Business Central y Odoo; la cantidad es la de Inventario y Ventas |
 | El artículo era un texto libre sin comprobar | **Producto de Inventario** o **servicio de Servicios**, comprobados | El precio de un artículo que no existe no lo cobraba nadie |
 | Reglas en cadena por prioridad sobre el importe del tique, con mínimo y máximo de importe | **Una regla por línea, la mejor para el cliente**; prioridad como desempate; cantidad mínima | Square, Shopify, Toast y Lightspeed; las quejas de los foros |
