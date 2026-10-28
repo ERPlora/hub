@@ -538,7 +538,13 @@ class SessionOut(Schema):
     )
     merged_into_id: UUID | None = Field(description="The check it was merged into.")
     paid_total: int | None = Field(
-        description="What its check of Sales charged, in cents (none yet: null)."
+        description="What its check of Sales charged, in minor units of its currency (none yet: null)."
+    )
+    currency: str | None = Field(
+        description="ISO 4217 currency its check was charged in: its sales', never rewritten (none yet: null)."
+    )
+    currency_decimals: int | None = Field(
+        description="The decimals of that currency as the server counts them (0 in JPY; none yet: null)."
     )
     customer_id: UUID | None = Field(description="The customer of the check, if any.")
     customer_name: str | None = Field(description="Their name.")

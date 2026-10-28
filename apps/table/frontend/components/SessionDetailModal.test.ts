@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { mountTable, settle } from '../__tests__/mount-table';
-import { NOW, sessionRow, SETTINGS } from '../__tests__/tables';
+import { charged, NOW, sessionRow, SETTINGS } from '../__tests__/tables';
 import type { SessionOut } from '../operations';
 import SessionDetailModal from './SessionDetailModal.vue';
 
@@ -22,7 +22,7 @@ async function detail(session: SessionOut, locale: 'en' | 'es' = 'en') {
 describe('SessionDetailModal', () => {
   it('shows every field of a closed check in the business’s hours', async () => {
     const d = await detail(
-      sessionRow({ status: 'closed', closed_at: '2026-10-14T19:35:00Z', paid_total: 4250, notes: 'Allergy: nuts', customer_name: 'Ana García' }),
+      sessionRow({ status: 'closed', closed_at: '2026-10-14T19:35:00Z', ...charged(4250), notes: 'Allergy: nuts', customer_name: 'Ana García' }),
       'es',
     );
     expect(d.inDoc('table-session-detail')?.getAttribute('aria-label')).toBe('Sesión · Mesa 4');
@@ -35,5 +35,14 @@ describe('SessionDetailModal', () => {
     const d = await detail(sessionRow({ status: 'parked', table_id: null, table_number: null, zone_name: null }));
     expect(d.inDoc('table-session-detail')?.getAttribute('aria-label')).toBe('Session · No table (parked)');
     expect([d.value('zone'), d.value('closed'), d.value('paid'), d.value('notes')]).toEqual(['—', '—', '—', '—']);
+  });
+
+  it('«Charged» goes in the currency the check was charged in: a business in Poland, złoty; in Japan, yen without decimals', async () => {
+    // flow table-business-currency: never a euro fixed in the app, the decimals the server counts.
+    const pl = await detail(sessionRow({ status: 'closed', ...charged(4250, 'PLN') }), 'es');
+    expect(pl.value('paid')?.replace(/[\u00a0\u202f]/g, ' ')).toBe('42,50 zł');
+    pl.wrapper.unmount();
+    const jp = await detail(sessionRow({ status: 'closed', ...charged(1250, 'JPY', 0) }));
+    expect(jp.value('paid')).toBe('¥1,250');
   });
 });

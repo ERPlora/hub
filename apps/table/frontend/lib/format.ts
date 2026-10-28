@@ -1,9 +1,17 @@
 // How the table screens paint times, durations and money (pages never format by hand): the business's
 // clock (its IANA zone, `table.settings.get` → `timezone`), the page language's own format (Intl), and
 // the tone of an open check's time after the room settings' minutes (amber, then red; Square paints the
-// same two). Money is whole cents of euros, as Sales charges it.
+// same two). Money is whole minor units, as Sales charges it: what a check charged in the currency it was
+// charged in (a record is never rewritten), the lines of an open check in the business's (`useBusinessMoney`,
+// the platform's: its country's), with the decimals the server counts, never the browser's Intl (which gives
+// the forint none). Until the business answers an amount is a figure without a symbol, never the euro by default.
+import type { Money } from '../../../../base/frontend/lib/home';
 
-const CURRENCY = 'EUR';
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+/** The decimals of an amount while its currency is unknown. */
+const UNKNOWN_DECIMALS = 2;
 const MINUTE = 60_000;
 
 const formats = new Map<string, Intl.DateTimeFormat>();
@@ -74,15 +82,27 @@ export function clockTime(iso: string | null | undefined, now: Date, locale: str
   return dateFormat(locale, timeZone, options).format(date);
 }
 
-const money = new Map<string, Intl.NumberFormat>();
+const moneyFormats = new Map<string, Intl.NumberFormat>();
 
-/** Whole cents as euros in `locale` («22,50 €», «€22.50»); nothing charged is '—', never zero. */
-export function formatMoney(cents: number | null | undefined, locale: string): string {
+/** Minor units in `money`, in `locale` («42,50 zł», «€22.50», «¥1,250»; «22,50» while it is unknown); nothing
+ *  charged is '—', never zero. */
+export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
   if (cents === null || cents === undefined) return '—';
-  let found = money.get(locale);
+  const decimals = money?.decimals ?? UNKNOWN_DECIMALS;
+  const key = `${locale}|${money?.currency ?? ''}|${decimals}`;
+  let found = moneyFormats.get(key);
   if (!found) {
-    found = new Intl.NumberFormat(locale, { style: 'currency', currency: CURRENCY });
-    money.set(locale, found);
+    const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+    // The symbol a till of that country prints («zł», «¥»); until the currency is known, the figure alone.
+    const style: Intl.NumberFormatOptions = money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol' } : {};
+    found = new Intl.NumberFormat(locale, { ...style, ...digits });
+    moneyFormats.set(key, found);
   }
-  return found.format(cents / 100);
+  return found.format(cents / 10 ** decimals);
+}
+
+/** The money of a charge: the currency it was charged in, with the decimals the server says, else `business`'s. */
+export function recordMoney(record: { currency?: string | null; currency_decimals?: number | null }, business?: Money): Money | undefined {
+  const { currency, currency_decimals: decimals } = record;
+  return currency && typeof decimals === 'number' ? { currency, decimals } : business;
 }

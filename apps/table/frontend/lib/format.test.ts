@@ -3,7 +3,7 @@
 // amber and red after the room settings' minutes.
 import { describe, expect, it } from 'vitest';
 
-import { clock, clockTime, durationMinutes, durationTone, formatMoney, minutesSince } from './format';
+import { clock, clockTime, durationMinutes, durationTone, formatMoney, minutesSince, recordMoney } from './format';
 
 const NOW = new Date('2026-10-14T19:40:00Z'); // 21:40 in Madrid (summer time)
 
@@ -50,10 +50,40 @@ describe('clockTime', () => {
   });
 });
 
+// The money a business charges in (flow table-business-currency): its country's, with the decimals the server counts
+// it in — never a euro fixed in the app nor the browser's Intl decimals (which gives the forint none).
+const EUR = { currency: 'EUR', decimals: 2 };
+const PLN = { currency: 'PLN', decimals: 2 };
+const JPY = { currency: 'JPY', decimals: 0 };
+const HUF = { currency: 'HUF', decimals: 2 };
+const spaced = (text: string) => text.replace(/[  ]/g, ' ');
+
 describe('formatMoney', () => {
-  it('paints cents as euros, and nothing charged as a dash, never zero', () => {
-    expect(formatMoney(2250, 'es')).toBe('22,50\u00a0€');
-    expect(formatMoney(2250, 'en')).toBe('€22.50');
-    expect(formatMoney(null, 'es')).toBe('—');
+  it('paints minor units in the currency it is given, and nothing charged as a dash, never zero', () => {
+    expect(spaced(formatMoney(2250, 'es', EUR))).toBe('22,50 €');
+    expect(formatMoney(2250, 'en', EUR)).toBe('€22.50');
+    expect(spaced(formatMoney(4250, 'es', PLN))).toBe('42,50 zł');
+    expect(spaced(formatMoney(4250, 'en', PLN))).toBe('zł 42.50');
+    expect(formatMoney(null, 'es', PLN)).toBe('—');
+    expect(formatMoney(undefined, 'en', PLN)).toBe('—');
+  });
+
+  it('divides by the decimals the server counts, never by a hundred: the yen has none, the forint two', () => {
+    expect(formatMoney(1250, 'en', JPY)).toBe('¥1,250');
+    expect(spaced(formatMoney(125000, 'es', HUF))).toBe('1250,00 Ft');
+  });
+
+  it('while the business has not answered, the figure goes without a symbol, never in euros', () => {
+    expect(formatMoney(2250, 'es')).toBe('22,50');
+    expect(formatMoney(123450, 'en')).toBe('1,234.50');
+  });
+});
+
+describe('recordMoney', () => {
+  it('a charge is painted in the currency it was charged in; without one, in the business’s', () => {
+    expect(recordMoney({ currency: 'EUR', currency_decimals: 2 }, PLN)).toEqual(EUR);
+    expect(recordMoney({ currency: 'JPY', currency_decimals: 0 })).toEqual(JPY);
+    expect(recordMoney({ currency: null, currency_decimals: null }, PLN)).toEqual(PLN);
+    expect(recordMoney({}, undefined)).toBeUndefined();
   });
 });

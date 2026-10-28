@@ -1,9 +1,10 @@
 // «Split check» (TABLE-F17): the lines of the table's check in Sales, read live, each with a checkbox; the
 // ones marked go to the new check («Split»), none marked = a blank one. While they load, «Loading…»; a
-// check with no lines says so.
+// check with no lines says so. Each amount in the business's currency (flow table-business-currency).
 import { describe, expect, it } from 'vitest';
 
 import { click, ionChecked, mountTable, settle } from '../__tests__/mount-table';
+import { business, JAPANESE, POLISH } from '../__tests__/tables';
 import SplitLines from './SplitLines.vue';
 
 const OP = 'sale.order.get';
@@ -27,9 +28,28 @@ describe('SplitLines', () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ order_id: 'o1' }]);
     expect(s.el('split-loading').text()).toContain('Loading…');
+    await s.result('base.business.get', business());
     await s.result(OP, ORDER);
     expect(s.el('split-line-l1').text()).toBe('2 × Coffee · €3.00');
     expect(s.el('split-line-l2').text()).toBe('1 × Steak · €18.00');
+  });
+
+  it('paints each line in the business’s currency, its country’s: a business in Poland splits in złoty', async () => {
+    const m = await mountTable(SplitLines, { props: { orderId: 'o1', marked: [] }, locale: 'es' });
+    await m.live();
+    await m.result('base.business.get', business(POLISH));
+    await m.result(OP, ORDER);
+    const text = (id: string) => m.wrapper.find(`[data-testid="table-sheet-split-line-${id}"]`).text().replace(/\s+/g, ' ');
+    expect(text('l1')).toBe('2 × Coffee · 3,00 zł');
+    expect(text('l2')).toBe('1 × Steak · 18,00 zł');
+  });
+
+  it('until the business answers a line goes without a symbol, never in euros; then in its currency and decimals', async () => {
+    const s = await setup();
+    await s.result(OP, ORDER);
+    expect(s.el('split-line-l1').text()).toBe('2 × Coffee · 3.00');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.el('split-line-l1').text()).toBe('2 × Coffee · ¥300');
   });
 
   it('marks a line, splits, and goes back', async () => {
@@ -67,6 +87,7 @@ describe('SplitLines', () => {
         { id: 'l2', name: 'Queso', quantity: '0.532', unit: 'kg', line_total: 1064 },
       ],
     });
+    await m.result('base.business.get', business());
     const text = (id: string) => m.wrapper.find(`[data-testid="table-sheet-split-line-${id}"]`).text().replace(/\s+/g, ' ');
     expect(text('l1')).toBe('1 × Café · 1,50 €');
     expect(text('l2')).toBe('0,532 kg × Queso · 10,64 €');

@@ -215,6 +215,10 @@ export interface SessionOut {
   transferred_from_id: string | null;
   merged_into_id: string | null;
   paid_total: number | null;
+  /** The currency its check was charged in (its sales', never rewritten) and its decimals as the server counts them
+   *  (0 in JPY); null while nothing is charged. */
+  currency: string | null;
+  currency_decimals: number | null;
   customer_id: string | null;
   customer_name: string | null;
 }

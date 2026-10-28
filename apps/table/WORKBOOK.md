@@ -161,7 +161,8 @@ una cuenta abierta se pone ámbar y rojo según los Ajustes. Buscador «Buscar m
 embudo por zona, camarero y estado. Por fila «Detalle» (ventana con zona, camarero, estado, comensales, apertura,
 cierre, tiempo, cobrado y notas), en las abiertas «Cerrar sesión» (con confirmación), en las aparcadas
 «Volver a sentar» (elige la mesa libre) y, en las terminadas, «Borrar» (solo el administrador). Las
-horas van en la hora del negocio.
+horas van en la hora del negocio. Lo cobrado va en la moneda en que se cobró: la del negocio (la de su
+país, con sus decimales), nunca en euros si el negocio cobra en otra.
 
 ### Ajustes
 Menú **Mesas → Ajustes**: «Preguntar los comensales al sentar una mesa», «Aviso ámbar (minutos)» y
@@ -534,8 +535,8 @@ Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
 Pasos:
 1. En la ventana de la mesa ocupada pulsa «Dividir cuenta».
-2. Marca las líneas que se van a la cuenta nueva (las de su cuenta en Ventas) y pulsa «Dividir». Sin
-   nada marcado, la nueva nace vacía.
+2. Marca las líneas que se van a la cuenta nueva (las de su cuenta en Ventas, cada una con su importe
+   en la moneda del negocio) y pulsa «Dividir». Sin nada marcado, la nueva nace vacía.
 3. Mesas abre una segunda cuenta en la misma mesa (1 comensal) y Ventas le pasa las líneas marcadas,
    en la misma operación. Cobrar una cierra solo esa: la mesa sigue Ocupada con la otra. Se puede
    dividir aunque la mesa esté bloqueada o desactivada: no se sienta a nadie nuevo.
@@ -618,8 +619,8 @@ Actor: responsable, empleado
 Pantalla: Sesiones
 Pasos:
 1. Abre **Mesas → Sesiones**: arranca en «Abiertas», las más recientes primero.
-2. «Cerradas» enseña las cerradas con «Cobrado» y «Cierre»; «Todas», también las trasladadas,
-   fusionadas y aparcadas.
+2. «Cerradas» enseña las cerradas con «Cobrado» (en la moneda en que se cobró: la del negocio) y
+   «Cierre»; «Todas», también las trasladadas, fusionadas y aparcadas.
 3. Filtra por zona, camarero o estado, o busca por número de mesa.
 4. «Detalle» enseña zona, camarero, estado, comensales, apertura, cierre, tiempo, cobrado y notas.
 Entra: las cuentas de mesa y lo cobrado en Ventas.
@@ -1049,6 +1050,10 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 23. **Una cuenta aparcada que Ventas cobra o anula se cierra** (antes se quedaba «Aparcada» para
     siempre).
 24. **Fusionar no pierde lo cobrado** por la cuenta de origen antes de juntarla.
+25. **Los importes van en la moneda del negocio** (la de su país, con los decimales que cuenta el
+    servidor; lo cobrado, en la moneda en que se cobró, que no se reescribe; mientras el negocio no
+    contesta, la cifra sin símbolo): el producto actual los pintaba siempre en euros
+    (`table-business-currency`).
 
 ### Lo que NO hace, a propósito
 
