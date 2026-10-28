@@ -446,7 +446,7 @@ def _documents(config, problems: list[str]) -> dict[str, str]:
     if state.state == "stale":
         problems.append(
             f"{config.label}: {WORKBOOK_EN}: out of date with {WORKBOOK}: "
-            f"{translate_by_hand(config.label)}."
+            f"{translate_by_hand(config.label)}"
         )
     elif state.state == "current":
         try:

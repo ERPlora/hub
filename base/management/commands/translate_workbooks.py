@@ -61,8 +61,9 @@ def spanish_dates(configs) -> list[str]:
     """``<app>: WORKBOOK.en.md:<line>: <pattern>`` of each Spanish date placeholder in a current translation.
 
     Its fenced code blocks are left as they are (the translation's own rule), so a pattern there is
-    quoted on purpose and does not count; inline code does, as in ``OS-AAAAMMDD-NNNN``. A stale or
-    unreadable translation is ``stale_translations``'s.
+    quoted on purpose and does not count; inline code does, as in ``OS-AAAAMMDD-NNNN``. Nor does the
+    header (line 1 of a current one): its hash is hex, and may spell ``aaaa``. A stale or unreadable
+    translation is ``stale_translations``'s.
     """
     found = []
     for config in configs:
@@ -75,6 +76,8 @@ def spanish_dates(configs) -> list[str]:
         if state.state != "current":
             continue
         for number, line in catalog.prose_lines(state.en_path.read_text(encoding="utf-8")):
+            if number == 1:
+                continue
             found += [
                 f"{config.label}: {catalog.WORKBOOK_EN}:{number}: {pattern}"
                 for pattern in _SPANISH_DATE_RE.findall(line)

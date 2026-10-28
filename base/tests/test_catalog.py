@@ -25,6 +25,7 @@ from base.catalog import (
     build_registry,
     en_header,
     known_verticals,
+    prose_lines,
     source_hash,
     stale_translations,
     template_apps,
@@ -218,6 +219,25 @@ def test_the_heading_inside_a_code_block_does_not_cut():
     assert "Notas internas" not in part
 
 
+#: A line that looks like a fence inside a block and closes nothing: of the other character, shorter, or with an info string.
+NOT_CLOSING = {"other-character": ("```", "~~~"), "shorter": ("````", "```"), "info-string": ("```", "```text")}
+
+
+@pytest.mark.parametrize(("fence", "inner"), NOT_CLOSING.values(), ids=NOT_CLOSING)
+def test_only_a_fence_like_the_opening_one_closes_its_code_block(fence, inner):
+    fenced = WORKBOOK.replace("### Paso a paso\n", f"### Paso a paso\n\n{fence}\n{inner}\n{CUT}\n{fence}\n")
+    part = user_part(fenced)
+    assert CUT in part
+    assert "Estado: hecho" in part
+
+
+@pytest.mark.parametrize(("fence", "inner"), NOT_CLOSING.values(), ids=NOT_CLOSING)
+def test_the_prose_lines_are_the_numbered_ones_outside_the_fenced_code_blocks(fence, inner):
+    """What ``translate_workbooks --check`` reads for a Spanish date: an unclosed block runs to the end."""
+    text = f"Before.\n{fence}\n{inner}\nDD/MM/AAAA\n{fence}\nAfter.\n~~~\nDD/MM/AAAA"
+    assert list(prose_lines(text)) == [(1, "Before."), (6, "After.")]
+
+
 def test_a_dangling_anchor_fails_and_names_it():
     with pytest.raises(WorkbookError, match="#no-existe"):
         user_part(WORKBOOK.replace("(#cómo-se-usa)", "(#no-existe)"))
@@ -399,13 +419,16 @@ HEADER_COMMAND = (
 
 
 def test_a_stale_translation_fails_telling_to_translate_it_by_hand_with_its_header(tmp_path):
-    """ERPlora uses no ANTHROPIC_API_KEY (PLAN-MIGRATIONS §24-D): never a command that calls the API."""
+    """ERPlora uses no ANTHROPIC_API_KEY (PLAN-MIGRATIONS §24-D): never a command that calls the API.
+
+    The command ends the line: copied to its end, it runs (a full stop after its quote would be Python).
+    """
     stale = translated(USER_PART.replace("cosas", "objetos"))
     [problem] = problems([module(tmp_path, en=stale)])
     assert problem == (
         "things: WORKBOOK.en.md: out of date with WORKBOOK.md: translate by hand the part of WORKBOOK.md "
         "that changed into WORKBOOK.en.md and make its first line the header this prints: "
-        f"{HEADER_COMMAND.format('things')}."
+        f"{HEADER_COMMAND.format('things')}"
     )
     assert "translate_workbooks" not in problem
 

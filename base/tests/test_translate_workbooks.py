@@ -321,6 +321,17 @@ def test_check_of_one_app_looks_at_its_dates_only(tmp_path, installed, translato
     call_command("translate_workbooks", "--check", "--app", "stock")
 
 
+def test_check_reads_no_date_in_the_header_though_its_hash_spells_aaaa(tmp_path, installed, translator):
+    """The header's sha256 is hex: about one in a thousand spells «aaaa», and that is no Spanish date."""
+    workbook = WORKBOOK.replace("Guarda **cosas**.", "Guarda **cosas** (1028).")
+    source = catalog.user_part(workbook)
+    assert "aaaa" in source_hash(source)
+    installed(module(tmp_path, workbook=workbook, en=translated(source, ENGLISH)))
+    translator(allowed=False)
+
+    call_command("translate_workbooks", "--check")
+
+
 # ── base: the platform's WORKBOOK is translated too, though it is no module of the store ─────────
 
 
