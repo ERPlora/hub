@@ -94,13 +94,11 @@ BUSINESS = "base.business.get"
 
 def business_country(scope: Scope | None) -> str:
     """The country erplora.com registered for ``scope``'s business (ISO 3166-1 alpha-2), as ``base.business.get`` reads
-    it, as the platform (an API key holds only the permission of the operation it opened). ERPlora's own hub has no
-    business on erplora.com in phase 1: its issuer's country. ``""`` when there is none: a demo, or a scope that is no
-    business's (no registry row), both in ERPlora's market, Spain."""
+    it, as the platform (an API key holds only the permission of the operation it opened). ERPlora's own hub too: the
+    platform answers its business (its issuer's country), so VeriFactu keeps no second source of it. ``""`` when there
+    is none: a demo, or a scope that is no business's (no registry row), both in ERPlora's market, Spain."""
     if scope is None:
         return ""
-    if platform.is_platform_hub(scope):
-        return settings.PLATFORM_ISSUER_COUNTRY
     business = get_operation(BUSINESS)
     try:
         return business(system_context(scope), business.input()).country

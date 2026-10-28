@@ -9,19 +9,15 @@ puts it back in the queue (services.py).
 import datetime as dt
 import uuid
 
-from django.conf import settings as django_settings
 from django.db.models import Case, Count, IntegerField, Min, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
+from live.context import OperationContext
 from live.errors import NotFound
-from live.operations import get as operation_named
 from live.operations import operation
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings, Usage
-from base.business import currency_of
-from base.operations import is_platform_hub
 from apps.printing.schemas import (
     CoverageIn,
     CoverageOut,
@@ -71,23 +67,6 @@ def actor(ctx: OperationContext) -> str:
     else:
         label = str(who)
     return label[:128]
-
-
-# ── The business's currency ─────────────────────────────────────────────────────────────────────
-
-#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
-BUSINESS = "base.business.get"
-
-
-def business_currency(ctx: OperationContext) -> str:
-    """The currency of ``ctx``'s business (ISO 4217), the one a receipt whose caller does not say is in, as
-    ``base.business.get`` reads it. Read as the platform: an API key holds only the permission of what it prints, and
-    every person of the hub may see it anyway. ERPlora's own hub has no business on erplora.com (phase 1: no registry
-    row, ``create_platform_hub``): its papers keep the currency of its issuer's country, as its sales and invoices do."""
-    if is_platform_hub(ctx.scope):
-        return currency_of(django_settings.PLATFORM_ISSUER_COUNTRY)
-    business = operation_named(BUSINESS)
-    return business(system_context(ctx.scope), business.input()).currency
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────────────────────────

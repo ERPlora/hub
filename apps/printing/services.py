@@ -44,7 +44,6 @@ from apps.printing.queries import (
     MAX_ATTEMPTS,
     active_devices,
     actor,
-    business_currency,
     cancellable,
     current_settings,
     device_row,
@@ -83,6 +82,7 @@ from apps.printing.schemas import (
     SettingsOut,
     SettingsPatchIn,
 )
+from base import operations as platform
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +409,7 @@ def _stamped(ctx: OperationContext, data: JobCreateIn) -> dict:
         return document
     document.setdefault("locale", ctx.language)
     if data.document_type != "generic" and "decimals" not in document:
-        document["decimals"] = get_currency_precision(data.currency or business_currency(ctx))
+        document["decimals"] = get_currency_precision(data.currency or platform.business_currency(ctx.scope))
     return document
 
 

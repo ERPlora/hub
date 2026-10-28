@@ -1474,11 +1474,13 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     la app apagada (`queries.outside_spain`, `refuse_outside_spain` → `AppInactive`): sus facturas salen
     «unavailable» (nunca un 409 que las deshaga), la reacción no sella, la cola no envía (`blockers` →
     `outside_spain`), la factura no pinta recibo (`by_invoice` vacío) y el veto de apagar no lo atrapa
-    (`disable_refusal` → `None`). Sin país (una demo) o en el hub propio de ERPlora (`PLATFORM_ISSUER_COUNTRY`), es
-    España. Lo sellado antes en un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda
-    sin enviar, con su motivo. Que **Apps** no la ofrezca encendible fuera de España necesita un gancho de encendido
-    de la plataforma (`can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como `can_disable`, que respeten
-    `base.app.enable` y `base.app.list`); hasta entonces se enciende y no hace nada.
+    (`disable_refusal` → `None`). Sin país (una demo), es España. El hub propio de ERPlora lee su país como los demás,
+    de `base.business.get`, que para él contesta el de su emisor (`PLATFORM_ISSUER_COUNTRY`, hub#329): VeriFactu no
+    guarda otra fuente del mismo dato (FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY). Lo sellado antes en
+    un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda sin enviar, con su motivo. Que
+    **Apps** no la ofrezca encendible fuera de España necesita un gancho de encendido de la plataforma
+    (`can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como `can_disable`, que respeten `base.app.enable` y
+    `base.app.list`); hasta entonces se enciende y no hace nada.
 
 ### Cambios frente al producto actual
 
