@@ -336,3 +336,19 @@ def test_another_rectification_issued_after_the_card_takes_its_number_and_this_o
     turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     mine = rectifications().get(rectifies_id=original.id)
     assert (first.number, mine.number) == (said, f"RECT-{today.year}-000002")
+
+
+def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_says_why(issuer):
+    """Without reading the preview first, a rectifying invoice asked to be rectified: the card's preview cannot be read,
+    so no card (nothing is confirmed blind) and the model hears why, in the person's language."""
+    original = an_invoice()
+    rect = run("invoice.invoice.rectify", {"number": original.number, "reason": "x"}).invoice
+    with translation.override("es"):
+        plan = turn(call("invoice.invoice.rectify", {"number": rect.number, "reason": REASON}))
+        why = str(queries.CANNOT_RECTIFY_RECTIFICATION)
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
+        ("invoice.invoice.rectify", "error", "invoice.cannot_rectify_rectification")
+    ]
+    assert json.loads(plan["append"][0]["content"])["error"]["message"] == why
+    assert rectifications().count() == 1
