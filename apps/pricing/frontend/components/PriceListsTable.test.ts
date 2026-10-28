@@ -6,7 +6,8 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { priceList } from '../__tests__/fixtures';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { EMPLOYEE, errorFrame, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
 import ListConfirm from './ListConfirm.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
@@ -24,9 +25,11 @@ const OLD = priceList({ id: 'l2', code: 'OLD', name: 'Old', customer_group_id: n
 
 type Action = { id: string; label: string; hidden?: (row: unknown) => boolean };
 
-async function setup(options: MountOptions = {}) {
+/** The table live, with the hub's business answered (`null`: it has not answered yet). */
+async function setup(options: MountOptions = {}, owner: Business | null = business()) {
   const m = await mountPricing(PriceListsTable, options);
   await m.live();
+  if (owner) await m.result('base.business.get', owner);
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
   const rows = () => m.wrapper.findAll('[data-testid="pricing-lists-row"]');
@@ -146,6 +149,22 @@ describe('PriceListsTable', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No price lists.');
   });
 
+  it('in Poland a zloty list can be made general and a euro one not; until the business answers, none', async () => {
+    const s = await setup({}, business(POLISH));
+    await s.show(page([GENERAL]));
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN' }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate']);
+    const before = await setup({}, null);
+    await before.show(page([GENERAL]));
+    expect(before.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate']);
+  });
+
+  it('an inactive list in the business’s currency is not offered «Make general» (PRICING-F04)', async () => {
+    const s = await setup({}, business(POLISH));
+    await s.show(page([GENERAL]));
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN', is_active: false }))).toEqual(['open', 'edit', 'activate']);
+  });
+
   it('offers each action where it applies, and opens a list by its row or «Open»', async () => {
     const s = await setup();
     await s.show(page([GENERAL, VIP, OLD]));
@@ -153,7 +172,7 @@ describe('PriceListsTable', () => {
     expect(s.shownFor(priceList({ customer_group_id: null }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate']);
     expect(s.shownFor(VIP)).toEqual(['open', 'edit', 'deactivate']);
     expect(s.shownFor(OLD)).toEqual(['open', 'edit', 'activate']);
-    // A list in another currency cannot be the general one (the till sells in euros).
+    // A list in another currency cannot be the general one (the till sells in the business's, here euros).
     expect(s.shownFor(priceList({ customer_group_id: null, currency: 'USD' }))).toEqual(['open', 'edit', 'deactivate']);
     s.table().vm.$emit('rowClick', VIP);
     await flush();

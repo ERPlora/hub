@@ -33,14 +33,12 @@ from apps.pricing.models import CODE_MAX_LENGTH, DEFAULT_PRIORITY, NAME_MAX_LENG
 
 T = TypeVar("T")
 
-#: Ninety-nine billion euros in cents: far above any price, inside a bigint.
+#: Ninety-nine billion in cents: far above any price, inside a bigint.
 MAX_CENTS = 9_999_999_999_999
 #: Tiers of one rule.
 MAX_TIERS = 10
 #: The largest «buy» or «free» of a rule.
 MAX_UNITS = 1000
-#: The currency of the business (phase 1: every ERPlora business sells in euros, as Sales).
-BUSINESS_CURRENCY = "EUR"
 
 SAY_WHICH_LIST = _("Say which price list: its id, its code or its name.")
 SAY_WHICH_RULE = _("Say which discount rule: its id, its code or its name.")
@@ -104,7 +102,7 @@ D_RULE_ID = "The discount rule's id."
 D_RULE = "The discount rule's code or name (e.g. 2X1), when its id is not known."
 D_CODE = "Short code, unique in the business whatever its case (e.g. VIP)."
 D_NAME = "The name people see (e.g. «VIP members»)."
-D_CURRENCY = "Currency of its prices, ISO 4217 with two decimals; EUR by default."
+D_CURRENCY = "Currency of its prices, ISO 4217 with two decimals; the business's (its country's) by default."
 D_TAX_INCLUDED = (
     "Whether its prices already carry the tax: true (included), false (added on top, B2B), "
     "or null to sell as the business does."
@@ -118,7 +116,7 @@ D_PRODUCT_ID = "The product's id (Inventory)."
 D_PRODUCT = "The product's SKU or name, when its id is not known."
 D_SERVICE_ID = "The service's id (Services)."
 D_SERVICE = "The service's name, when its id is not known."
-D_PRICE = "Price in cents (12.50 € = 1250), for the same quantity the catalog's price is for."
+D_PRICE = "Price in cents of the list's currency (12.50 = 1250), for the same quantity the catalog's price is for."
 D_MIN_QUANTITY = "From this quantity on (in the product's unit; a service: units); 1 by default."
 D_SEARCH = "Free text to search."
 D_DIR = "Sort direction: asc or desc."
@@ -218,7 +216,7 @@ class _ListFields(In):
 class PriceListIn(_ListFields):
     code: Code = Field(description=D_CODE)
     name: Name = Field(description=D_NAME)
-    currency: Currency = Field("EUR", description=D_CURRENCY)
+    currency: Currency | None = Field(None, description=D_CURRENCY)
     tax_included: bool | None = Field(None, description=D_TAX_INCLUDED)
     customer_group_id: UUID | None = Field(None, description=D_GROUP_ID)
     customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description=D_GROUP)
@@ -229,10 +227,9 @@ class PriceListIn(_ListFields):
     @field_validator("is_default")
     @classmethod
     def _general_for_everybody(cls, value: bool, info: ValidationInfo) -> bool:
+        # Its currency is the business's, which only the operation knows (services.create_price_list).
         if value and (info.data.get("customer_group_id") or info.data.get("customer_group")):
             raise ValueError(str(DEFAULT_HAS_GROUP))
-        if value and info.data.get("currency", BUSINESS_CURRENCY) != BUSINESS_CURRENCY:
-            raise ValueError(str(DEFAULT_CURRENCY) % {"currency": BUSINESS_CURRENCY})
         return value
 
 

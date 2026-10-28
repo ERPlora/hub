@@ -31,6 +31,7 @@ from apps.pricing import events
 from apps.pricing.models import ACTOR_MAX_LENGTH, DiscountRule, PriceItem, PriceList
 from apps.pricing.queries import (
     ITEM_NOT_FOUND,
+    business_currency,
     call_service,
     find_list,
     find_rule,
@@ -42,7 +43,6 @@ from apps.pricing.queries import (
     snapshot_values,
 )
 from apps.pricing.schemas import (
-    BUSINESS_CURRENCY,
     DEFAULT_CURRENCY,
     DEFAULT_HAS_GROUP,
     RANGE_BACKWARDS,
@@ -208,11 +208,17 @@ def _default_changed(ctx: OperationContext, price_list: PriceList, previous: Pri
     },
 )
 def create_price_list(ctx: OperationContext, data: PriceListIn) -> dict:
+    """Without a currency, the list is in the business's (its country's); the general one, only in that one."""
+    business = business_currency(ctx)
+    currency = data.currency or business
+    if data.is_default and currency != business:
+        message = str(DEFAULT_CURRENCY) % {"currency": business}
+        raise InvalidPayload(message, code="invalid_field", fields={"is_default": message})
     actor = _actor(ctx)
     price_list = PriceList(
         code=data.code,
         name=data.name,
-        currency=data.currency,
+        currency=currency,
         tax_included=data.tax_included,
         customer_group_id=_group_id(data.customer_group_id, data.customer_group),
         valid_from=data.valid_from,
@@ -260,9 +266,11 @@ def update_price_list(ctx: OperationContext, data: PriceListPatchIn) -> dict:
         if group_id is not None and price_list.is_default:
             field = "customer_group" if "customer_group" in sent else "customer_group_id"
             raise InvalidPayload(str(DEFAULT_HAS_GROUP), code="invalid_field", fields={field: str(DEFAULT_HAS_GROUP)})
-    if price_list.is_default and changes.get("currency", BUSINESS_CURRENCY) != BUSINESS_CURRENCY:
-        message = str(DEFAULT_CURRENCY) % {"currency": BUSINESS_CURRENCY}
-        raise InvalidPayload(message, code="invalid_field", fields={"currency": message})
+    if price_list.is_default and "currency" in changes:
+        business = business_currency(ctx)
+        if changes["currency"] != business:
+            message = str(DEFAULT_CURRENCY) % {"currency": business}
+            raise InvalidPayload(message, code="invalid_field", fields={"currency": message})
     start = changes.get("valid_from", price_list.valid_from)
     until = changes.get("valid_until", price_list.valid_until)
     if start is not None and until is not None and until < start:
@@ -300,8 +308,9 @@ def set_default_price_list(ctx: OperationContext, data: PriceListDefaultIn) -> d
             raise Conflict(str(LIST_INACTIVE), code="pricing.price_list_inactive")
         if price_list.customer_group_id is not None:
             raise Conflict(str(DEFAULT_HAS_GROUP), code="pricing.default_has_group")
-        if price_list.currency != BUSINESS_CURRENCY:
-            raise Conflict(str(DEFAULT_CURRENCY) % {"currency": BUSINESS_CURRENCY}, code="pricing.default_currency")
+        business = business_currency(ctx)
+        if price_list.currency != business:
+            raise Conflict(str(DEFAULT_CURRENCY) % {"currency": business}, code="pricing.default_currency")
         price_list.updated_by = _actor(ctx)
         previous = _save_list(price_list, make_default=True)
     else:

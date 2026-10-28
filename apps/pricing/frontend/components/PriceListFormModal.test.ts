@@ -1,11 +1,13 @@
-// PRICING-F02 and F03: «New price list» asks for Code and Name (required), Currency (EUR), Tax (Business
+// PRICING-F02 and F03: «New price list» asks for Code and Name (required), Currency (the business's, its
+// country's: EUR in Spain, PLN in Poland; flow pricing-business-currency), Tax (Business
 // default, Tax included, Tax excluded), Customer group (searched in Customers; empty = no group), From,
 // Until and «General list» (not with a group). A row's Edit opens «Editing price list — {name}» and sends
 // only what changed (no group = `customer_group_id: null`). Refusals stay in the dialog, under their field.
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { priceList } from '../__tests__/fixtures';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { click, ionChecked, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import PriceListFormModal from './PriceListFormModal.vue';
 
@@ -16,8 +18,11 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; checked?: boolean };
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+/** The dialog open, with the hub's business answered (`null`: it has not answered yet). */
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', owner: Business | null = business()) {
   const m = await mountPricing(PriceListFormModal, { props: { open: false, priceList: null, ...props }, locale });
+  await m.live();
+  if (owner) await m.result('base.business.get', owner);
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -97,7 +102,49 @@ describe('PriceListFormModal', () => {
     expect(s.sent()[0].body).toMatchObject({ code: 'GEN', customer_group_id: null, tax_included: null, is_default: true });
   });
 
-  it('a general list goes in euros: the switch goes off with another currency', async () => {
+  it('a new list proposes the business’s currency: in Poland PLN, which can be the general one and the euro not', async () => {
+    const s = await setup({}, 'en', business(POLISH));
+    expect(s.field('currency').value).toBe('PLN');
+    expect(s.field('is_default').disabled).toBe(false);
+    await ionChecked(s.field('is_default'), true);
+    await ionValue(s.field('currency'), 'eur', 'ionInput');
+    expect([s.field('is_default').checked, s.field('is_default').disabled]).toEqual([false, true]);
+    await ionValue(s.field('currency'), 'pln', 'ionInput');
+    expect(s.field('is_default').disabled).toBe(false);
+    s.answer(201, priceList({ currency: 'PLN' }));
+    await ionValue(s.field('code'), 'VIP', 'ionInput');
+    await ionValue(s.field('name'), 'VIP members', 'ionInput');
+    await click(s.save());
+    expect(s.sent()[0].body).toMatchObject({ code: 'VIP', currency: 'PLN' });
+  });
+
+  it('until the business answers, the currency is empty and the list cannot be general; the answer fills it', async () => {
+    const s = await setup({}, 'en', null);
+    expect([s.field('currency').value, s.field('is_default').disabled]).toEqual(['', true]);
+    await s.result('base.business.get', business(POLISH));
+    await settle();
+    expect([s.field('currency').value, s.field('is_default').disabled]).toEqual(['PLN', false]);
+  });
+
+  it('what the person typed in Currency stays when the business answers', async () => {
+    const s = await setup({}, 'en', null);
+    await ionValue(s.field('currency'), 'usd', 'ionInput');
+    await s.result('base.business.get', business(POLISH));
+    await settle();
+    expect(s.field('currency').value).toBe('usd');
+  });
+
+  it('an emptied Currency sends none: the server takes the business’s', async () => {
+    const s = await setup({}, 'en', business(POLISH));
+    s.answer(201, priceList({ currency: 'PLN' }));
+    await ionValue(s.field('code'), 'VIP', 'ionInput');
+    await ionValue(s.field('name'), 'VIP members', 'ionInput');
+    await ionValue(s.field('currency'), ' ', 'ionInput');
+    await click(s.save());
+    expect(s.sent()[0].body).not.toHaveProperty('currency');
+  });
+
+  it('a general list goes in the business’s currency: the switch goes off with another currency', async () => {
     const s = await setup();
     await ionChecked(s.field('is_default'), true);
     await ionValue(s.field('currency'), 'usd', 'ionInput');

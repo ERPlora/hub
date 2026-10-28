@@ -4,7 +4,7 @@
 // old module's pricing#28: neither sorted nor filtered, its units differ), Applies to (with the customer
 // group), Validity, Priority and Status —, «Search code or name…», column filters behind the funnel (Status
 // opens on the active ones), list or cards, 50 a page by name. Whoever manages gets «+» (New discount rule), Edit,
-// Deactivate (asking first) and Activate.
+// Deactivate (asking first) and Activate. An amount per unit is in the business's currency (its country's).
 import {
   ConfirmDialog,
   DataTable,
@@ -22,7 +22,7 @@ import { computed, ref } from 'vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { validityLabel } from '../lib/format';
+import { useBusinessMoney, validityLabel } from '../lib/format';
 import { appliesToLabel, ruleValueLabel } from '../lib/rules';
 import type { RuleListIn, RuleOut, RuleScope, RuleType, Status } from '../operations';
 import PageNotices, { blockingError } from './PageNotices.vue';
@@ -38,6 +38,7 @@ const DEFAULT_STATUS = 'active';
 const session = useSession();
 const t = useT();
 const locale = useLocale();
+const money = useBusinessMoney();
 const canManage = computed(() => session.can('pricing.manage'));
 
 const table = useServerTable({ sort: 'name' });
@@ -78,7 +79,7 @@ const columns = computed<DataTableColumn<RuleOut>[]>(() => [
     format: (_, row) => t(`pricing.rules.type.${row.rule_type}`),
     filter: { type: 'select', options: TYPES.map((value) => ({ value, label: t(`pricing.rules.type.${value}`) })) },
   },
-  { key: 'value', label: t('pricing.rules.columns.value'), align: 'right', format: (_, row) => ruleValueLabel(row, t, locale.value) },
+  { key: 'value', label: t('pricing.rules.columns.value'), align: 'right', format: (_, row) => ruleValueLabel(row, t, locale.value, money.value) },
   {
     key: 'applies_to',
     label: t('pricing.rules.columns.appliesTo'),

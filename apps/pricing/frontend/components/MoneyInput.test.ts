@@ -12,6 +12,8 @@ import MoneyInput from './MoneyInput.vue';
 
 type Control = HTMLElement & { errorText?: string };
 
+const PLN = { currency: 'PLN', decimals: 2 };
+
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const model = { value: (props.modelValue as string) ?? '' };
   const m = await mountPricing(MoneyInput, {
@@ -78,6 +80,24 @@ describe('MoneyInput', () => {
   it("the server's message for the field wins", async () => {
     const s = await setup({ modelValue: '12', errorText: 'Ensure this value is less than or equal to 9999999999999' });
     expect(s.errorText()).toBe('Ensure this value is less than or equal to 9999999999999');
+  });
+
+  it('in the field’s currency: «12,5 zł» is read in zlotys, and a euro amount is not one (pricing-business-currency)', async () => {
+    const s = await setup({ money: PLN }, 'es');
+    await s.input().setValue('12,5 zł');
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['12,50', undefined]);
+    await s.input().setValue('12,50 €');
+    await s.blur();
+    expect(s.errorText()).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 12,50.');
+  });
+
+  it('«1.250» gives both readings in the field’s currency', async () => {
+    const s = await setup({ modelValue: '1.250', showError: true, money: PLN });
+    expect(s.errorText()).toBe(
+      `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en', PLN)} or ${formatMoney(125, 'en', PLN)}. Write the decimals so there is no doubt.`,
+    );
+    expect(s.errorText()).toContain('zł');
   });
 
   it('a negative amount says it cannot be negative', async () => {

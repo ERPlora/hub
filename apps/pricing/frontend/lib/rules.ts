@@ -3,16 +3,17 @@
 // 6+: 15 %»), never a bare number whose unit has to be guessed; what it applies to, with its customer
 // group after it (or «Deleted group» when Customers deleted it); and the tax basis of a list, where an empty one follows the business and says so.
 import type { RuleOut } from '../operations';
-import { formatMoney, formatPercent, formatQuantity } from './format';
+import { formatMoney, formatPercent, formatQuantity, type Money } from './format';
 
 type Translate = (key: string, named?: Record<string, unknown>) => string;
 
-export function ruleValueLabel(rule: RuleOut, t: Translate, locale: string): string {
+/** A rule's value; an amount per unit in the business's `money` (a bare figure until it answers). */
+export function ruleValueLabel(rule: RuleOut, t: Translate, locale: string, money?: Money): string {
   switch (rule.rule_type) {
     case 'percent':
       return formatPercent(rule.percent ?? 0, locale);
     case 'fixed':
-      return t('pricing.rules.value.perUnit', { amount: formatMoney(rule.amount ?? 0, locale) });
+      return t('pricing.rules.value.perUnit', { amount: formatMoney(rule.amount ?? 0, locale, money) });
     case 'buy_x_get_y':
       return t('pricing.rules.value.buyGet', { buy: rule.buy_quantity ?? 0, get: rule.get_quantity ?? 0 });
     default:
