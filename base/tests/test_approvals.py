@@ -184,6 +184,18 @@ class TestApproving:
         braked = approve(client, asked, "saas:2")
         assert braked.status_code == 429 and code(braked) == "base.too_many_attempts"
 
+    def test_twenty_wrong_pins_from_one_address_brake_it_whatever_name_they_try(self, client, adam, eva):
+        """hub#2517 of the old hub: changing the person on every try does not dodge the address's brake."""
+        from uuid import uuid4
+
+        asked = refused(client)
+        for _ in range(20):
+            body = {**asked, "person": str(uuid4()), "pin": "0000"}
+            assert code(post(client, "/approvals", body)) == "base.approval_refused"
+        braked = approve(client, asked, "saas:2")
+        assert braked.status_code == 429 and code(braked) == "base.too_many_attempts"
+        assert Approval.objects.count() == 0
+
     def test_only_somebody_who_could_do_it_themselves_approves_it(self, client, adam, eva, mario):
         response = approve(client, refused(client), "saas:4", pin="1357")
         assert response.status_code == 403 and code(response) == "base.approver_cannot"
