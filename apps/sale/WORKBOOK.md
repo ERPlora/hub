@@ -1618,9 +1618,13 @@ administrador y responsable, los mismos que anulan y devuelven).
   avisos): `CASH_LIMIT` y `TICKET_LIMIT` solo tienen `ES`, y un negocio de otro país no lleva ninguno.
 - **Moneda** (FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja, Facturas e Inventario en hub#273): la del
   negocio la da `base.business.get` desde el registro de este hub (la de su país, APP-BASE-6), nunca preguntando a
-  erplora.com; `queries.business_currency(ctx)` la lee como la plataforma (una API key solo trae los permisos de lo
-  que cobra) y, en el hub propio de ERPlora (fase 1, sin negocio registrado), da la del país de su emisor
-  (`PLATFORM_ISSUER_COUNTRY`), como sus facturas. `Sale.currency` se guarda al cobrar y ya no tiene valor por
+  erplora.com, y Ventas la pregunta a `base` como Inventario, Facturas y Tarifas:
+  `base.operations.business_currency(ctx.scope)` (BASE-F50), que la lee como la plataforma (una API key solo trae
+  los permisos de lo que cobra) y en el hub propio de ERPlora (sin negocio registrado en erplora.com) contesta la
+  del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como sus facturas. Ventas no guarda copia propia de esa
+  pregunta (FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY): `queries.business_currency(ctx)` es una línea que la
+  devuelve, y queda como la respuesta de Ventas que usa Caja (`requires = ["sale"]`) para contar en la moneda con
+  la que cobra una venta ahora. `Sale.currency` se guarda al cobrar y ya no tiene valor por
   defecto (migración `0011`, sin datos); lo cobrado se pinta, se avisa (`money_text(cents, currency)`) y se imprime
   con la suya. `SaleOut`, `SaleRow` y `sale.refund.options` llevan `currency` y `currency_decimals` (los de
   `babel`, nunca los de Intl, que le da 0 al forinto); el TPV, `useBusinessMoney()` de `base`, y mientras el

@@ -11,8 +11,10 @@ from live.errors import Conflict
 
 from apps.printing.models import PrintJob
 from apps.sale.models import Sale
+from apps.sale.queries import business_currency as sales_business_currency
 from apps.sale.queries import money_text
 from apps.sale.tests.conftest import A, B, ctx_for, run
+from base import operations as base_operations
 from base.models import Hub
 
 pytestmark = pytest.mark.django_db
@@ -199,3 +201,75 @@ def test_what_a_sale_can_give_back_is_said_in_its_own_currency(coffee):
     business_in("ES")
     options = run("sale.refund.options", {"sale_id": str(sale.id)})
     assert (options.currency, options.currency_decimals, options.refundable_total) == ("JPY", 0, 300)
+
+
+# ── One way to the currency (FIX-HUB-SALE-OWN-COPY-OF-BUSINESS-CURRENCY) ─────────────────────────
+# Sales asks the one question every app that charges asks (``base.operations.business_currency``, BASE-F50), on
+# ERPlora's own hub too, never a copy of its own that drifts in silence (here, an answer other than the one of the
+# business's or the issuer's country). ``queries.business_currency`` stays as Sales' public answer (Cash register
+# counts with it, ``requires = ["sale"]``), and it is base's.
+
+
+def coffee_for(scope: Scope) -> str:
+    """A coffee of 150 in ``scope``'s catalog, and its SKU."""
+    sku = f"COF-{scope.key.upper()}"
+    coffee_in(scope, sku)
+    return sku
+
+
+def colour_for(scope: Scope) -> str:
+    """A «from» service of 50.00 to 90.00 in ``scope``'s business, and its id."""
+    data = {"name": "Colour", "pricing_type": "from", "price": 6000, "min_price": 5000, "max_price": 9000, "tax_category_key": "service.generic"}
+    return str(run("service.service.create", data, system_context(scope)).id)
+
+
+def charged(ctx: OperationContext, sku: str) -> str:
+    """The currency a sale charged now (SALE-F01) keeps."""
+    sale = charge("sale-currency-base", ctx, sku=sku)
+    return Sale.objects.get(pk=sale.id).currency
+
+
+def answered(ctx: OperationContext, _sku: str) -> str:
+    """What Sales answers Cash register: the currency a sale charged now keeps."""
+    return sales_business_currency(ctx)
+
+
+def range_said(ctx: OperationContext, service_id: str) -> str:
+    """The refusal of a service line typed out of its range (SALE-F38), its amounts said in the business's currency."""
+    order = run("sale.order.open", {}, ctx)
+    with translation.override("en"), pytest.raises(Conflict) as refusal:
+        run("sale.order.add_service_line", {"order_id": str(order.id), "service_id": service_id, "unit_price": 3000}, ctx)
+    return refusal.value.message
+
+
+def bill_printed(ctx: OperationContext, sku: str) -> tuple:
+    """The decimals and the total of the bill of an open check on paper (SALE-F21)."""
+    order = run("sale.order.open", {"lines": [{"product": sku, "quantity": "2"}], "label": "Table 4"}, ctx)
+    run("sale.order.print_bill", {"order_id": str(order.id)}, ctx)
+    (job,) = jobs()
+    return job.document["decimals"], job.document["total"]
+
+
+#: Each place Sales takes the business's currency: what it needs first, what it does, what base answers and what that
+#: gives. The bill asks in yens: the zloty and the euro both have two decimals, the paper would not tell them apart.
+FROM_BASE = {
+    "charge": (coffee_for, charged, "PLN", "PLN"),
+    "cash-register-s-answer": (coffee_for, answered, "PLN", "PLN"),
+    "service-range": (colour_for, range_said, "PLN", "That amount is outside what the service allows (PLN\xa050.00 – PLN\xa090.00)."),
+    "bill": (coffee_for, bill_printed, "JPY", (0, 300.0)),
+}
+
+
+@pytest.mark.parametrize("platform_hub", [False, True], ids=["a-business-s-hub", "erploras-own-hub"])
+@pytest.mark.parametrize("caller", sorted(FROM_BASE))
+def test_each_place_takes_the_currency_base_answers(caller, platform_hub, till, settings, monkeypatch):
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = "ES"
+    business_in("ES")
+    scope = Scope("host", "erplora") if platform_hub else A
+    prepare, through, base_says, gives = FROM_BASE[caller]
+    ready = prepare(scope)
+    asked = []
+    monkeypatch.setattr(base_operations, "business_currency", lambda scope: asked.append(scope) or base_says)
+    assert through(ctx_for(scope=scope), ready) == gives
+    assert asked and set(asked) == {scope}
