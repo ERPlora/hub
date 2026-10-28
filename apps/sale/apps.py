@@ -72,6 +72,24 @@ class SaleConfig(LiveAppConfig):
         "sale.order.add_open_line": _("Sell at an open price"),
         "sale.order.void_ordered": _("Delete an open check with something on it"),
     }
+    # The same, with how much is approved, from the figures of that very request (BASE-F84; sales#398, hub#2180: the
+    # manager read «above the maximum» and approved blind): the first sentence whose every hole fills, an amount in the
+    # business's currency; none fills (a zero, an empty figure, a check's own discount at its charge), the words above.
+    # Void, refund, void an item and delete a check have no figure on the first level of their input.
+    approval_figures = {
+        "sale.order.set_line_discount_over_limit": [_("Discount a line by {discount_percent, percent}")],
+        "sale.order.set_discount_over_limit": [
+            _("Discount the check by {discount_percent, percent} and {discount_amount, money}"),
+            _("Discount the check by {discount_percent, percent}"),
+            _("Discount the check by {discount_amount, money}"),
+        ],
+        "sale.sale.complete_over_limit": [
+            _("Charge with a discount of {discount_percent, percent} and {discount_amount, money}"),
+            _("Charge with a discount of {discount_percent, percent}"),
+            _("Charge with a discount of {discount_amount, money}"),
+        ],
+        "sale.order.add_open_line": [_("Sell at an open price of {unit_price, money}")],
+    }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: the old `storefront` (filled) and
     # `chatbubble-ellipses-outline` wait in UI-REQUESTS.md. The departments of the open price read

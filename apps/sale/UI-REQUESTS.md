@@ -20,11 +20,6 @@ Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cam
 - **Permiso por entrada de menú** (`Nav.permission`): el producto actual escondía «Notas rápidas»,
   «Departamentos» (aquí «Secciones») y «Ajustes» a quien no tiene `sale.manage_settings`. Hoy salen
   en el menú y la página se abre en solo lectura (o con el aviso «No tienes permiso…» en Ajustes).
-- **La cifra en «Hace falta una aprobación»** (BASE-F84): Ventas ya pide la aprobación del responsable
-  (precio libre, descuento por encima del máximo, anular una cuenta o una línea enviada, anular y
-  devolver ventas; `apps.py` `approvals`), pero la frase de lo que se aprueba es fija por orden, así que
-  un descuento dice «Descontar una línea por encima del máximo» sin el porcentaje ni el importe (SALE-F14,
-  «Pendiente»). Hace falta que la plataforma deje a la app poner la frase de cada petición.
 
 ## Formato
 
