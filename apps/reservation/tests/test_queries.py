@@ -354,6 +354,26 @@ def test_the_free_tables_count_a_stay_in_real_time_the_nights_the_clocks_change(
     assert (taken.free, taken.taken_until) == (False, dt.time(3, 30))
     assert table_at(CLOCKS_FORWARD, "03:30").free
 
+
+def test_the_free_tables_look_around_the_business_day_not_the_utc_one_west_of_utc():
+    """West of UTC an evening is already the next UTC day: the neighbours of a stay are the days of
+    the business's wall clock, so a table kept since the night before is still found."""
+    five = make_table("5")
+    with timezone.override("America/New_York"):
+        make_reservation(
+            date=dt.date(2030, 3, 4),
+            time="23:00",
+            duration_minutes=24 * 60,
+            table=five,
+            status="confirmed",
+        )
+        row = run(
+            "reservation.availability.tables",
+            {"date": "2030-03-05", "time": "22:00", "duration_minutes": 60},
+        ).rows[0]
+    assert (row.free, row.taken_from, row.taken_until) == (False, dt.time(23, 0), dt.time(23, 0))
+
+
 def test_a_reservation_being_changed_does_not_take_its_own_table():
     four = make_table("4")
     mine = make_reservation(time="21:00", table=four, status="confirmed")
