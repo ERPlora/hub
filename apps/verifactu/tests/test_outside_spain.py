@@ -117,6 +117,16 @@ def test_erploras_own_hub_reads_its_country_from_the_platform_too(db, settings, 
     assert queries.outside_spain(PLATFORM)
 
 
+def test_a_scope_with_no_registry_row_is_in_spain(db):
+    # FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY (reviewer): a scope erplora.com never registered (no
+    # ``base.Hub`` row, so ``base.business.get`` answers ``NotFound``) is in ERPlora's market, Spain: ``""``, not a
+    # country of its own, so VeriFactu seals and sends for it as for a demo.
+    nowhere = Scope("host", "nowhere")
+    assert not Hub.objects.filter(slug=nowhere.key).exists()
+    assert queries.business_country(nowhere) == ""
+    assert not queries.outside_spain(nowhere)
+
+
 # (c) The queue
 
 
