@@ -215,8 +215,8 @@ msgstr "cita"
 msgid "discount (%)"
 msgstr "descuento (%)"
 
-msgid "discount (cents)"
-msgstr "descuento (céntimos)"
+msgid "fixed-amount discount"
+msgstr "descuento de importe fijo"
 
 msgid "discount approved by"
 msgstr "descuento autorizado por"
@@ -892,6 +892,9 @@ msgstr "Servicios"
 
 msgid "Menus"
 msgstr "Menús"
+
+msgid "Fixed-amount discount"
+msgstr "Descuento de importe fijo"
 
 msgid "Quick note"
 msgstr "Nota rápida"
