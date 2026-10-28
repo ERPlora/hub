@@ -426,6 +426,19 @@ class TestWhatIsApprovedWithItsFigure:
         body = {"idempotency_key": "approval-figure-0002", "order_id": order["id"], "payments": [{"method": "card"}]}
         assert asked_in(cashier, CHARGE_OVER, body, "en") == "Charge with a discount above the maximum"
 
+    def test_a_check_charge_with_a_discount_figure_in_its_body_is_refused_before_any_approval(self, cashier, menu):
+        # The charge of a check takes no discount of its own (it lives in the check), so a figure in its body would be
+        # said by the dialog and ignored by the charge: a crafted request could show the manager a figure the check does
+        # not have. The dialog says the words of always (the body is no valid request, so no figure is read) and the
+        # charge itself refuses that body.
+        order = open_check(cashier, {"product": "MEN"})
+        body = {"idempotency_key": "approval-figure-0003", "order_id": order["id"], "payments": [{"method": "card"}]}
+        for figure in ({"discount_percent": "1"}, {"discount_amount": 100}):
+            assert asked_in(cashier, CHARGE_OVER, {**body, **figure}, "en") == "Charge with a discount above the maximum"
+            response = through_approval(cashier, CHARGE_OVER, {**body, **figure})
+            assert response.status_code == 422, response.content
+            assert "set on the check itself" in response.content.decode(), response.content
+
     def test_an_open_price_says_its_amount(self, cashier, coffee):
         order = open_check(cashier)
         body = {"order_id": order["id"], "unit_price": 420, "tax_category_key": "restaurant.food"}

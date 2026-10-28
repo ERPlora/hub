@@ -562,6 +562,9 @@ msgstr ""
 "Cobra una cuenta abierta (order_id) o líneas sueltas (lines, de servicios o de"
 " precio libre), una de las dos."
 
+msgid "The discount of an open check is set on the check itself, not at the charge."
+msgstr "El descuento de una cuenta abierta se pone en la propia cuenta, no al cobrar."
+
 msgid "Enter the country's ISO code, e.g. ES, FR or GB."
 msgstr "Escribe el código ISO del país, p. ej. ES, FR o GB."
 

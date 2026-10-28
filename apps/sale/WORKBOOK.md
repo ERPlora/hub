@@ -654,8 +654,10 @@ declarados ya lo llevan descontado, y la venta guarda el importe descontado.
 Si falla: con «Permitir descuentos» apagado no hay botones y el servidor rechaza «Este negocio no
 permite descuentos.». Por encima del máximo, si en «Hace falta una aprobación» se pulsa «Cancelar», la
 cuenta sigue como estaba y se lee «Esto necesita la aprobación de un encargado.». Un importe mayor
-que la cuenta no se puede aplicar. Si otro dispositivo está cobrando esa cuenta, gana el primero
-(SALE-F01).
+que la cuenta no se puede aplicar. Al cobrar una cuenta, el descuento va en la cuenta, nunca en la
+petición del cobro: una que lo traiga se rechaza con «El descuento de una cuenta abierta se pone en la
+propia cuenta, no al cobrar.» y «Hace falta una aprobación» no dice esa cifra. Si otro dispositivo está
+cobrando esa cuenta, gana el primero (SALE-F01).
 Implicados: BASE-F84, BASE-F85
 
 ### SALE-F15 Invitar una línea
