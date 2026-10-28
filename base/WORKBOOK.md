@@ -2080,13 +2080,17 @@ Actor: empleado, encargado
 Pantalla: Hace falta una aprobación
 Pasos:
   1. Alguien intenta algo que su rol no permite y que la app deja aprobar a un responsable. En lugar de un error
-     sale «Hace falta una aprobación» con «Se aprueba: {action}», en palabras de la app.
+     sale «Hace falta una aprobación» con «Se aprueba: {action}», en palabras de la app y en el idioma de quien lo
+     pide; cuando la app lo dice con cifras, con las de eso mismo que se pide (el porcentaje o el importe de un
+     descuento, en la moneda del negocio, o la cantidad), para que el responsable sepa cuánto aprueba. Si alguna
+     cifra falta o es cero, la frase no la nombra.
   2. Lee «Pide a un encargado que introduzca su PIN para aprobarlo.» y «…o que pase su placa: no hace falta pulsar
      nada antes.».
   3. En «¿Quién lo aprueba?», las caras de quienes pueden hacerlo ellos mismos y tienen PIN (con una sola, su teclado
      sale ya). El responsable toca la suya y teclea su PIN en el teclado, entero a la vista sin desplazar, también el
      0 y «Borrar» («Otra persona» vuelve a las caras), o pasa su placa en cualquier momento.
   4. La acción se hace una vez y sale «Aprobado por {name}». La sesión de quien lo pidió no se cierra.
+  También desde el asistente: el «sí» de su tarjeta abre el mismo diálogo, con las cifras de lo que se le pidió.
 Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
 **Empleados › Aprobaciones**. Eventos `base.approval.granted` y `base.approval.used`. Se gasta junto con la acción:
@@ -2109,10 +2113,12 @@ Pasos:
   1. En **Empleados › Aprobaciones** (la pestaña solo existe para quien administra): «Cada acción que necesitó el PIN
      de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo
      ni borrarlo.».
-  2. Una fila por aprobación, la última primero: «Cuándo», «Acción» (en palabras), «Autorizado por», «Lo pidió»,
-     «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
-  3. Busca con «Buscar por persona o acción…» y, en «Filtros» (el embudo), filtra por «Cuándo» (un día o unos días
-     seguidos), «Acción» (las que hay en el registro), «Con» y «Estado».
+  2. Una fila por aprobación, la última primero: «Cuándo», «Acción» (en palabras y en su idioma; con las cifras de
+     lo que se hizo con ella, cuando la app las da: una aprobación sin usar no hizo nada y no lleva cifras),
+     «Autorizado por», «Lo pidió», «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
+  3. Busca con «Buscar por persona o acción…» (también por sus cifras) y, en «Filtros» (el embudo), filtra por
+     «Cuándo» (un día o unos días seguidos), «Acción» (las que hay en el registro, cada una una vez y sin cifras),
+     «Con» y «Estado».
   4. «Exportar CSV» descarga un archivo con las aprobaciones que dejan la búsqueda y los filtros, también las más
      antiguas que la lista ya no enseña, con las mismas columnas en su idioma; mientras tanto dice «Exportando…».
 Entra: el registro de aprobaciones.
@@ -3036,7 +3042,20 @@ Implicados: ACCOUNTS-F38
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta
   (`ApprovalDoor`) delante de la sesión en toda orden: a quien es del negocio y le falta el permiso le responde 403
   `requires_elevation` con `approval: {operation, label, fingerprint}` (huella de negocio, método, ruta y cuerpo); a
-  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre;
+  quien no es del negocio (sin `base.view_home`), el `permission_denied` de siempre. La frase con cifras
+  (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE; hub#2180 y hub#2186 del hub viejo): junto a `approvals`, la
+  app declara `approval_figures = {"<orden>": [_("… {campo} …"), …]}`, frases que se prueban en orden con huecos de
+  la entrada de la orden: `{campo}` (texto o número), `{campo, percent}` (0–100, `format_percent`) y
+  `{campo, money}` (unidades menores en la moneda del negocio, `business_currency`); gana la primera cuyos huecos se
+  llenan todos (ni vacío, ni `None`, ni cero), y si ninguna, la frase fija. Las cifras salen de la entrada
+  **validada** por el esquema de la orden (`approvals.figures_from`: `json.loads` + `op.input.model_validate`, como la
+  ruta y el asistente), solo de los campos que nombran sus frases (`figures_of`); una entrada que no valida da la
+  frase fija y el error es el de la propia orden. La huella y el gasto del pase no cambian; el pase gastado guarda
+  esas cifras (`Approval.figures`, JSON, migración `0018`), y la lista y el CSV las dicen en el idioma de quien lee
+  (`operation_label` es el nombre sin cifras, para el filtro «Acción»). `base.E008` comprueba la declaración al
+  arrancar: orden de la propia app que su `approvals` nombra, campos que existen en su entrada, `percent` de un
+  número y `money` de un entero, y los mismos huecos en `en` y `es`. Hoy la declaran `demo` (`demo.item.add_line`);
+  Ventas, en su FIX (SALE-F14).
   `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.pin_owner`,
   `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
   pase de un uso (120 s, `X-Elevation-Token`); la puerta marca la petición con él (`Approved`), `base.operations`

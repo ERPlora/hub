@@ -29,7 +29,9 @@ def spending(op: Operation, ctx, alias: str) -> Iterator[str]:
     from base.schemas import ApprovalSpendIn
 
     with transaction.atomic(using=alias):
-        spend = ApprovalSpendIn(token=approved.token, operation=op.name, fingerprint=approved.fingerprint)
+        spend = ApprovalSpendIn(
+            token=approved.token, operation=op.name, fingerprint=approved.fingerprint, figures=approved.figures
+        )
         if not get("base.approval.spend")(ctx, spend).spent:
-            raise refusal(op.name, approved.fingerprint)
+            raise refusal(op.name, approved.fingerprint, approved.figures, ctx.scope)
         yield alias

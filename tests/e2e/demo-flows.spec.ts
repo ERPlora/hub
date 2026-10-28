@@ -223,8 +223,9 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
             await expect(detail.locator(`[data-testid=${hook}]`), hook).toHaveCount(0);
           }
           await snap(employee.page, 'DEMO-F06', width);
+          // A line asks for a manager's approval instead (BASE-F84), said with its figures; nothing is added meanwhile.
           const refused = await api<Envelope>(employee.context, A, 'POST', '/demo/items/add_line', { id, text: 'Employee', qty: 1 });
-          expect([refused.status, refused.data.error?.code]).toEqual([403, 'permission_denied']);
+          expect([refused.status, refused.data.error?.code]).toEqual([403, 'requires_elevation']);
         } finally {
           await employee.context.close();
         }
@@ -253,6 +254,10 @@ for (const [width, viewport] of Object.entries(FLOW_VIEWPORTS)) {
   });
 }
 
+/** The longest the SDK holds a change of the live stream while it reconnects (its backoff caps at 30 s,
+ *  `MAX_BACKOFF_MS` of `@erplora/ui/sdk`), with the 150 ms of its resubscribe debounce and room for the reopen. */
+const LIVE_REOPEN_MS = 45_000;
+
 // CLOSE-DEMO: more items than one page of `demo.item.list` holds (100, `ItemListIn.limit`). On a phone «Load more»
 // grows the window only within those 100 (three in a row at 25 per page), and past them the list pages instead, so
 // the oldest row is reached without «The items could not be loaded» (the second «Load more» at 50 per page asked for
@@ -274,10 +279,21 @@ test('DEMO-F05 with more than 100 items, every row in reach at 390, 834 and 1440
     for (const other of outside) await expect(row(page, other)).toHaveCount(0);
     await expect.poll(async () => (await rowNames(page))[0]).toBe(first);
   }
-  /** Clicks `control` and waits for its answer: the last row shown changes, or the list fails. */
+  /**
+   * Clicks `control` and waits for its answer: first the live stream reopened with the control's change, then the
+   * last row shown changes, or the list fails. The SDK reopens the stream 150 ms after a change, but when the stream
+   * has dropped (a loaded machine) it holds every change until its reconnection backoff ends, up to `LIVE_REOPEN_MS`:
+   * the rows' 15 s count from the reopen, never from a click the backoff held (FIX DEMO-F05, rv-332).
+   */
   async function advance(control: Locator, what: string): Promise<void> {
     const before = (await rowNames(page)).at(-1);
+    const reopened = page.waitForResponse((answer) => answer.url().includes('/api/live') && answer.status() === 200, {
+      timeout: LIVE_REOPEN_MS,
+    });
     await control.click();
+    await reopened.catch(() => {
+      throw new Error(`${what}: the live stream did not reopen with the list's new window in ${LIVE_REOPEN_MS / 1000} s`);
+    });
     await expect
       .poll(async () => (await loadError().count()) > 0 || (await rowNames(page)).at(-1) !== before, { timeout: 15_000 })
       .toBe(true);

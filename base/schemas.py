@@ -1105,6 +1105,9 @@ class ApprovalSpendIn(Schema):
     token: str = Field(max_length=128)
     operation: str = Field(max_length=120)
     fingerprint: str = Field(max_length=64)
+    figures: dict[str, Any] = Field(
+        default_factory=dict, description="The figures of the request its app's sentences name, kept on the record."
+    )
 
 
 class ApprovalSpentOut(Schema):
@@ -1135,7 +1138,8 @@ class ApprovalListIn(Schema):
 class ApprovalOut(Schema):
     id: UUID
     at: dt.datetime
-    action: str = Field(description="What was approved, in words.")
+    action: str = Field(description="What was approved, in words, with the figures of what was done.")
+    operation_label: str = Field(description="What the action is called, without figures: the «Action» filter.")
     operation: str
     requested_by: str
     approved_by: str
