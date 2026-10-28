@@ -5,7 +5,7 @@
 // the hub's database (phase 1: hubs `a` and `b` share it), the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, login, psql, shown } from './helpers';
+import { A, api, login, painted, psql, shown } from './helpers';
 
 /** Every name a service spec gives starts like this. */
 export const TAG = 'E2E Svc';
@@ -27,14 +27,16 @@ export const FLOW_VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
-/** Waits until no finite animation runs (a modal opening, a popover closing): the capture shows the state
- *  the flow reached, not a frame of Ionic's transition; spinners (infinite) do not count. */
+/** Waits until no finite animation runs (a modal opening, a popover closing) and the page is painted as it is
+ *  now: the capture shows the state the flow reached, not a frame of Ionic's transition nor, right after
+ *  `setViewportSize`, the previous size's (`painted`); spinners (infinite) do not count. */
 export async function settled(page: Page): Promise<void> {
   await page.waitForFunction(() =>
     document
       .getAnimations()
       .every((animation) => animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity),
   );
+  await painted(page);
 }
 
 /** The page does not scroll sideways: everything fits its width. */

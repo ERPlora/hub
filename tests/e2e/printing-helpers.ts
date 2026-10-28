@@ -4,7 +4,7 @@
 // go of the devices a spec printed from (PRINTING-F18: the owner's claim sets the device up).
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, psql, shot } from './helpers';
+import { A, api, capture, painted, psql } from './helpers';
 
 /** Phone, tablet and desktop: 390×844, 834×1112 and 1440×900. */
 export const FLOW_VIEWPORTS = [
@@ -20,7 +20,7 @@ export async function flowShots(page: Page, key: string, ready: (page: Page) => 
     await ready(page);
     // The table refits to its box and a sheet slides to its new size: a frame, then every animation that
     // ends (a spinner never does), not a fixed wait.
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await painted(page);
     await page.evaluate(() =>
       Promise.all(
         document
@@ -29,7 +29,7 @@ export async function flowShots(page: Page, key: string, ready: (page: Page) => 
           .map((animation) => animation.finished.catch(() => undefined)),
       ),
     );
-    await page.screenshot({ path: shot(`APP-PRINTING-${key}-${viewport.label}`) });
+    await capture(page, `APP-PRINTING-${key}-${viewport.label}`);
   }
   await page.setViewportSize(restore);
 }
