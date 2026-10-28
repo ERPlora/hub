@@ -194,10 +194,20 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 }
 
 // A person's page with a badge and without it (BASE-G10, G139, G140): one badge per run, given and taken away once on the
-// phone (where its form is tightest), and the page seen with it and without it at the three sizes. Every badge given
+// phone (where its form is tightest), and the page seen with it and without it at the three sizes, its field and buttons
+// usable at each one (a trial click: Playwright's checks of a real one, nothing sent). Every badge given
 // counts against who gives it, the accepted ones too (`BADGE_CHANGE_LIMIT`, 30 an hour, gh:hub#2560), as a PIN chosen
 // does: the approvals' specs choose theirs once per run, in `beforeAll`. A badge per size spent three per run, and the
 // eleventh run within the hour fell with «Too many badges tried» (rv-332).
+/** The badge's field takes a number and `buttons` take a click at this size, without spending a badge: a trial click runs
+ *  every check of a real one (shown, still, enabled, nothing over it) and sends nothing. */
+async function badgeFormUsable(page: Page, ...buttons: string[]): Promise<void> {
+  const field = testid(page, 'person-badge-input').locator('input');
+  await expect(field).toBeEditable();
+  await field.click({ trial: true, timeout: 5_000 });
+  for (const id of buttons) await testid(page, id).click({ trial: true, timeout: 5_000 });
+}
+
 test("BASE-G10 BASE-G139 BASE-G140 — a person's page, a badge given and taken away once, seen at 390, 834 and 1440", async ({
   browser,
 }) => {
@@ -216,7 +226,7 @@ test("BASE-G10 BASE-G139 BASE-G140 — a person's page, a badge given and taken 
   for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await page.setViewportSize(viewport);
     await expect(testid(page, 'person-badge')).toContainText('Has a badge since');
-    await expect(testid(page, 'person-badge-remove')).toBeVisible();
+    await badgeFormUsable(page, 'person-badge-save', 'person-badge-remove');
     await snap(page, 'BASE-G140', Number(label));
   }
   await page.setViewportSize(VIEWPORTS[390]);
@@ -225,7 +235,7 @@ test("BASE-G10 BASE-G139 BASE-G140 — a person's page, a badge given and taken 
   for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await page.setViewportSize(viewport);
     await expect(testid(page, 'person-badge')).toContainText('No badge.');
-    await expect(testid(page, 'person-badge-save')).toBeVisible();
+    await badgeFormUsable(page, 'person-badge-save');
     await snap(page, 'BASE-G139', Number(label));
   }
   await noProblems(problems);
