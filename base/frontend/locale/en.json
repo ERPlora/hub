@@ -1181,6 +1181,7 @@
         "cancel": "Cancel",
         "cancelAll": "Cancel all",
         "count": "It acts on {count} records.",
+        "preview": "What will happen",
         "notFromChat": "I cannot tell how many records this would change, so I do not do it from here. Open its screen, where you can see them.",
         "yes": "Yes",
         "no": "No",

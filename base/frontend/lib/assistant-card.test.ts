@@ -3,7 +3,7 @@
 // `assistant-confirm.test.ts` and `assistant-danger.test.ts`.
 import { describe, expect, it } from 'vitest';
 
-import { actionKey, type AssistantCard, cardLine, fieldLabelKey, fieldText, typedMatches } from './assistant-card';
+import { actionKey, type AssistantCard, cardLine, fieldLabelKey, fieldLines, fieldText, typedMatches } from './assistant-card';
 
 const EUR = { currency: 'EUR', decimals: 2 };
 const t = (key: string, values?: Record<string, unknown>) => (values ? `${key}${JSON.stringify(values)}` : key);
@@ -71,6 +71,20 @@ describe('each datum', () => {
     // The app a card turns on or off (base.app.enable/disable, PLAN-HUB §9): «App» in both languages.
     expect(fieldLabelKey('app')).toBe('base.assistant.card.fields.app');
     expect(fieldLabelKey('tax_category_key')).toBeNull();
+  });
+});
+
+describe('the lines of a dangerous write', () => {
+  it('each datum by its name in the person’s language, else by the label the server gives it, and its value in words', () => {
+    // BASE-F98: what the write sends and what it will do (its preview) are both said this way.
+    expect(fieldLines(card().fields.slice(0, 2), opts)).toEqual([
+      'base.assistant.card.fields.name: Corte caballero',
+      'base.assistant.card.fields.price: 15,00\u00a0€',
+    ]);
+    expect(fieldLines([{ name: 'expected_balance', label: 'Efectivo esperado', kind: 'money', value: 23000 }], opts)).toEqual([
+      'Efectivo esperado: 230,00\u00a0€',
+    ]);
+    expect(fieldLines([], opts)).toEqual([]);
   });
 });
 

@@ -1403,6 +1403,11 @@ class AssistantCardOut(Schema):
     confirm_word: str = Field(description="What to type to confirm a dangerous write; empty for a normal one.")
     blocked: bool = Field(description="A dangerous write that names no record: not done from the chat.")
     money: AssistantMoneyOut | None = Field(default=None, description="The business's currency, for its amounts.")
+    preview: list[AssistantFieldOut] | None = Field(
+        default=None,
+        description="What a dangerous write will do, as the read its app declares answers it for this person (BASE-F98); "
+        "none when its app declares no preview.",
+    )
 
 
 class AssistantTurnOut(Schema):
