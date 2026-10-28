@@ -1,26 +1,60 @@
 // How the staff screens paint and read money, rates, calendar dates and wall-clock times (pages never
-// format by hand). Money is whole cents of euros (the Hub has no currency setting yet); a calendar
-// date (`YYYY-MM-DD`) is a day, not an instant, so it is painted in UTC and never moves a day; a time
-// is the wall clock of the business (`HH:MM:SS` on the wire, `HH:MM` in a time field).
+// format by hand). Money is whole minor units of the business's currency (its country's, with the decimals
+// the server counts it in: `useBusinessMoney`); until the business answers an amount is a figure without a
+// symbol, never in euros by default. A calendar date (`YYYY-MM-DD`) is a day, not an instant, so it is
+// painted in UTC and never moves a day; a time is the wall clock of the business (`HH:MM:SS` on the wire,
+// `HH:MM` in a time field).
 import { describe, expect, it } from 'vitest';
 
 import {
   centsFromText,
+  currencySymbol,
   formatDate,
   formatMoney,
   formatPercent,
   formatTime,
   hoursSummary,
+  type Money,
   moneyText,
   timeValue,
 } from './format';
 
+const EURO: Money = { currency: 'EUR', decimals: 2 };
+const ZLOTY: Money = { currency: 'PLN', decimals: 2 };
+const YEN: Money = { currency: 'JPY', decimals: 0 };
+/** Intl's no-break spaces as plain ones, to compare what a person reads. */
+const plain = (text: string) => text.replace(/\s/g, ' ');
+
 describe('formatMoney', () => {
-  it('paints whole cents as euros in the reader’s language', () => {
+  it('paints whole minor units in the business\'s currency, in the reader’s language', () => {
     // Intl keeps the amount and the sign together with a no-break space.
-    expect(formatMoney(1250, 'es')).toBe('12,50 €');
-    expect(formatMoney(1250, 'en')).toBe('€12.50');
-    expect(formatMoney(0, 'en')).toBe('€0.00');
+    expect(formatMoney(1250, 'es', EURO)).toBe('12,50\u00a0€');
+    expect(formatMoney(1250, 'en', EURO)).toBe('€12.50');
+    expect(formatMoney(0, 'en', EURO)).toBe('€0.00');
+  });
+
+  it('a business in Poland reads złoty, never euros', () => {
+    expect(plain(formatMoney(1250, 'es', ZLOTY))).toBe('12,50 zł');
+    expect(plain(formatMoney(1250, 'en', ZLOTY))).toBe('zł 12.50');
+  });
+
+  it('a business in Japan reads yen with the decimals the server counts (none): 1500 is ¥1,500', () => {
+    expect(formatMoney(1500, 'en', YEN)).toBe('¥1,500');
+    expect(plain(formatMoney(1500, 'es', YEN))).toBe('1500 ¥');
+  });
+
+  it('until the business answers, a figure without a symbol, never euros', () => {
+    expect(formatMoney(1250, 'es')).toBe('12,50');
+    expect(formatMoney(1250, 'en')).toBe('12.50');
+  });
+});
+
+describe('currencySymbol (the end of the hourly-rate field)', () => {
+  it('the symbol a till of that country prints; nothing until the business answers', () => {
+    expect(currencySymbol('es', EURO)).toBe('€');
+    expect(currencySymbol('es', ZLOTY)).toBe('zł');
+    expect(currencySymbol('en', YEN)).toBe('¥');
+    expect(currencySymbol('es')).toBe('');
   });
 });
 
@@ -47,6 +81,26 @@ describe('moneyText and centsFromText (the hourly-rate field)', () => {
 
   it('keeps a negative figure negative, for the server to say why it refuses it under the field', () => {
     expect(centsFromText('-3')).toBe(-300);
+  });
+
+  // gh:staff#64: the rate was read and written on the euro's scale whatever the business's currency.
+  it('reads and writes with the decimals of the business\'s currency: in yen «1500» is 1500, not 150000', () => {
+    expect(moneyText(1500, 'es', YEN)).toBe('1500');
+    expect(moneyText(1500, 'en', YEN)).toBe('1500');
+    expect(centsFromText('1500', YEN)).toBe(1500);
+    expect(centsFromText('1500', ZLOTY)).toBe(150000);
+    expect(moneyText(1250, 'es', ZLOTY)).toBe('12,50');
+    expect(centsFromText('12,50', ZLOTY)).toBe(1250);
+  });
+
+  it('a figure with more decimals than the currency has is rounded to it (in yen, to the unit)', () => {
+    expect(centsFromText('12,5', YEN)).toBe(13);
+    expect(centsFromText('0.015', EURO)).toBe(2);
+  });
+
+  it('until the business answers, two decimals, as typed', () => {
+    expect(moneyText(1250, 'es')).toBe('12,50');
+    expect(centsFromText('12,50')).toBe(1250);
   });
 });
 

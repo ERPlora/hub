@@ -4,11 +4,15 @@
 //     and the pay only when the person may see it (otherwise the server refuses it);
 //   - Edit sends ONLY what changed (STAFF-F02 «solo cambia lo enviado»), `null` to clear the role,
 //     the Hub user or the hire date, and the pay only when it may see it and it changed;
-//   - money is typed in euros and travels in whole cents; the commission travels as typed.
+//   - money is typed in the business's currency and travels in its whole minor units (with its decimals:
+//     none in yen); the commission travels as typed.
 import { describe, expect, it } from 'vitest';
 
 import type { CompensationOut, MemberDetailOut } from '../operations';
+import type { Money } from './format';
 import { blankMemberForm, createPayload, formFromRecord, patchPayload } from './memberForm';
+
+const YEN: Money = { currency: 'JPY', decimals: 0 };
 
 const DETAIL: MemberDetailOut = {
   id: 'm1',
@@ -102,6 +106,12 @@ describe('createPayload (New)', () => {
     for (const key of ['hourly_rate', 'commission_rate', 'notes']) expect(without).not.toHaveProperty(key);
   });
 
+  // gh:staff#64: the rate travels in the minor units of the business's currency, not on the euro's scale.
+  it('in yen the typed rate travels as it is: «1500» is 1500, not 150000', () => {
+    const form = { ...blankMemberForm(), first_name: 'A', last_name: 'B', hourly_rate: '1500' };
+    expect(createPayload(form, { pay: true, money: YEN })).toMatchObject({ hourly_rate: 1500 });
+  });
+
   it('an empty commission is 0; a rate that is not a figure goes as typed for the server to refuse under it', () => {
     const form = { ...blankMemberForm(), first_name: 'A', last_name: 'B', hourly_rate: 'doce' };
     expect(createPayload(form, { pay: true })).toMatchObject({ hourly_rate: 'doce', commission_rate: '0' });
@@ -129,6 +139,10 @@ describe('formFromRecord (Edit · {name})', () => {
       commission_rate: '12.5',
       notes: 'Prefers mornings.',
     });
+  });
+
+  it('the rate in the decimals of the business\'s currency: none in yen', () => {
+    expect(formFromRecord(DETAIL, { ...PAY, hourly_rate: 1500 }, 'es', YEN).hourly_rate).toBe('1500');
   });
 
   it('without the pay, its fields stay empty', () => {
@@ -169,5 +183,11 @@ describe('patchPayload (Edit sends only what changed)', () => {
     expect(patchPayload('m1', original, form, { pay: true })).toEqual({ id: 'm1', commission_rate: '15', notes: 'Afternoons now.' });
     expect(patchPayload('m1', original, form, { pay: false })).toEqual({ id: 'm1' });
     expect(patchPayload('m1', original, { ...original, hourly_rate: '13' }, { pay: true })).toEqual({ id: 'm1', hourly_rate: 1300 });
+  });
+
+  it('in yen the rate is compared and sent in yen', () => {
+    const yen = formFromRecord(DETAIL, { ...PAY, hourly_rate: 1500 }, 'en', YEN);
+    expect(patchPayload('m1', yen, { ...yen, hourly_rate: '1500' }, { pay: true, money: YEN })).toEqual({ id: 'm1' });
+    expect(patchPayload('m1', yen, { ...yen, hourly_rate: '1600' }, { pay: true, money: YEN })).toEqual({ id: 'm1', hourly_rate: 1600 });
   });
 });

@@ -1,10 +1,10 @@
 // The record form of a staff member (STAFF-F01, F02, F03, F21): one form for «New» and for
 // «Edit · {name}», and the operation input each one sends. New sends the whole typed record; Edit sends
-// only what changed (`null` clears the role, the Hub user or the hire date). The pay (hourly rate in
-// euros → whole cents, commission in %, HR notes) only travels for whoever may see it: the server
-// refuses it otherwise. Nothing here judges a value: the server does, and says it under its field.
+// only what changed (`null` clears the role, the Hub user or the hire date). The pay (hourly rate in the
+// business's currency → its whole minor units, commission in %, HR notes) only travels for whoever may see
+// it: the server refuses it otherwise. Nothing here judges a value: the server does, and says it under its field.
 import type { CompensationOut, MemberDetailOut, MemberIn, MemberPatchIn, MemberStatus } from '../operations';
-import { centsFromText, moneyText } from './format';
+import { centsFromText, type Money, moneyText } from './format';
 
 /** What the form holds while it is typed: every field as its control holds it. */
 export interface MemberForm {
@@ -25,15 +25,17 @@ export interface MemberForm {
   color: string;
   specialties: string;
   bio: string;
-  /** Euros as typed. */
+  /** The business's currency as typed. */
   hourly_rate: string;
   commission_rate: string;
   notes: string;
 }
 
-/** Who sends the form: whether they may see (and so send) the pay. */
+/** Who sends the form: whether they may see (and so send) the pay, and the business's currency it is typed in
+ *  (`useBusinessMoney`; unknown while it has not answered: two decimals). */
 export interface SendOptions {
   pay: boolean;
+  money?: Money;
 }
 
 const TEXTS = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'color', 'specialties', 'bio'] as const;
@@ -66,9 +68,9 @@ function commission(text: string): string {
   return trimmed === '' ? '0' : trimmed;
 }
 
-/** Whole cents, or the text as typed when it is not a figure (the server refuses it under its field). */
-function rate(text: string): number {
-  const cents = centsFromText(text);
+/** Whole minor units of `money`, or the text as typed when it is not a figure (the server refuses it under its field). */
+function rate(text: string, money?: Money): number {
+  const cents = centsFromText(text, money);
   return (cents ?? text.trim()) as number;
 }
 
@@ -97,15 +99,15 @@ export function createPayload(form: MemberForm, options: SendOptions): MemberIn 
   if (form.user_id) payload.user_id = Number(form.user_id);
   if (form.hire_date) payload.hire_date = form.hire_date;
   if (options.pay) {
-    payload.hourly_rate = rate(form.hourly_rate);
+    payload.hourly_rate = rate(form.hourly_rate, options.money);
     payload.commission_rate = commission(form.commission_rate);
     payload.notes = form.notes.trim();
   }
   return payload;
 }
 
-/** «Edit · {name}»: the record (and, when given, its pay) in the form's fields. */
-export function formFromRecord(record: MemberDetailOut, pay: CompensationOut | null, locale: string): MemberForm {
+/** «Edit · {name}»: the record (and, when given, its pay, in the decimals of `money`) in the form's fields. */
+export function formFromRecord(record: MemberDetailOut, pay: CompensationOut | null, locale: string, money?: Money): MemberForm {
   return {
     first_name: record.first_name,
     last_name: record.last_name,
@@ -121,7 +123,7 @@ export function formFromRecord(record: MemberDetailOut, pay: CompensationOut | n
     color: record.color,
     specialties: record.specialties,
     bio: record.bio,
-    hourly_rate: pay ? moneyText(pay.hourly_rate, locale) : '',
+    hourly_rate: pay ? moneyText(pay.hourly_rate, locale, money) : '',
     commission_rate: pay ? String(Number(pay.commission_rate)) : '',
     notes: pay?.notes ?? '',
   };
@@ -140,8 +142,10 @@ export function patchPayload(id: string, original: MemberForm, form: MemberForm,
   if (form.user_id !== original.user_id) patch.user_id = form.user_id ? Number(form.user_id) : null;
   if (form.hire_date !== original.hire_date) patch.hire_date = form.hire_date || null;
   if (options.pay) {
-    const typed = centsFromText(form.hourly_rate);
-    if (typed === null || typed !== centsFromText(original.hourly_rate)) patch.hourly_rate = rate(form.hourly_rate);
+    const typed = centsFromText(form.hourly_rate, options.money);
+    if (typed === null || typed !== centsFromText(original.hourly_rate, options.money)) {
+      patch.hourly_rate = rate(form.hourly_rate, options.money);
+    }
     if (Number(commission(form.commission_rate)) !== Number(commission(original.commission_rate)) || Number.isNaN(Number(commission(form.commission_rate)))) {
       patch.commission_rate = commission(form.commission_rate);
     }

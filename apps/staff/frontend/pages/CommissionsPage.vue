@@ -15,7 +15,7 @@ import { computed, ref } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney, formatPercent } from '../lib/format';
+import { formatDate, formatMoney, formatPercent, useBusinessMoney } from '../lib/format';
 import type { CommissionPeriod, CommissionReportIn, CommissionReportRow } from '../operations';
 import { staffTabs } from '../tabs';
 
@@ -73,7 +73,9 @@ const days = computed(() => {
 });
 
 // ── The list ───────────────────────────────────────────────────────────────────────────────────
-const money = (cents: number): string => formatMoney(cents, locale.value);
+/** The business's currency (its country's): what was sold and earned is painted in it (staff-business-currency). */
+const business = useBusinessMoney();
+const money = (cents: number): string => formatMoney(cents, locale.value, business.value);
 
 const columns = computed<DataTableColumn<CommissionReportRow>[]>(() => [
   {
