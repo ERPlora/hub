@@ -10,7 +10,8 @@ gateway (``saas`` ``assistant/internal.py``), without the ORM.
 - **A write never runs without the person's yes**: its card (``card``) says what it will send, each datum by its name
   in the person's language (the name its app's models give it: their metadata, no query); ``risk="high"`` asks
   to type a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many; such a write
-  that names no record is not done from the chat (``blocked``).
+  that names no record is not done from the chat (``blocked``). Such a write may show what it will do (``preview``):
+  a read of its own app its ``ai=`` names, run as the person before the card; one that cannot be read shows no card.
 - **The gateway**: every door is a signed POST (``base.signing``, the secret of every ``/internal`` call) naming this
   business by its host (``scope.key``); the browser never talks to it. ``stream_turn`` relays a turn as the Hub's own
   frames (``text``, ``usage``, ``error``, ``done``); its refusals become one of ours (``assistant.quota_exceeded``,
@@ -29,6 +30,7 @@ from typing import Any
 import httpx
 import pydantic
 from django.conf import settings
+from django.core import checks
 from django.core.exceptions import FieldDoesNotExist
 from django.http import StreamingHttpResponse
 from django.utils import translation
@@ -399,6 +401,22 @@ def error_content(code: str, message: str, fields: dict | None = None) -> str:
     return json.dumps({"error": error}, ensure_ascii=False)
 
 
+def _run(ctx: OperationContext, op: Operation, data: dict) -> tuple[ToolOutcome | None, Any]:
+    """``op`` run with ``data`` for ``ctx``'s person, by its own operation: ``(None, its result)``, or why it did not
+    run (``(outcome, None)``)."""
+    try:
+        validated = op.input.model_validate(data)
+    except pydantic.ValidationError as exc:
+        fields = {".".join(str(part) for part in error["loc"]) or "__all__": error["msg"] for error in exc.errors()}
+        return ToolOutcome("error", "invalid_payload", error_content("invalid_payload", "Some data does not fit.", fields)), None
+    try:
+        return None, op(ctx, validated)
+    except (PermissionDenied, AppInactive, Unauthorized) as exc:
+        return ToolOutcome("refused", exc.code, error_content(exc.code, str(exc))), None
+    except OperationError as exc:
+        return ToolOutcome("error", exc.code, error_content(exc.code, str(exc), getattr(exc, "fields", None))), None
+
+
 def run_tool(ctx: OperationContext, op: Operation, arguments: str) -> ToolOutcome:
     """Run ``op`` with the model's ``arguments`` (JSON text) for ``ctx``'s person, by its own operation."""
     try:
@@ -407,21 +425,98 @@ def run_tool(ctx: OperationContext, op: Operation, arguments: str) -> ToolOutcom
         data = None
     if not isinstance(data, dict):
         return ToolOutcome("error", "invalid_payload", error_content("invalid_payload", "The arguments are not a JSON object."))
-    try:
-        validated = op.input.model_validate(data)
-    except pydantic.ValidationError as exc:
-        fields = {".".join(str(part) for part in error["loc"]) or "__all__": error["msg"] for error in exc.errors()}
-        return ToolOutcome("error", "invalid_payload", error_content("invalid_payload", "Some data does not fit.", fields))
-    try:
-        result = op(ctx, validated)
-    except (PermissionDenied, AppInactive, Unauthorized) as exc:
-        return ToolOutcome("refused", exc.code, error_content(exc.code, str(exc)))
-    except OperationError as exc:
-        return ToolOutcome("error", exc.code, error_content(exc.code, str(exc), getattr(exc, "fields", None)))
+    failure, result = _run(ctx, op, data)
+    if failure is not None:
+        return failure
     content = result.model_dump_json()
     if len(content) > MAX_RESULT_CHARS:
         content = content[:MAX_RESULT_CHARS] + " …(cut)"
     return ToolOutcome("ok", "", content)
+
+
+# ── What a dangerous write will do, on its card (BASE-F98) ───────────────────────────────────────────────────────
+
+
+def preview_of(op: Operation) -> Any:
+    """What ``op``'s ``ai=`` declares as its preview (``base.E005`` checks its shape at start), or ``None``."""
+    ai = op.ai if isinstance(op.ai, dict) else {}
+    return ai.get("preview")
+
+
+@cache
+def _output_schema(op: Operation) -> dict:
+    return op.output.model_json_schema()
+
+
+def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
+    """What the dangerous write ``op`` will do with ``arguments``, as its app says it: the read its ``ai=`` names
+    (``"preview": {"operation": <a query of its app>, "fields": [<data of its answer>]}``), run as ``ctx``'s person
+    — their permissions, their business — with the data of the write its input takes. The card's data, by their names
+    in the person's language and an amount in cents as money, in the order the app names them; what the read leaves
+    empty or hides from this person (none: a blind count's expected cash) is not there. ``(None, None)`` without a
+    preview; ``(outcome, None)`` when it cannot be read: the write is not confirmed blind."""
+    declared = preview_of(op)
+    if declared is None:
+        return None, None
+    read = registry[declared["operation"]]
+    failure, result = _run(ctx, read, {name: value for name, value in arguments.items() if name in read.input.model_fields})
+    if failure is not None:
+        return failure, None
+    answer = result.model_dump(mode="json")
+    schema = _output_schema(read)
+    defs = schema.get("$defs", {})
+    props = schema.get("properties", {})
+    with translation.override(ctx.language):
+        fields = [
+            _field(name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), answer.get(name))
+            for name in declared["fields"]
+        ]
+    return None, [field for field in fields if field["kind"] != "empty"]
+
+
+@checks.register("base")
+def check_previews(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E005``: a preview names a read of the write's own app, the data of its answer the card shows and nothing
+    the write does not send; only a dangerous write declares one (a normal one's card is a single line)."""
+    errors: list[checks.CheckMessage] = []
+    for op in registry.values():
+        declared = preview_of(op)
+        problems = [] if declared is None else _preview_problems(op, declared)
+        if problems:
+            errors.append(
+                checks.Error(
+                    f"{op.name} declares a preview that {'; '.join(problems)}.",
+                    hint='Declare ai={"risk": "high", "preview": {"operation": "<app>.<entity>.<a query>", "fields": '
+                    '[<data of its answer>]}} on a dangerous write, with a read whose input the write also takes.',
+                    obj=op.name,
+                    id="base.E005",
+                )
+            )
+    return errors
+
+
+def _preview_problems(op: Operation, declared: Any) -> list[str]:
+    if not isinstance(declared, dict) or not isinstance(declared.get("operation"), str):
+        return ["is not an operation and fields"]
+    problems = []
+    if op.kind != "command" or risk(op) != "high":
+        problems.append("is never shown: it is not dangerous (risk high)")
+    read = registry.get(declared["operation"])
+    if read is None:
+        return [*problems, f"names no operation {declared['operation']}"]
+    if read.app_label != op.app_label:
+        problems.append(f"names {read.name}, of another app")
+    if read.kind != "query":
+        problems.append(f"names {read.name}, not a read")
+    fields = declared.get("fields")
+    if not isinstance(fields, list) or not fields or not all(isinstance(name, str) for name in fields):
+        return [*problems, "names no field of its answer"]
+    given = _output_schema(read).get("properties", {})
+    problems += [f"shows {name}, but {read.name} gives no field {name}" for name in fields if name not in given]
+    problems += [
+        f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields
+    ]
+    return problems
 
 
 def rounds(messages: list[dict]) -> int:

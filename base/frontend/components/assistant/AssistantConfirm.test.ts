@@ -107,6 +107,53 @@ describe('AssistantConfirm', () => {
     m.wrapper.unmount();
   });
 
+  it('a dangerous one shows what it will do, as its app says it, before what it sends (BASE-F98)', async () => {
+    // FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: closing the drawer listed the session and the counted
+    // cash, never the expected one nor the difference.
+    const close: AssistantCard = {
+      ...HIGH,
+      operation: 'cash_register.session.close',
+      app: 'cash_register',
+      app_name: 'Caja',
+      action: 'close',
+      fields: [{ name: 'closing_balance', label: 'Efectivo contado', kind: 'money', value: 25000 }],
+      count: null,
+      confirm_word: 'CONFIRMAR',
+      preview: [
+        { name: 'number', label: 'Número', kind: 'text', value: 'S-261028-0001' },
+        { name: 'expected_balance', label: 'Efectivo esperado', kind: 'money', value: 23000 },
+        { name: 'difference', label: 'Diferencia', kind: 'money', value: 2000 },
+      ],
+    };
+    const { dialog } = await card(close);
+    const preview = document.querySelector<HTMLElement>('[data-testid="assistant-confirm-preview"]');
+    expect(preview?.textContent).toContain('Lo que va a pasar');
+    expect([...preview!.querySelectorAll('li')].map((item) => item.textContent?.trim())).toEqual([
+      'Número: S-261028-0001',
+      'Efectivo esperado: 230,00\u00a0€',
+      'Diferencia: 20,00\u00a0€',
+    ]);
+    expect(dialog.props('consequences')).toEqual(['Efectivo contado: 250,00\u00a0€']);
+    expect(dialog.props('requireText')).toBe('CONFIRMAR');
+    document.body.innerHTML = '';
+    await mountBase(AssistantConfirm, {
+      locale: 'en',
+      props: { card: { ...close, confirm_word: 'CONFIRM' }, more: false, money: { currency: 'USD', decimals: 2 } },
+    });
+    await flush();
+    const english = document.querySelector<HTMLElement>('[data-testid="assistant-confirm-preview"]')?.textContent ?? '';
+    expect(english).toContain('What will happen');
+    expect(english).toContain('$230.00');
+  });
+
+  it('a card whose app declares no preview shows none', async () => {
+    await card(HIGH);
+    expect(document.querySelector('[data-testid="assistant-confirm-preview"]')).toBeNull();
+    document.body.innerHTML = '';
+    await card({ ...HIGH, preview: [] });
+    expect(document.querySelector('[data-testid="assistant-confirm-preview"]')).toBeNull();
+  });
+
   it('cancelling runs nothing', async () => {
     const { wrapper, dialog } = await card(NORMAL);
     dialog.vm.$emit('cancel');

@@ -2389,17 +2389,24 @@ Pasos:
   1. Una acción que su app marca como peligrosa no se confirma con un clic: la tarjeta dice, por ejemplo, «Borrar en
      Servicios. Revisa cada dato antes de seguir.», pone cada dato en su línea con su nombre en el idioma de la
      persona y pide «Para confirmar, escribe CONFIRMAR:».
-  2. Si la acción nombra los registros uno a uno, dice cuántos («Afecta a 3 registros.») y pide escribir ese número
+  2. Si su app lo declara, la tarjeta dice antes, bajo «Lo que va a pasar», lo que la acción va a hacer, tal como su
+     app lo calcula para quien pregunta y con sus permisos. Por ejemplo, al quitar el PIN a alguien sale de quién es
+     («Nombre: …» y «Correo: …»), no solo el código de la persona. Lo que la app no le enseña a esa persona tampoco
+     sale en la tarjeta.
+  3. Si la acción nombra los registros uno a uno, dice cuántos («Afecta a 3 registros.») y pide escribir ese número
      en lugar de la palabra.
-  3. Si no los nombra (todos, o los que cumplen un filtro), no se hace desde el chat: no sale tarjeta, la respuesta dice «No puedo
+  4. Si no los nombra (todos, o los que cumplen un filtro), no se hace desde el chat: no sale tarjeta, la respuesta dice «No puedo
      saber cuántos registros cambiaría esto, así que no lo hago desde aquí. Ábrelo en su pantalla, donde puedes
      verlos.» y el asistente explica dónde se hace.
-  4. «Ejecutar» solo se puede pulsar cuando lo escrito coincide (sin importar las mayúsculas ni los espacios de los
+  5. «Ejecutar» solo se puede pulsar cuando lo escrito coincide (sin importar las mayúsculas ni los espacios de los
      extremos), y el negocio lo vuelve a comprobar antes de hacerlo.
-  5. Restablecer el negocio y exportar una copia nunca se hacen desde el chat: se hacen en Ajustes › Datos y copias.
-Entra: el riesgo que la app declara en cada acción y sus datos.
+  6. Restablecer el negocio y exportar una copia nunca se hacen desde el chat: se hacen en Ajustes › Datos y copias.
+Entra: el riesgo que la app declara en cada acción y sus datos; si la declara, su vista previa.
 Sale: si se acepta, como BASE-F97.
 Si falla: lo escrito que no coincide no deja ejecutar; cancelar no hace nada y el asistente lo cuenta como cancelado.
+Si la vista previa no se puede leer (el registro ya no está, o la persona no puede verlo), no sale la tarjeta ni se
+hace nada: nada se confirma a ciegas. El recibo dice «No se hizo, falló: …» o «No se hizo, sin permiso: …» y el
+asistente cuenta por qué.
 Implicados: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Comprobar lo que dice el asistente contra lo que de verdad hizo
@@ -2946,7 +2953,14 @@ Implicados: ACCOUNTS-F38
   último trozo del nombre de la operación (`action`), por su verbo en `base.assistant.card.actions` de los catálogos
   `en` y `es` de `base` (`actionKey` de `lib/assistant-card.ts`, por clave exacta; sin clave, «Do this»): una app con
   una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
-  `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`), la
+  `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`), la vista previa de una
+  escritura peligrosa (BASE-F98, `preview`: su `ai=` lleva `"preview": {"operation": "<una query de su app>",
+  "fields": [<datos de su respuesta>]}`; el turno la corre como la persona, `_run` con su `ctx`, con los datos de la
+  escritura que su entrada toma, antes de la tarjeta; quita los vacíos y los `None`, lo que la lectura oculta; si no
+  se puede leer, su error es el de la escritura y no sale tarjeta; `base.E005` comprueba al arrancar que es una
+  query de la misma app, que da esos campos, que la escritura lleva toda su entrada y que es `risk="high"`; la
+  tarjeta la pinta bajo «Lo que va a pasar», `AssistantConfirm.vue`; hoy la declara `base.person.pin_remove` con
+  `base.person.detail`), la
   comparación del servidor (`confirmed`, como `ConfirmDialog`: sin mayúsculas ni espacios de los extremos),
   `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
   puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report` y `/internal/speech/transcribe`, con

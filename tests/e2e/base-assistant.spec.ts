@@ -427,6 +427,52 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
   await context.close();
 });
 
+// flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
+// FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what a dangerous write sends («Persona:
+// saas:3»), never what it will do. Base's own preview: «Remove the PIN» names whose PIN goes, as its read
+// (`base.person.detail`) answers it to who asks. One whose preview cannot be read shows no card: nothing to confirm blind.
+// Cancelled, and the second refused: nothing changes.
+test('BASE-F98 — a dangerous card shows what will happen, as its app reads it for the person; one whose preview cannot be read shows no card', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW';
+  // The employee enters once, as on their first day: a fresh database knows only who has entered.
+  await (await freshPage(browser, EMPLOYEE)).context().close();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const people = await api<{ people: { id: string; name: string; email: string }[] }>(context, A, 'GET', '/people');
+  expect(people.status, JSON.stringify(people.data)).toBe(200);
+  const employee = people.data.people.find((person) => person.email === EMPLOYEE.email);
+  expect(employee, JSON.stringify(people.data.people)).toBeDefined();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  await ask(page, `E2E-ASK base__person__pin_remove {"person":"${employee!.id}"}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  const preview = card(page).locator('[data-testid="assistant-confirm-preview"]');
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Quitar en Empleados. Revisa cada dato antes de seguir.');
+    await expect(preview).toContainText('Lo que va a pasar');
+    await expect(preview.locator('li')).toHaveText([`Nombre: ${employee!.name}`, `Correo: ${EMPLOYEE.email}`]);
+    await expect(card(page)).toContainText(`Persona: ${employee!.id}`);
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
+    await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, cancelado: Quitar en Empleados');
+  // A person this business does not have: the preview cannot be read, so no card; the receipt says it failed.
+  await ask(page, 'E2E-ASK base__person__pin_remove {"person":"saas:0"}');
+  await expect(card(page)).toBeHidden();
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, falló: Quitar en Empleados');
+  await context.close();
+});
+
 test('BASE-G117 — an answer that says it changed something nothing changed is flagged, outside the answer', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });

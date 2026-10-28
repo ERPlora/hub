@@ -1181,6 +1181,7 @@
         "cancel": "Cancelar",
         "cancelAll": "Cancelar todo",
         "count": "Afecta a {count} registros.",
+        "preview": "Lo que va a pasar",
         "notFromChat": "No puedo saber cuántos registros cambiaría esto, así que no lo hago desde aquí. Ábrelo en su pantalla, donde puedes verlos.",
         "yes": "Sí",
         "no": "No",
