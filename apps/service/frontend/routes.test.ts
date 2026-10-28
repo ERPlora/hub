@@ -51,11 +51,11 @@ describe('service routes.ts', () => {
     expect([...source.matchAll(/^import\s+(?!type\b).*$/gm)]).toEqual([]);
   });
 
-  it('has a page for every tab, and every menu entry of apps.py is one of them', () => {
+  it('has a page for every tab, and every route apps.py names (its menu and where the Home sends) is one of them', () => {
     expect(routes.map((r) => r.path)).toEqual(SERVICE_TABS.map((tab) => tab.to));
     const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
-    const paths = [...appsPy.matchAll(/"(\/service\/[a-z-]+)"/g)].map((m) => m[1]);
-    expect(paths.every((path) => routes.some((r) => r.path === path))).toBe(true);
-    expect(paths).toHaveLength(3);
+    const paths = [...new Set([...appsPy.matchAll(/"(\/service\/[a-z-]+)"/g)].map((m) => m[1]))];
+    expect(paths.sort()).toEqual(['/service/categories', '/service/packages', '/service/services']);
+    for (const path of paths) expect(routes.some((r) => r.path === path), path).toBe(true);
   });
 });
