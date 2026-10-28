@@ -223,6 +223,23 @@ def test_an_open_price_line_takes_the_department_and_its_vat():
     assert line.department_id is not None
 
 
+def test_with_inventory_off_no_product_is_sold_and_an_open_price_still_is(coffee, monkeypatch):
+    # Inventory is asked by name through the platform's door: off, the till's own 409, and an open price needs no catalog.
+    from apps.sale.queries import CATALOG_UNAVAILABLE
+    from base import activation
+
+    monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"inventory"}))
+    order = open_order()
+    with pytest.raises(Conflict) as refused:
+        add(order.id, product="COF")
+    assert (refused.value.code, refused.value.message) == ("sale.catalog_unavailable", str(CATALOG_UNAVAILABLE))
+    added = run(
+        "sale.order.add_open_line",
+        {"order_id": str(order.id), "tax_category_key": "product.generic", "unit_price": 999, "name": "Various"},
+    )
+    assert [line.unit_price for line in added.lines] == [999]
+
+
 def test_without_departments_an_open_price_takes_a_tax_category_by_name():
     order = run(
         "sale.order.add_open_line",

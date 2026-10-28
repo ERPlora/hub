@@ -11,11 +11,13 @@ sits in front of the routes (``base.approvals``).
 """
 
 import json
+from dataclasses import replace
 
 import pytest
 from django.apps import apps
 from django.core.cache import cache
 from django.utils import translation
+from live.errors import PermissionDenied
 from live.meta import all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import get as operation
@@ -376,41 +378,140 @@ class TestDeleteAnOpenCheck:
 # ── What goes with an approved command, and nothing more ─────────────────────────────────────────────────────────────
 
 
+#: What the cashier may not do in Invoicing and Services, and an approved void or refund does on the way.
+RECTIFY, RETURN_SESSION = "invoice.rectify_invoice", "service.return_session"
+
+
+@pytest.fixture
+def platform_rule(monkeypatch):
+    """Every operation of another app the till runs through the platform's one door (``base.operations.call``), as
+    ``(operation, the command running, whether it went with an approval)``: what ``base.approvals.consequence_context``
+    gave it. Sales has no rule of its own."""
+    from live.operations import current_operation
+
+    from base import operations as platform
+
+    rule, seen = platform.consequence_context, []
+
+    def spy(ctx, op):
+        given = rule(ctx, op)
+        running = current_operation.get()
+        seen.append((op.name, running.name if running else None, given is not ctx))
+        return given
+
+    monkeypatch.setattr(platform, "consequence_context", spy)
+    return seen
+
+
+def while_running(seen: list, name: str) -> list:
+    """The calls of ``seen`` made by the command ``name`` itself (not by what it calls in turn)."""
+    return [(called, carried) for called, running, carried in seen if running == name]
+
+
+@pytest.fixture
+def haircut_with_shampoo(product, customer):
+    """A haircut paid with a voucher session and a shampoo by card, charged with Invoicing's ticket: Lucía's sale."""
+    run("invoice.issuer.update", ISSUER)
+    product("Shampoo", "SHA", 1200, "product.generic")
+    haircut = run("service.service.create", {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"})
+    _grant, sale, line = charged_with_voucher(haircut, customer("Lucía Pérez"), product=True)
+    return sale, line
+
+
+def the_cashiers_context(*, approved: str | None = None):
+    """Eva's context, with the one permission more of ``approved`` and its mark on the request, as the platform builds
+    it for a command a manager approved; ``None``: no approval and no request."""
+    from types import SimpleNamespace
+
+    from apps.sale.tests.conftest import ctx_for
+    from base.approvals import Approved
+
+    ctx = ctx_for("hub_employee", actor="eva")
+    if approved is None:
+        return replace(ctx, permissions=ctx.permissions | {"sale.void_sale"})
+    op = operation(approved)
+    mark = Approved(operation=op.name, permission=op.permission, token="elev_x", fingerprint="f" * 64)
+    return replace(ctx, permissions=ctx.permissions | {op.permission}, request=SimpleNamespace(approved=mark))
+
+
 class TestWhatGoesWithIt:
-    """``consequence_context``: what an approved command asks of another app goes with it; a read never does, and
-    without an approval the caller's own permissions decide."""
+    """What a command a manager approved asks of another app goes with it, by the platform's rule (BASE-F84): only the
+    commands of another app the approved command itself runs, a read never, and without an approval the caller's own
+    permissions decide."""
 
-    @staticmethod
-    def context(approved: bool):
-        from types import SimpleNamespace
+    def test_the_cashier_may_not_rectify_nor_give_sessions_back_on_their_own(self):
+        cashier = permissions_for_role(all_live_app_configs(), "hub_employee")
+        assert RECTIFY not in cashier and RETURN_SESSION not in cashier
 
-        from base.approvals import Approved
-        from apps.sale.tests.conftest import ctx_for
+    def test_an_approved_void_takes_the_rectifying_invoice_and_the_sessions_with_it(
+        self, cashier, haircut_with_shampoo, platform_rule
+    ):
+        sale, line = haircut_with_shampoo
+        voided = through_approval(cashier, "/sale/sales/void", {"sale_id": str(sale.id), "reason": "wrong customer"})
+        assert voided.status_code == 200, voided.content
+        assert voided.json()["void_invoice_status"] == "issued"
+        assert Redemption.objects.get(pk=SaleLine.objects.get(pk=line.id).voucher_session_id).status == "returned"
+        assert while_running(platform_rule, "sale.sale.void") == [
+            ("service.session.return", True),
+            ("invoice.invoice.rectify_from_void", True),
+        ]
 
-        ctx = ctx_for("hub_employee")
-        mark = Approved(operation="sale.sale.void", permission="sale.void_sale", token="elev_x", fingerprint="f" * 64)
-        return type(ctx)(
-            scope=ctx.scope,
-            actor=ctx.actor,
-            permissions=ctx.permissions,
-            request=SimpleNamespace(approved=mark) if approved else None,
-        )
+    def test_an_approved_refund_takes_its_rectifying_invoice_and_the_session_with_it(
+        self, cashier, haircut_with_shampoo, platform_rule
+    ):
+        sale, line = haircut_with_shampoo
+        card = Sale.objects.get(pk=sale.id).payments.get()
+        body = {
+            "sale_id": str(sale.id),
+            "reason": "did not come",
+            "idempotency_key": "approval-refund-0002",
+            "lines": [{"line_id": str(line.id)}],
+            "allocations": [{"payment_id": str(card.id), "amount": 1200}],
+        }
+        refunded = through_approval(cashier, "/sale/sales/refund", body)
+        assert refunded.status_code == 200, refunded.content
+        assert refunded.json()["invoice_status"] == "issued"
+        assert Redemption.objects.get(pk=SaleLine.objects.get(pk=line.id).voucher_session_id).status == "returned"
+        assert while_running(platform_rule, "sale.sale.refund") == [
+            ("service.session.return", True),
+            ("invoice.invoice.rectify_from_refund", True),
+        ]
 
-    def test_a_command_of_another_app_goes_with_the_approved_command(self):
-        from apps.sale.queries import consequence_context
+    def test_a_read_and_what_the_cashier_already_may_keep_the_cashiers_own(
+        self, cashier, coffee, platform_rule, monkeypatch
+    ):
+        # Cash register in the business (the conftest takes it out), charging cash without an open drawer.
+        monkeypatch.setattr("apps.sale.services.DRAWER_CHECK", "cash_register.session.current")
+        run("cash_register.settings.update", {"enable_cash_register": False})
+        run("invoice.issuer.update", ISSUER)
+        cap(10)
+        body = {
+            "idempotency_key": "approval-key-0004",
+            "lines": [{"product": "COF"}],
+            "discount_percent": "50",
+            "payments": [{"method": "cash"}],
+        }
+        charged = through_approval(cashier, "/sale/sales/complete_over_limit", body)
+        assert charged.status_code == 201, charged.content
+        ran = while_running(platform_rule, "sale.sale.complete_over_limit")
+        # The drawer and the catalog are reads; the ticket, a command of Invoicing the cashier may already issue.
+        assert {"cash_register.session.current", "inventory.unit.list", "invoice.invoice.create_from_sale"} <= {
+            name for name, _carried in ran
+        }
+        assert [name for name, carried in ran if carried] == []
 
-        returned = consequence_context(self.context(approved=True), operation("service.session.return"))
-        assert returned.has("service.return_session")
+    def test_only_the_approved_command_carries_never_another_of_the_till(self, haircut_with_shampoo):
+        """The assistant marks its turn's request with the approval: another command of the till with the very same
+        permission (a void, under the approval of voiding an item) takes nothing of other apps with it."""
+        sale, line = haircut_with_shampoo
+        ctx = the_cashiers_context(approved="sale.order.void_line")
+        with pytest.raises(PermissionDenied):
+            run("sale.sale.void", {"sale_id": str(sale.id), "reason": "wrong customer"}, ctx)
+        assert Sale.objects.get(pk=sale.id).status == "completed"
+        assert Redemption.objects.get(pk=SaleLine.objects.get(pk=line.id).voucher_session_id).status != "returned"
 
-    def test_a_read_never_does(self):
-        from apps.sale.queries import consequence_context
-
-        ctx = self.context(approved=True)
-        assert consequence_context(ctx, operation("sale.sale.stats")) is ctx
-
-    def test_without_an_approval_the_callers_own_permissions_decide(self):
-        from apps.sale.queries import consequence_context
-
-        ctx = self.context(approved=False)
-        assert consequence_context(ctx, operation("service.session.return")) is ctx
-        assert not ctx.has("service.return_session")
+    def test_without_an_approval_the_callers_own_permissions_decide(self, haircut_with_shampoo):
+        sale, _line = haircut_with_shampoo
+        with pytest.raises(PermissionDenied):
+            run("sale.sale.void", {"sale_id": str(sale.id), "reason": "wrong customer"}, the_cashiers_context())
+        assert Sale.objects.get(pk=sale.id).status == "completed"
