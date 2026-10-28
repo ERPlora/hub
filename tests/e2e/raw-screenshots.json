@@ -64,6 +64,7 @@
   "fix-hub-coop-allow-popups.spec.ts": 1,
   "fix-hub-csp-whatsapp-media-gate.spec.ts": 1,
   "fix-hub-csp-whatsapp-media.spec.ts": 1,
+  "fix-hub-flow-automations-title-cut-on-phone.spec.ts": 1,
   "fix-hub-home-chart-iso-day-labels.spec.ts": 1,
   "fix-hub-home-timeline-raw-utc-time.spec.ts": 1,
   "fix-hub-home-verifactu-legal-level-in-production.spec.ts": 3,
