@@ -9,7 +9,8 @@ from django.utils import translation
 from live.context import Scope, system_context
 
 from apps.invoice.models import Invoice
-from apps.invoice.tests.conftest import B, ISSUER, ctx_for, run
+from apps.invoice.tests.conftest import A, B, ISSUER, ctx_for, run
+from base import operations as base_operations
 from base.models import Hub
 
 pytestmark = pytest.mark.django_db
@@ -94,3 +95,21 @@ def test_erploras_own_hub_invoices_in_the_currency_of_its_issuer_s_country(setti
     platform = ctx_for(scope=Scope("host", "erplora"))
     run("invoice.issuer.update", ISSUER, platform)
     assert manual(system_context(platform.scope)).currency == currency
+
+
+@pytest.mark.parametrize("platform_hub", [False, True], ids=["a-business-s-hub", "erploras-own-hub"])
+def test_a_manual_invoice_asks_base_for_the_business_s_currency(settings, monkeypatch, platform_hub):
+    # FIX-HUB-INVOICE-OWN-COPY-OF-BUSINESS-CURRENCY: invoicing asks the one question every app that charges asks
+    # (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub too, never a copy of its own that drifts
+    # in silence from it (here, an answer other than the one of the business's or the issuer's country).
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = "ES"
+    business_in("ES")
+    scope = Scope("host", "erplora") if platform_hub else A
+    ctx = ctx_for(scope=scope)
+    run("invoice.issuer.update", ISSUER, ctx)
+    asked = []
+    monkeypatch.setattr(base_operations, "business_currency", lambda scope: asked.append(scope) or "KWD")
+    invoice = manual(system_context(scope) if platform_hub else ctx)
+    assert (invoice.currency, invoice.currency_decimals) == ("KWD", 3)
+    assert asked == [scope]
