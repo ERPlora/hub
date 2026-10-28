@@ -272,7 +272,8 @@ def test_the_homes_panels_are_the_old_modules_five():
             False,
             "staff.view",
             {"sort": "-member_count", "limit": 10},
-            {"label": "name", "value": "member_count"},
+            # Each bar in its role's colour, as the old module's `map.color` (FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-COLOR).
+            {"label": "name", "value": "member_count", "color": "color"},
             {"valueFormat": "number"},
         ),
     ]

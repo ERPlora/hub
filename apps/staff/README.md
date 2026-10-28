@@ -70,8 +70,6 @@ pnpm e2e tests/e2e/staff-flows.spec.ts tests/e2e/staff-members.spec.ts tests/e2e
 
 ## Qué queda fuera
 
-- El color de cada rol en las barras de «Empleados por rol» del Inicio: el panel de barras de `base` no pinta
-  colores (fuera de esta app).
 - Borrar las ocho columnas de los ajustes retirados y su CHECK (el paso contract de hub#177), una vez
   desplegado.
 - Lo que Comisiones aún no cuenta, de otras apps: una venta con «Atiende yo» y la sesión de un bono.

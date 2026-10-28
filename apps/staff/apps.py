@@ -151,7 +151,8 @@ class StaffConfig(LiveAppConfig):
             operation="staff.time_off.today",
             map={"title": "member_name", "description": "leave_type_label"},
         ),
-        # The old panel's ten at most, the role with more active people first.
+        # The old panel's ten at most, the role with more active people first, each bar in its role's colour (a role
+        # without one keeps the panel's).
         Widget(
             key="by_role",
             title=_("Staff by role"),
@@ -162,7 +163,7 @@ class StaffConfig(LiveAppConfig):
             kind="bar-list",
             operation="staff.role.list",
             params={"sort": "-member_count", "limit": 10},
-            map={"label": "name", "value": "member_count"},
+            map={"label": "name", "value": "member_count", "color": "color"},
             options={"valueFormat": "number"},
         ),
     ]
