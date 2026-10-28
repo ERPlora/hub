@@ -1,18 +1,21 @@
 // The amount field of «New payment» (PAYMENT-F02), as the old screen read it (pm#521):
 // an outlined md text field with the decimal keyboard. It accepts «2,20», «1.234,56» or what is pasted
-// from the screen and, on leaving it, rewrites a readable amount in the page format. What is not an
-// amount says so under the field («This is not an amount…», or both readings of «1.250»), after the
-// person leaves it or tries to save; the server's message for the field wins.
+// from the screen, in the business's currency, and, on leaving it, rewrites a readable amount in the page format
+// (once the business has answered: until then, as typed; hub#342). What is not an amount says so under the field
+// («This is not an amount…», or both readings of «1.250»), after the person leaves it or tries to save; the
+// server's message for the field wins.
 import { IonInput } from '@ionic/vue';
 import { describe, expect, it } from 'vitest';
 
-import { flush, mountPayment } from '../__tests__/mount-payment';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, flush, JAPANESE, mountPayment, POLISH } from '../__tests__/mount-payment';
 import { formatMoney } from '../lib/format';
 import MoneyInput from './MoneyInput.vue';
 
 type Control = HTMLElement & { errorText?: string };
+const EUR = { currency: 'EUR', decimals: 2 };
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', shop: Business | null = business()) {
   const model = { value: (props.modelValue as string) ?? '' };
   const m = await mountPayment(MoneyInput, {
     props: {
@@ -26,7 +29,9 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
       ...props,
     },
     locale,
+    business: shop,
   });
+  await m.live();
   const input = () => m.wrapper.findComponent(IonInput);
   async function blur() {
     input().element.dispatchEvent(new CustomEvent('ionBlur'));
@@ -71,8 +76,30 @@ describe('MoneyInput', () => {
   it('«1.250» gives both readings', async () => {
     const s = await setup({ modelValue: '1.250', showError: true });
     expect(s.errorText()).toBe(
-      `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en')} or ${formatMoney(125, 'en')}. Write the decimals so there is no doubt.`,
+      `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en', EUR)} or ${formatMoney(125, 'en', EUR)}. Write the decimals so there is no doubt.`,
     );
+  });
+
+  it('in a business in Poland, reads «12,50 zł» and rewrites it on leaving; «13,50 €» is not an amount', async () => {
+    const s = await setup({}, 'en', business(POLISH));
+    await s.input().setValue('12,50 zł');
+    await s.blur();
+    expect(s.model.value).toBe('12.50');
+    expect(s.errorText()).toBeUndefined();
+    await s.input().setValue('13,50 €');
+    await s.blur();
+    expect(s.model.value).toBe('13,50 €');
+    expect(s.errorText()).toBe('This is not an amount. Type a figure, for example 12.50.');
+  });
+
+  it('while the business is unknown, leaving the field keeps what was typed: no decimals made up (hub#342)', async () => {
+    const s = await setup({}, 'en', null);
+    await s.input().setValue('150');
+    await s.blur();
+    expect(s.model.value).toBe('150');
+    await s.result('base.business.get', business(JAPANESE));
+    await s.blur();
+    expect(s.model.value).toBe('150');
   });
 
   it("the server's message for the field wins", async () => {

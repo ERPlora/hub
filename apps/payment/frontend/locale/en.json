@@ -68,6 +68,7 @@
         "methodPlaceholder": "Method…",
         "date": "Date",
         "amount": "Amount",
+        "amountIn": "Amount ({currency})",
         "beneficiary": "Beneficiary",
         "concept": "Concept",
         "iban": "Beneficiary IBAN",

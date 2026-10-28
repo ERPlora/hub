@@ -26,9 +26,7 @@ from apps.payment.schemas import (
     PaymentPage,
     PaymentRefIn,
 )
-
-#: The business's currency until the Hub keeps its own (the same euro the till charges in).
-CURRENCY = "EUR"
+from base.business import currency_decimals
 
 METHOD_NOT_FOUND = _("That payment method does not exist in this business.")
 METHOD_AMBIGUOUS = _(
@@ -55,11 +53,6 @@ METHOD_ORDER = {
     "bank_account_ref": ("bank_account_ref",),
     "is_active": ("is_active",),
 }
-
-
-def business_currency() -> str:
-    """The currency a payment is in when it does not say one (the old ``payments.hub_currency``)."""
-    return CURRENCY
 
 
 # --- Shared with services.py, inside the command's own transaction --------------------------------
@@ -147,6 +140,9 @@ def payment_row(payment: Payment, *, whole: bool = False) -> dict:
         "payment_date": payment.payment_date,
         "amount": payment.amount,
         "currency": payment.currency,
+        # The decimals the server counts its currency in (CLDR: 2 in the forint, 0 in the yen): the screen never
+        # asks the browser's Intl, which gives the forint none.
+        "currency_decimals": currency_decimals(payment.currency),
         "beneficiary_name": payment.beneficiary_name,
         "beneficiary_iban": iban if whole else mask_account(iban),
         "concept": payment.concept,
