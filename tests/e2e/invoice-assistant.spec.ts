@@ -5,9 +5,10 @@
 // says it and asks to rectify the invoice it named. The SaaS must be seeded with that provider (README «El asistente»).
 // The owner, with an invoice issued, asks «rectifica la factura <number> porque el precio estaba mal»: the preview comes
 // first (the original, the type, the reason, the next number of the series, the amounts in negative), then the dangerous
-// card; «Cancel» issues nothing and the original stays issued, typing the word issues it and «Invoices» shows the
-// original cancelled and the new rectifying one dated today. Asked to rectify a rectifying invoice, the assistant says
-// why and offers no card.
+// card, which carries it too in «What will happen» (the type, the next number, the amounts in negative as money:
+// FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW, through base's preview, BASE-F98); «Cancel» issues nothing and
+// the original stays issued, typing the word issues it and «Invoices» shows the original cancelled and the new
+// rectifying one dated today. Asked to rectify a rectifying invoice, the assistant says why and offers no card.
 // Nothing reaches VeriFactu's tax agency: issuing seals the record locally (no transmission in this stack).
 // What this file creates is deleted after it (its invoices, their records, the numbering as found).
 // flow: INVOICE-F08
@@ -60,6 +61,14 @@ function unspend(): void {
 }
 
 /** An invoice (F1) issued by hand, 100.00 € + 21 % VAT, recorded for the cleanup. */
+/** The preview the Hub gives for rectifying `number` (server-side evidence of what the assistant and its card say). */
+async function previewOf(context: BrowserContext, number: string): Promise<Preview> {
+  const path = `/invoice/invoices/rectification_preview?number=${encodeURIComponent(number)}&reason=${encodeURIComponent(REASON)}`;
+  const read = await api<Preview>(context, A, 'GET', path);
+  expect(read.status, JSON.stringify(read.data)).toBe(200);
+  return read.data;
+}
+
 async function anInvoice(context: BrowserContext): Promise<InvoiceOut> {
   const created = await api<InvoiceOut>(context, A, 'POST', '/invoice/invoices', {
     lines: [{ description: `e2e Corte ${RUN}`, quantity: '1', unit_price: 10000, tax_rate: '21' }],
@@ -140,6 +149,7 @@ function toldPreview(): Record<string, unknown> {
 }
 
 const euros = (cents: number) => `${(cents / 100).toFixed(2)} €`;
+const previewBlock = (page: Page): Locator => card(page).locator('[data-testid="assistant-confirm-preview"]');
 const asked = (number: string) => `E2E-RECTIFY ${number} rectifica la factura ${number} porque ${REASON}`;
 
 test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: the preview first, then the dangerous card; «Cancel» issues nothing, the typed word issues it', async ({ page }) => {
@@ -148,9 +158,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   const context = page.context();
   const invoice = await anInvoice(context);
   // The preview the Hub gives for it, read before (server-side evidence of what the assistant must say).
-  const expected = (
-    await api<Preview>(context, A, 'GET', `/invoice/invoices/rectification_preview?number=${encodeURIComponent(invoice.number)}&reason=${encodeURIComponent(REASON)}`)
-  ).data;
+  const expected = await previewOf(context, invoice.number);
   expect([expected.invoice_type, expected.total_amount]).toEqual(['R1', -12100]);
 
   await openPanel(page);
@@ -178,6 +186,15 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   await expect(card(page)).toContainText('Rectify in Invoicing. Check each datum before going on.');
   await expect(card(page)).toContainText(`Number: ${invoice.number}`);
   await expect(card(page)).toContainText(`Reason: ${REASON}`);
+  // And what it will do: the rectifying invoice of that preview, its amounts as money (EUR, the business's currency).
+  await expect(previewBlock(page)).toContainText('What will happen');
+  await expect(previewBlock(page).locator('li')).toHaveText([
+    'Type of rectifying invoice: R1',
+    `Next number: ${expected.next_number}`,
+    'Tax base: -€100.00',
+    'Tax: -€21.00',
+    'Total: -€121.00',
+  ]);
   const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
   await expect(submit).toBeDisabled();
   for (const vp of VIEWPORTS) {
@@ -273,6 +290,62 @@ test('BASE-F97 — in Spanish the card and the receipt of rectifying say «Recti
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   await expect(receipts(page).last()).toHaveText('No se hizo, cancelado: Rectificar en Facturación');
   expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
+  await context.close();
+});
+
+// FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW: the card of rectifying listed only what it sends (the number
+// and the reason), never the rectifying invoice it issues. Through base's preview (BASE-F98) its «Lo que va a pasar»
+// shows the type, the next number of the RECT series (read, never taken) and the base, the tax and the total in
+// negative, as money. «Cancelar» issues nothing and takes no number; the word issues exactly the number it said.
+test('INVOICE-F08 — in Spanish the rectification card shows what will happen: the type, the next number and the amounts in negative as money', async ({ browser }) => {
+  const FIX = 'FIX-HUB-INVOICE-ASSISTANT-RECTIFY-CARD-WITHOUT-PREVIEW';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/invoice/invoices');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${A}/invoice/invoices`);
+  const invoice = await anInvoice(context);
+  const said = (await previewOf(context, invoice.number)).next_number;
+  const lines = [
+    'Tipo de rectificativa: R1',
+    `Siguiente número: ${said}`,
+    'Base imponible: -100,00 €',
+    'Impuesto: -21,00 €',
+    'Total: -121,00 €',
+  ];
+
+  await openPanel(page);
+  await ask(page, asked(invoice.number));
+  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await expect(card(page)).toContainText('¿Ejecutar esta acción?');
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(previewBlock(page)).toContainText('Lo que va a pasar');
+    await expect(previewBlock(page).locator('li')).toHaveText(lines);
+    // Each line wraps inside the card, never past it (390 wide).
+    expect(await previewBlock(page).evaluate((el) => el.scrollWidth <= el.clientWidth), `${FIX}-${vp.label} overflows`).toBe(true);
+    await untilStill(page);
+    await page.screenshot({ path: shot(`${FIX}-${vp.label}`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  // «Cancelar»: nothing is issued, and the number the card said is still the next one (it was never taken).
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
+  expect((await previewOf(context, invoice.number)).next_number).toBe(said);
+
+  // Asked again, the word typed: the rectifying invoice carries exactly the number the card said.
+  await ask(page, asked(invoice.number));
+  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  await expect(previewBlock(page).locator('li')).toHaveText(lines);
+  await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('CONFIRMAR');
+  await decide(page, 'submit');
+  await expect(lastAnswer(page)).toContainText('Hecho.');
+  const after = await invoiceOf(context, invoice.id);
+  expect([after.status, after.rectifications]).toMatchObject(['cancelled', [{ number: said }]]);
+  issuedIds.add(after.rectifications[0].id);
   await context.close();
 });
 
