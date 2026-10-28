@@ -19,7 +19,8 @@ CI=1 pnpm e2e tests/e2e/sale-sales.spec.ts     # una spec: SIN `--` (con él, Pl
 ```
 
 Antes de la primera spec, `global-setup.ts` comprueba que la BD de la ejecución (`DB_NAME`) no tiene
-migraciones pendientes (`migrate --check`, `migrate_hubs --check`) y nunca migra nada. Antes aún, rechaza más de un
+migraciones pendientes (`migrate --check`, `migrate_hubs --check`) y nunca migra nada; después, que el SaaS de la pila
+tiene las cuentas de demo con las que entran las specs (abajo, «Varias ejecuciones a la vez»). Antes aún, rechaza más de un
 worker: `--workers=N` pisa el `workers: 1` de `playwright.config.ts`, y dos specs a la vez sobre la misma pila se
 borran los datos. Para correr en paralelo, otra pila (abajo, «Varias ejecuciones a la vez»).
 
@@ -55,8 +56,8 @@ the code within … ms».
 
 ## La pila compartida
 
-Sin variables, el e2e va contra la pila compartida: Hub en `:8000` (Vite `:5173`), SaaS en `:8001` y la BD
-`hub`. La usan otras sesiones: no se migra ni se borra desde aquí.
+Sin variables, el e2e va contra la pila compartida: Hub en `:8000` (Vite `:5173`), SaaS en `:8001` y las BD
+`hub` y `saas` (la del SaaS, con sus cuentas de demo). La usan otras sesiones: no se migra ni se borra desde aquí.
 
 ## Varias ejecuciones a la vez
 
@@ -72,6 +73,7 @@ caja abierto de la otra y `cash-register-shift.spec.ts` falló).
 | `SAAS_URL` | el SaaS propio, donde va el login | `config/settings.py`, specs |
 | `DB_NAME` | la BD de la ejecución (control + negocio de `a`/`b`) | `config/settings.py`, specs (`psql()`) |
 | `E2E_MAIL_DIR` | la carpeta de correo del SaaS propio (código de acceso) | specs (`mail.ts`) |
+| `E2E_SAAS_DB` | la BD del SaaS propio, si no es `saas_e2e_<Hub+1>` (con el Hub en `:8000`, `saas`) | `global-setup.ts` y las specs que la leen (`stack.ts`) |
 
 Para el `runserver` basta `VITE_DEV_PORT` en el `.env` del worktree; para la e2e hay que **exportarla** (Vite y
 las specs no leen el `.env`). Exportada o en el `.env`, `uv run pytest` sigue en el `5173`
@@ -94,12 +96,21 @@ Reglas que el e2e hace cumplir:
   entorno, dice en una línea qué hizo con cada una (nunca su valor) y, si alguna no es una clave, falla sin escribir
   nada (`fernet-keys.ts`).
 - Si la BD e2e aún no existe, `global-setup.ts` lo dice con la orden que la crea.
+- Las specs entran con las cuentas de demo del SaaS (`owner@example.com` y `employee@example.com`, con acceso a `a` y
+  `b`), que solo crea `manage.py demo_seed` del SaaS. `global-setup.ts` las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`,
+  por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir nada) y, si faltan, para antes de la primera spec con
+  la orden que las siembra; si esa BD no existe, con la que la crea. Sin ellas, cada login esperaba 30 s para caer con «The
+  email address and/or password you specified are not correct.».
 
 Lo que no puede comprobar el e2e, y lo pide la receta:
 
 - **Un SaaS por pila**, con el retorno a su Hub (`HUB_CALLBACK_TEMPLATE`, `HUB_ADMIN_CALLBACK_URL`) y **su carpeta
   de correo** (`EMAIL_FILE_PATH`, la misma que su `E2E_MAIL_DIR`): con una carpeta compartida, una ejecución
   puede leer el código de acceso que el otro SaaS mandó a la misma cuenta y el login falla.
+- **Su propia BD del SaaS** (`saas_e2e_<Hub+1>`, la crea y la migra `tests/e2e/database.ts` del SaaS con
+  `E2E_SAAS_PORT=<Hub+1>`), con `env -u DB_NAME` al crearla y `DB_NAME=saas_e2e_<Hub+1>` en su `runserver`: la `saas` del
+  `.env` es de la pila compartida y puede ir atrasada de migraciones (su login cae con un 500), y con el `DB_NAME` del Hub
+  exportado el SaaS abre la BD del Hub (su login cae con `relation "django_site" does not exist`).
 - **Una pila por checkout**: dos Vite del mismo checkout comparten `node_modules/.vite` y se rompen el uno al
   otro al optimizar dependencias (la página se queda en blanco). Cada pila sale de su worktree.
 
@@ -107,20 +118,24 @@ Receta (pila en `8030`, desde la raíz de `erplora-next`; otra pila: otros puert
 
 ```bash
 export COMPOSE_FILE="$PWD/compose.yaml"
-# 1. SaaS propio en 8031, desde un worktree del SaaS, con su carpeta de correo
-(cd <saas-wt> && VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
+# 1. SaaS propio en 8031, desde un worktree del SaaS, sobre su BD saas_e2e_8031 y con su carpeta de correo
+cd <saas-wt>
+env -u DB_NAME E2E_SAAS_PORT=8031 node tests/e2e/database.ts        # crea y migra saas_e2e_8031
+env DB_NAME=saas_e2e_8031 uv run python manage.py demo_seed         # las cuentas de demo con las que entran las specs
+env DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' HUB_INTERNAL_URL=http://localhost:8030 \
   EMAIL_FILE_PATH="$PWD/.mail-8031" \
-  uv run python manage.py runserver 127.0.0.1:8031)    # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
-# 2. La pila del Hub, desde su worktree
+  uv run python manage.py runserver 127.0.0.1:8031   # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
+# 2. La pila del Hub, desde su worktree (en otra terminal)
 cd <hub-wt>
 export E2E_HUB_PORT=8030 VITE_DEV_PORT=5203 SAAS_URL=http://localhost:8031 DB_NAME=hub_e2e_8030 \
   E2E_MAIL_DIR=<saas-wt>/.mail-8031
 node tests/e2e/database.ts                           # crea y migra hub_e2e_8030
 uv run python manage.py runserver 127.0.0.1:8030     # con las mismas variables
 CI=1 pnpm e2e
-# 3. Al terminar: parar ese runserver y su SaaS, y borrar la BD
+# 3. Al terminar: parar ese runserver y su SaaS, y borrar las dos BD
 node tests/e2e/database.ts --drop
+(cd <saas-wt> && env -u DB_NAME E2E_SAAS_PORT=8031 node tests/e2e/database.ts --drop)
 ```
 
 ## La demo (`demo.spec.ts`)
@@ -153,11 +168,11 @@ escribe una clave real. Pide tres cosas al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
   `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`
-  (y `demo_seed`, como el resto de specs con las cuentas de demo). La spec lo comprueba al arrancar y, si falta, cae
-  con «not seeded with this provider».
+  (además del `demo_seed` de la receta de arriba, como el resto de specs). La spec lo comprueba al arrancar y, si falta,
+  cae con «not seeded with this provider».
 - **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS: sin ella el dictado responde 503.
-- **`E2E_SAAS_DB`**, si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`): la spec fija en ella los
-  mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
+- **`E2E_SAAS_DB`** (la de la tabla de arriba), si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`):
+  la spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
 
 ```bash
 # El SaaS de la pila (8871), desde su worktree:
