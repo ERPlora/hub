@@ -6,7 +6,8 @@
 // Priority (100). A row's Edit opens «Editing rule — {name}» and «Save» sends only what changed: a new
 // type with its value, a new scope with its target (the server empties the old ones). Refusals stay in
 // the dialog, under their field. The amount, and the catalog prices beside the products and services, are in
-// the business's currency (its country's; a bare figure until it answers).
+// the business's currency (its country's; a bare figure until it answers, and then an untouched amount takes its
+// decimals).
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -137,6 +138,16 @@ watch(
   },
   { immediate: true },
 );
+
+// The business answers (or its currency changes) with the form open: an amount per unit the person has not touched
+// is rewritten from the rule with the currency's decimals («1.50» → «150» in yen); what they typed stays as typed,
+// read in the new currency when they save (the field says so when it cannot be).
+watch(money, (now, before) => {
+  if (!open.value) return;
+  const amount = props.rule?.amount ?? null;
+  if (form.value.amount !== moneyFieldText(amount, locale.value, before)) return;
+  form.value = { ...form.value, amount: moneyFieldText(amount, locale.value, now) };
+});
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
