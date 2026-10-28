@@ -371,7 +371,6 @@ describe('InvoicesPage: the states of the screen', () => {
       await answerIssuer(s, false, { locale: 'es', actionable: false });
       expect(said(s.wrapper.text(), 'Todavía no puedes facturar')).toBe(1);
       expect(redNotices(s)).toBe(1);
-    expect(redNotices(s)).toBe(1);
       expect(said(s.wrapper.text(), 'Esto lo tiene que configurar un administrador.')).toBe(1);
       expect(s.wrapper.findAll('ion-button').filter((b) => b.text() === 'Configurar')).toHaveLength(0);
     }
