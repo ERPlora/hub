@@ -3,7 +3,8 @@
 // map, the shell's i18n with the invoice catalogues merged in, a session and a memory router.
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
 // from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
-import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
+// `platformNotice` paints a page as the hub does: base's blocking strip over it (`chrome.notice`, frontend/main.ts).
+import { createShellI18n, provideSession, type SessionMe, SHELL_CONFIG_KEY } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
 import { mount } from '@vue/test-utils';
@@ -16,7 +17,10 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-import type { Business } from '../../../../base/frontend/operations';
+import BlockingStrip from '../../../../base/frontend/components/BlockingStrip.vue';
+import baseEn from '../../../../base/frontend/locale/en.json';
+import baseEs from '../../../../base/frontend/locale/es.json';
+import type { Business, SetupStatus } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
@@ -88,6 +92,8 @@ export interface MountOptions {
   locale?: 'en' | 'es';
   session?: SessionMe;
   stubs?: Record<string, Component | boolean>;
+  /** The page behind a session with the hub's chrome: base's blocking strip over it, in base's words too. */
+  platformNotice?: boolean;
 }
 
 type Params = Record<string, unknown>;
@@ -104,18 +110,20 @@ export async function mountInvoice(component: Component, options: MountOptions =
   const harness = createTestClient({ routes: OPERATION_ROUTES });
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/:path(.*)*', component: { template: '<div />' } }],
+    routes: [{ path: '/:path(.*)*', component: { template: '<div />' }, meta: options.platformNotice ? { auth: true } : {} }],
   });
   await router.push(options.path ?? '/invoice/invoices');
   await router.isReady();
   // The session is provided app-wide, as createShell does.
   const app = createApp({});
   provideSession(ref(options.session ?? OWNER), ref('live'), { app });
+  const messages = options.platformNotice ? { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } : { en, es };
+  const chrome = options.platformNotice ? { [SHELL_CONFIG_KEY as symbol]: { homePath: '/', chrome: { notice: BlockingStrip } } } : {};
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
-      provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
+      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages })],
+      provide: { ...app._context.provides, ...chrome, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },
   });
@@ -174,6 +182,54 @@ export async function mountInvoice(component: Component, options: MountOptions =
   };
 
   return { ...harness, router, wrapper, live, params, subId, result, reopen, sent, answer, find, inDoc };
+}
+
+export type MountedInvoice = Awaited<ReturnType<typeof mountInvoice>>;
+
+/** Invoicing's ⛔ «Your business details» as `base.setup.status` tells it (apps.py `setup`; gh:hub#435: also to whoever
+ *  may not set it up, with `actionable: false`), in the person's language. */
+export function issuerStatus(fields: { configured: boolean; actionable: boolean; locale?: 'en' | 'es' }): SetupStatus {
+  const pending = fields.configured ? 0 : 1;
+  return {
+    total: 1,
+    pending,
+    unavailable: 0,
+    blocking_pending: pending,
+    items: [
+      {
+        key: 'invoice.business_identity',
+        app: 'invoice',
+        state: fields.configured ? 'done' : 'pending',
+        level: 'legal',
+        required: true,
+        actionable: fields.actionable,
+        title: fields.locale === 'es' ? 'Los datos de tu negocio' : 'Your business details',
+        description: '',
+        icon: 'ion:storefront-outline',
+        route: '/invoice/issuer',
+        order: 40,
+      },
+    ],
+  };
+}
+
+/** What the hub answers every live question of a screen about its issuer (the platform's strip and, if the screen
+ *  asks, `invoice.issuer.get`): set up or missing, for the person mounted (`actionable` by `invoice.manage_issuer`). */
+export async function answerIssuer(m: MountedInvoice, configured: boolean, options: { locale?: 'en' | 'es'; actionable?: boolean; rev?: number } = {}) {
+  const status = issuerStatus({ configured, actionable: options.actionable ?? true, locale: options.locale });
+  const asked = (op: OpName) => m.client.stream.subscriptions(op).length > 0;
+  if (asked('base.setup.status')) await m.result('base.setup.status', status, {}, options.rev);
+  if (asked('invoice.issuer.get')) await m.result('invoice.issuer.get', { configured }, {}, options.rev);
+}
+
+/** The red notices on the screen, whatever their words: base's strip and any danger notice of the page's own. */
+export function redNotices(m: MountedInvoice): number {
+  return m.wrapper.findAll('[data-testid="blocking-strip"], [data-tone="danger"]').length;
+}
+
+/** How many times `needle` is said in `text`. */
+export function said(text: string, needle: string): number {
+  return text.split(needle).length - 1;
 }
 
 /** Mounts `use` (a composable call) inside a component of the invoice app's harness. */

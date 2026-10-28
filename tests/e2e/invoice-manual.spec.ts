@@ -1,6 +1,6 @@
 // Invoicing in Chrome, by hand (apps/invoice/WORKBOOK.md), against the real Sales, Customers and Taxes:
-//   - INVOICE-F21: without the issuer, Invoices says nothing can be invoiced; «Set up» opens the issuer page,
-//     the owner saves it and the notice goes;
+//   - INVOICE-F21: without the issuer, Invoices says once that nothing can be invoiced (base's red strip, no notice of
+//     Invoicing's own under it); its «Set up» opens the issuer page, the owner saves it and the strip goes;
 //   - INVOICE-F16: the manual invoice found in Invoices by its customer;
 //   - INVOICE-F03, F19, F08: a manual invoice from «New invoice» (the server's VAT and number), marked as
 //     paid, then rectified (R1, its reason): the original is cancelled and links its rectifying one;
@@ -55,18 +55,20 @@ async function issuedFor(page: Page, search: string): Promise<InvoiceOut> {
   return invoiceOf(page.context(), res.data.rows[0].id);
 }
 
-test('INVOICE-F21: without the issuer Invoices says so; «Set up» opens it, the owner saves it and the notice goes', async ({ page, context }) => {
+test('INVOICE-F21: without the issuer Invoices says so once; «Set up» opens it, the owner saves it and the strip goes', async ({ page, context }) => {
   // No issuer: a configured one loses its address (the hub's own comes back after).
   if (original.configured) psql("update invoice_issuer set address = ''");
   try {
     await login(page, A, '/invoice/invoices');
-    const notice = shown(page).locator('[data-testid=invoice-issuer-notice]');
-    await expect(notice).toContainText('You cannot invoice yet');
-    await expect(notice).toContainText('No ticket or invoice can be issued until you set this up:');
+    const strip = shown(page).locator('[data-testid=blocking-strip]');
+    await expect(strip).toContainText('You cannot issue invoices yet');
+    await expect(strip).toContainText('No ticket or invoice can be issued until this is set up:');
+    // The one notice: Invoicing does not say it again under the strip.
+    await expect(shown(page).locator('[data-testid=invoice-issuer-notice]')).toHaveCount(0);
     await flowShots(page, 'INVOICE-F21-notice', async (p) => {
-      await expect(shown(p).locator('[data-testid=invoice-issuer-notice]')).toBeVisible();
+      await expect(shown(p).locator('[data-testid=blocking-strip]')).toBeVisible();
     });
-    await notice.locator('[data-testid=invoice-issuer-notice-setup]').click();
+    await strip.locator('[data-testid="blocking-configure-invoice.business_identity"]').click();
     await page.waitForURL(/\/invoice\/issuer$/);
     const form = shown(page);
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toBeVisible();
@@ -79,10 +81,10 @@ test('INVOICE-F21: without the issuer Invoices says so; «Set up» opens it, the
     await flowShots(page, 'INVOICE-F21', async (p) => {
       await expect(shown(p).locator('[data-testid=invoice-issuer-legal-name] input')).toHaveValue(ISSUER['legal-name']);
     });
-    // Back in Invoices, the notice is gone.
+    // Back in Invoices, the strip is gone.
     await page.goto(`${A}/invoice/invoices`);
     await expect(shown(page).locator('[data-testid=invoice-list-row], [data-testid=invoice-list-empty]').first()).toBeVisible();
-    await expect(shown(page).locator('[data-testid=invoice-issuer-notice]')).toHaveCount(0);
+    await expect(shown(page).locator('[data-testid=blocking-strip]')).toHaveCount(0);
   } finally {
     // The hub's own issuer back; with none before, the run's stays for the next tests and goes at the end.
     await restoreIssuer(context, original);

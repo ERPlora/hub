@@ -5,17 +5,24 @@
 // negocio»; its «Configurar» leads to Invoicing → Issuer and, once the legal name, tax ID and address are saved there,
 // the step is done without a reload. «Tu numeración de facturas» is «Recomendado» and pending while the business has no
 // series, and done without a reload once it has one; an employee is told about the ⛔ without «Configurar» (and the red
-// strip of the other screens and Invoicing's own notice say who has to set it up, gh:hub#2567) and never about the
-// numbering. Captures
-// `FIX-INVOICE-SETUP-HOOKS-INVOICE-F21-<width>` (the ⛔) and `…-INVOICE-F14-<width>` (the numbering).
+// strip of the other screens says who has to set it up, gh:hub#2567) and never about the numbering. On Invoices and
+// Series the red strip is the one notice: Invoicing does not say it again under it, and it goes, without a reload,
+// once the issuer is saved (FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES). Captures
+// `FIX-INVOICE-SETUP-HOOKS-INVOICE-F21-<width>` (the ⛔), `…-INVOICE-F14-<width>` (the numbering) and
+// `FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES-[series-]<width>` (Invoices and Series with no issuer).
 // The hub's issuer row is parked for the run and put back as it was after it (other specs need it); the run's own
 // series are `E2E…`, which the cleanup removes.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, type Credentials, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { stamp, VIEWPORTS } from './inventory-helpers';
+import { ensureIssuer } from './invoice-helpers';
 
 const KEY = 'FIX-INVOICE-SETUP-HOOKS';
+/** The task that left the red strip as the one notice of Invoices and Series. */
+const ONE_NOTICE = 'FIX-HUB-INVOICE-TWO-NEAR-IDENTICAL-BUSINESS-DATA-NOTICES';
+/** Base's strip title, the words both notices said. */
+const CANNOT_INVOICE = 'Todavía no puedes facturar';
 const IDENTITY = 'invoice.business_identity';
 const NUMBERING = 'invoice.numbering';
 /** The hub's issuer, parked while the run needs a hub without one. */
@@ -208,19 +215,12 @@ test('INVOICE-F21 and INVOICE-F14: an employee is told about the ⛔ without «C
     await expect(strip).toContainText('Los datos de tu negocio');
     await expect(strip).toContainText('Esto lo tiene que configurar un administrador.');
     await expect(strip.locator(`[data-testid="blocking-configure-${IDENTITY}"]`)).toHaveCount(0);
-    // Invoicing's own notice says the same: no «Configurar» to an Issuer page they can only read.
-    const notice = shown(page).locator('[data-testid="invoice-issuer-notice"]');
-    await expect(notice.locator('[data-testid="invoice-issuer-notice-delegated"]')).toHaveText('Esto lo tiene que configurar un administrador.');
-    await expect(notice.locator('[data-testid="invoice-issuer-notice-setup"]')).toHaveCount(0);
-    // On a phone the note goes on its own line under the step, as the strip above says it: never a narrow column
-    // beside the step's name, broken into three lines.
-    const step = await notice.locator('[data-testid="invoice-issuer-notice-item"]').boundingBox();
-    const note = notice.locator('[data-testid="invoice-issuer-notice-delegated"]');
-    const noteBox = await note.boundingBox();
-    if (!step || !noteBox) throw new Error('the notice paints the step and its note');
-    expect(noteBox.y, 'the note starts under the step').toBeGreaterThanOrEqual(step.y + step.height - 1);
-    expect(Math.abs(noteBox.x - step.x), 'the step and its note start at the same edge').toBeLessThanOrEqual(1);
-    expect(await lines(note), 'the note in at most two lines').toBeLessThanOrEqual(2);
+    // The one notice: Invoicing does not say it again under the strip, so who has to set it up is said once.
+    await expect(shown(page).locator('[data-testid="invoice-issuer-notice"]')).toHaveCount(0);
+    await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(1);
+    await expect(shown(page).getByText('Esto lo tiene que configurar un administrador.', { exact: true })).toHaveCount(1);
+    // On a phone the note reads whole, never a narrow column broken into three lines.
+    expect(await lines(strip.locator('.blocking-strip-note')), 'the note in at most two lines').toBeLessThanOrEqual(2);
     await untilStill(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, 'no sideways scroll at 390').toBeLessThanOrEqual(0);
@@ -249,6 +249,44 @@ for (const size of VIEWPORTS) {
       await page.screenshot({ path: shot(`${KEY}-INVOICE-F14-${size.label}`) });
     } finally {
       await context.close();
+    }
+  });
+}
+
+// flow: INVOICE-F21
+for (const size of VIEWPORTS) {
+  test(`INVOICE-F21 at ${size.label}: Invoices and Series say once that nothing can be invoiced, and nothing once the issuer is saved`, async ({ browser }) => {
+    const { context, page } = await spanish(browser, { width: size.width, height: size.height });
+    try {
+      for (const [screen, name] of [['invoices', ONE_NOTICE], ['series', `${ONE_NOTICE}-series`]] as const) {
+        await page.goto(`${A}/invoice/${screen}`);
+        const strip = shown(page).locator('[data-testid="blocking-strip"]');
+        await expect(strip).toBeVisible();
+        await expect(strip).toContainText('Los datos de tu negocio');
+        await expect(strip.locator(`[data-testid="blocking-configure-${IDENTITY}"]`)).toHaveText('Configurar');
+        // One red notice on the screen, whatever its words: the strip, and none of Invoicing's own under it.
+        await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(1);
+        await expect(shown(page).locator('[data-testid="blocking-strip"], .inline-feedback[data-tone="danger"]')).toHaveCount(1);
+        await expect(shown(page).locator('[data-testid="invoice-issuer-notice"]')).toHaveCount(0);
+        await untilStill(page);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
+        await page.screenshot({ path: shot(`${name}-${size.label}`) });
+      }
+
+      // Saved anywhere (another device, here the API), the strip leaves Series without a reload, and Invoices with it.
+      await markNoReload(page);
+      await ensureIssuer(context);
+      await expect(shown(page).locator('[data-testid="blocking-strip"]')).toHaveCount(0);
+      await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(0);
+      await expectNoReload(page);
+      await page.goto(`${A}/invoice/invoices`);
+      await expect(shown(page).locator('[data-testid=invoice-list-row], [data-testid=invoice-list-empty]').first()).toBeVisible();
+      await expect(shown(page).getByText(CANNOT_INVOICE, { exact: true })).toHaveCount(0);
+      await expect(shown(page).locator('[data-testid="blocking-strip"], .inline-feedback[data-tone="danger"]')).toHaveCount(0);
+    } finally {
+      await context.close();
+      noIssuer();
     }
   });
 }
