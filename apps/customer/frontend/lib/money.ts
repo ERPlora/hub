@@ -96,7 +96,7 @@ function wholeUnits(integer: string, group: string | null): number | null {
  */
 export function readAmount(value: string | number | null | undefined, money?: Money): AmountReading {
   if (value === null || value === undefined) return { kind: 'blank' };
-  const text = withoutMark(String(value).replace(/[\s  ]/g, ''), money);
+  const text = withoutMark(String(value).replace(/[\s\u00a0\u202f]/g, ''), money);
   if (!text) return { kind: 'blank' };
   if (!/^\d[\d.,]*$/.test(text)) return { kind: 'invalid' };
   const decimals = money?.decimals ?? UNKNOWN_DECIMALS;

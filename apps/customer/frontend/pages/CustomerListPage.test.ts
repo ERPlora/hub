@@ -470,12 +470,17 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     expect(spent(yen)).toEqual(['¥4,550', '¥4,550']);
   });
 
-  it('an amount typed before the business answers is read again in its currency when it does', async () => {
+  it('an amount typed before the business answers is read again in its currency when it does, from the first page', async () => {
     const s = await setup();
-    await s.show(PAGE);
+    await s.show({ ...PAGE, total: 200 });
     await s.filter({ spent_from: '1250' });
     expect(s.params(LIST)).toEqual([{ spent_min: 125000, sort: 'name', descending: false, limit: 50, offset: 0 }]);
-    await s.result(s.call, BUSINESS, business(JAPANESE));
+    await s.showOnNewStream({ ...PAGE, total: 200 });
+    s.table().vm.$emit('pageChange', 2);
+    await flush();
+    expect(s.params(LIST)).toEqual([{ spent_min: 125000, sort: 'name', descending: false, limit: 50, offset: 100 }]);
+    await s.clock.advance(150);
+    await s.result(s.net.lastStream(), BUSINESS, business(JAPANESE));
     await s.showOnNewStream(PAGE);
     expect(s.params(LIST)).toEqual([{ spent_min: 1250, sort: 'name', descending: false, limit: 50, offset: 0 }]);
   });
