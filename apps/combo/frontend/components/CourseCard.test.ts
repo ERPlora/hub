@@ -3,11 +3,12 @@
 // up», «Move down», «Edit details» and «Withdraw» (the page acts on them). Inside, «Choices»: a row per
 // product with its supplement and why it is not offered, and per row the handle, up, down, «Sold out» /
 // «Available», edit and remove (after its confirmation); below, the product picker, «Supplement», «Add
-// choice» and «Add several». A refusal is said inside the course.
+// choice» and «Add several». A refusal is said inside the course. Every amount is the business's currency: the
+// supplement on the row, the field («Supplement (PLN)») and the price in the picker; a bare figure until it answers.
 import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, ionValue, type MountOptions, mountCombo, settle } from '../__tests__/mount-combo';
+import { business, click, EMPLOYEE, ionValue, JAPANESE, type MountOptions, mountCombo, page, POLISH, settle } from '../__tests__/mount-combo';
 import type { GroupOut, OptionOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
 import CourseCard from './CourseCard.vue';
@@ -48,10 +49,18 @@ const COURSE: GroupOut = {
 
 async function setup(course: GroupOut = COURSE, options: MountOptions = {}) {
   const m = await mountCombo(CourseCard, { props: { course, index: 0, count: 2 }, ...options });
-  const el = (testid: string) => m.inDoc(testid) as HTMLElement & { disabled?: boolean; errorText?: string; value?: unknown };
+  await m.live();
+  const el = (testid: string) => m.inDoc(testid) as HTMLElement & { disabled?: boolean; errorText?: string; label?: string; value?: unknown };
   const picker = () => m.wrapper.findComponent(Combo);
   const posts = () => m.sent().filter((call) => call.method === 'POST');
-  return { ...m, el, picker, posts };
+  /** What a choice's row reads (the label; the row's own buttons come after it). */
+  const label = (id: string) =>
+    el(`combo-choice-${id}`)
+      .querySelector('.combo-course__choice')
+      ?.innerHTML.replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;|\s+/g, ' ')
+      .trim();
+  return { ...m, el, picker, posts, label };
 }
 
 describe('CourseCard: the course', () => {
@@ -78,10 +87,8 @@ describe('CourseCard: the course', () => {
 describe('CourseCard: its choices', () => {
   it('a row per product, with its supplement and why it is not offered', async () => {
     const s = await setup();
-    // What the row reads (the label; the row's own buttons come after it).
-    const label = (id: string) => s.el(`combo-choice-${id}`).querySelector('.combo-course__choice')?.innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    expect(label('o1')).toBe('Hake +€2.00');
-    expect(label('o2')).toContain('Chicken');
+    expect(s.label('o1')).toBe('Hake +€2.00');
+    expect(s.label('o2')).toContain('Chicken');
     expect(s.el('combo-choice-o2-status').textContent?.trim()).toBe('Sold out');
     expect(s.el('combo-choice-o3-status').textContent?.trim()).toBe('Deactivated in Inventory');
     expect(s.inDoc('combo-choice-o1-status')).toBeNull();
@@ -212,5 +219,69 @@ describe('CourseCard: adding and editing a choice', () => {
     expect(s.el('combo-course-g1-save').textContent).toContain('Añadir elección');
     const sold = await setup({ ...COURSE, options: [option({ id: 'o4', product_id: 'p4', product_name: 'Flan', status: 'product_sold_out' })] }, { locale: 'es' });
     expect(sold.el('combo-choice-o4-status').textContent?.trim()).toBe('Agotado en Inventario');
+  });
+});
+
+describe('CourseCard: in the business’s currency', () => {
+  const HAKE = { id: 'p1', name: 'Hake', sku: 'HAK', price: 1400, unit: 'ud', pricing_unit: 'ud', price_quantity: '1' };
+
+  it('in Poland the supplement is in złoty: on the row, in the field «Supplement (PLN)», in the picker and when saved', async () => {
+    const s = await setup(COURSE, { business: business(POLISH), locale: 'es' });
+    expect(s.label('o1')).toBe('Hake +2,00 zł');
+    expect(s.el('combo-course-g1-delta').label).toBe('Suplemento (PLN)');
+    s.answerBy({ '/api/inventory/products': [200, page([HAKE])] });
+    const options = await (s.picker().props('search') as (query: string) => Promise<Array<{ hint?: string }>>)('');
+    expect(options.map((o) => o.hint?.replace(/[\u00a0\u202f]/g, ' '))).toEqual(['HAK · 14,00 zł']);
+    s.answer(201, option({ id: 'o9' }));
+    s.picker().vm.$emit('update:modelValue', { id: 'p9', label: 'Sole' });
+    await ionValue(s.el('combo-course-g1-delta'), '1,50 zł', 'ionInput');
+    await click(s.el('combo-course-g1-save'));
+    expect(s.posts().at(-1)?.body).toEqual({ group_id: 'g1', product_id: 'p9', price_delta: 150 });
+  });
+
+  it('a euro amount is never read as złoty: the field says it is not an amount and nothing is sent', async () => {
+    const s = await setup(COURSE, { business: business(POLISH) });
+    s.picker().vm.$emit('update:modelValue', { id: 'p9', label: 'Sole' });
+    await ionValue(s.el('combo-course-g1-delta'), '1,50 €', 'ionInput');
+    await click(s.el('combo-course-g1-save'));
+    expect(s.el('combo-course-g1-delta').errorText).toBe('This is not an amount. Type a figure, for example 12.50.');
+    expect(s.posts()).toEqual([]);
+  });
+
+  it('in yen a supplement has no decimals: editing shows «200» and «250» is saved as 250', async () => {
+    const s = await setup(COURSE, { business: business(JAPANESE) });
+    expect(s.label('o1')).toBe('Hake +¥200');
+    await click(s.el('combo-choice-o1-edit'));
+    expect(s.el('combo-course-g1-delta').value).toBe('200');
+    s.answer(200, option({}));
+    await ionValue(s.el('combo-course-g1-delta'), '250', 'ionInput');
+    await click(s.el('combo-course-g1-save'));
+    expect(s.posts()).toEqual([{ method: 'POST', path: '/api/combo/options/update', query: {}, body: { id: 'o1', price_delta: 250 } }]);
+  });
+
+  it('until the business answers, a bare figure and «Supplement»; an edit opened then follows the currency when it arrives', async () => {
+    const s = await setup(COURSE, { business: null });
+    expect(s.label('o1')).toBe('Hake +2.00');
+    expect(s.el('combo-course-g1-delta').label).toBe('Supplement');
+    await click(s.el('combo-choice-o1-edit'));
+    expect(s.el('combo-course-g1-delta').value).toBe('2.00');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.label('o1')).toBe('Hake +¥200');
+    expect(s.el('combo-course-g1-delta').label).toBe('Supplement (JPY)');
+    // Untouched, the field is rewritten from the choice with the yen's decimals: saving changes nothing.
+    expect(s.el('combo-course-g1-delta').value).toBe('200');
+    await click(s.el('combo-course-g1-save'));
+    expect(s.posts()).toEqual([]);
+  });
+
+  it('what the person typed before the business answers stays as typed, and is read in its currency', async () => {
+    const s = await setup(COURSE, { business: null });
+    await click(s.el('combo-choice-o1-edit'));
+    await ionValue(s.el('combo-course-g1-delta'), '350', 'ionInput');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.el('combo-course-g1-delta').value).toBe('350');
+    s.answer(200, option({}));
+    await click(s.el('combo-course-g1-save'));
+    expect(s.posts()).toEqual([{ method: 'POST', path: '/api/combo/options/update', query: {}, body: { id: 'o1', price_delta: 350 } }]);
   });
 });

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Menus (WORKBOOK «Pantallas · Menús»; COMBO-F01 to F04): the live `combo.combo.list` in a server-side
-// DataTable — Name, Closed price, How it is sold, On sale, Order —, «Search a menu…», filters by name,
+// DataTable — Name, Closed price (in the business's currency), How it is sold, On sale, Order —, «Search a menu…», filters by name,
 // how it is sold and on sale, by order then name, 50 a page, table or cards. With the right to manage,
 // «+» opens «New menu» and each row «Edit details» and «Withdraw» (after its confirmation); the new or
 // changed row arrives through the stream. Tapping a row opens the menu's builder.
@@ -22,13 +22,15 @@ import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import type { ComboListIn, ComboOut, SupplyKind } from '../operations';
 
 const session = useSession();
 const router = useRouter();
 const t = useT();
 const locale = useLocale();
+/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+const money = useBusinessMoney();
 const canManage = computed(() => session.can('combo.manage'));
 
 const table = useServerTable({ sort: 'sort_order' });
@@ -57,7 +59,7 @@ const yesNo = computed(() => [
 
 const columns = computed<DataTableColumn<ComboOut>[]>(() => [
   { key: 'name', label: t('combo.menus.columns.name'), sortable: true, priority: 'high', filter: { type: 'text' } },
-  { key: 'price', label: t('combo.menus.columns.price'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.price, locale.value) },
+  { key: 'price', label: t('combo.menus.columns.price'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.price, locale.value, money.value) },
   {
     key: 'supply_kind',
     label: t('combo.menus.columns.supply'),

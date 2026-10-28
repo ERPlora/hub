@@ -5,15 +5,17 @@
 // row per product with its supplement and why it is not offered (sold out here, or deactivated or
 // deleted in Inventory); per row the handle, up and down (the whole order saved at once), «Sold out» /
 // «Available», edit (keeps its place) and remove (after its confirmation). Below, the product picker,
-// «Supplement» (it may be negative), «Add choice» and «Add several». A refusal is said in the course.
+// «Supplement (PLN)» (it may be negative), «Add choice» and «Add several». A refusal is said in the course. Every
+// amount is in the business's currency, its country's, with its decimals; a bare figure (and just «Supplement»)
+// until the business answers, never a euro.
 import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonReorder, IonReorderGroup } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatDelta } from '../lib/format';
+import { formatDelta, useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchProducts } from '../lib/pickers';
 import { courseRule } from '../lib/rules';
@@ -37,7 +39,8 @@ const canManage = computed(() => session.can('combo.manage'));
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
-const searchArticles = computed(() => searchProducts(client, locale.value));
+const money = useBusinessMoney();
+const searchArticles = computed(() => searchProducts(client, locale.value, money.value));
 
 const create = useCommand('combo.option.create');
 const update = useCommand('combo.option.update');
@@ -132,8 +135,18 @@ function startEdit(choice: OptionOut): void {
   resetForm();
   editing.value = choice;
   article.value = { id: choice.product_id, label: choice.product_name };
-  delta.value = choice.price_delta ? moneyFieldText(choice.price_delta, locale.value) : '';
+  delta.value = choice.price_delta ? moneyFieldText(choice.price_delta, locale.value, money.value) : '';
 }
+
+// The business answers (or its currency changes) while a choice is being edited: a supplement the person has not
+// touched is rewritten from the choice with the currency's decimals («2.00» → «200» in yen); what they typed stays
+// as typed, read in the new currency when they save (the field says so when it cannot be).
+watch(money, (now, before) => {
+  const choice = editing.value;
+  if (!choice?.price_delta) return;
+  if (delta.value !== moneyFieldText(choice.price_delta, locale.value, before)) return;
+  delta.value = moneyFieldText(choice.price_delta, locale.value, now);
+});
 
 /** The refusal of the last save: of the form when it was one, of anything else in the course otherwise. */
 const formError = computed<ApiError | null>(() => (editing.value ? update.error.value : create.error.value));
@@ -157,7 +170,7 @@ async function save(): Promise<void> {
     reason.value = t('combo.choices.duplicate');
     return;
   }
-  const read = parseMoney(delta.value, { signed: true });
+  const read = parseMoney(delta.value, { signed: true, money: money.value });
   if (!read.ok) return;
   const price = read.cents ?? 0;
   try {
@@ -281,7 +294,7 @@ async function save(): Promise<void> {
             <span
               v-if="choice.price_delta"
               class="combo-course__delta"
-            >{{ formatDelta(choice.price_delta, locale) }}</span>
+            >{{ formatDelta(choice.price_delta, locale, money) }}</span>
             <StatusPill
               v-if="choice.status !== 'offered'"
               size="sm"
@@ -380,7 +393,7 @@ async function save(): Promise<void> {
           v-model="delta"
           signed
           :testid="`${prefix}-delta`"
-          :label="t('combo.choices.delta')"
+          :label="money ? t('combo.choices.deltaIn', { currency: money.currency }) : t('combo.choices.delta')"
           :error-text="fields.price_delta"
           :show-error="tried"
         />

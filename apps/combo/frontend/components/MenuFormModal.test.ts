@@ -2,12 +2,14 @@
 // menu» asks for Name, Kitchen name, Closed price, «How is it sold?» (both consequences always shown,
 // the chosen one stressed), the VAT category (only eaten in, searched in Taxes), the order and «On
 // sale» (ticked). A menu eaten in without a VAT category is refused before it is sent. Editing sends
-// only what changed. Refusals stay in the dialog, under their field.
+// only what changed. Refusals stay in the dialog, under their field. The closed price is in the business's currency
+// («Closed price (PLN)», with its decimals); just «Closed price» while the business has not answered.
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { Business } from '../../../../base/frontend/operations';
 import type { ComboOut } from '../operations';
-import { click, ionChecked, ionValue, mountCombo, settle } from '../__tests__/mount-combo';
+import { business, click, ionChecked, ionValue, JAPANESE, mountCombo, POLISH, settle } from '../__tests__/mount-combo';
 import MenuFormModal from './MenuFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -32,8 +34,11 @@ const MENU: ComboOut = {
   updated_at: '2026-10-15T10:00:00Z',
 };
 
-async function setup(combo: ComboOut | null = null, locale: 'en' | 'es' = 'en') {
-  const m = await mountCombo(MenuFormModal, { props: { open: false, combo }, locale });
+/** `answer`: what the business answers when the stream opens (`null`: it opens and the business does not answer
+ *  yet); without it, the stream never opens. */
+async function setup(combo: ComboOut | null = null, locale: 'en' | 'es' = 'en', answer?: Business | null) {
+  const m = await mountCombo(MenuFormModal, { props: { open: false, combo }, locale, business: answer });
+  if (answer !== undefined) await m.live();
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -146,5 +151,61 @@ describe('MenuFormModal: editing', () => {
     expect(s.inDoc('combo-menu-form')?.getAttribute('aria-label')).toBe('Menú · Menu of the day');
     expect([s.field('price').label, s.field('supply_kind').label]).toEqual(['Precio cerrado', '¿Cómo se vende?']);
     expect(s.field('price').value).toBe('13,50');
+  });
+});
+
+describe('MenuFormModal: in the business’s currency', () => {
+  it('in Poland the closed price is in złoty: the field says PLN and «13,50 zł» is 1350 grosze', async () => {
+    const s = await setup(null, 'en', business(POLISH));
+    expect(s.field('price').label).toBe('Closed price (PLN)');
+    s.answer(201, { ...MENU, groups: [], sellable: false, blockers: [] });
+    await ionValue(s.field('name'), 'Menu of the day', 'ionInput');
+    await ionValue(s.field('price'), '13,50 zł', 'ionInput');
+    s.tax().vm.$emit('update:modelValue', { id: 'restaurant.food', label: 'Restaurant — food · 10%' });
+    await settle();
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1350]);
+  });
+
+  it('a euro amount is never read as złoty: the field says it is not an amount and nothing is sent', async () => {
+    const s = await setup(null, 'es', business(POLISH));
+    expect(s.field('price').label).toBe('Precio cerrado (PLN)');
+    await ionValue(s.field('name'), 'Menú', 'ionInput');
+    await ionValue(s.field('supply_kind'), 'goods');
+    await ionValue(s.field('price'), '13,50 €', 'ionInput');
+    await click(s.save());
+    expect(s.sent()).toEqual([]);
+    expect(s.field('price').errorText).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 12,50.');
+  });
+
+  it('in yen the price has no decimals: it opens as «1350» and «1400» is saved as 1400', async () => {
+    const s = await setup(MENU, 'en', business(JAPANESE));
+    expect(s.field('price').value).toBe('1350');
+    s.answer(200, { ...MENU, price: 1400, groups: [], sellable: true, blockers: [] });
+    await ionValue(s.field('price'), '1400', 'ionInput');
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', price: 1400 } }]);
+  });
+
+  it('opened before the business answers, an untouched price is rewritten with its currency’s decimals when it arrives', async () => {
+    const s = await setup(MENU, 'en', null);
+    expect([s.field('price').label, s.field('price').value]).toEqual(['Closed price', '13.50']);
+    await s.result('base.business.get', business(JAPANESE));
+    expect([s.field('price').label, s.field('price').value]).toEqual(['Closed price (JPY)', '1350']);
+    // Nothing changed: saving sends nothing about the price.
+    s.answer(200, { ...MENU, is_active: false, groups: [], sellable: true, blockers: [] });
+    await ionChecked(s.field('is_active'), false);
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', is_active: false } }]);
+  });
+
+  it('what the person typed before the business answers stays as typed, and is read in its currency', async () => {
+    const s = await setup(MENU, 'en', null);
+    await ionValue(s.field('price'), '1500', 'ionInput');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('price').value).toBe('1500');
+    s.answer(200, { ...MENU, price: 1500, groups: [], sellable: true, blockers: [] });
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', price: 1500 } }]);
   });
 });

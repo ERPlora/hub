@@ -16,6 +16,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -23,6 +24,46 @@ import es from '../locale/es.json';
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+
+/** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another
+ *  (the money a menu's price and a supplement are painted and typed in is the business's). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Bar Pepe',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/bar-pepe/settings',
+    ...fields,
+  };
+}
+
+/** A business in Poland: it sells in złoty. */
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
+/** A business in Japan: the yen has no minor units. */
+export const JAPANESE: Partial<Business> = {
+  country: 'JP',
+  country_name: 'Japan',
+  currency: 'JPY',
+  currency_label: 'JPY · Japanese Yen',
+  currency_decimals: 0,
+};
+
+/** A business in Hungary: the server counts the forint in two decimals, where the browser's Intl gives it none. */
+export const HUNGARIAN: Partial<Business> = {
+  country: 'HU',
+  country_name: 'Hungary',
+  currency: 'HUF',
+  currency_label: 'HUF · Hungarian Forint',
+  currency_decimals: 2,
+};
 
 /** Owner, admin or manager: `combo.*` (apps.py `role_permissions`); they read Inventory's products and
  *  Taxes' categories for the pickers. */
@@ -43,6 +84,8 @@ export const EMPLOYEE: SessionMe = {
 
 export interface MountOptions {
   props?: Record<string, unknown>;
+  /** What `base.business.get` answers when the stream opens; `null`: it never answers (the currency unknown). */
+  business?: Business | null;
   path?: string;
   locale?: 'en' | 'es';
   session?: SessionMe;
@@ -81,8 +124,13 @@ export async function mountCombo(component: Component, options: MountOptions = {
     },
   });
 
-  /** Opens the stream; returns the call to push frames into. */
-  const live = (): Promise<StreamCall> => harness.goLive();
+  /** Opens the stream and answers the business, if a piece follows it; returns the call to push frames into. */
+  async function live(): Promise<StreamCall> {
+    const call = await harness.goLive();
+    const answer = options.business === undefined ? business() : options.business;
+    if (answer && harness.client.stream.subscriptions('base.business.get').length) await result('base.business.get', answer);
+    return call;
+  }
 
   /** The params of every live subscription to `op`. */
   const params = (op: OpName): Params[] => harness.client.stream.subscriptions(op).map((s) => s.params as Params);
