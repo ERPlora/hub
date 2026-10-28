@@ -7,11 +7,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, json, type MountOptions, mountCustomer, refusal, sent, subId } from '../__tests__/mount-customer';
 import { pageOf } from '../__tests__/fixtures';
+import { namesGiven } from '../__tests__/searchbar-name';
 import MembershipEditor from './MembershipEditor.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastSuccess: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (await import('../__tests__/searchbar-name')).recordSearchbarName,
 }));
 beforeEach(() => vi.mocked(toastSuccess).mockClear());
 
@@ -447,5 +452,26 @@ describe('MembershipEditor', () => {
     expect(s.wrapper.get('h3').text()).toBe('Grupos');
     expect(s.save().text()).toBe('Guardar grupos');
     expect(s.boxes()[2][1]).toBe('Old (no activo)');
+  });
+
+  // flow: customer-searchbar — Ionic 8 names the field of an `ion-searchbar` «search text», in English, whatever its
+  // hint says, so a screen reader read «search text» on the card's group and tag search (more than 100 of them).
+  it('its search box, once there are more than 100 groups, is named by its hint in the person’s language, never «search text»', async () => {
+    const s = await setup({}, { locale: 'es' });
+    await s.result(s.call, 'customer.group.list', pageOf([group('g1', 'VIP'), ...OTHER_GROUPS(99)], 140));
+    const bar = s.wrapper.get('[data-testid="customer-groups-search"]').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar grupo…');
+    await s.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search group…');
+  });
+
+  it('the tags’ search box is named by its own hint', async () => {
+    const tag = (id: string, name: string) => ({ id, name, color: 'primary', is_active: true, customer_count: 0 });
+    const s = await setup({ kind: 'tags', selected: [] }, { locale: 'es' });
+    await s.result(s.call, 'customer.tag.list', pageOf(Array.from({ length: 100 }, (_, i) => tag(`t${i}`, `Tag ${i}`)), 101));
+    const bar = s.wrapper.get('[data-testid="customer-tags-search"]').element;
+    expect(namesGiven(bar).at(-1)).toBe('Buscar etiqueta…');
+    await s.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search tag…');
   });
 });
