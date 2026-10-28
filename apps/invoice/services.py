@@ -41,7 +41,6 @@ from apps.invoice.queries import (
     FULL,
     RECTIFYING,
     TICKET,
-    business_currency,
     VERIFACTU_BY_INVOICE,
     born_series_values,
     document_of_sale,
@@ -94,6 +93,7 @@ from apps.tax.queries import (
     round_half_up,
     tax_kind_of,
 )
+from base import operations as base_operations
 
 logger = logging.getLogger(__name__)
 
@@ -723,7 +723,7 @@ def create(ctx: OperationContext, data: InvoiceCreateIn) -> dict:
         issuer=_issuer_copy(issuer),
         operation_date=today,
         source_type=Invoice.Source.MANUAL,
-        currency=business_currency(ctx),
+        currency=base_operations.business_currency(ctx.scope),
         notes=data.notes,
         description=_operation_text(item.description for item in data.lines),
     )
