@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:05f3fac543f42bb4d0d86940019ceac4cd64b611b8bfcb6c6cfbbb9c418a884e -->
+<!-- generated from WORKBOOK.md sha256:8fc31ed84c89bdfcf4bac33464427d0def4d97bace8f2106b928250d84d06892 -->
 
 ## What it is for and who it is for
 
@@ -2003,13 +2003,16 @@ Out: an approval valid for that action, of that person, once and for two minutes
 **Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`. It is spent together with the
 action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
 within those two minutes, goes through with it; if it went through, it is not repeated; two at once with the same one,
-only one goes through. Whoever is not of the business gets the refusal of always, without the approval's question.
+only one goes through. What the approved action does on the way in other apps (the rectifying invoice of a void, the
+voucher sessions it gives back) goes with the approval, as when the manager does it themselves; nothing more: not what
+is only looked up, nor the next action. Whoever is not of the business gets the refusal of always, without the
+approval's question.
 If it fails: the dialog stays open with "Those details do not approve this. Check the name and the PIN, and try
 again.", "That person cannot approve this: ask somebody who may do it themselves.", "This no longer needs an
 approval: do it again.", "This is not approved with a PIN.", the wait after too many attempts or "Could not send
 the approval. Check the connection and try again.". With nobody with a PIN who may: "Nobody here can approve this
 with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the app back its refusal.
-Involved: BASE-F85, BASE-F55, BASE-F56
+Involved: BASE-F85, BASE-F55, BASE-F56, SALE-F30, SALE-F31
 
 ### BASE-F85 Look up who approved what
 Status: done
