@@ -130,3 +130,79 @@ describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 t
     expect(m.params('flow.recipe.list')).toEqual([{}]);
   });
 });
+
+// FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE: on a phone «New automation», icon and words, took the bar and left
+// the title as «A…». There it is its «+» alone, still named «New automation» (Material's top app bar, iOS's
+// navigation bars); from a tablet on, its icon and its words, as before.
+describe('AutomationsPage: «New automation» on a phone', () => {
+  /** A window whose phone query answers `phone`, and can be resized. */
+  function screenOf(phone: boolean) {
+    const listeners = new Set<(event: { matches: boolean }) => void>();
+    const query = {
+      matches: phone,
+      media: '(max-width: 767px)',
+      addEventListener: (_: string, listener: (event: { matches: boolean }) => void) => listeners.add(listener),
+      removeEventListener: (_: string, listener: (event: { matches: boolean }) => void) => listeners.delete(listener),
+    };
+    const spy = vi.spyOn(window, 'matchMedia').mockReturnValue(query as unknown as MediaQueryList);
+    return {
+      spy,
+      listeners,
+      resize(next: boolean) {
+        query.matches = next;
+        for (const listener of listeners) listener({ matches: next });
+      },
+    };
+  }
+
+  const words = (m: Awaited<ReturnType<typeof setup>>) => m.find('flow-new').text().trim();
+  const iconSlot = (m: Awaited<ReturnType<typeof setup>>) => m.find('flow-new').find('[data-testid=flow-new-icon]').attributes('slot');
+
+  it('on a phone it is its «+» alone, named «New automation», and still opens a new one', async () => {
+    const screen = screenOf(true);
+    try {
+      const m = await setup();
+      expect(words(m)).toBe('');
+      expect(iconSlot(m)).toBe('icon-only');
+      expect(m.find('flow-new').attributes('aria-label')).toBe('New automation');
+      expect(m.find('flow-new').attributes('title')).toBe('New automation');
+      await click(m.find('flow-new').element);
+      await settle();
+      expect(m.router.currentRoute.value.path).toBe('/flow/automations/new');
+    } finally {
+      screen.spy.mockRestore();
+    }
+  });
+
+  it('from a tablet on, its icon and its words; turning the device changes it, and leaving lets the window go', async () => {
+    const screen = screenOf(false);
+    try {
+      const m = await setup();
+      expect(words(m)).toBe('New automation');
+      expect(iconSlot(m)).toBe('start');
+      expect(m.find('flow-new').attributes('aria-label')).toBe('New automation');
+      expect(m.find('flow-new').attributes('title')).toBeUndefined();
+      screen.resize(true);
+      await settle();
+      expect(words(m)).toBe('');
+      expect(iconSlot(m)).toBe('icon-only');
+      m.wrapper.unmount();
+      expect(screen.listeners.size).toBe(0);
+    } finally {
+      screen.spy.mockRestore();
+    }
+  });
+
+  it('in Spanish its name is «Nueva automatización»', async () => {
+    const screen = screenOf(true);
+    try {
+      const m = await mountFlow(AutomationsPage, { locale: 'es', answers: { '/api/flow/catalog': [200, CATALOG] } });
+      await m.live();
+      await settle();
+      await m.result('flow.flow.list', page([], 0, 100), { limit: 100 });
+      expect(m.find('flow-new').attributes('aria-label')).toBe('Nueva automatización');
+    } finally {
+      screen.spy.mockRestore();
+    }
+  });
+});

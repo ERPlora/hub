@@ -95,7 +95,8 @@ Configuración inicial, paso a paso:
 ### Automatizaciones
 Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 
-- El botón **Nueva automatización**, arriba a la derecha.
+- El botón **Nueva automatización**, arriba a la derecha; en el móvil es solo su **+**, para que el título
+  se lea entero.
 - **Esperan tu respuesta** — solo si hay alguna pregunta que puedas contestar: cada tarjeta, de qué
   automatización viene, la pregunta y sus detalles, a quién se le hizo, qué pasa si nadie contesta y qué
   hace un no, **Añadir una nota (opcional)**, **Aprobar** y **No** (FLOW-F29). Un responsable o un empleado,
