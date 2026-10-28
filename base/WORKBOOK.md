@@ -527,8 +527,8 @@ Pasos:
      idioma de quien mira. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
      de la lista, sea del signo que sea; una cifra negativa, como un descuadre de caja en el que faltó dinero o
      un producto con existencias por debajo de cero, sale en rojo y con su signo (-0,40 €), y las demás
-     conservan el color del panel o, si su app da un color a cada fila, el de la suya (cada rol de Personal, en
-     el suyo). El rojo de una cifra negativa gana siempre al color de su fila.
+     conservan el color del panel o, si su app da un color a cada fila, el de la suya. El rojo de una cifra
+     negativa gana siempre al color de su fila.
   3. En un gráfico de días, cada barra lleva debajo su día de la semana (o su fecha, si abarca más de una
      semana) y encima salen el día y su importe: los de la última barra hasta que tocas otra. Un día por debajo
      de cero tiene su barra tan alta como su cifra, en rojo; los demás conservan su color.
