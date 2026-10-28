@@ -221,6 +221,12 @@ def _is_money(name: str, prop: dict) -> bool:
     return name.endswith("_cents") or "in cents" in str(prop.get("description", "")).lower()
 
 
+def _is_signed(prop: dict) -> bool:
+    """Whether the schema declares the datum signed (``json_schema_extra={"signed": True}``): an amount that says over
+    or short, as Cash register's difference, which the card writes with its sign («+» over)."""
+    return prop.get("signed") is True
+
+
 def _generated_title(name: str) -> str:
     """The title pydantic makes up for a field without one (``closing_balance`` → «Closing Balance»)."""
     return name.title().replace("_", " ").strip()
@@ -279,14 +285,15 @@ def _field(name: str, label: str, prop: dict, value: Any) -> dict:
         kind = "object"
     else:
         kind = "text"
-    return {"name": name, "label": label, "kind": kind, "value": value}
+    field = {"name": name, "label": label, "kind": kind, "value": value}
+    return {**field, "signed": True} if kind == "money" and _is_signed(prop) else field
 
 
 def card(op: Operation, arguments: dict, language: str) -> dict:
     """What the person sees before ``op`` runs with ``arguments``: its app, its action, each datum it sends by its name
-    in ``language`` (``_label``; an amount in cents marked ``money``), its risk and, for a dangerous one, what to type
-    (``confirm_word``) — how many records when it names them by ``ids``, and ``blocked`` when it names none (not from
-    the chat)."""
+    in ``language`` (``_label``; an amount in cents marked ``money``, and ``signed`` when its schema declares it so),
+    its risk and, for a dangerous one, what to type (``confirm_word``) — how many records when it names them by
+    ``ids``, and ``blocked`` when it names none (not from the chat)."""
     schema = _schema(op)
     defs = schema.get("$defs", {})
     props = schema.get("properties", {})
@@ -452,9 +459,10 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     """What the dangerous write ``op`` will do with ``arguments``, as its app says it: the read its ``ai=`` names
     (``"preview": {"operation": <a query of its app>, "fields": [<data of its answer>]}``), run as ``ctx``'s person
     — their permissions, their business — with the data of the write its input takes. The card's data, by their names
-    in the person's language and an amount in cents as money, in the order the app names them; what the read leaves
-    empty or hides from this person (none: a blind count's expected cash) is not there. ``(None, None)`` without a
-    preview; ``(outcome, None)`` when it cannot be read: the write is not confirmed blind."""
+    in the person's language and an amount in cents as money (``signed`` when its schema declares it so, as a
+    difference), in the order the app names them; what the read leaves empty or hides from this person (none: a blind
+    count's expected cash) is not there. ``(None, None)`` without a preview; ``(outcome, None)`` when it cannot be read:
+    the write is not confirmed blind."""
     declared = preview_of(op)
     if declared is None:
         return None, None
@@ -477,7 +485,8 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
 @checks.register("base")
 def check_previews(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     """``base.E005``: a preview names a read of the write's own app, the data of its answer the card shows and nothing
-    the write does not send; only a dangerous write declares one (a normal one's card is a single line)."""
+    the write does not send; only a dangerous write declares one (a normal one's card is a single line), and only an
+    amount in cents is declared signed."""
     errors: list[checks.CheckMessage] = []
     for op in registry.values():
         declared = preview_of(op)
@@ -511,8 +520,15 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     fields = declared.get("fields")
     if not isinstance(fields, list) or not fields or not all(isinstance(name, str) for name in fields):
         return [*problems, "names no field of its answer"]
-    given = _output_schema(read).get("properties", {})
+    schema = _output_schema(read)
+    given = schema.get("properties", {})
     problems += [f"shows {name}, but {read.name} gives no field {name}" for name in fields if name not in given]
+    shown = {name: _resolved(given[name], schema.get("$defs", {})) for name in fields if name in given}
+    problems += [
+        f"marks {name} signed, but it is no amount in cents"
+        for name, prop in shown.items()
+        if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(name, prop))
+    ]
     problems += [
         f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields
     ]

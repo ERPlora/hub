@@ -50,6 +50,21 @@ describe('each datum', () => {
     expect(fieldText(card().fields[1], opts)).toBe('15,00\u00a0€');
   });
 
+  it('an amount marked signed says over or short as Cash register does: + over, - short, none at zero', () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN: a difference over came as «137,90 €», like an
+    // amount, while only the one short had its sign.
+    const difference = (value: number) => ({ name: 'difference', label: 'Diferencia', kind: 'money' as const, value, signed: true });
+    expect(fieldText(difference(13790), opts)).toBe('+137,90 €');
+    expect(fieldText(difference(-490), opts)).toBe('-4,90 €');
+    expect(fieldText(difference(0), opts)).toBe('0,00 €');
+    expect(fieldText(difference(13790), { ...opts, locale: 'en' })).toBe('+€137.90');
+    // Until the business's currency is known, the figure alone, with its sign.
+    expect(fieldText(difference(13790), { locale: 'en', t })).toBe('+137.90');
+    // Any other amount, positive as it is, never gets one; nor does a datum that is no amount, whatever it says.
+    expect(fieldText(card().fields[1], opts)).toBe('15,00 €');
+    expect(fieldText({ name: 'duration', label: 'Duration', kind: 'text', value: 1500, signed: true }, opts)).toBe('1500');
+  });
+
   it('what is not marked as money stays a number', () => {
     expect(fieldText({ name: 'duration', label: 'Duration', kind: 'text', value: 1500 }, opts)).toBe('1500');
   });

@@ -1,11 +1,12 @@
 // COMBO-F06 «Añadir varios»: a dialog with a search on the server, a box per active product of
 // Inventory and «Add N selected»; what the course already offers is ticked, greyed and says so. They go
 // in at once, in the order ticked and without supplement (`combo.option.bulk_create`). Nothing ticked
-// answers why instead of sending.
+// answers why instead of sending. Each product names its price in the business's currency.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, ionChecked, ionValue, mountCombo, page, settle } from '../__tests__/mount-combo';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, click, ionChecked, ionValue, mountCombo, page, POLISH, settle } from '../__tests__/mount-combo';
 import type { GroupOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
 
@@ -45,8 +46,14 @@ const PRODUCTS = [
   { id: 'p3', name: 'Soup', sku: 'SOU', price: 600, ...PORTION },
 ];
 
-async function setup(locale: 'en' | 'es' = 'en', catalogue: [number, unknown] = [200, page(PRODUCTS)]) {
-  const m = await mountCombo(BulkAddModal, { props: { open: false, course: COURSE }, locale, answers: { '/api/inventory/products': catalogue } });
+async function setup(locale: 'en' | 'es' = 'en', catalogue: [number, unknown] = [200, page(PRODUCTS)], answer?: Business | null) {
+  const m = await mountCombo(BulkAddModal, {
+    props: { open: false, course: COURSE },
+    locale,
+    business: answer,
+    answers: { '/api/inventory/products': catalogue },
+  });
+  await m.live();
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -81,6 +88,12 @@ describe('BulkAddModal', () => {
     expect(s.inDoc('combo-bulk-item-p1')?.textContent).toContain('Already in this course');
     expect([s.box('p2').checked, s.box('p2').disabled]).toEqual([false, false]);
     expect(s.submit().textContent).toContain('Add 0 selected');
+  });
+
+  it('names each product’s price in the business currency: złoty in Poland, never a euro', async () => {
+    const s = await setup('es', [200, page(PRODUCTS)], business(POLISH));
+    expect(s.inDoc('combo-bulk-item-p2')?.textContent?.replace(/[\u00a0\u202f]/g, ' ')).toContain('Salad · SAL · 6,50 zł');
+    expect(s.inDoc('combo-bulk')?.textContent).not.toContain('€');
   });
 
   it('nothing ticked answers why, and sends nothing', async () => {

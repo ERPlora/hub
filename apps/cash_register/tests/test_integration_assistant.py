@@ -261,6 +261,9 @@ def test_the_close_card_shows_the_session_its_drawer_the_expected_and_the_differ
         ("expected_balance", "money", 10150),
         ("difference", "money", difference),
     ]
+    # The difference with its sign, as the screens write it (FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN):
+    # over or short at a glance; the expected cash is an amount like any other.
+    assert [field["name"] for field in preview if field.get("signed")] == ["difference"]
     assert [field["label"] for field in preview] == card_labels(SCREENS)
     assert [field["label"] for field in close_preview({"closing_balance": counted}, language="en")[1]] == card_labels(
         SCREENS_EN
@@ -280,6 +283,9 @@ def test_the_card_the_person_sees_carries_that_preview_and_closes_nothing(coffee
         ("expected_balance", 10150),
         ("difference", 14850),
     ]
+    # The difference reaches the person's card marked signed, the rest not (the turn's schema dropped the mark:
+    # FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN).
+    assert [field["name"] for field in card["preview"] if field["signed"]] == ["difference"]
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 
