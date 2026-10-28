@@ -293,6 +293,11 @@ class BellCounterOut(Schema):
 
 class BellCountersOut(Schema):
     counters: list[BellCounterOut]
+    refresh_every: int | None = Field(
+        default=None,
+        description="Seconds after which the bell reads its counters again, for one whose figure moves as time passes; "
+        "none: only when something changes.",
+    )
 
 
 class NoticeListIn(Schema):

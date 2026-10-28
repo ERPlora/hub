@@ -290,7 +290,7 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
                         "icon": "ion:warning-outline",
                     },
                 )
-        return {"counters": counters}
+        return {"counters": counters, "refresh_every": home.bell_refresh_every(ctx, modules)}
 
 
 @operation("base.notice.list", kind="query", permission=VIEW_HOME, input=NoticeListIn, output=NoticeListOut)

@@ -16,6 +16,12 @@ panels of the dashboard (``widgets``) and its counters of the bell (``bell``), e
 - whoever lacks a step's permission is not told about it, except a pending ⛔ (``actionable: false``): it is what
   will stop their invoice, whoever clears it (hub#435).
 
+A counter whose figure moves as time passes, with no event (a job waiting a minute with no device alive to print
+it), names in ``bell_refresh_every`` of its module's ``LiveAppConfig`` (counter key → seconds) how often the bell reads
+it again besides its ``refresh_on`` (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): the bell is told the shortest
+period among the counters the person may see (:func:`bell_refresh_every`), and ``base.E007`` checks the declarations
+at start (:func:`bell_refresh_errors`).
+
 The device's notices (PLAN-HUB round 2026-10-23, ``notices``; ``base.notice.list``) run the same way: every row of
 a notice's query that passes its ``when`` is told, with the texts filled in from the row in the person's language
 (:func:`device_notices`); the shell tells each one once on the device, with the installed app's system notice.
@@ -32,12 +38,13 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from django.conf import settings
+from django.core import checks
 from django.utils import timezone
 from django.utils.functional import Promise
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
-from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, module_configs
+from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import get
 
 logger = logging.getLogger(__name__)
@@ -60,6 +67,11 @@ LEGAL_IN_PRODUCTION = {
 #: Where a step without ``order`` goes: after every step placed (the old hub's ``DEFAULT_ORDER``).
 DEFAULT_ORDER = 500
 DEFAULT_STEP_ICON = "ion:settings-outline"
+#: The attribute of a module's ``LiveAppConfig`` with how often the bell reads its counters again: key → seconds.
+BELL_REFRESH_ATTRIBUTE = "bell_refresh_every"
+#: The shortest of those periods: the old hub's bell asked every 30 s, and a shorter one would make every open screen
+#: of the business a poller of its hub.
+MIN_BELL_REFRESH_SECONDS = 30
 
 
 def shown_modules(*, demo_hub: bool = False) -> list[LiveAppConfig]:
@@ -314,6 +326,54 @@ def bell_counters(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> li
                     }
                 )
     return counters
+
+
+def bell_refresh_every(ctx: OperationContext, configs: Iterable[LiveAppConfig]) -> int | None:
+    """How often the bell of the person of ``ctx`` reads its counters again: the shortest period declared for a counter
+    they may see (at zero too: it is the time that raises it), ``None`` when none asks (its events only, as before)."""
+    periods = [
+        seconds
+        for config in configs
+        for key, seconds in (getattr(config, BELL_REFRESH_ATTRIBUTE, None) or {}).items()
+        for counter in config.bell
+        if counter.key == key and ctx.has(counter.permission)
+    ]
+    return min(periods, default=None)
+
+
+def bell_refresh_errors(configs: Iterable[LiveAppConfig]) -> list[checks.CheckMessage]:
+    """``base.E007``: ``bell_refresh_every`` maps counters of the app's own bell to whole seconds, none under
+    :data:`MIN_BELL_REFRESH_SECONDS`."""
+    hint = (
+        f"Declare {BELL_REFRESH_ATTRIBUTE} = {{\"<counter key>\": <seconds>}} on the module's LiveAppConfig, for counters of "
+        f"its own bell that change as time passes, each at least {MIN_BELL_REFRESH_SECONDS} s."
+    )
+    errors = []
+    for config in configs:
+        declared = getattr(config, BELL_REFRESH_ATTRIBUTE, None)
+        if declared is None:
+            continue
+        problems = []
+        if not isinstance(declared, Mapping):
+            problems.append(f"is {declared!r}, not a mapping of its counters to seconds")
+        else:
+            counters = {counter.key for counter in getattr(config, "bell", [])}
+            for key, seconds in declared.items():
+                if key not in counters:
+                    problems.append(f"names {key!r}, which is no counter of its bell")
+                elif not isinstance(seconds, int) or isinstance(seconds, bool) or seconds < MIN_BELL_REFRESH_SECONDS:
+                    problems.append(f"reads {key!r} again every {seconds!r}, not whole seconds from {MIN_BELL_REFRESH_SECONDS}")
+        errors += [
+            checks.Error(f"{config.label}'s {BELL_REFRESH_ATTRIBUTE} {problem}.", hint=hint, obj=config, id="base.E007")
+            for problem in problems
+        ]
+    return errors
+
+
+@checks.register("base")
+def check_bell_refresh(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """The bell's clock of every app of ours (whatever ``app_configs`` ``manage.py check`` passes)."""
+    return bell_refresh_errors(all_live_app_configs())
 
 
 # --- The device's notices (PLAN-HUB round 2026-10-23) ------------------------------------------------------------

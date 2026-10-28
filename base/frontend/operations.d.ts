@@ -73,6 +73,12 @@ export interface BellCounter {
   icon: string;
 }
 
+/** `base.BellCountersOut`: the counters above zero, and how often the bell reads them again (none: only on a change). */
+export interface BellCounters {
+  counters: BellCounter[];
+  refresh_every: number | null;
+}
+
 /** `base.DeviceNoticeOut`: a row the device is told once (APPOINTMENT-F28). */
 export interface DeviceNoticeRow {
   /** «<app>.<notice>». */
@@ -679,7 +685,7 @@ declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.setup.status': { input: NoInput; output: SetupStatus };
     'base.widget.list': { input: NoInput; output: { widgets: WidgetDef[] } };
-    'base.bell.counters': { input: NoInput; output: { counters: BellCounter[] } };
+    'base.bell.counters': { input: NoInput; output: BellCounters };
     'base.notice.list': { input: NoInput; output: { notices: DeviceNoticeRow[]; sources: string[] } };
     // Apps (APP-BASE-4)
     'base.app.list': { input: NoInput; output: AppList };
