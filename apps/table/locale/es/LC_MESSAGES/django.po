@@ -399,3 +399,9 @@ msgstr "Líneas a mover"
 
 msgid "Guest's name"
 msgstr "Nombre del cliente"
+
+msgid "Your tables"
+msgstr "Tus mesas"
+
+msgid "Add the tables of your dining room: without them there is no order per table, no split and no transfer."
+msgstr "Añade las mesas de tu sala: sin ellas no hay comanda por mesa, ni dividir ni transferir."
