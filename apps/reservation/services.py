@@ -50,6 +50,7 @@ from apps.reservation.models import (
 from apps.reservation.queries import (
     blocks_of,
     business_now,
+    business_zone,
     engine_blocks,
     entry_out,
     find_entry,
@@ -62,6 +63,7 @@ from apps.reservation.queries import (
     settings_row,
     slot_out,
     slots_of,
+    starts_at,
     table_facts,
 )
 from apps.reservation.schemas import (
@@ -321,7 +323,9 @@ def judge(
     table: Table | None,
     exclude: tuple = (),
 ) -> None:
-    """Raises the first reason that refuses ``request`` (engine.verdict), with what the gate reads."""
+    """Raises the first reason that refuses ``request`` (engine.verdict), with what the gate reads: in the
+    business's zone, so that what lasts counts real time."""
+    request = replace(request, zone=business_zone())
     window = request.window
     verdict = engine.verdict(
         request,
@@ -851,13 +855,13 @@ def delete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
 )
 def release_unconfirmed(ctx: OperationContext, data: NoIn) -> dict:
     window = dt.timedelta(minutes=lock_book().no_show_window_minutes)
-    now = business_now()
+    now = timezone.now()
     stale = [
         row
         for row in Reservation.objects.select_for_update()
-        .filter(is_deleted=False, status=S.PENDING, date__lte=now.date())
+        .filter(is_deleted=False, status=S.PENDING, date__lte=business_now().date())
         .order_by("date", "time", "id")
-        if dt.datetime.combine(row.date, row.time) + window < now
+        if starts_at(row.date, row.time) + window < now
     ]
     stamp = timezone.now()
     for row in stale:

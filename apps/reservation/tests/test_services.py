@@ -44,6 +44,10 @@ pytestmark = pytest.mark.django_db
 
 EMPLOYEE = "hub_employee"
 MANAGER = "hub_manager"
+#: Madrid's clocks go back an hour (03:00 summer time is 02:00 again) and forward (02:00 is 03:00).
+CLOCKS_BACK = dt.date(2026, 10, 25)
+CLOCKS_FORWARD = dt.date(2026, 3, 29)
+SUNDAY = 6
 
 
 def events(prefix: str = "reservation.") -> list[str]:
@@ -271,6 +275,59 @@ def test_a_table_out_of_service_or_already_booked_then_refuses(week):
         == "5 (no zone)"
     )
 
+
+def test_the_table_is_held_for_its_real_time_the_night_the_clocks_go_back():
+    make_slot(SUNDAY, "00:00", "05:00")
+    five = make_table("5")
+    make_reservation(
+        date=CLOCKS_BACK, time="01:37", duration_minutes=90, table=five, status="confirmed"
+    )
+    luis = dict(
+        table_id=str(five.id),
+        date=CLOCKS_BACK.isoformat(),
+        duration_minutes=60,
+        guest_name="Luis",
+        guest_phone="600333444",
+    )
+    # 01:37 summer time plus 90 real minutes ends at 02:07 of the second pass: 02:30 (the first) clashes.
+    error = refusal(lambda: book(time="02:30", **luis))
+    assert (error.code, error.message) == (
+        "reservation.table_taken",
+        "Table 5 (no zone) already has a reservation from 01:37 to 02:07.",
+    )
+    assert book(time="03:00", **luis).end_time == dt.time(4, 0)
+
+
+def test_the_table_is_held_for_its_real_time_the_night_the_clocks_go_forward(monkeypatch):
+    pin_clock(monkeypatch, dt.datetime(2026, 3, 20, 11, 0, tzinfo=dt.UTC))
+    make_slot(SUNDAY, "00:00", "05:00")
+    five = make_table("5")
+    make_reservation(
+        date=CLOCKS_FORWARD, time="01:00", duration_minutes=90, table=five, status="confirmed"
+    )
+    luis = dict(
+        table_id=str(five.id),
+        date=CLOCKS_FORWARD.isoformat(),
+        duration_minutes=60,
+        guest_name="Luis",
+        guest_phone="600333444",
+    )
+    # 01:00 winter time plus 90 real minutes ends at 03:30 summer time.
+    error = refusal(lambda: book(time="03:00", **luis))
+    assert (error.code, error.message) == (
+        "reservation.table_taken",
+        "Table 5 (no zone) already has a reservation from 01:00 to 03:30.",
+    )
+    assert book(time="03:30", **luis).end_time == dt.time(4, 30)
+
+
+def test_a_time_gone_is_judged_by_real_time_the_night_the_clocks_go_back(monkeypatch):
+    # 02:20 of the second pass (01:20 UTC): the 02:40 a reservation keeps is the first, gone an hour ago.
+    pin_clock(monkeypatch, dt.datetime(2026, 10, 25, 1, 20, tzinfo=dt.UTC))
+    make_slot(SUNDAY, "00:00", "05:00")
+    error = refusal(lambda: book(date=CLOCKS_BACK.isoformat(), time="02:40"))
+    assert error.code == "reservation.in_past"
+    assert book(date=CLOCKS_BACK.isoformat(), time="03:00").time == dt.time(3, 0)
 
 def test_a_table_said_by_its_number_that_does_not_exist_is_not_found(week):
     with pytest.raises(NotFound) as caught:
@@ -516,6 +573,23 @@ def test_the_window_to_release_is_the_rules_one():
         == 0
     )
 
+
+def test_the_window_to_release_counts_real_time_the_nights_the_clocks_change(monkeypatch):
+    def release() -> int:
+        return run(
+            "reservation.reservation.release_unconfirmed", {}, system_context(A)
+        ).released
+
+    # 01:50 winter time plus the 15 minutes is 03:05 summer time: at 03:00 it still has five minutes.
+    make_reservation(date=CLOCKS_FORWARD, time="01:50")
+    pin_clock(monkeypatch, dt.datetime(2026, 3, 29, 1, 0, tzinfo=dt.UTC))
+    assert release() == 0
+    pin_clock(monkeypatch, dt.datetime(2026, 3, 29, 1, 6, tzinfo=dt.UTC))
+    assert release() == 1
+    # 02:50 of the first pass plus 15 minutes is 02:05 of the second: at 02:10 winter time it goes.
+    make_reservation(date=CLOCKS_BACK, time="02:50")
+    pin_clock(monkeypatch, dt.datetime(2026, 10, 25, 1, 10, tzinfo=dt.UTC))
+    assert release() == 1
 
 # ── Slots (F01) and blocked dates (F02) ──────────────────────────────────────────────────────────
 
