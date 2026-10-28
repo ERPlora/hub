@@ -5,41 +5,32 @@
 // A tap records («Listening…»: the key turns «Stop»), the next one stops; erplora.com transcribes, the words land in
 // the assistant's box after what was written and its panel opens: the person sees what was understood and sends it,
 // and a write still asks its card. Nothing is sent by itself. A refused microphone, an empty or too long dictation and
-// a failure are a toast. The recorder, the icons and the assistant are base's: the dictation of its composer.
-import { useLiveClient } from '@erplora/ui/sdk';
-import { nativeBridge, toast, useSession } from '@erplora/ui/shell';
+// a failure are a toast. The dictation is base's (`useDictation`, PLAN-HUB §18: one recording per tap, two minutes,
+// 2 MB, the words into the box and the panel open, the recording thrown away on leaving); the key says each reason
+// with its own text and keeps the offline guard base does not have.
+import { toast, useSession } from '@erplora/ui/shell';
 import { IonIcon, IonSpinner } from '@ionic/vue';
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
-import { useAssistant } from '../../../../../base/frontend/lib/assistant';
 import { ASSISTANT_ICONS } from '../../../../../base/frontend/lib/assistant-icons';
-import {
-  base64Of,
-  browserVoice,
-  canDictate,
-  type Recording,
-  recordVoice,
-  type VoiceEnv,
-} from '../../../../../base/frontend/lib/assistant-input';
-import { useLocale, useT } from '../../composables/useT';
-
-/** erplora.com transcribes up to 2 MB of audio (the composer's limit). */
-const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
+import { browserVoice, type VoiceEnv } from '../../../../../base/frontend/lib/assistant-input';
+import { type DictationProblem, useDictation } from '../../../../../base/frontend/lib/dictation';
+import { useT } from '../../composables/useT';
 
 const props = withDefaults(defineProps<{ voice?: VoiceEnv }>(), { voice: () => browserVoice() });
 
 const t = useT();
-const locale = useLocale();
 const session = useSession();
-const client = useLiveClient();
-const assistant = useAssistant();
 
-const shown = computed(() => session.can('base.view_home') && canDictate(props.voice));
+/** A failure is red; the rest say what the person can do about it. */
+function say(problem: DictationProblem): void {
+  void toast(t(`sale.pos.speak.${problem}`), problem === 'failed' ? 'danger' : 'warning');
+}
+
+const { available, recording, transcribing, toggle, cancel } = useDictation({ voice: () => props.voice, onProblem: say });
+
+const shown = computed(() => session.can('base.view_home') && available.value);
 const offline = ref(globalThis.navigator?.onLine === false);
-const recording = shallowRef<Recording | null>(null);
-const transcribing = ref(false);
-/** The browser is still asking for the microphone: a second tap meanwhile opens no second recording. */
-const starting = ref(false);
 /** Greyed: offline and not recording (a recording can always be stopped). */
 const unavailable = computed(() => offline.value && !recording.value);
 
@@ -51,71 +42,16 @@ onMounted(() => {
   window.addEventListener('offline', onConnection);
 });
 
-function warn(message: string): void {
-  void toast(message, 'warning');
-}
-
-async function transcribe(current: Recording): Promise<void> {
-  transcribing.value = true;
-  try {
-    const clip = await current.stop();
-    if (clip.blob.size > MAX_AUDIO_BYTES) return warn(t('sale.pos.speak.tooLong'));
-    const answer = await client.api.call('base.assistant.transcribe', {
-      audio: await base64Of(clip.blob),
-      mime_type: clip.mime,
-      language: locale.value,
-    });
-    const words = answer.text.trim();
-    if (!words) return warn(t('sale.pos.speak.empty'));
-    const before = assistant.state.draft.trimEnd();
-    assistant.state.draft = before ? `${before} ${words}` : words;
-    assistant.setOpen(true);
-  } catch (error) {
-    console.error('sale: the dictation could not be transcribed', error);
-    void toast(t('sale.pos.speak.failed'), 'danger');
-  } finally {
-    transcribing.value = false;
-  }
-}
-
 async function press(): Promise<void> {
-  if (transcribing.value || starting.value) return;
-  const current = recording.value;
-  if (current) {
-    recording.value = null;
-    if (offline.value) {
-      current.cancel();
-      return warn(t('sale.pos.speak.offline'));
-    }
-    return transcribe(current);
-  }
-  if (offline.value) return warn(t('sale.pos.speak.offline'));
-  starting.value = true;
-  try {
-    // Two minutes: it stops by itself and what was said is transcribed.
-    const started = await recordVoice(props.voice, () => {
-      if (recording.value === started) {
-        recording.value = null;
-        void transcribe(started);
-      }
-    });
-    recording.value = started;
-  } catch (error) {
-    const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
-    // The installed app has no browser bar: there the microphone is allowed again in the device's settings.
-    if (denied) return warn(nativeBridge() ? t('sale.pos.speak.deniedInApp') : t('sale.pos.speak.denied'));
-    console.error('sale: the microphone did not start', error);
-    void toast(t('sale.pos.speak.failed'), 'danger');
-  } finally {
-    starting.value = false;
-  }
+  if (!offline.value) return toggle();
+  // Without a connection nothing can be transcribed: a recording is thrown away, and the toast says why.
+  if (recording.value) cancel();
+  void toast(t('sale.pos.speak.offline'), 'warning');
 }
 
 onBeforeUnmount(() => {
   window.removeEventListener('online', onConnection);
   window.removeEventListener('offline', onConnection);
-  recording.value?.cancel();
-  recording.value = null;
 });
 </script>
 
