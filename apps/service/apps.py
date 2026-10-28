@@ -1,7 +1,9 @@
 """The service app: the catalog of services a salon sells, who performs each one, and the vouchers."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+
+from apps.service.events import SERVICE_EVENTS
 
 
 class ServiceConfig(LiveAppConfig):
@@ -85,6 +87,25 @@ class ServiceConfig(LiveAppConfig):
             "service.grant_package",
         ],
     }
+    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Your service catalogue» (module.json
+    # `setup`, services#26), order 31 and important, done once one offered service can be charged (its tax category
+    # alive), for whoever adds services, leading to the list of services. Refreshed on what changes the services on
+    # offer. The old module declared no panel and no bell row.
+    setup = [
+        SetupStep(
+            key="catalog",
+            operation="service.catalog.status",
+            configured_when=[SetupCheck(field="sellable_services", truthy=True)],
+            title=_("Your service catalogue"),
+            description=_("Add the services you sell, with their price and duration."),
+            icon="ion:briefcase-outline",
+            route="/service/services",
+            permission="service.add_service",
+            order=31,
+            required=True,
+            refresh_on=SERVICE_EVENTS,
+        )
+    ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. The same icons as the tabbar (frontend/tabs.ts).
     # SERVICE-F25: the holds of the till nobody charged in a day are marked expired, every hour, by the

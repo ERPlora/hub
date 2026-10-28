@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4e4844f12fc50b93ae0e2b8599b5c8477500653fd65ddaefb5ad9ba8eba53e00 -->
+<!-- generated from WORKBOOK.md sha256:6cbf2d2dadf9684893a465e3aa38ab622b61bf83f0d76cb2f325d5dcd20a2405 -->
 
 ## What it is for and who it is for
 
@@ -51,7 +51,8 @@ on it.
 2. In **Taxes → Categories** there must be at least one active tax category: without it the service form
    warns "There are no tax categories yet. Set them up in Taxes before adding services.".
 3. Create the categories you want to group the catalogue (SERVICE-F07) and add the services
-   (SERVICE-F01). For many at once, the assistant adds them in one go (SERVICE-F06).
+   (SERVICE-F01). For many at once, the assistant adds them in one go (SERVICE-F06). Until there is a
+   service that can be charged, the Home reminds you with "Your service catalogue".
 4. Open each service and assign it the professionals who perform it (SERVICE-F31). While a service has
    nobody assigned, the agenda lets the whole bookable team perform it (SERVICE-F33).
 5. Create the vouchers in **Packages** (SERVICE-F12), always filling in **Uses**: empty means unlimited
@@ -193,26 +194,32 @@ Amounts, durations and dates show in the format of the language of whoever is lo
 ### SERVICE-F01 Add a service
 Status: done
 Actor: employee, manager, assistant
-Screen: Services
+Screen: Home, Services
 Steps:
-1. In **Services** tap **New service**.
-2. Type the Name, choose the Pricing (**Fixed price** comes chosen), the Price and the Duration (min).
+1. On the **Home**, while no service can be charged, "Finish setting up your business" brings "Your
+   service catalogue" ("Add the services you sell, with their price and duration."), "Important", to
+   whoever may add services. "Set up" leads to **Services**.
+2. In **Services** tap **New service**.
+3. Type the Name, choose the Pricing (**Fixed price** comes chosen), the Price and the Duration (min).
    Choose a Category or leave "No category".
-3. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
+4. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
    Settings comes chosen if there is one). Without it **Create service** cannot be tapped.
-4. Tap **Create service**: the form closes and the service shows in the table as **Active**.
+5. Tap **Create service**: the form closes and the service shows in the table as **Active**.
 In: the categories of Services and the active tax categories of Taxes.
 Out: the service on offer and bookable (`service.service.created`); from that moment the agenda and the
 till see it and, if it is booked online, the Online booking page too. What is not given takes the
 Settings: duration, buffer before and after, online booking and tax category; without Settings, 60 min,
-no buffer and with online booking.
+no buffer and with online booking. With the first service on offer and with its tax category active, "Your
+service catalogue" is "Done" on the Home without a reload; if they are all archived (SERVICE-F04) or none
+has an active tax category any more, the step goes back to pending by itself, and restoring one
+(SERVICE-F05) makes it "Done" again.
 If it fails: inside the form, each reason below its field: an amount that cannot be understood ("This is
 not an amount. Type a figure, for example 12.50.", also with another currency's symbol: "€22.50" in a
 business in Poland), one that reads two ways or a negative one; a deleted
 category ("That category is not available: it does not exist in this business or it has been
 deleted."); a tax category that does not exist or is deactivated ("That tax category does not exist in
 Taxes or is deactivated."); with no tax category at all, the notice of Taxes. What was typed is kept.
-Involved: TAX-F01
+Involved: TAX-F01, BASE-F01
 
 ### SERVICE-F02 Edit a service
 Status: done
@@ -799,7 +806,7 @@ her phone. If a name fits several, it says which and asks to choose (409
 | The services, with search, filters and sorting, in pages (up to 100) | view services | F01–F05 | `service.service.list` |
 | A whole service | view services | F02, F10 | `service.service.get` |
 | The catalogue to sell and book: the services on offer | view services | F09, F10 | `service.service.list_for_sale` |
-| How many services are on offer and how many can be charged | view services | F01 | `service.catalog.status` |
+| How many services are on offer and how many can be charged (the "Your service catalogue" step of the Home) | view services | F01 | `service.catalog.status` |
 | The categories, with the services on offer of each | view categories | F07, F08 | `service.category.list` |
 | A category | view categories | F07 | `service.category.get` |
 | The settings | view services | F11 | `service.settings.get` |

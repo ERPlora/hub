@@ -59,7 +59,7 @@ TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/service apps/sale/tests/test_
   apps/appointment/tests/test_integration_service.py apps/pricing/tests/test_integration_service.py
 pnpm test apps/service apps/sale/frontend/components/checkout
 pnpm e2e tests/e2e/service-flows.spec.ts tests/e2e/service-catalog.spec.ts tests/e2e/service-vouchers.spec.ts \
-  tests/e2e/sale-voucher.spec.ts
+  tests/e2e/sale-voucher.spec.ts tests/e2e/fix-service-setup-hooks.spec.ts
 ```
 
 - `tests/test_integration_tax.py`, `test_integration_staff.py`, `test_integration_customer.py` y
@@ -68,10 +68,11 @@ pnpm e2e tests/e2e/service-flows.spec.ts tests/e2e/service-catalog.spec.ts tests
   vez en hilos.
 - `service-flows.spec.ts` recorre los flujos con pantalla en 390, 834 y 1440; el bono en el cobro se ve en
   `sale-voucher.spec.ts`.
+- `test_integration_home.py` lleva el paso «Tu catálogo de servicios» del Inicio por la consulta real de `base`
+  (con dos hubs y con Servicios apagada); `fix-service-setup-hooks.spec.ts` lo recorre en 390, 834 y 1440.
 
 ## Qué queda fuera
 
-- Vender un bono en el TPV (y, con ello, concederlo al cobrar y anularlo con su venta), importar servicios
-  desde un fichero y el paso «Tu catálogo de servicios» de «Termina de configurar tu negocio»: «Lo que queda
-  fuera» del WORKBOOK.
+- Vender un bono en el TPV (y, con ello, concederlo al cobrar y anularlo con su venta) e importar servicios
+  desde un fichero: «Lo que queda fuera» del WORKBOOK.
 - El panel lateral de [`UI-REQUESTS.md`](UI-REQUESTS.md).
