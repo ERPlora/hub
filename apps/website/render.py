@@ -23,13 +23,12 @@ passes it, and the public home keeps one page per day.
 
 import datetime as dt
 import math
-from decimal import Decimal
 from html import escape
 from typing import Any
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
-from babel.numbers import format_currency, format_decimal
+from babel.numbers import format_decimal
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
 from django.utils.timesince import timesince
@@ -38,7 +37,7 @@ from live.markdown import render_markdown
 
 from apps.website.palettes import BLACK, WHITE, mix, resolve, rgb
 from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
-from base.business import currency_decimals
+from base.business import money_text
 
 #: The sections between the hero and the footer, in their order.
 BODY_SECTIONS = ("about", "catalog", "gallery", "reviews", "contact", "location")
@@ -199,11 +198,7 @@ def price_label(item: dict, currency: str) -> str:
         return pgettext("website price", "Free")
     if kind == "none" or price is None:
         return ""
-    amount = format_currency(
-        Decimal(price).scaleb(-currency_decimals(currency)),
-        currency,
-        locale=translation.to_locale(translation.get_language() or "en"),
-    )
+    amount = money_text(price, currency)
     if kind == "from":
         return gettext("From %(price)s") % {"price": amount}
     if kind == "hourly":

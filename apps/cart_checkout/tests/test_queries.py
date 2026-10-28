@@ -128,6 +128,7 @@ def test_a_row_carries_everything_a_cart_says(shop):
         "total_items": Decimal("2.000"),
         "total_amount": 2500,
         "currency": "EUR",
+        "currency_decimals": 2,
         "expires_at": None,
         "last_activity_at": None,
         "notes": "VIP",

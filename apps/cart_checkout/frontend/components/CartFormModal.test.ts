@@ -24,6 +24,7 @@ const CART = {
   total_items: '0.000',
   total_amount: 0,
   currency: 'EUR',
+  currency_decimals: 2,
 };
 
 async function setup(locale: 'en' | 'es' = 'en') {

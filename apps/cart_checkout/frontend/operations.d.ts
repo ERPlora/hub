@@ -78,7 +78,10 @@ export interface CartOut {
   total_items: DecimalText;
   /** Minor units of `currency`. */
   total_amount: number;
+  /** ISO 4217, kept from its creation (the business's then, or the one asked for): never rewritten. */
   currency: string;
+  /** The decimals of `currency` as the server counts them (0 in JPY; 2 in HUF, which Intl gives none). */
+  currency_decimals: number;
   expires_at: string | null;
   last_activity_at: string | null;
   notes: string;
@@ -211,7 +214,10 @@ export interface OrderOut {
   status: OrderStatus;
   /** Minor units of `currency`. */
   total_amount: number;
+  /** ISO 4217: its cart's, never rewritten. */
   currency: string;
+  /** The decimals of `currency` as the server counts them (0 in JPY; 2 in HUF, which Intl gives none). */
+  currency_decimals: number;
   notes: string;
   failure_reason: string;
   placed_at: string | null;

@@ -9,7 +9,7 @@
     "loading": "Cargando…",
     "noResults": "Sin resultados",
     "noResultsMessage": "Nada coincide con la búsqueda o los filtros.",
-    "amountInvalid": "Escribe un importe, como 12,50",
+    "amountInvalid": "Escribe un importe, como {example}",
     "noPermission": "No tienes permiso",
     "live": {
       "reconnecting": "Reconectando…",

@@ -28,8 +28,8 @@ son copias de las de `apps/payment` (como las de `inventory`, `customer`, `sale`
 pedidas en `apps/sale/UI-REQUESTS.md` e `apps/invoice/UI-REQUESTS.md` («Tabla de servidor viva»); cuando
 lleguen a `@erplora/ui/components`, se borran de aquí con sus tests.
 
-La lectura de un importe tecleado o pegado en un filtro («1.250,50», «12,50 €»; lo ambiguo, «1.250», no
-se adivina) vive en `frontend/lib/format.ts` (`toMinor`, `unreadableTotals`), como la de `payment`,
+La lectura de un importe tecleado o pegado en un filtro, en la moneda del negocio («1.250,50», «12,50 zł»,
+«PLN 12,50»; lo ambiguo, «1.250», no se adivina, ni el símbolo de otra moneda) vive en `frontend/lib/format.ts` (`toMinor`, `unreadableTotals`), como la de `payment`,
 `customer`, `inventory`, `sale`, `invoice` y `verifactu`, cada una con su copia (el producto actual lo
 pedía en pm#501). Cuando `@erplora/ui` lleve un lector común de importes para los filtros de rango con
 `amount: true`, la app lo usa y borra el suyo con sus tests.

@@ -175,7 +175,7 @@ def create_cart(ctx: OperationContext, data: CartIn) -> dict:
         session_token=data.session_token,
         customer_email=data.customer_email,
         customer_name=data.customer_name,
-        currency=data.currency or business_currency(),
+        currency=data.currency or business_currency(ctx),
         expires_at=data.expires_at,
         last_activity_at=timezone.now(),
         created_by=actor,
@@ -314,7 +314,8 @@ def _line_and_cart(item_id) -> tuple[CartItem, Cart]:
     ai={
         "description": "Add a product line to an active shopping cart (named by its session code, its customer or "
         "its id): the product's reference and name as free text, the quantity (up to three decimals) and the "
-        "unit price in minor units (12,50 € = 1250). The cart's totals are recomputed.",
+        "unit price in minor units of the cart's currency (its currency_decimals: 12.50 is 1250 with two, ¥1,250 is "
+        "1250). The cart's totals are recomputed.",
         "risk": "normal",
     },
 )

@@ -277,7 +277,7 @@ def test_the_editors_preview_prices_in_the_business_s_currency(services_catalog)
     business_in("PL")
     save()
     html = run("website.site.preview").html
-    assert "PLN15.00" in html
+    assert "PLN\xa015.00" in html
     assert "€" not in html
 
 

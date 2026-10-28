@@ -36,9 +36,8 @@ from apps.cart_checkout.schemas import (
     OrderPage,
     OrderRefIn,
 )
-
-#: The business's currency until the Hub keeps its own (the same euro the till charges in).
-CURRENCY = "EUR"
+from base import operations as platform
+from base.business import currency_decimals
 
 CART_NOT_FOUND = _("That cart does not exist in this business.")
 CART_AMBIGUOUS = _("“%(said)s” matches several carts: %(codes)s. Say which one.")
@@ -83,9 +82,10 @@ ORDER_ORDER = {
 }
 
 
-def business_currency() -> str:
-    """The currency a cart is in when its creator does not say one (the old ``hub_settings.currency``)."""
-    return CURRENCY
+def business_currency(ctx: OperationContext) -> str:
+    """The currency a cart is in when its creator does not say one (the old ``hub_settings.currency``): the business's,
+    its country's (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub its issuer's country's."""
+    return platform.business_currency(ctx.scope)
 
 
 # --- Shared with services.py, inside the command's own transaction --------------------------------
@@ -201,6 +201,7 @@ def cart_row(cart: Cart) -> dict:
         "total_items": cart.total_items,
         "total_amount": cart.total_amount,
         "currency": cart.currency,
+        "currency_decimals": currency_decimals(cart.currency),
         "expires_at": cart.expires_at,
         "last_activity_at": cart.last_activity_at,
         "notes": cart.notes,
@@ -242,6 +243,7 @@ def order_row(order: Order) -> dict:
         "status": order.status,
         "total_amount": order.total_amount,
         "currency": order.currency,
+        "currency_decimals": currency_decimals(order.currency),
         "notes": order.notes,
         "failure_reason": order.failure_reason,
         "placed_at": order.placed_at,
