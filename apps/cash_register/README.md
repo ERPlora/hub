@@ -18,7 +18,8 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
   negocio, entradas y salidas con concepto, arqueo por billetes y monedas y cierre con esperado, contado y
   diferencia congelados. El cierre también se pide al asistente («cierra la caja con 250 € contados»): lee
   antes el resumen del cierre (`session.closing_summary`, ciego para quien no ve el esperado) y cierra con
-  la tarjeta de riesgo alto, escribiendo la palabra.
+  la tarjeta de riesgo alto, escribiendo la palabra; la tarjeta repite en «Lo que va a pasar» la sesión, el
+  cajón, el esperado y la diferencia (la vista previa de base, BASE-F98, con esa misma lectura).
 - **Lo que viene de Ventas** (F13, F14, F15, F17): cada cobro, anulación y devolución, por forma de pago,
   leído de Ventas al mirar; lo que no cae en ningún turno sale en «Cobros fuera de turno».
 - **Reglas del cierre** (F04, F07, F08, F10): Ventas no cobra en efectivo con la caja cerrada; arqueo ciego
