@@ -16,7 +16,7 @@ A business without a country (a demo) is in ERPlora's market, Spain: it files as
 import base64
 
 import pytest
-from live.context import OperationContext, system_context
+from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive
 from live.operations import get
 
@@ -32,6 +32,7 @@ pytestmark = pytest.mark.django_db
 ONLY_IN_SPAIN = "VeriFactu is only for businesses in Spain."
 NOT_SENT = "this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT"
 CUT = [{"description": "Cut", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
+PLATFORM = Scope("host", "erplora")
 
 
 def business_in(country: str, slug: str = "a") -> None:
@@ -98,6 +99,22 @@ def test_each_hub_reads_its_own_business_s_country(issuer):
     in_poland, in_spain = ticket(), ticket(ctx_for(scope=B))
     assert (in_poland.verifactu_status, in_spain.verifactu_status) == ("unavailable", "sealed")
     assert list(Record.objects.values_list("invoice_id", flat=True)) == [in_spain.id]
+
+
+def test_erploras_own_hub_reads_its_country_from_the_platform_too(db, settings, monkeypatch):
+    # FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY: ``base.business.get`` answers ERPlora's own hub (hub#329),
+    # so VeriFactu asks it there as anywhere else, never a second source of the same country that drifts in silence if
+    # the platform moves where its hub's country comes from (here, an answer other than ``PLATFORM_ISSUER_COUNTRY``).
+    settings.PLATFORM_HUB_SLUG = PLATFORM.key
+    settings.PLATFORM_ISSUER_COUNTRY = "ES"
+    assert not queries.outside_spain(PLATFORM)
+
+    business = get(queries.BUSINESS)
+    answer = business.fn
+    monkeypatch.setattr(business, "fn", lambda ctx, data: {**answer(ctx, data), "country": "PL"})
+
+    assert queries.business_country(PLATFORM) == "PL"
+    assert queries.outside_spain(PLATFORM)
 
 
 # (c) The queue
