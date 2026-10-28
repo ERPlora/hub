@@ -352,7 +352,9 @@ test('INVOICE-F08 — in Spanish the rectification card shows what will happen: 
 // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: an invoice issued in euros, rectified once
 // erplora.com had registered the business in Poland, showed «Total: -121,00 zł» in «What will happen»: the card
 // painted every amount in the business's currency. Each amount of the preview is now in the one its read answers (the
-// invoice's, which keeps the one it was issued in), in English and in Spanish; «Cancel» issues nothing.
+// invoice's, which keeps the one it was issued in), in English and in Spanish; «Cancel» issues nothing. Asked first in
+// English, the receipt of that turn read in Spanish once the person switched said «Rectificar en Invoicing»: now it is
+// said whole in the screen's language, and nothing on the Spanish screen is left in English.
 test('BASE-F97 — with the business moved to Poland, the rectification card says the euro invoice’s amounts in euros, never in złoty', async ({ browser }) => {
   const FIX = 'FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY';
   const registration = registrationOf('a');
@@ -374,6 +376,10 @@ test('BASE-F97 — with the business moved to Poland, the rectification card say
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(`${A}/invoice/invoices`);
       await openPanel(page);
+      if (language === 'es') {
+        // The receipt of the turn asked in English, read now in Spanish: whole in Spanish, the app by its menu.
+        await expect(receipts(page)).toHaveText(['No se hizo, cancelado: Rectificar en Facturación']);
+      }
       await ask(page, asked(invoice.number));
       await expect(card(page)).toBeVisible({ timeout: 30_000 });
       const said = (await previewOf(context, invoice.number)).next_number;
@@ -385,6 +391,12 @@ test('BASE-F97 — with the business moved to Poland, the rectification card say
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await expect(previewBlock(page).locator('li')).toHaveText(lines);
         await expect(previewBlock(page)).not.toContainText('zł');
+        if (language === 'es') {
+          // Nothing on the Spanish screen in English: neither the card, nor a receipt, nor the panel.
+          for (const english of ['Invoicing', 'Not done', 'Rectify in', 'What will happen', 'Run this action', 'Tax base']) {
+            await expect(page.locator('body')).not.toContainText(english, { useInnerText: true });
+          }
+        }
         expect(await previewBlock(page).evaluate((el) => el.scrollWidth <= el.clientWidth), `${FIX}-${language}-${vp.label} overflows`).toBe(true);
         await untilStill(page);
         await page.screenshot({ path: shot(language === 'en' ? `${FIX}-${vp.label}` : `${FIX}-es-${vp.label}`) });
@@ -392,7 +404,9 @@ test('BASE-F97 — with the business moved to Poland, the rectification card say
       await page.setViewportSize({ width: 1440, height: 900 });
       // «Cancel»: nothing is issued.
       await decide(page, 'cancel');
-      await expect(receipts(page).last()).toContainText(language === 'en' ? 'Not done, cancelled' : 'No se hizo, cancelado');
+      await expect(receipts(page).last()).toHaveText(
+        language === 'en' ? 'Not done, cancelled: Rectify in Invoicing' : 'No se hizo, cancelado: Rectificar en Facturación',
+      );
       expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
     }
   } finally {
