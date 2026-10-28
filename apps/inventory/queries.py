@@ -34,9 +34,9 @@ from django.db.models import (
 from django.db.models.functions import Cast, Coalesce, NullIf
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
+from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import get, operation
+from live.operations import operation
 
 from apps.inventory.models import (
     UNIT_SPECS,
@@ -73,8 +73,7 @@ from apps.inventory.schemas import (
     UnitListIn,
     UnitPage,
 )
-from base.business import currency_of
-from base.operations import is_platform_hub
+from base import operations as platform
 
 PRODUCT_NOT_FOUND = _("This product does not exist in this hub.")
 CATEGORY_NOT_FOUND = _("This category no longer exists.")
@@ -103,8 +102,6 @@ YES, NO = _("Yes"), _("No")
 CSV_CONTENT_TYPE = "text/csv"
 # Excel reads a CSV as UTF-8 only with it.
 BOM = "\ufeff"
-#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
-BUSINESS = "base.business.get"
 #: What a spreadsheet runs as a formula at the start of a cell (=HYPERLINK, @SUM…): a text cell that
 #: starts so gets an apostrophe in front, which the import takes back (services.EXPORT_GUARD).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
@@ -117,17 +114,6 @@ ON_SALE = Q(is_active=True, is_sold_out=False)
 
 
 # Shared by services.py, inside the command's own transaction
-
-
-def business_currency(ctx: OperationContext) -> str:
-    """The currency of ``ctx``'s business (ISO 4217): the one its prices and costs are in, as ``base.business.get``
-    reads it. Read as the platform: an API key holds only the permission of the operation it opened, and every person
-    of the hub may see it anyway. ERPlora's own hub has no business on erplora.com (phase 1: no registry row,
-    ``create_platform_hub``): its catalog keeps the currency of its issuer's country, as its sales do."""
-    if is_platform_hub(ctx.scope):
-        return currency_of(settings.PLATFORM_ISSUER_COUNTRY)
-    business = get(BUSINESS)
-    return business(system_context(ctx.scope), business.input()).currency
 
 
 def current_settings() -> Settings:
@@ -646,7 +632,7 @@ def config_row(settings: Settings) -> dict:
 )
 def export_products(ctx: OperationContext, params: ProductFiltersIn) -> dict:
     products = filter_products(_products(current_settings()), params)
-    currency = business_currency(ctx)
+    currency = platform.business_currency(ctx.scope)
     rows = [
         [
             _text_cell(product.name),

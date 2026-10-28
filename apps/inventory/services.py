@@ -46,7 +46,6 @@ from apps.inventory.models import (
 )
 from apps.inventory.queries import (
     FORMULA_STARTS,
-    business_currency,
     config_row,
     current_settings,
     find_category,
@@ -88,6 +87,7 @@ from apps.inventory.schemas import (
     WriteOffIn,
 )
 from apps.tax.models import TaxCategory
+from base import operations as platform
 
 SKU_TAKEN = _("That SKU already exists in the catalog.")
 EAN13_TAKEN = _("Another product of the catalog already has that EAN-13.")
@@ -221,7 +221,7 @@ def bulk_create_products(ctx: OperationContext, data: ProductImportIn) -> dict:
     categories; their stock leaves an «initial» movement. The rehearsal (``dry_run``) writes nothing.
     """
     settings = current_settings()
-    currency = business_currency(ctx)
+    currency = platform.business_currency(ctx.scope)
     rows = data.rows
     skus = [_unguarded(row.sku.strip()) for row in rows]
     live_skus = set(Product.objects.filter(is_deleted=False, sku__in=skus).values_list("sku", flat=True))
@@ -388,7 +388,7 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
     """INVENTORY-F25: Printing's queue takes the label (PRINTING-F12); a person who cannot reach it gets
     ``inventory.label_queue_unavailable`` and nothing queued, so the screen prints from the browser."""
     product = find_product(data.id, data.product)
-    currency = business_currency(ctx)
+    currency = platform.business_currency(ctx.scope)
     # Code 128, the code the label printer draws, carries the printable ASCII only.
     if not all(" " <= char <= "~" for char in product.sku):
         raise Conflict(str(SKU_NOT_BARCODE), code="inventory.sku_not_barcode")

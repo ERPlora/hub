@@ -1102,10 +1102,12 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   ensayo. Hasta 100 filas por llamada: el cliente parte el fichero (y con ello «Parar») y detecta los
   SKU repetidos entre trozos. La adivinanza de cabeceras y la ventana fiscal son de la página.
 - **Exportar**: CSV con los formatos CLDR del idioma de la petición (librería `babel`), `;` donde la
-  coma es el decimal (Excel en español) y BOM UTF-8. Los importes van en la moneda del negocio
-  (`base.business.get`, la de su país; `queries.business_currency`, leída como la plataforma) y con sus decimales;
-  en el hub propio de ERPlora, sin negocio en erplora.com (fase 1, sin fila de registro: `create_platform_hub`), la
-  del país de su emisor (`PLATFORM_ISSUER_COUNTRY`), como Ventas y Tarifas;
+  coma es el decimal (Excel en español) y BOM UTF-8. Los importes van en la moneda del negocio y con sus
+  decimales; exportar, importar y la etiqueta (F25) la preguntan a `base.operations.business_currency` como toda
+  app que cobra (BASE-F50), sin copia propia: la de su país que contesta `base.business.get`, leída como la
+  plataforma (una API key solo lleva el permiso de la operación), y en el hub propio de ERPlora, sin negocio en
+  erplora.com (fase 1, sin fila de registro: `create_platform_hub`), la del país de su emisor
+  (`PLATFORM_ISSUER_COUNTRY`), como Ventas y Tarifas (`tests/test_business_currency.py`);
   la importación acepta su código y su símbolo alrededor de la cifra («PLN12.50», «12,50 zł»), no los de otra.
 - **Agotado (INVENTORY-F29, 2026-10-21)**: `Product.is_sold_out` con `db_default=False` (la 0003 solo
   añade la columna: un proceso con el código anterior sigue insertando). «A la venta» = activo y no
