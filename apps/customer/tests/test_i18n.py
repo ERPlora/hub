@@ -10,6 +10,7 @@ from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
 from live.errors import InvalidPayload
+from live.operations import registry
 
 from apps.customer import models, queries, schemas, services
 
@@ -61,7 +62,8 @@ def lazy_texts_of(module) -> list[Promise]:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
+    its schemas."""
     config = apps.get_app_config("customer")
     lazies = [
         config.verbose_name,
@@ -92,10 +94,24 @@ def visible_texts() -> set[str]:
         models.Consent.Channel,
         models.Consent.State,
         models.Consent.Source,
+        models.HealthRecord.TestResult,
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {str(text) for text in lazies} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles customer's operations give their input data (``gettext_noop``): the assistant's card names each
+    datum by them, so each one needs its Spanish. Only the ones customer wrote: pydantic leaves ``title`` empty
+    otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "customer"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -118,6 +134,19 @@ def test_the_compiled_catalog_is_current():
         msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
     }
     assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+
+
+def test_the_card_says_each_title_with_customers_own_spanish():
+    """A title customer shares with another app («Duplicate customer» with Reservations) is said with the Spanish of
+    whichever app Django merges last: if it is not customer's, customer's own entry is dead text (hub#323)."""
+    with (LOCALE / "django.mo").open("rb") as compiled:
+        own = gettext.GNUTranslations(compiled)
+    titles = schema_titles()
+    assert {"Duplicate customer", "Groups", "Note"} <= titles
+    with translation.override("es"):
+        assert {title: translation.gettext(title) for title in titles} == {
+            title: own.gettext(title) for title in titles
+        }
 
 
 def test_spanish_texts():
