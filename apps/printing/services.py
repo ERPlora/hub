@@ -62,6 +62,8 @@ from apps.printing.schemas import (
     DeviceOut,
     DeviceRefIn,
     DeviceRegisterIn,
+    DeviceSeenIn,
+    DeviceSeenOut,
     DeviceUpdateIn,
     EmptyIn,
     JobAckOut,
@@ -801,11 +803,23 @@ def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
                 device = PrintDevice.objects.create(key=key, name=data.name, registered_by=actor(ctx))
         except IntegrityError:
             device = PrintDevice.objects.select_for_update().get(key=key)
-    device.name, device.retired_at, device.retired_by = data.name, None, ""
-    device.save(update_fields=["name", "retired_at", "retired_by"])
+    # Set up from the device in hand: it is there (the old hub's «a re-registration counts as news»).
+    device.name, device.retired_at, device.retired_by, device.last_seen_at = data.name, None, "", timezone.now()
+    device.save(update_fields=["name", "retired_at", "retired_by", "last_seen_at"])
     device.printers.set(printers)
     record_event(ctx, events.DEVICE_REGISTERED, {"id": str(device.id)})
     return device_row(device, key)
+
+
+@operation("printing.device.seen", kind="command", permission="printing.print", input=DeviceSeenIn, output=DeviceSeenOut)
+def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
+    """The device's presence: base's /ws/print runs it at the hello and at the beats of a device that prints
+    (``print_presence`` of this app), as the device's user, so ``printing.print`` is all it asks — whoever is signed in
+    at the till prints. The device set up with that id (not retired) is there now; anything else is not, and nothing is
+    set up by being there. No event: every device beats every 30 s, and the bell reads the clock instead
+    (``bell_refresh_every``). No route, no API key and no assistant: the id never travels in a URL."""
+    seen = active_devices().filter(key=PrintDevice.key_of(data.device)).update(last_seen_at=timezone.now())
+    return {"seen": seen > 0}
 
 
 @operation(

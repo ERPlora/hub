@@ -4,10 +4,12 @@ their state, the state of one printer, the queue and its summary by function."""
 import datetime as dt
 
 import pytest
+from django.db.models import F
 from django.utils import timezone
 from live.errors import NotFound, PermissionDenied
 
 from apps.printing.models import Printer, PrintJob
+from apps.printing.queries import PENDING
 from apps.printing.tests.conftest import ctx_for, enqueue, printer, run
 
 pytestmark = pytest.mark.django_db
@@ -213,20 +215,31 @@ def test_the_devices_by_name_with_the_printers_each_one_reaches():
 # ── Who prints each function: the Home's «Set up your printer» and the bell's «Nothing is printing» ───────────────
 # A device set up here (not retired) prints the active printers it reaches: the jobs of those printers, and the jobs of
 # a function no printer took yet on the paper of one of them (``printing.job.claim``). A job no such device can take
-# waits for ever: that is what the bell counts (old-hub:HUB_SHELL-F63, gh:hub#800).
+# waits for ever: that is what the bell counts (old-hub:HUB_SHELL-F63, gh:hub#800) — once it has waited a minute, and
+# counting as such a device only one that gave news in the last 90 s (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF,
+# below). The Home's step asks set up only: a device off right now is not a step undone.
 
 
-def reaches(*printers, name: str = "Counter", retired: bool = False):
+def reaches(*printers, name: str = "Counter", retired: bool = False, seen: dt.timedelta | None = dt.timedelta(0)):
+    """A device set up with ``printers``; ``seen``: how long ago it last gave news (``None``: never)."""
     from apps.printing.models import PrintDevice
 
+    now = timezone.now()
     device = PrintDevice.objects.create(
-        name=name, key=PrintDevice.key_of(name), retired_at=timezone.now() if retired else None
+        name=name,
+        key=PrintDevice.key_of(name),
+        retired_at=now if retired else None,
+        last_seen_at=None if seen is None else now - seen,
     )
     device.printers.add(*(p.id for p in printers))
     return device
 
 
-def coverage(usage: str = "receipt", ctx=None):
+def coverage(usage: str = "receipt", ctx=None, *, waited: dt.timedelta | None = dt.timedelta(minutes=2)):
+    """``printing.device.coverage`` of ``usage``: (configured, count). ``waited``: read as if every job waiting had been
+    queued that long before (the bell counts what waited a minute); ``None``: as they are."""
+    if waited is not None:
+        PrintJob.objects.filter(PENDING).update(created_at=F("created_at") - waited)
     out = run("printing.device.coverage", {"usage": usage}, ctx=ctx)
     assert out.usage == usage
     return out.configured, out.count
@@ -243,11 +256,18 @@ def test_a_receipt_printer_no_device_reaches_prints_nothing_and_its_receipts_wai
     assert coverage() == (False, 2)
 
 
-def test_a_device_set_up_with_the_receipt_printer_prints_the_receipts_even_if_it_never_asked_yet():
-    # The old hub's «registered for the station, live or not» (hub#1948): a till off overnight is not a step undone.
+def test_a_device_set_up_with_the_receipt_printer_prints_the_receipts():
     reaches(printer("Till"))
     enqueue()
     assert coverage() == (True, 0)
+
+
+def test_a_device_set_up_but_off_still_ticks_the_step_and_its_receipts_ring_the_bell():
+    # The old hub's «registered for the station, live or not» (hub#1948): a till off overnight is not a step undone. But
+    # nobody is printing its receipts: the bell says so (print_hosts::is_undrained, live_hosts == 0).
+    reaches(printer("Till"), seen=dt.timedelta(minutes=5))
+    enqueue()
+    assert coverage() == (True, 1)
 
 
 def test_a_retired_device_an_inactive_printer_or_another_functions_printer_print_no_receipt():
@@ -267,6 +287,14 @@ def test_the_computers_own_printer_prints_a4_pages_not_the_receipt():
     # Sales' receipt goes on receipt paper (the thermal printer); the computer's printer takes the A4 pages only.
     reaches(printer("Office", kind="system", address=""))
     assert coverage() == (False, 0)
+
+
+def test_a_receipt_waiting_for_a_printer_is_not_printed_by_a_device_that_reaches_its_function_on_a4_only():
+    # A device reaching the computer's printer of the receipts prints their A4 pages, not their paper: a receipt
+    # queued with no receipt printer waits for nobody (the paper of printing.job.claim), on the bell too.
+    reaches(printer("Office", kind="system", address=""))
+    enqueue()
+    assert coverage() == (False, 1)
 
 
 def test_a_job_waits_for_nobody_when_its_own_printer_is_reached_by_no_device():
@@ -314,6 +342,67 @@ def test_whoever_sees_the_printers_reads_it_and_nobody_else():
         run("printing.device.coverage", {"usage": "receipt"}, ctx=ctx_for("nobody"))
 
 
+# ── The bell by the clock (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF): the old hub's ``print_hosts::is_undrained``.
+# A job waits for nobody once it has waited a minute (``UNDRAINED_ALERT_SECONDS``: not every till that restarts) and no
+# device set up to print it gave news in the last 90 s (``HOST_TTL_SECONDS``: three missed beats of 30 s). News is its
+# hello and its beats on base's /ws/print (``printing.device.seen``), asking for a job and being set up from it.
+
+
+def queued_ago(seconds: int, **more):
+    """A receipt queued ``seconds`` ago."""
+    job = enqueue(**more).job
+    PrintJob.objects.filter(pk=job.id).update(created_at=timezone.now() - dt.timedelta(seconds=seconds))
+    return job
+
+
+def test_a_receipt_waiting_a_minute_with_its_device_off_rings_the_bell():
+    reaches(printer("Till"), seen=dt.timedelta(seconds=95))
+    queued_ago(65)
+    assert coverage(waited=None) == (True, 1)
+
+
+def test_a_device_that_gave_news_in_the_last_90_seconds_prints_them_and_the_bell_is_quiet():
+    device = reaches(printer("Till"), seen=dt.timedelta(seconds=85))
+    queued_ago(65)
+    assert coverage(waited=None) == (True, 0)
+    # The till went quiet: three beats later, it counts as off.
+    type(device).objects.filter(pk=device.pk).update(last_seen_at=timezone.now() - dt.timedelta(seconds=95))
+    assert coverage(waited=None) == (True, 1)
+
+
+def test_a_device_that_never_gave_news_prints_nothing():
+    reaches(printer("Till"), seen=None)
+    queued_ago(65)
+    assert coverage(waited=None) == (True, 1)
+
+
+def test_a_receipt_queued_less_than_a_minute_ago_does_not_ring_it_yet():
+    # Not a red badge on every screen each time a till restarts (the old hub's 60 s).
+    till = printer("Till")
+    reaches(till, seen=None)
+    queued_ago(50)
+    queued_ago(5, job_key="sale:2")
+    assert coverage(waited=None) == (True, 0)
+    queued_ago(70, job_key="sale:3")
+    assert coverage(waited=None) == (True, 1), "only what waited a minute"
+
+
+def test_the_minute_counts_for_a_printer_no_device_reaches_too():
+    printer("Till")
+    queued_ago(30)
+    assert coverage(waited=None) == (False, 0)
+    queued_ago(61, job_key="sale:2")
+    assert coverage(waited=None) == (False, 1)
+
+
+def test_another_devices_news_does_not_print_a_printer_it_does_not_reach():
+    till, spare = printer("Till"), printer("Spare", address="10.0.0.9")
+    reaches(till, name="Till device", seen=dt.timedelta(minutes=5))
+    reaches(spare, name="Spare device")
+    queued_ago(65, printer=str(till.id))
+    assert coverage(waited=None) == (True, 1)
+
+
 def test_the_summary_by_function_counts_what_no_device_set_up_here_can_print():
     # The bell's «Nothing is printing “…”» leads to the printers' summary: each function says it too, so the card
     # never says «Ready» while its paper waits for nobody.
@@ -324,8 +413,24 @@ def test_the_summary_by_function_counts_what_no_device_set_up_here_can_print():
         return {row.usage: row.unattended for row in run("printing.job.summary").usages}
 
     assert unattended() == {"receipt": 1, "kitchen": 0, "bar": 0, "label": 0}
-    reaches(till)
+    reaches(till, seen=None)
+    # «Set one up» is for what no device set up prints: one set up, even off, is no device to set up.
     assert unattended()["receipt"] == 0
+
+
+def test_the_summary_by_function_counts_what_waited_a_minute_with_its_device_off_as_the_bell():
+    # Where the bell's «Nothing is printing “Receipt”» leads, the receipts' card says the device is off, not «Ready».
+    till = printer("Till")
+    device = reaches(till, seen=dt.timedelta(minutes=5))
+    queued_ago(65)
+    queued_ago(10, job_key="sale:2")
+
+    def stalled() -> dict:
+        return {row.usage: row.stalled for row in run("printing.job.summary").usages}
+
+    assert stalled() == {"receipt": 1, "kitchen": 0, "bar": 0, "label": 0}
+    type(device).objects.filter(pk=device.pk).update(last_seen_at=timezone.now())
+    assert stalled()["receipt"] == 0
 
 
 def test_a_job_waiting_without_a_printer_is_only_taken_by_a_device_of_its_own_function():

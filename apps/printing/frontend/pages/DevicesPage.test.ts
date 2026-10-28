@@ -1,5 +1,5 @@
 // Printing → Devices (PRINTING-F18; WORKBOOK «Pantallas · Dispositivos»): the devices set up to print, live, by
-// name — Name (this device marked), Printers, Last job asked and Set up by —, and what the device the page runs on
+// name — Name (this device marked), Printers, Last seen and Set up by —, and what the device the page runs on
 // does. Whoever sets up the printers sets this device up («Print from this device»), edits any device and
 // retires it after asking; everybody else reads.
 import { DataTable, type DataTableAction, type DataTableColumn } from '@erplora/ui/components';

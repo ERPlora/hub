@@ -150,7 +150,7 @@ class PrintDevice(UUIDModel):
     printers = models.ManyToManyField(Printer, related_name="devices", blank=True, verbose_name=_("printers"))
     registered_at = models.DateTimeField(_("set up at"), auto_now_add=True)
     registered_by = models.CharField(_("set up by"), max_length=ACTOR_MAX_LENGTH, blank=True)
-    last_seen_at = models.DateTimeField(_("last asked for a job at"), null=True, blank=True)
+    last_seen_at = models.DateTimeField(_("last seen at"), null=True, blank=True)
     retired_at = models.DateTimeField(_("retired at"), null=True, blank=True)
     retired_by = models.CharField(_("retired by"), max_length=ACTOR_MAX_LENGTH, blank=True)
 

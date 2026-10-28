@@ -80,9 +80,10 @@ def test_every_operation_has_a_route_and_is_open_to_api_keys():
     from live.operations import registry
 
     ops = {name for name in registry if name.startswith("printing.")}
-    # The platform's own have no door: no route, no API key, no assistant — the scheduled prune (PRINTING-F20)
-    # and the read of /ws/print's hello (printing.device.get: the device's id never travels in a URL).
-    platform = {"printing.job.prune", "printing.device.get"}
+    # The platform's own have no door: no route, no API key, no assistant — the scheduled prune (PRINTING-F20),
+    # the read of /ws/print's hello (printing.device.get: the device's id never travels in a URL) and the device's
+    # presence /ws/print tells at its hello and beats (printing.device.seen, print_presence).
+    platform = {"printing.job.prune", "printing.device.get", "printing.device.seen"}
     assert platform <= ops
     assert all(not registry[name].expose_api and not registry[name].ai for name in platform)
     ops -= platform

@@ -636,14 +636,15 @@ def test_a_manager_sets_up_this_device_and_an_employee_on_it_prints_its_printers
         ["Kitchen", "Till"],
         True,
     )
-    assert (device.registered_by, device.last_seen_at) == ("tester", None)
+    # Set up from the device in hand, it is there (seen); asking for a job is news again.
+    assert device.registered_by == "tester" and device.last_seen_at is not None
     assert events("printing.device.registered") == [{"id": str(device.id)}]
     queued = enqueue().job
     taken = take(till)
     assert taken.id == queued.id
     stored = PrintJob.objects.get(pk=queued.id)
     assert (stored.device, stored.print_device_id) == ("Counter till", device.id)
-    assert PrintDevice.objects.get(pk=device.id).last_seen_at is not None
+    assert PrintDevice.objects.get(pk=device.id).last_seen_at > device.last_seen_at
     ack = answer("printing.job.complete", queued.id)
     assert (ack.confirmed, ack.job.status, ack.job.device) == (True, "done", "Counter till")
 
@@ -795,6 +796,60 @@ def test_a_device_set_up_in_a_hub_is_told_on_that_hubs_channel_only():
     run("printing.device.retire", {"device_id": str(device.id)}, ctx=dataclasses.replace(ctx_for(MANAGER), scope=B))
     scoped = OutboxEvent.objects.filter(name__startswith="printing.device.").values_list("name", "scope_key")
     assert sorted(scoped) == [("printing.device.registered", "b"), ("printing.device.retired", "b")]
+
+
+# ── The device's presence (base's /ws/print declares it ``print_presence``; the old hub's ``print_hosts::heartbeat``) ──
+
+
+def seen_at(device_id: str = TILL_ID):
+    return PrintDevice.objects.get(key=PrintDevice.key_of(device_id)).last_seen_at
+
+
+def test_a_device_that_says_it_is_there_is_seen_now_with_an_employees_session():
+    # The socket runs it as the device's user: whoever is signed in at the till prints, an employee too (with only
+    # printing.print, never printing.manage_settings, its presence would never land).
+    register(printer("Till"))
+    PrintDevice.objects.update(last_seen_at=None)
+    before = timezone.now()
+    out = run("printing.device.seen", {"device": TILL_ID}, ctx=ctx_for(EMPLOYEE))
+    assert out.seen is True
+    assert before <= seen_at() <= timezone.now()
+
+
+def test_a_retired_device_or_one_never_set_up_here_is_not_seen():
+    device = register(printer("Till"))
+    run("printing.device.retire", {"device_id": str(device.id)}, ctx=ctx_for(MANAGER))
+    PrintDevice.objects.update(last_seen_at=None)
+    assert run("printing.device.seen", {"device": TILL_ID}, ctx=ctx_for(EMPLOYEE)).seen is False
+    assert seen_at() is None
+    assert run("printing.device.seen", {"device": SPARE_ID}, ctx=ctx_for(EMPLOYEE)).seen is False
+    assert not PrintDevice.objects.filter(key=PrintDevice.key_of(SPARE_ID)).exists(), "being there sets nothing up"
+
+
+def test_whoever_cannot_print_is_refused_and_nothing_is_seen():
+    register(printer("Till"))
+    PrintDevice.objects.update(last_seen_at=None)
+    with pytest.raises(PermissionDenied):
+        run("printing.device.seen", {"device": TILL_ID}, ctx=ctx_for("nobody"))
+    assert seen_at() is None
+
+
+def test_being_seen_records_no_event_so_a_beat_wakes_no_screen():
+    # Every device beats every 30 s: an event would re-run the printers, the devices, the queue and the Home of every
+    # client each time. The bell reads the clock instead (bell_refresh_every).
+    register(printer("Till"))
+    events = OutboxEvent.objects.count()
+    for _ in range(3):
+        run("printing.device.seen", {"device": TILL_ID}, ctx=ctx_for(EMPLOYEE))
+    assert OutboxEvent.objects.count() == events
+
+
+def test_setting_a_device_up_from_it_is_news_that_it_is_there():
+    # The old hub's «a heartbeat or a re-registration both count as news»: set up from the device in hand, it is there.
+    before = timezone.now()
+    device = register(printer("Till"))
+    assert before <= seen_at() <= timezone.now()
+    assert device.last_seen_at == seen_at()
 
 
 def test_the_channel_reads_the_printers_of_the_device_that_says_hello():
@@ -991,6 +1046,16 @@ def test_a_job_queued_in_b_wakes_b_only(listen):
     on_a, on_b = listen(A), listen(B)
     run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, ctx_for(scope=B))
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": ["printing.job.queued"]})]
+    assert received(on_a, timeout=0.3) == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_device_seen_in_b_tells_neither_b_nor_a(listen):
+    till = run("printing.printer.create", {"name": "Till", "kind": "network", "address": "10.0.0.1", "usage": "receipt"}, ctx_for(scope=B))
+    run("printing.device.register", {"name": "Till", "printers": [str(till.id)]}, ctx=dataclasses.replace(on_device(TILL_ID), scope=B))
+    on_a, on_b = listen(A), listen(B)
+    assert run("printing.device.seen", {"device": TILL_ID}, ctx=ctx_for(EMPLOYEE, scope=B)).seen is True
+    assert received(on_b, timeout=0.3) == []
     assert received(on_a, timeout=0.3) == []
 
 

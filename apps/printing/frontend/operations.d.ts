@@ -208,6 +208,8 @@ export interface UsageSummary {
   failed: number;
   /** Its jobs waiting that no device set up here can print. */
   unattended: number;
+  /** Its jobs that have waited a minute or more with no device on (seen in the last 90 s) to print them: the bell's. */
+  stalled: number;
 }
 
 export interface JobSummaryOut {
@@ -260,9 +262,9 @@ export interface DevicePrinterOut {
 /** Who prints a function: the Home's «Set up your printer» (`configured`, receipts) and the bell's «Nothing is printing». */
 export interface CoverageOut {
   usage: Usage;
-  /** A device set up here reaches an active printer of the function on receipt paper. */
+  /** A device set up here reaches an active printer of the function on receipt paper, on or not. */
   configured: boolean;
-  /** Its jobs waiting that no device set up here can print. */
+  /** Its jobs that have waited a minute or more with no device on (seen in the last 90 s) to print them. */
   count: number;
 }
 
@@ -274,7 +276,7 @@ export interface DeviceOut {
   printers: DevicePrinterOut[];
   registered_at: string;
   registered_by: string;
-  /** When it last asked for a job; null = never yet. */
+  /** When it last gave news: set up from it, connected to print (each beat) or asked for a job; null = never yet. */
   last_seen_at: string | null;
   /** It is the device the page runs on. */
   this_device: boolean;

@@ -43,6 +43,12 @@ MAX_ATTEMPTS = 5
 LEASE = dt.timedelta(seconds=90)
 #: A job of a printer queued for longer than this makes the printer «waiting».
 WAITING_AFTER = dt.timedelta(minutes=1)
+#: A job that has waited this long with no device there to print it rings the bell: not every till that restarts
+#: (the old hub's ``UNDRAINED_ALERT_SECONDS``).
+STALLED_AFTER = dt.timedelta(seconds=60)
+#: A device set up here is there while its last news is this recent: its hello or a beat on base's /ws/print, asking for
+#: a job or being set up from it (the old hub's ``HOST_TTL_SECONDS``: three missed beats of 30 s).
+SEEN_WITHIN = dt.timedelta(seconds=90)
 #: The functions, in the order the screens and the summary show them.
 USAGES = [usage.value for usage in Usage]
 #: The settings' field of each function's printer.
@@ -377,16 +383,13 @@ def list_jobs(ctx: OperationContext, params: JobListIn) -> dict:
     return {"rows": [job_row(job, now) for job in page], "total": total, "limit": params.limit, "offset": params.offset}
 
 
-def coverage(usages: list[str]) -> dict[str, tuple[bool, int]]:
-    """Per function: whether a device set up here reaches an active printer of it on receipt paper, and how many of
-    its jobs wait that no device set up here can print.
+def _takeable(devices: QuerySet[PrintDevice], usages: list[str]) -> tuple[set[tuple[str, str]], Q]:
+    """What ``devices`` print: the (function, paper) of the active printers they reach, and the waiting jobs they take.
 
-    A device set up here (not retired) prints the active printers it reaches: the jobs of those printers, and the jobs
-    of a function no printer took yet on the paper of one of them (``printing.job.claim``). Set up is enough, as the old
-    hub's registration for a station: a device off right now is not a step undone. Only waiting jobs count: one a device
-    has is that device's, and one that ended waits for nobody.
+    A device prints the active printers it reaches: the jobs of those printers, and the jobs of a function no printer
+    took yet on the paper of one of them (``printing.job.claim``).
     """
-    reached = Printer.objects.filter(is_active=True, devices__in=active_devices())
+    reached = Printer.objects.filter(is_active=True, devices__in=devices)
     papers = {
         (usage, PrintJob.Format.A4 if kind == Printer.Kind.SYSTEM else PrintJob.Format.RECEIPT)
         for usage, kind in reached.filter(usage__in=usages).values_list("usage", "kind").distinct()
@@ -394,13 +397,40 @@ def coverage(usages: list[str]) -> dict[str, tuple[bool, int]]:
     takeable = Q(printer__in=reached)
     for usage, paper in papers:
         takeable |= Q(printer__isnull=True, usage=usage, format=paper)
-    jobs = {
-        row["usage"]: row["waiting"] - row["takeable"]
-        for row in PrintJob.objects.filter(PENDING, usage__in=usages)
-        .values("usage")
-        .annotate(waiting=Count("id"), takeable=Count("id", filter=takeable))
-    }
+    return papers, takeable
+
+
+def _waiting_for_nobody(usages: list[str], takeable: Q, since=None) -> dict[str, int]:
+    """Per function, how many of its jobs wait (queued at ``since`` or before, if given) that ``takeable`` leaves."""
+    jobs = PrintJob.objects.filter(PENDING, usage__in=usages)
+    if since is not None:
+        jobs = jobs.filter(created_at__lte=since)
+    rows = jobs.values("usage").annotate(waiting=Count("id"), takeable=Count("id", filter=takeable))
+    return {row["usage"]: row["waiting"] - row["takeable"] for row in rows}
+
+
+def coverage(usages: list[str]) -> dict[str, tuple[bool, int]]:
+    """Per function: whether a device set up here reaches an active printer of it on receipt paper, and how many of
+    its jobs wait that no device set up here can print.
+
+    Set up is enough, as the old hub's registration for a station: a device off right now is not a step undone, nor a
+    device to set up (:func:`stalled` says whether it is on). Only waiting jobs count: one a device has is that
+    device's, and one that ended waits for nobody.
+    """
+    papers, takeable = _takeable(active_devices(), usages)
+    jobs = _waiting_for_nobody(usages, takeable)
     return {usage: ((usage, PrintJob.Format.RECEIPT) in papers, jobs.get(usage, 0)) for usage in usages}
+
+
+def stalled(usages: list[str]) -> dict[str, int]:
+    """Per function, the bell's «Nothing is printing»: its jobs that have waited :data:`STALLED_AFTER` or more and that
+    no device there can print — one set up here whose last news is within :data:`SEEN_WITHIN` (the old hub's
+    ``print_hosts::is_undrained``). A device set up but off prints nothing: nobody is printing its papers."""
+    now = timezone.now()
+    there = active_devices().filter(last_seen_at__gte=now - SEEN_WITHIN)
+    _papers, takeable = _takeable(there, usages)
+    jobs = _waiting_for_nobody(usages, takeable, since=now - STALLED_AFTER)
+    return {usage: jobs.get(usage, 0) for usage in usages}
 
 
 @operation(
@@ -412,7 +442,8 @@ def coverage(usages: list[str]) -> dict[str, tuple[bool, int]]:
     expose_api=True,
     ai={
         "description": "How printing is going, by function (receipts, kitchen, bar, labels): its active printers, the "
-        "one chosen in the settings, how many jobs wait and since when, how many a device has and how many failed."
+        "one chosen in the settings, how many jobs wait and since when, how many a device has, how many failed, and "
+        "how many have waited a minute with no device on to print them."
     },
 )
 def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
@@ -430,7 +461,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
     for printer in Printer.objects.filter(is_active=True).order_by(_SYSTEM_LAST, Lower("name"), "id"):
         active.setdefault(printer.usage, []).append(printer)
     settings = current_settings()
-    reach = coverage(USAGES)
+    reach, stuck = coverage(USAGES), stalled(USAGES)
     usages = []
     for usage in USAGES:
         row = counts.get(usage, {})
@@ -448,6 +479,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
                 "sent": row.get("sent", 0),
                 "failed": row.get("failed", 0),
                 "unattended": reach[usage][1],
+                "stalled": stuck[usage],
             }
         )
     return {
@@ -514,7 +546,8 @@ def device_row(device: PrintDevice, this_key: str | None) -> dict:
     expose_api=True,
     ai={
         "description": "List the devices set up to print, by name: the printers each one reaches and prints for, who set "
-        "it up and when it last asked for a job. Only these devices print; their own ids are never shown."
+        "it up and when it was last seen (connected to print, or asked for a job). Only these devices print; their own "
+        "ids are never shown."
     },
 )
 def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
@@ -545,11 +578,12 @@ def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
     output=CoverageOut,
     expose_api=True,
     ai={
-        "description": "Whether a function (receipt, kitchen, bar, label) has a device set up to print it, and how many of "
-        "its jobs wait that no device set up here can print. «Is anybody printing the kitchen orders?»"
+        "description": "Whether a function (receipt, kitchen, bar, label) has a device set up to print it, on or not, and "
+        "how many of its jobs have waited a minute or more with no device on to print them (none set up for them, or "
+        "the one set up gave no news in the last 90 s). «Is anybody printing the kitchen orders?»"
     },
 )
 def device_coverage(ctx: OperationContext, params: CoverageIn) -> dict:
     """The Home's «Set up your printer» (``configured`` of the receipts) and the bell's «Nothing is printing» (``count``)."""
-    configured, unattended = coverage([params.usage])[params.usage]
-    return {"usage": params.usage, "configured": configured, "count": unattended}
+    configured, _unattended = coverage([params.usage])[params.usage]
+    return {"usage": params.usage, "configured": configured, "count": stalled([params.usage])[params.usage]}
