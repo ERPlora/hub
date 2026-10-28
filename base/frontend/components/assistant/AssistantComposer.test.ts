@@ -192,6 +192,29 @@ describe('AssistantComposer', () => {
     expect(posted).toEqual([]);
   });
 
+  // FIX-HUB-BASE-ASSISTANT-MIC-DOUBLE-TAP-OPENS-TWO-RECORDINGS: a second tap while the browser still asks for the
+  // microphone opened a second recording, and the first one stayed on, untranscribed, until its two minutes.
+  it('two taps while the browser asks for the microphone open one recording, and the next tap transcribes it', async () => {
+    let allow: (stream: MediaStream) => void = () => undefined;
+    const voice = {
+      ...microphone(),
+      getUserMedia: vi.fn(() => new Promise<MediaStream>((resolve) => (allow = resolve))),
+    };
+    const m = await composer({ voice });
+    await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+    await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+    await flush();
+    expect(voice.getUserMedia).toHaveBeenCalledTimes(1);
+    allow({ getTracks: () => [{ stop: () => undefined }] } as unknown as MediaStream);
+    for (let i = 0; i < 3; i += 1) await flush();
+    expect(accessibleName(m.wrapper.get('[data-testid="assistant-mic"]').element)).toBe('Detener la grabación');
+    await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+    for (let i = 0; i < 6; i += 1) await flush();
+    expect(m.sent).toHaveLength(1);
+    expect(assistant.state.draft).toBe('dos cafés');
+    expect(voice.getUserMedia).toHaveBeenCalledTimes(1);
+  });
+
   it('a microphone refused, or a dictation nobody said anything in, says so in a line', async () => {
     const denied = { ...microphone(), getUserMedia: vi.fn(async () => Promise.reject(new DOMException('no', 'NotAllowedError'))) };
     const m = await composer({ voice: denied });
@@ -209,6 +232,19 @@ describe('AssistantComposer', () => {
     expect(silent.wrapper.get('[data-testid="assistant-composer-problem"]').text()).toBe(
       'No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.',
     );
+  });
+
+  it('the line about a refused microphone stays until the next tap, which records once it is allowed', async () => {
+    const voice = microphone();
+    voice.getUserMedia.mockRejectedValueOnce(new DOMException('no', 'NotAllowedError'));
+    const m = await composer({ voice });
+    await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+    for (let i = 0; i < 3; i += 1) await flush();
+    expect(m.wrapper.find('[data-testid="assistant-composer-problem"]').exists()).toBe(true);
+    await m.wrapper.get('[data-testid="assistant-mic"]').trigger('click');
+    for (let i = 0; i < 3; i += 1) await flush();
+    expect(m.wrapper.find('[data-testid="assistant-composer-problem"]').exists()).toBe(false);
+    expect(accessibleName(m.wrapper.get('[data-testid="assistant-mic"]').element)).toBe('Detener la grabación');
   });
 
   // BASE-F94: the installed app (Android, Windows) has no browser bar, so a refused microphone is allowed again in the

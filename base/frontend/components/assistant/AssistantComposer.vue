@@ -2,12 +2,12 @@
 // The assistant's composer, at the foot of its panel (BASE-G111, G112; the old hub's drawer foot): attach, dictate, the
 // box and «Send» — «Stop» while the answer comes. Enter sends on a keyboard; Shift+Enter, and Enter on a touch screen,
 // are a new line. The files erplora.com reads become chips that can be removed before sending; a refusal (type, size,
-// microphone, an empty dictation) is one line above the box until the next try. A dictation lands in the box after what
-// was written and is never sent by itself. What is written outlives the panel (it is the assistant's `draft`).
-import { HubIcon, nativeBridge } from '@erplora/ui/shell';
-import { useLiveClient } from '@erplora/ui/sdk';
+// microphone, an empty dictation) is one line above the box until the next try. A dictation (base's, `useDictation`:
+// one recording per tap) lands in the box after what was written and is never sent by itself. What is written outlives
+// the panel (it is the assistant's `draft`).
+import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonIcon, IonSpinner, IonTextarea } from '@ionic/vue';
-import { computed, onBeforeUnmount, ref, shallowRef, useTemplateRef } from 'vue';
+import { computed, shallowRef, useTemplateRef } from 'vue';
 
 import { useAssistant } from '../../lib/assistant';
 import { ASSISTANT_ICONS } from '../../lib/assistant-icons';
@@ -16,33 +16,31 @@ import {
   base64Of,
   browserVoice,
   bytesOf,
-  canDictate,
   enterSends,
   fileProblem,
   mimeOf,
   type Problem,
-  type Recording,
-  recordVoice,
   type VoiceEnv,
 } from '../../lib/assistant-input';
+import { useDictation } from '../../lib/dictation';
 import { useBaseI18n } from '../../lib/i18n';
-
-/** erplora.com transcribes up to 2 MB of audio. */
-const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 
 const props = withDefaults(defineProps<{ offline: boolean; voice?: VoiceEnv }>(), { voice: () => browserVoice() });
 
-const { t, locale } = useBaseI18n();
-const client = useLiveClient();
+const { t } = useBaseI18n();
 const assistant = useAssistant();
 const state = assistant.state;
 
 const picker = useTemplateRef<HTMLInputElement>('picker');
 const problem = shallowRef<Problem | null>(null);
-const recording = shallowRef<Recording | null>(null);
-const transcribing = ref(false);
+const dictation = useDictation({
+  voice: () => props.voice,
+  onProblem: (reason) => {
+    problem.value = { key: `base.assistant.voice.${reason}`, values: {} };
+  },
+});
+const { available: canDictate, recording, transcribing } = dictation;
 
-const dictation = computed(() => canDictate(props.voice));
 const canSend = computed(() => !props.offline && !state.busy && (state.draft.trim() !== '' || state.files.length > 0));
 
 function onInput(event: CustomEvent<{ value?: string | null }>): void {
@@ -101,65 +99,10 @@ function remove(index: number): void {
   state.files.splice(index, 1);
 }
 
-async function transcribe(current: Recording): Promise<void> {
-  transcribing.value = true;
-  try {
-    const clip = await current.stop();
-    if (clip.blob.size > MAX_AUDIO_BYTES) {
-      problem.value = { key: 'base.assistant.voice.tooLong', values: {} };
-      return;
-    }
-    const answer = await client.api.call('base.assistant.transcribe', {
-      audio: await base64Of(clip.blob),
-      mime_type: clip.mime,
-      language: locale.value,
-    });
-    const words = answer.text.trim();
-    if (!words) {
-      problem.value = { key: 'base.assistant.voice.empty', values: {} };
-      return;
-    }
-    const before = state.draft.trimEnd();
-    state.draft = before ? `${before} ${words}` : words;
-  } catch (error) {
-    console.error('assistant: dictation failed', error);
-    problem.value = { key: 'base.assistant.voice.failed', values: {} };
-  } finally {
-    transcribing.value = false;
-  }
-}
-
-async function toggleMic(): Promise<void> {
-  if (transcribing.value) return;
+function toggleMic(): void {
   problem.value = null;
-  const current = recording.value;
-  if (current) {
-    recording.value = null;
-    await transcribe(current);
-    return;
-  }
-  try {
-    // Two minutes: it stops by itself and what was said is transcribed.
-    const started = await recordVoice(props.voice, () => {
-      if (recording.value === started) {
-        recording.value = null;
-        void transcribe(started);
-      }
-    });
-    recording.value = started;
-  } catch (error) {
-    const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
-    if (!denied) console.error('assistant: the microphone did not start', error);
-    // The installed app has no browser bar: there the microphone is allowed again in the device's settings.
-    const refused = nativeBridge() ? 'base.assistant.voice.deniedInApp' : 'base.assistant.voice.denied';
-    problem.value = { key: denied ? refused : 'base.assistant.voice.failed', values: {} };
-  }
+  void dictation.toggle();
 }
-
-onBeforeUnmount(() => {
-  recording.value?.cancel();
-  recording.value = null;
-});
 </script>
 
 <template>
@@ -229,7 +172,7 @@ onBeforeUnmount(() => {
         />
       </ion-button>
       <ion-button
-        v-if="dictation"
+        v-if="canDictate"
         fill="clear"
         size="small"
         class="assistant-composer-tool"
