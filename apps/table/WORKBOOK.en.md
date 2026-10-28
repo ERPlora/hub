@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7d9be9249b0cb268284a99d0406443fe20ea85afd199bbbab60a67fc83862d56 -->
+<!-- generated from WORKBOOK.md sha256:b7dca107dbb766c303977d329b14c5c04b6fab7cb76304aefae90887dc2b573a -->
 
 ## What it is for and who it is for
 
@@ -628,7 +628,10 @@ Screen: none (it is seen on the Floor plan)
 Steps:
 1. In Reservations, a booking with a table becomes Confirmed (or is born already confirmed).
 2. In that same operation, Tables sets that table aside for the booking from its date and time (the business's) until its length
-   ends (120 minutes if it brings none), with its guests, its name and its customer card.
+   ends (120 minutes if it brings none), with its guests, its name and its customer card. The night the clocks change the
+   length is the real one: a 90-minute booking sets the table aside for 90 minutes, not an hour more nor an hour less. A time
+   that repeats (02:30 on the October night) is the first one, still on summer time; one that does not exist (02:30 on the
+   March night) becomes 03:30.
 3. From 60 minutes before its time the table shows Reserved; before that, Available with "Ana · 21:00".
 4. A table can have several bookings held; the plan shows today's earliest.
 In: from Reservations, the booking with its table, date, time, length, guests, name and card.
@@ -645,8 +648,8 @@ Screen: none (it is seen on the Floor plan)
 Steps:
 1. In Reservations the table, the date, the time, the length, the guests or the name of a held booking
    is changed.
-2. In that same operation, Tables moves the hold to the new table and to the new time; if the booking's table is taken away,
-   it releases the hold.
+2. In that same operation, Tables moves the hold to the new table and to the new time, with the same real length (also
+   the night the clocks change); if the booking's table is taken away, it releases the hold.
 In: from Reservations, the changed booking.
 Out: the hold moved or released (announces: `table.table.held` or `table.table.hold_released`).
 If it fails: a new table that is deleted, deactivated or out of service does not receive the hold:

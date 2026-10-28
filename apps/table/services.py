@@ -1245,8 +1245,11 @@ def expire_holds(ctx: OperationContext, data: NoIn) -> dict:
 
 
 def _window(day: dt.date, at: dt.time, minutes: int) -> tuple[dt.datetime, dt.datetime]:
-    """A reservation's window: its wall-clock day and time, in the business's zone."""
-    start = dt.datetime.combine(day, at, tzinfo=business_zone())
+    """A reservation's window: it starts at its wall-clock day and time in the business's zone and lasts
+    its minutes of real time, in UTC (wall-clock arithmetic held a table an hour longer or shorter the
+    night the clocks change). A time that happens twice is the occurrence ``at.fold`` says (a time from
+    Reservations: the first); a time the clocks skip moves forward by the gap."""
+    start = dt.datetime.combine(day, at, tzinfo=business_zone()).astimezone(dt.UTC)
     return start, start + dt.timedelta(minutes=minutes)
 
 

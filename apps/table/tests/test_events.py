@@ -141,14 +141,22 @@ def test_an_erasure_without_a_card_touches_no_hold():
 # ── Reservations: the operations it calls by name inside its transaction ─────────────────────────
 
 
+#: A reservation's day and time on the business's wall clock, fixed: built from the test's clock, the
+#: night the clocks went back it fell (hub#254).
+SERVICE_DAY, SERVICE_TIME = "2026-10-14", "21:00"
+
+
+def utc(*parts: int) -> dt.datetime:
+    return dt.datetime(*parts, tzinfo=dt.UTC)
+
+
 def reservation(status: str, table, ref: str = "res-1", **more) -> dict:
-    start = timezone.localtime() + dt.timedelta(minutes=30)
     return {
         "id": ref,
         "status": status,
         "table_id": str(table.id) if table else None,
-        "date": start.date().isoformat(),
-        "time": start.strftime("%H:%M"),
+        "date": SERVICE_DAY,
+        "time": SERVICE_TIME,
         "duration_minutes": 90,
         "party_size": 4,
         "guest_name": "Ana",
@@ -179,8 +187,74 @@ def test_a_confirmed_reservation_holds_its_table_once_in_the_business_zone():
         4,
     )
     local = timezone.localtime(hold.held_from)
-    assert local.strftime("%H:%M") == payload["time"]
+    assert (local.date().isoformat(), local.strftime("%H:%M")) == (SERVICE_DAY, SERVICE_TIME)
     assert hold.held_until - hold.held_from == dt.timedelta(minutes=90)
+
+
+@pytest.mark.parametrize(
+    ("day", "time", "starts"),
+    [
+        # The night the clocks go back (03:00 summer time → 02:00 winter time): 90 minutes, not 150.
+        ("2026-10-25", "01:37", utc(2026, 10, 24, 23, 37)),
+        # The night the clocks go forward (02:00 winter time → 03:00 summer time): 90 minutes, not 30.
+        ("2026-03-29", "01:30", utc(2026, 3, 29, 0, 30)),
+        # A time that happens twice is its first occurrence (still summer time), as calendars do.
+        ("2026-10-25", "02:30", utc(2026, 10, 25, 0, 30)),
+        # A time the clocks skip moves forward by the gap: 02:30 is 03:30 summer time.
+        ("2026-03-29", "02:30", utc(2026, 3, 29, 1, 30)),
+    ],
+)
+def test_a_reservation_the_night_the_clocks_change_holds_its_table_for_its_real_duration(
+    day, time, starts
+):
+    table = make_table("6", zone=make_zone())
+    sync(reservation("confirmed", table, date=day, time=time))
+    hold = Hold.objects.get()
+    assert (hold.held_from, hold.held_until) == (
+        starts,
+        starts + dt.timedelta(minutes=90),
+    )
+
+
+@pytest.mark.parametrize(
+    ("day", "change", "starts"),
+    [
+        # Only its time changes, the night the clocks go back.
+        ("2026-10-25", {"time": "01:45"}, utc(2026, 10, 24, 23, 45)),
+        # Only its day changes, into that night.
+        ("2026-10-18", {"date": "2026-10-25"}, utc(2026, 10, 24, 23, 37)),
+    ],
+)
+def test_a_reservation_moved_the_night_the_clocks_change_keeps_its_real_duration(
+    day, change, starts
+):
+    table = make_table("6", zone=make_zone())
+    sync(reservation("confirmed", table, date=day, time="01:37"))
+    move({"id": "res-1", **change})
+    hold = Hold.objects.get()
+    assert (hold.held_from, hold.held_until) == (
+        starts,
+        starts + dt.timedelta(minutes=90),
+    )
+
+
+def test_a_hold_at_the_second_of_a_repeated_time_stays_there_when_only_its_duration_changes():
+    """02:30 happens twice the night the clocks go back: a hold at the second one (winter time) keeps it."""
+    table = make_table("6", zone=make_zone())
+    second = utc(2026, 10, 25, 1, 30)
+    Hold.objects.create(
+        table=table,
+        source="reservation",
+        source_ref="res-1",
+        held_from=second,
+        held_until=second + dt.timedelta(minutes=60),
+    )
+    move({"id": "res-1", "duration_minutes": 90})
+    hold = Hold.objects.get()
+    assert (hold.held_from, hold.held_until) == (
+        second,
+        second + dt.timedelta(minutes=90),
+    )
 
 
 def test_a_cancelled_or_no_show_reservation_releases_its_hold_without_its_name():
@@ -217,19 +291,20 @@ def test_an_updated_reservation_moves_its_hold_and_one_without_a_table_releases_
     old, new = make_table("1", zone=zone), make_table("2", zone=zone)
     sync(reservation("confirmed", old)
     )
-    later = timezone.localtime() + dt.timedelta(hours=2)
     move(
         {
             "id": "res-1",
             "table_id": str(new.id),
-            "time": later.strftime("%H:%M"),
-            "date": later.date().isoformat(),
+            "time": "23:00",
+            "date": "2026-10-15",
         },
     )
     hold = Hold.objects.get()
-    assert (hold.table_id, timezone.localtime(hold.held_from).strftime("%H:%M")) == (
+    later = timezone.localtime(hold.held_from)
+    assert (hold.table_id, later.date().isoformat(), later.strftime("%H:%M")) == (
         new.id,
-        later.strftime("%H:%M"),
+        "2026-10-15",
+        "23:00",
     )
     move({"id": "res-1", "table_id": None}
     )
