@@ -16,6 +16,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     ConfigDict,
@@ -45,6 +46,12 @@ SAY_WHICH_ENTRY = _("Say which waitlist entry: its id, or its guest's name or ph
 SLOT_ENDS_BEFORE = _("A slot has to end after it starts.")
 BLOCK_NEEDS_HOURS = _("Give the hours it blocks, or block the whole day.")
 BLOCK_ENDS_BEFORE = _("The blocked hours have to end after they start.")
+
+# How the Reservations screens name the data the models do not (the assistant's card names each datum by its title).
+GUEST = gettext_noop("Guest")
+ZONE = gettext_noop("Zone")
+BOOK_ANYWAY = gettext_noop("Book anyway")
+ON_BEHALF_OF = gettext_noop("On behalf of the customer")
 
 Status = Literal["pending", "confirmed", "seated", "completed", "cancelled", "no_show"]
 Source = Literal["phone", "in_person", "waitlist", "whatsapp", "online"]
@@ -227,10 +234,12 @@ class ReservationRefIn(In):
     id: UUID | None = Field(None, description="The reservation's id.")
     guest: Said | None = Field(
         None,
+        title=GUEST,
         description="The guest's name or phone, when the id is not known («Ana», «600 111 222»).",
     )
     day: dt.date | None = Field(
         None,
+        title=gettext_noop("Reservation date"),
         description="The reservation's day, YYYY-MM-DD, to tell it apart when the guest has several.",
     )
 
@@ -261,7 +270,7 @@ class ReservationIn(In):
     )
     table_id: UUID | None = Field(None, description=D_TABLE_ID)
     table: Said | None = Field(None, description=D_TABLE)
-    zone: Said | None = Field(None, description=D_ZONE)
+    zone: Said | None = Field(None, title=ZONE, description=D_ZONE)
     source: BookingSource = Field(
         "phone",
         description="How it was booked: phone, in_person, whatsapp or online (the last two keep the minimum notice).",
@@ -272,7 +281,7 @@ class ReservationIn(In):
     internal_notes: Notes = Field(
         "", description="The restaurant's own notes, never shown to the guest."
     )
-    overbook: bool = Field(False, description=D_OVERBOOK)
+    overbook: bool = Field(False, title=BOOK_ANYWAY, description=D_OVERBOOK)
 
     @model_validator(mode="after")
     def _for_whom(self):
@@ -295,21 +304,27 @@ class ReservationPatchIn(ReservationRefIn):
     )
     table_id: UUID | None = Field(None, description="The new table (an id of Tables).")
     table: Said | None = Field(None, description="The new table's number, e.g. «5».")
-    zone: Said | None = Field(None, description=D_ZONE)
+    zone: Said | None = Field(None, title=ZONE, description=D_ZONE)
     no_table: bool = Field(
-        False, description="True leaves the reservation without a table."
+        False,
+        title=gettext_noop("No table"),
+        description="True leaves the reservation without a table.",
     )
     notes: Notes | None = Field(None, description="The guest's new notes.")
     internal_notes: Notes | None = Field(
         None, description="The restaurant's new internal notes."
     )
-    overbook: bool = Field(False, description=D_OVERBOOK)
-    on_behalf_of: UUID | None = Field(None, description=D_ON_BEHALF_OF)
+    overbook: bool = Field(False, title=BOOK_ANYWAY, description=D_OVERBOOK)
+    on_behalf_of: UUID | None = Field(
+        None, title=ON_BEHALF_OF, description=D_ON_BEHALF_OF
+    )
 
 
 class CancelIn(ReservationRefIn):
     reason: _text(500) = Field("", description="Why it is cancelled (optional).")
-    on_behalf_of: UUID | None = Field(None, description=D_ON_BEHALF_OF)
+    on_behalf_of: UUID | None = Field(
+        None, title=ON_BEHALF_OF, description=D_ON_BEHALF_OF
+    )
 
 
 class ReservationOut(Schema):
@@ -664,10 +679,13 @@ class WaitlistIn(In):
 class WaitlistRefIn(In):
     id: UUID | None = Field(None, description="The entry's id.")
     guest: Said | None = Field(
-        None, description="The guest's name or phone, when the id is not known."
+        None,
+        title=GUEST,
+        description="The guest's name or phone, when the id is not known.",
     )
     day: dt.date | None = Field(
         None,
+        title=gettext_noop("Date"),
         description="The entry's day, to tell it apart when the guest waits for several.",
     )
 
@@ -681,6 +699,7 @@ class WaitlistRefIn(In):
 class WaitlistConvertIn(WaitlistRefIn):
     overbook: bool = Field(
         False,
+        title=gettext_noop("Convert anyway"),
         description="True converts it into a slot already full, knowingly (after a reservation.no_capacity refusal).",
     )
 
@@ -787,7 +806,11 @@ class MergedIn(Reaction):
     """``customer.customer.merged``: the card that stays and the one absorbed."""
 
     id: UUID | None = Field(None, description="The card that stays.")
-    absorbed_id: UUID | None = Field(None, description="The card merged into it.")
+    absorbed_id: UUID | None = Field(
+        None,
+        title=gettext_noop("Duplicate customer"),
+        description="The card merged into it.",
+    )
 
 
 class CustomerEventIn(Reaction):

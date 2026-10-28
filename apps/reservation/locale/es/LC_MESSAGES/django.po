@@ -398,3 +398,31 @@ msgstr ""
 
 msgid "Send overbook as true to book this full slot anyway."
 msgstr "Envía overbook como true para reservar igualmente esta franja llena."
+
+# How the assistant's card names the data of reservation's writes (titles of the schemas).
+msgid "Guest"
+msgstr "Cliente"
+
+msgid "Reservation date"
+msgstr "Fecha de la reserva"
+
+msgid "Date"
+msgstr "Fecha"
+
+msgid "Zone"
+msgstr "Zona"
+
+msgid "No table"
+msgstr "Sin mesa"
+
+msgid "Book anyway"
+msgstr "Reservar igualmente"
+
+msgid "Convert anyway"
+msgstr "Convertir igualmente"
+
+msgid "On behalf of the customer"
+msgstr "En nombre del cliente"
+
+msgid "Duplicate customer"
+msgstr "Ficha duplicada"
