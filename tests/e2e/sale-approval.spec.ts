@@ -14,17 +14,24 @@
 // apps goes with it by the platform's rule: a sale paid with Lucía's voucher and a shampoo by card, voided by the
 // cashier with the owner's PIN, gives its session back to the voucher and its rectifying invoice is issued in the void
 // (the cashier may do neither on their own). Screenshots of that approval in the three viewports.
+// flow: SALE-F14
+// FIX-HUB-SALE-APPROVAL-WITHOUT-FIGURE-DECLARATION (SALE-F14; BASE-F84, F85; sales#398, sales#403, hub#2180): with a
+// maximum discount of 10 %, the cashier puts 50 % on a line at Sell and «An approval is needed» says that 50 %, then a
+// fixed amount on the check and it says that amount in the business's currency, as Square and Toast print what the
+// manager approves; the owner approves each with their PIN and the check keeps it. Screenshots of the dialog with the
+// figure in the three viewports; the maximum goes back to what it was.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
-import { cleanInventory, createProduct } from './inventory-helpers';
+import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post } from './service-helpers';
 
 const KEY = 'FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL';
 const VOUCHER_KEY = 'FIX-HUB-SALE-OWN-COPY-OF-APPROVED-COMMAND-CONSEQUENCES';
+const FIGURE_KEY = 'FIX-HUB-SALE-APPROVAL-WITHOUT-FIGURE-DECLARATION';
 const SKU = `E2E-APR-${stamp()}`;
 const OWNER_PIN = '2468';
 /** The dialog over Sales at a phone, a tablet and a desk (the SaaS panel's `VIEWPORTS`). */
@@ -43,6 +50,9 @@ let toRefund: SaleOut;
 let toKeep: SaleOut;
 let ownerName = '';
 let cashierName = '';
+let article: Product;
+/** The till's discount settings as the run found them (`null`: not read yet), given back after it. */
+let discountsWere: { allow_discounts: boolean; max_discount_percent: number } | null = null;
 
 /**
  * The username of whoever is signed in on `context`. Not by email: a hub database kept from a stack whose SaaS was
@@ -80,7 +90,7 @@ test.beforeAll(async ({ browser }) => {
   await login(owner.page, A, '/sale/sales');
   ownerName = await usernameOf(context);
   await drawerOff(context);
-  await createProduct(context, { name: 'E2E Approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
+  article = await createProduct(context, { name: 'E2E Approval', sku: SKU, price: 450, tax_category_key: 'product.generic' });
   toVoid = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toRefund = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
   toKeep = await chargeByApi(context, { lines: [{ product: SKU }], payments: [{ method: 'card' }] });
@@ -95,6 +105,10 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
+  if (discountsWere && owner) {
+    const back = await api(owner.context, A, 'POST', '/sale/settings', discountsWere);
+    expect(back.status, 'the discount settings back as they were').toBe(200);
+  }
   forgetThePinAndTheApprovals();
   cleanSales();
   cleanServices();
@@ -263,4 +277,105 @@ test('SALE-F30, SALE-F32: an approved void of a sale paid with a voucher gives t
   const stored = await detail(sale);
   expect([stored.status, stored.voided_by, stored.void_invoice_status]).toEqual(['voided', cashierName, 'issued']);
   expect(sessionOf(sale)).toBe('returned');
+});
+
+// ── SALE-F14: «An approval is needed» says the figure that is approved ─────────────────────────────────────────────────
+
+/** `text` as a pattern, any space as any space: the Hub writes «50 %» and «1,00 €» with a non-breaking one. */
+const loose = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s/g, '\\s');
+
+/** What the dialog says is approved, in Spanish (the cashier's language from here on, and the longest texts). */
+const approving = (said: string): RegExp => new RegExp(`^Se aprueba: ${loose(said)}$`);
+
+/** The business's money as the Hub writes it in Spanish, in the currency and decimals it answers. */
+async function moneyOf(context: BrowserContext): Promise<{ decimals: number; said: (minor: number) => string }> {
+  const business = await api<{ currency: string; currency_decimals: number }>(context, A, 'GET', '/business');
+  expect(business.status, 'GET /api/business').toBe(200);
+  const { currency, currency_decimals: decimals } = business.data;
+  const format = new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return { decimals, said: (minor: number) => format.format(minor / 10 ** decimals) };
+}
+
+const tillLine = (page: Page) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: article.name }).first();
+
+/** The cashier's till with a fresh check holding the article: its line's id. */
+async function checkWithTheArticle(page: Page): Promise<string> {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto(`${A}/sale/pos`);
+  await shown(page).locator(`[data-testid=pos-product-${article.id}]`).waitFor({ state: 'visible' });
+  await expect(shown(page).locator('[data-testid=pos-cart-empty]')).toBeVisible();
+  await shown(page).locator(`[data-testid=pos-product-${article.id}]`).click();
+  await expect(tillLine(page)).toBeVisible();
+  return ((await tillLine(page).getAttribute('data-testid')) ?? '').replace('pos-line-', '');
+}
+
+async function keys(page: Page, typed: string): Promise<void> {
+  for (const key of typed) await page.locator(`[data-testid=pos-key-${key === '.' ? 'dot' : key}]:visible`).click();
+}
+
+/** The figure an approval spent by the cashier for `operation` kept (Employees › Approvals, BASE-F85). */
+const keptFigure = (operation: string, field: string): string =>
+  psql(
+    `SELECT figures->>'${field}' FROM base_approval WHERE operation = '${operation}' AND used_at IS NOT NULL AND approved_by = '${ownerName}' AND requested_by = '${cashierName}'`,
+  );
+
+test('SALE-F14: a line discount above the maximum says its 50 % in «Hace falta una aprobación», and the owner approves it', async () => {
+  const settings = await api<{ allow_discounts: boolean; max_discount_percent: number }>(owner.context, A, 'GET', '/sale/settings');
+  expect(settings.status).toBe(200);
+  discountsWere = { allow_discounts: settings.data.allow_discounts, max_discount_percent: settings.data.max_discount_percent };
+  const capped = await api(owner.context, A, 'POST', '/sale/settings', { allow_discounts: true, max_discount_percent: 10 });
+  expect(capped.status, 'a maximum discount of 10 %').toBe(200);
+  // The cashier's till in Spanish (the Hub's language cookie, as the sign-in sets it).
+  await cashier.context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+
+  const { page } = cashier;
+  const lineId = await checkWithTheArticle(page);
+  await tillLine(page).locator(`[data-testid=pos-line-${lineId}-discount]`).click();
+  await keys(page, '50');
+  await page.locator('[data-testid=pos-discount-apply]:visible').click();
+
+  const dialog = approval(page);
+  await expect(dialog.getByTestId('approval-action')).toHaveText(approving('Descontar una línea un 50 %'));
+  await expect(dialog.getByTestId('pinpad').or(dialog.getByTestId('pin-face').first())).toBeVisible();
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await untilStill(page);
+    await expect(dialog.getByTestId('approval-action')).toBeInViewport();
+    await page.screenshot({ path: shot(`${FIGURE_KEY}-${viewport.label}`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
+
+  await ownerApproves(page);
+  await expect(dialog).toBeHidden();
+  await expect(tillLine(page)).toContainText('−50');
+  expect(psql(`SELECT discount_percent || '|' || discount_approved_by FROM sale_orderline WHERE id = '${lineId}'`)).toBe(`50.00|${ownerName}`);
+  expect(Number(keptFigure('sale.order.set_line_discount_over_limit', 'discount_percent'))).toBe(50);
+});
+
+test('SALE-F14: a fixed discount on the check above the maximum says its amount in the business s currency', async () => {
+  const { page } = cashier;
+  const money = await moneyOf(owner.context);
+  // About half of what is left on the check, in whole units of the currency: above the maximum of 10 %.
+  const lineId = ((await tillLine(page).getAttribute('data-testid')) ?? '').replace('pos-line-', '');
+  const left = Number(psql(`SELECT line_total FROM sale_orderline WHERE id = '${lineId}'`));
+  const off = Math.round(left / 2 / 10 ** money.decimals) * 10 ** money.decimals || 10 ** money.decimals;
+  await shown(page).locator('[data-testid=pos-ticket-discount]').click();
+  // The business's currency button, after «%» (Vue hands the segment's value over as a property, not an attribute).
+  await page.locator('[data-testid=pos-discount-mode]:visible ion-segment-button').last().click();
+  await keys(page, String(off / 10 ** money.decimals));
+  await page.locator('[data-testid=pos-discount-apply]:visible').click();
+
+  const dialog = approval(page);
+  await expect(dialog.getByTestId('approval-action')).toHaveText(approving(`Descontar ${money.said(off)} de la cuenta`));
+  await ownerApproves(page);
+  await expect(dialog).toBeHidden();
+  await expect(shown(page).locator('[data-testid=pos-ticket-discount-row]')).toBeVisible();
+  const orderId = psql(`SELECT order_id FROM sale_orderline WHERE id = '${lineId}'`);
+  expect(psql(`SELECT discount_amount || '|' || discount_approved_by FROM sale_order WHERE id = '${orderId}'`)).toBe(`${off}|${ownerName}`);
+  expect(Number(keptFigure('sale.order.set_discount_over_limit', 'discount_amount'))).toBe(off);
 });
