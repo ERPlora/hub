@@ -13,6 +13,7 @@ import pycountry
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     AfterValidator,
@@ -39,6 +40,15 @@ TAG_REF_MISSING = _("Give the tag's id or its name.")
 FIELD_REF_MISSING = _("Give the field's id or its name.")
 OPTIONS_MISSING = _("Add at least one option.")
 OWN_KIND = _("That kind is the customer app's own: use another one.")
+
+# How the Customers screens name the data the models do not (the assistant's card names each datum by its title).
+DUPLICATE_CUSTOMER = gettext_noop("Duplicate customer")
+GROUPS = gettext_noop("Groups")
+TAGS = gettext_noop("Tags")
+GROUP = gettext_noop("Group")
+TAG = gettext_noop("Tag")
+GROUP_COLOR = gettext_noop("Group color")
+TAG_COLOR = gettext_noop("Tag color")
 
 
 def _email(value: str) -> str:
@@ -174,7 +184,7 @@ class CustomerOfIn(Schema):
 class GroupRefIn(Schema):
     id: UUID | None = Field(None, description="The group's id.")
     group: Reference | None = Field(
-        None, validate_default=True, description="The group's current name, when the id is not known."
+        None, validate_default=True, title=GROUP, description="The group's current name, when the id is not known."
     )
 
     _named = field_validator("group")(_named_unless("id", GROUP_REF_MISSING))
@@ -183,7 +193,7 @@ class GroupRefIn(Schema):
 class TagRefIn(Schema):
     id: UUID | None = Field(None, description="The tag's id.")
     tag: Reference | None = Field(
-        None, validate_default=True, description="The tag's current name, when the id is not known."
+        None, validate_default=True, title=TAG, description="The tag's current name, when the id is not known."
     )
 
     _named = field_validator("tag")(_named_unless("id", TAG_REF_MISSING))
@@ -366,6 +376,7 @@ class CustomerPatchIn(CustomerRefIn):
     field_values: list[FieldValueIn] | None = Field(
         None,
         max_length=200,
+        title=gettext_noop("Custom fields"),
         description="The custom fields' values. When sent, every required field must end up with a value.",
     )
 
@@ -403,13 +414,16 @@ class ImportRowIn(Schema):
 
 class ImportIn(Schema):
     rows: list[ImportRowIn] = Field(
-        min_length=1, max_length=50, description="One to fifty rows of the file."
+        min_length=1,
+        max_length=50,
+        title=gettext_noop("Rows to import"),
+        description="One to fifty rows of the file.",
     )
 
 
 class SetGroupsIn(CustomerRefIn):
     group_ids: list[UUID] = Field(
-        [], max_length=200, description="The ids of the groups the customer is in."
+        [], max_length=200, title=GROUPS, description="The ids of the groups the customer is in."
     )
     groups: list[Reference] = Field(
         [], max_length=200, description="The names of the groups the customer is in."
@@ -418,7 +432,7 @@ class SetGroupsIn(CustomerRefIn):
 
 class SetTagsIn(CustomerRefIn):
     tag_ids: list[UUID] = Field(
-        [], max_length=200, description="The ids of the tags the customer has."
+        [], max_length=200, title=TAGS, description="The ids of the tags the customer has."
     )
     tags: list[Reference] = Field(
         [], max_length=200, description="The names of the tags the customer has."
@@ -428,9 +442,14 @@ class SetTagsIn(CustomerRefIn):
 class MergeIn(CustomerRefIn):
     """``id``/``customer`` is the card that stays; ``absorbed_id``/``absorbed`` the duplicate."""
 
-    absorbed_id: UUID | None = Field(None, description="The duplicate's id: it is merged into the other card.")
+    absorbed_id: UUID | None = Field(
+        None, title=DUPLICATE_CUSTOMER, description="The duplicate's id: it is merged into the other card."
+    )
     absorbed: Reference | None = Field(
-        None, validate_default=True, description="The duplicate's exact name, phone or email."
+        None,
+        validate_default=True,
+        title=DUPLICATE_CUSTOMER,
+        description="The duplicate's exact name, phone or email.",
     )
 
     _absorbed_named = field_validator("absorbed")(_named_unless("absorbed_id", ABSORBED_REF_MISSING))
@@ -446,12 +465,14 @@ class EraseIn(CustomerRefIn):
 
 
 class NoteIn(CustomerOfIn):
-    content: _text(5000, 1) = Field(description="The note.")
+    content: _text(5000, 1) = Field(title=gettext_noop("Note"), description="The note.")
     title: _text(200) = Field(
         "", description="A title of the caller's own; empty shows «Note added»."
     )
     author_name: _text(200) = Field(
-        "", description="The author's name, when it is not the person signed in."
+        "",
+        title=gettext_noop("Author"),
+        description="The author's name, when it is not the person signed in.",
     )
 
 
@@ -547,7 +568,7 @@ class ConsentHistoryIn(CustomerOfIn, PageIn):
 
 
 class OrderLinkIn(Schema):
-    order_id: UUID = Field(description="The open order's id in the sale app.")
+    order_id: UUID = Field(title=gettext_noop("Open order"), description="The open order's id in the sale app.")
     customer_id: UUID | None = Field(
         None, description="The customer's id; without a customer the link is removed."
     )
@@ -657,7 +678,7 @@ class GroupIn(Schema):
     )
     description: _text(1000) = Field("", description="What the group is for.")
     color: _text(20, 1) = Field(
-        "primary", description="The group's color, a name of the theme (primary)."
+        "primary", title=GROUP_COLOR, description="The group's color, a name of the theme (primary)."
     )
     sort_order: int = Field(0, ge=0, le=INT4_MAX, description="Its place in the lists, lowest first.")
 
@@ -665,7 +686,7 @@ class GroupIn(Schema):
 class GroupPatchIn(GroupRefIn):
     name: _text(100, 1) | None = Field(None, description="The new name.")
     description: _text(1000) | None = Field(None, description="The new description.")
-    color: _text(20, 1) | None = Field(None, description="The new color.")
+    color: _text(20, 1) | None = Field(None, title=GROUP_COLOR, description="The new color.")
     sort_order: int | None = Field(None, ge=0, le=INT4_MAX, description="The new place in the lists.")
     is_active: bool | None = Field(
         None, description="Whether the group is offered on the cards."
@@ -695,13 +716,13 @@ class TagIn(Schema):
         description="The tag's name, unique among the active tags."
     )
     color: _text(20, 1) = Field(
-        "primary", description="The tag's color, a name of the theme (primary)."
+        "primary", title=TAG_COLOR, description="The tag's color, a name of the theme (primary)."
     )
 
 
 class TagPatchIn(TagRefIn):
     name: _text(60, 1) | None = Field(None, description="The new name.")
-    color: _text(20, 1) | None = Field(None, description="The new color.")
+    color: _text(20, 1) | None = Field(None, title=TAG_COLOR, description="The new color.")
     is_active: bool | None = Field(
         None, description="Whether the tag is offered on the cards."
     )
