@@ -39,6 +39,9 @@ describe('AssistantStepPanel', () => {
     expect((combo.props('options') as { id: string }[]).map((option) => option.id)).toEqual(['task.task.create']);
     combo.vm.$emit('update:modelValue', { id: 'task.task.create', label: 'Create' });
     expect(s.emitted().at(-1)).toMatchObject({ tools: ['task.task.list', 'task.task.create'] });
+    // Once added, the search starts empty again: what was typed is no value of the step.
+    await s.wrapper.vm.$nextTick();
+    expect(s.wrapper.findComponent({ name: 'Combo' }).vm.$.uid).not.toBe(combo.vm.$.uid);
     await s.find('flow-assistant-tool-remove-s1-task.task.list').trigger('click');
     expect(s.emitted().at(-1)).toMatchObject({ tools: [] });
   });

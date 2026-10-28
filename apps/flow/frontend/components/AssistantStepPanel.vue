@@ -6,7 +6,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
 import { asCallText } from '../lib/document';
@@ -48,8 +48,12 @@ function change(patch: Partial<AssistantStep>): void {
   emit('update:step', { ...props.step, ...patch });
 }
 
+/** Bumped on every addition: a fresh search, empty, so what was typed never looks like a value of the step. */
+const added = ref(0);
+
 function addTool(option: ComboOption | null): void {
   if (option && !props.step.tools.includes(String(option.id))) change({ tools: [...props.step.tools, String(option.id)] });
+  added.value += 1;
 }
 
 function setRounds(text: string | null | undefined): void {
@@ -104,6 +108,7 @@ function setRounds(text: string | null | undefined): void {
         :data-testid="`flow-assistant-notools-${id}`"
       >{{ $t('flow.assistant.noTools') }}</span>
       <Combo
+        :key="added"
         :testid="`flow-assistant-addtool-${id}`"
         :model-value="null"
         :options="addable"
