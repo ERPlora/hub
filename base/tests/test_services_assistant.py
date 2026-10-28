@@ -12,7 +12,7 @@ from live.errors import OperationError, Unauthorized
 from live.operations import get, registry
 
 from base import assistant
-from base.models import Membership
+from base.models import Hub, Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
@@ -84,6 +84,16 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     # The business's currency with its decimals: an amount in its minor unit
     # (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY).
     assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
+
+
+def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
+    """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a yen business has no cents, so its turn
+    tells the model «17 JPY → 17» (``base.business.get``'s ``currency_decimals``), never a fixed «.00 → 1700»;
+    the card's money carries the same decimals."""
+    Hub.objects.filter(slug="a").update(country="JP")
+    plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
+    assert "17 JPY → 17" in plan["instructions"]
+    assert plan["confirm"]["money"] == {"currency": "JPY", "decimals": 0}
 
 
 # ── Reads run by themselves (BASE-G115) ──────────────────────────────────────────────────────────────────────────
