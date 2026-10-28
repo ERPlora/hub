@@ -177,12 +177,9 @@ def test_a_general_list_that_keeps_losing_the_race_is_refused_with_its_code(monk
 
 
 def test_the_general_list_is_in_the_business_s_currency():
-    # A general list in dollars would never apply: the till sells in euros.
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError) as invalid:  # the schema refuses it, as a route's 422 says
-        run("pricing.price_list.create", {"code": "USD", "name": "USD", "currency": "USD", "is_default": True})
-    assert [error["loc"] for error in invalid.value.errors()] == [("is_default",)]
+    # A general list in dollars would never apply: the till sells in the business's currency (here, euros).
+    error = refused(InvalidPayload, "pricing.price_list.create", {"code": "USD", "name": "USD", "currency": "USD", "is_default": True})
+    assert set(error.fields) == {"is_default"} and not PriceList.objects.filter(code="USD").exists()
     make_list("DOLLARS", currency="USD")
     assert refused(Conflict, "pricing.price_list.set_default", {"price_list": "DOLLARS"}).code == "pricing.default_currency"
     make_list("GEN", is_default=True)
