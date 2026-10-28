@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
+from live.operations import registry
 
 from apps.table import queries, schemas, services
 from apps.table.models import (
@@ -72,7 +73,8 @@ def lazy_constants(module) -> list:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
+    its schemas."""
     config = apps.get_app_config("table")
     lazies = [
         config.verbose_name,
@@ -103,7 +105,19 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | {"Table %(number)s"}
+        return {str(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles table's operations give their input data (``gettext_noop``): the assistant's card names each datum
+    by them, so each one needs its Spanish. Only the ones table wrote: pydantic leaves ``title`` empty otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "table"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -125,6 +139,19 @@ def test_the_compiled_catalog_is_current():
         msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
     }
     assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+
+
+def test_the_card_says_each_title_with_tables_own_spanish():
+    """A title table shares with an app installed before it («Into check», «Lines to move» with Sales) is said with
+    that app's Spanish, so table's own entry would be dead text: they have to say the same."""
+    with (LOCALE / "django.mo").open("rb") as compiled:
+        own = gettext.GNUTranslations(compiled)
+    titles = schema_titles()
+    assert {"Into check", "Lines to move"} <= titles
+    with translation.override("es"):
+        assert {title: translation.gettext(title) for title in titles} == {
+            title: own.gettext(title) for title in titles
+        }
 
 
 def test_spanish_texts_of_the_workbook():
