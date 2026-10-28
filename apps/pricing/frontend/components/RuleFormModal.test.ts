@@ -6,7 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { rule } from '../__tests__/fixtures';
+import { business, POLISH, rule } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import RuleFormModal from './RuleFormModal.vue';
 
@@ -131,6 +131,20 @@ describe('RuleFormModal', () => {
         { min_quantity: '6', percent: '15.5' },
       ],
     });
+  });
+
+  it('an amount per unit is typed in the business’s currency: in Poland «0,50 zł», never a euro one', async () => {
+    const s = await setup();
+    await s.live();
+    await s.result('base.business.get', business(POLISH));
+    s.answer(201, rule());
+    await named(s, 'FIX', 'Fifty off');
+    await ionValue(s.field('rule_type'), 'fixed');
+    await ionValue(s.field('amount'), '0,50 €', 'ionInput');
+    expect(s.save().disabled).toBe(true);
+    await ionValue(s.field('amount'), '0,50 zł', 'ionInput');
+    await click(s.save());
+    expect(s.sent()[0].body).toMatchObject({ rule_type: 'fixed', amount: 50 });
   });
 
   it('a refusal is said under its field and what was typed stays', async () => {

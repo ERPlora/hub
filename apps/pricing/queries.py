@@ -2,7 +2,7 @@
 resolution of the price of a line (WORKBOOK PRICING-F13).
 
 Resolution: the candidate lists are the active ones in force on the business day of the sale, in the
-business's currency and of the sale's tax basis (or following the business), that apply to the
+business's currency (its country's, ``base.business.get``) and of the sale's tax basis (or following the business), that apply to the
 customer (the general one and those of the customer's active groups), or only the one asked for by
 name. In each, the highest quantity break the line reaches; the lowest price wins (Business Central's
 «best price»); without any, the catalog's. Then one automatic rule, the best for the customer, comes
@@ -18,11 +18,12 @@ from typing import Any
 from uuid import UUID
 
 import pydantic
+from django.conf import settings as django_settings
 from django.db.models import CharField, Count, F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
 from live.operations import UnknownOperation, get, operation
 
@@ -32,7 +33,6 @@ from apps.inventory.models import UNIT_SPECS, Product, ProductCategory
 from apps.inventory.queries import find_product
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.schemas import (
-    BUSINESS_CURRENCY,
     Page,
     PriceItemListIn,
     PriceItemOut,
@@ -44,6 +44,8 @@ from apps.pricing.schemas import (
     RuleListIn,
     RuleOut,
 )
+from base.business import currency_of
+from base.operations import is_platform_hub
 
 #: Candidates named when a text matches several.
 MAX_CANDIDATES = 5
@@ -57,6 +59,19 @@ ITEM_NOT_FOUND = _("That price no longer exists.")
 SERVICES_UNAVAILABLE = _("Services is not active in this business.")
 
 SERVICE_GET = "service.service.get"
+#: What tells the business's currency: its country's, from this hub's registry, never asking erplora.com (APP-BASE-6).
+BUSINESS = "base.business.get"
+
+
+def business_currency(ctx: OperationContext) -> str:
+    """The currency of ``ctx``'s business (ISO 4217), the one its general list and its sales are in, as
+    ``base.business.get`` reads it. Read as the platform: an API key holds only the permission of the operation it
+    opened, and every person of the hub may see it anyway. ERPlora's own hub has no business on erplora.com (phase 1:
+    no registry row, ``create_platform_hub``): it keeps the currency of its issuer's country, as its sales do."""
+    if is_platform_hub(ctx.scope):
+        return currency_of(django_settings.PLATFORM_ISSUER_COUNTRY)
+    business = get(BUSINESS)
+    return business(system_context(ctx.scope), business.input()).currency
 
 
 def business_today() -> dt.date:
@@ -475,7 +490,7 @@ def best_list_price(article: Article, quantity: Decimal, lists: list[PriceList])
     return item, by_list[item.price_list_id]
 
 
-def candidate_lists(data: ResolveIn, on: dt.date, groups: list[UUID]) -> list[PriceList]:
+def candidate_lists(data: ResolveIn, on: dt.date, groups: list[UUID], currency: str) -> list[PriceList]:
     if data.price_list_id is not None or data.price_list is not None:
         asked = find_list(data.price_list_id, data.price_list)
         if not asked.is_active or not PriceList.objects.filter(in_force(on), pk=asked.pk).exists():
@@ -489,7 +504,7 @@ def candidate_lists(data: ResolveIn, on: dt.date, groups: list[UUID]) -> list[Pr
         in_force(on),
         Q(tax_included__isnull=True) | Q(tax_included=data.tax_included),
         is_active=True,
-        currency=BUSINESS_CURRENCY,
+        currency=currency,
     )
     return list(rows.filter(Q(is_default=True) | Q(customer_group_id__in=groups)))
 
@@ -555,7 +570,8 @@ def resolve_line(ctx: OperationContext, data: ResolveIn) -> dict:
     on = business_day(data.when)
     article = article_of(ctx, data)
     groups = _customer_groups(data)
-    lists = candidate_lists(data, on, groups)
+    currency = business_currency(ctx)
+    lists = candidate_lists(data, on, groups, currency)
     item, price_list = best_list_price(article, data.quantity, lists)
     unit_price = item.price if item else article.base_price
     line_amount = half_up(unit_price * article.ratio(data.quantity))
@@ -574,7 +590,7 @@ def resolve_line(ctx: OperationContext, data: ResolveIn) -> dict:
         "price_list_name": price_list.name if price_list else None,
         "tax_included": price_list.tax_included if price_list else None,
         # Only a list asked for by name may be in another currency (candidate_lists).
-        "currency": price_list.currency if price_list else BUSINESS_CURRENCY,
+        "currency": price_list.currency if price_list else currency,
         "line_amount": line_amount,
         "discount": discount,
         "rule_id": rule.id if rule else None,

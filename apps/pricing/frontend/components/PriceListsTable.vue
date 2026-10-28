@@ -4,7 +4,8 @@
 // group («Everybody» for the general one, «Deleted group» when Customers deleted it), Tax, Validity, Prices and Status —, «Search code or name…»,
 // column filters behind the funnel (Status opens on the active ones), list or cards, 50 a page by name. A row and its «Open»
 // open the list's detail; whoever manages gets «+» (New price list), Edit, Make general (an active list
-// in euros without group that is not general), Deactivate (not the general one, asking first) and Activate.
+// in the business's currency, its country's, without group that is not general; none until the business
+// answers), Deactivate (not the general one, asking first) and Activate.
 import {
   DataTable,
   type DataTableAction,
@@ -22,7 +23,7 @@ import { useRouter } from 'vue-router';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { BUSINESS_CURRENCY, validityLabel } from '../lib/format';
+import { useBusinessMoney, validityLabel } from '../lib/format';
 import { groupName, taxBasisLabel } from '../lib/rules';
 import type { PriceListListIn, PriceListOut, Status, TaxBasis } from '../operations';
 import ListConfirm, { type ListAction } from './ListConfirm.vue';
@@ -39,6 +40,7 @@ const session = useSession();
 const router = useRouter();
 const t = useT();
 const locale = useLocale();
+const money = useBusinessMoney();
 const canManage = computed(() => session.can('pricing.manage'));
 
 const table = useServerTable({ sort: 'name' });
@@ -128,7 +130,7 @@ const actions = computed<DataTableAction<PriceListOut>[]>(() => [
           icon: 'checkmark-circle-outline',
           menuOnly: true,
           hidden: (row: PriceListOut) =>
-            row.is_default || !row.is_active || row.customer_group_id !== null || row.currency !== BUSINESS_CURRENCY,
+            row.is_default || !row.is_active || row.customer_group_id !== null || row.currency !== money.value?.currency,
         },
         {
           id: 'deactivate',

@@ -58,10 +58,11 @@ def test_the_lists_are_active_by_name_by_default():
 
 def test_a_list_needs_a_code_and_a_name_trimmed():
     data = PriceListIn(code="  VIP ", name="  VIP members ")
+    # Without a currency the operation takes the business's (test_business_currency).
     assert (data.code, data.name, data.currency, data.tax_included, data.is_default) == (
         "VIP",
         "VIP members",
-        "EUR",
+        None,
         None,
         False,
     )
@@ -95,9 +96,10 @@ def test_the_general_list_has_no_group():
     }
 
 
-def test_the_general_list_is_in_euros():
-    assert PriceListIn(code="c", name="n", is_default=True).currency == "EUR"
-    assert errors(PriceListIn, code="c", name="n", currency="USD", is_default=True) == {"is_default": "value_error"}
+def test_the_currency_of_the_general_list_is_left_to_the_operation():
+    # Only the operation knows the business's currency (its country's): the schema neither fixes nor refuses one.
+    assert PriceListIn(code="c", name="n", is_default=True).currency is None
+    assert PriceListIn(code="c", name="n", currency="USD", is_default=True).currency == "USD"
 
 
 def test_a_list_is_named_by_id_or_by_its_code_or_name():

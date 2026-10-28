@@ -1,5 +1,28 @@
 // Rows of the pricing app as the server sends them, for the page and component tests.
+import type { Business } from '../../../../base/frontend/operations';
 import type { PriceItemOut, PriceListOut, RuleOut } from '../operations';
+
+/** The hub's business (`base.business.get`, the platform's): one in Spain, in euros, unless a test says another
+ *  (the money pricing paints and reads is the business's, and a list's own). */
+export function business(fields: Partial<Business> = {}): Business {
+  return {
+    name: 'Salón Lucía',
+    country: 'ES',
+    country_name: 'Spain',
+    timezone: 'Europe/Madrid',
+    language: 'es',
+    language_name: 'Spanish',
+    currency: 'EUR',
+    currency_label: 'EUR · Euro',
+    currency_decimals: 2,
+    demo: false,
+    settings_url: 'https://erplora.com/hubs/salon-lucia/settings',
+    ...fields,
+  };
+}
+
+/** A business in Poland: it sells in złoty. */
+export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
 
 export function priceList(overrides: Partial<PriceListOut> = {}): PriceListOut {
   return {

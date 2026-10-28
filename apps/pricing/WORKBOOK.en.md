@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3ad38f7dc178b64d9ed15a555e6cfe60ca91dc5aa4eb44b0299b06dab87d0060 -->
+<!-- generated from WORKBOOK.md sha256:571d4af3cfa1b5a063c4e1fcaaca86d9621861075a7041bcc40961379e05694d -->
 
 ## What it is for and who it is for
 
@@ -100,7 +100,8 @@ does on purpose, and it leaves a delicatessen without promotions.
 3. With no price list or rule, everything is charged at the catalog's price: installing Price Lists changes nothing
    until you create the first one.
 4. "Today" and the dates of the price lists and the rules are the business's day: in phase 1, the Hub's
-   time zone, **Europe/Madrid**. The business's currency is the **euro**.
+   time zone, **Europe/Madrid**. The business's currency is its country's, the one **Settings → Business**
+   says (the euro in Spain, the zloty in Poland).
 
 ## Screens
 
@@ -119,12 +120,12 @@ excluded"), **Validity** ("Always", "From Jul 1, 2026", "Until…" or both dates
 text they contain), Customer group, Tax and Status (on opening, **Active** already chosen;
 **Inactive**, or **All** for both); 50 per page, as a list or as cards.
 
-- **+** opens **New price list**: **Code** and **Name** (required), **Currency** (EUR), **Tax**
-  (Business default by default), **Customer group** (search box; empty = none), **From** and
+- **+** opens **New price list**: **Code** and **Name** (required), **Currency** (the business's),
+  **Tax** (Business default by default), **Customer group** (search box; empty = none), **From** and
   **Until**, and **General list** (a toggle; not possible with a group).
 - Row actions: **Open** (also by tapping the row), **Edit**, **Make general** (in the "⋮" menu;
-  only on an active one, without a group, in euros and that is not general yet; asks for confirmation), **Deactivate** (in the
-  "⋮" menu; asks for confirmation; not on the general one) or **Activate** (on the inactive ones). The employee only sees
+  only on an active one, without a group, in the business's currency and that is not general yet; asks for
+  confirmation), **Deactivate** (in the "⋮" menu; asks for confirmation; not on the general one) or **Activate** (on the inactive ones). The employee only sees
   **Open**.
 
 **Discount rules**: search box "Search code or name…", columns **Code**, **Name**, **Type**
@@ -147,7 +148,8 @@ Activate** (whichever applies; with the same confirmations as in the table).
 
 Below, **Prices**: search box "Search product or service…", columns **Item** (name),
 **Type** (Product or Service), **SKU**, **From** (the minimum quantity, with its unit), **Price** and
-**Catalog price** (Inventory's; "—" on a service). The prices, in the price list's currency. Sorted
+**Catalog price** (Inventory's; "—" on a service). The prices, in the price list's currency; the catalog
+one, in the business's. Sorted
 by Item, From and Price; filtered by Type, with the funnel; 50 per page.
 
 - **+** opens **New price**: **Type** (Product or Service), the item's search box (a product by
@@ -207,7 +209,8 @@ Steps:
 1. Tap **+** in "Price lists": **New price list** opens.
 2. Type the **Code** (up to 50 characters; unique, case-insensitive: "VIP" and "vip" are the
    same) and the **Name** (up to 200).
-3. If you want: the **Currency** (three-letter ISO code with two decimals: EUR, USD, GBP…), the
+3. If you want: the **Currency** (the business's, already filled in; another, by its three-letter ISO code
+   with two decimals: EUR, USD, GBP…; if you leave it empty, the business's), the
    **Tax** (Business default, Tax included, Tax excluded), the **Customer group**,
    **From** and **Until** (both included), and **General list**.
 4. Tap **Create**: the price list shows in the table, active and without prices.
@@ -217,8 +220,8 @@ stops being so in the same operation: there are never two.
 If it fails: under its field and without creating anything: "A price list with that code already exists. Pick a different code."
 (also if the one that has it is deactivated), a currency that does not exist or does not have two decimals,
 "Until" before "From", a group that does not exist, "The general list is for everybody: take its customer
-group off." or "The general list goes in the business's currency (EUR), the one the till sells in." (the toggle
-turns off by itself with a group or with another currency).
+group off." or "The general list goes in the business's currency ({currency}), the one the till sells in." (the
+toggle turns off by itself with a group or with another currency).
 Involved: Customers
 
 ### PRICING-F03 Edit a price list
@@ -240,14 +243,15 @@ Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists, Price list (detail)
 Steps:
-1. **Make general** on an active price list, without a group and in euros (on any other it is not offered).
+1. **Make general** on an active price list, without a group and in the business's currency (on any other it
+   is not offered).
 2. Confirm "{name} becomes the general price list: it will apply to every customer, and the current one will
    stop being general.".
 In: the price list. Through the assistant or the API the mark can also be **taken off** (no general list).
 Out: the new general price list and `pricing.price_list.default_changed` (with the previous one). If two people
 choose at the same time, a single one remains: the last one.
 If it fails: "A deactivated price list cannot be the general one.", "The general list is for everybody: take
-its customer group off.", "The general list goes in the business's currency (EUR)…" and, if other choices win the race
+its customer group off.", "The general list goes in the business's currency ({currency})…" and, if other choices win the race
 three times in a row, "Someone else is changing the general price list right now. Try again
 in a moment." (409 `pricing.default_busy`, never a server error).
 Involved: none
@@ -290,7 +294,8 @@ Steps:
 3. **From quantity**: the minimum quantity from which it applies (1 by default; in the product's
    unit, "0.5" kg, and in its step). For volume prices, repeat the product with another minimum
    quantity.
-4. **Price**: in euros, as a person types it ("12.50"). It is the price for the same quantity as the
+4. **Price**: in the price list's currency, as a person types it ("12.50"; also with its sign or its code,
+   "12.50 zł" in a price list in zlotys, never with another currency's). It is the price for the same quantity as the
    catalog's (if the catalog says "€0.37 per 100 ud", the price list's is also per 100 ud).
 5. Tap **Add**.
 In: the price list (active), the item and its price. The assistant names the price list by its code or its
@@ -341,7 +346,7 @@ Steps:
 3. **Type** and its value (the units are those of each item's price: kg for a coffee at €20/kg
    sold in grams; one unit for what is sold by units and for services):
    - **Percentage**: the % taken off the line (up to 100, two decimals).
-   - **Amount per unit**: the euros taken off for each unit of the price sold.
+   - **Amount per unit**: what is taken off, in the business's currency, for each unit of the price sold.
    - **Buy X, get Y**: "Buy" and "Free" (2 and 1 = every 3 units, 1 free, rounded down).
    - **Tiered**: up to 10 tiers, each one with **From quantity** and **Percent (%)** ("Add
      tier", "Remove tier").
@@ -392,7 +397,8 @@ Steps:
 1. Whoever asks gives the **product** or the **service** (by id, name or SKU), and if they want the
    **customer**, the **quantity** (1 by default), the **moment** (now by default) or a specific
    **price list**.
-2. The candidate price lists are the active ones, valid that day, in euros and **of the sale's tax basis**
+2. The candidate price lists are the active ones, valid that day, in the business's currency and **of the
+   sale's tax basis**
    (`tax_included`; tax included if it does not say, as at a till) or that follow the business, that
    apply to that customer: the general one and those of their active groups. Prices of different bases are never compared
    (a general one at €10.00 with VAT does not lose against a company one at €9.00 without VAT, €10.89 with
@@ -529,8 +535,8 @@ Sales does **not** require Price Lists and Price Lists does not touch Sales. Wha
    a free-price line, with an appointment's `booked_price` or with a price set by hand (Odoo).
 4. The manual line discount and the check discount go **on top** (Shopify, Toast, Odoo), with Sales'
    `max_discount_percent` cap.
-5. The automatic price lists already come in the sale's basis and in euros. Only a price list asked for by its
-   name can come in another basis or currency: if the answer's `tax_included` is not `null` and does not
+5. The automatic price lists already come in the sale's basis and in the business's currency. Only a price
+   list asked for by its name can come in another basis or currency: if the answer's `tax_included` is not `null` and does not
    match the sale's, or the currency is not the sale's, do not use that price (Sales' own
    409): Price Lists converts neither bases nor currencies.
 6. On a service, the price list's price only applies if the service has a fixed price (the others are

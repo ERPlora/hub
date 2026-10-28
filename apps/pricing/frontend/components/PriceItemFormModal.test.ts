@@ -56,6 +56,18 @@ describe('PriceItemFormModal', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  it('a price is typed in the list’s currency: «12,50 zł» in a list in zlotys, and a euro amount is not one', async () => {
+    const s = await setup({ currency: 'PLN' });
+    s.answer(201, priceItem());
+    s.article().vm.$emit('update:modelValue', { id: 'p1', label: 'Shampoo' });
+    await settle();
+    await ionValue(s.field('price'), '12,50 €', 'ionInput');
+    expect(s.save().disabled).toBe(true);
+    await ionValue(s.field('price'), '12,50 zł', 'ionInput');
+    await click(s.save());
+    expect(s.sent()[0].body).toEqual({ price_list_id: 'l1', product_id: 'p1', min_quantity: '1', price: 1250 });
+  });
+
   it('a service is searched in Services and sent as such', async () => {
     const s = await setup();
     s.answer(201, priceItem({ kind: 'service' }));

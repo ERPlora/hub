@@ -9,6 +9,8 @@ import en from '../locale/en.json';
 import es from '../locale/es.json';
 import { appliesToLabel, ruleValueLabel, taxBasisLabel } from './rules';
 
+const EUR = { currency: 'EUR', decimals: 2 };
+
 function translator(locale: 'en' | 'es') {
   const i18n = createShellI18n({ locale, messages: { en, es } });
   return (key: string, named?: Record<string, unknown>) => (named ? i18n.global.t(key, named) : i18n.global.t(key));
@@ -18,7 +20,7 @@ describe('ruleValueLabel', () => {
   it('paints each type with its unit', () => {
     const t = translator('es');
     expect(ruleValueLabel(rule({ percent: '12.50' }), t, 'es')).toBe('12,5\u00a0%');
-    expect(ruleValueLabel(rule({ rule_type: 'fixed', percent: null, amount: 50 }), t, 'es')).toBe('0,50\u00a0€ por unidad');
+    expect(ruleValueLabel(rule({ rule_type: 'fixed', percent: null, amount: 50 }), t, 'es', EUR)).toBe('0,50\u00a0€ por unidad');
     expect(ruleValueLabel(rule({ rule_type: 'buy_x_get_y', percent: null, buy_quantity: 2, get_quantity: 1 }), t, 'es')).toBe(
       'Compra 2, llévate 1',
     );
@@ -27,7 +29,13 @@ describe('ruleValueLabel', () => {
       { min_quantity: '6.000', percent: '15.00' },
     ];
     expect(ruleValueLabel(rule({ rule_type: 'tiered', percent: null, tiers }), t, 'es')).toBe('3+: 10\u00a0% · 6+: 15\u00a0%');
-    expect(ruleValueLabel(rule({ rule_type: 'fixed', percent: null, amount: 50 }), translator('en'), 'en')).toBe('€0.50 per unit');
+    expect(ruleValueLabel(rule({ rule_type: 'fixed', percent: null, amount: 50 }), translator('en'), 'en', EUR)).toBe('€0.50 per unit');
+  });
+
+  it('an amount per unit is in the business’s currency: in Poland, zlotys; a bare figure until it answers', () => {
+    const fixed = rule({ rule_type: 'fixed', percent: null, amount: 50 });
+    expect(ruleValueLabel(fixed, translator('es'), 'es', { currency: 'PLN', decimals: 2 })).toBe('0,50\u00a0zł por unidad');
+    expect(ruleValueLabel(fixed, translator('en'), 'en')).toBe('0.50 per unit');
   });
 });
 
