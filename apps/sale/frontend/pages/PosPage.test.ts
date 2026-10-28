@@ -6,6 +6,7 @@ import { toast, toastError, toastSuccess } from '@erplora/ui/shell';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SHELL_BACK_EVENT } from '../../../../base/frontend/lib/system-back';
 import { click, EMPLOYEE, errorFrame, flush, MANAGER, mountSale, settle } from '../__tests__/mount-sale';
 import CartHeading from '../components/pos/CartHeading.vue';
 import CartLines from '../components/pos/CartLines.vue';
@@ -614,6 +615,57 @@ describe('PosPage: the phone', () => {
     await settle();
     expect(s.find('pos-till').classes()).not.toContain('pos-till--cart-open');
     expect(drawer().attributes('role')).toBeUndefined();
+  });
+
+  it('Android’s Back closes what is on top: «Open checks» first, then the drawer, then it is the shell’s', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    const pressBack = () => {
+      const ask = new CustomEvent(SHELL_BACK_EVENT, { cancelable: true });
+      window.dispatchEvent(ask);
+      return ask.defaultPrevented;
+    };
+    const s = await setup();
+    const cartOpen = () => s.find('pos-till').classes().includes('pos-till--cart-open');
+    await click(s.find('pos-cart-fab').element);
+    await click(s.find('pos-open-checks').element);
+    expect(s.find('pos-checks').exists()).toBe(true);
+    expect(pressBack()).toBe(true);
+    await settle();
+    expect(s.find('pos-checks').exists()).toBe(false);
+    expect(cartOpen()).toBe(true);
+    expect(pressBack()).toBe(true);
+    await settle();
+    expect(cartOpen()).toBe(false);
+    expect(pressBack()).toBe(false);
+  });
+
+  it('a drawer left open when the till widens (a phone turned, a window enlarged) is a column: Back is the shell’s', async () => {
+    const media = { matches: true, change: () => {} };
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      get matches() {
+        return media.matches;
+      },
+      media: query,
+      addEventListener: (_: string, listener: () => void) => (media.change = listener),
+      removeEventListener: () => {},
+    }));
+    const pressBack = () => {
+      const ask = new CustomEvent(SHELL_BACK_EVENT, { cancelable: true });
+      window.dispatchEvent(ask);
+      return ask.defaultPrevented;
+    };
+    const s = await setup();
+    await click(s.find('pos-cart-fab').element);
+    media.matches = false;
+    media.change();
+    await settle();
+    expect(s.find('pos-till').classes()).not.toContain('pos-till--phone');
+    expect(pressBack()).toBe(false);
   });
 
 
