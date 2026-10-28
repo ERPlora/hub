@@ -368,3 +368,34 @@ msgstr "El aviso rojo no puede llegar antes que el ámbar."
 
 msgid "Table %(number)s"
 msgstr "Mesa %(number)s"
+
+# How the assistant's card names the data of table's writes (titles of the schemas).
+msgid "Zone colour"
+msgstr "Color de la zona"
+
+msgid "Number prefix"
+msgstr "Prefijo del número"
+
+msgid "First number"
+msgstr "Primer número"
+
+msgid "Move to zone"
+msgstr "Mover a la zona"
+
+msgid "Customer"
+msgstr "Cliente"
+
+msgid "Destination table"
+msgstr "Mesa de destino"
+
+msgid "Destination zone"
+msgstr "Zona de destino"
+
+msgid "Into check"
+msgstr "Cuenta de destino"
+
+msgid "Lines to move"
+msgstr "Líneas a mover"
+
+msgid "Guest's name"
+msgstr "Nombre del cliente"
