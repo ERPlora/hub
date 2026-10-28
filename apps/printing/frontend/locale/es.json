@@ -109,7 +109,7 @@
       "columns": {
         "name": "Nombre",
         "printers": "Impresoras",
-        "lastSeen": "Último trabajo pedido",
+        "lastSeen": "Visto por última vez",
         "registeredBy": "Dado de alta por"
       },
       "thisDevice": "Este dispositivo",
@@ -194,6 +194,8 @@
       "stalled": "En cola, sin impresora",
       "noDevice": "Sin dispositivo",
       "noDeviceHint": "Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.",
+      "deviceOff": "Dispositivo apagado",
+      "deviceOffHint": "El dispositivo que lo imprime no responde: enciéndelo y abre en él la app de ERPlora.",
       "failing": "Con errores",
       "waiting": "En cola: {n}",
       "oldest": "el más antiguo lleva {age}",

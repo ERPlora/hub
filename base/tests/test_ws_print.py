@@ -896,7 +896,8 @@ async def test_a_beat_counts_the_printers_the_device_still_reaches(sockets, sess
 # ── The device's presence (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE) ──────────────────────────────
 
 
-#: The command a test declares as the print hosts' presence (``print_presence``); printing does not declare one yet.
+#: The print hosts' presence (``print_presence``): printing declares its own under this name, which a test stands in for
+#: with a command that records who it was told about.
 SEEN = "printing.device.seen"
 
 
@@ -911,7 +912,8 @@ class SeenOut(Schema):
 @pytest.fixture
 def presence(monkeypatch):
     """Declares ``SEEN`` as the presence of printing's config and registers it as a command that records who it was
-    told about, and by whom; ``fails`` makes it raise instead. Returns the list of ``(device, actor)`` told."""
+    told about, and by whom; ``fails`` makes it raise instead; ``declared=False`` takes printing's own declaration away.
+    Returns the list of ``(device, actor)`` told."""
     told: list[tuple[str, str]] = []
 
     def declare(*, fails: BaseException | None = None, declared: bool = True) -> list[tuple[str, str]]:
@@ -925,8 +927,7 @@ def presence(monkeypatch):
             name=SEEN, kind="command", permission=None, input=SeenIn, output=SeenOut, expose_api=False, ai=None, fn=seen
         )
         monkeypatch.setitem(registry, SEEN, op)
-        if declared:
-            monkeypatch.setattr(django_apps.get_app_config("printing"), "print_presence", SEEN, raising=False)
+        monkeypatch.setattr(django_apps.get_app_config("printing"), "print_presence", SEEN if declared else None)
         return told
 
     return declare

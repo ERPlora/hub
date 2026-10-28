@@ -381,6 +381,10 @@ class UsageSummary(Schema):
         description="Its jobs waiting that no device set up here can print (no device reaches their printer, or a "
         "printer of their function and paper)."
     )
+    stalled: int = Field(
+        description="Its jobs that have waited a minute or more with no device on to print them, as the bell counts "
+        "them: those no device set up here prints, and those whose device gave no news in the last 90 s (off)."
+    )
 
 
 class JobSummaryOut(Schema):
@@ -472,7 +476,10 @@ class DeviceOut(Schema):
     printers: list[DevicePrinterOut] = Field(description="The printers it reaches and prints for, by name.")
     registered_at: datetime = Field(description="When it was set up to print.")
     registered_by: str = Field(description="Who set it up.")
-    last_seen_at: datetime | None = Field(description="When it last asked for a job; none = never yet.")
+    last_seen_at: datetime | None = Field(
+        description="When it last gave news: set up from it, connected to print (each beat) or asked for a job; none = "
+        "never yet. Without news for 90 s it counts as off."
+    )
     this_device: bool = Field(description="It is the device asking.")
 
 
@@ -517,13 +524,22 @@ class CoverageOut(Schema):
         "its papers come out, whether that device is on right now or not."
     )
     count: int = Field(
-        description="Its jobs waiting that no device set up here can print: their printer is reached by none, or they "
-        "wait for a printer of their function and paper that no device reaches."
+        description="Its jobs that have waited a minute or more with no device on to print them: their printer is "
+        "reached by no device seen in the last 90 s, or they wait for a printer of their function and paper that none "
+        "reaches."
     )
 
 
 class DeviceGetIn(Closed):
     device: DeviceName = Field(description="The device's own id, as its hello says it (base's /ws/print).")
+
+
+class DeviceSeenIn(Closed):
+    device: DeviceName = Field(description="The device's own id, as its hello says it (base's /ws/print).")
+
+
+class DeviceSeenOut(Schema):
+    seen: bool = Field(description="A device set up here (not retired) has that id: it is there now.")
 
 
 class DeviceGetOut(Schema):

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // «Print queue» (PRINTING-F01; the old screen's queue zone): one card per role that has an active printer
 // or jobs (a new business sees none), with its state — «Ready», «Waiting, no printer», «No device» (jobs no
-// device set up here can print: where the bell's «Nothing is printing “…”» leads, it says why), «With errors» —,
+// device set up here can print: where the bell's «Nothing is printing “…”» leads, it says why), «Device off» (jobs
+// that waited a minute while the device set up for them gave no news for 90 s: the bell's too), «With errors» —,
 // «Waiting: N · the oldest has waited 3 min» or «Nothing waiting», the failed ones and the printer it prints
 // on now (the chosen one, else the first active one: named, never counted — hub#1527). A role with jobs waiting for over a minute and no active printer raises the orange alert
 // with its cause. Nothing waiting, sent unconfirmed or failed: «All clear». Live: every job that changes re-runs
@@ -42,6 +43,7 @@ const failed = computed(() => status.value === 'error');
 function stateOf(u: UsageSummary): { tone: 'success' | 'warning' | 'danger'; label: string } {
   if (u.printers === 0) return { tone: 'warning', label: t('printing.summary.stalled') };
   if (u.unattended > 0) return { tone: 'warning', label: t('printing.summary.noDevice') };
+  if (u.stalled > 0) return { tone: 'warning', label: t('printing.summary.deviceOff') };
   if (u.failed > 0) return { tone: 'danger', label: t('printing.summary.failing') };
   return { tone: 'success', label: t('printing.summary.ready') };
 }
@@ -137,6 +139,12 @@ function alertText(u: UsageSummary): string {
           :data-testid="`printing-summary-no-device-${u.usage}`"
         >
           {{ $t('printing.summary.noDeviceHint') }}
+        </p>
+        <p
+          v-if="u.printers > 0 && u.unattended === 0 && u.stalled > 0"
+          :data-testid="`printing-summary-device-off-${u.usage}`"
+        >
+          {{ $t('printing.summary.deviceOffHint') }}
         </p>
         <p
           v-if="u.prints_on"

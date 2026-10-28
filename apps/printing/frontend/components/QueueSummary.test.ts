@@ -20,6 +20,7 @@ const usage = (name: UsageSummary['usage'], more: Partial<UsageSummary> = {}): U
   sent: 0,
   failed: 0,
   unattended: 0,
+  stalled: 0,
   ...more,
 });
 
@@ -127,5 +128,31 @@ describe('QueueSummary by the clock', () => {
     await s.result(OP, summary(usage('receipt', { printers: 1, prints_on: 'Caja', pending: 1, oldest_pending_at: ago(0) })));
     expect(words(s.find('printing-summary-card-receipt').element)).toMatch(/^Recibo Listo /);
     expect(s.wrapper.find('[data-testid="printing-summary-no-device-receipt"]').exists()).toBe(false);
+  });
+
+  it('a role whose device set up is off says so, not «Ready», and what to do', async () => {
+    // The bell rings for it too (FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF): a minute in the queue, its device quiet.
+    const s = await setup('es');
+    await s.result(OP, summary(usage('receipt', { printers: 1, prints_on: 'Caja', pending: 1, oldest_pending_at: ago(2), stalled: 1 })));
+    const card = words(s.find('printing-summary-card-receipt').element);
+    expect(card).toMatch(/^Recibo Dispositivo apagado /);
+    expect(card).not.toContain('Listo');
+    expect(s.find('printing-summary-device-off-receipt').text()).toBe(
+      'El dispositivo que lo imprime no responde: enciéndelo y abre en él la app de ERPlora.',
+    );
+    expect(s.wrapper.find('[data-testid="printing-summary-no-device-receipt"]').exists()).toBe(false);
+    // None set up at all: «set one up» says it, not «switch it on».
+    await s.result(OP, summary(usage('receipt', { printers: 1, prints_on: 'Caja', pending: 1, oldest_pending_at: ago(2), unattended: 1, stalled: 1 })));
+    expect(words(s.find('printing-summary-card-receipt').element)).toMatch(/^Recibo Sin dispositivo /);
+    expect(s.wrapper.find('[data-testid="printing-summary-device-off-receipt"]').exists()).toBe(false);
+  });
+
+  it('says the device is off in English too', async () => {
+    const s = await setup();
+    await s.result(OP, summary(usage('kitchen', { printers: 1, pending: 1, oldest_pending_at: ago(2), stalled: 1 })));
+    expect(words(s.find('printing-summary-card-kitchen').element)).toMatch(/^Kitchen Device off /);
+    expect(s.find('printing-summary-device-off-kitchen').text()).toBe(
+      'The device that prints it is not responding: switch it on and open the ERPlora app on it.',
+    );
   });
 });

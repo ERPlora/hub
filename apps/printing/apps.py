@@ -57,7 +57,8 @@ class PrintingConfig(LiveAppConfig):
     # 70, recommended: without a printer the business still sells, hub#1731), done once a device set up here reaches
     # an active receipt printer (the old «registered for the receipt station», live or not, hub#1948); and its bell row
     # «Nothing is printing “…”» (HUB_SHELL-F63, hub#987), one per function, for everybody with Printing: whoever
-    # stands at the counter can switch the till back on. The old module had none of its own, nor panels.
+    # stands at the counter can switch the till back on. It counts what has waited a minute with no device on to print
+    # it (seen in the last 90 s), as the old print_hosts::is_undrained. The old module had none of its own, nor panels.
     setup = [
         SetupStep(
             key="printer",
@@ -87,6 +88,12 @@ class PrintingConfig(LiveAppConfig):
         )
         for usage, label in NOTHING_PRINTING.items()
     ]
+    # A job starts counting once it has waited a minute and a device stops counting 90 s after its last news: the
+    # number moves with no event, so the bell reads it again every 30 s, the old bell's poll (print-alert.ts, POLL_MS).
+    bell_refresh_every = {f"stalled_{usage}": 30 for usage in NOTHING_PRINTING}
+    # The news that a device is there (the old hub's print_hosts::heartbeat): base's /ws/print runs it at the hello
+    # and at every beat of a device that prints, as the device's user (base.E006).
+    print_presence = "printing.device.seen"
     # PRINTING-F20: the queue forgets the jobs that ended (printed, cancelled, failed) over 30 days ago,
     # once an hour, as the platform (cron in UTC).
     scheduled_tasks = [
