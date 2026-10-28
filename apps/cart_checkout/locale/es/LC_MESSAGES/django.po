@@ -265,3 +265,13 @@ msgstr "El total de esta línea (cantidad × precio) supera lo que cabe en un ca
 
 msgid "The cart's total would be above what a cart can hold."
 msgstr "El total del carrito superaría lo que cabe en un carrito."
+
+# How the assistant's card names the data of cart_checkout's writes (titles of the schemas).
+msgid "Customer"
+msgstr "Cliente"
+
+msgid "Cart line"
+msgstr "Línea del carrito"
+
+msgid "Order"
+msgstr "Pedido"
