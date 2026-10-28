@@ -110,6 +110,7 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
   const page = await context.newPage();
   await login(page, A, '/');
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await ready(context);
   const streams: number[] = [];
   const reads: number[] = [];
