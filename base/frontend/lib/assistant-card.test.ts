@@ -60,8 +60,9 @@ describe('each datum', () => {
     expect(fieldText(difference(13790), { ...opts, locale: 'en' })).toBe('+€137.90');
     // Until the business's currency is known, the figure alone, with its sign.
     expect(fieldText(difference(13790), { locale: 'en', t })).toBe('+137.90');
-    // Any other amount, positive as it is, never gets one.
+    // Any other amount, positive as it is, never gets one; nor does a datum that is no amount, whatever it says.
     expect(fieldText(card().fields[1], opts)).toBe('15,00 €');
+    expect(fieldText({ name: 'duration', label: 'Duration', kind: 'text', value: 1500, signed: true }, opts)).toBe('1500');
   });
 
   it('what is not marked as money stays a number', () => {

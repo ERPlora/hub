@@ -510,16 +510,36 @@ def test_a_preview_is_checked_at_start(monkeypatch, write, why):
 class SignedNameOut(Schema):
     name: str = Field(title="Owner", json_schema_extra={"signed": True})
     total_cents: int = Field(json_schema_extra={"signed": True})
+    paid_cents: str = Field(description="What was paid, in cents, as written.", json_schema_extra={"signed": True})
 
 
 def test_a_preview_marks_signed_only_an_amount(monkeypatch):
-    """A sign means over or short: only an amount in cents may be declared signed, said at start like the rest."""
+    """A sign means over or short: only an amount in cents may be declared signed, said at start like the rest. A
+    text whose name says cents is no amount either: a number is what takes a sign."""
     read = count_preview({}, SignedNameOut)
     monkeypatch.setitem(registry, read.name, read)
-    monkeypatch.setitem(registry, SETTLE.name, declaring({"operation": read.name, "fields": ["name", "total_cents"]}))
+    monkeypatch.setitem(
+        registry, SETTLE.name, declaring({"operation": read.name, "fields": ["name", "total_cents", "paid_cents"]})
+    )
     [error] = preview_errors()
     assert "marks name signed, but it is no amount in cents" in error.msg
+    assert "marks paid_cents signed, but it is no amount in cents" in error.msg
     assert "total_cents" not in error.msg
+
+
+@pytest.mark.parametrize(
+    ("prop", "value"),
+    [
+        ({"type": "string", "signed": True}, "Ana"),
+        ({"type": "integer", "description": "Counted − expected, in cents.", "signed": True}, None),
+        ({"type": "integer", "description": "Counted − expected, in cents.", "signed": "yes"}, 13790),
+    ],
+    ids=["a text", "an amount left empty", "not declared with True"],
+)
+def test_only_an_amount_declared_signed_carries_the_mark(prop, value):
+    """The mark is for the card to write a sign on an amount: a datum that is no amount in cents, an amount left empty
+    (a difference hidden from this person) or a declaration that is not ``True`` carry none, whatever the schema says."""
+    assert "signed" not in assistant._field("difference", "Diferencia", prop, value)
 
 
 def test_the_previews_of_today_are_declared_right(settle):
