@@ -2372,9 +2372,9 @@ Pasos:
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
      línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe sale en la moneda del negocio (nunca en
      céntimos), salvo uno de «Lo que va a pasar» que su app da en otra moneda, que sale en la suya: rectificar una
-     factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty. Una diferencia sale con su
-     signo como en la pantalla de su app, para ver de un vistazo si sobra o falta (el cierre de caja dice
-     «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No», y
+     factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
+     la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
+     vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No», y
      una lista, por cuántos elementos lleva. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
      técnico. Una acción de la propia plataforma se nombra por la pantalla donde se hace, por ejemplo «Cambiar en
@@ -2384,7 +2384,8 @@ Pasos:
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
-     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …».
+     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
+     persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio y, en «Lo que va a pasar»,
 la que dé su app.
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
