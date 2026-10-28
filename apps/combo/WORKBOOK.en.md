@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:395517856619da028811ca1f4e57edbb4b0b5d3c37285f1ea79688f49d60450f -->
+<!-- generated from WORKBOOK.md sha256:5f5d62d404be5322461b9d87294d97f5c0d3e2fa3073adc11370ebf2b1d40f1c -->
 
 ## What it is for and who it is for
 
@@ -52,7 +52,9 @@ references and their forums) is still valid and is adopted, nothing more:
 - Only a product that is sold and charged **by units** can be a choice (a menu carries "a portion",
   not "a kilo" nor "the price of 100"); the search boxes only offer those. A product deactivated
   or deleted in Inventory cannot be added.
-- The closed price and the supplements are amounts in euros, written with a comma or a point.
+- The closed price and the supplements go in **the business's currency**, its country's, the one
+  **Settings → Business** shows (euros in Spain, złoty in Poland), with its decimals (the yen has none),
+  written with a comma or a point. The examples in this document are of a business in Spain, in euros.
 
 Initial setup, step by step:
 
@@ -68,22 +70,22 @@ Initial setup, step by step:
 
 ### Menus
 Menu **Menus**. Table of menus with the search box "Search a menu…" (it searches by name and by
-kitchen name), table or cards view and columns: Name (sorts and filters), "Closed price" (sorts), "How
+kitchen name), table or cards view and columns: Name (sorts and filters), "Closed price" (in the business's currency; sorts), "How
 it is sold" ("Eat in" or "Take away"; sorts and filters), "On sale" (Yes or No; sorts and filters) and
 Order (sorts). Pages of 50, by order and name. With the right to manage there is a **+** button and,
 per row, "Edit details" and "Withdraw"; without it, only the list is seen. Tapping a row opens the
 builder.
 
 The create and edit form (title "New menu" or "Menu · {name}") has: Name, "Kitchen name" ("Leave it
-empty and the kitchen ticket uses the commercial name."), "Closed price" ("What the customer pays for
-the whole menu, whatever they pick."), "How is it sold?" ("Eaten in (hospitality service)" or "Sold as
+empty and the kitchen ticket uses the commercial name."), "Closed price (<currency>)" (the business's:
+"Closed price (PLN)" in Poland; "What the customer pays for the whole menu, whatever they pick."), "How is it sold?" ("Eaten in (hospitality service)" or "Sold as
 a product / to take away", with the explanation of both always in sight and the chosen one
 highlighted), "VAT category" (only if it is "eaten in"), "Order on the menu list" and the "On sale"
 checkbox (ticked to begin with), with "Save" and "Cancel".
 
 ### Menu builder
 It opens when a menu is tapped (`/combo/menus/<id>`). The back arrow of the top bar goes back to Menus.
-At the top of the page, the name and the price of the menu, and a notice with what that menu will do on the ticket: "This menu is billed as a
+At the top of the page, the name and the price of the menu (in the business's currency), and a notice with what that menu will do on the ticket: "This menu is billed as a
 single service: one line at its VAT category, whatever the components are taxed at." or "This menu is
 billed as goods: its price will be split across the components you add, one line each.". Below, if
 the menu is not on the till yet, another notice, "Not on the till yet", says why, one reason per line.
@@ -91,12 +93,13 @@ the menu is not on the till yet, another notice, "Not on the till yet", says why
 Then, the "Courses" section ("A course is a step of THIS menu — Starter, Main, Dessert, Drink. Its
 order is the order it is asked for.") and a card per course, in order: name, its rule ("Compulsory ·
 pick 1 · up to 1 · no repeats") and, with the right to manage, the drag handle, "Move up", "Move
-down", "Edit details" and "Withdraw". Inside, "Choices": a row per product with its supplement, a
-"Sold out" mark if it is not available today, "Sold out in Inventory" if its product is sold out
+down", "Edit details" and "Withdraw". Inside, "Choices": a row per product with its supplement with its
+sign ("+€2.00" in Spain, "+zł 2.00" in Poland), a "Sold out" mark if it is not available today, "Sold out in Inventory" if its product is sold out
 for the whole business and, if the product can no longer be sold, "Deactivated in Inventory", "No
 longer in the catalogue", "Not sold by units in Inventory" or, in a menu "to take away", "No VAT
 category to take away"; per row, the handle, move up, move down, "Sold out / Available", edit and
-remove. Below, the search box "Search a product…", "Supplement", "Add choice" and "Add several"
+remove. Below, the search box "Search a product…" (each product with its SKU and its price), "Supplement
+(<currency>)", "Add choice" and "Add several"
 (window with a search box and checkboxes, and the "Category" field with "Tick all of “{category}”
 (N)": "Add N selected"; what is already in the course comes ticked "Already in this course").
 At the end, the "Add a course" form (Course name, "Minimum picks", "Maximum picks", the checkbox "The
@@ -156,7 +159,8 @@ Screen: Menus
 Steps:
 1. In Menus, tap **+**.
 2. Type the Name; if the kitchen ticket must say something else, the "Kitchen name".
-3. Type the "Closed price": what the customer pays for the whole menu. Empty is 0.
+3. Type the "Closed price (<currency>)": what the customer pays for the whole menu, in the business's
+   currency and with its decimals (the yen has none). Empty is 0.
 4. Choose "How is it sold?": "Eaten in" bills ONE line at the menu's rate, the drink included (the
    menu of the day); "Sold as a product / to take away": if all the choices are taxed the same, ONE
    line at that rate; if not, ONE line per dish, each one at its rate, with the price shared out
@@ -171,8 +175,8 @@ categories from Taxes.
 Out: the menu (announces: new menu).
 If it fails: next to the field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
 without it, it cannot be billed.", "A menu price cannot be below zero. To make a choice cheaper, give it
-a negative supplement instead.", "This is not an amount. Type a figure, for example 12.50." and the one
-about the two possible readings of an amount ("1.250"), which quotes what was typed. A VAT category that
+a negative supplement instead.", "This is not an amount. Type a figure, for example 12.50." (also with
+another currency's sign: "€13.50" in a business in Poland) and the one about the two possible readings of an amount ("1.250"), which quotes what was typed. A VAT category that
 does not exist in Taxes: "That tax category does not exist in Taxes.". Without the right to manage
 there is no + button.
 Involved: TAX-F01
@@ -243,8 +247,8 @@ Screen: Menu builder
 Steps:
 1. On the course's card, type in "Search a product…" and choose the product from Inventory's
    catalogue (it searches by name and by SKU).
-2. Type the "Supplement" if substituting costs more (or less, with a minus sign) than the closed
-   price; empty is no supplement.
+2. Type the "Supplement (<currency>)", in the business's currency, if substituting costs more (or less,
+   with a minus sign) than the closed price; empty is no supplement.
 3. Tap "Add choice": it goes in last. For several at once, "Add several": tick the boxes
    and tap "Add N selected" (all go in without a supplement and in the order they were ticked). For
    a whole category, choose it in "Category": the list shows its products and "Tick all of
@@ -276,7 +280,7 @@ Steps:
 2. Each course says its rule: "Choose N" if it asks for exactly N, "Choose N to M" if it asks for a minimum
    and allows up to a ceiling, "Choose at least N" if it asks for a minimum with no ceiling, "Up to N" if it
    only has a ceiling, "Optional" if not; and its available choices, with the supplement with its sign if it
-   is not zero ("+€2.00"). On opening nothing is chosen.
+   is not zero ("+€2.00" in Spain). On opening nothing is chosen.
 3. Choose: in a course of a single choice, tapping another one changes it; in one with a ceiling, on
    reaching it the next tap says "«Coffee» is full: take one out to choose another."; a choice that can
    be repeated carries its counter and its "−".
@@ -353,8 +357,8 @@ equivalent to take away in Taxes, so this menu cannot be sold to take away."; in
 menu "to take away" that dish is not offered and the builder marks it "No VAT category to take away".
 "To take away" with a product without a tax category: "“{product}” has no tax category in
 Inventory, so this menu cannot be charged." (and it is not offered). Split with all the products at
-€0 in the catalogue: "The products of this menu have no catalogue price, so its VAT cannot be
-split."; if all the offered choices of a menu "to take away" are worth €0 and go to
+price 0 in the catalogue: "The products of this menu have no catalogue price, so its VAT cannot be
+split."; if all the offered choices of a menu "to take away" are worth 0 and go to
 different categories, the menu is not on the till.
 Involved: SALE-F12, TAX-F19
 

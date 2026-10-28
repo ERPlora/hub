@@ -53,7 +53,7 @@ cd hub   # o tu worktree
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/combo apps/sale/tests/test_integration_combo.py \
   apps/kitchen/tests/test_integration_combo.py
 pnpm test apps/combo apps/sale/frontend/components/pos
-pnpm e2e tests/e2e/combo-menus.spec.ts tests/e2e/combo-till.spec.ts
+pnpm e2e tests/e2e/combo-menus.spec.ts tests/e2e/combo-till.spec.ts tests/e2e/combo-business-currency.spec.ts
 ```
 
 - `tests/test_integration_sale.py` va contra Ventas real (precio, rechazos, cuenta abierta y reparto al
@@ -63,11 +63,16 @@ pnpm e2e tests/e2e/combo-menus.spec.ts tests/e2e/combo-till.spec.ts
 - `combo-menus.spec.ts` recorre la lista y el constructor (F01–F06, F12, F13) y una venta del menú
   (F07–F09); `combo-till.spec.ts`, el TPV, Cocina e Inventario de verdad (F07–F11). Los dos, en 390, 834 y
   1440.
+- `combo-business-currency.spec.ts`: la lista de menús, el constructor (precio cerrado y suplementos) y los
+  campos de importe en la moneda del negocio (el negocio `a` en Polonia, en złoty, en 390, 834 y 1440, y de
+  vuelta en España, en euros). Los importes se pintan y se leen con `base.business.get` (`useBusinessMoney`),
+  con los decimales que cuenta el servidor; mientras el negocio no contesta, una cifra sin símbolo, nunca un
+  euro.
 
 ## Qué queda fuera
 
 - Horario del menú, elección por defecto y modificadores dentro de un plato, servicios de Servicios como
-  elección y pintar en el constructor el reparto en euros de un menú «para llevar»: «Lo que NO hace, a
+  elección y pintar en el constructor el reparto con importes de un menú «para llevar»: «Lo que NO hace, a
   propósito» del WORKBOOK.
 - Marcar una cuenta «para llevar» en el TPV: es de Ventas; hasta entonces manda el ajuste del menú
   («Contradicciones señaladas» del WORKBOOK).

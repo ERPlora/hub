@@ -8,14 +8,14 @@
 // «Loading…», a failure offers «Retry», and an answer older than the last search is dropped. A category
 // of Inventory narrows the list to its products (all of them, the course takes 40 at most) and «Tick all
 // of “category” (N)» ticks the ones the course does not offer yet, in the list's order (combos#12: Square
-// and WooCommerce Composite add a whole category at once).
+// and WooCommerce Composite add a whole category at once). Each product's price is in the business's currency.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonItem, IonList, IonNote, IonSearchbar } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import { isPortion, searchCategories } from '../lib/pickers';
 import type { GroupOut } from '../operations';
 
@@ -37,6 +37,8 @@ interface Article {
 const locale = useLocale();
 const t = useT();
 const client = useLiveClient();
+/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+const money = useBusinessMoney();
 const add = useCommand('combo.option.bulk_create');
 const articles = ref<Article[]>([]);
 const loading = ref(false);
@@ -209,7 +211,7 @@ async function save(): Promise<void> {
             justify="start"
             @ion-change="tick(article.id, $event.detail.checked)"
           >
-            {{ article.name }} · {{ article.sku }} · {{ formatMoney(article.price, locale) }}
+            {{ article.name }} · {{ article.sku }} · {{ formatMoney(article.price, locale, money) }}
           </ion-checkbox>
           <ion-note
             v-if="already.has(article.id)"
