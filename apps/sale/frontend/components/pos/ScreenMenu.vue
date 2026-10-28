@@ -2,13 +2,15 @@
 // The ⋮ SCREEN menu (not a sale menu) at the end of the category strip: its one item puts the page on
 // the browser's full screen, or takes it off (the whole page: the sheets live in the app's root). The label follows the real state (the toggle, Esc, F11),
 // never a local guess. Where the device cannot (an iPhone's Safari) there is no menu at all. Anchored
-// under its button; a tap anywhere else, or Escape, closes it.
+// under its button; a tap anywhere else, Escape or Android's Back closes it.
 import { HubIcon } from '@erplora/ui/shell';
 import { onBeforeUnmount, shallowRef } from 'vue';
 
+import { useSystemBack } from '../../composables/pos/useSystemBack';
 import { isActive, isCapable, onChange, toggle } from '../../lib/fullscreen';
 
 const open = shallowRef(false);
+useSystemBack(open, () => (open.value = false));
 const capable = isCapable();
 const active = shallowRef(isActive());
 const stop = onChange(() => (active.value = isActive()));

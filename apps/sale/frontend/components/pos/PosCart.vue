@@ -6,9 +6,10 @@
 // `kitchen`), the tabs «Check» and «Current order»: the second one shows only what is pending, says how many
 // items wait (also to a screen reader) and carries the send bar; a send goes up (`send`, with its rush). With
 // the right to see Kitchen's tickets (`kitchenTickets`), «Tickets · N» rides beside the head of what was sent
-// (KITCHEN-F19, F20).
+// (KITCHEN-F19, F20). Android's Back closes the open dropdown.
 import { computed, shallowRef, watch } from 'vue';
 
+import { useSystemBack } from '../../composables/pos/useSystemBack';
 import { useT } from '../../composables/useT';
 import type { OrderLineOut, OrderOut, OrderRow, SettingsOut } from '../../operations';
 import CartFooter from './CartFooter.vue';
@@ -67,6 +68,7 @@ const emit = defineEmits<{
 
 const t = useT();
 const checksOpen = shallowRef(false);
+useSystemBack(checksOpen, () => (checksOpen.value = false));
 
 const lines = computed(() => props.order?.lines ?? []);
 const hasLines = computed(() => lines.value.length > 0);

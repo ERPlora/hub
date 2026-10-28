@@ -1,8 +1,9 @@
 // The ⋮ screen menu at the end of the category strip (WORKBOOK «Vender»): «Full screen» / «Exit full
 // screen», the browser's own, for the whole page (the sheets live in the app's root); not there at all
-// where the device cannot do it.
+// where the device cannot do it. Android's Back on the installed app closes it, as Escape does (base's `erplora:back`).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SHELL_BACK_EVENT } from '../../../../../base/frontend/lib/system-back';
 import { click, mountSale } from '../../__tests__/mount-sale';
 import ScreenMenu from './ScreenMenu.vue';
 
@@ -22,6 +23,13 @@ vi.mock('../../lib/fullscreen', () => ({
     return () => (screen.listeners = screen.listeners.filter((l) => l !== listener));
   },
 }));
+
+/** One press of the system Back, as the shell asks: `true` when the app took it. */
+function pressBack(): boolean {
+  const ask = new CustomEvent(SHELL_BACK_EVENT, { cancelable: true });
+  window.dispatchEvent(ask);
+  return ask.defaultPrevented;
+}
 
 beforeEach(() => {
   screen.capable = true;
@@ -68,5 +76,23 @@ describe('ScreenMenu', () => {
     m.find('pos-screen-menu-list').element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await m.wrapper.vm.$nextTick();
     expect(m.find('pos-fullscreen').exists()).toBe(false);
+  });
+
+  it('Android’s Back closes the open menu and the till stays; with the menu closed Back is the shell’s', async () => {
+    const m = await mountSale(ScreenMenu, {});
+    expect(pressBack()).toBe(false);
+    await click(m.find('pos-screen-menu').element);
+    expect(pressBack()).toBe(true);
+    await m.wrapper.vm.$nextTick();
+    expect(m.find('pos-fullscreen').exists()).toBe(false);
+    expect(m.find('pos-screen-menu').attributes('aria-expanded')).toBe('false');
+    expect(pressBack()).toBe(false);
+  });
+
+  it('a menu that leaves the screen open no longer answers Back', async () => {
+    const m = await mountSale(ScreenMenu, {});
+    await click(m.find('pos-screen-menu').element);
+    m.wrapper.unmount();
+    expect(pressBack()).toBe(false);
   });
 });
