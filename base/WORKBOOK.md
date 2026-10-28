@@ -527,7 +527,8 @@ Pasos:
      idioma de quien mira. En una lista con barras, cada barra mide lo grande que es su cifra frente a la mayor
      de la lista, sea del signo que sea; una cifra negativa, como un descuadre de caja en el que faltó dinero o
      un producto con existencias por debajo de cero, sale en rojo y con su signo (-0,40 €), y las demás
-     conservan el color del panel.
+     conservan el color del panel o, si su app da un color a cada fila, el de la suya. El rojo de una cifra
+     negativa gana siempre al color de su fila.
   3. En un gráfico de días, cada barra lleva debajo su día de la semana (o su fecha, si abarca más de una
      semana) y encima salen el día y su importe: los de la última barra hasta que tocas otra. Un día por debajo
      de cero tiene su barra tan alta como su cifra, en rojo; los demás conservan su color.
@@ -2666,6 +2667,14 @@ Implicados: ACCOUNTS-F38
   fecha (`17 oct`); una etiqueta que no es un día se queda tal cual. Encima de las barras salen el día entero y el
   importe (`options.format`) de la barra elegida: la última hasta que se toca o enfoca otra (gh:hub#2392 del hub
   viejo; `tests/e2e/fix-hub-home-chart-iso-day-labels.spec.ts`).
+- Un panel `bar-list` cuyo `map` declara `color` pinta cada barra con el color de su fila (`renderBarList` del hub
+  viejo: `color: row[map.color]`), solo si es un hex `#rgb` o `#rrggbb` (`HEX_COLOR` de `base/frontend/lib/home.ts`):
+  lo teclea una persona y va al estilo de la barra, así que cualquier otra cosa (un nombre CSS, `var(…)`, `url(…)`)
+  pinta como sin `map.color`. Una barra negativa no lleva color: su rojo gana, porque una alarma pesa más que la
+  categoría (las barras de datos de Excel con su relleno de negativo, el formato condicional de Power BI sobre los
+  colores de categoría, los umbrales de Grafana sobre su color fijo; FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR).
+  Un color claro casi no se ve sobre la pista gris: el contraste es el del color que eligió quien lo tecleó. Un
+  `chart` no pinta `map.color` (el hub viejo tampoco).
 - Un panel `timeline` dice cuándo pasó cada entrada con `formatMoment` de `base/frontend/lib/home.ts` (`Intl`, en
   la zona del dispositivo: el Hub aún no tiene la del negocio en el navegador, gh:hub#1212): de hoy, la hora sola;
   de ayer, la palabra de `Intl.RelativeTimeFormat` y la hora; antes, la fecha corta y la hora (con el año si es de

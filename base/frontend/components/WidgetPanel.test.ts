@@ -157,6 +157,31 @@ describe('WidgetPanel', () => {
     expect(fills.map((fill) => fill.classes())).toEqual([['widget-bar-fill'], ['widget-bar-fill']]);
   });
 
+  // BASE-F06 (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR): Staff's «Staff by role» painted every role in the panel's
+  // colour. A panel that declares `map.color` paints each bar in its row's colour; a negative stays red, and one
+  // without the declaration keeps the panel's colour.
+  it("paints each bar of a bar-list in its row's colour when the panel maps one, a negative still red", async () => {
+    const m = await panel({ kind: 'bar-list', map: { label: 'name', value: 'n', color: 'color' } });
+    const call = await m.live();
+    await m.result(call, 'demo.item.stats', {
+      rows: [
+        { name: 'Stylist', n: 4, color: '#2e7d32' },
+        { name: 'Reception', n: 2, color: '#c2185b' },
+        { name: 'Cleaning', n: -1, color: '#2e7d32' },
+        { name: 'Typed', n: 1, color: 'red' },
+      ],
+    });
+    const fills = m.wrapper.findAll('.widget-bar-fill').map((fill) => fill.element as HTMLElement);
+    expect(fills.map((fill) => fill.style.backgroundColor)).toEqual(['#2e7d32', '#c2185b', '', '']);
+    expect(fills[1].style.width).toBe('50%');
+    expect(fills[2].classList.contains('widget-bar-fill--negative')).toBe(true);
+
+    const plain = await panel({ kind: 'bar-list', map: { label: 'name', value: 'n' } });
+    const again = await plain.live();
+    await plain.result(again, 'demo.item.stats', { rows: [{ name: 'Stylist', n: 4, color: '#2e7d32' }] });
+    expect((plain.wrapper.get('.widget-bar-fill').element as HTMLElement).style.backgroundColor).toBe('');
+  });
+
   it('paints a timeline as one entry per row', async () => {
     const m = await panel({ kind: 'timeline', map: { title: 'who', time: 'at' } });
     const call = await m.live();

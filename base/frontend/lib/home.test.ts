@@ -407,6 +407,71 @@ describe('a bar-list with negatives (BASE-F06): the bar measures the size, only 
   });
 });
 
+// BASE-F06 — a bar-list with the colour of its row (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-MAP-COLOR): Staff's «Staff by
+// role» painted every role's bar in the panel's colour although each role has its own; the old hub's `renderBarList`
+// gave each bar `color: row[map.color]`. The colour is typed by a person (a role's colour in Staff), so only a hex
+// colour (#rgb, #rrggbb) reaches the bar: anything else paints as before. A negative stays red whatever its row's
+// colour: the alarm wins over the category, as Excel's data bars, Power BI's rules or Grafana's thresholds do.
+describe('a bar-list with the colour of its row (BASE-F06): `map.color`, only a hex colour, red still wins', () => {
+  const byRole = widget('staff.by_role', {
+    kind: 'bar-list',
+    map: { label: 'name', value: 'member_count', color: 'color' },
+    options: { valueFormat: 'number' },
+  });
+  const barsOf = (rows: Record<string, unknown>[], fields: Partial<WidgetDef> = {}) => {
+    const view = widgetView({ ...byRole, ...fields }, { rows }, 'es');
+    if (view.kind !== 'bar-list') throw new Error(`expected a bar-list, got ${view.kind}`);
+    return view.bars;
+  };
+
+  it('each bar takes the colour its row gives, #rrggbb or #rgb', () => {
+    const bars = barsOf([
+      { name: 'Estilista', member_count: 4, color: '#2E7D32' },
+      { name: 'Recepción', member_count: 2, color: '#c2185b' },
+      { name: 'Limpieza', member_count: 1, color: '#fa0' },
+    ]);
+    expect(bars).toStrictEqual([
+      { label: 'Estilista', value: 4, text: '4', share: 1, color: '#2E7D32' },
+      { label: 'Recepción', value: 2, text: '2', share: 0.5, color: '#c2185b' },
+      { label: 'Limpieza', value: 1, text: '1', share: 0.25, color: '#fa0' },
+    ]);
+  });
+
+  it('a panel that does not declare `map.color` paints as before, even when its rows have a colour', () => {
+    const bars = barsOf([{ name: 'Estilista', member_count: 4, color: '#2e7d32' }], { map: { label: 'name', value: 'member_count' } });
+    expect(bars).toStrictEqual([{ label: 'Estilista', value: 4, text: '4', share: 1 }]);
+  });
+
+  it('a row with no colour, or one that is no hex colour, paints as before: nothing typed reaches the style', () => {
+    const typed = ['', '   ', 'red', 'rgb(0, 0, 0)', 'var(--ion-color-danger)', '#12345', '#ggg', '#2e7d32ff', ' #2e7d32', '#2e7d32;', '#fff; background: url(x)'];
+    const bars = barsOf([
+      ...typed.map((color, index) => ({ name: `R${index}`, member_count: 1, color })),
+      { name: 'Sin color', member_count: 1, color: null },
+      { name: 'Sin campo', member_count: 1 },
+      { name: 'Número', member_count: 1, color: 0x2e7d32 },
+    ]);
+    expect(bars).toHaveLength(typed.length + 3);
+    expect(bars.filter((bar) => 'color' in bar)).toEqual([]);
+  });
+
+  it('a negative is red whatever its row says: it carries no colour of its own, only the mark', () => {
+    const bars = barsOf([
+      { name: 'Estilista', member_count: 2, color: '#2e7d32' },
+      { name: 'Recepción', member_count: -1, color: '#2e7d32' },
+    ]);
+    expect(bars).toStrictEqual([
+      { label: 'Estilista', value: 2, text: '2', share: 1, color: '#2e7d32' },
+      { label: 'Recepción', value: -1, text: '-1', share: 0.5, negative: true },
+    ]);
+  });
+
+  it('a row without its value («—») has no bar, so no colour either', () => {
+    expect(barsOf([{ name: 'Estilista', member_count: null, color: '#2e7d32' }])).toStrictEqual([
+      { label: 'Estilista', value: null, text: '—', share: 0 },
+    ]);
+  });
+});
+
 // BASE-F06 — a chart of business days (Sales' «Sales, last 7 days»): the old hub's gh:hub#2392 painted each day
 // as `2026-10-17` and no amount at all.
 describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
