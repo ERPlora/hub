@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The menu's builder (WORKBOOK «Pantallas · Constructor del menú»; COMBO-F05, F06, F12), opened from a
 // row of Menus: `combo.combo.get` live. The top bar goes back to Menus (the Hub's one way back); on top of
-// the page, the name and the closed price, what the menu
+// the page, the name and the closed price (in the business's currency), what the menu
 // does on the receipt (one line eaten in, split to take away) and, when the till does not offer it yet,
 // why. Then «Courses»: a card per course in the order the till asks them (the handle and the arrows save
 // the whole order at once; «Withdraw» asks first), and «Add a course», which edits the course whose
@@ -17,7 +17,7 @@ import CourseCard from '../components/CourseCard.vue';
 import CourseForm from '../components/CourseForm.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import type { GroupOut } from '../operations';
 
 const props = defineProps<{ id: string }>();
@@ -26,6 +26,8 @@ const session = useSession();
 const canManage = computed(() => session.can('combo.manage'));
 const t = useT();
 const locale = useLocale();
+/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+const money = useBusinessMoney();
 
 const { data: menu, status, error } = useLive('combo.combo.get', () => ({ id: props.id }));
 const blocked = computed(() => blockingError(error.value));
@@ -116,7 +118,7 @@ async function confirmRemove(): Promise<void> {
         <span
           class="combo-builder__price"
           data-testid="combo-builder-price"
-        >{{ formatMoney(shown.price, locale) }}</span>
+        >{{ formatMoney(shown.price, locale, money) }}</span>
       </div>
 
       <InlineFeedback

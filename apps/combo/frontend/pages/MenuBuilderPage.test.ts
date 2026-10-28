@@ -3,12 +3,13 @@
 // detail of the Hub); on top of the page, the name and the price, what
 // the menu does on the receipt and, when the till does not offer it yet, why. Then «Courses», one card
 // each in their order (the handle and the arrows save the whole order at once; «Withdraw» asks first),
-// and «Add a course», which edits the course whose «Edit details» was pressed.
+// and «Add a course», which edits the course whose «Edit details» was pressed. The closed price and the
+// supplements are in the business's currency (its country's); a bare figure until it answers, never a euro.
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCombo } from '../__tests__/mount-combo';
+import { business, EMPLOYEE, errorFrame, flush, type MountOptions, mountCombo, POLISH } from '../__tests__/mount-combo';
 import CourseCard from '../components/CourseCard.vue';
 import CourseForm from '../components/CourseForm.vue';
 import type { ComboDetailOut, GroupOut } from '../operations';
@@ -76,6 +77,40 @@ describe('MenuBuilderPage', () => {
     // The way back is the top bar's arrow, never a second one inside the page.
     expect(s.wrapper.findComponent(AppPage).props('backHref')).toBe('/combo/menus');
     expect(s.inDoc('combo-builder-back')).toBeNull();
+  });
+
+  it('a business in Poland reads the closed price and the supplements in złoty', async () => {
+    const s = await setup({ business: business(POLISH), locale: 'es' });
+    const mains: GroupOut = {
+      ...course('g2', 'Mains', 1),
+      options: [
+        {
+          id: 'o1',
+          group_id: 'g2',
+          product_id: 'p1',
+          product_name: 'Hake',
+          sku: 'HAK',
+          catalog_price: 1400,
+          price_delta: 200,
+          is_available: true,
+          sort_order: 0,
+          status: 'offered',
+        },
+      ],
+    };
+    await s.show({ ...MENU, groups: [course('g1', 'Starters', 0), mains] });
+    const plain = (text: string | null | undefined) => text?.replace(/[\u00a0\u202f]/g, ' ');
+    expect(plain(s.inDoc('combo-builder-price')?.textContent)).toBe('13,50 zł');
+    expect(plain(s.inDoc('combo-choice-o1')?.querySelector('.combo-course__delta')?.textContent)).toBe('+2,00 zł');
+    expect(s.wrapper.text()).not.toContain('€');
+  });
+
+  it('until the business answers the closed price is a figure without a symbol, never a euro', async () => {
+    const s = await setup({ business: null });
+    await s.show(MENU);
+    expect(s.inDoc('combo-builder-price')?.textContent).toBe('13.50');
+    await s.result('base.business.get', business(POLISH));
+    expect(s.inDoc('combo-builder-price')?.textContent?.replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 13.50');
   });
 
   it('a menu to take away says its price will be split, and one on the till says nothing more', async () => {
