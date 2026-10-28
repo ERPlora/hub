@@ -71,9 +71,17 @@ const ROUTES = {
   '/api/staff/members/update': [200, DETAIL],
 } as Record<string, [number, unknown]>;
 
-async function setup(member: MemberOut | null = null, options: MountOptions & { routes?: Record<string, [number, unknown]> } = {}) {
+async function setup(
+  member: MemberOut | null = null,
+  options: MountOptions & { routes?: Record<string, [number, unknown]>; business?: Parameters<typeof business>[0] } = {},
+) {
   const m = await mountStaff(MemberFormModal, { props: { open: false, member }, ...options });
   m.answerBy({ ...ROUTES, ...options.routes });
+  // The business answered before the dialog opens (`options.business`).
+  if (options.business) {
+    await m.live();
+    await m.result(BUSINESS, business(options.business));
+  }
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -426,6 +434,13 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
     const s = await setup(ROW, { routes: YEN_PAY });
     expect(s.field('hourly_rate').value).toBe('15.00');
     await answer(s, JAPANESE);
+    expect(s.field('hourly_rate').value).toBe('1500');
+    await click(s.save());
+    expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1' }]);
+  });
+
+  it('with the business known when the record opens, its rate comes in its decimals at once', async () => {
+    const s = await setup(ROW, { routes: YEN_PAY, business: JAPANESE });
     expect(s.field('hourly_rate').value).toBe('1500');
     await click(s.save());
     expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1' }]);
