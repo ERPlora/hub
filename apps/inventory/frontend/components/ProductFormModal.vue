@@ -102,6 +102,19 @@ watch(
   { immediate: true },
 );
 
+// The business answers (or its currency changes) with the form open: a price or cost the person has not touched is
+// rewritten from the product with the currency's decimals («2.20» → «220» in yen), and so is what it opened with;
+// what they typed stays as typed, read in the new currency when they save (the field says so when it cannot be).
+watch(business, () => {
+  if (!open.value) return;
+  const now = fieldsOf(props.product);
+  const untouched = (key: 'price' | 'cost') => form.value[key] === original.value[key];
+  const price = untouched('price') ? now.price : form.value.price;
+  const cost = untouched('cost') ? now.cost : form.value.cost;
+  original.value = { ...original.value, price: now.price, cost: now.cost };
+  form.value = { ...form.value, price, cost };
+});
+
 const command = computed(() => (editing.value ? update : create));
 const error = computed(() => command.value.error.value);
 const pending = computed(() => command.value.pending.value);

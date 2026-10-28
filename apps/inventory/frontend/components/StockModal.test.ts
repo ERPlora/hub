@@ -8,7 +8,8 @@
 // Quantities in the product's unit and its step; a refusal stays in the dialog under its field.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { flush, mountInventory, ok, product, refusal, UNITS } from '../__tests__/mount-inventory';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, flush, mountInventory, ok, product, refusal, UNITS } from '../__tests__/mount-inventory';
 import StockModal from './StockModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -22,13 +23,19 @@ afterEach(() => {
 
 type Control = HTMLElement & { value?: unknown; errorText?: string; disabled?: boolean; label?: string; helperText?: string };
 
-async function setup(kind: 'receive' | 'count' | 'write_off', props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+async function setup(
+  kind: 'receive' | 'count' | 'write_off',
+  props: Record<string, unknown> = {},
+  locale: 'en' | 'es' = 'en',
+  answer?: Business | null,
+) {
   const m = await mountInventory(StockModal, {
     props: { open: true, kind, product: product({ stock: '5.000' }), units: UNITS.rows, ...props },
     locale,
     attach: true,
+    business: answer,
   });
-  await m.live();
+  const call = await m.live();
   await flush();
   const el = (id: string) => document.querySelector<Control>(`[data-testid="${id}"]`);
   async function type(id: string, value: string) {
@@ -41,8 +48,12 @@ async function setup(kind: 'receive' | 'count' | 'write_off', props: Record<stri
     el('inventory-stock-form-submit')!.click();
     await flush();
   }
+  async function leave(id: string) {
+    el(id)!.dispatchEvent(new CustomEvent('ionBlur'));
+    await flush();
+  }
   const sent = (path: string) => m.body(m.calls(path).at(-1)!);
-  return { ...m, el, type, submit, sent };
+  return { ...m, call, el, type, leave, submit, sent };
 }
 
 describe('StockModal: goods receipt', () => {
@@ -69,6 +80,18 @@ describe('StockModal: goods receipt', () => {
     await t.type('inventory-stock-qty', '2,5');
     await t.submit();
     expect(t.sent('/api/inventory/stock/receive')).toEqual({ items: [{ product_id: 'p1', qty: '2.5', unit_cost: null }] });
+  });
+
+  it('a unit cost typed and left before the business answers is read in its currency: «150» in yen is 150', async () => {
+    const s = await setup('receive', {}, 'en', null);
+    await s.type('inventory-stock-qty', '3');
+    await s.type('inventory-stock-cost', '150');
+    await s.leave('inventory-stock-cost');
+    await s.result(s.call, 'base.business.get', business({ currency: 'JPY', currency_decimals: 0 }));
+    expect(s.el('inventory-stock-cost')?.value).toBe('150');
+    s.net.onApi(() => ok({ rows: [product({ stock: '8.000' })] }));
+    await s.submit();
+    expect(s.sent('/api/inventory/stock/receive')).toEqual({ items: [{ product_id: 'p1', qty: '3', unit_cost: 150 }] });
   });
 
   it("a quantity off the unit's step says so under the quantity and stays", async () => {

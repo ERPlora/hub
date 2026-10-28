@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // A money field of the inventory forms (price, cost, a reception's unit cost; WORKBOOK INVENTORY-F01):
 // what a person types or pastes («2,20», «1.234,56», «2,20 €»), in the business's currency, rewritten in the page format when
-// they leave it. It holds the text; the form reads the cents with `parseMoney` when it saves. What
-// is not an amount says so under the field once the person leaves it (or `showError`, after a save
-// attempt); the server's message for the field wins.
+// they leave it (once the business has answered: until then, as typed). It holds the text; the form reads the cents
+// with `parseMoney` when it saves. What is not an amount says so under the field once the person leaves it (or
+// `showError`, after a save attempt); the server's message for the field wins.
 import { IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
@@ -37,6 +37,8 @@ const message = computed(() => props.errorText || ((left.value || props.showErro
 
 function onBlur(): void {
   left.value = true;
+  // Until the business answers, its decimals are unknown: what was typed stays, never «150» made «150.00».
+  if (!business.value) return;
   const normalised = normaliseMoneyText(text.value, locale.value, business.value);
   if (normalised !== text.value) text.value = normalised;
 }

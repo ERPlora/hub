@@ -84,8 +84,13 @@ async function setup(
   }
   const sent = (path: string) => m.body(m.calls(path).at(-1)!) as Record<string, unknown>;
   const chips = () => [...document.querySelectorAll('[data-testid^="inventory-product-categories-chip-"]')].map((c) => c.textContent?.trim());
-  return { ...m, el, type, pick, choose, check, submit, fillRequired, sent, chips };
+  /** `base.business.get` answers now (the form opened with `business: null`, before it did); `rev` 2+ is a change. */
+  const answer = (fields: Partial<Business>, rev = 1) => m.result(call, 'base.business.get', business(fields), rev);
+  return { ...m, el, type, pick, choose, check, submit, fillRequired, sent, chips, answer };
 }
+
+const JAPANESE: Partial<Business> = { country: 'JP', country_name: 'Japan', currency: 'JPY', currency_label: 'JPY · Japanese Yen', currency_decimals: 0 };
+const KUWAITI: Partial<Business> = { country: 'KW', country_name: 'Kuwait', currency: 'KWD', currency_label: 'KWD · Kuwaiti Dinar', currency_decimals: 3 };
 
 describe('ProductFormModal: new product', () => {
   it('«New product» with every field of the old panel, the tax category empty, «Save» off', async () => {
@@ -301,6 +306,64 @@ describe('ProductFormModal: editing', () => {
     it('while the business is not read, «Cost» without a currency, never the euro', async () => {
       const s = await setup({}, { business: null });
       expect(s.el('inventory-product-cost')?.label).toBe('Cost');
+    });
+  });
+
+  describe('the business answers after the form opened (flow INVENTORY-F02)', () => {
+    const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 12.50.';
+
+    it('an untouched price and cost are rewritten from the product with the yen’s decimals, and «Save changes» sends neither', async () => {
+      const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['2.20', '0.80']);
+      await s.answer(JAPANESE);
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['220', '80']);
+      expect(s.el('inventory-product-cost')?.label).toBe('Cost (JPY)');
+      await s.type('inventory-product-name', 'Cola');
+      s.net.onApi(() => ok(product({ name: 'Cola' })));
+      await s.submit();
+      expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', name: 'Cola' });
+    });
+
+    it('with three decimals they are rewritten in that scale, never saved ten times bigger', async () => {
+      const s = await setup({ product: product({ price: 1500, cost: 800 }) }, { business: null });
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['15.00', '8.00']);
+      await s.answer(KUWAITI);
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['1.500', '0.800']);
+      await s.type('inventory-product-name', 'Cola');
+      s.net.onApi(() => ok(product({ name: 'Cola' })));
+      await s.submit();
+      expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', name: 'Cola' });
+    });
+
+    it('the currency changes again with the form open: still untouched, still rewritten from the product', async () => {
+      const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
+      await s.answer(JAPANESE);
+      await s.answer(KUWAITI, 2);
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['0.220', '0.080']);
+      await s.type('inventory-product-name', 'Cola');
+      s.net.onApi(() => ok(product({ name: 'Cola' })));
+      await s.submit();
+      expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', name: 'Cola' });
+    });
+
+    it('a new price typed before is kept as typed and read in the yen; the untouched cost is still rewritten', async () => {
+      const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
+      await s.type('inventory-product-price', '300');
+      await s.answer(JAPANESE);
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['300', '80']);
+      s.net.onApi(() => ok(product({ price: 300 })));
+      await s.submit();
+      expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', price: 300 });
+    });
+
+    it('what was typed that the yen cannot read stays as typed: the field says so and nothing is sent', async () => {
+      const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
+      await s.type('inventory-product-price', '1,75');
+      await s.answer(JAPANESE);
+      expect(s.el('inventory-product-price')?.value).toBe('1,75');
+      await s.submit();
+      expect(s.calls('/api/inventory/products/update')).toHaveLength(0);
+      expect(s.el('inventory-product-price')?.errorText).toBe(NOT_AMOUNT);
     });
   });
 });
