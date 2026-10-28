@@ -65,6 +65,29 @@ describe('each datum', () => {
     expect(fieldText({ name: 'duration', label: 'Duration', kind: 'text', value: 1500, signed: true }, opts)).toBe('1500');
   });
 
+  it('an amount that carries its own currency (a preview’s, as its read answers it) is written in it, not the business’s', () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: an invoice issued in euros, rectified once the
+    // business had moved to Poland, showed «-121,00 zł» on the card.
+    const PLN = { currency: 'PLN', decimals: 2 };
+    const total = { name: 'total_amount', label: 'Total', kind: 'money' as const, value: -12100, money: EUR };
+    expect(fieldText(total, { ...opts, money: PLN })).toBe('-121,00 €');
+    expect(fieldText(total, { locale: 'en', money: PLN, t })).toBe('-€121.00');
+    // Even before the business's is known; with its sign when it is a difference.
+    expect(fieldText(total, { locale: 'es-ES', t })).toBe('-121,00 €');
+    expect(fieldText({ ...total, value: 4200, signed: true }, { ...opts, money: PLN })).toBe('+42,00 €');
+    // One that carries none, in the business's, as before.
+    expect(fieldText({ ...total, money: null }, { ...opts, money: PLN })).toBe('-121,00 zł');
+    expect(fieldText(card().fields[1], { ...opts, money: PLN })).toBe('15,00 zł');
+  });
+
+  it('an amount is in the minor unit of its currency: a yen invoice’s total is not a hundred times less', () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: Invoicing answers ¥12,100 as 12100.
+    const JPY = { currency: 'JPY', decimals: 0 };
+    const total = { name: 'total_amount', label: 'Total', kind: 'money' as const, value: -12100, money: JPY };
+    expect(fieldText(total, { ...opts, locale: 'en' })).toBe('-¥12,100');
+    expect(fieldText(card().fields[1], { locale: 'en', money: JPY, t })).toBe('¥1,500');
+  });
+
   it('what is not marked as money stays a number', () => {
     expect(fieldText({ name: 'duration', label: 'Duration', kind: 'text', value: 1500 }, opts)).toBe('1500');
   });

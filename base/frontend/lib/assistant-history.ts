@@ -45,7 +45,7 @@ export interface Bubble {
   /** The question that led to an answer (for «Report a problem»). */
   question?: string;
   /** What ran in the turn, for the receipts under the bubble. */
-  executed?: { name: string; app: string; app_name?: string; outcome: string }[];
+  executed?: { name: string; app: string; app_name?: string; screen?: string; outcome: string }[];
 }
 
 export interface Thread {

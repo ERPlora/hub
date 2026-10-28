@@ -134,6 +134,8 @@ describe('several things in a row (BASE-G115, G119)', () => {
       [{ type: 'confirm', card: CARD, call: CREATE }, done({ append: [asked(CREATE)], pending: [CREATE], continuation: 'tok' })],
       [
         { type: 'executed', call_id: 'c1', name: 'demo.item.create', app: 'demo', app_name: 'Demo', kind: 'command', outcome: 'ok', code: '' },
+        // One of the platform: the server names its screen by its key too, for the receipt to say it in the screen's language.
+        { type: 'executed', call_id: 'c2', name: 'base.access.settings_update', app: 'base', app_name: 'Ajustes', screen: 'settings', kind: 'command', outcome: 'ok', code: '' },
         { type: 'text', text: 'He creado Mesa 4.' },
         done({ append: [{ role: 'tool', tool_call_id: 'c1', content: '{"id":"x"}' }, { role: 'assistant', content: 'He creado Mesa 4.' }] }),
       ],
@@ -145,8 +147,13 @@ describe('several things in a row (BASE-G115, G119)', () => {
     const answer = assistant.state.thread.bubbles.at(-1)!;
     expect(answer.text).toBe('He creado Mesa 4.');
     expect(answer.notices).toEqual([]);
-    // Where it happened, as the server names it for the receipt (the platform by its screen).
-    expect(answer.executed).toEqual([{ name: 'demo.item.create', app: 'demo', app_name: 'Demo', outcome: 'ok' }]);
+    // Where it happened, as the server names it for the receipt: the platform by its screen's key (`screen`), kept with
+    // the receipt (FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: without it, a receipt read in
+    // another language names the screen in the turn's).
+    expect(answer.executed).toEqual([
+      { name: 'demo.item.create', app: 'demo', app_name: 'Demo', outcome: 'ok' },
+      { name: 'base.access.settings_update', app: 'base', app_name: 'Ajustes', screen: 'settings', outcome: 'ok' },
+    ]);
     expect(assistant.state.confirm).toBeNull();
     expect(assistant.state.busy).toBe(false);
   });

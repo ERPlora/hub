@@ -9,7 +9,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonIcon } from '@ionic/vue';
 import { computed } from 'vue';
 
-import { actionKey } from '../../lib/assistant-card';
+import { actionKey, screenKey } from '../../lib/assistant-card';
 import { errorView } from '../../lib/assistant-guide';
 import type { Bubble } from '../../lib/assistant-history';
 import { ASSISTANT_ICONS } from '../../lib/assistant-icons';
@@ -23,7 +23,8 @@ const props = defineProps<{
   bubble: Bubble;
   screenExists: (path: string) => boolean;
   nameOf: (path: string) => string | undefined;
-  appNameOf: (app: string) => string;
+  /** The menu's name of an app, in the screen's language; none for an app it does not list. */
+  appNameOf: (app: string) => string | undefined;
   /** Who runs the business, on the web: «Upgrade plan» opens the plan's page on erplora.com. */
   canUpgrade: boolean;
   planUrl: string;
@@ -69,11 +70,19 @@ const receipts = computed(() =>
     outcome: row.outcome,
     text: t(`base.assistant.receipts.${row.outcome}`, {
       action: t(actionKey(row.name.split('.').at(-1) ?? '')),
-      // As the server names it (the platform by its screen); a receipt kept from before it did, by the menu.
-      app: row.app_name || props.appNameOf(row.app),
+      app: placeOf(row),
     }),
   })),
 );
+
+/** Where an action happened, in the language the screen is in, never in the one of its turn (a receipt kept from a
+ *  turn in English read «Rectificar en Invoicing» in Spanish): the platform by its screen, an app by its menu; one
+ *  neither names (an app the menu does not list, a receipt kept from before it carried its screen), as the server
+ *  named it then. */
+function placeOf(row: { app: string; app_name?: string; screen?: string }): string {
+  const key = screenKey(row.screen);
+  return key ? t(key) : props.appNameOf(row.app) || row.app_name || row.app;
+}
 
 const writing = computed(() => !props.bubble.done && props.bubble.text === '');
 const silent = computed(() => props.bubble.done && !props.bubble.text && !props.bubble.error && !props.bubble.stopped);

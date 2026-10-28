@@ -2692,6 +2692,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
                 "name": op.name if op else call.name,
                 "app": op.app_label if op else "",
                 "app_name": app_name,
+                "screen": assistant.screen(op) if op else "",
                 "kind": op.kind if op else "",
                 "outcome": outcome.outcome,
                 "code": outcome.code,
@@ -2708,6 +2709,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     text = assistant.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
+        decimals=business.get("currency_decimals", 2),
         business=business.get("name") or "",
         screens=_assistant_screens(ctx),
     )

@@ -63,7 +63,7 @@ function screenExists(path: string): boolean {
 assistant.setScreenCheck(screenExists);
 
 const nameOf = (path: string) => screenLabel(path, session.menu.value, t);
-const appNameOf = (app: string) => session.menu.value.find((section) => section.id === app)?.label ?? app;
+const appNameOf = (app: string) => session.menu.value.find((section) => section.id === app)?.label;
 
 const planUrl = readJsonBlock<HubHome>('hub-home')?.plan_url ?? '';
 // gh:hub#1259: the plan is upgraded by whoever administers the business, and only on the web (it sells).

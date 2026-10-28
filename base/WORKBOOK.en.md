@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7727ff339173d123bc8a806eb26697355376196178a5ae3d7e2dbf81f97bd559 -->
+<!-- generated from WORKBOOK.md sha256:5bca41a9f687e9739e6c9081f475087b79de62e3d91a3559087b66cbff720143 -->
 
 ## What it is for and who it is for
 
@@ -2256,8 +2256,10 @@ Steps:
   1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes").
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
      for example "Create in Services: Haircut · €15.00 · 30". An amount shows in the business's currency (never in
-     cents); a difference, with its sign as on its app's screen, to see at a glance whether there is too much or too
-     little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
+     cents), except one of "What will happen" that its app gives in another currency, which shows in its own:
+     rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
+     the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
+     screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
      no sign when it balances); a yes or a no, as "Yes" or "No", and a list, by how many items it carries. Everything
      shows in the person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the
      same one its app calls it by, never a technical name. An action of the platform itself is named by the screen where
@@ -2268,8 +2270,10 @@ Steps:
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
-     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …".
-In: the action, its data and its risk, as its app declares them; the business's currency.
+     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". If the
+     person changes language, the earlier receipts show entirely in the new one, the app's name too.
+In: the action, its data and its risk, as its app declares them; the business's currency and, in "What will happen",
+the one its app gives.
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". If the page is reloaded with the card open nothing is done, and the answer ends in "The
