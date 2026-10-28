@@ -63,7 +63,8 @@ depende de él.
    formulario de servicio avisa «Todavía no hay categorías fiscales. Configúralas en Impuestos antes
    de añadir servicios.».
 3. Crea las categorías que quieras para agrupar el catálogo (SERVICE-F07) y da de alta los servicios
-   (SERVICE-F01). Para muchos a la vez, el asistente los da de alta de golpe (SERVICE-F06).
+   (SERVICE-F01). Para muchos a la vez, el asistente los da de alta de golpe (SERVICE-F06). Hasta que
+   haya un servicio que se pueda cobrar, el Inicio te lo recuerda con «Tu catálogo de servicios».
 4. Abre cada servicio y asígnale los profesionales que lo hacen (SERVICE-F31). Mientras un servicio
    no tenga a nadie asignado, la agenda deja que lo haga todo el equipo reservable (SERVICE-F33).
 5. Crea los bonos en **Bonos y paquetes** (SERVICE-F12) poniendo siempre **Usos**: vacío significa
@@ -204,28 +205,34 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F33 | Saber quién puede hacer un servicio | hecho |
 
 ### SERVICE-F01 Dar de alta un servicio
-<!-- origen: qa:verticals/beauty/01-services-professionals-and-schedules wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-services-create-sql-transaccional fi:modules/services#navigation fi:modules/services#permission-role_permissions fi:modules/services#query-services-services-list fi:modules/services#validation-declarativa-bloque-validates old:services/workflow/catalogo.md#services-f01 qa:modules/services/create-service-with-duration-and-price -->
+<!-- origen: qa:verticals/beauty/01-services-professionals-and-schedules wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-services-create-sql-transaccional fi:modules/services#navigation fi:modules/services#permission-role_permissions fi:modules/services#query-services-services-list fi:modules/services#validation-declarativa-bloque-validates old:services/workflow/catalogo.md#services-f01 qa:modules/services/create-service-with-duration-and-price old-hub:HUB_SHELL-F27 gh:services#26 -->
 Estado: hecho
 Actor: empleado, responsable, asistente
-Pantalla: Servicios
+Pantalla: Inicio, Servicios
 Pasos:
-1. En **Servicios** pulsa **Nuevo servicio**.
-2. Escribe el Nombre, elige la Tarifa (viene **Precio fijo**), el Precio y la Duración (min). Elige
+1. En el **Inicio**, mientras no haya ningún servicio que se pueda cobrar, «Termina de configurar tu
+   negocio» trae «Tu catálogo de servicios» («Añade los servicios que vendes, con su precio y su
+   duración.»), «Importante», a quien puede dar de alta servicios. «Configurar» lleva a **Servicios**.
+2. En **Servicios** pulsa **Nuevo servicio**.
+3. Escribe el Nombre, elige la Tarifa (viene **Precio fijo**), el Precio y la Duración (min). Elige
    una Categoría o deja «Sin categoría».
-3. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
+4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
    si hay una). Sin ella **Crear servicio** no se puede pulsar.
-4. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
+5. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
 Entra: las categorías de Servicios y las categorías fiscales activas de Impuestos.
 Sale: el servicio en oferta y reservable (`service.service.created`); desde ese momento lo ven la
 agenda y el TPV y, si se reserva online, la página de Reservas online. Lo que no se dice toma los Ajustes: duración, margen antes y después,
-reserva online y categoría fiscal; sin Ajustes, 60 min, sin margen y con reserva online.
+reserva online y categoría fiscal; sin Ajustes, 60 min, sin margen y con reserva online. Con el primer
+servicio en oferta y con su categoría fiscal activa, «Tu catálogo de servicios» queda «Hecho» en el Inicio
+sin recargar; si se archivan todos (SERVICE-F04) o ninguno tiene ya una categoría fiscal activa, el paso
+vuelve a pendiente solo, y al restaurar uno (SERVICE-F05) vuelve a «Hecho».
 Si falla: dentro del formulario, cada motivo debajo de su campo: un importe que no se entiende
 («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», también con el símbolo de otra moneda:
 «22,50 €» en un negocio de Polonia), uno que se lee de dos maneras o uno negativo; una categoría eliminada («Esa categoría no está disponible: no existe en este negocio o se
 ha eliminado.»); una categoría fiscal que no existe o está desactivada («Esa categoría fiscal no
 existe en Impuestos o está desactivada.»); sin ninguna categoría fiscal, el aviso de Impuestos. Lo
 tecleado se conserva.
-Implicados: TAX-F01
+Implicados: TAX-F01, BASE-F01
 
 ### SERVICE-F02 Editar un servicio
 <!-- origen: fi:modules/services#command-services-services-update-sql-transaccional fi:modules/services#query-services-services-get old:services/workflow/catalogo.md#services-f02 -->
@@ -834,7 +841,7 @@ teléfono. Si un nombre vale para varios, se dice cuáles y se pide que elija (4
 | Los servicios, con búsqueda, filtros y orden, en páginas (hasta 100) | ver servicios | F01–F05 | `service.service.list` |
 | Un servicio completo | ver servicios | F02, F10 | `service.service.get` |
 | El catálogo para vender y reservar: los servicios en oferta | ver servicios | F09, F10 | `service.service.list_for_sale` |
-| Cuántos servicios hay en oferta y cuántos se pueden cobrar | ver servicios | F01 | `service.catalog.status` |
+| Cuántos servicios hay en oferta y cuántos se pueden cobrar (el paso «Tu catálogo de servicios» del Inicio) | ver servicios | F01 | `service.catalog.status` |
 | Las categorías, con los servicios en oferta de cada una | ver categorías | F07, F08 | `service.category.list` |
 | Una categoría | ver categorías | F07 | `service.category.get` |
 | Los ajustes | ver servicios | F11 | `service.settings.get` |
@@ -988,6 +995,13 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   yen no tiene), nunca negativo, la misma unidad que cobra Ventas (service-business-currency: la pantalla la
   lee y la escribe con `useBusinessMoney` de `base`); el descuento en porcentaje, en
   puntos básicos (1050 = 10,50 %).
+- **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SERVICE-SETUP-HOOKS): `ServiceConfig.setup` declara el
+  `setup` del módulo viejo (`module.json`, services#26): clave `service.catalog`, sobre `service.catalog.status`, hecho
+  con `sellable_services` (en oferta y con la categoría fiscal activa), orden 31, `required` (nivel «Importante»),
+  permiso `service.add_service`, ruta `/service/services` y `refresh_on` los eventos de servicio (alta, una o varias;
+  cambio; archivo; restauración). Una categoría fiscal no se desactiva por operación (solo en el admin), así que no
+  hay evento de Impuestos que lo mueva. Sin paneles ni campana: el módulo viejo no los declaraba. Pruebas:
+  `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
 - **Archivar y eliminar son lógicos**: un servicio archivado (`is_active = False`, `archived_at`),
   una categoría o un bono eliminados (`is_deleted`) siguen en la base de datos. Una categoría
   eliminada suelta sus servicios y sube sus subcategorías a su padre en la misma transacción.
@@ -1080,8 +1094,6 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
-- **El paso «Tu catálogo de servicios» de «Termina de configurar tu negocio»**: el Hub aún no tiene
-  esa lista; la consulta `service.catalog.status` ya está.
 
 ## Lo que NO hace, a propósito
 
