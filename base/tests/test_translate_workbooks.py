@@ -2,10 +2,12 @@
 
 The hash is the user part's, not the file's: touching «Para quien lo mantiene» costs nothing. With
 the hash in the header unchanged, no call; otherwise one call and the header with the new hash.
-``--check`` never reaches the network. The API is always a double here: ``translate`` (one call to
-the Claude API) is replaced, and its own test fakes the SDK client. ``ANTHROPIC_API_KEY`` comes from
-the environment or the checkout's ``.env``, like every setting; here only from the test's own (``key``):
-without it, the command stops before the API with an error that names it.
+``--check`` never reaches the network: it fails on a stale translation, telling to translate it by
+hand with the header ``HEADER_COMMAND`` prints (PLAN-MIGRATIONS §24-D: ERPlora uses no API key), and on
+a Spanish date placeholder left in a current one. The API is always a double here: ``translate`` (one
+call to the Claude API) is replaced, and its own test fakes the SDK client. ``ANTHROPIC_API_KEY`` comes
+from the environment or the checkout's ``.env``, like every setting; here only from the test's own
+(``key``): without it, the command stops before the API with an error that names it.
 """
 
 import re
@@ -24,6 +26,11 @@ from base.catalog import en_header, source_hash
 from base.management.commands import translate_workbooks
 from base.tests.test_catalog import USER_PART, WORKBOOK, module, translated
 
+#: The command of PLAN-MIGRATIONS §24-D that prints the first line of a hand-made WORKBOOK.en.md.
+HEADER_COMMAND = (
+    'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
+    "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
+)
 ENGLISH = "## What it is for\n\nKeeps **things**. See [how to use it](#how-to-use-it).\n\n![List of things](docs/img/list.png)\n\n## How to use it\n\n### Step by step\nStatus: done\n"
 
 
@@ -199,9 +206,119 @@ def test_check_passes_when_every_translation_is_current_or_missing(tmp_path, ins
     call_command("translate_workbooks", "--check")
 
 
+def test_check_tells_to_translate_each_stale_one_by_hand_with_its_header_never_through_the_api(tmp_path, installed, translator):
+    """ERPlora uses no ANTHROPIC_API_KEY (PLAN-MIGRATIONS §24-D): whoever reads the error translates by hand."""
+    installed(
+        module(tmp_path, "current", en=translated(USER_PART, ENGLISH)),
+        module(tmp_path, "stale", en=translated("una versión anterior\n", ENGLISH)),
+        module(tmp_path, "stock", en="## What it is for\n"),
+    )
+    translator(allowed=False)
+
+    with pytest.raises(CommandError) as raised:
+        call_command("translate_workbooks", "--check")
+
+    message = str(raised.value)
+    assert message.startswith("Out of date WORKBOOK.en.md: stale, stock.")
+    assert "translate_workbooks --app" not in message
+    for label in ("stale", "stock"):
+        assert (
+            f"{label}: translate by hand the part of WORKBOOK.md that changed into WORKBOOK.en.md "
+            f"and make its first line the header this prints: {HEADER_COMMAND.format(label)}"
+        ) in message
+    assert HEADER_COMMAND.format("current") not in message
+
+
 def test_the_real_modules_are_up_to_date(translator):
     translator(allowed=False)
     call_command("translate_workbooks", "--check")
+
+
+# ── --check and the Spanish date placeholders a hand-made translation keeps (hub#225's guard) ──────
+
+
+def body_with(line: str) -> str:
+    """``ENGLISH`` with ``line`` in place of its first paragraph."""
+    return ENGLISH.replace("Keeps **things**. See [how to use it](#how-to-use-it).", line)
+
+
+def line_of(text: str, needle: str) -> int:
+    [number] = [number for number, line in enumerate(text.splitlines(), start=1) if needle in line]
+    return number
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Numbered `OS-AAAAMMDD-NNNN`.",
+        "Born on DD/MM/AAAA.",
+        "Born on dd/mm/aaaa, see [how to use it](#how-to-use-it).",
+    ],
+    ids=["inline-code", "prose", "lowercase"],
+)
+def test_check_fails_naming_the_file_and_line_of_a_spanish_date_in_a_current_translation(tmp_path, installed, translator, line):
+    en = translated(USER_PART, body_with(line))
+    installed(module(tmp_path, "current", en=translated(USER_PART, ENGLISH)), module(tmp_path, en=en))
+    translator(allowed=False)
+
+    with pytest.raises(CommandError) as raised:
+        call_command("translate_workbooks", "--check")
+
+    [pattern] = translate_workbooks._SPANISH_DATE_RE.findall(line)
+    message = str(raised.value)
+    assert f"things: WORKBOOK.en.md:{line_of(en, pattern)}: {pattern}" in message
+    assert "current:" not in message and "Out of date" not in message
+
+
+def test_check_ignores_a_spanish_date_quoted_in_a_fenced_code_block_and_counts_the_one_after_it(tmp_path, installed, translator):
+    """A fenced block is left as it is (the translation's rules): a pattern there is quoted on purpose."""
+    quoted = "Numbered as the Spanish ticket shows it:\n\n```\nOS-AAAAMMDD-NNNN\n```\n\n~~~~text\nDD/MM/AAAA\n~~~~"
+    en = translated(USER_PART, body_with(quoted))
+    [config] = installed(module(tmp_path, en=en))
+    translator(allowed=False)
+
+    call_command("translate_workbooks", "--check")
+
+    en = translated(USER_PART, body_with(f"{quoted}\n\nBorn on dd/mm/aaaa."))
+    Path(config.path, "WORKBOOK.en.md").write_text(en)
+    with pytest.raises(CommandError) as raised:
+        call_command("translate_workbooks", "--check")
+
+    message = str(raised.value)
+    assert f"things: WORKBOOK.en.md:{line_of(en, 'dd/mm/aaaa')}: dd/mm/aaaa" in message
+    assert "OS-AAAAMMDD-NNNN" not in message and "DD/MM/AAAA" not in message
+
+
+def test_check_reports_a_stale_translation_and_a_spanish_date_together(tmp_path, installed, translator):
+    installed(
+        module(tmp_path, "stale", en=translated("una versión anterior\n", ENGLISH)),
+        module(tmp_path, en=translated(USER_PART, body_with("Born on DD/MM/AAAA."))),
+    )
+    translator(allowed=False)
+
+    with pytest.raises(CommandError) as raised:
+        call_command("translate_workbooks", "--check")
+
+    message = str(raised.value)
+    assert "Out of date WORKBOOK.en.md: stale." in message and "things: WORKBOOK.en.md:" in message
+
+
+def test_a_stale_translation_is_told_to_be_made_again_its_dates_are_checked_once_current(tmp_path, installed, translator):
+    installed(module(tmp_path, en=translated("una versión anterior\n", body_with("Born on DD/MM/AAAA."))))
+    translator(allowed=False)
+
+    with pytest.raises(CommandError) as raised:
+        call_command("translate_workbooks", "--check")
+
+    assert str(raised.value).startswith("Out of date WORKBOOK.en.md: things.")
+    assert "DD/MM/AAAA" not in str(raised.value)
+
+
+def test_check_of_one_app_looks_at_its_dates_only(tmp_path, installed, translator):
+    installed(module(tmp_path, en=translated(USER_PART, body_with("Born on DD/MM/AAAA."))), module(tmp_path, "stock"))
+    translator(allowed=False)
+
+    call_command("translate_workbooks", "--check", "--app", "stock")
 
 
 # ── base: the platform's WORKBOOK is translated too, though it is no module of the store ─────────
@@ -237,8 +354,10 @@ def test_a_changed_user_part_of_the_real_base_workbook_fails_the_check(tmp_path,
     assert edited != spanish
     (Path(base.path) / "WORKBOOK.md").write_text(edited, encoding="utf-8")
 
-    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\. Run translate_workbooks --app base\."):
+    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\.") as raised:
         call_command("translate_workbooks", "--check")
+
+    assert HEADER_COMMAND.format("base") in str(raised.value)
 
 
 def test_the_platforms_workbook_is_translated_when_asked_for(tmp_path, installed, translator):
@@ -269,7 +388,7 @@ def test_check_fails_on_a_platform_workbook_it_cannot_read(tmp_path, installed, 
     installed(platform(tmp_path, workbook=broken, en=translated(USER_PART, ENGLISH)))
     translator(allowed=False)
 
-    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\. Run translate_workbooks --app base\."):
+    with pytest.raises(CommandError, match=r"Out of date WORKBOOK\.en\.md: base\."):
         call_command("translate_workbooks", "--check")
     with pytest.raises(CommandError, match="base: WORKBOOK.md: .*#no-existe"):
         call_command("translate_workbooks", "--app", "base")

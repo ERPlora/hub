@@ -391,16 +391,29 @@ def test_a_module_without_workbook_fails(tmp_path):
     assert problem.startswith("things: WORKBOOK.md:")
 
 
-def test_a_stale_translation_fails_with_the_command_that_regenerates_it(tmp_path):
+#: The command of PLAN-MIGRATIONS §24-D that prints the first line of a hand-made WORKBOOK.en.md.
+HEADER_COMMAND = (
+    'uv run python manage.py shell --no-imports -c "from django.apps import apps; from base import catalog; '
+    "print(catalog.en_header(catalog.source_hash(catalog.workbook_translation(apps.get_app_config('{}')).source)))\""
+)
+
+
+def test_a_stale_translation_fails_telling_to_translate_it_by_hand_with_its_header(tmp_path):
+    """ERPlora uses no ANTHROPIC_API_KEY (PLAN-MIGRATIONS §24-D): never a command that calls the API."""
     stale = translated(USER_PART.replace("cosas", "objetos"))
     [problem] = problems([module(tmp_path, en=stale)])
-    assert problem.startswith("things: WORKBOOK.en.md:")
-    assert "translate_workbooks --app things" in problem
+    assert problem == (
+        "things: WORKBOOK.en.md: out of date with WORKBOOK.md: translate by hand the part of WORKBOOK.md "
+        "that changed into WORKBOOK.en.md and make its first line the header this prints: "
+        f"{HEADER_COMMAND.format('things')}."
+    )
+    assert "translate_workbooks" not in problem
 
 
 def test_a_translation_without_its_header_is_stale(tmp_path):
     [problem] = problems([module(tmp_path, en="## What it is for\n")])
-    assert "translate_workbooks --app things" in problem
+    assert problem.startswith("things: WORKBOOK.en.md: out of date with WORKBOOK.md:")
+    assert HEADER_COMMAND.format("things") in problem
 
 
 def test_a_translation_with_a_dangling_anchor_fails(tmp_path):
