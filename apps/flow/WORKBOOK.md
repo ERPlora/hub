@@ -730,7 +730,8 @@ Pasos:
 3. La lista enseña solo los nombres. Para usar uno, en un valor del paso pulsa **Insertar un dato** y elige
    «Secreto «STRIPE_KEY»» en **Secretos**.
 4. Para borrarlo, pulsa su **×** y confirma «¿Borrar STRIPE_KEY?» con **Sí, borrarlo** o **Conservarlo**.
-Entra: el nombre y el valor de cada secreto (por voz, por su nombre: «guarda la clave de Stripe»).
+Entra: el nombre y el valor de cada secreto, tecleados en esta pantalla. El asistente no guarda secretos: un
+valor dicho en una conversación ya habría salido al historial.
 Sale: el secreto sellado con la clave del servidor (`flow.secret.saved`, `flow.secret.deleted`). Su valor
 solo se abre en el momento de llamar y nunca sale: ni en la lista, ni en **Probar** (que enseña «••••»), ni
 en el historial, ni en un fallo; lo que el otro sistema responda con el secreto dentro también sale tapado.
@@ -1028,8 +1029,10 @@ Implicados: FLOW-F37, FLOW-F38
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
-habla) y la API, con las mismas reglas y los mismos permisos. Una automatización se nombra por su id o
-por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (`flow.ambiguous_flow`).
+habla) y la API, con las mismas reglas y los mismos permisos, salvo guardar un secreto, que el asistente no
+hace (su valor se teclea en la pantalla), y lo que hace solo la plataforma, que nadie pide. Una automatización
+se nombra por su id o por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles
+(`flow.ambiguous_flow`).
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -1064,7 +1067,7 @@ por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles (
 | Arranca las de horario o fecha que toca | solo la plataforma | F22 | `flow.schedule.fire_due` |
 | Sigue las ejecuciones cuya espera terminó | solo la plataforma | F23 | `flow.run.resume_due` |
 | Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
-| Guarda (o cambia) un secreto, sellado | gestionar | F26 | `flow.secret.set` |
+| Guarda (o cambia) un secreto, sellado | gestionar (nunca el asistente) | F26 | `flow.secret.set` |
 | Borra un secreto | gestionar | F26 | `flow.secret.delete` |
 | Hace, por detrás, la llamada de una ejecución que la espera | solo la plataforma | F27 | `flow.run.call` |
 | Toma la llamada de una ejecución para hacerla | solo la plataforma | F27 | `flow.run.claim_call` |
@@ -1274,7 +1277,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   a cuyo «Solo cuando…» le faltan **claves** del de hoy recibe solo esas (una clave que el dueño cambió se
   respeta). Las apps de este carril que traen recetas hoy: `appointment` y `online_booking`.
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
-  encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`.
+  encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`. Las escrituras de
+  `flow.system` (solo la plataforma) empiezan por «System only» y `flow.secret.set` por «Not an assistant tool»:
+  el asistente no las ofrece a nadie, ni al superusuario (`tests/test_integration_assistant.py`).
 - El admin de Django del Hub tiene **CRUD completo** sobre `Flow`, `FlowRun`, `Draft` y `Question`; de `Secret`, solo
   ver el nombre y borrar (un valor no se escribe ni se lee desde el admin). Una escritura cruda del admin no
   deja aviso.

@@ -490,3 +490,43 @@ msgstr "Pide permisos que sus pasos no usan: %(names)s."
 
 msgid "Its steps use permissions it does not ask for: %(names)s."
 msgstr "Sus pasos usan permisos que no pide: %(names)s."
+
+# How the assistant's card names the data of flow's writes (titles of the schemas), as the Automations screens do.
+msgid "Starts with"
+msgstr "Arranca con"
+
+msgid "Draft"
+msgstr "Borrador"
+
+msgid "Permissions"
+msgstr "Permisos"
+
+msgid "How it ended"
+msgstr "Cómo terminó"
+
+msgid "Body"
+msgstr "Texto"
+
+msgid "Truncated"
+msgstr "Recortado"
+
+msgid "Technical text"
+msgstr "Texto técnico"
+
+msgid "Reference of what happened"
+msgstr "Referencia de lo que pasó"
+
+msgid "What happened"
+msgstr "Qué pasó"
+
+msgid "What brought it"
+msgstr "Lo que la arrancó"
+
+msgid "Actor"
+msgstr "Quién lo hizo"
+
+msgid "Value"
+msgstr "Valor"
+
+msgid "Answer"
+msgstr "Respuesta"
