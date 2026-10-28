@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dedbe7f256082f6730ff05acbcf83e1b175af3573ade6a4045eeb10739fe0591 -->
+<!-- generated from WORKBOOK.md sha256:fd728c6aa7e95884b333f4c7980f31ff2410bb88e5e2b27dafeba08766bdbe54 -->
 
 ## What it is for and who it is for
 
@@ -51,8 +51,9 @@ Checked against the market sweep of the current module (20/08/2026) and against 
   own tax category of an option). Turning Modifiers on turns both on.
 - Without **Sales** nobody asks for the groups at the till; without **Kitchen** the kitchen ticket does
   not carry them. Both talk to Modifiers through its services, never through its tables.
-- Supplements go in **euros with cents** on screen and in **whole cents** through the API; they can be
-  negative (a discount) or zero (free).
+- Supplements go in **the business's currency**, its country's, the one **Settings → Business** shows
+  (euros in Spain, złoty in Poland), with its decimals on screen and in **whole cents** (that currency's
+  smallest unit) through the API; they can be negative (a discount) or zero (free).
 
 Initial setup, step by step:
 
@@ -81,8 +82,9 @@ the group's sheet, for everyone.
 ### Group sheet
 Title "Group — {name}" and its rule. Two sections:
 
-- **Options**: each one with its name, its kitchen ticket name (if different), its supplement ("+€1.00",
-  "-€0.50" or "Free"), its own tax category if it has one and the "By default" mark. Whoever manages
+- **Options**: each one with its name, its kitchen ticket name (if different), its supplement in the
+  business's currency ("+€1.00" or "-€0.50" in Spain, "+zł 1.00" in Poland; or "Free"), its own tax
+  category if it has one and the "By default" mark. Whoever manages
   sees "Add option" and, on each one, Edit and Delete. Empty: "This group has no options yet.".
   If it has fewer options than the minimum asks for (and they cannot repeat), a notice says so: the till
   could not complete it.
@@ -95,9 +97,9 @@ Title "Group — {name}" and its rule. Two sections:
 ### Forms
 - **Group** ("New group" / "Editing group — {name}"): Name, "Kitchen ticket name", "Minimum (1 or more
   = required)", "Maximum (0 = no ceiling)", "An option can be chosen more than once" and Order.
-- **Option** ("New option" / "Editing option — {name}"): Name, "Kitchen ticket name", "Supplement (€)"
-  (negative is a discount; empty or 0, free), "Own tax category" (searched; empty = the dish's), Order
-  and "Chosen by default".
+- **Option** ("New option" / "Editing option — {name}"): Name, "Kitchen ticket name",
+  "Supplement (<currency>)" (the business's: "Supplement (PLN)" in Poland; negative is a discount; empty
+  or 0, free), "Own tax category" (searched; empty = the dish's), Order and "Chosen by default".
 - **Link** ("Apply «{group}» to…"): Product or Category, and the search box of each one.
 - **Delete** group or option and **Stop applying**: they ask for confirmation saying what goes with it.
 
@@ -188,7 +190,8 @@ Screen: Modifiers (group sheet)
 Steps:
 1. Open the group and, in Options, tap "Add option".
 2. Type the Name (unique within the group) and, if needed, the kitchen ticket name.
-3. Type the Supplement in euros: positive charges more, negative is a discount, empty or 0 is free.
+3. Type the Supplement in the business's currency, its country's in Settings → Business, with its
+   decimals (the yen has none): positive charges more, negative is a discount, empty or 0 is free.
 4. Only if the option is taxed differently from the dish, choose its own tax category; empty, it
    inherits the dish's.
 5. Tick "Chosen by default" if the till must bring it already ticked. In a group of maximum 1, ticking
@@ -235,7 +238,8 @@ Steps:
 2. Each group says its rule: "Choose N" if it asks for exactly N, "Choose N to M" if it asks for a
    minimum and lets you reach a ceiling, "Choose at least N" if it asks for a minimum without a ceiling,
    "Up to N" if it only has a ceiling, "Optional" if not; each option carries its supplement with its
-   sign if it is not zero ("+€1.00") and the default options already come ticked.
+   sign, in the business's currency, if it is not zero ("+€1.00" in Spain) and the default options
+   already come ticked.
 3. Tap the options: in a group of a single one, tapping another one changes it and tapping the same one
    removes it; in a group that repeats, each option goes on its own row, with its whole name, and each
    tap adds one to the counter ("× 2") that "−" takes away; on reaching the ceiling, the next tap warns
