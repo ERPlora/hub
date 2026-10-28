@@ -692,9 +692,9 @@ def repair_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     input=SecretSetIn,
     output=SecretOut,
     ai={
-        "description": "Save a secret (an API key, a token) by name for the automations' calls to other systems; "
-        "saving a name again replaces its value. NEVER ask anybody for a secret's value in a conversation: the "
-        "person types it in the automation's step, on the screen. Its value is never shown again.",
+        "description": "Not an assistant tool: saves a secret (an API key, a token) by name for the automations' "
+        "calls to other systems; saving a name again replaces its value. NEVER ask anybody for a secret's value in a "
+        "conversation: the person types it in the automation's step, on the screen. Its value is never shown again.",
         "risk": "high",
     },
 )
@@ -1209,7 +1209,7 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
     input=DueIn,
     output=DueOut,
     ai={
-        "description": "Platform only, every minute: closes the questions nobody answered in time and does what "
+        "description": "System only, every minute: closes the questions nobody answered in time and does what "
         "each step says for silence (what a no does, stop, or carry on).",
         "risk": "normal",
     },
@@ -1279,7 +1279,7 @@ def dispatch_call(scope: Scope, run_id: uuid.UUID) -> None:
     input=RunRefIn,
     output=DueOut,
     ai={
-        "description": "Platform only, in the worker: the reaction to `flow.run.parked` — a run that is calling "
+        "description": "System only, in the worker: the reaction to `flow.run.parked` — a run that is calling "
         "makes its call after this COMMIT (`flow.run.claim_call` → the call → `flow.run.record_call`), never "
         "inside a person's request; a run that waits or asks has nothing to call.",
         "risk": "normal",
@@ -1299,7 +1299,7 @@ def call_parked(ctx: OperationContext, data: RunRefIn) -> dict:
     input=RunRefIn,
     output=ClaimCallOut,
     ai={
-        "description": "Platform only: takes a run's call to another system to make it (nobody else holds it), "
+        "description": "System only: takes a run's call to another system to make it (nobody else holds it), "
         "with its data and secrets filled in, for CALL_LEASE_MINUTES.",
         "risk": "normal",
     },
@@ -1368,7 +1368,7 @@ def _open_secrets(names: list[str]) -> tuple[dict[str, str], StepFailed | None]:
     input=RecordCallIn,
     output=DueOut,
     ai={
-        "description": "Platform only: records how a run's call to another system ended and goes on with the run "
+        "description": "System only: records how a run's call to another system ended and goes on with the run "
         "(or stops it with the reason); an answer for a run that is no longer calling changes nothing.",
         "risk": "normal",
     },
@@ -1420,8 +1420,8 @@ def _parent_chain(actor: str) -> list[str]:
     input=ReactIn,
     output=ReactOut,
     ai={
-        "description": "Platform reaction to every event of the outbox: starts the automations that wait for it "
-        "(once per automation and event) and runs their steps.",
+        "description": "System only: the platform's reaction to every event of the outbox: starts the automations "
+        "that wait for it (once per automation and event) and runs their steps.",
         "risk": "normal",
     },
 )
@@ -1510,8 +1510,8 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
     input=DueIn,
     output=DueOut,
     ai={
-        "description": "Scheduled task, every minute: starts once each automation whose schedule or date has come, "
-        "and moves its schedule on from now.",
+        "description": "System only, a scheduled task, every minute: starts once each automation whose schedule or "
+        "date has come, and moves its schedule on from now.",
         "risk": "normal",
     },
 )
@@ -1550,8 +1550,8 @@ def fire_due(ctx: OperationContext, data: DueIn) -> dict:
     input=DueIn,
     output=DueOut,
     ai={
-        "description": "Scheduled task, every minute: the runs whose wait is over go on with their next step; "
-        "those of a paused or deleted automation are cancelled.",
+        "description": "System only, a scheduled task, every minute: the runs whose wait is over go on with their "
+        "next step; those of a paused or deleted automation are cancelled.",
         "risk": "normal",
     },
 )
@@ -1687,8 +1687,8 @@ def retry_run(ctx: OperationContext, data: RunRefIn) -> dict:
     input=DueIn,
     output=DueOut,
     ai={
-        "description": "Scheduled task, every hour: deletes the finished runs older than 90 days (the history "
-        "keeps 90 days); a run that is waiting or running is never touched.",
+        "description": "System only, a scheduled task, every hour: deletes the finished runs older than 90 days "
+        "(the history keeps 90 days); a run that is waiting or running is never touched.",
         "risk": "normal",
     },
 )
