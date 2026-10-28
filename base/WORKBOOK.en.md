@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2e1b0b8dea89fa66079b2d397828092c08d25bdeba9303367ba9f38bf143a895 -->
+<!-- generated from WORKBOOK.md sha256:afd6d3b831a756caf4aa1973675a448b59574abf99bc5e1fc6ef61e973d0e631 -->
 
 ## What it is for and who it is for
 
@@ -2186,8 +2186,9 @@ Steps:
   2. They go with the next message, with or without text, and stay in the person's bubble by their name. They travel
      only once, with that question: afterwards the conversation only remembers what they were called.
   3. To dictate, they tap "Dictate by voice" (it only shows if the device can record). The browser (in the installed
-     app, the device) asks for permission to use the microphone. While it records, the button turns red and is called
-     "Stop recording"; after two minutes it stops by itself.
+     app, the device) asks for permission to use the microphone; while it asks, another tap does not open a second
+     recording. While it records, the button turns red and is called "Stop recording"; after two minutes it stops by
+     itself.
   4. On stopping, "Transcribing…" shows and the text lands in the box, after whatever was written. **It is not sent by
      itself**: the person reviews it and taps "Send", and what they ask goes through its card like any other request
      (BASE-F97).

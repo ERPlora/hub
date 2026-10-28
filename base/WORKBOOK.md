@@ -2298,8 +2298,8 @@ Pasos:
   2. Se envían con el siguiente mensaje, con texto o sin él, y en la burbuja de la persona quedan con su nombre.
      Viajan una sola vez, con esa pregunta: después la conversación solo recuerda cómo se llamaban.
   3. Para dictar, pulsa «Dictar por voz» (solo sale si el dispositivo puede grabar). El navegador (en la app
-     instalada, el dispositivo) pide permiso para el micrófono. Mientras graba, el botón se pone rojo y se llama
-     «Detener la grabación»; a los dos minutos para solo.
+     instalada, el dispositivo) pide permiso para el micrófono; mientras lo pide, otra pulsación no abre una segunda
+     grabación. Mientras graba, el botón se pone rojo y se llama «Detener la grabación»; a los dos minutos para solo.
   4. Al parar sale «Transcribiendo…» y el texto cae en el cuadro, detrás de lo que hubiera escrito. **No se envía
      solo**: la persona lo revisa y pulsa «Enviar», y lo que pida pasa por su tarjeta como cualquier otra petición
      (BASE-F97).
@@ -3001,8 +3001,10 @@ Implicados: ACCOUNTS-F38
   cerrado en `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida
   antes de `logout` (también el bloqueo por inactividad). Comprobaciones de la respuesta en `lib/assistant-grounding.ts`,
   formato en `lib/assistant-markdown.ts` (nunca `v-html`), adjuntos y voz en `lib/assistant-input.ts`
-  (`MediaRecorder`, dos minutos), atajos, fallos y cupo en `lib/assistant-guide.ts`. Desde 768 px el panel se ancla
-  (clase `assistant-docked` en `<html>`, que empuja el pane); por debajo, velo.
+  (`MediaRecorder`, dos minutos), el dictado en `lib/dictation.ts` (`useDictation`: una grabación por pulsación, 2 MB,
+  el texto al cuadro y el panel abierto; el mismo para el cuadro y para la app que abre el asistente dictando),
+  atajos, fallos y cupo en `lib/assistant-guide.ts`. Desde 768 px el panel se ancla (clase `assistant-docked` en
+  `<html>`, que empuja el pane); por debajo, velo.
 - Tests: `base/tests/test_assistant.py`, `test_services_assistant.py` y `test_api_assistant.py` (con la pasarela
   falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant*.test.ts`,
   `components/assistant/*.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`; e2e
