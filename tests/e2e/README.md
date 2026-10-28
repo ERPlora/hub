@@ -225,6 +225,21 @@ contaba 0 filas tras confirmar un diálogo pasaba antes de que se borrara nada (
 - Tras confirmar un diálogo, se espera `await expect(<diálogo>).toBeHidden()` antes de contar filas o afirmar que
   algo ya no está.
 
+## Las capturas
+
+Una captura justo después de `setViewportSize` puede salir antes de que el navegador pinte la página a su nuevo tamaño:
+la zona que destapa el cambio de tamaño aún tiene lo de arriba de la página, y la captura repite la barra superior en su
+parte de abajo (87 filas; en `main`, 5 de 24 capturas de la lista de la demo sin espera y 2 de 24 tras `settled`). Esa
+captura es la prueba de una pantalla que nadie vio. Toda captura de la e2e pasa por `capture(page, name)` (`helpers.ts`):
+espera a un fotograma pintado, repite la captura mientras repite la franja de arriba (`repeatedTop`, la del SaaS) y, si
+no deja de hacerlo, falla diciéndolo y no escribe nada; si no, la deja en `.artifacts/<name>.png` y la devuelve. Lo que
+tiene que estar en pantalla antes (datos, un diálogo, ninguna animación en curso: `settled` de `service-helpers.ts`, que
+también espera al fotograma pintado, o `untilStill`) lo espera la spec. `helpers-capture.spec.ts` falla si vuelve a pasar.
+
+`raw-screenshots.test.ts` (Vitest) es el trinquete: ningún fichero de `tests/e2e` hace más `.screenshot(` crudos de los
+que lista `raw-screenshots.json` (los que quedaban al llegar `capture`), y una spec nueva no hace ninguno. Al pasar
+capturas de un fichero a `capture`, baja su número en el JSON (o quita su línea): la lista solo encoge.
+
 ## Medir cuándo acaba una petición
 
 En la pila de desarrollo Vite sirve cada módulo de la SPA por separado, y llenan el búfer de Resource Timing de
