@@ -11,7 +11,21 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { MemberMineOut, MemberOut } from '../operations';
-import { click, EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountStaff, page, settle } from '../__tests__/mount-staff';
+import {
+  BUSINESS,
+  business,
+  click,
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  JAPANESE,
+  MANAGER,
+  type MountOptions,
+  mountStaff,
+  page,
+  POLISH,
+  settle,
+} from '../__tests__/mount-staff';
 import MemberFormModal from '../components/MemberFormModal.vue';
 import MyRecordModal from '../components/MyRecordModal.vue';
 import TerminateDialog from '../components/TerminateDialog.vue';
@@ -108,6 +122,7 @@ describe('MembersPage: the live directory', () => {
 
   it('paints Name, Role, Email, Status and, for whoever may see the pay, Rate/h; Phone starts hidden', async () => {
     const s = await setup();
+    await s.result(BUSINESS, business());
     await s.result('staff.member.compensation', PAY);
     await s.show(page(ROWS));
     expect(s.prop<Array<{ key: string; label: string; hidden?: boolean }>>('columns').map((c) => [c.key, c.label, !!c.hidden])).toEqual([
@@ -256,6 +271,35 @@ describe('MembersPage: the live directory', () => {
     await flush();
     expect(s.find('staff-members-inactive').exists()).toBe(true);
     expect(s.table().exists()).toBe(false);
+  });
+});
+
+describe('MembersPage: the business\'s currency (staff-business-currency)', () => {
+  const plain = (text: string) => text.replace(/\s/g, ' ');
+  const rate = async (fields: Parameters<typeof business>[0] | null, locale: 'en' | 'es' = 'en', hourly_rate = 1250) => {
+    const s = await setup({ locale });
+    if (fields) await s.result(BUSINESS, business(fields));
+    await s.result('staff.member.compensation', page([{ ...PAY.rows[0], hourly_rate }]));
+    await s.show(page(ROWS));
+    return { s, cell: plain(s.cells(0)[4]) };
+  };
+
+  it('a business in Poland sees Rate/h in złoty, never in euros', async () => {
+    const { s, cell } = await rate(POLISH, 'es');
+    expect(cell).toBe('12,50 zł');
+    expect(s.wrapper.text()).not.toContain('€');
+  });
+
+  it('a business in Spain still sees euros', async () => {
+    expect((await rate({})).cell).toBe('€12.50');
+  });
+
+  it('a business in Japan sees whole yen: 1500 is ¥1,500', async () => {
+    expect((await rate(JAPANESE, 'en', 1500)).cell).toBe('¥1,500');
+  });
+
+  it('until the business answers, Rate/h is a figure without a symbol, never euros', async () => {
+    expect((await rate(null)).cell).toBe('12.50');
   });
 });
 

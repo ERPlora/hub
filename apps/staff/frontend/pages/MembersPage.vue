@@ -31,7 +31,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { MEMBER_STATUSES, memberStatusTone } from '../lib/enums';
-import { formatMoney } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import { accountSearch, roleSearch } from '../lib/pickers';
 import type { MemberListIn, MemberOut } from '../operations';
 import { staffTabs } from '../tabs';
@@ -39,6 +39,8 @@ import { staffTabs } from '../tabs';
 const session = useSession();
 const t = useT();
 const locale = useLocale();
+/** The business's currency (its country's): Rate/h is painted in it (staff-business-currency). */
+const money = useBusinessMoney();
 const client = useLiveClient();
 
 const canAdd = computed(() => session.can('staff.add_member'));
@@ -123,7 +125,7 @@ const columns = computed<DataTableColumn<MemberOut>[]>(() => [
           align: 'right' as const,
           format: (_: unknown, row: MemberOut) => {
             const cents = rates.value.get(row.id);
-            return cents === undefined ? '—' : formatMoney(cents, locale.value);
+            return cents === undefined ? '—' : formatMoney(cents, locale.value, money.value);
           },
         },
       ]

@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MemberMineOut } from '../operations';
-import { click, mountStaff, settle } from '../__tests__/mount-staff';
+import { BUSINESS, business, click, JAPANESE, mountStaff, POLISH, settle } from '../__tests__/mount-staff';
 import MyRecordModal from './MyRecordModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -36,10 +36,14 @@ const MINE: MemberMineOut = {
   commission_rate: '10.00',
 };
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountStaff(MyRecordModal, { props: { open: false, record: MINE }, locale });
+/** The modal open on `MINE`; the business answers (in Spain unless `where` says another; `null`: not yet). */
+async function setup(locale: 'en' | 'es' = 'en', where: Parameters<typeof business>[0] | null = {}, record: MemberMineOut = MINE) {
+  const m = await mountStaff(MyRecordModal, { props: { open: false, record }, locale });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
+  await settle();
+  await m.live();
+  if (where) await m.result(BUSINESS, business(where));
   await settle();
   const fields = () =>
     [...(m.inDoc('staff-my-record-fields') as HTMLElement).querySelectorAll('[data-testid="staff-my-record-field"]')].map((el) => [
@@ -79,5 +83,21 @@ describe('MyRecordModal (STAFF-F08)', () => {
     expect(s.inDoc('staff-my-record')?.getAttribute('aria-label')).toBe('Mi ficha');
     expect(s.fields().at(-2)).toEqual(['Tarifa por hora', '12,50 €']);
     expect(s.inDoc('staff-my-record-done')?.textContent?.trim()).toBe('Cerrar');
+  });
+});
+
+describe('MyRecordModal: the business\'s currency (staff-business-currency)', () => {
+  const rate = (s: Awaited<ReturnType<typeof setup>>) => (s.fields().at(-2)?.[1] ?? '').replace(/\s/g, ' ');
+
+  it('a business in Poland reads its own rate in złoty', async () => {
+    expect(rate(await setup('es', POLISH))).toBe('12,50 zł');
+  });
+
+  it('a business in Japan reads whole yen', async () => {
+    expect(rate(await setup('en', JAPANESE, { ...MINE, hourly_rate: 1500 }))).toBe('¥1,500');
+  });
+
+  it('until the business answers, a figure without a symbol, never euros', async () => {
+    expect(rate(await setup('en', null))).toBe('12.50');
   });
 });

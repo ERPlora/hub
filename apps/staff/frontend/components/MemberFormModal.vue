@@ -7,6 +7,10 @@
 // «No Hub access» first, as in the old select: the way to empty them. Editing reads the
 // whole record and its pay when it opens (the row has not everything) and sends only what changed.
 // The server judges: its 422 goes under each field, a 409 on top; the dialog keeps what was typed.
+// The hourly rate is typed in the business's currency (its country's, with the decimals the server counts:
+// staff-business-currency), its symbol at the end of the field; until the business answers, two decimals and no
+// symbol. If it answers with the dialog open, the rate as loaded is rewritten in its decimals and what was
+// typed is read in it when saving.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -15,6 +19,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { MEMBER_STATUSES } from '../lib/enums';
+import { currencySymbol, moneyText, useBusinessMoney } from '../lib/format';
 import { blankMemberForm, createPayload, formFromRecord, type MemberForm, patchPayload } from '../lib/memberForm';
 import { accountSearch, asCombo, roleSearch } from '../lib/pickers';
 import type { MemberOut } from '../operations';
@@ -30,6 +35,9 @@ const t = useT();
 const locale = useLocale();
 const session = useSession();
 const client = useLiveClient();
+const money = useBusinessMoney();
+/** What the end of the Hourly rate field says: the business's currency symbol, nothing until it answers. */
+const symbol = computed(() => currencySymbol(locale.value, money.value));
 
 const canPay = computed(() => session.can('staff.view_compensation'));
 const editing = computed(() => props.member !== null);
@@ -55,6 +63,8 @@ const complete = computed(() => form.value.first_name.trim() !== '' && form.valu
 
 /** Each opening retires the reads of the previous one: a late answer never lands on another record. */
 let opening = 0;
+/** The hourly rate the record was loaded with, in minor units (`null`: none loaded). */
+let loadedRate: number | null = null;
 
 const findRoles = asCombo(roleSearch(client, { activeOnly: true, by: 'id' }), () => t('staff.members.form.roleNone'));
 const findAccounts = asCombo(accountSearch(client), () => t('staff.members.form.hubUserNone'));
@@ -86,7 +96,8 @@ async function loadRecord(member: MemberOut, ticket: number): Promise<void> {
       canPay.value ? client.api.call('staff.member.compensation', { id: member.id, limit: 1 }) : Promise.resolve(null),
     ]);
     if (ticket !== opening) return;
-    const loaded = formFromRecord(record, pay?.rows[0] ?? null, locale.value);
+    loadedRate = pay?.rows[0]?.hourly_rate ?? null;
+    const loaded = formFromRecord(record, pay?.rows[0] ?? null, locale.value, money.value);
     original.value = loaded;
     form.value = { ...loaded };
     roleLabel.value = record.role_name ?? '';
@@ -108,6 +119,7 @@ function start(): void {
   const member = props.member;
   roleLabel.value = member?.role_name ?? '';
   userLabel.value = '';
+  loadedRate = null;
   const blank = blankMemberForm();
   // What the row already says, at once; the rest arrives with the record.
   const first: MemberForm = member
@@ -140,6 +152,16 @@ watch(
   { immediate: true },
 );
 
+// The business answers (or changes currency) with the dialog open: the rate as loaded is written in its decimals;
+// a rate already typed stays as typed (it is read in the currency when saving).
+watch([() => money.value?.currency, () => money.value?.decimals], () => {
+  if (loadedRate === null) return;
+  const text = moneyText(loadedRate, locale.value, money.value);
+  const untouched = form.value.hourly_rate === original.value.hourly_rate;
+  original.value = { ...original.value, hourly_rate: text };
+  if (untouched) form.value = { ...form.value, hourly_rate: text };
+});
+
 function set<K extends keyof MemberForm>(field: K, value: MemberForm[K]): void {
   form.value = { ...form.value, [field]: value };
 }
@@ -158,7 +180,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
-  const options = { pay: canPay.value };
+  const options = { pay: canPay.value, money: money.value };
   try {
     if (props.member) await update.run(patchPayload(props.member.id, original.value, form.value, options));
     else await creation.run(createPayload(form.value, options));
@@ -430,10 +452,12 @@ async function save(): Promise<void> {
             @ion-input="set('hourly_rate', text($event.detail.value))"
           >
             <ion-text
+              v-if="symbol"
               slot="end"
               aria-hidden="true"
+              data-testid="staff-member-form-hourly_rate-currency"
             >
-              €
+              {{ symbol }}
             </ion-text>
           </ion-input>
           <ion-input
