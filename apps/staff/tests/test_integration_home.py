@@ -76,8 +76,8 @@ def member(first_name: str, last_name: str = "López", ctx=None, **fields) -> st
     return str(run("staff.member.create", {"first_name": first_name, "last_name": last_name, **fields}, ctx).id)
 
 
-def role(name: str, ctx=None) -> str:
-    return str(run("staff.role.create", {"name": name}, ctx).id)
+def role(name: str, ctx=None, **fields) -> str:
+    return str(run("staff.role.create", {"name": name, **fields}, ctx).id)
 
 
 def time_off(member_id: str, start: dt.date, end: dt.date | None = None, *, approved: bool = True, ctx=None, **fields):
@@ -231,6 +231,28 @@ def test_staff_by_role_paints_the_active_people_of_each_role_the_biggest_first_t
     assert len(bars(panel, ctx_for())) == 10
     assert bars(panel, ctx_for())[:2] == [("Colourist", 3), ("Stylist", 1)]
     assert reception
+
+
+@pytest.mark.django_db
+def test_staff_by_role_gives_each_bar_its_roles_colour_and_none_to_a_role_without_one():
+    """The old module's `map.color`: base paints each bar in the hex its row gives (FIX-HUB-BASE-HOME-BAR-LIST-IGNORES-
+    MAP-COLOR); a role without a colour gives "" and its bar keeps the panel's (FIX-HUB-STAFF-ROLE-BARS-IGNORE-ROLE-COLOR)."""
+    panel = panels(ctx_for())[BY_ROLE]
+    assert panel["map"]["color"] == "color"
+    stylist, colourist = role("Stylist", color="#E11D48"), role("Colourist", color="#16A34A")
+    reception = role("Reception")
+    for first_name, role_id in (
+        ("Ana", colourist),
+        ("Bea", colourist),
+        ("Carla", colourist),
+        ("Dora", stylist),
+        ("Eva", stylist),
+        ("Fina", reception),
+    ):
+        member(first_name, role_id=role_id)
+    assert [
+        (row[panel["map"]["label"]], row[panel["map"]["value"]], row[panel["map"]["color"]]) for row in rows(panel, ctx_for())
+    ] == [("Colourist", 3, "#16A34A"), ("Stylist", 2, "#E11D48"), ("Reception", 1, "")]
 
 
 @pytest.mark.django_db
