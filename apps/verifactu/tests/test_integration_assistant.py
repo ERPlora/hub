@@ -8,6 +8,7 @@ secret (the certificate and its password, the signed authorisation and the copy 
 assistant tool» — said in a chat it has already reached the model and the history, and its card would paint it in
 clear. The person gives it in «Configuración», as before."""
 
+import json
 from typing import get_args
 
 import pytest
@@ -139,3 +140,32 @@ def test_a_secret_inside_a_nested_schema_is_seen_too():
         others: list[Holder] = []
 
     assert secret_data(Upload) == ["holder.password", "others.password"]
+
+
+@pytest.mark.django_db
+def test_a_turn_that_still_names_the_certificate_upload_builds_no_card_and_runs_nothing():
+    """The way the chat really takes (``base.assistant.turn``, BASE-G118): a model that calls the write by its name
+    anyway, password included, is refused as «not available»; no card is built (before the fix, the card came back
+    with «hunter2» in clear), so the password is painted nowhere the person sees, and the receipt names what was
+    refused without running it."""
+    turn = get("base.assistant.turn")
+    name = assistant.tool_name("verifactu.certificate.upload")
+    arguments = json.dumps({"p12_base64": "MIIFAKEP12", "password": "hunter2"})
+    asked = {"role": "user", "content": "sube mi certificado, la contraseña es hunter2"}
+    called = {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [{"id": "c1", "type": "function", "function": {"name": name, "arguments": arguments}}],
+    }
+    data = turn.input.model_validate(
+        {
+            "messages": [asked, called],
+            "pending": [{"call_id": "c1", "name": name, "arguments": arguments}],
+        }
+    )
+    plan = turn(ctx_for("hub_owner", language="es"), data).model_dump(mode="json")
+    assert plan["confirm"] is None  # before the fix: its card, the password in clear among its fields
+    refused = plan["executed"][0]
+    assert (refused["outcome"], refused["code"], refused["name"]) == ("refused", "not_available", "verifactu.certificate.upload")
+    # Only the history the model wrote itself still carries the password: nothing the turn builds does.
+    assert "hunter2" not in json.dumps({key: value for key, value in plan.items() if key != "messages"})
