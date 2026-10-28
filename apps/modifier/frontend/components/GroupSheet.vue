@@ -15,7 +15,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 
 import { useSheetList } from '../composables/useSheetList';
 import { useLocale, useT } from '../composables/useT';
-import { choiceRule, formatDelta } from '../lib/format';
+import { choiceRule, formatDelta, useBusinessMoney } from '../lib/format';
 import type { GroupOut, LinkOut, OptionOut } from '../operations';
 import LinkFormModal from './LinkFormModal.vue';
 import OptionFormModal from './OptionFormModal.vue';
@@ -49,7 +49,9 @@ const rule = computed(() => choiceRule(group.value, t));
 const short = computed(
   () => !group.value.allow_repeat && options.total.value > 0 && options.total.value < group.value.min_choices,
 );
-const delta = (cents: number) => formatDelta(cents, locale.value, t('modifier.free'));
+/** The business's currency (its country's), a bare figure until it answers: never a euro by default. */
+const money = useBusinessMoney();
+const delta = (cents: number) => formatDelta(cents, locale.value, t('modifier.free'), money.value);
 const target = (link: LinkOut) =>
   link.target_kind === 'product' ? `${link.product_name ?? ''} (${link.product_sku ?? ''})` : (link.category_name ?? '');
 const targetLabel = (link: LinkOut) =>

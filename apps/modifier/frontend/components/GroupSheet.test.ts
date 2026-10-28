@@ -1,5 +1,6 @@
 // The group's sheet (WORKBOOK «Hoja del grupo»; MODIFIER-F04, F05): «Group — {name}» with its rule, followed
-// live; «Options» with each one's supplement («+1,00 €», «Free»), its own tax category and «By default»,
+// live; «Options» with each one's supplement in the business's currency («+1,00 zł» in Poland, «+1,00 €» in
+// Spain; a bare figure until the business answers, never a euro by default; «Free»), its own tax category and «By default»,
 // and «Applies to» with each product («Product · Burger (BUR-01)») or category. Whoever may manage adds,
 // edits and deletes options and applies or stops applying the group; an employee only reads. 20 at a time
 // with «Load more»; loading, empty and error states per section; a warning when the group asks for more
@@ -8,7 +9,8 @@ import { ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { GroupOut, LinkOut, OptionOut } from '../operations';
-import { click, EMPLOYEE, errorFrame, flush, mountModifier, page, settle } from '../__tests__/mount-modifier';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, click, EMPLOYEE, errorFrame, flush, mountModifier, page, POLISH, settle } from '../__tests__/mount-modifier';
 import GroupSheet from './GroupSheet.vue';
 import LinkFormModal from './LinkFormModal.vue';
 import OptionFormModal from './OptionFormModal.vue';
@@ -80,8 +82,9 @@ async function setup(options: { locale?: 'en' | 'es'; session?: typeof EMPLOYEE;
   return { ...m, text };
 }
 
-async function filled(options: Parameters<typeof setup>[0] = {}) {
+async function filled(options: Parameters<typeof setup>[0] & { owner?: Business | null } = {}) {
   const s = await setup(options);
+  if (options.owner !== null) await s.result('base.business.get', options.owner ?? business());
   await s.result('modifier.group.get', options.group ?? SAUCES);
   await s.result('modifier.option.list', page(OPTIONS, 3, 20));
   await s.result('modifier.link.list', page(LINKS, 2, 20));
@@ -110,6 +113,20 @@ describe('GroupSheet', () => {
     expect(s.text('modifier-sheet-links-row-l1')).toContain('Product · Burger (BUR-01)');
     expect(s.text('modifier-sheet-links-row-l2')).toContain('Category · Mains');
     expect(s.inDoc('modifier-sheet-short')).toBeNull();
+  });
+
+  it('each supplement in the business’s currency: in Poland in złoty, never a euro', async () => {
+    const s = await filled({ owner: business(POLISH), locale: 'es' });
+    expect(s.text('modifier-sheet-options-row-o2')).toMatch(/Cheese.*\+1,00 zł/);
+    expect(s.text('modifier-sheet-options-row-o3')).toMatch(/Soda.*\+2,50 zł/);
+    expect(s.text('modifier-sheet-options-row-o1')).toContain('Gratis');
+    expect(['o1', 'o2', 'o3'].map((id) => s.text(`modifier-sheet-options-row-${id}`)).join(' ')).not.toContain('€');
+  });
+
+  it('until the business answers a supplement is a bare figure, never a euro by default', async () => {
+    const s = await filled({ owner: null });
+    expect(s.text('modifier-sheet-options-row-o2')).toMatch(/Cheese\s*\+1\.00\s*Kitchen/);
+    expect(s.text('modifier-sheet-options-row-o2')).not.toContain('€');
   });
 
   it('a newer version of the group is painted when it comes', async () => {

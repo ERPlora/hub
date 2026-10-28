@@ -53,7 +53,7 @@ cd hub   # o tu worktree
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/modifier apps/sale/tests/test_integration_modifier.py \
   apps/kitchen/tests/test_integration_modifier.py
 pnpm test apps/modifier
-pnpm e2e tests/e2e/modifier-groups.spec.ts tests/e2e/modifier-till.spec.ts
+pnpm e2e tests/e2e/modifier-groups.spec.ts tests/e2e/modifier-till.spec.ts tests/e2e/modifier-business-currency.spec.ts
 ```
 
 - `tests/test_integration_sale.py` va contra Ventas real (lo que pregunta el TPV, descuento, repetido, plato a peso,
@@ -63,6 +63,10 @@ pnpm e2e tests/e2e/modifier-groups.spec.ts tests/e2e/modifier-till.spec.ts
   vez en hilos.
 - `modifier-groups.spec.ts` recorre la tabla y la hoja (F01–F05); `modifier-till.spec.ts`, el TPV, el cobro, la
   pantalla de cocina y el borrado en Inventario de verdad (F06–F09). Los dos, en 390, 834 y 1440.
+- `modifier-business-currency.spec.ts`: la hoja del grupo y «Nueva opción» en la moneda del negocio (F04; el
+  negocio `a` en Polonia, en złoty, en 390, 834 y 1440, y de vuelta en España, en euros). Los importes se pintan y
+  se leen con `base.business.get` (`useBusinessMoney`), con los decimales que cuenta el servidor; mientras el
+  negocio no contesta, una cifra sin símbolo, nunca un euro.
 
 ## Qué queda fuera
 
