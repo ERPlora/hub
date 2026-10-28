@@ -11,7 +11,8 @@ An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The pl
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
 :func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it), and
-:func:`business_currency` the currency its business charges in (``base.business.get``, read as the platform).
+:func:`business_currency` the currency its business charges in (``base.business.get``, read as the platform). An app
+runs another app's operation with :func:`call`.
 This is the only piece phase 2 replaces (scope = ``use_hub``): from S1, :meth:`HubContextBuilder.enter` gives a live
 re-run its hub's database (the request's own is ``base.middleware.HubDatabaseMiddleware``'s).
 """
@@ -22,18 +23,20 @@ import uuid
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
+import pydantic
 from django.conf import settings
 from django.db import DatabaseError
 from django.http import Http404, HttpRequest
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope, system_context
-from live.errors import NotFound, Unauthorized
+from live.errors import AppInactive, InvalidPayload, NotFound, OperationError, Unauthorized
+from live.operations import UnknownOperation
 from live.operations import get as get_operation
 from live.slugs import validate_hub_slug
 
 from base import registry
 from base.api_keys import KeyCaller
-from base.approvals import Approved
+from base.approvals import Approved, consequence_context
 from base.permissions import permissions_for, reload_user
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import HUB_SCOPE_KIND, use_hub
@@ -100,6 +103,32 @@ def business_currency(scope: Scope) -> str:
     return read(system_context(scope), read.input()).currency
 
 
+def call(ctx: OperationContext, name: str, data: dict, *, unavailable: OperationError | None = None) -> Any:
+    """Runs another app's operation ``name`` with ``data`` for the caller: the one way an app asks another for
+    something (BASE-F84). Its permission and its active-app check apply, its refusals reach the caller as they are and,
+    nested in a write, it runs in a savepoint, so a refusal the caller catches leaves nothing of it behind. Inside a
+    command a manager approved for this request, a command of another app goes with it (``consequence_context``). An
+    app absent or off is ``unavailable`` when given (the caller's own 409), else ``UnknownOperation``/``AppInactive``;
+    an input it does not take is the caller's 422, as a route would answer it."""
+    try:
+        op = get_operation(name)
+    except UnknownOperation:
+        if unavailable is not None:
+            raise unavailable from None
+        raise
+    try:
+        payload = op.input.model_validate(data)
+    except pydantic.ValidationError as invalid:
+        fields = {".".join(map(str, error["loc"])): error["msg"] for error in invalid.errors()}
+        raise InvalidPayload(next(iter(fields.values()), str(invalid)), code="invalid_payload", fields=fields) from None
+    try:
+        return op(consequence_context(ctx, op), payload)
+    except AppInactive:
+        if unavailable is not None:
+            raise unavailable from None
+        raise
+
+
 def _host_name(request: HttpRequest) -> str:
     return request.get_host().split(":", 1)[0].lower()
 
@@ -164,7 +193,8 @@ class HubContextBuilder:
         permissions = permissions_for(actor, scope)
         approved = getattr(request, "approved", None)
         if isinstance(approved, Approved):
-            # APP-BASE-5: a manager approved this very request (``base.approvals``): its one permission more.
+            # APP-BASE-5: a manager approved this very request (``base.approvals``): its one permission more. What that
+            # command asks of other apps on the way goes with it through ``call`` (``approvals.consequence_context``).
             permissions = frozenset(permissions) | {approved.permission}
         return OperationContext(
             scope=scope,

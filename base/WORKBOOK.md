@@ -2095,14 +2095,16 @@ Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
 **Empleados › Aprobaciones**. Eventos `base.approval.granted` y `base.approval.used`. Se gasta junto con la acción:
 si la acción falla por un motivo del negocio, la aprobación sigue sin usar y la misma acción, repetida en esos dos
-minutos, pasa con ella; si salió bien, no se repite; dos a la vez con la misma, solo pasa una. Quien no es del negocio
-recibe el rechazo de siempre, sin la pregunta de la aprobación.
+minutos, pasa con ella; si salió bien, no se repite; dos a la vez con la misma, solo pasa una. Lo que la acción
+aprobada hace por el camino en otras apps (la factura rectificativa de una anulación, las sesiones de bono que
+devuelve) va con la aprobación, como cuando lo hace el propio responsable; nada más: ni lo que solo se consulta ni la
+acción siguiente. Quien no es del negocio recibe el rechazo de siempre, sin la pregunta de la aprobación.
 Si falla: el diálogo se queda abierto con «Esos datos no aprueban esto. Revisa el nombre y el PIN, y vuelve a
 intentarlo.», «Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo.», «Esto ya no necesita
 aprobación: vuelve a hacerlo.», «Esto no se aprueba con un PIN.», la espera tras demasiados intentos o «No se pudo
 enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.». Sin nadie con PIN que pueda: «Aquí nadie puede
 aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.». «Cancelar» devuelve a la app su rechazo.
-Implicados: BASE-F85, BASE-F55, BASE-F56
+Implicados: BASE-F85, BASE-F55, BASE-F56, SALE-F30, SALE-F31
 
 ### BASE-F85 Consultar quién aprobó qué
 <!-- origen: old-hub:HUB_SHELL-F93 -->
@@ -3063,7 +3065,20 @@ Implicados: ACCOUNTS-F38
   (`base/entitlement.py`) abre esa transacción en `base/approval_spend.py` y gasta el pase dentro
   (`base.approval.spend`, sin ruta, con la fila bloqueada), así que una orden que falla lo deja sin gastar, una que
   salió bien no se repite y de dos a la vez solo corre una (`base/tests/test_approval_spend.py`; excepción razonada
-  en `tests/test_guardrails.py`, `APPROVAL_SPEND_REASON`). En el cliente, `withApproval(() => command.run(input))` de
+  en `tests/test_guardrails.py`, `APPROVAL_SPEND_REASON`).
+  Lo que la orden aprobada pide a otras apps por el camino va con ella (hub#250,
+  FIX-HUB-BASE-APPROVED-COMMAND-CROSS-APP-CALLS-USE-CALLER-PERMISSIONS): una app corre la operación de otra con
+  `base.operations.call(ctx, name, data, unavailable=…)` (la entrada se valida como en una ruta y lo que no valida es
+  el 422 del que llama; la app ausente o apagada, su `unavailable`, o `UnknownOperation`/`AppInactive` sin él), que la
+  corre con `approvals.consequence_context`: mientras corre la orden aprobada de esa petición (el `current_operation`
+  de live es la orden de la marca `Approved`, cuyo pase ya se gastó en su transacción), una orden (`kind="command"`) de
+  **otra** app recibe su permiso. Una consulta nunca, una orden de la propia app nunca y nada fuera de la orden
+  aprobada (la petición siguiente, otra herramienta del turno del asistente, que marca la petición del turno entero);
+  quien ya tiene el permiso sigue con su contexto tal cual. Solo las llamadas directas de la orden aprobada: lo que
+  esa otra orden llame a su vez va con el contexto que recibió. La huella y el gasto del pase no cambian
+  (`base/tests/test_approved_calls.py`). Ventas aún lleva su copia (`approval_of`, `consequence_context` y `call_app`
+  de `apps/sale/queries.py`) y pasa a `call` en su FIX; Reservas y Mesas, sin órdenes aprobables, llevan su
+  `call_app` propio, al que no llega ninguna aprobación. En el cliente, `withApproval(() => command.run(input))` de
   `base/frontend/lib/approval.ts` abre el diálogo y repite la orden una vez (`getElevationToken` en
   `frontend/main.ts`). El registro es `base.models.Approval` (`base.approval.list`).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
@@ -3075,7 +3090,7 @@ Implicados: ACCOUNTS-F38
 - Menú lateral: `SIDEBAR` de `frontend/main.ts`; cada entrada lleva el `visible` del shell (`ShellSidebarItem`,
   `packages/ui`) con el permiso de la operación de su pantalla (`allowedTo` de `base/frontend/lib/sidebar.ts`): un
   empleado no ve «Sistema» (`base.administer_hub`).
-- Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py`, `test_approval_spend.py` y `test_api_docs.py`; Vitest de
+- Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py`, `test_approval_spend.py`, `test_approved_calls.py` y `test_api_docs.py`; Vitest de
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
   `tests/e2e/base-employees.spec.ts`.

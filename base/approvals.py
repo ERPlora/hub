@@ -14,8 +14,11 @@ pass is spent (``base.approval.spend``, its row locked) in the command's own tra
 from ``LIVE["operation_database"]``): a command that fails leaves it unspent, one that went through cannot be repeated,
 and of two at once only one runs. A pass that is spent, late, forged, another person's, another command's or another
 request's is the same question again, never a way in. Whoever is not of the business gets the refusal of always.
+What the approved command asks of another app on the way (``base.operations.call``) goes with it, while it runs: a
+command of another app gets its permission too (:func:`consequence_context`); a read, never.
 """
 
+import dataclasses
 import functools
 import hashlib
 import json
@@ -37,10 +40,10 @@ from django.http import HttpRequest
 from django.utils import translation
 from django.utils.functional import Promise
 from django.utils.translation import gettext
-from live.context import Scope
+from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.meta import all_live_app_configs
-from live.operations import Operation, get
+from live.operations import Operation, current_operation, get
 from ninja import NinjaAPI
 from ninja.security import django_auth
 
@@ -272,6 +275,35 @@ class Approved:
     fingerprint: str
     #: The figures of that request its app's sentences name (:func:`figures_of`): the record keeps them.
     figures: dict = field(default_factory=dict, compare=False)
+
+
+def approval_of(ctx: OperationContext) -> Approved | None:
+    """The manager's approval the request of ``ctx`` came with (the door's or the assistant's mark); ``None`` without
+    one."""
+    marked = getattr(getattr(ctx, "request", None), "approved", None)
+    return marked if isinstance(marked, Approved) else None
+
+
+def consequence_context(ctx: OperationContext, op: Operation) -> OperationContext:
+    """The context ``op``, an operation of another app, runs with as part of the caller's (``base.operations.call``).
+    While the command a manager approved for this very request runs (live's ``current_operation``: its pass is spent
+    in its transaction before its body runs), a command of another app it calls goes with it, as when the manager does
+    it themselves: the rectifying invoice of a void, the voucher's sessions a refund gives back. A read never, a command
+    of the approved command's own app never, nor anything outside the approved command (the next request, another tool
+    of the assistant's turn): the caller's own context, as it is also for who already may (a command without a
+    permission, anybody)."""
+    approval = approval_of(ctx)
+    running = current_operation.get()
+    if (
+        approval is None
+        or running is None
+        or running.name != approval.operation
+        or op.kind != "command"
+        or op.app_label == running.app_label
+        or ctx.has(op.permission)
+    ):
+        return ctx
+    return dataclasses.replace(ctx, permissions=frozenset(ctx.permissions) | {op.permission})
 
 
 def refusal(operation: str, fingerprint_: str, figures: dict | None = None, scope: Scope | None = None) -> ApprovalRequired:
