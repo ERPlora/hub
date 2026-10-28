@@ -146,3 +146,36 @@ test('SALE-F01 / BASE-F94 — offline, «Speak» stays greyed and a tap says why
   await speak(page);
   expect(transcribed()).toBe(dictations + 1);
 });
+
+// FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION: the dictation is base's (`useDictation`, PLAN-HUB §18); the key keeps
+// its own offline guard, and a recording stopped once the connection is gone goes through base's `cancel`.
+test('SALE-F01 — a recording stopped once the connection is gone is thrown away untranscribed, and a toast says why', async ({ page }) => {
+  await login(page, A, '/sale/pos', EMPLOYEE);
+  const status = page.locator('[data-testid="pos-speak-status"]');
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await till(page);
+    // The catalogue loaded, so the picture shows the till as the person sees it.
+    await expect(page.locator('[data-testid="pos-grid-loading"]')).toBeHidden();
+    const dictations = transcribed();
+    await key(page).click();
+    await expect(key(page)).toHaveText('Stop');
+    await expect(status).toHaveText('Listening…');
+    await untilStill(page);
+    await page.screenshot({ path: shot(`FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION-${vp.label}`) });
+
+    await page.context().setOffline(true);
+    // A recording can always be stopped: the key is not greyed while it records.
+    await expect(key(page)).toHaveAttribute('aria-disabled', 'false');
+    await key(page).click();
+    await expect(page.locator('ion-toast').filter({ hasText: 'No connection: talking to the assistant needs the internet.' }).last()).toBeVisible();
+    await expect(key(page)).toHaveText('Speak');
+    await expect(key(page)).toHaveAttribute('aria-disabled', 'true');
+    await expect(status).toBeHidden();
+    await expect(panel(page)).toHaveAttribute('data-open', 'false');
+    expect(transcribed()).toBe(dictations);
+
+    await page.context().setOffline(false);
+    await expect(key(page)).toHaveAttribute('aria-disabled', 'false');
+  }
+});
