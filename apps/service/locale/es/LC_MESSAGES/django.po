@@ -539,3 +539,19 @@ msgstr "Esa sesión ya se devolvió en otra devolución."
 
 msgid "Say whose vouchers: the customer's id, name or phone."
 msgstr "Di de quién son los bonos: el id del cliente, su nombre o su teléfono."
+
+# How the assistant's card names the data of service's writes (titles of the schemas).
+msgid "Tax category"
+msgstr "Categoría fiscal"
+
+msgid "Default tax category"
+msgstr "Categoría fiscal por defecto"
+
+msgid "Services included"
+msgstr "Servicios incluidos"
+
+msgid "Duplicate customer"
+msgstr "Ficha duplicada"
+
+msgid "Refund or void"
+msgstr "Devolución o anulación"
