@@ -19,7 +19,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, compactBar, login, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, compactBar, login, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 import { STACK } from './stack';
@@ -347,6 +347,58 @@ test('INVOICE-F08 — in Spanish the rectification card shows what will happen: 
   expect([after.status, after.rectifications]).toMatchObject(['cancelled', [{ number: said }]]);
   issuedIds.add(after.rectifications[0].id);
   await context.close();
+});
+
+// FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: an invoice issued in euros, rectified once
+// erplora.com had registered the business in Poland, showed «Total: -121,00 zł» in «What will happen»: the card
+// painted every amount in the business's currency. Each amount of the preview is now in the one its read answers (the
+// invoice's, which keeps the one it was issued in), in English and in Spanish; «Cancel» issues nothing.
+test('BASE-F97 — with the business moved to Poland, the rectification card says the euro invoice’s amounts in euros, never in złoty', async ({ browser }) => {
+  const FIX = 'FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY';
+  const registration = registrationOf('a');
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/invoice/invoices');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // Issued while the business is in Spain: in euros.
+  await registerBusinessIn(registration, 'ES');
+  const invoice = await anInvoice(context);
+  expect(((await invoiceOf(context, invoice.id)) as InvoiceOut & { currency: string }).currency).toBe('EUR');
+  await registerBusinessIn(registration, 'PL');
+  try {
+    // The business now charges in złoty (the card's own currency, for what a write sends).
+    const business = await api<{ currency: string }>(context, A, 'GET', '/business');
+    expect([business.status, business.data.currency]).toEqual([200, 'PLN']);
+    for (const language of ['en', 'es'] as const) {
+      await context.addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(`${A}/invoice/invoices`);
+      await openPanel(page);
+      await ask(page, asked(invoice.number));
+      await expect(card(page)).toBeVisible({ timeout: 30_000 });
+      const said = (await previewOf(context, invoice.number)).next_number;
+      const lines =
+        language === 'en'
+          ? ['Type of rectifying invoice: R1', `Next number: ${said}`, 'Tax base: -€100.00', 'Tax: -€21.00', 'Total: -€121.00']
+          : ['Tipo de rectificativa: R1', `Siguiente número: ${said}`, 'Base imponible: -100,00 €', 'Impuesto: -21,00 €', 'Total: -121,00 €'];
+      for (const vp of VIEWPORTS) {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await expect(previewBlock(page).locator('li')).toHaveText(lines);
+        await expect(previewBlock(page)).not.toContainText('zł');
+        expect(await previewBlock(page).evaluate((el) => el.scrollWidth <= el.clientWidth), `${FIX}-${language}-${vp.label} overflows`).toBe(true);
+        await untilStill(page);
+        await page.screenshot({ path: shot(language === 'en' ? `${FIX}-${vp.label}` : `${FIX}-es-${vp.label}`) });
+      }
+      await page.setViewportSize({ width: 1440, height: 900 });
+      // «Cancel»: nothing is issued.
+      await decide(page, 'cancel');
+      await expect(receipts(page).last()).toContainText(language === 'en' ? 'Not done, cancelled' : 'No se hizo, cancelado');
+      expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
+    }
+  } finally {
+    await registerBusinessIn(registration, registration.country);
+    await context.close();
+  }
 });
 
 test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says why and offers no card', async ({ page }) => {
