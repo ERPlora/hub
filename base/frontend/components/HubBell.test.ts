@@ -100,8 +100,9 @@ describe('HubBell', () => {
 });
 
 describe('HubBell does not poll', () => {
-  // The old hub's bell asked the server every 30 s; this one is told by the live query. Fake timers run the
-  // page's clock five minutes ahead: nothing else must have asked the server, nor reopened the stream.
+  // The old hub's bell asked the server every 30 s; this one is told by the live query, and asks again only when a
+  // counter says so (`refresh_every`, below). Fake timers run the page's clock five minutes ahead: with no counter
+  // asking, nothing else must have asked the server, nor reopened the stream.
   it('asks nothing more once subscribed, however long the page stays open', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'] });
@@ -120,4 +121,111 @@ describe('HubBell does not poll', () => {
       fetchSpy.mockRestore();
     }
   });
+});
+
+describe('HubBell reads again by the clock when a counter asks', () => {
+  // FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE: a counter whose figure moves as time passes (a job waiting a
+  // minute with no device alive) has no event to re-run the live query; `refresh_every` says how often the bell reads
+  // `base.bell.counters` again. The fake timers are the test's only: real ones come back in `finally`.
+  const BELL = '/api/home/bell';
+
+  async function clocked(answer: (call: number) => Response | Promise<Response>) {
+    let calls = 0;
+    const s = await setup();
+    s.net.onApi(() => answer(++calls));
+    const reads = () => s.net.api.filter((call) => call.url.startsWith(BELL)).length;
+    const tick = async (ms: number) => {
+      vi.advanceTimersByTime(ms);
+      await flush();
+    };
+    return { ...s, reads, tick };
+  }
+
+  function withFakeTimers(test: () => Promise<void>) {
+    return async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval'] });
+      try {
+        await test();
+      } finally {
+        vi.useRealTimers();
+      }
+    };
+  }
+
+  it(
+    'every refresh_every seconds it reads the counters again and shows them without a reload',
+    withFakeTimers(async () => {
+      const s = await clocked(() => Response.json({ counters: [counter('printing.stalled_kitchen', 2, '/printing/printers')], refresh_every: 30 }));
+      await s.result(s.call, 'base.bell.counters', { counters: [], refresh_every: 30 });
+      expect(s.badge().exists()).toBe(false);
+
+      await s.tick(29_000);
+      expect(s.reads()).toBe(0);
+      await s.tick(1_000);
+      expect(s.reads()).toBe(1);
+      expect(s.badge().text()).toBe('2');
+      await s.tick(30_000);
+      expect(s.reads()).toBe(2);
+    }),
+  );
+
+  it(
+    'stops reading when no counter asks any more, and when it is gone',
+    withFakeTimers(async () => {
+      const s = await clocked(() => Response.json({ counters: [], refresh_every: 30 }));
+      await s.result(s.call, 'base.bell.counters', { counters: [], refresh_every: 30 });
+      await s.tick(30_000);
+      expect(s.reads()).toBe(1);
+
+      await s.result(s.call, 'base.bell.counters', { counters: [], refresh_every: null }, 2);
+      await s.tick(5 * 60_000);
+      expect(s.reads()).toBe(1);
+
+      await s.result(s.call, 'base.bell.counters', { counters: [], refresh_every: 30 }, 3);
+      s.wrapper.unmount();
+      await s.tick(5 * 60_000);
+      expect(s.reads()).toBe(1);
+    }),
+  );
+
+  it(
+    'a reading that fails keeps the last counters, and one older than a live result does not undo it',
+    withFakeTimers(async () => {
+      let release: (response: Response) => void = () => undefined;
+      const s = await clocked((call) =>
+        call === 1
+          ? new Response('{}', { status: 500 })
+          : new Promise<Response>((resolve) => (release = resolve)),
+      );
+      await s.result(s.call, 'base.bell.counters', { counters: [counter('demo.open_items', 3, '/demo/items')], refresh_every: 30 });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      await s.tick(30_000);
+      expect(s.badge().text()).toBe('3');
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
+
+      await s.tick(30_000); // the second reading is on its way…
+      await s.result(s.call, 'base.bell.counters', { counters: [counter('demo.open_items', 5, '/demo/items')], refresh_every: 30 }, 2);
+      release(Response.json({ counters: [counter('demo.open_items', 4, '/demo/items')], refresh_every: 30 }));
+      await flush();
+      expect(s.badge().text()).toBe('5');
+    }),
+  );
+
+  it(
+    'reads nothing while the page is hidden',
+    withFakeTimers(async () => {
+      const s = await clocked(() => Response.json({ counters: [], refresh_every: 30 }));
+      await s.result(s.call, 'base.bell.counters', { counters: [], refresh_every: 30 });
+      const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      try {
+        await s.tick(60_000);
+        expect(s.reads()).toBe(0);
+      } finally {
+        hidden.mockRestore();
+      }
+      await s.tick(30_000);
+      expect(s.reads()).toBe(1);
+    }),
+  );
 });

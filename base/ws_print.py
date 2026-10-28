@@ -93,6 +93,15 @@ claim, a confirmation, a cancellation) does not, and neither does the job this d
 ``failed``, which waits for a retry, another device or the next wake (a printer out of paper would burn its
 hand-outs). It runs as the device's user (its permissions re-read every time), on its hub's channel only, and never
 carries the document, which travels only in the answer to ``claim``.
+
+**The presence** (the old hub's heartbeat, ``print_hosts::heartbeat``; FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE):
+the ``hello`` and every ``beat`` of a device that prints for something are news that it is there. The app that keeps
+the print hosts says where that news goes with ``print_presence`` on its ``LiveAppConfig``: the name of a command of
+its own whose input takes ``device``, which the socket runs with the device's id and context, as every other
+operation here (``base.E006`` checks the declaration at start). Without one the socket tells nobody, as before. A
+device that beats faster than it is told is told about no more than once every :data:`PRESENCE_SECONDS`; a presence
+that fails is logged and the socket goes on (the beat is answered and the device still drains): a write that did not
+land costs one beat of news, never the printing.
 """
 
 import asyncio
@@ -101,6 +110,7 @@ import json
 import logging
 import math
 import re
+import time
 import uuid
 from collections.abc import Callable
 from contextlib import nullcontext
@@ -114,6 +124,7 @@ from asgiref.sync import ThreadSensitiveContext, sync_to_async
 from django.conf import settings
 from django.contrib import auth
 from django.contrib.auth.models import AnonymousUser
+from django.core import checks
 from django.core.exceptions import NON_FIELD_ERRORS, SuspiciousOperation
 from django.core.handlers.asgi import ASGIRequest
 from django.db import close_old_connections
@@ -124,6 +135,7 @@ from live.broker import broker
 from live.context import OperationContext, get_builder
 from live.errors import NotFound, OperationError
 from live.executor import BYE_FRAME, Stream, Subscription, executor
+from live.meta import all_live_app_configs
 from live.operations import UnknownOperation, get
 
 from base.middleware import HubHostRequiredMiddleware, opened_elsewhere
@@ -141,6 +153,11 @@ MAX_FRAME_BYTES = 8 * 1024
 HELLO_TIMEOUT_SECONDS = 15.0
 #: How often a connected device beats, told in ``ready`` and ``beat`` (the old hub's ``HEARTBEAT_SECONDS``).
 HEARTBEAT_SECONDS = 30
+#: The least time between two presences told of one device (``print_presence``): half a beat, so a device beating at
+#: the rate it is told is told about at every beat, and one beating faster writes no more than every 15 s.
+PRESENCE_SECONDS = HEARTBEAT_SECONDS / 2
+#: The attribute of a ``LiveAppConfig`` naming the command told of a print host's presence.
+PRESENCE_ATTRIBUTE = "print_presence"
 #: Waiting jobs of each role the wake watches, newest first: a job just queued is always among them, and 20 of the
 #: longest rows printing lists (about 170 KiB) stay under a live result's cap (``live.sse.MAX_RESULT_BYTES``).
 WAKE_WINDOW = 20
@@ -200,6 +217,8 @@ class Device:
     waiting: dict[str, set[tuple]] = field(default_factory=dict)
     #: Jobs this device sent back to the queue itself (``failed``): waiting again, they are no news to it.
     sent_back: set[tuple] = field(default_factory=set)
+    #: When its presence was last told (``time.monotonic``); ``None`` = not yet on this socket.
+    announced_at: float | None = None
 
     @property
     def roles(self) -> list[str]:
@@ -397,6 +416,8 @@ class PrintSocket:
         self._unfollow()
         self.device = device
         await self._follow()
+        # Connecting is news: the device is there (the old hub's heartbeat at hello).
+        await self._sync(self._announce)
         return {"type": "ready", "deviceId": device.device_id, "roles": device.roles, "heartbeatSeconds": HEARTBEAT_SECONDS}
 
     def _register(self, frame: dict) -> Device:
@@ -499,8 +520,32 @@ class PrintSocket:
         return {"type": "beat", "refreshed": len(printers), "heartbeatSeconds": HEARTBEAT_SECONDS}
 
     def _still_reached(self) -> dict[str, str]:
+        """The printers the device still prints for; when there are any, the beat is news that it is there."""
         device = self.device
-        return self._reached(self._fresh_context(), device.device_id, device.declared) or {}
+        printers = self._reached(self._fresh_context(), device.device_id, device.declared) or {}
+        if printers:
+            self._announce()
+        return printers
+
+    def _announce(self) -> None:
+        """Tell the declared presence (``print_presence``) that the device is there, once per :data:`PRESENCE_SECONDS`.
+
+        A presence that fails is logged and the socket goes on: the device still prints, and its next beat tells it
+        again.
+        """
+        name = presence_operation()
+        device = self.device
+        if name is None:
+            return
+        now = time.monotonic()
+        if device.announced_at is not None and now - device.announced_at < PRESENCE_SECONDS:
+            return
+        try:
+            self._run(name, {"device": device.device_id})
+        except Exception:
+            logger.warning("The presence of print host %s failed (%s); the socket goes on.", device.device_id, name, exc_info=True)
+            return
+        device.announced_at = now
 
     # ── Session, context and the operations ───────────────────────────────────────────────────────
 
@@ -655,6 +700,54 @@ class PrintSocket:
             return str(uuid.UUID(job_id))
         except ValueError:
             raise self._invalid(self._t(gettext_noop("jobId is the id of a job this hub handed out."))) from None
+
+
+def presence_operation() -> str | None:
+    """The command told of a print host's presence: what an app declares in ``print_presence``, or ``None``."""
+    for config in all_live_app_configs():
+        name = getattr(config, PRESENCE_ATTRIBUTE, None)
+        if name:
+            return name
+    return None
+
+
+@checks.register("base")
+def check_print_presence(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E006``: ``print_presence`` names a command of the declaring app whose input takes ``device``, and one app
+    at most declares it (the socket tells one presence)."""
+    errors: list[checks.CheckMessage] = []
+    declared = [config for config in all_live_app_configs() if getattr(config, PRESENCE_ATTRIBUTE, None) is not None]
+    hint = (
+        'Declare print_presence = "<app>.<entity>.<action>" on the LiveAppConfig of the app that keeps the print hosts: '
+        "a command of its own services.py whose input takes device."
+    )
+    for config in declared:
+        problem = _presence_problem(config, getattr(config, PRESENCE_ATTRIBUTE))
+        if problem:
+            errors.append(checks.Error(f"{config.label}'s print_presence {problem}.", hint=hint, obj=config, id="base.E006"))
+    if len(declared) > 1:
+        labels = ", ".join(sorted(config.label for config in declared))
+        errors.append(
+            checks.Error(f"print_presence is declared by {labels}: one app at most tells it.", hint=hint, id="base.E006")
+        )
+    return errors
+
+
+def _presence_problem(config, name: Any) -> str | None:
+    """Why ``name`` is no presence ``config`` may declare, or ``None``."""
+    if not isinstance(name, str):
+        return f"is {name!r}, not the name of an operation"
+    try:
+        op = get(name)
+    except UnknownOperation:
+        return f"names {name}, which is no operation"
+    if op.app_label != config.label:
+        return f"names {name}, an operation of another app"
+    if op.kind != "command":
+        return f"names {name}, a {op.kind}: the presence is a write"
+    if "device" not in op.input.model_fields:
+        return f"names {name}, whose input takes no device"
+    return None
 
 
 def _http_request(scope: dict) -> HttpRequest:

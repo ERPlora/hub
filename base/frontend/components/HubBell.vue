@@ -4,26 +4,60 @@
 // above zero; opened, one row per counter («Failed events (2)») that leads to its screen when this hub has it.
 // A failed read keeps the last counters (`useLive` keeps its data); one that never came says so. `folded` (a phone's
 // «More options», TopbarChrome.vue): no button of its own; the list opens from that menu's row (`show`, `total`).
-import { useLive } from '@erplora/ui/sdk';
+// A counter whose figure moves as time passes, with no event (a job waiting a minute with no device alive), makes the
+// result carry `refresh_every`: the bell reads the counters again that often while the page is in sight, and a reading
+// older than a live result that came meanwhile is dropped (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE).
+import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonBadge, IonButton, IonItem, IonLabel, IonList, IonPopover } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-import type { BellCounter } from '../operations';
+import type { BellCounter, BellCounters } from '../operations';
 import { useBaseI18n } from '../lib/i18n';
 
 defineProps<{ folded?: boolean }>();
 
 const { t } = useBaseI18n();
 const router = useRouter();
+const client = useLiveClient();
 const { data, status } = useLive('base.bell.counters', {});
 const open = ref(false);
 const anchor = ref<Event | undefined>();
 
-const counters = computed<BellCounter[]>(() => data.value?.counters ?? []);
+/** The newest result: the live one, or the reading of the clock when it came after it. */
+const latest = shallowRef<BellCounters | undefined>();
+/** How many live results came: a reading that started before the last one is older than it. */
+let pushes = 0;
+watch(data, (value) => {
+  pushes += 1;
+  if (value !== undefined) latest.value = value;
+});
+
+async function readAgain(): Promise<void> {
+  if (document.visibilityState === 'hidden') return;
+  const before = pushes;
+  try {
+    const result = await client.api.call('base.bell.counters', {});
+    if (pushes === before) latest.value = result;
+  } catch (error) {
+    console.warn('base: the bell could not read its counters again', error);
+  }
+}
+
+let clock: ReturnType<typeof setInterval> | undefined;
+watch(
+  () => latest.value?.refresh_every ?? null,
+  (seconds) => {
+    clearInterval(clock);
+    clock = seconds ? setInterval(() => void readAgain(), seconds * 1000) : undefined;
+  },
+);
+onScopeDispose(() => clearInterval(clock));
+
+const counters = computed<BellCounter[]>(() => latest.value?.counters ?? []);
 const total = computed(() => counters.value.reduce((sum, counter) => sum + counter.count, 0));
-const failed = computed(() => data.value === undefined && status.value === 'error');
+const failed = computed(() => latest.value === undefined && status.value === 'error');
 
 /** A route the router has (its hash aside): one that falls on the 404 leads nowhere. */
 const reachable = (route: string) => route !== '' && router.resolve(route).name !== 'not-found';

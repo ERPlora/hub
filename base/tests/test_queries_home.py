@@ -90,7 +90,7 @@ def modules(monkeypatch, settings):
     return use
 
 
-def module(label, *, setup=(), widgets=(), bell=(), notices=(), listed=True, permissions=(), name=None):
+def module(label, *, setup=(), widgets=(), bell=(), notices=(), listed=True, permissions=(), name=None, **more):
     return SimpleNamespace(
         label=label,
         verbose_name=name or label.capitalize(),
@@ -100,6 +100,7 @@ def module(label, *, setup=(), widgets=(), bell=(), notices=(), listed=True, per
         bell=list(bell),
         notices=list(notices),
         permissions=list(permissions),
+        **more,
     )
 
 
@@ -676,6 +677,39 @@ def test_the_counters_of_a_module_out_of_the_store_only_where_the_setting_says(m
 
     Hub.objects.filter(slug="a").update(is_demo=True)
     assert [c["key"] for c in bell(ctx())] == ["demo.open"]
+
+
+def refresh_every(context):
+    return get("base.bell.counters")(context, BellCountersIn()).model_dump(mode="json")["refresh_every"]
+
+
+def test_a_counter_that_changes_with_time_asks_the_bell_to_read_it_again(modules, declare):
+    """FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE: a counter whose figure moves as time passes (a job waiting for
+    a minute with no device alive) names how often the bell reads it again, besides its events. The bell is told the
+    shortest period among the counters the person may see of the apps on, also while they are at zero: it is the time
+    that raises them."""
+    declare("printing.device.coverage", {"count": 0})
+    declare("stock.item.count", {"count": 2})
+    stalled = counter("stalled", "printing.device.coverage", permission="printing.view_settings")
+    late = counter("late", "printing.device.coverage")
+    printing = module(
+        "printing",
+        permissions=["printing.view_settings"],
+        bell=[stalled, late],
+        bell_refresh_every={"stalled": 30, "late": 60},
+    )
+    modules(printing, module("stock", bell=[counter()]))
+
+    assert refresh_every(ctx("printing.view_settings")) == 30
+    assert refresh_every(ctx()) == 60, "only the counters this person may see"
+    assert bell(ctx()) == [
+        {"key": "stock.to_confirm", "app": "stock", "count": 2, "route": "/stock", "label": "To confirm", "icon": ""}
+    ]
+
+    modules(printing, module("stock", bell=[counter()]), on=["stock"])
+    assert refresh_every(ctx("printing.view_settings")) is None, "printing is off"
+    modules(module("stock", bell=[counter()]))
+    assert refresh_every(ctx()) is None, "no counter asks: the bell follows its events only, as before"
 
 
 def dead_event(scope, status=EventDelivery.Status.DEAD):
