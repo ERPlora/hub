@@ -850,6 +850,30 @@ msgstr "Cobrar con un descuento por encima del máximo"
 msgid "Sell at an open price"
 msgstr "Vender a precio libre"
 
+msgid "Discount a line by {discount_percent, percent}"
+msgstr "Descontar una línea un {discount_percent, percent}"
+
+msgid "Discount the check by {discount_percent, percent} and {discount_amount, money}"
+msgstr "Descontar la cuenta un {discount_percent, percent} y {discount_amount, money}"
+
+msgid "Discount the check by {discount_percent, percent}"
+msgstr "Descontar la cuenta un {discount_percent, percent}"
+
+msgid "Discount the check by {discount_amount, money}"
+msgstr "Descontar {discount_amount, money} de la cuenta"
+
+msgid "Charge with a discount of {discount_percent, percent} and {discount_amount, money}"
+msgstr "Cobrar con un descuento del {discount_percent, percent} y {discount_amount, money}"
+
+msgid "Charge with a discount of {discount_percent, percent}"
+msgstr "Cobrar con un descuento del {discount_percent, percent}"
+
+msgid "Charge with a discount of {discount_amount, money}"
+msgstr "Cobrar con un descuento de {discount_amount, money}"
+
+msgid "Sell at an open price of {unit_price, money}"
+msgstr "Vender a precio libre por {unit_price, money}"
+
 msgid "Delete an open check with something on it"
 msgstr "Eliminar una cuenta abierta con algo pedido"
 

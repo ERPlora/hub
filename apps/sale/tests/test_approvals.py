@@ -323,7 +323,7 @@ class TestDiscountAboveTheMaximum:
         }
         assert code(post(cashier, "/sale/sales", body)) == "sale.discount_over_limit"
         question = asked(post(cashier, "/sale/sales/complete_over_limit", body))
-        assert question["label"] == "Charge with a discount above the maximum"
+        assert question["label"] == "Charge with a discount of 50%"
         charged = post(cashier, "/sale/sales/complete_over_limit", body, **with_pass(approve(cashier, question)))
         assert charged.status_code == 201, charged.content
         assert charged.json()["total"] == 75
@@ -336,10 +336,118 @@ class TestOpenPrice:
     def test_the_managers_pin_lets_the_cashier_add_an_open_price(self, cashier, coffee):
         order = open_check(cashier)
         body = {"order_id": order["id"], "unit_price": 420, "tax_category_key": "restaurant.food"}
-        assert asked(post(cashier, "/sale/orders/add_open_line", body))["label"] == "Sell at an open price"
+        assert asked(post(cashier, "/sale/orders/add_open_line", body))["label"] == "Sell at an open price of €4.20"
         added = through_approval(cashier, "/sale/orders/add_open_line", body)
         assert added.status_code == 200, added.content
         assert [line["unit_price"] for line in added.json()["lines"]] == [150, 420]
+
+
+# ── SALE-F14 and F09 What is approved, with its figure ───────────────────────────────────────────────────────────────
+# sales#398, sales#403, hub#2180: the manager read «Discount a line above the maximum» and approved blind. «An
+# approval is needed» says how much they approve, as Square, Toast and Lightspeed print it («Discount 50% requires
+# manager»): the sentences of ``approval_figures`` (BASE-F84), filled with the figures of that very request in the
+# language of whoever asks; an amount in the business's currency. A figure in zero or empty fills no hole: the next
+# sentence, or the words of always, never half a sentence. Void, refund, void an item and delete a check say no
+# figure: their input has none on its first level (an amount of a refund lives in its tenders).
+
+
+def asked_in(client, path: str, data: dict, language: str) -> str:
+    """What «An approval is needed» says is approved for that very request, in ``language``."""
+    return asked(post(client, path, data, HTTP_ACCEPT_LANGUAGE=language))["label"]
+
+
+@pytest.fixture
+def menu(product):
+    return product("Menu", "MEN", 2500, "restaurant.food")
+
+
+LINE_OVER = "/sale/orders/set_line_discount_over_limit"
+CHECK_OVER = "/sale/orders/set_discount_over_limit"
+CHARGE_OVER = "/sale/sales/complete_over_limit"
+
+
+class TestWhatIsApprovedWithItsFigure:
+    def test_only_the_commands_with_a_figure_in_their_request_say_one_and_the_platform_s_check_passes(self):
+        from django.core import checks
+
+        sale = apps.get_app_config("sale")
+        assert set(sale.approval_figures) == {
+            "sale.order.set_line_discount_over_limit",
+            "sale.order.set_discount_over_limit",
+            "sale.sale.complete_over_limit",
+            "sale.order.add_open_line",
+        }
+        assert [error.msg for error in checks.run_checks(tags=["base"]) if error.id == "base.E008"] == []
+
+    def test_a_line_discount_says_its_percentage(self, cashier, coffee):
+        cap(10)
+        order = open_check(cashier)
+        body = {"order_id": order["id"], "line_id": order["lines"][0]["id"], "discount_percent": "50"}
+        assert asked_in(cashier, LINE_OVER, body, "en") == "Discount a line by 50%"
+        assert asked_in(cashier, LINE_OVER, body, "es") == "Descontar una línea un 50\xa0%"
+        assert asked_in(cashier, LINE_OVER, {**body, "discount_percent": "12.5"}, "es") == "Descontar una línea un 12,5\xa0%"
+
+    def test_a_check_discount_says_its_percentage_or_its_amount_in_the_business_s_currency(self, cashier, menu):
+        cap(10)
+        order = open_check(cashier, {"product": "MEN"})
+        percent = {"order_id": order["id"], "discount_percent": "50", "discount_amount": 0}
+        assert asked_in(cashier, CHECK_OVER, percent, "en") == "Discount the check by 50%"
+        assert asked_in(cashier, CHECK_OVER, percent, "es") == "Descontar la cuenta un 50\xa0%"
+        amount = {"order_id": order["id"], "discount_percent": "0", "discount_amount": 1250}
+        assert asked_in(cashier, CHECK_OVER, amount, "en") == "Discount the check by €12.50"
+        assert asked_in(cashier, CHECK_OVER, amount, "es") == "Descontar 12,50\xa0€ de la cuenta"
+        both = {"order_id": order["id"], "discount_percent": "5", "discount_amount": 1000}
+        assert asked_in(cashier, CHECK_OVER, both, "en") == "Discount the check by 5% and €10.00"
+        assert asked_in(cashier, CHECK_OVER, both, "es") == "Descontar la cuenta un 5\xa0% y 10,00\xa0€"
+
+    def test_a_figure_in_zero_or_empty_never_leaves_half_a_sentence(self, cashier, menu):
+        order = open_check(cashier, {"product": "MEN"})
+        # Neither a percentage nor an amount: the words of always, never «Discount the check by ».
+        nothing = {"order_id": order["id"], "discount_percent": "0"}
+        assert asked_in(cashier, CHECK_OVER, nothing, "en") == "Discount the check above the maximum"
+        assert asked_in(cashier, CHECK_OVER, {**nothing, "discount_amount": 0}, "es") == (
+            "Descontar la cuenta por encima del máximo"
+        )
+
+    def test_a_charge_above_the_maximum_says_the_discount_it_charges(self, cashier, menu):
+        cap(10)
+        body = {"idempotency_key": "approval-figure-0001", "lines": [{"product": "MEN"}], "payments": [{"method": "card"}]}
+        assert asked_in(cashier, CHARGE_OVER, {**body, "discount_percent": "50"}, "en") == "Charge with a discount of 50%"
+        assert asked_in(cashier, CHARGE_OVER, {**body, "discount_percent": "50"}, "es") == "Cobrar con un descuento del 50\xa0%"
+        assert asked_in(cashier, CHARGE_OVER, {**body, "discount_amount": 1250}, "en") == "Charge with a discount of €12.50"
+        assert asked_in(cashier, CHARGE_OVER, {**body, "discount_amount": 1250}, "es") == "Cobrar con un descuento de 12,50\xa0€"
+        both = {**body, "discount_percent": "5", "discount_amount": 1000}
+        assert asked_in(cashier, CHARGE_OVER, both, "en") == "Charge with a discount of 5% and €10.00"
+        assert asked_in(cashier, CHARGE_OVER, both, "es") == "Cobrar con un descuento del 5\xa0% y 10,00\xa0€"
+
+    def test_the_charge_of_a_check_says_the_words_of_always(self, cashier, menu):
+        # The check's own discount is not in the charge's request: no figure is read, so no half a sentence either.
+        order = open_check(cashier, {"product": "MEN"})
+        body = {"idempotency_key": "approval-figure-0002", "order_id": order["id"], "payments": [{"method": "card"}]}
+        assert asked_in(cashier, CHARGE_OVER, body, "en") == "Charge with a discount above the maximum"
+
+    def test_an_open_price_says_its_amount(self, cashier, coffee):
+        order = open_check(cashier)
+        body = {"order_id": order["id"], "unit_price": 420, "tax_category_key": "restaurant.food"}
+        assert asked_in(cashier, "/sale/orders/add_open_line", body, "en") == "Sell at an open price of €4.20"
+        assert asked_in(cashier, "/sale/orders/add_open_line", body, "es") == "Vender a precio libre por 4,20\xa0€"
+
+    def test_the_manager_approves_that_figure_and_the_record_says_it(self, client, cashier, coffee, make_user):
+        cap(10)
+        order = open_check(cashier)
+        body = {"order_id": order["id"], "line_id": order["lines"][0]["id"], "discount_percent": "50"}
+        question = asked(post(cashier, LINE_OVER, body, HTTP_ACCEPT_LANGUAGE="es"))
+        assert question["label"] == "Descontar una línea un 50\xa0%"
+        done = post(cashier, LINE_OVER, body, **with_pass(approve(cashier, question)))
+        assert done.status_code == 200, done.content
+        line = OrderLine.objects.get(pk=order["lines"][0]["id"])
+        assert (str(line.discount_percent), line.discount_approved_by) == ("50.00", "mario")
+        # Employees › Approvals (BASE-F85): the owner reads what Mario approved, with its figure, in their language.
+        client.force_login(make_user("ana", role="hub_owner"))
+        rows = client.get("/api/approvals", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="en").json()["approvals"]
+        assert [(row["action"], row["operation_label"]) for row in rows] == [
+            ("Discount a line by 50%", "Discount a line above the maximum")
+        ]
 
 
 # ── SALE-F18 Delete an open check ────────────────────────────────────────────────────────────────────────────────────
