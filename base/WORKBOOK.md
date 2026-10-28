@@ -1415,7 +1415,7 @@ Implicados: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 Ver la moneda del negocio
 <!-- origen: old-hub:HUB_SHELL-F158 -->
-Estado: parcial — el Inicio ya escribe sus importes en la moneda del negocio, pero las apps (Ventas, Caja, Facturas, Inventario) todavía en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
+Estado: parcial — el Inicio, Ventas, Caja, Facturación, Inventario, Tarifas, Impresión, Cocina y Suplementos ya van en la moneda del negocio, pero Pagos, Carrito y pago, Citas, Menús y combos y Clientes todavía en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
 Pasos:
@@ -2864,7 +2864,15 @@ Implicados: ACCOUNTS-F38
   demo). El registro se aplica como la plataforma: tras su COMMIT, `base.hub.register` avisa también al canal del
   propio negocio (`base/tests/test_business_live.py`). El Hub no guarda ni cambia nada de esto y no hay almacén
   clave/valor de ajustes: el `hub_settings` del runtime viejo se repartió entre sus dueños (país, zona e idioma en el
-  registro; territorio en Impuestos, TAX-F11; emisor en Facturación, INVOICE-F21; la moneda, la del país). Las apps
+  registro; territorio en Impuestos, TAX-F11; emisor en Facturación, INVOICE-F21; la moneda, la del país). El hub
+  propio de ERPlora (`PLATFORM_HUB_SLUG`; en la fase 1 sin fila en el registro) contesta el negocio de ERPlora, su emisor:
+  `PLATFORM_ISSUER_LEGAL_NAME` y `PLATFORM_ISSUER_COUNTRY` con la moneda de ese país, la zona y el idioma del despliegue,
+  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host sigue sin servir
+  pantallas en la fase 1 (`erplora` es un slug reservado: 404). La moneda que cobra cada app es
+  `base.operations.business_currency(scope)`: la de `base.business.get` leída como la plataforma (`system_context`;
+  una API key solo tiene los permisos de lo que cobra) y, en un ámbito que no es de ningún hub, su `NotFound`, nunca un
+  `EUR` por defecto (`base/tests/test_business_currency.py`). Ventas, Facturación, Inventario, Tarifas e Impresión aún
+  llevan su propia copia, `business_currency(ctx)`, que contesta lo mismo; Pagos, Carrito y pago, Citas, Menús y combos y Clientes
   aún cobran en `EUR` (BASE-F50 `parcial`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
