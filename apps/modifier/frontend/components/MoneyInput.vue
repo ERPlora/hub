@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The supplement field of the option form (MODIFIER-F04): what a person types or pastes («1,50», «-0,50»,
-// «1.234,56», «+1,00 €»), rewritten in the page format when they leave it. It holds the text; the form
-// reads the signed cents with `parseMoney` when it saves. What is not an amount says so under the field
+// «1.234,56», «+1,00 zł»), rewritten in the page format when they leave it, in the business's `money` (its
+// code or its sign around the figure is read, another currency's is not; at most its decimals). It holds the
+// text; the form reads the signed minor units with `parseMoney` when it saves. What is not an amount says so under the field
 // once the person leaves it (or `showError`, after a save attempt); the server's message for the field
 // wins. A phone's decimal keyboard has no minus: the ± button at its end turns a supplement into a
 // discount and back.
@@ -9,12 +10,20 @@ import { IonButton, IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, type Money } from '../lib/format';
 import { normaliseMoneyText, parseMoney } from '../lib/money';
 
 const props = withDefaults(
-  defineProps<{ label: string; testid: string; errorText?: string; helperText?: string; showError?: boolean; disabled?: boolean }>(),
-  { errorText: undefined, helperText: undefined, showError: false, disabled: false },
+  defineProps<{
+    label: string;
+    testid: string;
+    money?: Money;
+    errorText?: string;
+    helperText?: string;
+    showError?: boolean;
+    disabled?: boolean;
+  }>(),
+  { money: undefined, errorText: undefined, helperText: undefined, showError: false, disabled: false },
 );
 const text = defineModel<string>({ required: true });
 
@@ -24,13 +33,13 @@ const left = ref(false);
 
 /** Why the text is not an amount, in the page language; `''` when it is one (or empty). */
 const readError = computed(() => {
-  const read = parseMoney(text.value);
+  const read = parseMoney(text.value, props.money);
   if (read.ok) return '';
   if (read.reason === 'not_amount') return t('modifier.money.notAmount');
   return t('modifier.money.ambiguous', {
     typed: text.value.trim(),
-    grouped: formatMoney(read.grouped, locale.value),
-    decimal: formatMoney(read.decimal, locale.value),
+    grouped: formatMoney(read.grouped, locale.value, props.money),
+    decimal: formatMoney(read.decimal, locale.value, props.money),
   });
 });
 
@@ -45,7 +54,7 @@ function toggleSign(): void {
 
 function onBlur(): void {
   left.value = true;
-  const normalised = normaliseMoneyText(text.value, locale.value);
+  const normalised = normaliseMoneyText(text.value, locale.value, props.money);
   if (normalised !== text.value) text.value = normalised;
 }
 </script>

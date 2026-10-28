@@ -62,8 +62,9 @@ Contrastada con el barrido de mercado del módulo actual (20/08/2026) y con la r
   **Impuestos** (la categoría fiscal propia de una opción). Encender Suplementos enciende las dos.
 - Sin **Ventas** nadie pregunta los grupos en el TPV; sin **Cocina** la comanda no los lleva. Las dos
   hablan con Suplementos por sus servicios, nunca por sus tablas.
-- Los suplementos van en **euros con céntimos** en pantalla y en **céntimos enteros** por la API; pueden
-  ser negativos (un descuento) o cero (gratis).
+- Los suplementos van en **la moneda del negocio**, la de su país, la que dice **Ajustes → Negocio** (euros
+  en España, złoty en Polonia), con sus decimales en pantalla y en **céntimos enteros** (la unidad más
+  pequeña de esa moneda) por la API; pueden ser negativos (un descuento) o cero (gratis).
 
 Configuración inicial, paso a paso:
 
@@ -92,8 +93,9 @@ la hoja del grupo, a todos.
 ### Hoja del grupo
 Título «Grupo — {nombre}» y su regla. Dos apartados:
 
-- **Opciones**: cada una con su nombre, su nombre de comanda (si es otro), su suplemento («+1,00 €»,
-  «−0,50 €» o «Gratis»), su categoría fiscal propia si la tiene y la marca «Por defecto». Quien gestiona
+- **Opciones**: cada una con su nombre, su nombre de comanda (si es otro), su suplemento en la moneda
+  del negocio («+1,00 €» o «−0,50 €» en España, «+1,00 zł» en Polonia; o «Gratis»), su categoría fiscal
+  propia si la tiene y la marca «Por defecto». Quien gestiona
   ve «Añadir opción» y, en cada una, Editar y Borrar. Vacío: «Este grupo todavía no tiene opciones.».
   Si tiene menos opciones de las que pide el mínimo (y no se repiten), un aviso lo dice: el TPV no
   podría completarlo.
@@ -107,8 +109,8 @@ De 20 en 20, con «Cargar más».
 - **Grupo** («Nuevo grupo» / «Editando grupo — {nombre}»): Nombre, «Nombre en la comanda», «Mínimo (1 o
   más = obligatorio)», «Máximo (0 = sin techo)», «Se puede repetir una opción» y Orden.
 - **Opción** («Nueva opción» / «Editando opción — {nombre}»): Nombre, «Nombre en la comanda»,
-  «Suplemento (€)» (negativo descuenta; vacío o 0, gratis), «Categoría fiscal propia» (se busca;
-  vacía = la del plato), Orden y «Elegida por defecto».
+  «Suplemento (<moneda>)» (la del negocio: «Suplemento (PLN)» en Polonia; negativo descuenta; vacío o 0,
+  gratis), «Categoría fiscal propia» (se busca; vacía = la del plato), Orden y «Elegida por defecto».
 - **Enganchar** («Aplicar «{grupo}» a…»): Producto o Categoría, y el buscador de cada uno.
 - **Borrar** grupo u opción y **Dejar de aplicar**: piden confirmación diciendo qué se va con ello.
 
@@ -201,7 +203,8 @@ Pantalla: Suplementos (hoja del grupo)
 Pasos:
 1. Abre el grupo y, en Opciones, pulsa «Añadir opción».
 2. Escribe el Nombre (único dentro del grupo) y, si hace falta, el nombre de comanda.
-3. Escribe el Suplemento en euros: positivo cobra de más, negativo descuenta, vacío o 0 es gratis.
+3. Escribe el Suplemento en la moneda del negocio, la de su país en Ajustes → Negocio, con sus decimales
+   (el yen no tiene): positivo cobra de más, negativo descuenta, vacío o 0 es gratis.
 4. Solo si la opción tributa distinto del plato, elige su categoría fiscal propia; vacía, hereda la del
    plato.
 5. Marca «Elegida por defecto» si el TPV debe traerla ya marcada. En un grupo de máximo 1, marcar otra
@@ -247,8 +250,8 @@ Pasos:
    hoja con su nombre. Sin grupos, el artículo entra directo.
 2. Cada grupo dice su regla: «Elige N» si pide justo N, «Elige de N a M» si pide un mínimo y deja llegar a
    un techo, «Elige al menos N» si pide un mínimo sin techo, «Hasta N» si solo tiene techo, «Opcional» si
-   no; cada opción lleva su suplemento con su signo si no es cero («+1,00 €») y las opciones por defecto ya
-   salen marcadas.
+   no; cada opción lleva su suplemento con su signo, en la moneda del negocio, si no es cero («+1,00 €» en
+   España) y las opciones por defecto ya salen marcadas.
 3. Toca las opciones: en un grupo de una sola, tocar otra la cambia y tocar la misma la quita; en un grupo
    que se repite, cada opción va en su renglón, con su nombre entero, y cada toque suma uno al contador
    («× 2») que «−» resta; al llegar al techo, el siguiente toque avisa de que el grupo está completo.

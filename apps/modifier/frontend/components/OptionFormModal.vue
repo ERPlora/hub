@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // MODIFIER-F04 «Añadir, cambiar o quitar las opciones de un grupo»: «Add option» asks for Name, «Kitchen
-// ticket name», «Supplement (€)» (signed: negative is a discount; empty or 0, free), «Own tax category»
+// ticket name», «Supplement (PLN)» (in the business's currency, its country's, with its decimals; just
+// «Supplement» until the business answers; signed: negative is a discount; empty or 0, free), «Own tax category»
 // (searched in Taxes; empty = the dish's), «Chosen by default» and Order; Edit opens «Editing option —
 // {name}» and sends only what changed with `modifier.option.update` (an emptied tax category sends
 // `''`, the dish's again). A supplement that is not an amount is never sent; the server's refusals (a
@@ -11,6 +12,7 @@ import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
+import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchTaxCategories } from '../lib/pickers';
 import type { GroupOut, OptionIn, OptionOut, OptionPatchIn } from '../operations';
@@ -37,6 +39,7 @@ interface Form {
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
+const money = useBusinessMoney();
 const creation = useCommand('modifier.option.create');
 const update = useCommand('modifier.option.update');
 const pending = computed(() => creation.pending.value || update.pending.value);
@@ -54,7 +57,7 @@ function fromOption(option: OptionOut | null): Form {
   return {
     name: option.name,
     kitchenName: option.kitchen_name,
-    price: moneyFieldText(option.price_delta, locale.value),
+    price: moneyFieldText(option.price_delta, locale.value, money.value),
     tax: option.tax_category_key ? { id: option.tax_category_key, label: option.tax_category_name ?? option.tax_category_key } : null,
     isDefault: option.is_default,
     order: String(option.sort_order),
@@ -72,6 +75,16 @@ watch(
   },
   { immediate: true },
 );
+
+// The business answers (or its currency changes) with the form open: a supplement the person has not touched is
+// rewritten from the option with the currency's decimals («1.50» → «150» in yen); what they typed stays as typed,
+// read in the new currency when they save (the field says so when it cannot be).
+watch(money, (now, before) => {
+  if (!open.value) return;
+  const written = props.option ? moneyFieldText(props.option.price_delta, locale.value, before) : '';
+  if (form.value.price !== written) return;
+  form.value = { ...form.value, price: props.option ? moneyFieldText(props.option.price_delta, locale.value, now) : '' };
+});
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
@@ -109,7 +122,7 @@ function patch(option: OptionOut, cents: number): OptionPatchIn {
 
 async function save(): Promise<void> {
   tried.value = true;
-  const read = parseMoney(form.value.price);
+  const read = parseMoney(form.value.price, money.value);
   if (!read.ok) return; // The field says why.
   const cents = read.cents ?? 0;
   try {
@@ -162,7 +175,8 @@ async function save(): Promise<void> {
         <MoneyInput
           v-model="form.price"
           testid="modifier-option-form-price_delta"
-          :label="$t('modifier.options.form.price')"
+          :label="money ? $t('modifier.options.form.priceIn', { currency: money.currency }) : $t('modifier.options.form.price')"
+          :money="money"
           :helper-text="$t('modifier.options.form.priceHint')"
           :error-text="fieldErrors.price_delta"
           :show-error="tried"
