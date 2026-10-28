@@ -1,8 +1,9 @@
 // The bell by the clock (FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE): a counter whose figure moves as time
 // passes, with no event, asks the bell to read it again (`bell_refresh_every` of its module); one that does not —
-// the demo's «Open demo items» here — moves with its events only, as before, and the bell asks the server nothing by
-// itself. No module of this stack asks yet: Printing will, for «Nobody is printing …» (PRINTING-F01), and the clock
-// itself is HubBell.test.ts's. Each viewport leaves `FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE-<width>`.
+// the demo's «Open demo items» here — moves with its events, as before. Printing asks, for «Nobody is printing …»
+// (PRINTING-F01, FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF, whose spec watches its row move by the clock): the
+// owner sees Printing, so the bell reads its rows again by itself. The clock itself is HubBell.test.ts's. Each viewport
+// leaves `FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE-<width>`.
 // flow: PRINTING-F01 BASE-F10
 import { expect, test } from '@playwright/test';
 
@@ -21,7 +22,7 @@ const WATCHED_MS = 35_000;
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`PRINTING-F01 BASE-F10 — with no counter asking for the clock, the bell moves with its events only, at ${width}`, async ({
+  test(`PRINTING-F01 BASE-F10 — the demo's counter moves with its events, and Printing's asks the bell for the clock, at ${width}`, async ({
     browser,
   }) => {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
@@ -46,9 +47,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await page.screenshot({ path: shot(`FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE-${width}`) });
 
     if (width === 1440) {
-      // No counter of this stack asks for the clock: over more than the shortest period, nothing is read again.
-      await page.waitForTimeout(WATCHED_MS);
-      expect(reads).toEqual([]);
+      // Printing's counters ask for the clock (30 s): within more than that period, the bell reads them again by itself.
+      await expect.poll(() => reads.length, { timeout: WATCHED_MS }).toBeGreaterThan(0);
     }
     await clearItems(context, A);
     await expect(bellBadge(page)).toBeHidden();
