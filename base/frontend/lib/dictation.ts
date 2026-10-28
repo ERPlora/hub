@@ -9,7 +9,8 @@
 //   the microphone refused (inside the installed app, which has no browser bar, `deniedInApp`), a recording too long,
 //   nothing heard, or a failure.
 // - `cancel` throws the recording away untranscribed; leaving the screen does too, also one the browser was still
-//   starting (its microphone is freed as soon as it arrives).
+//   starting (its microphone is freed as soon as it arrives). A transcription already on its way still lands in the
+//   box, without opening the panel.
 import { useLiveClient } from '@erplora/ui/sdk';
 import { nativeBridge } from '@erplora/ui/shell';
 import { computed, type MaybeRefOrGetter, onBeforeUnmount, ref, shallowRef, toValue } from 'vue';
@@ -42,7 +43,7 @@ export function useDictation(options: DictationOptions = {}) {
   const transcribing = ref(false);
   /** The browser is still asking for the microphone. */
   const starting = ref(false);
-  /** Bumped by `cancel`: a recording that arrives after it is thrown away. */
+  /** Bumped by `cancel`: a recording that arrives after it is thrown away; a transcription, not opening the panel. */
   let generation = 0;
 
   const available = computed(() => canDictate(voice()));
@@ -53,6 +54,7 @@ export function useDictation(options: DictationOptions = {}) {
   }
 
   async function transcribe(clip: Recording): Promise<void> {
+    const mine = generation;
     transcribing.value = true;
     try {
       const { blob, mime } = await clip.stop();
@@ -66,7 +68,8 @@ export function useDictation(options: DictationOptions = {}) {
       if (!words) return say('empty');
       const before = assistant.state.draft.trimEnd();
       assistant.state.draft = before ? `${before} ${words}` : words;
-      assistant.setOpen(true);
+      // Left meanwhile (the panel closed while «Transcribing…»): the words wait in the box, the panel stays as it is.
+      if (mine === generation) assistant.setOpen(true);
     } catch (error) {
       console.error('assistant: dictation failed', error);
       say('failed');

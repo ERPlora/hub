@@ -88,7 +88,7 @@ const Host = defineComponent({
   },
 });
 
-async function host(voice: VoiceEnv, answer: (sent: Sent) => Response = () => Response.json({ text: 'dos cafés', language: 'es' })) {
+async function host(voice: VoiceEnv, answer: (sent: Sent) => Response | Promise<Response> = () => Response.json({ text: 'dos cafés', language: 'es' })) {
   problems = [];
   const sent: Sent[] = [];
   const m = await mountBase(Host, {
@@ -260,6 +260,22 @@ describe('useDictation', () => {
     expect(FakeRecorder.last.state).toBe('inactive');
     expect(mic.track.stop).toHaveBeenCalled();
     expect(m.sent).toEqual([]);
+  });
+
+  // The composer leaves with the panel: closing it while «Transcribing…» keeps what was said in the box, as before, and
+  // does not open the panel the person has just closed.
+  it('leaving the screen while it transcribes: the words still land in the box, and the panel stays as it is', async () => {
+    let reply: (response: Response) => void = () => undefined;
+    const m = await host(microphone(), () => new Promise<Response>((resolve) => (reply = resolve)));
+    await dictation.toggle();
+    const stopping = dictation.toggle();
+    await settle();
+    expect(m.sent).toHaveLength(1);
+    m.unmount();
+    reply(Response.json({ text: 'dos cafés', language: 'es' }));
+    await stopping;
+    await settle();
+    expect([assistant.state.draft, assistant.state.open]).toEqual(['dos cafés', false]);
   });
 
   it('leaving the screen while the browser asks for the microphone frees it as soon as it arrives', async () => {
