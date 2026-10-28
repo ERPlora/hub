@@ -393,8 +393,8 @@ class ShiftReviewOut(Schema):
 class ClosingSummaryOut(Schema):
     """What closing a session would give, before it closes (CASH_REGISTER-F09): nothing is written.
     ``cash_register.session.close`` shows its number, drawer, expected and difference on its card (BASE-F98): their
-    titles are the names the Cash register screens give them (the difference's is its model's), and an amount says
-    «in cents» to be shown as money."""
+    titles are the names the Cash register screens give them (the difference's is its model's), an amount says «in
+    cents» to be shown as money and the difference is signed, to be shown with its sign as the screens write it."""
 
     session_id: UUID = Field(description="The session that would close.")
     number: str = Field(
@@ -414,7 +414,8 @@ class ClosingSummaryOut(Schema):
     )
     difference: int | None = Field(
         description="Counted − expected, in cents (positive = over, negative = short); none without a count or "
-        "when the expected is hidden."
+        "when the expected is hidden.",
+        json_schema_extra={"signed": True},
     )
     expected_hidden: bool = Field(
         description="A blind count hides the expected (and so the difference) from the reader: never guess them."

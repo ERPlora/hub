@@ -420,6 +420,48 @@ def test_a_preview_whose_data_do_not_fit_comes_back_with_the_field(settle):
     assert "id" in json.loads(failure.content)["error"]["fields"]
 
 
+class CountPreviewOut(Schema):
+    expected_balance: int | None = Field(description="The cash there should be, in cents.")
+    difference: int | None = Field(
+        description="Counted − expected, in cents (positive = over, negative = short).",
+        json_schema_extra={"signed": True},
+    )
+
+
+def count_preview(answer: dict, output: type[Schema] = CountPreviewOut) -> Operation:
+    return Operation(
+        name="demo.item.count_preview",
+        kind="query",
+        permission="demo.view",
+        input=SettlePreviewIn,
+        output=output,
+        expose_api=False,
+        ai={"description": "What counting a demo item would give."},
+        fn=lambda ctx, data: answer,
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("difference", [13790, -490, 0], ids=["over", "short", "even"])
+def test_an_amount_its_read_declares_signed_is_marked_so_and_no_other_amount_is(monkeypatch, difference):
+    """FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN: a cash difference over came as a bare amount
+    («€137.90») where Cash register writes «+€137.90». An amount the read's schema declares signed (``"signed": true``)
+    is marked so, whatever its value, for the card to write its sign; the expected cash beside it, and the amounts a
+    write sends, stay as they were."""
+    read = count_preview({"expected_balance": 11210, "difference": difference})
+    write = declaring({"operation": read.name, "fields": ["expected_balance", "difference"]})
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, write.name, write)
+    failure, fields = assistant.preview(ctx(), write, {"id": "7"})
+    assert failure is None
+    assert [{key: value for key, value in field.items() if key != "label"} for field in fields] == [
+        {"name": "expected_balance", "kind": "money", "value": 11210},
+        {"name": "difference", "kind": "money", "value": difference, "signed": True},
+    ]
+    price = next(field for field in assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"])
+    assert price == {"name": "price", "label": price["label"], "kind": "money", "value": 1500}
+
+
 def preview_errors() -> list:
     from django.core import checks
 
@@ -463,6 +505,21 @@ def test_a_preview_is_checked_at_start(monkeypatch, write, why):
     monkeypatch.setitem(registry, write.name, write)
     [error] = preview_errors()
     assert "demo.item.settle" in error.msg and why in error.msg
+
+
+class SignedNameOut(Schema):
+    name: str = Field(title="Owner", json_schema_extra={"signed": True})
+    total_cents: int = Field(json_schema_extra={"signed": True})
+
+
+def test_a_preview_marks_signed_only_an_amount(monkeypatch):
+    """A sign means over or short: only an amount in cents may be declared signed, said at start like the rest."""
+    read = count_preview({}, SignedNameOut)
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, SETTLE.name, declaring({"operation": read.name, "fields": ["name", "total_cents"]}))
+    [error] = preview_errors()
+    assert "marks name signed, but it is no amount in cents" in error.msg
+    assert "total_cents" not in error.msg
 
 
 def test_the_previews_of_today_are_declared_right(settle):

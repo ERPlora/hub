@@ -7,12 +7,14 @@
 // first (session, counted, expected, difference), then the dangerous card; «Cancel» leaves the shift open, typing the
 // word closes it and «Caja» shows it closed with its three amounts. The dangerous card carries, in «What will happen»,
 // what closing gives: the session's number, its drawer, the expected cash and the difference, as money in the business's
-// currency (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW, through base's preview, BASE-F98). A cashier
-// with the blind count on gets the summary and the card without the expected nor the difference, and the model never
-// received them.
+// currency (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW, through base's preview, BASE-F98), the
+// difference with its sign as «Cash register» writes it, in English and in Spanish («+€137.90», «+137,90 €»: over at a
+// glance; FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN, BASE-F97). A cashier with the blind count on
+// gets the summary and the card without the expected nor the difference, and the model never received them.
 // What this file creates is deleted after it (its sessions, its drawer, its sale and its product); the settings go back.
 // flow: CASH_REGISTER-F09
 // flow: CASH_REGISTER-F07
+// flow: BASE-F97
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -25,6 +27,7 @@ import { STACK } from './stack';
 
 const KEY = 'FIX-CASH_REGISTER-NO-VOICE-CLOSE-WITH-ASSISTANT';
 const PREVIEW_KEY = 'FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW';
+const SIGN_KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN';
 const RUN = stamp();
 const SKU = `E2E-CRA-${RUN}`;
 /** The drawer this file opens its shifts on: the card names it. */
@@ -41,8 +44,9 @@ const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `s
 let provider: Provider;
 let shirt: Product;
 let drawerId = '';
-/** Money as the card shows it to an English reader: the business's currency and decimals (base's `formatValue`). */
-let cardMoney: (cents: number) => string;
+/** Money as the card shows it to an English or a Spanish reader: the business's currency and decimals (base's
+ *  `formatValue`). */
+let cardMoney: (cents: number, locale?: string) => string;
 /** The sessions this file opened: the only ones its cleanup deletes. */
 const mine = new Set<string>();
 const settingsBefore: Record<string, unknown> = {};
@@ -137,14 +141,14 @@ test.beforeAll(async ({ browser }) => {
   expect(drawer.status, JSON.stringify(drawer.data)).toBe(201);
   drawerId = drawer.data.id;
   const { currency, decimals } = (await api<Currency>(context, A, 'GET', '/cash_register/currency')).data;
-  const format = new Intl.NumberFormat('en', {
-    style: 'currency',
-    currency,
-    currencyDisplay: 'narrowSymbol',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-  cardMoney = (cents) => format.format(cents / 10 ** decimals);
+  cardMoney = (cents, locale = 'en') =>
+    new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    }).format(cents / 10 ** decimals);
   await context.close();
 });
 
@@ -266,12 +270,13 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await expect(card(page)).toContainText(`Session: ${shift.number}`);
   await expect(card(page)).toContainText('Counted cash: €250.00');
   // And what closing gives (the close's summary, read as the owner): the session, its drawer, the expected and the
-  // difference, as money in the business's currency; the counted cash is not repeated.
+  // difference, as money in the business's currency, the difference over with its «+» as «Cash register» writes it;
+  // the counted cash is not repeated.
   const willHappen = [
     `Session: ${shift.number}`,
     `Drawer: ${DRAWER}`,
     `Expected in the drawer: ${cardMoney(expected)}`,
-    `Difference: ${cardMoney(25000 - expected)}`,
+    `Difference: +${cardMoney(25000 - expected)}`,
   ];
   const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
   await expect(submit).toBeDisabled();
@@ -285,6 +290,7 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
     await untilStill(page);
     await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
     await page.screenshot({ path: shot(`${PREVIEW_KEY}-${vp.label}`) });
+    await page.screenshot({ path: shot(`${SIGN_KEY}-${vp.label}`) });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -330,6 +336,38 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await expect(shown(page).locator('[data-testid=cash-register-new-session]')).not.toHaveAttribute('aria-disabled', 'true');
   // The owner's session, with the assistant docked, for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`).
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+});
+
+test('BASE-F97 — in Spanish, the close card writes the difference over with its «+», as «Cash register» does', async ({ browser }) => {
+  const { context, page } = await owner(browser);
+  // In Spanish (the Hub's language cookie, as the sign-in sets it).
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const shift = await shiftWithACashSale(context, 10000);
+  const expected = 10000 + 1210;
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${A}/cash_register/sessions`);
+  await openPanel(page);
+  await ask(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados');
+  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  const willHappen = [
+    `Sesión: ${shift.number}`,
+    `Cajón: ${DRAWER}`,
+    `Esperado en el cajón: ${cardMoney(expected, 'es')}`,
+    `Diferencia: +${cardMoney(25000 - expected, 'es')}`,
+  ];
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toBeVisible();
+    await expect(previewBlock(page)).toContainText('Lo que va a pasar');
+    await expect(previewBlock(page).locator('li')).toHaveText(willHappen);
+    expect(await previewBlock(page).evaluate((el) => el.scrollWidth <= el.clientWidth), `${SIGN_KEY}-es-${vp.label} overflows`).toBe(true);
+    await untilStill(page);
+    await page.screenshot({ path: shot(`${SIGN_KEY}-es-${vp.label}`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  expect((await detailOf(context, shift.id)).status).toBe('open');
+  await context.close();
 });
 
 test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close gets the summary without the expected nor the difference, and the model never gets them', async ({ browser }) => {

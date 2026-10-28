@@ -122,16 +122,18 @@ describe('AssistantConfirm', () => {
       preview: [
         { name: 'number', label: 'Número', kind: 'text', value: 'S-261028-0001' },
         { name: 'expected_balance', label: 'Efectivo esperado', kind: 'money', value: 23000 },
-        { name: 'difference', label: 'Diferencia', kind: 'money', value: 2000 },
+        { name: 'difference', label: 'Diferencia', kind: 'money', value: 2000, signed: true },
       ],
     };
     const { dialog } = await card(close);
     const preview = document.querySelector<HTMLElement>('[data-testid="assistant-confirm-preview"]');
     expect(preview?.textContent).toContain('Lo que va a pasar');
+    // The difference with its sign, as Cash register writes it: over at a glance
+    // (FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN); the expected cash, without.
     expect([...preview!.querySelectorAll('li')].map((item) => item.textContent?.trim())).toEqual([
       'Número: S-261028-0001',
       'Efectivo esperado: 230,00\u00a0€',
-      'Diferencia: 20,00\u00a0€',
+      'Diferencia: +20,00\u00a0€',
     ]);
     expect(dialog.props('consequences')).toEqual(['Efectivo contado: 250,00\u00a0€']);
     expect(dialog.props('requireText')).toBe('CONFIRMAR');
@@ -144,6 +146,7 @@ describe('AssistantConfirm', () => {
     const english = document.querySelector<HTMLElement>('[data-testid="assistant-confirm-preview"]')?.textContent ?? '';
     expect(english).toContain('What will happen');
     expect(english).toContain('$230.00');
+    expect(english).toContain('Diferencia: +$20.00');
   });
 
   it('a card whose app declares no preview shows none', async () => {

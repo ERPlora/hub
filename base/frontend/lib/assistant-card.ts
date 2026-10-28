@@ -1,7 +1,8 @@
 // The card of a write the assistant wants to run (BASE-G115, G116), as the server describes it (`base.assistant.turn`'s
 // `confirm`, base/assistant.py `card`): its action by its verb and its app by its name, never the operation's id; each
-// datum in words — an amount the schema says is in cents, in the business's currency (gh:hub#1045), a yes or no, a
-// dash for nothing, a list by how many. A normal write is one line; a dangerous one, every datum and what to type.
+// datum in words — an amount the schema says is in cents, in the business's currency (gh:hub#1045) and, when it says
+// it is signed (a difference), with its sign as Cash register writes it, a yes or no, a dash for nothing, a list by how
+// many. A normal write is one line; a dangerous one, every datum and what to type.
 import en from '../locale/en.json';
 import { formatValue, type Money } from './home';
 
@@ -10,6 +11,8 @@ export interface AssistantField {
   label: string;
   kind: 'text' | 'money' | 'bool' | 'list' | 'object' | 'empty';
   value: unknown;
+  /** An amount its app declares signed (Cash register's difference): «+» over, «-» short, none at zero. */
+  signed?: boolean;
 }
 
 export interface AssistantCard {
@@ -71,8 +74,10 @@ export function fieldText(field: AssistantField, format: CardFormat): string {
   switch (field.kind) {
     case 'empty':
       return '—';
-    case 'money':
-      return formatValue(field.value, 'currency', format.locale, format.money);
+    case 'money': {
+      const text = formatValue(field.value, 'currency', format.locale, format.money);
+      return field.signed && Number(field.value) > 0 ? `+${text}` : text;
+    }
     case 'bool':
       return format.t(field.value ? 'base.assistant.card.yes' : 'base.assistant.card.no');
     case 'list':
