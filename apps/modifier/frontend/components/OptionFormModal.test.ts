@@ -1,13 +1,14 @@
-// MODIFIER-F04: «Add option» asks for Name, «Kitchen ticket name», «Supplement (€)» (negative is a
-// discount; empty or 0, free), «Own tax category» (searched in Taxes; empty = the dish's), «Chosen by
+// MODIFIER-F04: «Add option» asks for Name, «Kitchen ticket name», «Supplement (PLN)» (in the business's
+// currency, its country's: the code says which; negative is a discount; empty or 0, free), «Own tax category» (searched in Taxes; empty = the dish's), «Chosen by
 // default» and Order, with «Create»; Edit opens «Editing option — {name}» with «Save», which sends only
 // what changed (an emptied tax category gives the dish's back). A supplement that is not an amount is
 // never sent; the server's refusals go under their field.
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { Business } from '../../../../base/frontend/operations';
 import type { GroupOut, OptionOut } from '../operations';
-import { click, ionChecked, ionValue, mountModifier, settle } from '../__tests__/mount-modifier';
+import { business, click, ionChecked, ionValue, JAPANESE, mountModifier, POLISH, settle } from '../__tests__/mount-modifier';
 import OptionFormModal from './OptionFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -33,9 +34,14 @@ const SODA: OptionOut = {
   updated_at: '2026-10-15T10:00:00Z',
 };
 
-async function setup(option: OptionOut | null = null, locale: 'en' | 'es' = 'en') {
+/** The form, opened; with `owner`, once the business (`base.business.get`) has answered. */
+async function setup(option: OptionOut | null = null, locale: 'en' | 'es' = 'en', owner?: Business) {
   const m = await mountModifier(OptionFormModal, { props: { open: false, group: DRINKS, option }, locale });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
+  if (owner) {
+    await m.live();
+    await m.result('base.business.get', owner);
+  }
   await m.wrapper.setProps({ open: true });
   await settle();
   const field = (name: string) => m.inDoc(`modifier-option-form-${name}`) as Control;
@@ -51,7 +57,7 @@ describe('OptionFormModal: New option', () => {
     expect(['name', 'kitchen_name', 'price_delta', 'sort_order'].map((name) => s.field(name).label)).toEqual([
       'Name',
       'Kitchen ticket name',
-      'Supplement (€)',
+      'Supplement',
       'Order',
     ]);
     expect(s.field('price_delta').helperText).toBe('Negative is a discount; empty or 0, free.');
@@ -120,6 +126,36 @@ describe('OptionFormModal: New option', () => {
     await ionChecked(s.field('is_default'), true);
     await click(s.save());
     expect(s.inDoc('modifier-option-form-is_default-error')?.textContent).toContain(message);
+  });
+});
+
+describe('OptionFormModal: in the business’s currency', () => {
+  it('in Poland the supplement is in złoty: the field says PLN, «2,50 zł» is 250 grosze and a euro amount is never sent', async () => {
+    const s = await setup(null, 'en', business(POLISH));
+    expect(s.field('price_delta').label).toBe('Supplement (PLN)');
+    s.answer(201, SODA);
+    await ionValue(s.field('name'), 'Cheese', 'ionInput');
+    await ionValue(s.field('price_delta'), '2,50 €', 'ionInput');
+    await click(s.save());
+    expect(s.sent()).toEqual([]);
+    expect(s.field('price_delta').errorText).toBe('This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.');
+    await ionValue(s.field('price_delta'), '+2,50 zł', 'ionInput');
+    await click(s.save());
+    expect((s.sent()[0].body as Record<string, unknown>).price_delta).toBe(250);
+  });
+
+  it('in Spain the field says EUR', async () => {
+    const s = await setup(null, 'es', business());
+    expect(s.field('price_delta').label).toBe('Suplemento (EUR)');
+  });
+
+  it('in yen, without minor units: 150 yen reads «150» and «200» sends 200', async () => {
+    const s = await setup({ ...SODA, price_delta: 150 }, 'es', business(JAPANESE));
+    expect(s.field('price_delta').value).toBe('150');
+    s.answer(200, { ...SODA, price_delta: 200 });
+    await ionValue(s.field('price_delta'), '200', 'ionInput');
+    await click(s.save());
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/modifier/options/update', query: {}, body: { id: 'o1', price_delta: 200 } }]);
   });
 });
 

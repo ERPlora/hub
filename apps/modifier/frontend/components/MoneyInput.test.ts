@@ -1,6 +1,7 @@
 // The supplement field of the option form (MODIFIER-F04): an outlined md text field with the decimal
-// keyboard. It accepts «1,50», «-0,50», «1.234,56» or what is pasted from the screen («+1,00 €») and, on
-// leaving it, rewrites a readable amount in the page format. What is not an amount says so under the
+// keyboard. It accepts «1,50», «-0,50», «1.234,56» or what is pasted from the screen («+1,00 zł»), in the
+// business's currency and with its decimals, and, on leaving it, rewrites a readable amount in the page
+// format. What is not an amount says so under the
 // field (or both readings of «1.250»), after the person leaves it or tries to save; the server's message
 // for the field wins.
 import { IonInput } from '@ionic/vue';
@@ -73,6 +74,32 @@ describe('MoneyInput', () => {
     expect(s.errorText()).toBe(
       `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en')} or ${formatMoney(125, 'en')}. Write the decimals so there is no doubt.`,
     );
+  });
+
+  it('reads and rewrites in the business’s currency: «+1,00 zł» in Poland, both readings in złoty', async () => {
+    const pln = { currency: 'PLN', decimals: 2 };
+    const s = await setup({ money: pln }, 'es');
+    await s.input().setValue('+1,00 zł');
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['1,00', undefined]);
+    await s.input().setValue('1.250');
+    await s.blur();
+    expect(s.errorText()?.replace(/\s/g, ' ')).toBe(
+      'Este importe se puede leer de dos maneras: «1.250» tanto puede ser 1250,00 zł como 1,25 zł. Escribe los decimales para que no haya duda.',
+    );
+    await s.input().setValue('1,00 €');
+    await s.blur();
+    expect(s.errorText()).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 1,50, o -0,50 para descontar.');
+  });
+
+  it('with the decimals of the business’s currency: in yen «1,5» is not an amount and «150» stays 150', async () => {
+    const s = await setup({ money: { currency: 'JPY', decimals: 0 } }, 'es');
+    await s.input().setValue('1,5');
+    await s.blur();
+    expect(s.errorText()).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 1,50, o -0,50 para descontar.');
+    await s.input().setValue('150 ¥');
+    await s.blur();
+    expect([s.model.value, s.errorText() || 'no message']).toEqual(['150', 'no message']);
   });
 
   it("the server's message for the field wins", async () => {
