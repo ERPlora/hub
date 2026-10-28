@@ -1,7 +1,7 @@
 # Workbook — Automatizaciones (app)
 Prefijo: FLOW
 Alcance MVP: transversal (peluquería y restaurante: reglas «cuando pase esto, haz aquello»)
-Estado de la app: hecha (servidor, motor y páginas); el paso de pedírselo al asistente espera a que exista (FLOW-F37 a F39)
+Estado de la app: hecha (servidor, motor y páginas)
 
 > Manual de usuario y especificación de la app `flow`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -29,11 +29,11 @@ en su fecha (FLOW-F21, F22), y también con **Ejecutar ahora**.
 Solo la usan el **propietario** y el **administrador**: una automatización actúa en nombre del negocio
 sin nadie delante. El responsable y el empleado no la ven.
 
-Cuando el Hub tenga su asistente (hoy no lo tiene: FLOW-F17), la usará por voz o por texto con la
-sesión de quien habla: «crea un flujo que al completar una venta de más de 100 € me cree una tarea» (lo
-deja como **borrador**, apagado, para que lo revises), «activa la automatización de bienvenida», «pausa
-la de la caja», «¿qué automatizaciones tengo?», «ejecuta ahora la revisión semanal», «¿por qué falló la
-de bienvenida?».
+Con el asistente del Hub se usa por voz o por texto, con la sesión de quien habla: «crea un flujo que al
+completar una venta de más de 100 € me cree una tarea» (lo deja como **borrador**, apagado, para que lo revises,
+FLOW-F17), «activa la automatización de bienvenida», «pausa la de la caja», «¿qué automatizaciones tengo?»,
+«ejecuta ahora la revisión semanal», «¿por qué falló la de bienvenida?». Y una automatización también le puede
+encargar un paso al asistente, sin nadie delante: **Pedírselo al asistente** (FLOW-F37 a F39).
 
 ## Referencia adoptada
 
@@ -132,7 +132,7 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
   despliegan al tocarlas; dentro, **Más opciones**: «Solo si…» y «Si falla, sigue», FLOW-F25), y los
   botones para añadir: **Hacer algo**, **Consultar algo**, **Solo sigue
   si…**, **Esperar**, **Enviar un mensaje** (FLOW-F31, con la Bandeja de WhatsApp), **Llamar a otro sistema**
-  (FLOW-F27) y **Preguntar antes a alguien** (FLOW-F28). Sin pasos: «Todavía no hay pasos. Añade lo primero que debe hacer esta
+  (FLOW-F27), **Preguntar antes a alguien** (FLOW-F28) y **Pedírselo al asistente** (FLOW-F37). Sin pasos: «Todavía no hay pasos. Añade lo primero que debe hacer esta
   automatización.»
 - **Probar**: lo que haría con lo último que pasó, sin hacer nada (FLOW-F13).
 - **Permisos**: «Una automatización se ejecuta con sus propios permisos, nunca con los tuyos. Nada de
@@ -179,7 +179,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F14 | Guardar y encender desde el editor | hecho |
 | FLOW-F15 | Ejecutar a mano | hecho |
 | FLOW-F16 | Ver qué hizo y por qué falló | hecho |
-| FLOW-F17 | Pedirle al asistente una automatización | parcial |
+| FLOW-F17 | Pedirle al asistente una automatización | hecho |
 | FLOW-F18 | Revisar un borrador del asistente y crearlo | hecho |
 | FLOW-F19 | Descartar un borrador del asistente | hecho |
 | FLOW-F20 | Otra app pregunta si una automatización ya está montada | hecho |
@@ -199,9 +199,9 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F34 | Poner en pausa una automatización que trae otra app, sin borrarla | hecho |
 | FLOW-F35 | Restaurar la versión de fábrica de una automatización que trae otra app | hecho |
 | FLOW-F36 | Reparar una automatización montada con un fallo que su app ya corrigió | hecho |
-| FLOW-F37 | Paso «Pedírselo al asistente» | parcial |
-| FLOW-F38 | El asistente hace el paso que le toca dentro de una automatización | parcial |
-| FLOW-F39 | El SaaS atiende el paso de IA de una automatización | parcial |
+| FLOW-F37 | Paso «Pedírselo al asistente» | hecho |
+| FLOW-F38 | El asistente hace el paso que le toca dentro de una automatización | hecho |
+| FLOW-F39 | El SaaS atiende el paso de IA de una automatización | hecho |
 
 ### FLOW-F01 Entrar en Automatizaciones
 <!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f01 -->
@@ -347,8 +347,8 @@ Pantalla: Guía
 Pasos:
 1. En la galería, pulsa **¿Cómo funciona esto?**.
 2. Lee los cinco apartados. «Lo que todavía no puede hacer» dice lo que de verdad falta: bifurcaciones,
-   contar hacia atrás desde una fecha del aviso, pedírselo al asistente, que los mensajes a un cliente salen
-   solo por WhatsApp (no por correo), y que el asistente solo escribe borradores.
+   contar hacia atrás desde una fecha del aviso, que los mensajes a un cliente salen solo por WhatsApp (no por
+   correo), y que el asistente solo escribe borradores.
 3. **Volver a las automatizaciones** regresa.
 Entra: nada; los textos van dentro de la app.
 Sale: nada guardado.
@@ -541,21 +541,23 @@ Implicados: FLOW-F13, FLOW-F15, FLOW-F21, FLOW-F22, FLOW-F23
 
 ### FLOW-F17 Pedirle al asistente una automatización
 <!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f26 -->
-Estado: parcial — el borrador, su forma y su bandeja están hechos y probados (FLOW-F18, FLOW-F19), pero el
-Hub todavía no tiene asistente: hoy nadie puede pedirlo hablando ni escribiendo.
+Estado: hecho
 Actor: propietario, administrador, asistente
 Pantalla: asistente
 Pasos:
-1. Pides al asistente algo que pase solo («crea un flujo que al completar una venta de más de 100 € me
-   cree una tarea»).
+1. Abre el asistente del Hub y pídele algo que pase solo, hablando o escribiendo («crea un flujo que al completar
+   una venta de más de 100 € me cree una tarea»).
 2. El asistente escribe un **borrador**: nombre, cuándo arranca, de uno a ocho pasos de «hacer algo»,
-   «solo sigue si» o «esperar», y las notas de lo que no supo decidir.
-3. Te dice que lo ha dejado esperando en Automatizaciones y repite sus dudas.
+   «solo sigue si» o «esperar», y las notas de lo que no supo decidir. Antes de dejarlo te enseña su tarjeta y
+   espera tu sí, como cualquier cambio que te pide.
+3. Te dice que lo ha dejado esperando en Automatizaciones y repite sus dudas; lo revisas en **Propuestas por el
+   asistente** (FLOW-F18).
 Entra: lo que se pide, en palabras, y lo que pueden usar las automatizaciones del negocio.
 Sale: un borrador pendiente (`flow.draft.proposed`). **No** crea ninguna automatización, no concede
-permisos y no ejecuta nada.
+permisos y no ejecuta nada. Solo quien puede gestionar las automatizaciones (propietario y administrador) se lo
+puede pedir.
 Si falla: un borrador que no sigue la forma pedida, o con un paso que lee lo que no deja ningún paso
-anterior, se rechaza antes de guardarlo.
+anterior, se rechaza antes de guardarlo y el asistente lo dice.
 Implicados: FLOW-F18, FLOW-F19
 
 ### FLOW-F18 Revisar un borrador del asistente y crearlo
@@ -982,49 +984,85 @@ Implicados: FLOW-F33, FLOW-F35
 
 ### FLOW-F37 Paso «Pedírselo al asistente»
 <!-- origen: old-hub:HUB-F95 old:flows/workflow/editor.md#flows-f17 -->
-Estado: parcial — sin asistente en el Hub ni en el SaaS: la app del asistente del Hub y la pasarela de IA del SaaS que lo atendería todavía no existen; el paso no se ofrece en el editor hasta que existan
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
-1. Abre una automatización y mira los botones para añadir de **Pasos**.
-2. El paso **Pedírselo al asistente** todavía no aparece entre ellos: una automatización aún no puede
-   encargarle nada al asistente.
-Entra: —
-Sale: nada todavía. Cuando exista, el paso le encargará algo al asistente con los datos de la automatización,
-solo con las consultas y acciones que la automatización tenga concedidas y el paso nombre, con «Que me lo
-pregunte» (lo que quiera cambiar espera en **Esperan tu respuesta**) o «Que lo haga por su cuenta», y un tope de
-vueltas.
-Si falla: no aplica mientras el paso no se ofrezca; una automatización que lo nombre se rechaza al guardar.
-Implicados: FLOW-F11, FLOW-F17, FLOW-F29, FLOW-F38, FLOW-F39
+1. En **Pasos**, pulsa **Pedírselo al asistente**. Se abre su tarjeta.
+2. En **Qué le pides**, escribe el encargo («Busca un hueco libre mañana para» y, con **Insertar un dato**, el
+   «Nombre del cliente» del aviso). Los datos que insertas, del aviso o de los pasos anteriores, se rellenan en el
+   momento de pedírselo.
+3. En **Qué puede usar**, elige con **Añadir una consulta o una acción** lo que el asistente podrá consultar o
+   hacer (solo salen las que el asistente sabe usar); × quita una. Sin ninguna, solo puede contestar con
+   palabras: «Nada todavía: solo puede contestar con palabras.».
+4. En **Cambios**, elige «Que me lo pregunte» (de fábrica) o «Que lo haga por su cuenta». La tarjeta lo explica:
+   «Lo que quiera cambiar espera un sí en Automatizaciones, en «Esperan tu respuesta». Lo que solo consulta nunca
+   espera.» o «Hace los cambios por su cuenta, como esta automatización, con los permisos que le has dado.».
+5. Ajusta **Vueltas como mucho** (de 1 a 10; de fábrica, 6) y, si quieres, **Más opciones** (FLOW-F25).
+6. Pulsa **Guardar** y, en **Permisos**, concede cada consulta o acción que puede usar (FLOW-F12).
+Entra: el encargo, lo que puede usar, cómo hace los cambios y las vueltas.
+Sale: el paso. Los pasos de después pueden insertar «Texto», lo que ha contestado, y, si un cambio esperó tu
+respuesta, «Aprobada», «Nota» y «Contestada por». **Probar** dice «Se lo pediría al asistente: …» con el encargo
+rellenado, sin pedírselo. Cada consulta o acción que nombra pasa a pedir su permiso.
+Si falla: un encargo vacío, más de 10 vueltas, o un encargo con un secreto no se guardan; tampoco algo que el
+negocio no tiene, que necesita a una persona delante o que el asistente no puede usar («El asistente no puede
+usar «…».»), junto a **Qué puede usar**.
+Implicados: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 El asistente hace el paso que le toca dentro de una automatización
 <!-- origen: old-hub:HUB-F279 -->
-Estado: parcial — sin asistente en el Hub ni en el SaaS: la app del asistente del Hub y la pasarela de IA del SaaS que lo atendería todavía no existen; sin el paso (FLOW-F37) no hay nada que hacer
+Estado: hecho
 Actor: la plataforma, asistente
-Pantalla: ninguna (se vería en Historial)
+Pantalla: ninguna (se ve en Historial)
 Pasos:
-1. Una ejecución llega a un paso **Pedírselo al asistente** (FLOW-F37), que hoy no se puede añadir.
-2. Por eso ninguna ejecución le pide nada al asistente.
-Entra: —
-Sale: nada todavía. Cuando exista, el asistente atenderá el paso sin nadie delante y fuera de la petición que lo
-arrancó, con solo las herramientas que la automatización tiene concedidas y el paso nombra; lo que cambie algo,
-con «Que me lo pregunte», quedará esperando una respuesta.
-Si falla: no aplica mientras el paso no se ofrezca.
-Implicados: FLOW-F37, FLOW-F39
+1. Una ejecución llega a un paso **Pedírselo al asistente**. **Ejecutar ahora** responde al momento: «Se ha
+   ejecutado y el asistente está en ello: míralo en Historial.»; el historial dice «Se lo ha pedido al
+   asistente; contesta en un momento.».
+2. El Hub se lo pide al asistente por detrás, sin nadie delante, con el encargo ya rellenado y solo lo que el paso
+   nombra **y** la automatización tiene concedido; nunca con los permisos de una persona.
+3. Lo que el asistente consulta se hace en el acto y no se le pregunta a nadie; el historial dice «El asistente
+   ha usado «…».».
+4. Lo que quiere cambiar:
+   - con «Que me lo pregunte», no se hace: espera en **Esperan tu respuesta** como «El asistente quiere cambiar
+     algo en «…»», con los datos que mandaría, y la ejecución se para ahí («El asistente quiere «…»: espera un
+     sí hasta el ….»). Un sí lo hace en ese momento, como la automatización, y la ejecución sigue; un no, o nadie
+     contesta en 72 horas, la cancela sin hacer nada (FLOW-F29, F30);
+   - con «Que lo haga por su cuenta», se hace en el acto, como la automatización, con las mismas comprobaciones
+     que su botón en la pantalla.
+5. Cuando contesta, el historial dice «El asistente ha contestado: «…»» y la ejecución sigue con los pasos de
+   después.
+Entra: el encargo, lo que el paso nombra y la automatización tiene concedido, y los datos de la ejecución.
+Sale: lo que contestó, para los pasos de después y en el historial; con «Que me lo pregunte», además, la
+respuesta de la persona. Lo que consulta o cambia avisa como si lo hiciera la automatización.
+Si falla: lo que no le has concedido no se le ofrece y, si lo pide, no se hace; lo que la acción rechaza
+(«El asistente ha intentado «…», que no lo ha aceptado.») se lo dice al asistente para que lo cuente. Si llega
+al tope de vueltas sin terminar, se para: «El asistente ha usado sus … vueltas sin terminar, así que ha parado.».
+Si erplora.com no contesta o falla, lo intenta tres veces en total (al segundo y a los tres segundos) sin
+repetir nada del negocio y, si sigue igual, se para con el motivo («El asistente no ha podido contestar ahora…»,
+«No ha podido llegar al asistente de erplora.com…»); los mensajes del mes acabados, o un negocio que no
+funciona, no se reintentan («Los mensajes del asistente de este mes se han acabado…»). Todas se pueden reanudar
+(FLOW-F24) o seguir con «Si falla, sigue» (FLOW-F25). Si el proceso se cae mientras piensa, se lo vuelve a pedir a
+los 5 minutos, desde lo que ya había hecho. Si alguien dice que sí cuando la acción ya no está concedida, no se
+hace: ««…» ya no está permitida o disponible, así que el cambio del asistente no se ha hecho.».
+Implicados: FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F29, FLOW-F30, FLOW-F37, FLOW-F39
 
 ### FLOW-F39 El SaaS atiende el paso de IA de una automatización
 <!-- origen: old-saas:SAAS_ASSISTANT-F04 -->
-Estado: parcial — sin asistente en el Hub ni en el SaaS: la app del asistente del Hub y la pasarela de IA del SaaS que lo atendería todavía no existen; es la otra mitad de FLOW-F38, que vive en el SaaS
+Estado: hecho
 Actor: la plataforma
 Pantalla: ninguna
 Pasos:
-1. Una ejecución que llega a **Pedírselo al asistente** llamaría a la pasarela de IA del SaaS con la llave del
-   negocio, sin persona delante.
-2. Esa pasarela todavía no existe, así que ninguna ejecución la llama.
-Entra: —
-Sale: nada todavía. Cuando exista, la llamada pasará por el mismo cupo mensual de mensajes del asistente que el
-chat (la primera vuelta de cada paso cuenta un mensaje) y dirá si un fallo se puede reintentar.
-Si falla: no aplica mientras no exista.
+1. Cada vez que el paso necesita al asistente, el Hub llama a erplora.com con la llave del negocio, sin persona
+   delante, igual que un turno del chat que no se pinta (en erplora.com, ASSISTANT-F13): no hay una puerta aparte.
+2. erplora.com gasta los mismos mensajes del mes que el chat: la primera vuelta de cada paso, uno; las vueltas que
+   le devuelven lo que consultó o hizo, ninguno.
+3. Contesta lo que dice el asistente y lo que quiere consultar o hacer, y no guarda nada de la conversación.
+Entra: el encargo, lo que el paso puede usar y, en las vueltas siguientes, lo ya hablado.
+Sale: la respuesta para el Hub y el gasto del mes del negocio (`assistant.message.claimed`, del lado de
+erplora.com).
+Si falla: dice si vale la pena repetir: el proveedor caído o un fallo interno, sí; los mensajes del mes acabados,
+un negocio que no funciona o una petición que no cuadra, no. Las automatizaciones y el chat comparten el mismo
+cupo del mes.
 Implicados: FLOW-F37, FLOW-F38
 
 ## Servicios: lo que entra y lo que sale
@@ -1355,7 +1393,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | paso `message` del motor (Email o WhatsApp) | paso «Enviar un mensaje»: la acción `whatsapp_inbox.message.notify` | solo WhatsApp (el Hub no manda correos a clientes) y solo a la conversación que ya existe con el número exacto |
 | paso `http` del motor | paso «Llamar a otro sistema» (`flow.run.claim_call`, `flow.run.record_call`) | la llamada la hace el worker tras guardar la ejecución, nunca la petición, con su clave de no repetición |
 | `…/approvals` (preguntas) | `flow.question.list`, `flow.question.answer`, `flow.question.expire_due` | el rol al que se pregunta sí decide quién contesta |
-| `…/approvals` (propuestas del asistente), `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
+| `…/approvals` (propuestas del asistente) | «Esperan tu respuesta» (FLOW-F38) | los cambios que el asistente quiere hacer esperan con las preguntas |
+| `…/events/dead*` | — | fuera (ver «Qué queda fuera») |
 | `POST /api/hub/flows/templates/{module}/{family}/activate` | `flow.recipe.enable` | se enciende desde la galería; crear, conceder y encender son una transacción y dos a la vez dan una |
 | `…/templates/{module}/{family}/deactivate` | `flow.recipe.disable` | — |
 | `…/templates/{module}/{family}/restore` | `flow.recipe.restore` | — |
@@ -1380,9 +1419,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | Producto actual | Aquí | Motivo si cambia |
 |---|---|---|
 | Automatizaciones (lista, borradores, galería) | `/flow/automations` | la lista es la `DataTable` del Hub (mismos controles: buscador, filtros, orden, casillas, interruptor, copiar, borrar) |
-| Editor (Pasos, Probar, Permisos, Historial) | `/flow/automations/:id` y `/new` | la misma columna; los pasos de mensaje y de asistente, fuera |
+| Editor (Pasos, Probar, Permisos, Historial) | `/flow/automations/:id` y `/new` | la misma columna, con los pasos de mensaje (FLOW-F31) y de asistente (FLOW-F37) |
 | Guía | `/flow/guide` | — |
-| Bandeja «Esperan tu respuesta» | «Esperan tu respuesta», arriba de `/flow/automations` | solo preguntas: las propuestas del asistente llegan con él |
+| Bandeja «Esperan tu respuesta» | «Esperan tu respuesta», arriba de `/flow/automations` | las preguntas y los cambios que el asistente quiere hacer (FLOW-F38) |
 | Bandeja «Necesita tu atención» (eventos caídos) | — | fuera: es la administración del outbox, de la plataforma |
 
 ## Contradicciones señaladas (no resueltas aquí)
@@ -1401,14 +1440,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Mandar un correo a un cliente desde una automatización** (FLOW-F31 lo manda por WhatsApp): el Hub todavía
   no manda correos a clientes. Y la cabecera con foto, vídeo o PDF de un WhatsApp (FLOW-F32, parcial): falta un
   sitio donde guardar los archivos.
-- **Paso «Pedírselo al asistente»** (FLOW-F37 a F39, parciales) y las propuestas del asistente en **Esperan tu
-  respuesta**: dependen de la app del asistente del Hub y de la pasarela de IA del SaaS, que todavía no existen
-  (PLAN-HUB §8, ronda 2026-10-15b).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
   intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
-- **El resto de recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp, que necesitan el asistente,
-  y el aviso de mesa confirmada, que espera a que Reservas diga el día en palabras) y su reparación concreta: las
+- **El resto de recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp, que ya pueden usar el paso
+  «Pedírselo al asistente», FLOW-F37, y el aviso de mesa confirmada, que espera a que Reservas diga el día en palabras) y su reparación concreta: las
   declara esa app en su `recipes.py` sobre este registro; la del aviso de cita confirmada ya está
   (WHATSAPP_INBOX-F23). La tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
 - **Encender una receta desde la pantalla de su propia app** (el Hub viejo lo hacía desde la de WhatsApp): hoy
