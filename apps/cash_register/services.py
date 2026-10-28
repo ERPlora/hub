@@ -420,6 +420,12 @@ def _open_for_writing(session_id, number) -> Session:
         "Read cash_register.session.closing_summary first with the same count, tell the person its summary, then close "
         "naming the session by the number it gave.",
         "risk": "high",
+        # Its card shows what closing gives, not only the session and the count it sends; a blind count's expected
+        # stays hidden from whoever may not see it (FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW, BASE-F98).
+        "preview": {
+            "operation": "cash_register.session.closing_summary",
+            "fields": ["number", "register_name", "expected_balance", "difference"],
+        },
     },
 )
 def close_session(ctx: OperationContext, data: SessionCloseIn) -> dict:
