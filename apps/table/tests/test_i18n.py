@@ -141,6 +141,19 @@ def test_the_compiled_catalog_is_current():
     assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
 
 
+def test_the_card_says_each_title_with_tables_own_spanish():
+    """A title table shares with an app installed before it («Into check», «Lines to move» with Sales) is said with
+    that app's Spanish, so table's own entry would be dead text: they have to say the same."""
+    with (LOCALE / "django.mo").open("rb") as compiled:
+        own = gettext.GNUTranslations(compiled)
+    titles = schema_titles()
+    assert {"Into check", "Lines to move"} <= titles
+    with translation.override("es"):
+        assert {title: translation.gettext(title) for title in titles} == {
+            title: own.gettext(title) for title in titles
+        }
+
+
 def test_spanish_texts_of_the_workbook():
     with translation.override("es"):
         config = apps.get_app_config("table")
