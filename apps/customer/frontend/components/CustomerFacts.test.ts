@@ -1,11 +1,12 @@
 // The card's data (CUSTOMER-F03): Email, Phone, Tax ID, Company, Address, Stage, Source, Preferred
 // channel, Purchases, Spent, Last purchase and Active, as the product showed them; and also the
 // birthday, anniversary, internal notes and custom fields, which the product only showed when editing.
+// «Spent» in the business's currency (customer-business-currency).
 import { formatDateTime } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import { DETAIL } from '../__tests__/fixtures';
-import { mountCustomer } from '../__tests__/mount-customer';
+import { business, JAPANESE, mountCustomer, POLISH } from '../__tests__/mount-customer';
 import { formatMoney } from '../lib/money';
 import type { CustomerDetailOut } from '../operations';
 import CustomerFacts from './CustomerFacts.vue';
@@ -16,6 +17,27 @@ async function setup(detail: CustomerDetailOut = DETAIL, locale: 'en' | 'es' = '
     m.wrapper.findAll('[data-testid="customer-facts"] .customer-facts__item').map((item) => [item.find('dt').text(), item.find('dd').text()]);
   return { ...m, facts };
 }
+
+describe('CustomerFacts: «Spent» in the business\'s currency (customer-business-currency)', () => {
+  const spent = (s: Awaited<ReturnType<typeof setup>>) =>
+    Object.fromEntries(s.facts())[s.wrapper.vm.$t('customer.detail.facts.spent')].replace(/\s/g, ' ');
+
+  it('in Poland in złoty, in Japan in yen without decimals, never in euros', async () => {
+    const pl = await setup(DETAIL, 'es');
+    await pl.result(await pl.live(), 'base.business.get', business(POLISH));
+    expect(spent(pl)).toBe('45,50 zł');
+
+    const jp = await setup();
+    await jp.result(await jp.live(), 'base.business.get', business(JAPANESE));
+    expect(spent(jp)).toBe('¥4,550');
+  });
+
+  it('a figure without a symbol until the business answers', async () => {
+    const s = await setup();
+    await s.live();
+    expect(spent(s)).toBe('45.50');
+  });
+});
 
 describe('CustomerFacts', () => {
   it('shows the card\'s data in the product order, and what was hidden before', async () => {

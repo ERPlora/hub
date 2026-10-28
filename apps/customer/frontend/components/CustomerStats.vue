@@ -1,16 +1,17 @@
 <script setup lang="ts">
 // The four figures above the customer list (WORKBOOK «Pantallas · Clientes»): Customers, Active,
-// VIP and Revenue, followed live from `customer.customer.stats`; a write anywhere re-runs it on the
-// server. The cards are the product's `ok-kpi` (label over a big value) rebuilt here until
+// VIP and Revenue (in the business's currency: customer-business-currency), followed live from
+// `customer.customer.stats`; a write anywhere re-runs it on the server. The cards are the product's `ok-kpi` (label over a big value) rebuilt here until
 // `@erplora/ui` has a KPI card (UI-REQUESTS.md).
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
-import { formatMoney } from '../lib/money';
+import { formatMoney, useBusinessMoney } from '../lib/money';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 
 const { locale } = useCustomerI18n();
 const { data, status } = useLive('customer.customer.stats', {});
+const money = useBusinessMoney();
 
 const loading = computed(() => data.value === undefined);
 
@@ -24,7 +25,7 @@ const figures = computed(() => {
       id: 'revenue',
       label: 'customer.stats.revenue',
       raw: stats?.total_revenue,
-      text: stats ? formatMoney(stats.total_revenue, locale.value) : '…',
+      text: stats ? formatMoney(stats.total_revenue, locale.value, money.value) : '…',
     },
   ];
 });

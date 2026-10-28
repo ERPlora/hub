@@ -2,7 +2,8 @@
 // «Add note» and «Activity» of a card (CUSTOMER-F05, F03), the product's chatter: the note goes in
 // with «Add» and comes back at the top of the activity by itself (`customer.activity.list` is live
 // and re-runs on `customer.note.added`). The activity keeps keys, never sentences: the titles of the
-// app's own kinds are translated here; another app's entry shows its own title.
+// app's own kinds are translated here; another app's entry shows its own title. An amount is in the currency its
+// entry carries, one without, in the business's (customer-business-currency).
 import { formatDateTime } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -12,7 +13,7 @@ import { computed, ref, watch } from 'vue';
 import { refusalFields } from '../lib/apiErrors';
 import { windowsOf } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
-import { formatMoney } from '../lib/money';
+import { formatMoney, recordMoney, useBusinessMoney } from '../lib/money';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { ActivityRow } from '../operations';
 
@@ -31,6 +32,7 @@ const OWN_KINDS = new Set([
 ]);
 
 const { t, locale } = useCustomerI18n();
+const money = useBusinessMoney();
 
 // «Show more» grows what is shown by 50; the server is asked in windows of ≤ 100 (`useLiveList`).
 const limit = ref(STEP);
@@ -51,7 +53,8 @@ function title(row: ActivityRow): string {
 function detail(row: ActivityRow): string {
   if (row.text) return row.text;
   const amount = row.data.amount;
-  return typeof amount === 'number' ? formatMoney(amount, locale.value) : '';
+  if (typeof amount !== 'number') return '';
+  return formatMoney(amount, locale.value, recordMoney({ currency: row.data.currency, currency_decimals: row.currency_decimals }, money.value));
 }
 
 function when(row: ActivityRow): string {

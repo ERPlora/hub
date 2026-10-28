@@ -1,13 +1,15 @@
 <script setup lang="ts">
 // «Purchases» of a card (CUSTOMER-F23): each sale with its date, amount and status, newest first,
 // 50 at a time, filterable by status; live (`customer.purchase.list` re-runs when a sale is paid,
-// voided or refunded). A refund is a line of its own, its amount negative (F22). New on the card:
+// voided or refunded). A refund is a line of its own, its amount negative (F22). Each amount in the currency
+// its sale was paid in (a record is never rewritten), one without, in the business's (customer-business-currency).
+// New on the card:
 // the product only gave them through the assistant.
 import { formatDateTime, StatusPill } from '@erplora/ui/components';
 import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { formatMoney } from '../lib/money';
+import { formatMoney, recordMoney, useBusinessMoney } from '../lib/money';
 import { windowsOf } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
@@ -17,6 +19,7 @@ const props = defineProps<{ customerId: string }>();
 
 const STEP = 50;
 const { t, locale } = useCustomerI18n();
+const money = useBusinessMoney();
 
 type Status = PurchaseRow['status'];
 const STATUSES: Status[] = ['confirmed', 'voided', 'refunded'];
@@ -91,7 +94,7 @@ function filterBy(event: CustomEvent<{ value?: unknown }>): void {
         :data-status="row.status"
       >
         <span class="customer-purchases__date">{{ formatDateTime(row.recorded_at, locale) }}</span>
-        <span class="customer-purchases__amount">{{ formatMoney(row.amount, locale) }}</span>
+        <span class="customer-purchases__amount">{{ formatMoney(row.amount, locale, recordMoney(row, money)) }}</span>
         <StatusPill
           size="sm"
           :tone="LOOK[row.status].tone"
