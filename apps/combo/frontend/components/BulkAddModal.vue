@@ -9,10 +9,10 @@
 // of Inventory narrows the list to its products (all of them, the course takes 40 at most) and «Tick all
 // of “category” (N)» ticks the ones the course does not offer yet, in the list's order (combos#12: Square
 // and WooCommerce Composite add a whole category at once). Each product's price is in the business's currency.
-import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, InlineFeedback, syncSearchbarInputName } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonItem, IonList, IonNote, IonSearchbar } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, useBusinessMoney } from '../lib/format';
@@ -57,6 +57,11 @@ const searchCategory = searchCategories(client, (n) => t('combo.bulk.categoryCou
 const tickable = computed(() =>
   category.value ? articles.value.filter((a) => !already.value.has(a.id) && !picked.value.includes(a.id)) : [],
 );
+
+// The search box named by its hint, in the person's language: Ionic 8 names its input «search text», in
+// English. Again when the language changes and when the dialog, opened again, creates it again.
+const body = useTemplateRef<HTMLElement>('body');
+watch([body, locale], ([root]) => syncSearchbarInputName(root, () => t('combo.bulk.search')), { flush: 'post' });
 
 async function load(): Promise<void> {
   const text = query.value.trim();
@@ -138,7 +143,10 @@ async function save(): Promise<void> {
     :error="add.error.value"
     @submit="save"
   >
-    <div class="combo-bulk">
+    <div
+      ref="body"
+      class="combo-bulk"
+    >
       <ion-searchbar
         data-testid="combo-bulk-search"
         :value="query"

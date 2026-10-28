@@ -7,7 +7,9 @@
 // ordered to take away (split, the beer at retail.alcohol) and as a pack to take away; a product
 // deactivated in Inventory shows up live as «Deactivated in Inventory», and one deleted leaves every menu once
 // the worker's outbox relay hands Inventory's notice over (run here as a tick runs it); the menu is withdrawn after its
-// confirmation; a menu withdrawn from another tab while its builder is open says it no longer exists.
+// confirmation; a menu withdrawn from another tab while its builder is open says it no longer exists. In
+// Spanish, the search box of «Añadir varios» is named by its hint, never Ionic's English «search text»
+// (flow: combo-searchbar, FIX-HUB-COMBO-SEARCHBAR-NAMED-IN-ENGLISH).
 // Screenshots of the list, the form and the builder at three viewports, with nothing past the right edge. What it creates is named «E2E Combo …» / «E2E-CMB-…» and deleted before and after.
 import { spawnSync } from 'node:child_process';
 
@@ -463,6 +465,34 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   await page.locator('[data-testid=combo-menu-form-submit]').click();
   await expect(row).toContainText('Yes');
   expect(await offered()).toEqual([MENU]);
+});
+
+// flow: combo-searchbar — Ionic 8 names the field of an `ion-searchbar` «search text», in English, whatever its hint
+// says, so a screen reader read «search text» on the search of «Añadir varios» (COMBO-F06).
+test('combo-searchbar: in Spanish the search box of «Añadir varios» is named by its hint, never «search text»', async ({ page, context }) => {
+  await login(page, A, '/combo/menus');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.goto(`${A}/combo/menus/${await menuId(context)}`);
+  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  await expect(shown(page).locator('[data-testid=combo-builder-name]')).toHaveText(MENU);
+  const starters = await courseId(page, 'Starters');
+  const bulk = page.locator('ion-modal[data-testid=combo-bulk]:visible');
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await shown(page).locator(`[data-testid=combo-course-${starters}-bulk]`).click();
+    await expect(bulk).toBeVisible();
+    const search = page.locator('[data-testid=combo-bulk-search]');
+    await expect(search.locator('input')).toHaveAttribute('placeholder', 'Busca un producto…');
+    await expect(search.locator('input')).toHaveAttribute('aria-label', 'Busca un producto…');
+    await expect(bulk.getByRole('searchbox', { name: 'Busca un producto…', exact: true })).toBeVisible();
+    await expect(page.locator(`[data-testid=combo-bulk-item-${made.LEN}]`)).toContainText('Ya está en este plato');
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.screenshot({ path: shot(`FIX-HUB-COMBO-SEARCHBAR-NAMED-IN-ENGLISH-${viewport.label}`) });
+    await page.locator('[data-testid=combo-bulk-cancel]:visible').click();
+    await expect(bulk).toBeHidden();
+  }
+  await page.setViewportSize({ width: 1280, height: 860 });
 });
 
 test('COMBO-F07, F08, F09: the till sells it, priced with its supplements, eaten in or to take away', async ({ page, context }) => {

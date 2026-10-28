@@ -1,7 +1,8 @@
 // COMBO-F06 «Añadir varios»: a dialog with a search on the server, a box per active product of
 // Inventory and «Add N selected»; what the course already offers is ticked, greyed and says so. They go
 // in at once, in the order ticked and without supplement (`combo.option.bulk_create`). Nothing ticked
-// answers why instead of sending. Each product names its price in the business's currency.
+// answers why instead of sending. Each product names its price in the business's currency. Its search box
+// is named by its hint, in the person's language: Ionic 8 names the input «search text», in English.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +15,20 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
+
+/** What the shared `syncSearchbarInputName` was asked to name, written down at each call: the searchbar it
+ *  names (the first one under the root it gets) and the name it reads then. */
+const named = vi.hoisted(() => [] as { bar: Element | null; name: string }[]);
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: (root: ParentNode | null | undefined, name: () => string) => {
+    named.push({ bar: root?.querySelector('ion-searchbar') ?? null, name: name() });
+  },
+}));
+
+/** The names `bar` was given, in order (the one it reads now, last). */
+const namesGiven = (bar: Element | null): string[] =>
+  named.filter((entry) => bar !== null && entry.bar === bar).map((entry) => entry.name);
 
 const COURSE: GroupOut = {
   id: 'g1',
@@ -203,6 +218,27 @@ describe('BulkAddModal', () => {
     await ionValue(s.inDoc('combo-bulk-search'), 'zzz', 'ionInput');
     await settle();
     expect(s.inDoc('combo-bulk-empty')?.textContent).toContain('No products match.');
+  });
+
+  it('combo-searchbar: its search box is named by its hint in the person’s language, never Ionic’s English «search text»', async () => {
+    const s = await setup('es');
+    const bar = s.inDoc('combo-bulk-search');
+    expect(namesGiven(bar).at(-1)).toBe('Busca un producto…');
+    await s.setLocale('en');
+    expect(namesGiven(bar).at(-1)).toBe('Search a product…');
+  });
+
+  it('combo-searchbar: opened again, its new search box is named too', async () => {
+    const s = await setup('es');
+    const first = s.inDoc('combo-bulk-search');
+    await s.wrapper.setProps({ open: false });
+    await settle();
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    const bar = s.inDoc('combo-bulk-search');
+    expect(bar).not.toBeNull();
+    expect(bar).not.toBe(first);
+    expect(namesGiven(bar)).toEqual(['Busca un producto…']);
   });
 
   it('speaks Spanish', async () => {
