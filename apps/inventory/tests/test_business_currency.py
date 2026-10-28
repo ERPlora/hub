@@ -8,6 +8,7 @@ import io
 
 import pytest
 from django.utils import translation
+from live.context import Scope
 from live.operations import get
 
 from apps.inventory.models import Product
@@ -97,3 +98,45 @@ def test_the_label_takes_the_price_in_the_business_s_currency_with_its_decimals(
     out = run("inventory.product.print_label", {"id": str(created.id)})
     document = PrintJob.objects.get(pk=out.job_id).document
     assert (document["price"], document["decimals"]) == (1210.0, 0)
+
+
+#: ERPlora's own hub by its issuer's country: the price and cost its export writes and its import reads back (en,
+#: ungrouped), and the label's price with its decimals (the yen has none).
+ISSUER_COUNTRIES = {
+    "PL": (["PLN12.50", "PLN8.20"], (12.5, 2)),
+    "JP": (["¥1250", "¥820"], (1250.0, 0)),
+}
+
+
+@pytest.fixture(params=sorted(ISSUER_COUNTRIES))
+def erplora(request, settings):
+    """ERPlora's own hub with its issuer in the country of ``request.param``. Phase 1 gives it no business on
+    erplora.com (no registry row, create_platform_hub): its catalog is in the currency of its issuer's country, as its
+    sales, invoices and price lists are."""
+    settings.PLATFORM_HUB_SLUG = "erplora"
+    settings.PLATFORM_ISSUER_COUNTRY = request.param
+    amounts, label = ISSUER_COUNTRIES[request.param]
+    return ctx_for(scope=Scope("host", "erplora")), amounts, label
+
+
+def test_erploras_own_hub_imports_prices_and_costs_in_the_currency_of_its_issuer_s_country(erplora):
+    platform, (price, cost), _label = erplora
+    row = {"line": 2, "name": "Gambas", "sku": "GAM", "price": price, "cost": cost, "tax_category_key": TAX}
+    report = run("inventory.product.bulk_create", ProductImportIn(rows=[row]), platform)
+    assert (report.created, report.failed) == (1, 0), [row.reason for row in report.rows]
+    product = Product.objects.get(sku="GAM")
+    assert (product.price, product.cost) == (1250, 820)
+
+
+def test_erploras_own_hub_exports_in_the_currency_of_its_issuer_s_country(erplora, gambas):
+    platform, amounts, _label = erplora
+    assert exported("en", platform) == amounts
+
+
+def test_erploras_own_hub_labels_in_the_currency_of_its_issuer_s_country(erplora):
+    platform, _amounts, label = erplora
+    run("printing.printer.create", {"name": "Labels", "kind": "network", "address": "192.168.1.50", "usage": "label"}, platform)
+    created = run("inventory.product.create", {"name": "Gambas", "sku": "GAM", "price": 1250, "tax_category_key": TAX}, platform)
+    out = run("inventory.product.print_label", {"id": str(created.id)}, platform)
+    document = PrintJob.objects.get(pk=out.job_id).document
+    assert (document["price"], document["decimals"]) == label
