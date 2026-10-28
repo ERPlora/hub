@@ -79,3 +79,14 @@ def test_the_card_paints_a_members_hourly_rate_as_money():
         card = assistant.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "es")
         rate = next(field for field in card["fields"] if field["name"] == "hourly_rate")
         assert (name, rate["kind"], rate["value"]) == (name, "money", 1250)
+
+
+def test_the_card_names_the_hourly_rate_as_the_record_does_without_naming_cents():
+    """staff-business-currency: the card paints the rate as money in the business's currency, whose minor unit is
+    not always the cent (groszy in Poland, whole yen in Japan): its name is the record's, «Tarifa por hora», never
+    «Tarifa por hora (céntimos)» beside «12,50 zł»."""
+    for name in ("staff.member.create", "staff.member.update"):
+        spanish = assistant.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "es")
+        assert [f["label"] for f in spanish["fields"] if f["name"] == "hourly_rate"] == [SCREENS["members"]["form"]["hourlyRate"]]
+        english = assistant.card(get(name), {"first_name": "Ana", "hourly_rate": 1250}, "en")
+        assert [f["label"] for f in english["fields"] if f["name"] == "hourly_rate"] == ["Hourly rate"]
