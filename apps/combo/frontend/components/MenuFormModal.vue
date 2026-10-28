@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// COMBO-F02, F03: the old menu panel as a dialog. «New menu» asks for Name, Kitchen name, Closed price,
-// «How is it sold?» (both consequences always shown, the chosen one stressed: the merchant must not
+// COMBO-F02, F03: the old menu panel as a dialog. «New menu» asks for Name, Kitchen name, «Closed price
+// (PLN)» (in the business's currency, its country's, with its decimals; just «Closed price» until the business
+// answers), «How is it sold?» (both consequences always shown, the chosen one stressed: the merchant must not
 // discover it on an invoice), the VAT category (only eaten in; searched in Taxes), the order on the list
 // and «On sale». A menu eaten in without a VAT category, or an amount that is not one, is refused
 // before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field.
@@ -10,6 +11,7 @@ import { IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
+import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchTaxCategories } from '../lib/pickers';
 import type { ComboIn, ComboOut, ComboPatchIn, SupplyKind } from '../operations';
@@ -34,6 +36,7 @@ interface Form {
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
+const money = useBusinessMoney();
 const searchTax = computed(() => searchTaxCategories(client, locale.value));
 const creation = useCommand('combo.combo.create');
 const update = useCommand('combo.combo.update');
@@ -46,7 +49,7 @@ function fromCombo(current: ComboOut | null): Form {
   return {
     name: current.name,
     kitchenName: current.kitchen_name,
-    price: moneyFieldText(current.price, locale.value),
+    price: moneyFieldText(current.price, locale.value, money.value),
     supplyKind: current.supply_kind,
     tax: current.tax_category_key ? { id: current.tax_category_key, label: current.tax_category_name ?? current.tax_category_key } : null,
     order: String(current.sort_order),
@@ -68,6 +71,15 @@ watch(
   },
   { immediate: true },
 );
+
+// The business answers (or its currency changes) with the dialog open: a closed price the person has not touched
+// is rewritten from the menu with the currency's decimals («13.50» → «1350» in yen); what they typed stays as
+// typed, read in the new currency when they save (the field says so when it cannot be).
+watch(money, (now, before) => {
+  if (!open.value || !props.combo) return;
+  if (form.value.price !== moneyFieldText(props.combo.price, locale.value, before)) return;
+  form.value = { ...form.value, price: moneyFieldText(props.combo.price, locale.value, now) };
+});
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
@@ -109,7 +121,7 @@ function patch(current: ComboOut, full: ComboIn): ComboPatchIn {
 
 async function save(): Promise<void> {
   tried.value = true;
-  const price = parseMoney(form.value.price);
+  const price = parseMoney(form.value.price, { money: money.value });
   if (!price.ok || taxMissing.value) return;
   const full = body(price.cents ?? 0);
   try {
@@ -163,7 +175,7 @@ async function save(): Promise<void> {
         <MoneyInput
           v-model="form.price"
           testid="combo-menu-form-price"
-          :label="t('combo.form.price')"
+          :label="money ? t('combo.form.priceIn', { currency: money.currency }) : t('combo.form.price')"
           :helper-text="t('combo.form.priceHelp')"
           :error-text="fieldErrors.price"
           :show-error="tried"

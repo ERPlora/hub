@@ -234,6 +234,8 @@ export interface ActivityRow {
   title: string;
   text: string;
   data: Record<string, unknown>;
+  /** The decimals of the currency its data carries (2 in EUR, 0 in JPY); `null` when it carries none. */
+  currency_decimals: number | null;
   related_id: string;
   related_type: string;
   actor: string;
@@ -271,6 +273,8 @@ export interface PurchaseRow {
   /** In cents; negative on a refund line (CUSTOMER-F22). */
   amount: number;
   currency: string;
+  /** The decimals of its currency as the server counts them (0 in JPY); `null` without a currency. */
+  currency_decimals: number | null;
   status: 'confirmed' | 'voided' | 'refunded';
   recorded_at: string;
   voided_at: string | null;

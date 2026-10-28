@@ -1,14 +1,27 @@
 // «Add note» and «Activity» on the card (CUSTOMER-F05, F03): the note goes in with «Add» («Note
 // added») and appears at the top of the activity by itself (the live query re-runs); the activity is
-// newest first, 50 at a time, each entry with its title in the page language, its text, when and who.
+// newest first, 50 at a time, each entry with its title in the page language, its text, when and who. An amount
+// is in the currency its entry carries, with the decimals the server counts; one without, in the business's
+// (customer-business-currency).
 import { formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonTextarea } from '@ionic/vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pageOf } from '../__tests__/fixtures';
-import { errorFrame, flush, json, type MountOptions, mountCustomer, refusal, sent, subId } from '../__tests__/mount-customer';
-import { formatMoney } from '../lib/money';
+import {
+  business,
+  errorFrame,
+  flush,
+  json,
+  type MountOptions,
+  mountCustomer,
+  POLISH,
+  refusal,
+  sent,
+  subId,
+} from '../__tests__/mount-customer';
+import { formatMoney, type Money } from '../lib/money';
 import type { ActivityRow } from '../operations';
 import ActivityPanel from './ActivityPanel.vue';
 
@@ -25,6 +38,7 @@ const entry = (id: string, kind: string, extra: Partial<ActivityRow> = {}): Acti
   title: '',
   text: '',
   data: {},
+  currency_decimals: null,
   related_id: '',
   related_type: '',
   actor: 'Ana',
@@ -32,6 +46,7 @@ const entry = (id: string, kind: string, extra: Partial<ActivityRow> = {}): Acti
   ...extra,
 });
 const ACTIVITY = 'customer.activity.list';
+const EUR: Money = { currency: 'EUR', decimals: 2 };
 
 async function setup(props: Record<string, unknown> = {}, options: MountOptions = {}) {
   const m = await mountCustomer(ActivityPanel, { props: { customerId: 'c1', canAddNote: true, ...props }, ...options });
@@ -40,6 +55,26 @@ async function setup(props: Record<string, unknown> = {}, options: MountOptions 
   const items = () => m.wrapper.findAll('[data-testid="customer-activity-item"]');
   return { ...m, call, note, items };
 }
+
+describe('ActivityPanel: the currency of each amount (customer-business-currency)', () => {
+  const texts = (s: Awaited<ReturnType<typeof setup>>) =>
+    s.wrapper.findAll('.customer-activity__text').map((t) => t.text().replace(/\s/g, ' '));
+
+  it('in Poland a purchase is in złoty; one recorded in euros keeps its euros; one without a currency, the business\'s', async () => {
+    const s = await setup({}, { locale: 'es' });
+    await s.result(s.call, 'base.business.get', business(POLISH));
+    await s.result(
+      s.call,
+      ACTIVITY,
+      pageOf([
+        entry('a1', 'purchase_recorded', { data: { amount: 2550, currency: 'PLN' }, currency_decimals: 2 }),
+        entry('a2', 'purchase_recorded', { data: { amount: 1000, currency: 'EUR' }, currency_decimals: 2 }),
+        entry('a3', 'purchase_voided', { data: { amount: 1250 } }),
+      ]),
+    );
+    expect(texts(s)).toEqual(['25,50 zł', '10,00 €', '12,50 zł']);
+  });
+});
 
 describe('ActivityPanel: the activity', () => {
   it('follows the card\'s activity, 50 newest first', async () => {
@@ -54,7 +89,7 @@ describe('ActivityPanel: the activity', () => {
       ACTIVITY,
       pageOf([
         entry('a1', 'note_added', { text: 'Prefers mornings' }),
-        entry('a2', 'purchase_recorded', { data: { amount: 2550, currency: 'EUR' } }),
+        entry('a2', 'purchase_recorded', { data: { amount: 2550, currency: 'EUR' }, currency_decimals: 2 }),
         entry('a6', 'purchase_refunded', { text: 'One cup back', data: { amount: 1210, currency: 'EUR' } }),
         entry('a3', 'consent_granted', { text: 'I want offers' }),
         entry('a4', 'appointment.visit', { title: 'Visit: haircut', actor: 'Luis' }),
@@ -66,7 +101,7 @@ describe('ActivityPanel: the activity', () => {
     expect(read(0).get('.customer-activity__text').text()).toBe('Prefers mornings');
     expect(read(0).get('.customer-activity__when').text()).toBe(`${formatDateTime('2026-10-02T10:00:00Z', 'en')} · by Ana`);
     expect(read(1).get('.customer-activity__title').text()).toBe('Purchase recorded');
-    expect(read(1).get('.customer-activity__text').text()).toBe(formatMoney(2550, 'en'));
+    expect(read(1).get('.customer-activity__text').text()).toBe(formatMoney(2550, 'en', EUR));
     expect(read(2).get('.customer-activity__title').text()).toBe('Purchase refunded');
     expect(read(2).get('.customer-activity__text').text()).toBe('One cup back');
     expect(read(3).get('.customer-activity__title').text()).toBe('Consent given');

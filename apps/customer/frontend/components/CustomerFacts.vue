@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The card's data, read-only (CUSTOMER-F03): the product's sheet (`dl.meta`) — Email, Phone, Tax ID,
-// Company, Address, Stage, Source, Preferred channel, Purchases, Spent, Last purchase, Active — and,
+// Company, Address, Stage, Source, Preferred channel, Purchases, Spent (in the business's currency:
+// customer-business-currency), Last purchase, Active — and,
 // new, the birthday, anniversary, internal notes and custom fields the product only showed when
 // editing (WORKBOOK «Cambios frente al producto actual»).
 import { formatDateTime } from '@erplora/ui/components';
@@ -8,7 +9,7 @@ import { computed } from 'vue';
 
 import { countryName } from '../lib/countries';
 import { formatDay } from '../lib/dates';
-import { formatMoney } from '../lib/money';
+import { formatMoney, useBusinessMoney } from '../lib/money';
 import { formatPhone } from '../lib/phoneDisplay';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { CustomerDetailOut, CustomFieldValueOut } from '../operations';
@@ -16,6 +17,7 @@ import type { CustomerDetailOut, CustomFieldValueOut } from '../operations';
 const props = defineProps<{ customer: CustomerDetailOut }>();
 
 const { t, locale } = useCustomerI18n();
+const money = useBusinessMoney();
 
 const dash = (value: string | null | undefined): string => (value && value.trim() ? value : '—');
 
@@ -32,7 +34,7 @@ const facts = computed(() => {
     { key: 'source', label: 'customer.detail.facts.source', value: t(`customer.source.${c.source}`) },
     { key: 'channel', label: 'customer.detail.facts.preferredChannel', value: t(`customer.channel.${c.preferred_channel}`) },
     { key: 'purchases', label: 'customer.detail.facts.purchases', value: String(c.total_purchases) },
-    { key: 'spent', label: 'customer.detail.facts.spent', value: formatMoney(c.total_spent, locale.value) },
+    { key: 'spent', label: 'customer.detail.facts.spent', value: formatMoney(c.total_spent, locale.value, money.value) },
     { key: 'lastPurchase', label: 'customer.detail.facts.lastPurchase', value: dash(formatDateTime(c.last_purchase_at, locale.value)) },
     { key: 'active', label: 'customer.detail.facts.active', value: c.is_active ? t('customer.common.yes') : t('customer.common.no') },
     { key: 'birthday', label: 'customer.detail.facts.birthday', value: formatDay(c.birthday, locale.value) },

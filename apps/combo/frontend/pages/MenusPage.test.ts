@@ -6,7 +6,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { EMPLOYEE, errorFrame, flush, type MountOptions, mountCombo, page } from '../__tests__/mount-combo';
+import { business, EMPLOYEE, errorFrame, flush, JAPANESE, type MountOptions, mountCombo, page, POLISH } from '../__tests__/mount-combo';
 import MenuFormModal from '../components/MenuFormModal.vue';
 import type { ComboOut } from '../operations';
 import MenusPage from './MenusPage.vue';
@@ -62,6 +62,26 @@ describe('MenusPage', () => {
     ]);
     expect(s.cells(0).slice(0, 5)).toEqual(['Menu of the day', '€13.50', 'Eat in', 'Yes', '1']);
     expect(s.cells(1).slice(1, 4)).toEqual(['€6.00', 'Take away', 'No']);
+  });
+
+  it('a business in Poland reads the closed prices in złoty, and in yen without decimals', async () => {
+    const s = await setup({ business: business(POLISH), locale: 'es' });
+    await s.show(page(ROWS));
+    expect(s.cells(0)[1].replace(/[\u00a0\u202f]/g, ' ')).toBe('13,50 zł');
+    expect(s.cells(1)[1].replace(/[\u00a0\u202f]/g, ' ')).toBe('6,00 zł');
+    expect(s.wrapper.text()).not.toContain('€');
+    const yen = await setup({ business: business(JAPANESE) });
+    await yen.show(page(ROWS));
+    expect(yen.cells(0)[1]).toBe('¥1,350');
+  });
+
+  it('until the business answers a closed price is a figure without a symbol, never a euro', async () => {
+    const s = await setup({ business: null });
+    await s.show(page(ROWS));
+    expect(s.cells(0)[1]).toBe('13.50');
+    expect(s.wrapper.text()).not.toContain('€');
+    await s.result('base.business.get', business(POLISH));
+    expect(s.cells(0)[1].replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 13.50');
   });
 
   it('none at all says how to start; the filters narrow it on the server', async () => {

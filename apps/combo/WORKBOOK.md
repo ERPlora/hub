@@ -64,7 +64,9 @@ referencias y sus foros) sigue vigente y se adopta, no más:
 - Solo un producto que se vende y se cobra **por unidades** puede ser una elección (un menú lleva «una
   ración», no «un kilo» ni «el precio de 100»); los buscadores solo ofrecen esos. Un producto desactivado
   o eliminado en Inventario no se puede añadir.
-- El precio cerrado y los suplementos son importes en euros, escritos con coma o punto.
+- El precio cerrado y los suplementos van en **la moneda del negocio**, la de su país, la que dice
+  **Ajustes → Negocio** (euros en España, złoty en Polonia), con sus decimales (el yen no tiene), escritos
+  con coma o punto. Los ejemplos de este documento son de un negocio de España, en euros.
 
 Configuración inicial, paso a paso:
 
@@ -79,22 +81,23 @@ Configuración inicial, paso a paso:
 
 ### Menús
 Menú **Menús**. Tabla de menús con el buscador «Buscar un menú…» (busca por nombre y por nombre de
-cocina), vista de tabla o de tarjetas y columnas: Nombre (se ordena y se filtra), «Precio cerrado» (se
-ordena), «Cómo se vende» («En el local» o «Para llevar»; se ordena y se filtra), «A la venta» (Sí o No;
+cocina), vista de tabla o de tarjetas y columnas: Nombre (se ordena y se filtra), «Precio cerrado» (en la
+moneda del negocio; se ordena), «Cómo se vende» («En el local» o «Para llevar»; se ordena y se filtra), «A la venta» (Sí o No;
 se ordena y se filtra) y Orden (se ordena). Páginas de 50, por orden y nombre. Con permiso de gestión
 hay botón **+** y, por fila, «Editar datos» y «Retirar»; sin él, solo se ve la lista. Tocar una fila
 abre el constructor.
 
 El formulario de alta y de edición (título «Menú nuevo» o «Menú · {nombre}») lleva: Nombre, «Nombre
-de cocina» («Déjalo vacío y la comanda usa el nombre comercial.»), «Precio cerrado» («Lo que paga el
-cliente por el menú entero, elija lo que elija.»), «¿Cómo se vende?» («Se consume en el local
+de cocina» («Déjalo vacío y la comanda usa el nombre comercial.»), «Precio cerrado (<moneda>)» (la del
+negocio: «Precio cerrado (PLN)» en Polonia; «Lo que paga el cliente por el menú entero, elija lo que
+elija.»), «¿Cómo se vende?» («Se consume en el local
 (servicio de restauración)» o «Se vende como producto / para llevar», con la explicación de las dos
 siempre a la vista y la elegida resaltada), «Tipo de IVA» (solo si es «en el local»), «Orden en la
 lista de menús» y la casilla «A la venta» (marcada de partida), con «Guardar» y «Cancelar».
 
 ### Constructor del menú
 Se abre al tocar un menú (`/combo/menus/<id>`). La flecha atrás de la barra de arriba vuelve a Menús.
-Arriba de la página, el nombre y el precio del menú, y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
+Arriba de la página, el nombre y el precio del menú (en la moneda del negocio), y un aviso con lo que hará ese menú en el tique: «Este menú se factura como un
 único servicio: una sola línea a su tipo de IVA, tributen como tributen sus componentes.» o «Este menú
 se factura como entrega de bienes: su precio se repartirá entre los componentes que añadas, una línea
 por cada uno.». Debajo, si el menú todavía no sale en el TPV, otro aviso, «Todavía no sale en el TPV»,
@@ -104,11 +107,12 @@ Después, la sección «Platos» («Un plato es un paso de ESTE menú: Primero, 
 orden es el orden en que se pregunta.») y una tarjeta por plato, en orden: nombre, su regla
 («Obligatorio · elige 1 · hasta 1 · sin repetir») y, con permiso de gestión, el asa de arrastre,
 «Subir», «Bajar», «Editar datos» y «Retirar». Dentro, «Elecciones»: una fila por producto con su
-suplemento, una marca «Agotado» si no está disponible hoy, «Agotado en Inventario» si su producto está agotado
+suplemento con su signo («+2,00 €» en España, «+2,00 zł» en Polonia), una marca «Agotado» si no está disponible hoy, «Agotado en Inventario» si su producto está agotado
 para todo el negocio y, si el producto ya no se puede vender, «Desactivado en Inventario», «Ya no está en el
 catálogo», «No se vende por unidades en Inventario» o, en un menú «para llevar», «Sin tipo de IVA para
 llevar»; por fila, el asa, subir, bajar, «Agotado / Disponible», editar y quitar. Debajo, el buscador
-«Busca un producto…», «Suplemento», «Añadir elección» y «Añadir varios» (ventana con buscador y
+«Busca un producto…» (cada producto con su SKU y su precio), «Suplemento (<moneda>)», «Añadir elección» y
+«Añadir varios» (ventana con buscador y
 casillas, y el campo «Categoría» con «Marcar todos los de «{categoría}» (N)»: «Añadir N seleccionados»;
 lo que ya está en el plato sale marcado «Ya está en este plato»).
 Al final, el formulario «Añadir un plato» (Nombre del plato, «Elecciones mínimas», «Elecciones
@@ -170,7 +174,8 @@ Pantalla: Menús
 Pasos:
 1. En Menús, pulsa **+**.
 2. Escribe el Nombre; si la comanda debe decir otra cosa, el «Nombre de cocina».
-3. Escribe el «Precio cerrado»: lo que paga el cliente por el menú entero. Vacío es 0.
+3. Escribe el «Precio cerrado (<moneda>)»: lo que paga el cliente por el menú entero, en la moneda del
+   negocio y con sus decimales (el yen no tiene). Vacío es 0.
 4. Elige «¿Cómo se vende?»: «Se consume en el local» factura UNA línea al tipo del menú, la bebida
    incluida (el menú del día); «Se vende como producto / para llevar»: si todas las elecciones tributan
    igual, UNA línea a ese tipo; si no, UNA línea por plato, cada una a su tipo, con el precio repartido
@@ -186,8 +191,8 @@ Sale: el menú (avisa: menú nuevo).
 Si falla: junto al campo: «El menú necesita un nombre.», «Un menú que se consume en el local
 necesita su propio tipo de IVA: sin él no se puede facturar.», «El precio de un menú no puede ser
 negativo. Para abaratar una opción, ponle un suplemento negativo.», «Esto no es un importe. Escribe
-una cifra, por ejemplo 12,50.» y el de las dos lecturas posibles de un importe («1.250»), que cita lo
-escrito. Un tipo de IVA que no existe en Impuestos: «Ese tipo de IVA no existe en Impuestos.». Sin
+una cifra, por ejemplo 12,50.» (también con el símbolo de otra moneda: «13,50 €» en un negocio de
+Polonia) y el de las dos lecturas posibles de un importe («1.250»), que cita lo escrito. Un tipo de IVA que no existe en Impuestos: «Ese tipo de IVA no existe en Impuestos.». Sin
 permiso de gestión no hay botón +.
 Implicados: TAX-F01
 
@@ -259,8 +264,8 @@ Pantalla: Constructor del menú
 Pasos:
 1. En la tarjeta del plato, escribe en «Busca un producto…» y elige el producto del catálogo de
    Inventario (busca por nombre y por SKU).
-2. Escribe el «Suplemento» si sustituir cuesta más (o menos, con signo negativo) que el precio
-   cerrado; vacío es sin suplemento.
+2. Escribe el «Suplemento (<moneda>)», en la moneda del negocio, si sustituir cuesta más (o menos, con
+   signo negativo) que el precio cerrado; vacío es sin suplemento.
 3. Pulsa «Añadir elección»: entra la última. Para varios de golpe, «Añadir varios»: marca las casillas
    y pulsa «Añadir N seleccionados» (todos entran sin suplemento y en el orden en que se marcaron). Para
    una categoría entera, elígela en «Categoría»: la lista enseña sus productos y «Marcar todos los de
@@ -293,7 +298,7 @@ Pasos:
    precio cerrado. Toca uno: se abre una hoja con su nombre y todos sus platos a la vez.
 2. Cada plato dice su regla: «Elige N» si pide justo N, «Elige de N a M» si pide un mínimo y deja llegar a
    un techo, «Elige al menos N» si pide un mínimo sin techo, «Hasta N» si solo tiene techo, «Opcional» si
-   no; y sus elecciones disponibles, con el suplemento con su signo si no es cero («+2,00 €»). Al abrir no
+   no; y sus elecciones disponibles, con el suplemento con su signo si no es cero («+2,00 €» en España). Al abrir no
    hay nada elegido.
 3. Elige: en un plato de una sola elección, tocar otra la cambia; en uno con techo, al llegar a él el
    siguiente toque dice ««Café» está completo: quita una para elegir otra.»; una elección que se puede
@@ -372,8 +377,8 @@ tiene equivalente para llevar en Impuestos, así que este menú no se puede vend
 menú «para llevar» ese plato no se ofrece y el constructor lo marca «Sin tipo de IVA para llevar».
 «Para llevar» con un producto sin categoría fiscal: ««{producto}» no tiene categoría fiscal en
 Inventario, así que este menú no se puede cobrar.» (y no se ofrece). Partido con todos los productos a
-0 € en el catálogo: «Los productos de este menú no tienen precio de catálogo, así que no se puede
-repartir su IVA.»; si todas las elecciones ofrecidas de un menú «para llevar» valen 0 € y van a
+precio 0 en el catálogo: «Los productos de este menú no tienen precio de catálogo, así que no se puede
+repartir su IVA.»; si todas las elecciones ofrecidas de un menú «para llevar» valen 0 y van a
 categorías distintas, el menú no sale en el TPV.
 Implicados: SALE-F12, TAX-F19
 
@@ -637,7 +642,13 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - Reordenar: `ion-reorder-group` (asa) y los botones subir/bajar, que acaban en la misma operación
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
 - Los importes se leen con `lib/money.ts` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento
-  admite signo).
+  admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
+  `base.business.get`): sus decimales, los del servidor, nunca los del navegador; su código o su símbolo es
+  ruido al leer, el de otra moneda no. Mientras el negocio no contesta, una cifra sin símbolo (nunca un
+  euro), el campo dice solo «Precio cerrado» o «Suplemento» y salir de él no lo reformatea. Si contesta (o
+  cambia) con el formulario del menú o la edición de una elección abiertos, el importe que nadie ha tocado
+  se reescribe desde lo guardado con los decimales de su moneda; lo tecleado se queda y se lee en ella al
+  guardar (si no se puede, lo dice el campo).
 - Iconos registrados en la shell; los del producto actual (`restaurant-outline`, `arrow-up-outline`)
   esperan en `UI-REQUESTS.md` con su sustituto (`layers-outline`, `chevron-up-outline`); el asa la pinta
   `ion-reorder` con su icono propio.
@@ -652,7 +663,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - **No admite servicios de la app Servicios** como elección: los packs de peluquería son los bonos y
   paquetes de Servicios (SERVICE-F12).
 - **No manda nada a cocina** por sí mismo.
-- **No enseña en el constructor el reparto en euros** de un menú «para llevar»: el aviso de arriba dice que
+- **No enseña en el constructor el reparto con importes** de un menú «para llevar»: el aviso de arriba dice que
   el precio se reparte entre los platos, y el reparto se ve en la cuenta antes de cobrar, igual que se
   cobra (COMBO-F09).
 
@@ -698,7 +709,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   L-Series y WooCommerce Composite mandan crearlo en el catálogo; Lightspeed K-Series, Toast y Odoo (su
   «Crear» en el campo de producto) lo crean dentro. Gana lo más aceptado: se crea en Inventario y el
   buscador del constructor lo encuentra en cuanto se guarda.
-- Precios en céntimos, como el resto de la plataforma.
+- Precios en céntimos enteros (la unidad más pequeña de la moneda del negocio), como el resto de la
+  plataforma.
 
 ## Contradicciones señaladas
 

@@ -36,7 +36,9 @@ Lo que la app necesita de `@erplora/ui` y todavía no está. Mientras tanto usa 
 
 ## Formateadores (`@erplora/ui/components/format`)
 
-- **`formatMoney(cents, locale, currency)`** — hoy `lib/money.ts` (euros).
+- **`formatMoney(cents, locale, money)`** — hoy `lib/money.ts`: en la moneda del negocio (`useBusinessMoney`, la de
+  su país) o en la que guardó la compra, con los decimales que cuenta el servidor; una cifra sin símbolo mientras el
+  negocio no contesta.
 - **`formatDay('YYYY-MM-DD', locale)`** — un día sin hora ni zona (cumpleaños, aniversario); hoy
   `lib/dates.ts`.
 

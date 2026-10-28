@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8fc31ed84c89bdfcf4bac33464427d0def4d97bace8f2106b928250d84d06892 -->
+<!-- generated from WORKBOOK.md sha256:7727ff339173d123bc8a806eb26697355376196178a5ae3d7e2dbf81f97bd559 -->
 
 ## What it is for and who it is for
 
@@ -2254,12 +2254,14 @@ Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
 Steps:
   1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes").
-  2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one
-     line, for example "Create in Services: Haircut · €15.00 · 30". An amount shows in the business's currency (never
-     in cents), a yes or a no as "Yes" or "No" and a list by how many items it carries. Everything shows in the
-     person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the same one its
-     app calls it by, never a technical name. An action of the platform itself is named by the screen where it is
-     done, for example "Change in Settings" or "Delete in Files". Each action shows with its own verb, never a
+  2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
+     for example "Create in Services: Haircut · €15.00 · 30". An amount shows in the business's currency (never in
+     cents); a difference, with its sign as on its app's screen, to see at a glance whether there is too much or too
+     little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
+     no sign when it balances); a yes or a no, as "Yes" or "No", and a list, by how many items it carries. Everything
+     shows in the person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the
+     same one its app calls it by, never a technical name. An action of the platform itself is named by the screen where
+     it is done, for example "Change in Settings" or "Delete in Files". Each action shows with its own verb, never a
      generic one: rectifying an invoice says "Rectify in Invoicing".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
