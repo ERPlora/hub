@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b7dca107dbb766c303977d329b14c5c04b6fab7cb76304aefae90887dc2b573a -->
+<!-- generated from WORKBOOK.md sha256:2769757e347dc69887765e39bbec82eb3584915d28421681737957a7bc7ad865 -->
 
 ## What it is for and who it is for
 
@@ -74,6 +74,7 @@ Initial setup, step by step:
 
 1. In **Tables → Zones** (or with the "+" of the **Floor plan**) create the zones of the room (TABLE-F01).
 2. In **Tables → Floor plan**, in "Edit plan", add the tables of each zone with the "+" (TABLE-F02).
+   Until a table is in use, the Home reminds you with "Your tables".
 3. Drag them until the plan looks like the room and set the capacity and the shape of each one
    (TABLE-F03, TABLE-F04).
 4. In **Tables → Settings** (the administrator only) decide whether the guests are asked when seating
@@ -227,22 +228,29 @@ Involved: TABLE-F06, TABLE-F09
 ### TABLE-F02 Add tables
 Status: done
 Actor: manager, administrator
-Screen: Floor plan (Edit plan), Tables
+Screen: Home, Floor plan (Edit plan), Tables
 Steps:
-1. In **Floor plan → Edit plan**, choose the zone and tap "+".
-2. In "Table number" type the number or name (S1, Terrace A) or leave it empty: "Auto-numbered", with
+1. On the **Home**, while no table is in use, "Finish setting up your business" brings "Your tables"
+   ("Add the tables of your dining room: without them there is no order per table, no split and no
+   transfer."), "Recommended", to whoever may create tables. "Set up" leads to **Tables → Tables**
+   (step 6).
+2. In **Floor plan → Edit plan**, choose the zone and tap "+".
+3. In "Table number" type the number or name (S1, Terrace A) or leave it empty: "Auto-numbered", with
    the first free number of that zone.
-3. Tap "Add table" (off while there is no zone).
-4. The table appears in the zone, in the first free spot, square, for 4 and Available.
-5. Another door: in **Tables → Tables**, "+" with Number, Capacity and Zone and "Add table"; it is also
+4. Tap "Add table" (off while there is no zone).
+5. The table appears in the zone, in the first free spot, square, for 4 and Available.
+6. Another door: in **Tables → Tables**, "+" with Number, Capacity and Zone and "Add table"; it is also
    born in the first free spot of its zone.
 In: number (or none), and in the list also capacity and zone.
 Out: the table (announces: `table.table.created`). With a table in use, "Choose table" of the till stops
-saying "There are no tables yet. Set them up in Tables → Floor plan." (`table.floor.status`).
+saying "There are no tables yet. Set them up in Tables → Floor plan." (`table.floor.status`), and "Your
+tables" is "Done" on the Home without a reload. An occupied or blocked table still counts; if they are
+all switched off or deleted (TABLE-F04), the step goes back to pending by itself. A zone without tables
+does not tick it.
 If it fails: a number repeated in the zone (regardless of case and spaces), through any door: "There is
 already a table with that number in this zone.". A zone deleted in the meantime: "That zone does not
 exist in this business.".
-Involved: TABLE-F03, TABLE-F04, TABLE-F07
+Involved: TABLE-F03, TABLE-F04, TABLE-F07, BASE-F01
 
 ### TABLE-F03 Place the tables on the plan
 Status: done
@@ -773,7 +781,7 @@ matches several, it is refused saying which ones (409 `*_ambiguous`).
 | A table check | view checks | F21, F22 | `table.session.get` |
 | The table checks of a Sales check (for the till: the table of the check on screen) | view checks | F12, F13, F24 | `table.session.by_order` |
 | The servers who have opened checks (for the filter) | view checks | F22 | `table.waiter.list` |
-| Whether the plan is set up (tables in use and zones), for "Choose table" of the till | view tables | F02 | `table.floor.status` |
+| Whether the plan is set up (tables in use and zones), for "Choose table" of the till and the "Your tables" step of the Home | view tables | F02 | `table.floor.status` |
 | The room settings | view settings | F08 | `table.settings.get` |
 
 The zones, the tables, the checks, the servers, the status of the plan and the settings can be followed
@@ -864,6 +872,7 @@ What Reservations sends when it calls (the same names as its notices `status_cha
 |---|---|---|
 | Sales & POS | "Choose table" of the till (SALE-F19): the tables and their status, seating or seating again the check on screen, taking its table away and following the table of a check | `table.table.list`, `table.floor.status`, `table.session.open`, `table.session.restore`, `table.session.park`, `table.session.by_order` |
 | Reservations | Holding, moving and releasing the table of a booking and seating it, inside its operation | `table.hold.sync_reservation`, `table.hold.move_reservation`, `table.hold.release`, `table.session.open` |
+| Platform (Home) | The "Your tables" step of "Finish setting up your business" (TABLE-F02) | `table.floor.status` |
 
 Kitchen does not call Tables: the ticket carries the title of its check, the one Tables sets in Sales
 ("Table 4"). Reservations, besides, repaints its screens with the notices of the tables and the zones

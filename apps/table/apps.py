@@ -2,7 +2,9 @@
 (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+
+from apps.table.events import TABLE_EVENTS
 
 
 class TableConfig(LiveAppConfig):
@@ -76,6 +78,28 @@ class TableConfig(LiveAppConfig):
             "table.view_settings",
         ],
     }
+    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Your tables» (module.json `setup`,
+    # tables#24), order 100 and recommended, done once one table is in use (not deleted, active: an occupied or blocked
+    # one still counts), for whoever adds tables, leading to the list of tables. Refreshed on what changes the tables in
+    # use; never a zone (one with tables is not deleted). The old module declared no panel and no bell row.
+    setup = [
+        SetupStep(
+            key="tables",
+            operation="table.floor.status",
+            configured_when=[SetupCheck(field="usable_tables", truthy=True)],
+            title=_("Your tables"),
+            description=_(
+                "Add the tables of your dining room: without them there is no order per table, no split and no transfer."
+            ),
+            # The old `map-outline` waits in UI-REQUESTS.md, as the menu's.
+            icon="ion:grid-outline",
+            route="/table/tables",
+            permission="table.add_table",
+            order=100,
+            required=False,
+            refresh_on=TABLE_EVENTS,
+        )
+    ]
     # TABLE-F29: the holds whose window passed are marked expired, every hour, by the worker as the
     # system (cron in UTC). Phase 1 sweeps the one database every hub shares; phase 2 runs it per hub,
     # each under ``use_hub``. Reading the plan already ignores them.

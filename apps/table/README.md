@@ -39,6 +39,7 @@ reservada o fuera de servicio, cuántos comensales hay, desde cuándo y quién l
 | Operaciones | 10 consultas (`queries.py`) y 26 acciones (`services.py`), todas con `ai=`; 31 rutas en `/api/table/…` (las 5 de la plataforma no tienen ruta) |
 | Eventos | 18, `table.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `sale.order.completed`/`voided` (`table.session.close_by_order`) y a `customer.customer.erased` (`table.hold.forget_customer`), por el relay del outbox |
 | Tarea programada | `expire_table_holds` → `table.hold.expire`, `0 * * * *`, `collapse` (la corre el worker) |
+| Inicio | El paso «Tus mesas» (`setup`: `table.floor.status`, hecho con una mesa en uso, orden 100, recomendado, para quien crea mesas, lleva a `/table/tables`); sin paneles ni campana, como el módulo viejo |
 | Migraciones | `0001_initial`, `0002_session_table_by_status` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
@@ -53,7 +54,7 @@ cd hub   # o tu worktree
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/table apps/sale/tests/test_integration_table.py \
   apps/reservation/tests/test_integration_table.py
 pnpm test apps/table apps/sale/frontend/components/pos
-pnpm e2e tests/e2e/table-flows.spec.ts tests/e2e/table-floor.spec.ts tests/e2e/sale-table.spec.ts
+pnpm e2e tests/e2e/table-flows.spec.ts tests/e2e/table-floor.spec.ts tests/e2e/sale-table.spec.ts tests/e2e/fix-table-setup-hooks.spec.ts
 ```
 
 - `tests/test_integration_sale.py` va contra Ventas y Clientes reales; `test_integration_relay.py`, contra
