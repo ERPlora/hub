@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // SERVICE-F12, F13: the old packages panel as a dialog. «New package» asks for Name, Discount type
-// (Percentage or Fixed amount) and its value, Closed price, Validity (days) and Uses, each with the old
+// (Percentage or Fixed amount) and its value, Closed price (an amount off and the closed price in the business's
+// currency, «Closed price (PLN)», with its decimals; service-business-currency), Validity (days) and Uses, each with the old
 // help, and «Services included»: a row per offered service (searched) with its Sessions, «Remove line»
 // and «Add service». «Create package» needs a name and a line. «Editing package — {name}» changes
 // everything but the lines (shown, fixed) and sends only what changed; an emptied closed price,
@@ -11,7 +12,7 @@ import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { percentFieldText, readPercentBp } from '../lib/format';
+import { type Money, percentFieldText, readPercentBp, useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchServices } from '../lib/pickers';
 import type { DiscountType, PackageIn, PackageOut, PackagePatchIn } from '../operations';
@@ -43,7 +44,8 @@ interface Form {
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
-const searchOffered = computed(() => searchServices(client, locale.value));
+const money = useBusinessMoney();
+const searchOffered = computed(() => searchServices(client, locale.value, money.value));
 const creation = useCommand('service.package.create');
 const update = useCommand('service.package.update');
 const pending = computed(() => creation.pending.value || update.pending.value);
@@ -53,6 +55,14 @@ const title = computed(() => (props.pkg ? t('service.packages.form.titleEdit', {
 let lineKey = 0;
 const newLine = (): Line => ({ key: ++lineKey, service: null, sessions: '1' });
 
+/** The money fields of `current` in the decimals of `currency` («90.00» in euros or unknown, «9000» in yen). */
+function moneyFields(current: PackageOut, currency: Money | undefined): Pick<Form, 'amount' | 'fixedPrice'> {
+  return {
+    amount: current.discount_amount ? moneyFieldText(current.discount_amount, locale.value, currency) : '',
+    fixedPrice: moneyFieldText(current.fixed_price, locale.value, currency),
+  };
+}
+
 function fromPackage(current: PackageOut | null): Form {
   if (!current) {
     return { name: '', discountType: 'percentage', percent: '', amount: '', fixedPrice: '', validity: '', uses: '', lines: [newLine()] };
@@ -61,8 +71,7 @@ function fromPackage(current: PackageOut | null): Form {
     name: current.name,
     discountType: current.discount_type,
     percent: current.discount_percent_bp ? percentFieldText(current.discount_percent_bp, locale.value) : '',
-    amount: current.discount_amount ? moneyFieldText(current.discount_amount, locale.value) : '',
-    fixedPrice: moneyFieldText(current.fixed_price, locale.value),
+    ...moneyFields(current, money.value),
     validity: current.validity_days === null ? '' : String(current.validity_days),
     uses: current.max_uses === null ? '' : String(current.max_uses),
     lines: [],
@@ -84,6 +93,20 @@ watch(
   { immediate: true },
 );
 
+// The business answers (or its currency changes) with the dialog open: an amount the person has not touched is
+// rewritten from the package with the currency's decimals («90.00» → «9000» in yen); what they typed stays as
+// typed, read in the new currency when they save (the field says so when it cannot be).
+watch(money, (now, before) => {
+  if (!open.value || !props.pkg) return;
+  const was = moneyFields(props.pkg, before);
+  const next = moneyFields(props.pkg, now);
+  form.value = {
+    ...form.value,
+    amount: form.value.amount === was.amount ? next.amount : form.value.amount,
+    fixedPrice: form.value.fixedPrice === was.fixedPrice ? next.fixedPrice : form.value.fixedPrice,
+  };
+});
+
 const completeLines = computed(() => form.value.lines.filter((line) => line.service));
 /** The lines of the last create, in the order they were sent: a 422 names them by that position. */
 const sentKeys = ref<number[]>([]);
@@ -102,8 +125,9 @@ const wholeOrNull = (value: string): number | null => {
   if (!trimmed) return null;
   return /^\d+$/.test(trimmed) ? Number(trimmed) : (trimmed as unknown as number);
 };
-const money = (value: string): number | null | undefined => {
-  const read = parseMoney(value);
+/** Minor units of a money field (empty = none); `undefined` when it is not an amount (the field says why). */
+const minor = (value: string): number | null | undefined => {
+  const read = parseMoney(value, money.value);
   return read.ok ? read.cents : undefined;
 };
 
@@ -114,8 +138,8 @@ function setLine(index: number, part: Partial<Line>): void {
 /** The money and discount of the form, or `null` when something typed is not an amount (it says so). */
 function amounts() {
   const f = form.value;
-  const fixedPrice = money(f.fixedPrice);
-  const amount = money(f.amount);
+  const fixedPrice = minor(f.fixedPrice);
+  const amount = minor(f.amount);
   if (fixedPrice === undefined || amount === undefined || (f.discountType === 'percentage' && percentBp.value === null)) return null;
   return { fixedPrice, amount: amount ?? 0, percent: percentBp.value ?? 0 };
 }
@@ -225,7 +249,7 @@ async function save(): Promise<void> {
           v-else
           testid="service-package-form-discount_amount"
           :model-value="form.amount"
-          :label="t('service.packages.form.discountAmount')"
+          :label="money ? t('service.packages.form.discountAmountIn', { currency: money.currency }) : t('service.packages.form.discountAmount')"
           :error-text="fieldErrors.discount_amount"
           :show-error="tried"
           @update:model-value="form = { ...form, amount: $event }"
@@ -233,7 +257,7 @@ async function save(): Promise<void> {
         <MoneyInput
           testid="service-package-form-fixed_price"
           :model-value="form.fixedPrice"
-          :label="t('service.packages.form.fixedPrice')"
+          :label="money ? t('service.packages.form.fixedPriceIn', { currency: money.currency }) : t('service.packages.form.fixedPrice')"
           :helper-text="t('service.packages.form.fixedPriceHelp')"
           :error-text="fieldErrors.fixed_price"
           :show-error="tried"

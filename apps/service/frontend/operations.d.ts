@@ -2,7 +2,7 @@
 // apps/service/schemas.py. Written by hand, as the other apps', until V3 generates them from
 // `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
 // One input per operation (ninja's parity): no path parameters, an id travels in the input.
-// On the wire: money in whole cents, minutes as integers, dates and moments ISO 8601.
+// On the wire: money in whole minor units of the business's currency, minutes as integers, dates and moments ISO 8601.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type PricingType = 'fixed' | 'hourly' | 'from' | 'variable' | 'free';

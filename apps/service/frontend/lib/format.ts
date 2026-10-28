@@ -1,20 +1,44 @@
 // How the service screens paint money, discounts and days (pages never format by hand), always with the
-// page language's own format (Intl). Money is whole cents of euros: the Hub has no currency setting and
-// every ERPlora business invoices in euros. A percentage discount travels in basis points (1050 =
-// 10,50 %): the form writes and reads it as a percentage with at most two decimals.
+// page language's own format (Intl). Money is whole minor units of the business's currency (flow
+// service-business-currency; `useBusinessMoney`, the platform's: its country's currency with the decimals the
+// server counts it in, never the browser's Intl, which gives the forint none): 1500 is ¥1,500 in Japan and
+// 15,00 € in Spain, as Sales charges it. Until the business answers an amount is a figure without a symbol, never
+// the euro by default. A percentage discount travels in basis points (1050 = 10,50 %): the form writes and reads
+// it as a percentage with at most two decimals.
+import type { Money } from '../../../../base/frontend/lib/home';
 
-const CURRENCY = 'EUR';
+export type { Money };
+export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+/** The decimals of an amount while the currency is unknown. */
+const UNKNOWN_DECIMALS = 2;
+
+/** The decimals of an amount in `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while it is unknown. */
+export const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNOWN_DECIMALS;
 
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
 const decimalMarks = new Map<string, string>();
 
-function numberFormat(locale: string, kind: 'money' | 'percent' | 'plain'): Intl.NumberFormat {
+function moneyFormat(locale: string, money: Money | undefined): Intl.NumberFormat {
+  const decimals = moneyDecimals(money);
+  const key = `${locale}|money|${money?.currency ?? ''}|${decimals}`;
+  let found = formats.get(key);
+  if (!found) {
+    const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+    // The symbol a till of that country prints («zł», «¥»); until the business is known, the figure alone.
+    const style: Intl.NumberFormatOptions = money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol' } : {};
+    found = new Intl.NumberFormat(locale, { ...style, ...digits });
+    formats.set(key, found);
+  }
+  return found;
+}
+
+function numberFormat(locale: string, kind: 'percent' | 'plain'): Intl.NumberFormat {
   const key = `${locale}|${kind}`;
   let found = formats.get(key);
   if (!found) {
     const options: Record<typeof kind, Intl.NumberFormatOptions> = {
-      money: { style: 'currency', currency: CURRENCY },
       percent: { style: 'percent', maximumFractionDigits: 2 },
       plain: { maximumFractionDigits: 2, useGrouping: false },
     };
@@ -34,9 +58,9 @@ export function decimalMark(locale: string): string {
   return found;
 }
 
-/** Whole cents as euros in `locale` («22,50 €», «€22.50»). */
-export function formatMoney(cents: number, locale: string): string {
-  return numberFormat(locale, 'money').format(cents / 100);
+/** Whole minor units in `money`, in `locale` («22,50 €», «zł 22.50», «¥1,500»; «22,50» while it is unknown). */
+export function formatMoney(cents: number, locale: string, money?: Money): string {
+  return moneyFormat(locale, money).format(cents / 10 ** moneyDecimals(money));
 }
 
 /** Basis points as a percentage in `locale` («10,5 %», «10.5%»). */

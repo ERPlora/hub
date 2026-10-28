@@ -10,7 +10,8 @@ import { HubIcon } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
 import type { AssignmentOut } from '../operations';
-import { click, errorFrame, flush, ionChecked, ionValue, mountService, page } from '../__tests__/mount-service';
+import type { Business } from '../../../../base/frontend/operations';
+import { business, click, errorFrame, flush, ionChecked, ionValue, JAPANESE, mountService, page, POLISH } from '../__tests__/mount-service';
 import ServiceProfessionals from './ServiceProfessionals.vue';
 
 const OP = 'service.assignment.list';
@@ -32,10 +33,11 @@ const ROWS = [row('a1', { is_primary: true }), row('a2', { member_name: 'Bea Rui
 
 type Control = HTMLElement & { value?: unknown; checked?: boolean; disabled?: boolean; label?: string };
 
-async function setup(options: { canChange?: boolean; locale?: 'en' | 'es' } = {}) {
+async function setup(options: { canChange?: boolean; locale?: 'en' | 'es'; business?: Business | null } = {}) {
   const m = await mountService(ServiceProfessionals, {
     props: { serviceId: 's1', canChange: options.canChange ?? true },
     locale: options.locale,
+    business: options.business,
   });
   await m.live();
   const el = (testid: string) => m.inDoc(testid) as Control;
@@ -47,6 +49,36 @@ async function setup(options: { canChange?: boolean; locale?: 'en' | 'es' } = {}
   };
   return { ...m, el, member, star, show: (data: unknown) => m.result(OP, data) };
 }
+
+// flow service-business-currency: a professional's own price is the business's currency, in its minor units.
+describe('ServiceProfessionals: in the business currency (service-business-currency)', () => {
+  it('paints each price in złoty for a business in Poland and names the field «Price (PLN, optional)»', async () => {
+    const s = await setup({ business: business(POLISH) });
+    await s.show(page(ROWS));
+    expect(s.el('service-professionals-row-a2')?.textContent?.replace(/\s/g, ' ')).toContain('40 min · zł 25.00');
+    expect(s.el('service-professionals-row-a2')?.textContent).not.toContain('€');
+    expect(s.el('service-professionals-price-a2').label).toBe('Price (PLN, optional)');
+  });
+
+  it('a business in Japan assigns someone at «3000»: 3000 yen', async () => {
+    const s = await setup({ business: business(JAPANESE) });
+    await s.show(page([]));
+    s.answer(201, ROWS[0]);
+    s.member().vm.$emit('update:modelValue', { id: 'm9', label: 'Carla' });
+    await ionValue(s.el('service-professionals-price'), '3000', 'ionInput');
+    await click(s.el('service-professionals-assign'));
+    expect(s.sent().map((call) => call.body)).toEqual([{ service_id: 's1', member_id: 'm9', custom_price: 3000 }]);
+  });
+
+  it('the business answers late: an own price nobody touched is rewritten in its decimals and Save stays off', async () => {
+    const s = await setup({ business: null });
+    await s.show(page([row('a2', { custom_price: 2500, price: 2500 })]));
+    expect(s.el('service-professionals-price-a2').value).toBe('25.00');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.el('service-professionals-price-a2').value).toBe('2500');
+    expect(s.el('service-professionals-save-a2').disabled).toBe(true);
+  });
+});
 
 describe('ServiceProfessionals', () => {
   it('follows who performs the service, main service first, with their time and price', async () => {

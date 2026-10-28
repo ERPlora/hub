@@ -51,8 +51,15 @@ describe('searchServiceCategories', () => {
 describe('searchServices', () => {
   it('offers the offered services with their price', async () => {
     const { client: c, call } = client([{ id: 's1', name: 'Cut', price: 2000 }]);
-    expect(await searchServices(c, 'es')('cu')).toEqual([{ id: 's1', label: 'Cut', hint: expect.stringMatching(/^20,00\s€$/) }]);
+    expect(await searchServices(c, 'es', { currency: 'EUR', decimals: 2 })('cu')).toEqual([{ id: 's1', label: 'Cut', hint: expect.stringMatching(/^20,00\s€$/) }]);
     expect(call).toHaveBeenCalledWith('service.service.list', { search: 'cu', limit: 20 });
+  });
+
+  // flow service-business-currency: the hint is the business's currency; a bare figure until it answers.
+  it('paints the price in the business currency it is given, and a bare figure without it', async () => {
+    const { client: c } = client([{ id: 's1', name: 'Cut', price: 1500 }]);
+    expect(await searchServices(c, 'en', { currency: 'JPY', decimals: 0 })('cu')).toEqual([{ id: 's1', label: 'Cut', hint: '¥1,500' }]);
+    expect(await searchServices(c, 'en')('cu')).toEqual([{ id: 's1', label: 'Cut', hint: '15.00' }]);
   });
 });
 

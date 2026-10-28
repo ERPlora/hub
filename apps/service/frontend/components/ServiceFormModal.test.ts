@@ -7,7 +7,7 @@ import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ServiceOut, SettingsOut } from '../operations';
-import { click, ionValue, mountService, page, settle } from '../__tests__/mount-service';
+import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
 import ServiceProfessionals from './ServiceProfessionals.vue';
 
@@ -64,8 +64,8 @@ const SETTINGS: SettingsOut = {
   updated_at: null,
 };
 
-async function setup(service: ServiceOut | null = null, locale: 'en' | 'es' = 'en', canChange = true) {
-  const m = await mountService(ServiceFormModal, { props: { open: false, service, canChange }, locale });
+async function setup(service: ServiceOut | null = null, locale: 'en' | 'es' = 'en', canChange = true, options: MountOptions = {}) {
+  const m = await mountService(ServiceFormModal, { props: { open: false, service, canChange }, locale, ...options });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -86,7 +86,7 @@ describe('ServiceFormModal: New service', () => {
     expect([s.field('name').label, s.field('pricing_type').label, s.field('price').label, s.field('duration').label]).toEqual([
       'Name',
       'Pricing',
-      'Price',
+      'Price (EUR)',
       'Duration (min)',
     ]);
     expect([s.combo('service-form-category').props('label'), s.combo('service-form-category').props('placeholder')]).toEqual([
@@ -180,8 +180,72 @@ describe('ServiceFormModal: Editing service — {name}', () => {
   it('speaks Spanish', async () => {
     const s = await setup(CUT, 'es');
     expect(s.inDoc('service-form')?.getAttribute('aria-label')).toBe('Editando servicio — Cut');
-    expect([s.field('pricing_type').label, s.combo('service-form-category').props('placeholder')]).toEqual(['Tarifa', 'Sin categoría']);
+    expect([s.field('pricing_type').label, s.field('price').label, s.combo('service-form-category').props('placeholder')]).toEqual([
+      'Tarifa',
+      'Precio (EUR)',
+      'Sin categoría',
+    ]);
     expect(s.save().textContent).toContain('Guardar cambios');
+  });
+});
+
+// flow service-business-currency: the price is typed, read and saved in the business's currency (its country's),
+// in its minor units: «1500» is 1500 yen in Japan, as Sales then charges it; never a euro fixed in the app.
+describe('ServiceFormModal: in the business currency (service-business-currency)', () => {
+  it('a business in Japan types «1500» and the service is saved at 1500 yen, under «Price (JPY)»', async () => {
+    const s = await setup(null, 'en', true, { business: business(JAPANESE) });
+    await s.result('service.settings.get', SETTINGS);
+    s.answer(201, CUT);
+    expect(s.field('price').label).toBe('Price (JPY)');
+    await ionValue(s.field('name'), 'Haircut', 'ionInput');
+    await ionValue(s.field('price'), '1500', 'ionInput');
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
+  });
+
+  it('a business in Poland edits the price in złoty: «24,50 zł» is 2450 grosze', async () => {
+    const s = await setup(CUT, 'en', true, { business: business(POLISH) });
+    expect([s.field('price').label, s.field('price').value]).toEqual(['Price (PLN)', '20.00']);
+    s.answer(200, CUT);
+    await ionValue(s.field('price'), '24,50 zł', 'ionInput');
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', price: 2450 }]);
+  });
+
+  it('a price in another currency’s sign is not an amount and nothing is sent', async () => {
+    const s = await setup(CUT, 'en', true, { business: business(POLISH) });
+    await ionValue(s.field('price'), '24,50 €', 'ionInput');
+    await click(s.save());
+    expect(s.sent()).toEqual([]);
+    expect(s.field('price').errorText).toBe('This is not an amount. Type a figure, for example 12.50.');
+  });
+
+  it('says «Price» without a code until the business answers', async () => {
+    const s = await setup(null, 'en', true, { business: null });
+    expect(s.field('price').label).toBe('Price');
+  });
+
+  it('the business answers with the form open: the untouched price is rewritten in its decimals and not sent', async () => {
+    const s = await setup({ ...CUT, price: 1500 }, 'en', true, { business: null });
+    expect(s.field('price').value).toBe('15.00');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('price').value).toBe('1500');
+    s.answer(200, CUT);
+    await ionValue(s.field('name'), 'Cut and wash', 'ionInput');
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', name: 'Cut and wash' }]);
+  });
+
+  it('what was typed before the business answered stays as typed and is read in its currency', async () => {
+    const s = await setup(null, 'en', true, { business: null });
+    await s.result('service.settings.get', SETTINGS);
+    await ionValue(s.field('name'), 'Haircut', 'ionInput');
+    await ionValue(s.field('price'), '1500', 'ionInput');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('price').value).toBe('1500');
+    s.answer(201, CUT);
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
   });
 });
 

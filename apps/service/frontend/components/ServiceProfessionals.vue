@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // SERVICE-F31, F32 «Profesionales que lo hacen» (the old Staff record's «Servicios que realiza», now on
 // the service, as Fresha, Square or Vagaro): the live `service.assignment.list` of the service, each
-// with what it lasts and costs with that person and their main service marked with a filled star (the
+// with what it lasts and costs with that person (in the business's currency, service-business-currency) and their
+// main service marked with a filled star (the
 // old Staff record's). Whoever may edit services assigns someone of Staff (searched on the server) with
 // their own minutes and price, changes those (empty = the service's), marks the main service with the
 // empty star of a row, switches one off or removes it. Changes come
@@ -14,7 +15,7 @@ import { IonButton, IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney } from '../lib/format';
+import { formatMoney, type Money, useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchMembers } from '../lib/pickers';
 import type { AssignmentOut } from '../operations';
@@ -34,6 +35,7 @@ interface Draft {
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
+const money = useBusinessMoney();
 const searchStaff = searchMembers(client);
 
 const { data, status, error: loadFailure, refresh } = useLive('service.assignment.list', () => ({ service_id: props.serviceId, limit: 100 }));
@@ -52,9 +54,10 @@ const failure = ref<ApiError | null>(null);
 const newcomer = ref<{ member: ComboOption | null; minutes: string; price: string }>({ member: null, minutes: '', price: '' });
 const drafts = ref<Record<string, Draft>>({});
 
-const ownOf = (row: AssignmentOut): Draft => ({
+/** A row's own minutes and price as its fields show them, the price in the decimals of `currency`. */
+const ownOf = (row: AssignmentOut, currency: Money | undefined): Draft => ({
   minutes: row.custom_duration === null ? '' : String(row.custom_duration),
-  price: moneyFieldText(row.custom_price, locale.value),
+  price: moneyFieldText(row.custom_price, locale.value, currency),
 });
 
 // What the server says resets the rows the person is not editing.
@@ -62,16 +65,28 @@ watch(
   rows,
   (now) => {
     const next: Record<string, Draft> = {};
-    for (const row of now) next[row.id] = changed(row) ? drafts.value[row.id] : ownOf(row);
+    for (const row of now) next[row.id] = changed(row) ? drafts.value[row.id] : ownOf(row, money.value);
     drafts.value = next;
   },
   { immediate: true },
 );
 
+// The business answers (or its currency changes): an own price nobody is editing is rewritten with the currency's
+// decimals («25.00» → «2500» in yen), so it does not look changed; what was typed stays, read in the new currency.
+watch(money, (now, before) => {
+  const next: Record<string, Draft> = {};
+  for (const row of rows.value) {
+    const draft = drafts.value[row.id];
+    const untouched = !draft || draft.price.trim() === ownOf(row, before).price;
+    next[row.id] = untouched ? { ...(draft ?? ownOf(row, now)), price: ownOf(row, now).price } : draft;
+  }
+  drafts.value = next;
+});
+
 function changed(row: AssignmentOut): boolean {
   const draft = drafts.value[row.id];
   if (!draft) return false;
-  const own = ownOf(row);
+  const own = ownOf(row, money.value);
   return draft.minutes.trim() !== own.minutes || draft.price.trim() !== own.price;
 }
 
@@ -84,7 +99,7 @@ const minutes = (value: string): number | null => {
 };
 /** Cents of a price field (empty = none); `undefined` when it is not an amount (the field says why). */
 const cents = (value: string): number | null | undefined => {
-  const read = parseMoney(value);
+  const read = parseMoney(value, money.value);
   return read.ok ? read.cents : undefined;
 };
 
@@ -116,7 +131,7 @@ async function saveOwn(row: AssignmentOut): Promise<void> {
   const draft = drafts.value[row.id];
   const custom = cents(draft.price);
   if (custom === undefined) return;
-  const own = ownOf(row);
+  const own = ownOf(row, money.value);
   const body = {
     id: row.id,
     ...(draft.minutes.trim() !== own.minutes ? { custom_duration: minutes(draft.minutes) } : {}),
@@ -217,7 +232,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
           />
           <strong>{{ row.member_name }}</strong>
           <span class="service-professionals__own">
-            {{ t('service.professionals.own', { duration: row.duration, price: formatMoney(row.price, locale) }) }}
+            {{ t('service.professionals.own', { duration: row.duration, price: formatMoney(row.price, locale, money) }) }}
           </span>
         </div>
         <div
@@ -239,7 +254,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
           <MoneyInput
             :testid="`service-professionals-price-${row.id}`"
             :model-value="drafts[row.id]?.price ?? ''"
-            :label="t('service.professionals.price')"
+            :label="money ? t('service.professionals.priceIn', { currency: money.currency }) : t('service.professionals.price')"
             @update:model-value="setDraft(row.id, { price: $event })"
           />
           <ion-button
@@ -298,7 +313,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
       <MoneyInput
         v-model="newcomer.price"
         testid="service-professionals-price"
-        :label="t('service.professionals.price')"
+        :label="money ? t('service.professionals.priceIn', { currency: money.currency }) : t('service.professionals.price')"
       />
       <ion-button
         data-testid="service-professionals-assign"

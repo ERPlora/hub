@@ -7,7 +7,7 @@ import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { click, EMPLOYEE, flush, MANAGER, type MountOptions, mountService, page } from '../__tests__/mount-service';
+import { business, click, EMPLOYEE, flush, MANAGER, type MountOptions, mountService, page, POLISH } from '../__tests__/mount-service';
 import { pkg } from '../__tests__/package';
 import GrantsSheet from '../components/GrantsSheet.vue';
 import MovementsSheet from '../components/MovementsSheet.vue';
@@ -54,6 +54,15 @@ describe('PackagesPage', () => {
     ]);
     expect(s.cells(0).slice(0, 5)).toEqual(['Bono 5 cortes', '10.5%', '€90.00', '1', 'Active']);
     expect(s.cells(1).slice(1, 5)).toEqual(['€5.00', '—', '1', 'Archived']);
+  });
+
+  // flow service-business-currency: the closed price and an amount off are the business's currency.
+  it('paints the closed price and an amount off in złoty for a business in Poland, never in euros', async () => {
+    const s = await setup({ business: business(POLISH) });
+    await s.show(page(ROWS));
+    expect(s.cells(0)[2].replace(/\s/g, ' ')).toBe('zł 90.00');
+    expect(s.cells(1)[1].replace(/\s/g, ' ')).toBe('zł 5.00');
+    expect(s.wrapper.text()).not.toContain('€');
   });
 
   it('a voucher with no discount says «—», never «-0 %» or «€0.00» (services#166)', async () => {

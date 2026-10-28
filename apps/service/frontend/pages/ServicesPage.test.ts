@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { ServiceOut } from '../operations';
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountService, OWNER, page } from '../__tests__/mount-service';
+import { business, EMPLOYEE, flush, JAPANESE, MANAGER, type MountOptions, mountService, OWNER, page, POLISH } from '../__tests__/mount-service';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import ServicesPage from './ServicesPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -266,6 +266,46 @@ describe('ServicesPage', () => {
     const employee = await setup({ session: EMPLOYEE });
     await employee.show(page(ROWS));
     expect([employee.prop('addable'), employee.prop('rowClickable'), employee.actions(ROWS[0])]).toEqual([true, false, []]);
+  });
+
+  // flow service-business-currency: the price is the business's (its country's), never a euro fixed in the app.
+  describe('in the business currency (service-business-currency)', () => {
+    it('paints the price in złoty for a business in Poland, never in euros', async () => {
+      const s = await setup({ business: business(POLISH) });
+      await s.show(page(ROWS));
+      expect(s.cells(0)[3].replace(/\s/g, ' ')).toBe('zł 22.50');
+      expect(s.wrapper.text()).not.toContain('€');
+    });
+
+    it('paints a price of 1500 yen as ¥1,500 for a business in Japan: the yen has no minor units', async () => {
+      const s = await setup({ business: business(JAPANESE) });
+      await s.show(page([service('s1', { price: 1500 })]));
+      expect(s.cells(0)[3]).toBe('¥1,500');
+    });
+
+    it('paints a figure without a symbol until the business answers', async () => {
+      const s = await setup({ business: null });
+      await s.show(page(ROWS));
+      expect(s.cells(0)[3]).toBe('22.50');
+    });
+
+    it('reads the price filter in the business currency’s minor units: «1500» is 1500 yen', async () => {
+      const s = await setup({ business: business(JAPANESE) });
+      s.table().vm.$emit('filtersChange', { price_from: '1500', price_to: '¥2,000' });
+      await flush();
+      expect(s.list()).toEqual([{ price_min: 1500, price_max: 2000, sort: 'name', limit: 50, offset: 0 }]);
+    });
+
+    it('a price filter typed before the business answers is read again in its currency, from the first page', async () => {
+      const s = await setup({ business: null });
+      s.table().vm.$emit('filtersChange', { price_from: '1500' });
+      await flush();
+      s.table().vm.$emit('pageChange', 2);
+      await flush();
+      expect(s.list()).toEqual([{ price_min: 150000, sort: 'name', limit: 50, offset: 100 }]);
+      await s.result('base.business.get', business(JAPANESE));
+      expect(s.list()).toEqual([{ price_min: 1500, sort: 'name', limit: 50, offset: 0 }]);
+    });
   });
 
   it('speaks Spanish', async () => {
