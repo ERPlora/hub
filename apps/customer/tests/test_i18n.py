@@ -94,6 +94,7 @@ def visible_texts() -> set[str]:
         models.Consent.Channel,
         models.Consent.State,
         models.Consent.Source,
+        models.HealthRecord.TestResult,
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
