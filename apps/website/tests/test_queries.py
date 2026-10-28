@@ -15,6 +15,7 @@ from apps.website.queries import catalog_cache_key, live_version, published_page
 from apps.website.schemas import CatalogSection
 from apps.website import reviews
 from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
+from base.models import Hub
 
 pytestmark = pytest.mark.django_db
 
@@ -225,7 +226,17 @@ def test_a_hidden_gallery_leaves_no_photo_in_the_public_site(hub_files):
     assert gallery.model_dump() == {"hidden": True, "title": "", "images": []}
 
 
+def business_in(country: str, slug: str = "a") -> None:
+    """``slug``'s business as erplora.com registered it in ``country``: its currency is its country's (BASE-F50)."""
+    Hub.objects.filter(slug=slug).update(country=country)
+
+
+def price_labels(out) -> dict[str, str]:
+    return {item.name: item.price_label for group in out.groups for item in group.items}
+
+
 def test_the_public_catalog_is_read_live_priced_for_the_visitor_and_cached_a_minute(services_catalog):
+    business_in("ES")
     save()
     run("website.site.publish")
     from apps.service.models import Service
@@ -234,10 +245,51 @@ def test_the_public_catalog_is_read_live_priced_for_the_visitor_and_cached_a_min
     out = run("website.public.catalog", ctx=with_language(visitor(), "es"))
     hair = next(group for group in out.groups if group.name == "Hair")
     assert [(item.name, item.price_label) for item in hair.items] == [("Beard", "9,00\xa0€"), ("Cut", "15,00\xa0€")]
-    assert cache.get(catalog_cache_key("a", 1, "es")) is not None
+    assert cache.get(catalog_cache_key("a", 1, "es", "EUR")) is not None
     Service.objects.filter(name="Beard").update(is_active=False)
     cached = run("website.public.catalog", ctx=with_language(visitor(), "es"))
     assert "Beard" in [item.name for group in cached.groups for item in group.items]
+
+
+@pytest.mark.parametrize(
+    ("country", "cut", "manicure"),
+    [
+        ("PL", "15,00\xa0PLN", "20,00\xa0PLN"),
+        # The yen has no minor unit: a price of 1500 is ¥1,500, never ¥15.
+        ("JP", "1.500\xa0JPY", "2.000\xa0JPY"),
+    ],
+)
+def test_the_public_catalog_is_priced_in_the_business_s_currency(services_catalog, country, cut, manicure):
+    # flow: website-business-currency — the currency of the business's country, with its decimals, never the euro.
+    business_in(country)
+    save()
+    run("website.site.publish")
+    labels = price_labels(run("website.public.catalog", ctx=with_language(visitor(), "es")))
+    assert labels["Cut"] == cut
+    assert labels["Manicure"].startswith(manicure)
+    assert labels["Advice"] == ""
+    assert not any("€" in label for label in labels.values())
+
+
+@pytest.mark.usefixtures("website_manifest")
+def test_the_editors_preview_prices_in_the_business_s_currency(services_catalog):
+    # flow: website-business-currency — the preview paints the page the visitors will see, in the same currency.
+    business_in("PL")
+    save()
+    html = run("website.site.preview").html
+    assert "PLN15.00" in html
+    assert "€" not in html
+
+
+def test_the_public_catalog_follows_a_change_of_the_business_s_country_at_once(services_catalog):
+    # The catalog is kept a minute: a business whose country (hence its currency) changes on erplora.com is never
+    # priced in the old one meanwhile.
+    business_in("ES")
+    save()
+    run("website.site.publish")
+    assert price_labels(run("website.public.catalog", ctx=with_language(visitor(), "es")))["Cut"] == "15,00\xa0€"
+    business_in("PL")
+    assert price_labels(run("website.public.catalog", ctx=with_language(visitor(), "es")))["Cut"] == "15,00\xa0PLN"
 
 
 def test_the_public_catalog_of_an_unpublished_site_is_not_found():

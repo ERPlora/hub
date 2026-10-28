@@ -11,8 +11,10 @@ script is the public bundle, ``frontend/website.ts``. The chrome (« Log in », 
 visitor's language; what the owner wrote is shown as written.
 
 The catalog is painted from a snapshot (``published_content["catalog"]``, or the preview's fresh read) in a block the
-bundle refreshes (``data-ep-block="catalog"``); :func:`catalog_view` prices it for the language, and the public
-catalog API answers the same shape.
+bundle refreshes (``data-ep-block="catalog"``); :func:`catalog_view` prices it for the language in the business's
+currency (the caller asks ``base.operations.business_currency``: the snapshot keeps the bare price, in the currency's
+minor unit, so a page painted after the business's country changes is in the new one), and the public catalog API
+answers the same shape.
 
 The header invites to write (WhatsApp, else the contact section) and to come (the address), and the opening hours
 mark today, the business's own day (:func:`local_day`, in the hub's time zone; Spain's when it has none): the caller
@@ -36,9 +38,8 @@ from live.markdown import render_markdown
 
 from apps.website.palettes import BLACK, WHITE, mix, resolve, rgb
 from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
+from base.business import currency_decimals
 
-#: The currency of the prices (ERPlora sells in Spain; the sale's own default).
-CURRENCY = "EUR"
 #: The sections between the hero and the footer, in their order.
 BODY_SECTIONS = ("about", "catalog", "gallery", "reviews", "contact", "location")
 #: The business's time zone when its hub has none: ERPlora sells in Spain.
@@ -91,6 +92,7 @@ def render_site(
     lang: str,
     *,
     hub: str,
+    currency: str,
     catalog: dict | None = None,
     request: Any = None,
     preview: bool = False,
@@ -99,7 +101,7 @@ def render_site(
 ) -> str:
     """The page of ``template`` with ``theme`` and ``content`` in ``lang``, for the hub whose slug is ``hub``.
 
-    ``catalog`` is the snapshot the catalog section paints; ``preview`` marks the editor's preview (not indexed,
+    ``currency`` is the business's (ISO 4217), its catalog's prices'; ``catalog`` is the snapshot the catalog section paints; ``preview`` marks the editor's preview (not indexed,
     links inert, no refresh); ``today`` (``mon`` … ``sun``, :func:`local_day`) is marked in the opening hours;
     ``reviews`` is Google's answer for the reviews section's place (``apps.website.reviews``), or ``None``.
     ``request`` is accepted for symmetry with Django's renderers and never used: the HTML must not depend on who
@@ -111,7 +113,7 @@ def render_site(
     valid_theme = Theme.model_validate(theme or {})
     valid_content = Content.model_validate(content or {})
     with translation.override(lang):
-        body = _body(valid_content, catalog, today, reviews, preview)
+        body = _body(valid_content, catalog, currency, today, reviews, preview)
         site_name = valid_content.topbar.name or hub
         context = {
             "lang": lang,
@@ -164,8 +166,9 @@ def _calls_to_action(body: list[dict]) -> list[dict]:
     return ctas
 
 
-def catalog_view(catalog: dict | None) -> dict:
-    """``catalog`` (a snapshot) with each item's price label in the active language; ``{}`` without a source."""
+def catalog_view(catalog: dict | None, currency: str) -> dict:
+    """``catalog`` (a snapshot) with each item's price label in the active language and in ``currency``, the
+    business's; ``{}`` without a source."""
     if not catalog or not catalog.get("source"):
         return {}
     show_prices = bool(catalog.get("show_prices", True))
@@ -178,7 +181,7 @@ def catalog_view(catalog: dict | None) -> dict:
                     "price": item.get("price") if show_prices else None,
                     "price_kind": item.get("price_kind", "none") if show_prices else "none",
                     "minutes": item.get("minutes"),
-                    "price_label": price_label(item) if show_prices else "",
+                    "price_label": price_label(item, currency) if show_prices else "",
                 }
                 for item in group.get("items", [])
             ],
@@ -188,15 +191,18 @@ def catalog_view(catalog: dict | None) -> dict:
     return {"source": catalog["source"], "show_prices": show_prices, "groups": groups}
 
 
-def price_label(item: dict) -> str:
-    """How the page prints an item's price: «€15.00», «From €40.00», «€20.00 / hour», «Free» or nothing."""
+def price_label(item: dict, currency: str) -> str:
+    """How the page prints an item's price in ``currency``: «€15.00», «From €40.00», «€20.00 / hour», «Free» or
+    nothing. The price is in the currency's minor unit (as Sales reads it): 1500 is €15.00, ¥1,500 or 1.500 KWD."""
     kind, price = item.get("price_kind", "none"), item.get("price")
     if kind == "free":
         return pgettext("website price", "Free")
     if kind == "none" or price is None:
         return ""
     amount = format_currency(
-        Decimal(price).scaleb(-2), CURRENCY, locale=translation.to_locale(translation.get_language() or "en")
+        Decimal(price).scaleb(-currency_decimals(currency)),
+        currency,
+        locale=translation.to_locale(translation.get_language() or "en"),
     )
     if kind == "from":
         return gettext("From %(price)s") % {"price": amount}
@@ -260,7 +266,12 @@ def _variables(colours: dict[str, str]) -> dict[str, str]:
 
 
 def _body(
-    content: Content, catalog: dict | None, today: str | None, reviews: dict | None = None, preview: bool = False
+    content: Content,
+    catalog: dict | None,
+    currency: str,
+    today: str | None,
+    reviews: dict | None = None,
+    preview: bool = False,
 ) -> list[dict]:
     """The sections between the hero and the footer that are shown and have something to show."""
     eyebrows = _eyebrows()
@@ -270,7 +281,7 @@ def _body(
         if section.hidden:
             continue
         if name == "catalog":
-            data = _catalog(section, catalog)
+            data = _catalog(section, catalog, currency)
         elif name == "contact":
             data = _contact(section, today)
         elif name == "reviews":
@@ -378,10 +389,10 @@ def _ago(moment: str) -> str:
     return gettext("%(time)s ago") % {"time": timesince(when, depth=1)}
 
 
-def _catalog(section, catalog: dict | None) -> dict | None:
+def _catalog(section, catalog: dict | None, currency: str) -> dict | None:
     if section.source is None:
         return None
-    view = catalog_view(catalog) or {"source": section.source, "show_prices": section.show_prices, "groups": []}
+    view = catalog_view(catalog, currency) or {"source": section.source, "show_prices": section.show_prices, "groups": []}
     default_title = (
         pgettext("website", "Our services") if section.source == "service" else pgettext("website", "Our products")
     )

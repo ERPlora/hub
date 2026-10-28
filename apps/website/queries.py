@@ -6,14 +6,17 @@
   ``website.public.reviews`` answer only while the module is on in the hub (404 ``app_inactive`` otherwise) and the hub's own site is published
   and live (404 ``website.not_published`` otherwise), the same guard ``/`` applies (``public_home.is_published``,
   through :func:`live_version`), and count each visitor (``base.throttle``: 60 a minute per hub and address, then
-  429 ``base.rate_limited``). The catalog is read live and kept a minute per hub, version and language; the reviews
-  are those kept (``apps.website.reviews``: a read never asks Google).
+  429 ``base.rate_limited``). The catalog is read live and kept a minute per hub, version, language and currency; the
+  reviews are those kept (``apps.website.reviews``: a read never asks Google).
 - **The catalog** (``read_catalog``): Inventory's products on sale or Services' offered services, read by their
   operations' names with a context that may read them (as ``apps.flow`` does), only while that app is on in the hub
   (``base.relay.active_apps``, the website's own guard); an app that is off or not there leaves the catalog empty,
   never an error.
 - ``published_page`` and ``live_version`` are what ``public_home`` reads; ``page_cache_key`` and
   ``catalog_cache_key`` name what is cached, and ``forget_cached`` drops a version's entries.
+- **The prices** are in the business's currency, asked of ``base`` (``base.operations.business_currency``, BASE-F50)
+  when they are painted, never kept with the snapshot: it is in every key of what is cached, so a business whose
+  country (hence its currency) changes on erplora.com is never shown the old one until an entry expires.
 
 Every read is of the request hub's own row (``hub_id``; phase 1: the tables are shared, models.py).
 """
@@ -54,7 +57,7 @@ from apps.website.schemas import (
     Theme,
 )
 from base import relay
-from base.operations import hub_id
+from base.operations import business_currency, hub_id
 from base.registry import hub_by_slug
 from base.throttle import RateLimited, allow, client_address
 
@@ -180,6 +183,7 @@ def preview_site(ctx: OperationContext, data: NoIn) -> dict:
         now["content"],
         ctx.language,
         hub=ctx.scope.key,
+        currency=business_currency(ctx.scope),
         catalog=catalog,
         preview=True,
         today=business_day(ctx.scope),
@@ -328,7 +332,8 @@ def public_site(ctx: OperationContext, data: NoIn) -> dict:
 def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
     _count_visitor(ctx)
     site = _live_site(ctx.scope)
-    key = catalog_cache_key(ctx.scope.key, site.published_version, ctx.language)
+    currency = business_currency(ctx.scope)
+    key = catalog_cache_key(ctx.scope.key, site.published_version, ctx.language, currency)
     cached = cache.get(key)
     if cached is not None:
         return cached
@@ -336,7 +341,7 @@ def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
     if section.hidden:
         section = CatalogSection(hidden=True)
     with translation.override(ctx.language):
-        view = catalog_view(read_catalog(ctx, section)) or {"source": None, "show_prices": True, "groups": []}
+        view = catalog_view(read_catalog(ctx, section), currency) or {"source": None, "show_prices": True, "groups": []}
     cache.set(key, view, CATALOG_TTL)
     return view
 
@@ -361,23 +366,24 @@ def public_reviews(ctx: OperationContext, data: NoIn) -> dict:
 # The cache
 
 
-def page_cache_key(slug: str, version: int, lang: str, day: str) -> str:
+def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str) -> str:
     """The rendered page of ``slug``'s publication ``version`` in ``lang`` on ``day`` (the opening hours mark today),
-    for this deploy's bundle."""
-    return f"website:home:{slug}:{version}:{lang}:{day}:{settings.APP_VERSION}"
+    priced in ``currency`` (the business's), for this deploy's bundle."""
+    return f"website:home:{slug}:{version}:{lang}:{day}:{currency}:{settings.APP_VERSION}"
 
 
-def catalog_cache_key(slug: str, version: int, lang: str) -> str:
-    return f"website:catalog:{slug}:{version}:{lang}"
+def catalog_cache_key(slug: str, version: int, lang: str, currency: str) -> str:
+    return f"website:catalog:{slug}:{version}:{lang}:{currency}"
 
 
-def forget_cached(slug: str, version: int) -> None:
-    """Drop the page and the catalog of ``slug``'s publication ``version`` in every language and on every day (after a
-    COMMIT)."""
+def forget_cached(slug: str, version: int, currency: str) -> None:
+    """Drop the page and the catalog of ``slug``'s publication ``version`` priced in ``currency`` (the business's) in
+    every language and on every day (after a COMMIT). What was kept in another currency, before the business's
+    country changed, is never read again (its key names that currency) and expires."""
     languages = [code for code, _name in settings.LANGUAGES]
     cache.delete_many(
-        [page_cache_key(slug, version, lang, day) for lang in languages for day in DAYS]
-        + [catalog_cache_key(slug, version, lang) for lang in languages]
+        [page_cache_key(slug, version, lang, day, currency) for lang in languages for day in DAYS]
+        + [catalog_cache_key(slug, version, lang, currency) for lang in languages]
     )
 
 

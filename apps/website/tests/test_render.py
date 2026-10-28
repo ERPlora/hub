@@ -42,14 +42,24 @@ DEFAULT = object()
 
 
 def render(
-    template="classic", content=None, lang="en", catalog=None, preview=False, theme=None, today=None, reviews=DEFAULT
+    template="classic",
+    content=None,
+    lang="en",
+    catalog=None,
+    preview=False,
+    theme=None,
+    today=None,
+    reviews=DEFAULT,
+    currency="EUR",
 ) -> str:
+    # A business in Spain (its prices in euros) unless a test says otherwise.
     return render_site(
         template,
         theme or THEME,
         full_content(gallery=gallery(), reviews={"place_ref": PLACE_ID}) if content is None else content,
         lang,
         hub="a",
+        currency=currency,
         catalog=catalog_snapshot() if catalog is None else catalog,
         preview=preview,
         today=today,
@@ -97,6 +107,24 @@ def test_the_catalog_comes_from_the_snapshot_in_a_block_the_bundle_refreshes(tem
     assert "data-ep-empty=" in block
     for text in ("Hair", "Cut", "30 min", "€15.00", "Colour", "From €40.00", "Consultation", "Free"):
         assert text in html, text
+
+
+@pytest.mark.parametrize(
+    ("currency", "lang", "labels"),
+    [
+        ("PLN", "en", ("PLN15.00", "From PLN40.00")),
+        ("PLN", "es", ("15,00\xa0PLN", "Desde 40,00\xa0PLN")),
+        # The price is in the currency's minor unit: the yen has none, the Kuwaiti dinar has three.
+        ("JPY", "en", ("¥1,500", "From ¥4,000")),
+        ("KWD", "es", ("1,500\xa0KWD", "Desde 4,000\xa0KWD")),
+    ],
+)
+def test_the_prices_are_in_the_business_s_currency_with_its_decimals(currency, lang, labels):
+    # flow: website-business-currency — a business outside the euro sees its own currency on its page, never euros.
+    html = render(lang=lang, currency=currency)
+    for label in labels:
+        assert label in html, label
+    assert "€" not in html
 
 
 def test_the_four_templates_are_four_different_pages():

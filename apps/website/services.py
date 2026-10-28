@@ -53,7 +53,7 @@ from apps.website.schemas import (
     SiteOut,
 )
 from apps.website.storage import image_key, image_url
-from base.operations import hub_id
+from base.operations import business_currency, hub_id
 
 #: The longest side of an image the website takes, in pixels.
 MAX_IMAGE_SIDE = 8000
@@ -175,7 +175,7 @@ def publish_site(ctx: OperationContext, data: NoIn) -> dict:
     site.updated_by = _actor(ctx)
     site.save()
     record_event(ctx, events.SITE_PUBLISHED, {"id": str(site.id), "version": site.published_version})
-    transaction.on_commit(partial(forget_cached, ctx.scope.key, previous), robust=True)
+    transaction.on_commit(partial(forget_cached, ctx.scope.key, previous, business_currency(ctx.scope)), robust=True)
     transaction.on_commit(partial(refresh_reviews, ctx.scope, site.published_content["content"], again=True), robust=True)
     return _publication(site)
 
@@ -202,7 +202,9 @@ def unpublish_site(ctx: OperationContext, data: NoIn) -> dict:
         site.updated_by = _actor(ctx)
         site.save()
         record_event(ctx, events.SITE_UNPUBLISHED, {"id": str(site.id), "version": site.published_version})
-        transaction.on_commit(partial(forget_cached, ctx.scope.key, site.published_version), robust=True)
+        transaction.on_commit(
+            partial(forget_cached, ctx.scope.key, site.published_version, business_currency(ctx.scope)), robust=True
+        )
     return _publication(site)
 
 

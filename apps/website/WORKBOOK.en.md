@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ee9744d67c7dde4288c5c05d0f675d2e83ee62cdac4490a545422d780050aca3 -->
+<!-- generated from WORKBOOK.md sha256:2e40b9469c72a40e14e0d76eee58213bc85fc52db0c7ae2de74de438bafa7fce -->
 
 ## What it is for and who it is for
 
@@ -118,7 +118,8 @@ when the system asks for less). The browser's tab shows the logo or, without one
 colour. It adapts to phone, tablet and computer (Bootstrap 5.3) with no sideways scrolling, in the
 chosen palette, light or dark; in auto it follows the visitor's device, also when it changes with the page open
 (without JavaScript it shows light). The catalog is painted with what was published and, when the page
-opens, refreshed with the products or services of that moment and their prices in the visitor's language. The rest of
+opens, refreshed with the products or services of that moment and their prices in the visitor's language and in the
+business's currency (its country's). The rest of
 the page's texts (Log in, the days, the default headings) come out in the browser's language (English or Spanish);
 what the owner writes, as written.
 
@@ -239,9 +240,11 @@ Steps:
    It saves as in WEBSITE-F01.
 In: the source, the chosen categories and whether prices show.
 Out: on the preview and, once published, on the page: the catalog grouped by category in their order (what has no
-category, last), up to 200 items, with pills to jump between categories when there are two or more. Prices: «€15.00»,
-«From €40.00», «€20.00 / hour» or «Free»; a variable price is not shown. Publishing keeps a copy, and the page
-refreshes it on opening with the products or services of that moment. Notice `website.site.updated`.
+category, last), up to 200 items, with pills to jump between categories when there are two or more. Prices, in the
+business's currency (its country's) with its decimals; for a business in Spain: «€15.00», «From €40.00», «€20.00 /
+hour» or «Free»; a variable price is not shown. Publishing keeps a copy, and the page refreshes it on opening with the
+products or services of that moment; if the business's country changes, the page and the preview come out in the new
+currency at once, without publishing again. Notice `website.site.updated`.
 If it fails: without Inventory or Services on, the note «Turn on Inventory or Services to show your products or
 services here.»; if the saved source is an app that was turned off, «Inventory is not on in this business: your page
 shows no catalog until you turn it on or choose another source.» (or Services) and the page has no catalog, never an
@@ -390,7 +393,7 @@ speaks) and the API, with the same rules and the same permissions.
 | The categories of Inventory or Services to choose from | manage | F05 | `website.catalog.categories` |
 | The QR of the public address, in PNG or SVG | view | F09 | `website.qr.get` |
 | What is published, without the hidden sections (no session) | anyone | F10 | `website.public.site` |
-| The published catalog, read at that moment and with the prices in the asker's language (no session) | anyone | F05, F10 | `website.public.catalog` |
+| The published catalog, read at that moment and with the prices in the asker's language and in the business's currency (no session) | anyone | F05, F10 | `website.public.catalog` |
 | The Google reviews kept for the published site, with their texts in the asker's language (no session; never asks Google) | anyone | F10, F12 | `website.public.reviews` |
 
 The three public ones answer only with the page online (otherwise, 404 `website.not_published`) and count each visitor:
