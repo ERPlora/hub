@@ -15,7 +15,7 @@ import { A, api, HUB_DIR, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, pick, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, openTillCart, stamp } from './sale-helpers';
 import { ownerPage, post, rowAction, settled } from './service-helpers';
-import { bookingDays, bookingTimes, type BookingTimes, untilMidnight } from './table-clock';
+import { bookingDays, bookingTimes, type BookingTimes, RESERVED_LEAD_MINUTES, untilMidnight } from './table-clock';
 
 const RUN = stamp();
 const TAG = `E2E Tbf ${RUN}`;
@@ -687,6 +687,9 @@ test('TABLE-F25, F26, F27, F28: a reservation holds its table, moves it, frees i
   const { context, page } = await ownerPage(browser, '/table/floor-plan');
   try {
     await floor(page);
+    // `soon` is chosen within the lead the plan paints Reserved from: the running server says the same lead.
+    const room = await api<{ reserved_lead_minutes: number }>(context, A, 'GET', '/table/settings');
+    expect(room.data.reserved_lead_minutes).toBe(RESERVED_LEAD_MINUTES);
     const one = await tableNo(context, '1');
     const two = await tableNo(context, '2');
     const reserve = async (guest: string, tableId: string, phone: string, at = soon) => {

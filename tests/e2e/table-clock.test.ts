@@ -55,8 +55,12 @@ describe('bookingTimes', () => {
     for (let minute = 0; minute < 24 * 60; minute += 1) {
       const now = new Date(at('00:00').getTime() + minute * MINUTE + 30_000);
       const times = bookingTimes(now);
-      if (times) expect([times.soon.date, times.evening.date]).toEqual([DAY, DAY]);
-      else expect(untilMidnight(now)).toBeLessThan(10 * MINUTE);
+      if (times) {
+        expect([times.soon.date, times.evening.date]).toEqual([DAY, DAY]);
+        // The margin counts the seconds of the run too, and no time passes the slot's last start (never «24:00»).
+        expect(minutes(times.soon.time) - (minute + 0.5)).toBeGreaterThanOrEqual(MARGIN_MINUTES);
+        expect(times.evening.time < '23:59').toBe(true);
+      } else expect(untilMidnight(now)).toBeLessThan(10 * MINUTE);
     }
   });
 
