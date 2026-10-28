@@ -524,3 +524,34 @@ msgstr "Negativa"
 
 msgid "Positive"
 msgstr "Positiva"
+
+# How the assistant's card names the data of customer's writes (titles of the schemas).
+msgid "Duplicate customer"
+msgstr "Ficha duplicada"
+
+msgid "Group"
+msgstr "Grupo"
+
+msgid "Tag"
+msgstr "Etiqueta"
+
+msgid "Group color"
+msgstr "Color del grupo"
+
+msgid "Tag color"
+msgstr "Color de la etiqueta"
+
+msgid "Custom fields"
+msgstr "Campos personalizados"
+
+msgid "Rows to import"
+msgstr "Filas a importar"
+
+msgid "Note"
+msgstr "Nota"
+
+msgid "Author"
+msgstr "Autor"
+
+msgid "Open order"
+msgstr "Pedido abierto"
