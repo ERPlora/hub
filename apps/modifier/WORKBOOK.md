@@ -458,8 +458,11 @@ cajero del producto actual es un empleado.
   `inventory.category.deleted` → `modifier.link.drop_category`; como sistema (`modifier.system`, que
   ningún papel tiene), sin ruta, idempotentes.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` al borrar
-  un grupo o una opción) y cada campo de `schemas.py` su `description`. `expose_api` en las seis
-  consultas.
+  un grupo o una opción) y cada campo de `schemas.py` su `description`. Los datos que ningún modelo
+  nombra llevan además un `title` en inglés con su `es` en el catálogo de la app (`option` «Opción»,
+  `tax_category_key` «Categoría fiscal propia», el nombre del formulario de opción): así los nombra la
+  tarjeta de confirmación del asistente, nunca por el título que pydantic inventa del campo
+  (`tests/test_integration_assistant.py`). `expose_api` en las seis consultas.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza
