@@ -89,7 +89,7 @@ Clientes se abre desde el menú **Clientes** y tiene cuatro pestañas: **Cliente
 Arriba, cuatro cifras: «Clientes», «Activos», «VIP» e «Ingresos» (lo gastado por las fichas vivas).
 Debajo, la tabla: «Nombre», «Email», «Teléfono», «Etapa» y «Gastado»; buscador «Buscar nombre,
 teléfono o email…» (busca también NIF y empresa); filtros por etapa, origen, activo y gastado
-(«Desde / Hasta», en euros); orden por cualquier columna; 50 por página. En la barra, **Añadir** e
+(«Desde / Hasta», en la moneda del negocio); orden por cualquier columna; 50 por página. En la barra, **Añadir** e
 **Importar CSV** a quien puede gestionar fichas, y **Exportar CSV** a quien puede exportar. Tocar
 una fila abre la ficha.
 
@@ -232,7 +232,8 @@ Pasos:
    mayúsculas ni acentos («garcia» encuentra «García»). Un término hecho solo de cifras y signos de
    teléfono (con espacios, guiones o paréntesis, con `+` o `00` delante) se busca por sus cifras, sin
    el `00` ni el cero nacional, así que la ficha se encuentra se escriba como se escriba.
-2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en euros).
+2. Con los filtros: etapa, origen, activo y gastado por rango («Desde / Hasta», en la moneda del negocio,
+   la de su país en Ajustes → Negocio, con sus decimales: el yen no tiene; con o sin su símbolo, «12,50 zł»).
 3. Ordena por nombre, email, teléfono, etapa, gastado, última compra o fecha de alta. De entrada, por
    nombre de la A a la Z, 50 por página (como mucho 100).
 4. Toca una fila para abrir su ficha (CUSTOMER-F03).
@@ -397,7 +398,8 @@ Pasos:
 Entra: la búsqueda y los filtros de la tabla.
 Sale: un fichero con las columnas `name`, `email`, `phone`, `tax_id`, `company_name`, `address`,
 `city`, `postal_code`, `country`, `lifecycle_stage`, `notes`, `source`, `is_active`,
-`total_purchases`, `total_spent` (en euros, con dos decimales), `last_purchase_at`, `created_at`,
+`total_purchases`, `total_spent` (en la moneda del negocio, con sus decimales: dos en euros o en złoty,
+ninguno en yenes), `last_purchase_at`, `created_at`,
 `groups` y `tags`. Un valor que empieza por `=`, `+`, `-` o `@` (un teléfono, por ejemplo) sale con
 un apóstrofo delante para que la hoja de cálculo no lo lea como una fórmula; la importación lo quita.
 Si falla: sin permiso de exportar, el servidor lo rechaza aunque se llame por la API. Sin fichas,
@@ -703,7 +705,8 @@ Actor: todos
 Pantalla: Ficha de cliente
 Pasos:
 1. Abre la ficha (CUSTOMER-F03).
-2. En «Compras» sale cada venta con su fecha, su importe y su estado («Cobrada» o «Anulada»), y cada
+2. En «Compras» sale cada venta con su fecha, su importe (en la moneda en que se cobró) y su estado
+   («Cobrada» o «Anulada»), y cada
    devolución en su propia línea («Devolución», importe en negativo), la más reciente primero, 50 por
    página; se puede filtrar por estado.
 Entra: el historial de compras de la ficha.
@@ -868,7 +871,8 @@ Pasos:
 1. Abre **Clientes**: arriba, encima de la tabla, salen cuatro cifras: «Clientes», «Activos», «VIP» e
    «Ingresos».
 2. «Clientes» cuenta las fichas que siguen en la lista; «Activos», las que tienen marcada la casilla
-   «Activo»; «VIP», las de la etapa «VIP», e «Ingresos» suma lo que han gastado todas ellas, en euros.
+   «Activo»; «VIP», las de la etapa «VIP», e «Ingresos» suma lo que han gastado todas ellas, en la moneda
+   del negocio.
 3. Las cifras cambian solas, sin recargar, cuando alguien da de alta, edita, elimina, une o borra los
    datos de una ficha, o cuando se cobra, se anula o se devuelve una venta con cliente.
 Entra: nada: cuentan todas las fichas que siguen en la lista, no solo las que deja ver la búsqueda o
@@ -1183,7 +1187,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 - **Un nombre por negocio** entre los grupos, entre las etiquetas y entre los campos, sin distinguir
   mayúsculas ni espacios.
 - **Un dato de salud solo se guarda con el permiso expreso en vigor**, y retirarlo lo borra.
-- **El dinero va en céntimos**; la pantalla escribe los filtros en euros.
+- **El dinero va en céntimos** (la unidad más pequeña de la moneda); la pantalla pinta los importes y
+  escribe los filtros en la moneda del negocio, la de su país en Ajustes → Negocio (euros en España, złoty
+  en Polonia), con sus decimales; mientras el negocio no contesta, una cifra sin símbolo, nunca euros. Cada
+  compra, en la moneda en que se cobró.
 - **Buscar por teléfono nunca devuelve a todos.**
 - **Clientes no depende de ninguna app**: se enciende sola.
 
