@@ -6,7 +6,7 @@
 // which Ionic also marks `.ion-page` and which holds the route's page and the presented dialogs.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, createItem, listReady, login, openApps, rowOf, shot, shown, uniqueName } from './helpers';
+import { A, api, capture, createItem, listReady, login, openApps, rowOf, shown, uniqueName } from './helpers';
 
 const OVERLAYS = 'ion-modal, ion-popover, ion-alert, ion-action-sheet, ion-loading, ion-toast, ion-picker-legacy';
 
@@ -47,9 +47,8 @@ test('with a dialog open, shown(page) is still the page under it, with its rows'
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await expect(rowOf(page, item.id)).toHaveCount(1);
-      // Two frames: Ionic lays the sheet and the page out again after the resize.
-      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-      await page.screenshot({ path: shot(`FIX-HUB-E2E-SHOWN-DIALOG-${viewport.label}`) });
+      // Ionic lays the sheet and the page out again after the resize: `capture` waits until it is painted.
+      await capture(page, `FIX-HUB-E2E-SHOWN-DIALOG-${viewport.label}`);
     }
   } finally {
     const res = await api(context, A, 'POST', '/demo/items/delete', { id: item.id });

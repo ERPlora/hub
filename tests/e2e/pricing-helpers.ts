@@ -3,7 +3,7 @@
 // `cleanPricing()` removes exactly that, in every app it touched, before and after the spec.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, capture, psql, shot, shown } from './helpers';
 
 export const TAG = 'E2E Pricing';
 export const CODE = 'E2EPF';
@@ -52,11 +52,9 @@ export async function shootFlow(page: Page, key: string, restore = DESKTOP): Pro
   const files: string[] = [];
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    // The tables refit to their box; wait for a frame rather than a fixed time.
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    const file = shot(`APP-PRICING-${key}-${viewport.label}`);
-    await page.screenshot({ path: file });
-    files.push(file);
+    // The tables refit to their box: `capture` waits until the page is painted at this size.
+    await capture(page, `APP-PRICING-${key}-${viewport.label}`);
+    files.push(shot(`APP-PRICING-${key}-${viewport.label}`));
   }
   await page.setViewportSize(restore);
   return files;
@@ -72,10 +70,8 @@ export async function shootConfirm(page: Page, key: string, testid: string, open
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await open();
     await expect(page.locator(`[data-testid=${testid}-submit]`)).toBeInViewport();
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    const file = shot(`APP-PRICING-${key}-${viewport.label}`);
-    await page.screenshot({ path: file });
-    files.push(file);
+    await capture(page, `APP-PRICING-${key}-${viewport.label}`);
+    files.push(shot(`APP-PRICING-${key}-${viewport.label}`));
     await page.locator(`[data-testid=${testid}-cancel]`).click();
     await expect(confirm).toBeHidden();
   }

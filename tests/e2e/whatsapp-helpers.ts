@@ -43,7 +43,7 @@ import { dirname, join, resolve } from 'node:path';
 
 import type { APIRequestContext, Page } from '@playwright/test';
 
-import { ARTIFACTS, HUB_DIR, psql, REPO_DIR, SAAS, shot } from './helpers';
+import { ARTIFACTS, capture, HUB_DIR, psql, REPO_DIR, SAAS } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
 import {
@@ -347,7 +347,7 @@ export async function flowShots(page: Page, flow: string, ready: (page: Page) =>
     await ready(page);
     await settled(page);
     await noHorizontalScroll(page, `${flow} ${viewport.label}`);
-    await page.screenshot({ path: shot(`APP-WHATSAPP_INBOX-1-${flow}-${viewport.label}`) });
+    await capture(page, `APP-WHATSAPP_INBOX-1-${flow}-${viewport.label}`);
   }
   await page.setViewportSize({ width: 1280, height: 860 });
 }

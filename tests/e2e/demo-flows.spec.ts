@@ -8,7 +8,7 @@
 // flow: DEMO-F01 DEMO-F02 DEMO-F03 DEMO-F04 DEMO-F05 DEMO-F06
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, createItem, EMPLOYEE, hostPage, listReady, row, rowNames, rowOf, shot, shown, uniqueName } from './helpers';
+import { A, api, capture, createItem, EMPLOYEE, hostPage, listReady, row, rowNames, rowOf, settled, shown, uniqueName } from './helpers';
 
 const FLOW_VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -19,36 +19,17 @@ const FLOW_VIEWPORTS = {
 type Envelope = { id: string; error?: { code: string } };
 
 /**
- * Counts the Ionic overlays sliding in or out (between their «will» and «did» events): their
- * animations run in shadow roots, out of `document.getAnimations()`.
- */
-function countMovingOverlays(): void {
-  const w = window as unknown as { __overlaysMoving: number };
-  w.__overlaysMoving = 0;
-  for (const kind of ['Alert', 'Modal', 'Popover', 'Toast']) {
-    for (const [start, end] of [['WillPresent', 'DidPresent'], ['WillDismiss', 'DidDismiss']]) {
-      document.addEventListener(`ion${kind}${start}`, () => (w.__overlaysMoving += 1));
-      document.addEventListener(`ion${kind}${end}`, () => (w.__overlaysMoving = Math.max(0, w.__overlaysMoving - 1)));
-    }
-  }
-}
-
-/**
- * The capture of `flow` at `width`, once nothing moves (no overlay coming or going, no page
- * transition nor floating label: the finite animations of the document) and nothing scrolls sideways.
+ * The capture of `flow` at `width`, once nothing moves (`settled`: no overlay coming or going in its shadow root, no
+ * page transition nor floating label) and nothing scrolls sideways (`capture`).
  */
 async function snap(page: Page, flow: string, width: string): Promise<void> {
-  await page.waitForFunction(
-    () =>
-      ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0 &&
-      document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity),
-  );
+  await settled(page);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(`APP-DEMO-${flow}-${width}`) });
+  await capture(page, `APP-DEMO-${flow}-${width}`);
 }
 
-/** A signed-in tablet at `viewport` whose pages count the moving overlays, on `next`. */
+/** A signed-in tablet at `viewport`, on `next`. */
 async function tablet(
   browser: Parameters<typeof hostPage>[0],
   viewport: { width: number; height: number },
@@ -56,7 +37,6 @@ async function tablet(
   credentials?: typeof EMPLOYEE,
 ): Promise<{ context: BrowserContext; page: Page }> {
   const signed = await hostPage(browser, A, { viewport, credentials });
-  await signed.context.addInitScript(countMovingOverlays);
   await signed.page.goto(`${A}${next}`);
   return signed;
 }

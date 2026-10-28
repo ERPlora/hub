@@ -86,12 +86,5 @@ export async function noHorizontalScroll(page: Page, label: string): Promise<voi
     .toBeLessThanOrEqual(0);
 }
 
-/** Waits until no finite animation runs (a modal opening, a popover closing), so a screenshot shows the
- *  state the flow reached and not a frame of Ionic's transition; spinners (infinite) do not count. */
-export async function settled(page: Page): Promise<void> {
-  await page.waitForFunction(() =>
-    document
-      .getAnimations()
-      .every((animation) => animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity),
-  );
-}
+/** Waits until nothing moves and the page is painted: helpers.ts's, the one every spec takes. */
+export { settled } from './helpers';

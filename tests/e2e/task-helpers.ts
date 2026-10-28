@@ -4,7 +4,7 @@
 // named «E2E Task …» (projects `e2e-…`) and deleted from the hub's database (phase 1: `a` and `b` share it).
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, type Credentials, login, psql, shot, shown } from './helpers';
+import { A, api, capture, type Credentials, login, psql, shown } from './helpers';
 
 /** Every name a task spec gives starts like this. */
 export const TAG = 'E2E Task';
@@ -44,7 +44,7 @@ export async function snap(page: Page, flow: string, width: number | string): Pr
   await page.waitForFunction(() => ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(`APP-TASK-${flow}-${width}`) });
+  await capture(page, `APP-TASK-${flow}-${width}`);
 }
 
 /** Chooses `label` in an `ion-select` that opens as a popover. */

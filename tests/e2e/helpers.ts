@@ -47,25 +47,56 @@ export async function iconStates(page: Page): Promise<{ name: string; painted: b
   );
 }
 
+/** How long `untilStill` waits for the page to stop moving: Ionic's overlays enter in well under a second. */
+const STILL_TIMEOUT_MS = 10_000;
+
 /**
- * Waits until nothing animates on screen, in the page nor in a shadow root (an `ion-progress-bar` slides its bar
- * there, an `ion-segment` its indicator), a shimmer that never ends aside: a capture taken mid-animation shows a
- * state the screen is leaving.
+ * What moves on the page now (run in the page, so self-contained): every finite animation running in the document
+ * and in every open shadow root under it, however deep. `document.getAnimations()` leaves shadow roots out, and Ionic
+ * animates its overlays (`ion-toast`, `ion-modal`, `ion-popover`), an `ion-progress-bar`'s bar or an `ion-segment`'s
+ * indicator inside theirs. Endless ones (spinners, a shimmer) never stop, so they never count.
+ */
+function movingInPage(): string[] {
+  const roots: Array<Document | ShadowRoot> = [document];
+  const moving: string[] = [];
+  for (const root of roots) {
+    for (const element of root.querySelectorAll('*')) if (element.shadowRoot) roots.push(element.shadowRoot);
+    for (const animation of root.getAnimations()) {
+      if (animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity) continue;
+      const target = (animation.effect as KeyframeEffect | null)?.target;
+      moving.push(`${root instanceof ShadowRoot ? `${root.host.localName} › ` : ''}${target?.localName ?? '?'}`);
+    }
+  }
+  return moving;
+}
+
+/**
+ * Puts `movingInPage` in the page as `window.__movingInPage`, for a probe that runs in the page frame by frame and has
+ * to know, in the same frame, whether anything moves (the same detector as `untilStill`, never a copy of it).
+ */
+export async function exposeMovingInPage(page: Page): Promise<void> {
+  await page.evaluate(`window.__movingInPage = ${movingInPage.toString()}`);
+}
+
+/** A page that navigates while `untilStill` asks what moves: it asks the new page next. Anything else fails the spec. */
+function navigating(error: unknown): string[] {
+  if (error instanceof Error && /Execution context was destroyed/.test(error.message)) return ['(navigating)'];
+  throw error;
+}
+
+/**
+ * Waits until nothing moves on screen (`movingInPage`): a capture taken mid-animation shows a state the screen is
+ * leaving. A page that reloads meanwhile is asked again; one that still moves after `STILL_TIMEOUT_MS` fails the spec,
+ * naming what moves.
  */
 export async function untilStill(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const animations = [...document.getAnimations()];
-    const walk = (root: Document | ShadowRoot) => {
-      for (const el of root.querySelectorAll('*')) {
-        if (el.shadowRoot) {
-          animations.push(...el.shadowRoot.getAnimations());
-          walk(el.shadowRoot);
-        }
-      }
-    };
-    walk(document);
-    return animations.every((a) => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity);
-  });
+  await expect
+    .poll(() => page.evaluate(movingInPage).catch(navigating), {
+      message: 'untilStill(): still moving',
+      timeout: STILL_TIMEOUT_MS,
+      intervals: [16],
+    })
+    .toEqual([]);
 }
 
 /** Path of a screenshot under `.artifacts/` (created on demand). */
@@ -73,6 +104,98 @@ export function shot(name: string): string {
   mkdirSync(ARTIFACTS, { recursive: true });
   return join(ARTIFACTS, `${name}.png`);
 }
+
+/** The fewest rows `repeatedTop` counts as a stripe. */
+const STRIPE_MIN_ROWS = 8;
+
+/**
+ * How many rows at the bottom of `png`, a screenshot of `page`, repeat the first rows of the image: 0 when none. It is
+ * what a capture taken before the browser painted the page at its new size shows (the area the resize uncovered,
+ * filled with the top of the page): evidence of a screen nobody saw. A stripe of one flat colour (a background at both
+ * ends) does not count. Decoded in `page`'s browser: the e2e has no image library. Ported from erplora.com's e2e
+ * (`repeatedTop` of its tests/e2e/panel/fixtures.ts).
+ */
+export async function repeatedTop(page: Page, png: Buffer): Promise<number> {
+  return page.evaluate(
+    async ({ base64, minRows }) => {
+      const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+      const { width, height } = bitmap;
+      const context = new OffscreenCanvas(width, height).getContext('2d');
+      if (!context) throw new Error('repeatedTop: no 2d context to read the screenshot');
+      context.drawImage(bitmap, 0, 0);
+      const pixels = new Uint32Array(context.getImageData(0, 0, width, height).data.buffer);
+      const sameRow = (a: number, b: number) => {
+        for (let x = 0; x < width; x++) if (pixels[a * width + x] !== pixels[b * width + x]) return false;
+        return true;
+      };
+      const flatRow = (row: number) => {
+        for (let x = 1; x < width; x++) if (pixels[row * width + x] !== pixels[row * width]) return false;
+        return true;
+      };
+      for (let rows = Math.floor(height / 2); rows >= minRows; rows--) {
+        let repeated = true;
+        let flat = true;
+        for (let row = 0; row < rows && repeated; row++) {
+          repeated = sameRow(height - rows + row, row);
+          flat &&= flatRow(row);
+        }
+        if (repeated && !flat) return rows;
+      }
+      return 0;
+    },
+    { base64: png.toString('base64'), minRows: STRIPE_MIN_ROWS },
+  );
+}
+
+/**
+ * Resolves once the browser has painted the page as it is now: a frame's callbacks run before it is painted, the next
+ * frame's once it has been. A screenshot right after `setViewportSize` needs it.
+ */
+export async function painted(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+}
+
+/**
+ * Settled: nothing moving (`untilStill`: an overlay of Ionic entering included, endless spinners aside) and the page
+ * painted as it is now (`painted`): the capture shows the state the flow reached, not a frame of Ionic's transition nor,
+ * right after `setViewportSize`, the previous size's. The one wait of every spec (service-helpers.ts and
+ * schedule-helpers.ts hand it out too).
+ */
+export async function settled(page: Page): Promise<void> {
+  await untilStill(page);
+  await painted(page);
+}
+
+/** How many screenshots `capture` takes at most while each one repeats the top of the page at its bottom. */
+const CAPTURE_TRIES = 10;
+
+/**
+ * The screenshot of `page` as painted at its size, written as `.artifacts/<name>.png` and returned: every capture of the
+ * e2e goes through here (`raw-screenshots.test.ts` keeps it so). It waits for a painted frame, and a screenshot that
+ * still repeats the top of the page at its bottom (`repeatedTop`) is taken again, a frame later, up to
+ * `CAPTURE_TRIES` times; if every one does, it fails saying so and writes nothing. What is on screen (data, a dialog,
+ * nothing moving: `settled`, `untilStill`) is the spec's to wait for before.
+ */
+export async function capture(page: Page, name: string, options: CaptureOptions = {}): Promise<Buffer> {
+  let rows = 0;
+  for (let tries = 0; tries < CAPTURE_TRIES; tries++) {
+    await painted(page);
+    const png = await page.screenshot(options);
+    rows = await repeatedTop(page, png);
+    if (rows === 0) {
+      writeFileSync(shot(name), png);
+      return png;
+    }
+  }
+  throw new Error(
+    `capture ${name}: every screenshot repeats the top ${rows} rows of the page at its bottom (${CAPTURE_TRIES} tries): ` +
+      'the browser never painted the page at its size',
+  );
+}
+
+/** What `capture` hands to `page.screenshot`: everything but the path, which is `shot(name)`. */
+export type CaptureOptions = Omit<NonNullable<Parameters<Page['screenshot']>[0]>, 'path'>;
 
 /** Writes the measurements of a check to `.artifacts/metrics/<key>.json` for the report. */
 export function record(key: string, data: unknown): void {

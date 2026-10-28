@@ -3,7 +3,7 @@
 // spec's `afterAll`) removes exactly them from the hub's database, with their movements and links.
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, capture, psql, shot, shown } from './helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -110,11 +110,9 @@ export async function shoot(page: Page, name: string, restore = { width: 1280, h
   const files: string[] = [];
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    // The table refits to its box; wait for a frame rather than a fixed time.
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    const file = shot(`${name}-${viewport.label}`);
-    await page.screenshot({ path: file });
-    files.push(file);
+    // The table refits to its box: `capture` waits until the page is painted at this size.
+    await capture(page, `${name}-${viewport.label}`);
+    files.push(shot(`${name}-${viewport.label}`));
   }
   await page.setViewportSize(restore);
   return files;
