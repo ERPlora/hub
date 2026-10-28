@@ -507,9 +507,12 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   imágenes). Los enlaces solo `https://`.
 - **Render y caché**: `public_home.respond` pinta la plantilla con lo publicado, en el idioma de `Accept-Language`
   (nunca una cookie), y guarda el HTML una hora en
-  `website:home:<slug>:<versión>:<idioma>:<día>:<moneda>:<APP_VERSION>` (la moneda es la del negocio,
-  `base.operations.business_currency`, que también pone precio a la vista previa y al catálogo público, guardado un
-  minuto en `website:catalog:<slug>:<versión>:<idioma>:<moneda>`; la copia publicada guarda el precio sin formato, en la
+  `website:home:<slug>:<versión>:<idioma>:<día>:<moneda>:<APP_VERSION>` (la moneda es la del negocio: la de su país,
+  `base.business.currency_of` de la fila del registro que el host ya cargó (`request.hub`), lo mismo que contesta
+  `base.business.get`, sin abrir una transacción de `@operation` por visita (una página servida de la caché cuesta lo
+  que costaba: las transacciones de un hub se cuentan por plan); la vista previa y el catálogo público, que son
+  operaciones, la preguntan con `base.operations.business_currency`, y el catálogo se guarda un minuto en
+  `website:catalog:<slug>:<versión>:<idioma>:<moneda>`; la copia publicada guarda el precio sin formato, en la
   unidad menor de la moneda, y `render.price_label` lo divide entre `10 ** decimales` de esa moneda: si el país del
   negocio cambia, la clave cambia y la página se repinta en la nueva sin volver a publicar; el día es el del negocio,
   `render.local_day` con la zona horaria del hub o `Europe/Madrid` si no tiene: el horario resalta hoy, así que cada

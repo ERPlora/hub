@@ -11,7 +11,9 @@ from datetime import UTC, datetime
 
 import pytest
 from django.core.cache import cache
+from django.db import connections
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from live.operations import get
 
 from apps.website import public_home
@@ -145,6 +147,24 @@ def test_the_page_prices_in_the_business_s_currency_and_follows_a_change_of_its_
     page = visit(client).content.decode()
     assert "PLN15.00" in page and "€" not in page
     assert cache.get(page_cache_key("a", 1, "en", local_day(""), "PLN")) is not None
+
+
+def test_a_visit_served_from_the_cache_opens_no_transaction_of_its_own(client):
+    # flow: website-business-currency — the currency of the kept page is the registry row's the host already loaded
+    # (`request.hub`'s country, what `base.business.get` answers), never an operation of its own per visitor: a hub's
+    # transactions are counted per plan (hub-tenancy), and a page served from the cache must cost what it cost before.
+    from apps.service.models import Service
+
+    Service.objects.create(name="Cut", price=1500, duration_minutes=30)
+    Hub.objects.filter(slug="a").update(country="PL")
+    publish()
+    assert "PLN" in visit(client).content.decode()
+    with CaptureQueriesContext(connections["default"]) as captured:
+        assert "PLN" in visit(client).content.decode()
+    statements = [query["sql"] for query in captured.captured_queries]
+    assert not any("SET TRANSACTION" in statement or "SAVEPOINT" in statement for statement in statements), statements
+    # The host's row, then the live check (`is_published` and `respond`, each the row's id and the publication).
+    assert len(statements) <= 5, statements
 
 
 def today_row(page: str) -> str:
