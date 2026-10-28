@@ -157,6 +157,7 @@ test(`${KEY}: website-business-currency a business in Poland sees its prices in 
     await expect(card(preview)).toContainText(ZLOTY);
     await expect(preview.locator('[data-ep-block="catalog"]')).not.toContainText('€');
     await card(preview).scrollIntoViewIfNeeded();
+    await settled(editor);
     await editor.screenshot({ path: shot(`${KEY}-preview-${size.name}`) });
   }
   // A visitor speaking Spanish reads the same złoty in Spanish.
