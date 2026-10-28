@@ -226,3 +226,40 @@ msgstr "Revisar la reserva por internet {{input.number}}"
 
 msgid "Leaves you the task, so no online booking goes unseen."
 msgstr "Te deja la tarea, para que ninguna reserva por internet pase sin verse."
+
+# How the assistant's card names the data of online_booking's writes (titles of the schemas), as its screens do.
+msgid "No."
+msgstr "Nº"
+
+msgid "Customer"
+msgstr "Cliente"
+
+msgid "Services"
+msgstr "Servicios"
+
+msgid "Professional"
+msgstr "Profesional"
+
+msgid "Day and time"
+msgstr "Día y hora"
+
+msgid "Personal link"
+msgstr "Enlace personal"
+
+msgid "Minimum booking notice (minutes)"
+msgstr "Antelación mínima para reservar (minutos)"
+
+msgid "Book at most this far ahead (days)"
+msgstr "Reservar como máximo con esta antelación (días)"
+
+msgid "Slot interval (minutes)"
+msgstr "Intervalo entre huecos (minutos)"
+
+msgid "Confirm the customer's bookings automatically"
+msgstr "Confirmar automáticamente las reservas de la clienta"
+
+msgid "Let the customer cancel her booking"
+msgstr "Permitir que la clienta cancele su cita"
+
+msgid "Minimum notice to cancel (hours)"
+msgstr "Antelación mínima para cancelar (horas)"

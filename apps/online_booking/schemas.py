@@ -12,6 +12,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     AfterValidator,
@@ -158,10 +159,13 @@ class BookingRefIn(In):
         None, description="The booking's id (its appointment's id)."
     )
     number: _text(24, 1) | None = Field(
-        None, description="The appointment number (APT-YYYYMMDD-NNNN)."
+        None,
+        title=gettext_noop("No."),
+        description="The appointment number (APT-YYYYMMDD-NNNN).",
     )
     customer: _text(200, 1) | None = Field(
         None,
+        title=gettext_noop("Customer"),
         description="The customer as a person says it: her name (or part of it), her phone or her email.",
     )
     date: dt.date | None = Field(
@@ -274,28 +278,38 @@ class SettingsIn(In):
         None,
         ge=0,
         le=10080,
+        title=gettext_noop("Minimum booking notice (minutes)"),
         description="Diary rule: minutes ahead the customer must book.",
     )
     max_advance_booking: int | None = Field(
         None,
         ge=0,
         le=365,
+        title=gettext_noop("Book at most this far ahead (days)"),
         description="Diary rule: days ahead one may book; 0 = no limit.",
     )
     slot_interval: int | None = Field(
-        None, ge=5, le=240, description="Diary rule: minutes between free times."
+        None,
+        ge=5,
+        le=240,
+        title=gettext_noop("Slot interval (minutes)"),
+        description="Diary rule: minutes between free times.",
     )
     auto_confirm_online: bool | None = Field(
         None,
+        title=gettext_noop("Confirm the customer's bookings automatically"),
         description="Diary rule: the customer's bookings are born confirmed (false: pending, to review).",
     )
     allow_customer_cancellation: bool | None = Field(
-        None, description="Diary rule: the customer may cancel her booking."
+        None,
+        title=gettext_noop("Let the customer cancel her booking"),
+        description="Diary rule: the customer may cancel her booking.",
     )
     cancellation_notice_hours: int | None = Field(
         None,
         ge=0,
         le=720,
+        title=gettext_noop("Minimum notice to cancel (hours)"),
         description="Diary rule: hours before the start she may still cancel.",
     )
 
@@ -417,13 +431,17 @@ class PublicSlotsOut(Schema):
 
 class PublicBookIn(In):
     service_ids: ServiceIds = Field(
-        description="The services to book (1 to 5), in order."
+        title=gettext_noop("Services"),
+        description="The services to book (1 to 5), in order.",
     )
     staff_id: UUID | None = Field(
-        None, description="The professional chosen; empty = anybody free then."
+        None,
+        title=gettext_noop("Professional"),
+        description="The professional chosen; empty = anybody free then.",
     )
     start: dt.datetime = Field(
-        description="When it starts: the business's wall-clock date and time (2030-03-05 10:00)."
+        title=gettext_noop("Day and time"),
+        description="When it starts: the business's wall-clock date and time (2030-03-05 10:00).",
     )
     name: _text(200, 1) = Field(description="The customer's full name.")
     phone: _text(30, 1) = Field(
@@ -455,7 +473,8 @@ class BookedOut(Schema):
 
 class TokenIn(In):
     token: _text(100, 20) = Field(
-        description="The token of the customer's personal link."
+        title=gettext_noop("Personal link"),
+        description="The token of the customer's personal link.",
     )
 
 
