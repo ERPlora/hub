@@ -70,6 +70,14 @@ function movingInPage(): string[] {
   return moving;
 }
 
+/**
+ * Puts `movingInPage` in the page as `window.__movingInPage`, for a probe that runs in the page frame by frame and has
+ * to know, in the same frame, whether anything moves (the same detector as `untilStill`, never a copy of it).
+ */
+export async function exposeMovingInPage(page: Page): Promise<void> {
+  await page.evaluate(`window.__movingInPage = ${movingInPage.toString()}`);
+}
+
 /** A page that navigates while `untilStill` asks what moves: it asks the new page next. Anything else fails the spec. */
 function navigating(error: unknown): string[] {
   if (error instanceof Error && /Execution context was destroyed/.test(error.message)) return ['(navigating)'];

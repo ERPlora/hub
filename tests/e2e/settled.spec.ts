@@ -8,6 +8,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, createItem, login, repeatedTop, settled as baseSettled, shown, uniqueName } from './helpers';
+import { signedIn, snap } from './cart-checkout-helpers';
 import { settled as scheduleSettled } from './schedule-helpers';
 import { settled } from './service-helpers';
 
@@ -82,6 +83,38 @@ test('hub-e2e-capture: after settled() a toast of Ionic has stopped, whole on sc
     await page.unroute('**/api/demo/**');
     const res = await api(context, A, 'POST', '/demo/items/delete', { id: item.id });
     expect(res.status).toBeLessThan(300);
+  }
+});
+
+test('hub-e2e-capture: the snap() of cart_checkout captures a toast of Ionic once it has stopped, at 390, 834 and 1440', async ({ browser }) => {
+  const { context, page } = await signedIn(browser, '/demo/items');
+  const item = await createItem(context, A, uniqueName('Snap toast'));
+  // Animations at a fifth of their speed (Chrome's own control): the toast enters for longer than a capture takes, so
+  // a snap() that does not wait for it captures it still sliding in.
+  const devtools = await context.newCDPSession(page);
+  await devtools.send('Animation.enable');
+  try {
+    await page.route('**/api/demo/**', (route) => (route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.continue()));
+    for (const size of SIZES) {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
+      await page.goto(`/demo/items/${item.id}`);
+      const detail = shown(page);
+      await detail.locator('[data-testid=demo-note] textarea').fill(`Note at ${size.label}`);
+      await expect(detail.getByTestId('demo-note-save')).toBeEnabled();
+      await settled(page);
+      await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.2 });
+      await detail.getByTestId('demo-note-save').click();
+      await expect(page.locator('ion-toast').last()).toBeVisible();
+      await snap(page, `${TASK}-SNAP`, size.label);
+      expect(await stillMoving(page), `still moving once snap() captured at ${size.label}`).toEqual([]);
+    }
+  } finally {
+    await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
+    await page.unroute('**/api/demo/**');
+    const res = await api(context, A, 'POST', '/demo/items/delete', { id: item.id });
+    expect(res.status).toBeLessThan(300);
+    await context.close();
   }
 });
 

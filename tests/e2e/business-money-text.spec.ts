@@ -9,7 +9,7 @@
 // it, the site saved as it was found and taken offline, and `a`'s registration put back, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, psql, registerBusinessIn, registrationOf, type Registration, shot } from './helpers';
+import { A, api, hostPage, psql, registerBusinessIn, registrationOf, type Registration, settled, shot } from './helpers';
 
 const KEY = 'FIX-HUB-PYTHON-MONEY-GLUES-CURRENCY-CODE-TO-AMOUNT';
 const SIZES = [
@@ -79,10 +79,10 @@ async function publicLabel(context: BrowserContext, language: string): Promise<s
   return item?.price_label ?? '';
 }
 
-/** The public page at rest for its capture: no focus ring, no colour still in transition. */
-async function settled(page: Page): Promise<void> {
+/** The public page at rest for its capture: no focus ring, nothing still moving (`settled`: no colour in transition). */
+async function atRest(page: Page): Promise<void> {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+  await settled(page);
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -144,7 +144,7 @@ test(`${KEY}: money-text the server writes a price in złoty as the browser does
     expect(price, size.name).not.toContain('PLN15.50');
     expect(await publicLabel(context, 'en-GB')).toBe(INTL.en);
     await card(page).scrollIntoViewIfNeeded();
-    await settled(page);
+    await atRest(page);
     await page.screenshot({ path: shot(`${KEY}-${size.name}`) });
     await context.close();
   }
