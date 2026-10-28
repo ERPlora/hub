@@ -56,6 +56,15 @@ export const JAPANESE: Partial<Business> = {
   currency_decimals: 0,
 };
 
+/** A business in Kuwait: the dinar has three decimals. */
+export const KUWAITI: Partial<Business> = {
+  country: 'KW',
+  country_name: 'Kuwait',
+  currency: 'KWD',
+  currency_label: 'KWD · Kuwaiti Dinar',
+  currency_decimals: 3,
+};
+
 /** Owner, admin or manager: `modifier.*` (apps.py `role_permissions`); they read Inventory and Taxes too. */
 export const OWNER: SessionMe = {
   user: { id: '1', label: 'Ana' },

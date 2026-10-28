@@ -76,6 +76,16 @@ watch(
   { immediate: true },
 );
 
+// The business answers (or its currency changes) with the form open: a supplement the person has not touched is
+// rewritten from the option with the currency's decimals («1.50» → «150» in yen); what they typed stays as typed,
+// read in the new currency when they save (the field says so when it cannot be).
+watch(money, (now, before) => {
+  if (!open.value) return;
+  const written = props.option ? moneyFieldText(props.option.price_delta, locale.value, before) : '';
+  if (form.value.price !== written) return;
+  form.value = { ...form.value, price: props.option ? moneyFieldText(props.option.price_delta, locale.value, now) : '' };
+});
+
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 /** A whole number as the server takes it; anything else as typed, for the server to refuse. */
