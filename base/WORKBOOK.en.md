@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:464f434379e70bcad675f3e57e44ada4af5152a7c4007d609f6828584ad3a18b -->
+<!-- generated from WORKBOOK.md sha256:2e1b0b8dea89fa66079b2d397828092c08d25bdeba9303367ba9f38bf143a895 -->
 
 ## What it is for and who it is for
 
@@ -2272,19 +2272,25 @@ Steps:
   1. An action its app marks as dangerous is not confirmed with one click: the card says, for example, "Delete in
      Services. Check each datum before going on.", puts each datum on its own line with its name in the person's
      language and asks "To confirm, type CONFIRM:".
-  2. If the action names the records one by one, it says how many ("It acts on 3 records.") and asks to type that
+  2. If its app declares it, the card first says, under "What will happen", what the action is going to do, as its
+     app works it out for the person who asks and with their permissions. For example, when taking someone's PIN
+     away it says whose it is ("Name: …" and "Email: …"), not just the person's code. What the app does not show
+     that person does not appear on the card either.
+  3. If the action names the records one by one, it says how many ("It acts on 3 records.") and asks to type that
      number instead of the word.
-  3. If it does not name them (all of them, or those matching a filter), it is not done from the chat: no card shows, the answer reads "I
+  4. If it does not name them (all of them, or those matching a filter), it is not done from the chat: no card shows, the answer reads "I
      cannot tell how many records this would change, so I do not do it from here. Open its screen, where you can see
      them." and the assistant explains where it is done.
-  4. "Run it" can only be tapped when what was typed matches (regardless of capitals and of the spaces at the ends),
+  5. "Run it" can only be tapped when what was typed matches (regardless of capitals and of the spaces at the ends),
      and the business checks it again before doing it.
-  5. Resetting the business and exporting a copy are never done from the chat: they are done in Settings › Data and
+  6. Resetting the business and exporting a copy are never done from the chat: they are done in Settings › Data and
      backups.
-In: the risk the app declares in each action, and its data.
+In: the risk the app declares in each action, and its data; if it declares one, its preview.
 Out: if accepted, as in BASE-F97.
 If it fails: what was typed and does not match does not let it run; cancelling does nothing and the assistant counts
-it as cancelled.
+it as cancelled. If the preview cannot be read (the record is no longer there, or the person cannot see it), no card
+shows and nothing is done: nothing is confirmed blind. The receipt says "Not done, it failed: …" or "Not done, not
+allowed: …" and the assistant tells why.
 Involved: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Check what the assistant says against what it really did

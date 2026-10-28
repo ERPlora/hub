@@ -24,6 +24,9 @@ export interface AssistantCard {
   blocked: boolean;
   /** The business's currency for its amounts (gh:hub#1045). */
   money?: Money | null;
+  /** What a dangerous write will do, as the read its app declares answers it for this person (BASE-F98); none when
+   *  its app declares no preview. */
+  preview?: AssistantField[] | null;
 }
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;
@@ -79,6 +82,15 @@ export function fieldText(field: AssistantField, format: CardFormat): string {
     default:
       return String(field.value);
   }
+}
+
+/** A dangerous write's data, one line each: its name in the person's language (or the server's label) and its value
+ *  in words. What it sends and what it will do (its preview) are said alike. */
+export function fieldLines(fields: readonly AssistantField[], format: CardFormat): string[] {
+  return fields.map((field) => {
+    const key = fieldLabelKey(field.name);
+    return `${key ? format.t(key) : field.label}: ${fieldText(field, format)}`;
+  });
 }
 
 /** A normal write in one line: its first three data, the empty ones left out. */
