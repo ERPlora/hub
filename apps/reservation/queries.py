@@ -86,8 +86,24 @@ def zone_name() -> str:
 
 
 def business_now() -> dt.datetime:
-    """Now on the business's wall clock (naive), what a reservation's day and time compare with."""
+    """Now on the business's wall clock (naive), what a reservation's day and time compare with (its
+    ``fold`` says which pass of a repeated hour it is)."""
     return timezone.localtime(timezone.now(), business_zone()).replace(tzinfo=None)
+
+
+def starts_at(day: dt.date, at: dt.time) -> dt.datetime:
+    """The instant (UTC) ``day`` at ``at`` on the business's wall clock is."""
+    return engine.instant(dt.datetime.combine(day, at), business_zone())
+
+
+def window_of(day: dt.date, at: dt.time, minutes: int) -> engine.Window:
+    """A stay from ``day`` at ``at`` on the business's wall clock, ``minutes`` of real time long."""
+    return engine.Window.of(day, at, minutes, business_zone())
+
+
+def wall_clock(moment: dt.datetime) -> dt.datetime:
+    """An instant on the business's wall clock (naive)."""
+    return engine.wall(moment, business_zone())
 
 
 def current_settings() -> Settings:
@@ -132,8 +148,10 @@ def reservations() -> QuerySet[Reservation]:
 
 
 def _end(reservation: Reservation) -> dt.time:
-    start = dt.datetime.combine(reservation.date, reservation.time)
-    return (start + dt.timedelta(minutes=reservation.duration_minutes)).time()
+    """When the stay ends on the wall clock: the night the clocks change, 90 minutes from 01:37 end at
+    02:07 (the second one) in October and 90 from 01:30 at 04:00 in March."""
+    window = window_of(reservation.date, reservation.time, reservation.duration_minutes)
+    return wall_clock(window.end).time()
 
 
 def reservation_out(ctx: OperationContext, reservation: Reservation) -> dict:
@@ -434,9 +452,10 @@ def booked_windows(
 ) -> list[tuple[Reservation, engine.Window]]:
     """The live reservations holding ``table_id`` around ``window`` (the days it touches and their
     neighbours), each with its window."""
-    days = {
-        window.start.date() + dt.timedelta(days=offset) for offset in (-1, 0, 1)
-    } | {window.end.date()}
+    first = wall_clock(window.start).date()
+    days = {first + dt.timedelta(days=offset) for offset in (-1, 0, 1)} | {
+        wall_clock(window.end).date()
+    }
     rows = (
         Reservation.objects.filter(
             is_deleted=False, table_id=table_id, status__in=HOLDING, date__in=days
@@ -446,7 +465,7 @@ def booked_windows(
     )
     out = []
     for row in rows:
-        theirs = engine.Window.of(row.date, row.time, row.duration_minutes)
+        theirs = window_of(row.date, row.time, row.duration_minutes)
         if theirs.overlaps(window):
             out.append((row, theirs))
     return out
@@ -606,7 +625,7 @@ def day_availability(ctx: OperationContext, params: DayIn) -> dict:
 )
 def free_tables(ctx: OperationContext, params: TablesIn) -> dict:
     minutes = params.duration_minutes or current_settings().default_duration_minutes
-    window = engine.Window.of(params.date, params.time, minutes)
+    window = window_of(params.date, params.time, minutes)
     exclude = (params.exclude_id,) if params.exclude_id else ()
     tables = Table.objects.filter(
         is_deleted=False, is_active=True, blocked=False
@@ -634,8 +653,8 @@ def free_tables(ctx: OperationContext, params: TablesIn) -> dict:
                 "capacity": table.capacity,
                 "fits": fits,
                 "free": not clash,
-                "taken_from": clash[0][1].start.time() if clash else None,
-                "taken_until": clash[0][1].end.time() if clash else None,
+                "taken_from": wall_clock(clash[0][1].start).time() if clash else None,
+                "taken_until": wall_clock(clash[0][1].end).time() if clash else None,
             }
         )
     out.sort(key=lambda row: (not row["free"], not row["fits"]))

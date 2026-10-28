@@ -28,6 +28,9 @@ from .conftest import (
 pytestmark = pytest.mark.django_db
 
 NOBODY = ctx_for(permissions=set())
+#: Madrid's clocks go back an hour (03:00 summer time is 02:00 again) and forward (02:00 is 03:00).
+CLOCKS_BACK = dt.date(2026, 10, 25)
+CLOCKS_FORWARD = dt.date(2026, 3, 29)
 
 
 def rows(result) -> list:
@@ -56,6 +59,13 @@ def test_the_list_gives_a_day_by_time_with_its_table_and_its_end():
     )
     assert (result.rows[0].table_label, result.rows[0].end_time) == ("", dt.time(22, 0))
 
+
+def test_the_end_of_a_reservation_is_its_real_end_on_the_wall_clock_the_nights_the_clocks_change():
+    back = make_reservation(date=CLOCKS_BACK, time="01:37", duration_minutes=90)
+    forward = make_reservation(date=CLOCKS_FORWARD, time="01:30", duration_minutes=90)
+    # 90 real minutes: 02:07 of the second pass in October, 04:00 summer time in March.
+    assert run("reservation.reservation.get", {"id": str(back.id)}).end_time == dt.time(2, 7)
+    assert run("reservation.reservation.get", {"id": str(forward.id)}).end_time == dt.time(4, 0)
 
 def test_the_list_hides_the_deleted_and_filters_by_status_table_customer_party_and_time():
     table = make_table("5")
@@ -314,6 +324,54 @@ def test_the_free_tables_are_the_ones_in_service_without_a_live_reservation_then
         "4 (Room)",
         4,
     )
+
+
+def test_the_free_tables_count_a_stay_in_real_time_the_nights_the_clocks_change():
+    five = make_table("5")
+
+    def table_at(day: dt.date, time: str):
+        return run(
+            "reservation.availability.tables",
+            {"date": day.isoformat(), "time": time, "duration_minutes": 60},
+        ).rows[0]
+
+    # 01:37 summer time plus 90 real minutes ends at 02:07 of the second pass (winter time).
+    make_reservation(
+        date=CLOCKS_BACK, time="01:37", duration_minutes=90, table=five, status="confirmed"
+    )
+    assert table_at(CLOCKS_BACK, "03:00").free
+    taken = table_at(CLOCKS_BACK, "02:30")
+    assert (taken.free, taken.taken_from, taken.taken_until) == (
+        False,
+        dt.time(1, 37),
+        dt.time(2, 7),
+    )
+    # 01:00 winter time plus 90 real minutes ends at 03:30 summer time.
+    make_reservation(
+        date=CLOCKS_FORWARD, time="01:00", duration_minutes=90, table=five, status="confirmed"
+    )
+    taken = table_at(CLOCKS_FORWARD, "03:00")
+    assert (taken.free, taken.taken_until) == (False, dt.time(3, 30))
+    assert table_at(CLOCKS_FORWARD, "03:30").free
+
+
+def test_the_free_tables_look_around_the_business_day_not_the_utc_one_west_of_utc():
+    """West of UTC an evening is already the next UTC day: the neighbours of a stay are the days of
+    the business's wall clock, so a table kept since the night before is still found."""
+    five = make_table("5")
+    with timezone.override("America/New_York"):
+        make_reservation(
+            date=dt.date(2030, 3, 4),
+            time="23:00",
+            duration_minutes=24 * 60,
+            table=five,
+            status="confirmed",
+        )
+        row = run(
+            "reservation.availability.tables",
+            {"date": "2030-03-05", "time": "22:00", "duration_minutes": 60},
+        ).rows[0]
+    assert (row.free, row.taken_from, row.taken_until) == (False, dt.time(23, 0), dt.time(23, 0))
 
 
 def test_a_reservation_being_changed_does_not_take_its_own_table():

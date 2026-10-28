@@ -788,7 +788,14 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
   filas anteriores las pasó a E.164 la migración `0002_guest_phone_e164` (reglas de `to_e164` copiadas,
   país `ES` de la fase 1; lo que no es número válido se queda como estaba).
 - **Hora del negocio**: fase 1, `settings.TIME_ZONE` (Europe/Madrid). El día y la hora se guardan de
-  pared; «ahora» es la hora del negocio.
+  pared; «ahora» es la hora del negocio. Lo que dura cuenta tiempo real (`engine.Window.of` con la zona,
+  instantes en UTC; en `queries.py`, `window_of` y `starts_at`): la estancia (la mesa que pisa la puerta,
+  las mesas libres de F23, el motivo «La mesa 5 ya tiene una reserva de 21:00 a 23:00.» y el fin de cada
+  reserva), la antelación mínima y la ventana de liberación de F13; y una hora pasada se juzga por el
+  instante. La noche del cambio de hora el fin de pared se corre: 90 minutos desde las 01:37 del 25/10
+  acaban a las 02:07 (la segunda) y desde las 01:30 del 29/03, a las 04:00. Una hora que se repite es la
+  primera (aún en horario de verano) y una que no existe pasa a la de después del salto (02:30 → 03:30),
+  como la retención de Mesas (TABLE-F25).
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cancelar, no presentado y
   todo borrado) y cada campo de `schemas.py` su `description`.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17): ajustes, franjas, bloqueos,
