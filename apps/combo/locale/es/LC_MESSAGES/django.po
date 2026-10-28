@@ -360,3 +360,21 @@ msgstr "Solo un producto que se vende y se cobra por unidades puede ser una elec
 #: services.py:78
 msgid "The new order has to list every one of them, once, and nothing else."
 msgstr "El orden nuevo tiene que nombrarlos a todos, una vez cada uno, y nada más."
+# How the assistant's card names the data of combo's writes (titles of the schemas).
+msgid "VAT category"
+msgstr "Tipo de IVA"
+
+msgid "Courses"
+msgstr "Platos"
+
+msgid "Products"
+msgstr "Productos"
+
+msgid "New product"
+msgstr "Producto nuevo"
+
+msgid "Choices"
+msgstr "Elecciones"
+
+msgid "SKU"
+msgstr "SKU"
