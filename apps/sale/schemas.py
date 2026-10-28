@@ -44,6 +44,9 @@ SAY_WHICH_QUICK_NOTE = _("Say which quick note: its id or its text.")
 ONE_SOURCE = _(
     "Charge an open check (order_id) or loose lines (lines, service lines or open-price lines), one of the two."
 )
+CHECK_DISCOUNT_ON_THE_CHECK = _(
+    "The discount of an open check is set on the check itself, not at the charge."
+)
 COUNTRY_CODE = _("Enter the country's ISO code, e.g. ES, FR or GB.")
 
 # How the Sales screens name the data the models do not (the assistant's card names each datum by its title).
@@ -895,6 +898,10 @@ class ChargeLinesIn(Schema):
             self.order_id is not None and loose
         ):
             raise ValueError(str(ONE_SOURCE))
+        # A check's discount lives in the check (set_discount): the charge takes none, so a figure here would be said by
+        # «An approval is needed» (approval_figures) and ignored by the charge.
+        if self.order_id is not None and (self.discount_percent > 0 or self.discount_amount > 0):
+            raise ValueError(str(CHECK_DISCOUNT_ON_THE_CHECK))
         return self
 
 
