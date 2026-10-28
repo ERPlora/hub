@@ -9,7 +9,8 @@
 // amount is in the business's currency (BASE-G98: «zł» in a Polish business, «€» in a Spanish one), never a fixed euro.
 // A row without its value (a cash session closed without a count) says «—» with no bar, never a 0 (BASE-F06). A bar is
 // as long as the size of its value; only one below zero is red, its amount with the sign, and every other bar keeps the
-// panel's colour (BASE-F06: a drawer 0,40 € short beside one 5,50 € over, which is a discrepancy too).
+// panel's colour (BASE-F06: a drawer 0,40 € short beside one 5,50 € over, which is a discrepancy too) — or its row's,
+// when the panel maps one (`map.color`: each role of Staff in its own colour); a negative stays red.
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
@@ -237,7 +238,7 @@ const chosenBar = computed(() => {
         ><span
           class="widget-bar-fill"
           :class="{ 'widget-bar-fill--negative': bar.negative }"
-          :style="{ width: percent(bar.share) }"
+          :style="{ width: percent(bar.share), backgroundColor: bar.color }"
         /></span>
       </li>
     </ul>
