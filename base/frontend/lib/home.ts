@@ -155,13 +155,16 @@ export function formatValue(value: unknown, format: unknown, locale: string, mon
 }
 
 /** A bar of a bar-list: `share` is the size of its value against the biggest size of the list (0–1, either sign);
- *  `negative` marks a value below zero, the only one painted apart (red, as a report marks it); any other bar has none. */
+ *  `negative` marks a value below zero, the only one painted apart (red, as a report marks it); any other bar has none.
+ *  `color` is its row's own colour, when the panel maps one (`map.color`) and it is a hex colour: a negative has none,
+ *  its red wins. */
 export interface Bar {
   label: string;
   value: number | null;
   text: string;
   share: number;
   negative?: true;
+  color?: string;
 }
 
 export type WidgetView =
@@ -198,21 +201,33 @@ const missing = (value: unknown): boolean => value === null || value === undefin
 /** What a panel says for a value a row does not have, as Square, Shopify or Odoo leave an empty cell: never a 0. */
 const NO_VALUE = '—';
 
+/** A colour a row may give its bar: only a hex colour (#rgb, #rrggbb), since a person types it (a role's colour in
+ *  Staff) and it goes into the bar's style. */
+const HEX_COLOR = /^#(?:[0-9a-f]{3}){1,2}$/i;
+
 /** The bars of a bar-list or a chart: a row without its value stays, as «—» with no share (BASE-F06); one whose value is
  *  no number is left out. A bar measures the size of its value against the biggest size, so a shortfall of 0,40 € is
- *  a short bar beside a surplus of 5,50 €, and only a value below zero is marked `negative` (BASE-F06). */
+ *  a short bar beside a surplus of 5,50 €, and only a value below zero is marked `negative` (BASE-F06). A bar takes its
+ *  row's colour when the panel maps one (`map.color`, the old hub's `renderBarList`), except a negative: red wins. */
 function bars(widget: WidgetDef, rows: Row[], locale: string, format: unknown, money: Money | undefined): Bar[] {
+  const colorField = widget.map.color;
   const read = rows
     .map((row) => {
       const value = row[widget.map.value];
-      return { label: text(row[widget.map.label]), value: missing(value) ? null : numeric(value) };
+      const color = colorField ? row[colorField] : undefined;
+      return {
+        label: text(row[widget.map.label]),
+        value: missing(value) ? null : numeric(value),
+        color: typeof color === 'string' && HEX_COLOR.test(color) ? color : undefined,
+      };
     })
     .filter((bar) => bar.label !== '' && (bar.value === null || Number.isFinite(bar.value)));
   const max = Math.max(numeric(widget.options.max) || 0, ...read.map((bar) => Math.abs(bar.value ?? 0)), 0);
-  return read.map((bar): Bar => {
+  return read.map(({ color, ...bar }): Bar => {
     if (bar.value === null) return { ...bar, text: NO_VALUE, share: 0 };
     const shown = { ...bar, text: formatValue(bar.value, format, locale, money), share: max > 0 ? Math.abs(bar.value) / max : 0 };
-    return bar.value < 0 ? { ...shown, negative: true } : shown;
+    if (bar.value < 0) return { ...shown, negative: true };
+    return color ? { ...shown, color } : shown;
   });
 }
 
