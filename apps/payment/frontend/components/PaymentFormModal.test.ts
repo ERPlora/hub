@@ -3,13 +3,16 @@
 // the Supplier invoice the old screen left to the API, with «Record payment». The three states of the
 // methods read are told apart (the old payments#24): still loading, could not be read (Retry), none
 // yet (go to Methods). An amount that is not one, or is 0, is refused under the field without asking
-// the server; the server's refusals go under their field (the old pm#513: inside the form).
+// the server; the server's refusals go under their field (the old pm#513: inside the form). The amount is typed
+// in the business's currency, with its decimals, and the field says which («Amount (PLN)»); the payment is
+// recorded in it by the server (the old payments#35), never in a euro fixed in the screen.
 import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { Business } from '../../../../base/frontend/operations';
 import { localDay } from '../lib/format';
 import type { MethodOut, PaymentOut } from '../operations';
-import { click, errorFrame, ionValue, mountPayment, page, RECORDER, settle } from '../__tests__/mount-payment';
+import { business, click, errorFrame, ionValue, JAPANESE, mountPayment, page, POLISH, RECORDER, settle } from '../__tests__/mount-payment';
 import PaymentFormModal from './PaymentFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -34,8 +37,8 @@ const CASH = method('m2', 'Cash drawer');
 const CREATED = { id: 'p1', reference: 'PAY-20261014-0001' } as PaymentOut;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountPayment(PaymentFormModal, { props: { open: false }, locale, session: RECORDER });
+async function setup(locale: 'en' | 'es' = 'en', shop: Business | null = business()) {
+  const m = await mountPayment(PaymentFormModal, { props: { open: false }, locale, session: RECORDER, business: shop });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -60,7 +63,7 @@ describe('PaymentFormModal', () => {
     expect(['method', 'date', 'amount', 'beneficiary', 'concept', 'iban', 'invoice'].map((name) => s.field(name).label)).toEqual([
       'Method',
       'Date',
-      'Amount',
+      'Amount (EUR)',
       'Beneficiary',
       'Concept',
       'Beneficiary IBAN',
@@ -185,7 +188,61 @@ describe('PaymentFormModal', () => {
     const s = await setup('es');
     await s.result(METHODS, page([BANK]));
     expect(s.inDoc('payment-form')?.getAttribute('aria-label')).toBe('Nuevo pago');
-    expect([s.field('method').label, s.field('amount').label, s.field('invoice').label]).toEqual(['Método', 'Importe', 'Factura del proveedor']);
+    expect([s.field('method').label, s.field('amount').label, s.field('invoice').label]).toEqual([
+      'Método',
+      'Importe (EUR)',
+      'Factura del proveedor',
+    ]);
     expect(s.save().textContent).toContain('Registrar pago');
+  });
+
+  describe('in the business’s currency (the old payments#35)', () => {
+    it('a business in Poland: «Amount (PLN)», «12,50 zł» is 1250 grosze and the server records it in złoty', async () => {
+      const s = await setup('en', business(POLISH));
+      await s.result(METHODS, page([BANK]));
+      expect(s.field('amount').label).toBe('Amount (PLN)');
+      s.answer(201, CREATED);
+      await s.fill('12,50 zł');
+      await click(s.save());
+      const [call] = s.sent();
+      expect((call.body as { amount: number }).amount).toBe(1250);
+      // No currency travels: the server records the payment in the business's (PAYMENT-F02).
+      expect(call.body).not.toHaveProperty('currency');
+    });
+
+    it('in Poland «13,50 €» is not an amount: said under the field and nothing is sent', async () => {
+      const s = await setup('en', business(POLISH));
+      await s.result(METHODS, page([BANK]));
+      await s.fill('13,50 €');
+      await click(s.save());
+      expect(s.field('amount').errorText).toBe('This is not an amount. Type a figure, for example 12.50.');
+      expect(s.sent()).toEqual([]);
+    });
+
+    it('a business in Japan reads the amount without decimals: «1.500» is 1500 yen', async () => {
+      const s = await setup('en', business(JAPANESE));
+      await s.result(METHODS, page([BANK]));
+      expect(s.field('amount').label).toBe('Amount (JPY)');
+      s.answer(201, CREATED);
+      await s.fill('1.500');
+      await click(s.save());
+      expect((s.sent()[0].body as { amount: number }).amount).toBe(1500);
+    });
+
+    it('until the business answers, the field says no currency and «Record payment» waits; what was typed is then read in the business’s (hub#325)', async () => {
+      const s = await setup('en', null);
+      await s.result(METHODS, page([BANK]));
+      expect(s.field('amount').label).toBe('Amount');
+      await s.fill('150');
+      expect(s.save().disabled).toBe(true);
+      await click(s.save());
+      expect(s.sent()).toEqual([]);
+      await s.result('base.business.get', business(JAPANESE));
+      expect(s.field('amount').label).toBe('Amount (JPY)');
+      expect(s.save().disabled).toBe(false);
+      s.answer(201, CREATED);
+      await click(s.save());
+      expect((s.sent()[0].body as { amount: number }).amount).toBe(150);
+    });
   });
 });

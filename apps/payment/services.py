@@ -29,7 +29,6 @@ from apps.payment.models import (
     PaymentMethod,
 )
 from apps.payment.queries import (
-    business_currency,
     find_method,
     find_payment,
     method_row,
@@ -45,6 +44,7 @@ from apps.payment.schemas import (
     PaymentOut,
     PaymentRefIn,
 )
+from base import operations as platform
 
 METHOD_NAME_TAKEN = _(
     "There is already a payment method with that name. Pick another name."
@@ -276,10 +276,10 @@ ATTEMPT_FIELDS = (
 )
 
 
-def _same_attempt(payment: Payment, data: PaymentIn) -> bool:
+def _same_attempt(payment: Payment, data: PaymentIn, currency: str) -> bool:
     if any(getattr(payment, field) != getattr(data, field) for field in ATTEMPT_FIELDS):
         return False
-    if payment.currency != (data.currency or business_currency()):
+    if payment.currency != currency:
         return False
     if data.method_id is not None:
         return payment.method_id == data.method_id
@@ -289,9 +289,9 @@ def _same_attempt(payment: Payment, data: PaymentIn) -> bool:
         return False
 
 
-def _recorded(data: PaymentIn) -> dict | None:
-    """The payment the attempt of ``data`` already recorded, as it is now; 409 when its key recorded
-    another payment."""
+def _recorded(data: PaymentIn, currency: str) -> dict | None:
+    """The payment the attempt of ``data`` (in ``currency``) already recorded, as it is now; 409 when its key
+    recorded another payment."""
     if data.idempotency_key is None:
         return None
     payment = (
@@ -301,7 +301,7 @@ def _recorded(data: PaymentIn) -> dict | None:
     )
     if payment is None:
         return None
-    if not _same_attempt(payment, data):
+    if not _same_attempt(payment, data, currency):
         raise Conflict(str(KEY_REUSED), code="payment.idempotency_key_reused")
     return payment_row(payment)
 
@@ -322,7 +322,9 @@ def _recorded(data: PaymentIn) -> dict | None:
     },
 )
 def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
-    recorded = _recorded(data)
+    # Without one, the business's currency: its country's (BASE-F50), never a euro fixed here (payments#35, #38).
+    currency = data.currency or platform.business_currency(ctx.scope)
+    recorded = _recorded(data, currency)
     if recorded is not None:
         return recorded
     method = _method_to_pay_from(data)
@@ -337,7 +339,7 @@ def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
                 method=method,
                 payment_date=data.payment_date,
                 amount=data.amount,
-                currency=data.currency or business_currency(),
+                currency=currency,
                 beneficiary_name=data.beneficiary_name,
                 beneficiary_iban=data.beneficiary_iban,
                 concept=data.concept,
@@ -347,7 +349,7 @@ def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
                 updated_by=actor,
             )
     except IntegrityError:
-        recorded = _recorded(data)
+        recorded = _recorded(data, currency)
         if recorded is None:
             raise
         return recorded

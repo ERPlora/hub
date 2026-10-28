@@ -378,6 +378,9 @@ class PaymentOut(Schema):
     payment_date: dt.date = Field(description="The day of the payment.")
     amount: int = Field(description="The amount in minor units of its currency.")
     currency: str = Field(description="Its currency (ISO 4217).")
+    currency_decimals: int = Field(
+        description="The decimals of its currency as the server counts them (2 in EUR and HUF, 0 in JPY)."
+    )
     beneficiary_name: str = Field(description="Who receives it.")
     beneficiary_iban: str = Field(description="The beneficiary's IBAN; may be empty.")
     concept: str = Field(description="What it is for; may be empty.")
