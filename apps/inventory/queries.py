@@ -11,7 +11,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from babel import Locale
-from babel.numbers import format_currency, format_decimal, get_currency_precision, get_decimal_symbol
+from babel.numbers import format_decimal, get_decimal_symbol
 from django.conf import settings
 from django.core.exceptions import EmptyResultSet
 from django.db.models import (
@@ -74,6 +74,7 @@ from apps.inventory.schemas import (
     UnitPage,
 )
 from base import operations as platform
+from base.business import money_text
 
 PRODUCT_NOT_FOUND = _("This product does not exist in this hub.")
 CATEGORY_NOT_FOUND = _("This category no longer exists.")
@@ -868,10 +869,8 @@ def _locale() -> Locale:
 
 def _money(cents: int, currency: str) -> str:
     """«2,20 €» in Spanish, «€2.20» in English (CLDR), in the business's ``currency`` with its decimals, ungrouped so
-    that the import reads it back."""
-    return format_currency(
-        Decimal(cents).scaleb(-get_currency_precision(currency)), currency, locale=_locale(), group_separator=False
-    )
+    that the import reads it back («PLN 2.20»: the code off the figure, as the browser writes it)."""
+    return money_text(cents, currency, grouped=False)
 
 
 def _text_cell(text: str) -> str:

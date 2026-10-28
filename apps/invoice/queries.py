@@ -11,7 +11,7 @@ in the reader's language.
 import datetime as dt
 from decimal import Decimal
 
-from babel.numbers import format_currency, format_decimal, format_percent, get_currency_precision
+from babel.numbers import format_decimal, format_percent, get_currency_precision
 from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Sum, Window
 from django.db.models.functions import Coalesce, Lag
 from django.template.loader import render_to_string
@@ -65,6 +65,7 @@ from apps.invoice.schemas import (
 )
 from apps.sale.queries import find_sale
 from apps.tax.queries import business_tax_kind, resolve_tax
+from base.business import money_text
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
@@ -458,21 +459,10 @@ def by_source(ctx: OperationContext, params: BySourceIn) -> dict:
 # ── The printable document ──────────────────────────────────────────────────────────────────────
 
 
-def _units(cents: int | Decimal, currency: str) -> Decimal:
-    """Minor units as units of ``currency``: 12100 is 121.00 €, and ¥12,100 (the yen has no cents)."""
-    return Decimal(cents).scaleb(-get_currency_precision(currency))
-
-
-def _money(cents: int, currency: str, language: str) -> str:
-    return format_currency(_units(cents, currency), currency, locale=language)
-
-
-def _unit_price(cents: Decimal, currency: str, language: str) -> str:
-    """A unit price: the currency's decimals, up to two more when the price without VAT has them (0.8264 €)."""
-    units = _units(cents, currency).normalize()
-    if -units.as_tuple().exponent <= get_currency_precision(currency):
-        return format_currency(units, currency, locale=language)
-    return format_currency(units, currency, locale=language, decimal_quantization=False)
+def _money(cents: int | Decimal, currency: str, language: str) -> str:
+    """Minor units of ``currency`` (12100 is 121.00 €, and ¥12,100: the yen has no cents); a unit price keeps the two
+    more decimals the price without VAT may have (0.8264 €)."""
+    return money_text(cents, currency, language=language)
 
 
 def _percent(rate, language: str) -> str:
@@ -552,7 +542,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
             {
                 "description": line.description,
                 "quantity": format_decimal(line.quantity.normalize(), locale=language),
-                "unit_price": _unit_price(line.unit_price, invoice.currency, language),
+                "unit_price": _money(line.unit_price, invoice.currency, language),
                 "discount": money(line.discount_amount) if line.discount_amount else "",
                 "tax_rate": _percent(line.tax_rate, language),
                 "amount": money(line.base_amount),

@@ -17,7 +17,6 @@ from itertools import groupby
 from operator import attrgetter
 from uuid import UUID
 
-from babel.numbers import format_currency, get_currency_symbol
 from django.conf import settings as django_settings
 from django.db.models import Count, Exists, F, Func, JSONField, OuterRef, Q, QuerySet, Sum
 from django.db.models.fields.json import KeyTextTransform
@@ -95,6 +94,7 @@ from apps.tax.queries import (
 from apps.tax.schemas import TAX_KIND_NAMES
 from base.approvals import approval_of, digest
 from base import operations as platform
+from base import business
 from base.business import currency_decimals
 from base.models import Approval
 from base.operations import call
@@ -662,15 +662,7 @@ def money_text(cents: int | None, currency: str = LIMITS_CURRENCY) -> str:
     thousands always grouped as every screen paints them («1.234,56 €», «€1,234.56», «PLN 1,234.56»; hub#1090);
     nothing is «—». Without a currency it is one of Spain's legal limits, which the law writes in euros (Invoicing says
     its ticket limit so too); any other amount passes its own, the sale's or the business's."""
-    if cents is None:
-        return "—"
-    locale = translation.to_locale(translation.get_language() or "en")
-    text = format_currency(Decimal(cents).scaleb(-currency_decimals(currency)), currency, locale=locale)
-    # CLDR's currency spacing, which Babel skips: a sign of letters before the figure never touches it («PLN 1.00»).
-    symbol = get_currency_symbol(currency, locale=locale)
-    if symbol[-1:].isalpha() and text.startswith(symbol) and text[len(symbol) : len(symbol) + 1].isdigit():
-        return f"{symbol}\xa0{text[len(symbol):]}"
-    return text
+    return "—" if cents is None else business.money_text(cents, currency)
 
 
 def _line_price(
