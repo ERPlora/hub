@@ -691,3 +691,43 @@ class TestTheFiguresAreCheckedAtStart:
         declare(monkeypatch, {APPROVABLE: [Translated("Lock after {pin_inactivity_minutes}")]})
         [error] = self.errors()
         assert "es" in error.msg
+
+
+class TestTheFiguresTheReviewAdded:
+    """Three holes the review found (FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE): the record says an amount in
+    the business's currency (the list and the CSV ask it only when a row has figures); a currency written in letters
+    never touches its figure («PLN 1.00»); and ``base.E008`` refuses the sentences of another app's command even when
+    that app's ``approvals`` name it too."""
+
+    CHECK = "sale.order.set_discount_over_limit"
+
+    @pytest.fixture(autouse=True)
+    def in_spain(self, monkeypatch):
+        from base.models import Hub
+
+        Hub.objects.update_or_create(slug="a", defaults={"status": "ready", "name": "A", "country": "ES"})
+        declare(monkeypatch, {self.CHECK: ["Discount the check by {discount_amount, money}"]}, config="sale")
+
+    def test_the_record_says_the_amount_in_the_business_s_currency(self, client, adam, eva):
+        recorded(operation=self.CHECK, figures={"discount_amount": 500})
+        client.force_login(adam)
+        rows = client.get("/api/approvals", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE="es").json()["approvals"]
+        assert [row["action"] for row in rows] == ["Discount the check by 5,00\xa0€"]
+        assert [row[1] for row in lines(exported(client, "en"))[1:]] == ["Discount the check by €5.00"]
+
+    def test_a_currency_of_letters_never_touches_its_figure(self):
+        from decimal import Decimal
+
+        from base.approvals import _money
+
+        assert _money(Decimal(100), "PLN", "en") == "PLN\xa01.00"
+        assert _money(Decimal(100), "PLN", "es") == "1,00\xa0PLN"
+        assert _money(Decimal(1234), "KWD", "en") == "KWD\xa01.234"
+
+    def test_another_app_s_command_is_refused_even_when_its_approvals_name_it(self, monkeypatch):
+        from django.core import checks
+
+        monkeypatch.setattr(apps.get_app_config("table"), "approvals", {APPROVABLE: "Lock the till"}, raising=False)
+        declare(monkeypatch, {APPROVABLE: ["Lock after {pin_inactivity_minutes}"]}, config="table")
+        errors = [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E008"]
+        assert [error.msg for error in errors] == [f"table says {APPROVABLE} with figures, but it is a command of base."]
