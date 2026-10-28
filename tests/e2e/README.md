@@ -111,6 +111,12 @@ Lo que no puede comprobar el e2e, y lo pide la receta:
   `E2E_SAAS_PORT=<Hub+1>`), con `env -u DB_NAME` al crearla y `DB_NAME=saas_e2e_<Hub+1>` en su `runserver`: la `saas` del
   `.env` es de la pila compartida y puede ir atrasada de migraciones (su login cae con un 500), y con el `DB_NAME` del Hub
   exportado el SaaS abre la BD del Hub (su login cae con `relation "django_site" does not exist`).
+- **Sus límites por dirección subidos** (`E2E_RELAX_LOGIN_RATE_LIMIT=True` en su `runserver`; `config/settings.py` del
+  SaaS, solo con `DEBUG`): todas las specs entran y se dan de alta desde `127.0.0.1`, y sin la marca una pasada entera
+  cae con «429 · Too many attempts» en el login o en la 11.ª alta de la hora (10 por hora y dirección). Cada cuenta
+  conserva su propio límite, y el freno de saltos al hub (`HUB_LOGIN_RATELIMIT`, arriba) no cambia. El e2e no lo puede
+  comprobar: la marca vive en el entorno del proceso del SaaS, el SaaS no la dice por ninguna ruta y probarla gastaría
+  los intentos que protege.
 - **Una pila por checkout**: dos Vite del mismo checkout comparten `node_modules/.vite` y se rompen el uno al
   otro al optimizar dependencias (la página se queda en blanco). Cada pila sale de su worktree.
 
@@ -124,7 +130,7 @@ env -u DB_NAME E2E_SAAS_PORT=8031 node tests/e2e/database.ts        # crea y mig
 env DB_NAME=saas_e2e_8031 uv run python manage.py demo_seed         # las cuentas de demo con las que entran las specs
 env DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' HUB_INTERNAL_URL=http://localhost:8030 \
-  EMAIL_FILE_PATH="$PWD/.mail-8031" \
+  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True \
   uv run python manage.py runserver 127.0.0.1:8031   # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
 # 2. La pila del Hub, desde su worktree (en otra terminal)
 cd <hub-wt>
@@ -170,7 +176,8 @@ escribe una clave real. Pide tres cosas al SaaS de la pila:
   `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`
   (además del `demo_seed` de la receta de arriba, como el resto de specs). La spec lo comprueba al arrancar y, si falta,
   cae con «not seeded with this provider».
-- **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS: sin ella el dictado responde 503.
+- **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS (con el resto de variables de la receta de
+  arriba, también `E2E_RELAX_LOGIN_RATE_LIMIT=True`): sin ella el dictado responde 503.
 - **`E2E_SAAS_DB`** (la de la tabla de arriba), si la BD del SaaS no es `saas_e2e_<Hub+1>` (con el Hub en :8000, `saas`):
   la spec fija en ella los mensajes del mes del negocio `a` antes de cada test, así que nunca gasta el cupo del plan.
 
@@ -179,7 +186,7 @@ escribe una clave real. Pide tres cosas al SaaS de la pila:
 env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-local \
   HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
-  EMAIL_FILE_PATH="$PWD/.mail-8871" uv run python manage.py runserver 127.0.0.1:8871
+  EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True uv run python manage.py runserver 127.0.0.1:8871
 # La spec, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
 CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
 ```
@@ -202,8 +209,9 @@ env DB_NAME=saas_e2e_8871 uv run python manage.py seed_taxonomy
 ```
 
 Sin ella la spec cae al empezar con «no business type of the restaurant vertical». Da de alta una cuenta por ejecución:
-el SaaS deja 10 altas por hora y dirección, así que tras varias ejecuciones seguidas se reinicia su `runserver` (la caché
-local es de memoria). Deja `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>.png` en `.artifacts/`.
+con `E2E_RELAX_LOGIN_RATE_LIMIT=True` en el SaaS (la receta) las altas no tienen tope práctico; sin la marca, el SaaS deja
+10 por hora y dirección, y tras varias ejecuciones seguidas hay que reiniciar su `runserver` (la caché local es de
+memoria). Deja `APP-BASE-10-BASE-G152-<idioma>-<pantalla>-<ancho>.png` en `.artifacts/`.
 
 ## La página a la vista y los diálogos
 
