@@ -12,7 +12,7 @@ import { promisify } from 'node:util';
 import { expect, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { compactBar, HUB_DIR, psql, REPO_DIR, shot, shown } from './helpers';
+import { capture, compactBar, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { confirmDialog, idFromUrl, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
@@ -103,7 +103,7 @@ for (const viewport of VIEWPORTS) {
       );
       await noHorizontalScroll(page, viewport.label);
       await settled(page);
-      await page.screenshot({ path: shot(`FIX-FLOW-ASSISTANT-STEP-editor-${viewport.label}`) });
+      await capture(page, `FIX-FLOW-ASSISTANT-STEP-editor-${viewport.label}`);
       await editor.locator('[data-testid=flow-editor-save]').click();
       await page.waitForURL(/\/flow\/automations\/[0-9a-f-]+$/);
       const flowId = idFromUrl(page);
@@ -141,7 +141,7 @@ for (const viewport of VIEWPORTS) {
       expect(spent() - spentBefore).toBe(1);
       await noHorizontalScroll(page, viewport.label);
       await settled(page);
-      await page.screenshot({ path: shot(`FIX-FLOW-ASSISTANT-STEP-${viewport.label}`) });
+      await capture(page, `FIX-FLOW-ASSISTANT-STEP-${viewport.label}`);
     } finally {
       await context.close();
     }
