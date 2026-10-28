@@ -13,9 +13,9 @@ cuánto queda.
 ## Qué hace hoy
 
 - **Las tarifas** (F01–F05): ver, buscar y filtrar tras el embudo (abre en «Activas»), crear con código único
-  sin distinguir mayúsculas, divisa ISO 4217 de dos decimales, base fiscal (según el negocio, con o sin
-  impuesto), grupo de clientes y fechas; editar solo lo enviado; elegir la general (una sola, sin grupo y en
-  euros) y desactivar o reactivar (nunca la general).
+  sin distinguir mayúsculas, divisa ISO 4217 de dos decimales (la del negocio, la de su país, si no se dice),
+  base fiscal (según el negocio, con o sin impuesto), grupo de clientes y fechas; editar solo lo enviado;
+  elegir la general (una sola, sin grupo y en la divisa del negocio) y desactivar o reactivar (nunca la general).
 - **Los precios** (F06–F08): el detalle de la tarifa con sus precios, el de ficha de Inventario al lado;
   poner el precio de un producto o de un servicio desde una cantidad mínima en la unidad del producto
   (repetirlo da precios por volumen), cambiarlo y quitarlo. En una tarifa desactivada solo se quitan.
@@ -57,7 +57,7 @@ quien lo mantiene» del WORKBOOK; las de la migración, en la ronda 2026-10-21 (
 cd hub   # o tu worktree
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/pricing
 pnpm test apps/pricing
-pnpm e2e tests/e2e/pricing-flows.spec.ts tests/e2e/pricing-lists.spec.ts
+pnpm e2e tests/e2e/pricing-flows.spec.ts tests/e2e/pricing-lists.spec.ts tests/e2e/pricing-business-currency.spec.ts
 ```
 
 - `tests/test_integration_inventory.py`, `test_integration_customer.py` y `test_integration_service.py` van
@@ -65,7 +65,9 @@ pnpm e2e tests/e2e/pricing-flows.spec.ts tests/e2e/pricing-lists.spec.ts
   outbox, una sola vez y con dos negocios; `test_concurrency.py`, en hilos (la general elegida a la vez, el
   código repetido, el borrado de lo que una escritura nombra y el del detalle que se lee).
 - `pricing-flows.spec.ts` recorre PRICING-F01 a F12 en 390, 834 y 1440; `pricing-lists.spec.ts`, de la
-  tarifa al precio de una línea (PRICING-F13).
+  tarifa al precio de una línea (PRICING-F13); `pricing-business-currency.spec.ts`, el negocio en Polonia
+  (tarifas y precios en eslotis) y de vuelta en España. `tests/test_business_currency.py`: la divisa del
+  negocio en el precio de una línea, la tarifa general y una tarifa nueva, con dos negocios y el hub de ERPlora.
 
 ## Qué queda fuera
 
