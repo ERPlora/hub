@@ -12,6 +12,8 @@ export type TemplateCategory = 'UTILITY' | 'MARKETING' | 'AUTHENTICATION';
 export type TemplateStatus = 'DRAFT' | 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | 'DELETED';
 export type WritableCategory = 'UTILITY' | 'MARKETING';
 export type HeaderFormat = '' | 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'LOCATION';
+/** The headers with a file (WHATSAPP_INBOX-F29). */
+export type FileHeaderFormat = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
 export type SubmitState = '' | 'queued' | 'sending' | 'failed';
 export type TemplateButtonType = 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
 export type ChannelStatus = 'not_connected' | 'connected' | 'reconnect_needed';
@@ -236,9 +238,27 @@ export interface TemplateButtonIn {
   phone_number?: string;
 }
 
+/** The file of a photo, video or document header, kept in the hub's store (WHATSAPP_INBOX-F29). */
+export interface TemplateSampleOut {
+  id: string;
+  header_format: FileHeaderFormat;
+  /** image/jpeg, image/png, video/mp4 or application/pdf: what its bytes are. */
+  content_type: string;
+  size: number;
+  name: string;
+}
+
+export interface TemplateSampleUploadIn {
+  header_format: FileHeaderFormat;
+  name: string;
+  content_base64: string;
+}
+
 export interface TemplateDraftOut {
   category: TemplateCategory;
+  header_format: HeaderFormat;
   header: string;
+  header_sample: TemplateSampleOut | null;
   body: string;
   body_examples: string[];
   footer: string;
@@ -254,6 +274,8 @@ export interface TemplateOut {
   status: TemplateStatus;
   header_format: HeaderFormat;
   header: string;
+  /** The file of its photo, video or document header when it was chosen here (none from WhatsApp Manager). */
+  header_sample: TemplateSampleOut | null;
   body: string;
   body_examples: string[];
   footer: string;
@@ -277,7 +299,10 @@ export interface TemplateOut {
 /** What the form writes (WHATSAPP_INBOX-F29, F30); `submit_key`: one per save, the same on a retry. */
 export interface TemplateWriteIn {
   category: WritableCategory;
+  /** Empty or TEXT (or missing): the text of `header`; IMAGE, VIDEO or DOCUMENT: the file of `header_sample`. */
+  header_format?: '' | 'TEXT' | FileHeaderFormat;
   header: string;
+  header_sample?: string | null;
   body: string;
   body_examples: string[];
   footer: string;
@@ -381,6 +406,7 @@ declare module '@erplora/ui/sdk' {
     'whatsapp_inbox.template.update': { input: TemplateUpdateIn; output: TemplateOut };
     'whatsapp_inbox.template.retry': { input: TemplateRefIn; output: TemplateOut };
     'whatsapp_inbox.template.delete': { input: TemplateRefIn; output: TemplateOut };
+    'whatsapp_inbox.template.upload_sample': { input: TemplateSampleUploadIn; output: TemplateSampleOut };
     'whatsapp_inbox.channel.get': { input: ChannelGetIn; output: ChannelOut };
     'whatsapp_inbox.channel.prepare': { input: ChannelPrepareIn; output: ChannelPrepareOut };
     'whatsapp_inbox.channel.connect': { input: ChannelConnectIn; output: ChannelConnectOut };

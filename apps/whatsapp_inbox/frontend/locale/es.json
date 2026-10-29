@@ -189,6 +189,30 @@
         "language": "Idioma",
         "category": "Categoría",
         "header": "Cabecera (opcional)",
+        "headerFormat": "Tipo de cabecera",
+        "headerFormats": {
+          "TEXT": "Texto",
+          "IMAGE": "Foto",
+          "VIDEO": "Vídeo",
+          "DOCUMENT": "Documento"
+        },
+        "noFile": "Ningún archivo elegido",
+        "chooseFile": "Elegir archivo",
+        "changeFile": "Cambiar archivo",
+        "uploading": "Subiendo…",
+        "fileRules": {
+          "IMAGE": "JPEG o PNG, hasta 5 MB.",
+          "VIDEO": "MP4, hasta 16 MB.",
+          "DOCUMENT": "PDF, hasta 25 MB."
+        },
+        "fileReview": "Meta revisa la plantilla con este archivo.",
+        "fileWrongType": {
+          "IMAGE": "Elige una foto JPEG o PNG.",
+          "VIDEO": "Elige un vídeo MP4.",
+          "DOCUMENT": "Elige un documento PDF."
+        },
+        "fileTooHeavy": "Este archivo pesa más de {mb} MB: elige uno más ligero.",
+        "fileUploadFailed": "No se pudo subir el archivo. Inténtalo de nuevo.",
         "body": "Texto",
         "bodyHint": "Donde va una variable, escribe su número entre dobles llaves, empezando por el 1.",
         "example": "Ejemplo de la variable {n}",
@@ -227,7 +251,9 @@
         "notAccepted": "No aceptada: {reason}",
         "notSent": "Cambios sin enviar: {reason}",
         "deleting": "Borrándose en Meta",
-        "unfillable": "No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager."
+        "unfillable": "No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager.",
+        "notSendableYet": "Aún no se puede enviar desde la bandeja: la cabecera lleva un archivo.",
+        "headerFile": "{kind}: {name}"
       }
     },
     "settings": {

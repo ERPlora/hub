@@ -29,6 +29,7 @@ const template = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   rejected_reason: '',
   synced_at: null,
   header_format: '',
+  header_sample: null,
   body_examples: [],
   buttons: [],
   meta_id: 'm1',

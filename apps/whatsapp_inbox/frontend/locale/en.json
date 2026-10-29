@@ -189,6 +189,30 @@
         "language": "Language",
         "category": "Category",
         "header": "Header (optional)",
+        "headerFormat": "Header type",
+        "headerFormats": {
+          "TEXT": "Text",
+          "IMAGE": "Photo",
+          "VIDEO": "Video",
+          "DOCUMENT": "Document"
+        },
+        "noFile": "No file chosen",
+        "chooseFile": "Choose file",
+        "changeFile": "Change file",
+        "uploading": "Uploading…",
+        "fileRules": {
+          "IMAGE": "JPEG or PNG, up to 5 MB.",
+          "VIDEO": "MP4, up to 16 MB.",
+          "DOCUMENT": "PDF, up to 25 MB."
+        },
+        "fileReview": "Meta reviews the template with this file.",
+        "fileWrongType": {
+          "IMAGE": "Choose a JPEG or PNG photo.",
+          "VIDEO": "Choose an MP4 video.",
+          "DOCUMENT": "Choose a PDF document."
+        },
+        "fileTooHeavy": "This file weighs more than {mb} MB: choose a lighter one.",
+        "fileUploadFailed": "The file could not be uploaded. Try again.",
         "body": "Text",
         "bodyHint": "Where a variable goes, write its number between double braces, starting with 1.",
         "example": "Example for variable {n}",
@@ -227,7 +251,9 @@
         "notAccepted": "Not accepted: {reason}",
         "notSent": "Changes not sent: {reason}",
         "deleting": "Being deleted at Meta",
-        "unfillable": "Can't be sent or edited here: it is managed in WhatsApp Manager."
+        "unfillable": "Can't be sent or edited here: it is managed in WhatsApp Manager.",
+        "notSendableYet": "Can't be sent from the inbox yet: its header has a file.",
+        "headerFile": "{kind}: {name}"
       }
     },
     "settings": {
