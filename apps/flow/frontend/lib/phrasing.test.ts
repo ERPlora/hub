@@ -270,3 +270,31 @@ describe('a question in words', () => {
   });
 });
 
+
+describe('«Ask the assistant» in words (FLOW-F37, F38)', () => {
+  const en = phrasing('en');
+  const step: Step = { id: 's1', kind: 'assistant', prompt: 'Book Ana', tools: [], mode: 'ask', max_rounds: 6 };
+  const entry = (more: Partial<LogEntry>): LogEntry => ({ step: 's1', kind: 'assistant', outcome: 'thinking', at: '2026-10-28T10:00:00Z', ...more }) as LogEntry;
+
+  it('names the step by what it is asked', () => {
+    expect(describeStep(step, [step], null, en)).toBe('Ask the assistant: Book Ana');
+    expect(describeStep({ ...step, prompt: '' }, [step], null, en)).toBe('Ask the assistant');
+  });
+
+  it('a run that waits for the assistant says so, not that it calls another system', () => {
+    expect(runStatusPill('calling', en, [entry({})])).toEqual({ tone: 'info', label: 'Waiting for the assistant' });
+    // Between two turns (the assistant used a read and thinks again) it still waits for the assistant.
+    expect(runStatusPill('calling', en, [entry({}), entry({ outcome: 'assistant_used', operation: 'task.task.list', ok: true })]).label).toBe('Waiting for the assistant');
+    expect(runStatusPill('calling', en, [entry({ kind: 'http', outcome: 'calling' })]).label).toBe('Calling another system');
+  });
+
+  it('tells in the history what the assistant did', () => {
+    expect(describeLog(entry({}), [step], null, en)).toBe('Asked the assistant; it answers in a moment.');
+    expect(describeLog(entry({ outcome: 'assistant_used', operation: 'task.task.create', ok: true }), [step], null, en)).toBe('The assistant used «Create a task».');
+    expect(describeLog(entry({ outcome: 'assistant_used', operation: 'task.task.create', ok: false }), [step], null, en)).toBe('The assistant tried «Create a task», which did not take it.');
+    expect(describeLog(entry({ outcome: 'assistant_answered', text: 'Done' }), [step], null, en)).toBe('The assistant answered: «Done»');
+    expect(describeLog(entry({ outcome: 'assistant_proposed', operation: 'task.task.create', until: '2026-10-31T10:00:00Z' }), [step], null, en)).toMatch(
+      /^The assistant wants to «Create a task»: it waits for a yes until /,
+    );
+  });
+});

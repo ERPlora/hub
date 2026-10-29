@@ -25,16 +25,16 @@ describe('GuidePage', () => {
     expect(section.findAll('li')).toHaveLength(4);
     const limits = section.text();
     expect(limits).toContain('The assistant writes drafts');
-    expect(limits).toContain('Asking the assistant: it comes in a later version. Messages to a customer go by WhatsApp only, not by email.');
+    expect(limits).toContain('Messages to a customer go by WhatsApp only, not by email.');
     // What it already does is no limit: starting on its own when something happens (FLOW-F21), calling another
-    // system (F27), asking a person first (F28) and sending a WhatsApp (F31).
+    // system (F27), asking a person first (F28), sending a WhatsApp (F31) and asking the assistant (F37).
+    expect(limits).not.toContain('Asking the assistant');
     expect(limits).not.toContain('Starting on its own');
     expect(limits).not.toContain('calling another system');
     expect(limits).not.toContain('Sending messages');
     const spanish = (await setup('es')).find('flow-guide-section-limits').text();
-    expect(spanish).toContain(
-      'Pedírselo al asistente: llega en una versión posterior. Los mensajes a un cliente salen solo por WhatsApp, no por correo.',
-    );
+    expect(spanish).toContain('Los mensajes a un cliente salen solo por WhatsApp, no por correo.');
+    expect(spanish).not.toContain('Pedírselo al asistente');
     expect(spanish).not.toContain('Arrancar sola');
   });
 

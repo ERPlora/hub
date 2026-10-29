@@ -301,3 +301,12 @@ def test_the_limits():
         "lt",
         "lte",
     )
+
+
+def test_the_reads_and_actions_an_assistant_step_may_use_are_permissions_of_the_automation():
+    # FLOW-F37: the assistant only uses what the step names and the owner granted (FLOW-F12).
+    steps = [
+        {"id": "s1", "kind": "command", "operation": "task.task.create"},
+        {"id": "s2", "kind": "assistant", "prompt": "Book it", "tools": ["appointment.slot.list", "task.task.create"]},
+    ]
+    assert doc.required_grants(steps) == ["task.task.create", "appointment.slot.list"]

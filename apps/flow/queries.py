@@ -28,6 +28,7 @@ from live.models import OutboxEvent
 from live.operations import Operation, operation, registry
 
 from apps.flow import document, recipes, vault
+from base import assistant as hub_assistant
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.schemas import (
     CatalogIn,
@@ -76,6 +77,7 @@ HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.
 HIGH_RISK_CODE = "flow.high_risk"
 NO_SECRET = _("There is no secret called «%(name)s».")
 BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
+NOT_FOR_THE_ASSISTANT = _("The assistant cannot use «%(name)s».")
 
 #: How many names an ambiguous reference lists.
 AMBIGUOUS_SHOWN = 5
@@ -222,6 +224,7 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
                 "description": str((op.ai or {}).get("description", "")),
                 "fields": action_fields(op),
                 "outputs": action_outputs(op),
+                "assistant": hub_assistant.is_tool(op),
             }
             for name, op in catalog_operations().items()
         ]
@@ -273,6 +276,16 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
                         if f"secret.{name}" in text
                     )
                     problems.setdefault(f"steps.{index}.{field}", str(NO_SECRET) % {"name": name})
+            continue
+        if step.kind == "assistant":
+            for name in step.tools:
+                problem = operation_problem(name)
+                if problem is None and not hub_assistant.is_tool(grantable_operations()[name]):
+                    problem = ("invalid_payload", str(NOT_FOR_THE_ASSISTANT) % {"name": name})
+                if problem is not None:
+                    problem_code, problems[f"steps.{index}.tools"] = problem
+                    code = HIGH_RISK_CODE if problem_code == HIGH_RISK_CODE else code
+                    break
             continue
         if step.kind not in ("command", "query"):
             continue
@@ -564,7 +577,7 @@ NOT_RESUMABLE = frozenset(
     }
 )
 #: The kinds of step whose output later steps read (``steps.<id>``).
-LEAVES = ("command", "query", "http", "ask")
+LEAVES = ("command", "query", "http", "ask", "assistant")
 RUN_NOT_RESUMABLE = _("Only a run that stopped by an error at one of its steps can be resumed.")
 BEFORE_ANY_STEP = _(
     "This run cannot be resumed: it stopped before doing any step, or would stop there again. Run it "
@@ -873,6 +886,12 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
             # Nothing is asked; what the person would answer is not known here.
             texts = {"title": document.fill(step.title, values), "details": document.fill(step.details, values)}
             steps.append(out | {"outcome": "would_ask", "params": texts | {"role": step.role, "hours": step.hours}})
+            unknown_steps.add(step.id)
+            continue
+        if step.kind == "assistant":
+            # Nothing is asked: what the assistant would answer is not known here.
+            asked = {"prompt": document.fill(step.prompt, values), "tools": list(step.tools), "mode": step.mode}
+            steps.append(out | {"outcome": "would_ask_assistant", "params": asked})
             unknown_steps.add(step.id)
             continue
         if step.kind == "condition":

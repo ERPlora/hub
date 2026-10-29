@@ -371,8 +371,36 @@ class AskStep(In):
     run_if: Condition | None = Field(None, description=D_RUN_IF)
 
 
+OperationName = Annotated[str, StringConstraints(strip_whitespace=True, max_length=96, pattern=NAME_RE.pattern)]
+
+
+class AssistantStep(In):
+    id: StepId = Field(
+        description="The step's id; later steps read `steps.<id>.text` (what the assistant answered) and, when a change "
+        "waited for a person, `.approved`, `.note` and `.answered_by`."
+    )
+    kind: Literal["assistant"] = Field(
+        description="Ask the assistant: with nobody in front, it does the task with the reads and actions the step "
+        "names and the automation was granted."
+    )
+    prompt: _text(4000, 1) = Field(description="What it is asked to do, with `{{…}}` data filled in when it runs.")
+    tools: list[OperationName] = Field(
+        default_factory=list,
+        max_length=20,
+        description="The reads and actions it may use, by name: each one is a permission of the automation.",
+    )
+    mode: Literal["ask", "auto"] = Field(
+        "ask",
+        description="`ask`: a change it wants waits in «Waiting for your answer» for a yes; `auto`: it makes it on its "
+        "own, as the automation. A read never waits.",
+    )
+    max_rounds: int = Field(6, ge=1, le=10, description="Most times it may answer before it must be done: 1 to 10.")
+    run_if: Condition | None = Field(None, description=D_RUN_IF)
+    on_error: Literal["stop", "continue"] | None = Field(None, description=D_ON_ERROR)
+
+
 Step = Annotated[
-    CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep, Field(discriminator="kind")
+    CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep | AssistantStep, Field(discriminator="kind")
 ]
 DraftStep = Annotated[
     CommandStep | ConditionStep | DelayStep, Field(discriminator="kind")
@@ -395,6 +423,8 @@ def _reads(step: Any) -> list[str]:
         return reads + [path for path in texts if not document.CALL_ONLY_RE.match(path)]
     if step.kind == "ask":
         return reads + document.references([step.title, step.details])
+    if step.kind == "assistant":
+        return reads + document.references(step.prompt)
     return reads
 
 
@@ -408,6 +438,8 @@ def _call_only(step: Any) -> list[str]:
         found += _condition_reads(step.when)
     elif step.kind == "ask":
         found += document.references([step.title, step.details])
+    elif step.kind == "assistant":
+        found += document.references(step.prompt)
     return [path for path in found if path.startswith(("secret.", "run."))]
 
 
@@ -431,7 +463,7 @@ def document_problems(steps: list[Any]) -> list[str]:
                 problems.append(str(STEP_READS_NOTHING) % {"n": number, "path": path})
             elif path.startswith("steps.") and path.split(".")[1] not in leaves:
                 problems.append(str(STEP_READS_LATER) % {"n": number, "path": path})
-        if step.kind in ("command", "query", "http", "ask"):
+        if step.kind in ("command", "query", "http", "ask", "assistant"):
             leaves.add(step.id)
     return problems
 
@@ -565,6 +597,25 @@ class RecordCallIn(In):
     detail: str = Field(
         "", max_length=2000, title=gettext_noop("Technical text"), description="What went wrong, technically."
     )
+
+
+class ToolCallIn(In):
+    call_id: str = Field(max_length=200, description="The call's id, as the model gave it.")
+    name: str = Field(max_length=200, description="The tool's name, as the gateway names it (`task__task__create`).")
+    arguments: str = Field("{}", max_length=200_000, description="Its data, as JSON text.")
+
+
+class AssistantRoundIn(In):
+    id: UUID = Field(description="The run whose «Ask the assistant» step is thinking.")
+    text: str = Field("", max_length=200_000, description="What the model said with its calls.")
+    calls: list[ToolCallIn] = Field(min_length=1, max_length=64, description="The reads and actions it asked for.")
+    continuation: str | None = Field(None, max_length=4096, description="What the gateway gave with the calls.")
+
+
+class RecordAssistantIn(In):
+    id: UUID = Field(description="The run whose «Ask the assistant» step ended.")
+    text: str = Field("", max_length=200_000, description="What the assistant answered.")
+    failure: str = Field("", max_length=96, description="Why it did not answer: the gateway's code; empty when it did.")
 
 
 class RunListIn(PageIn):
@@ -802,6 +853,8 @@ class CatalogActionOut(Schema):
     description: str
     fields: list[FieldOut]
     outputs: list[str]
+    #: Whether «Ask the assistant» may use it (its ``ai=`` offers it to the assistant).
+    assistant: bool = False
 
 
 class CatalogOut(Schema):
@@ -838,6 +891,7 @@ class TestStepOut(Schema):
         "skipped",
         "would_call",
         "would_ask",
+        "would_ask_assistant",
     ]
     operation: str = ""
     params: dict[str, Any] = {}
@@ -862,6 +916,20 @@ class ReactOut(Schema):
 
 class DueOut(Schema):
     count: int
+
+
+class ClaimAssistantOut(Schema):
+    claimed: bool
+    messages: list[dict[str, Any]] = []
+    tools: list[dict[str, Any]] = []
+    instructions: str = ""
+    continuation: str | None = None
+
+
+class AssistantRoundOut(Schema):
+    go_on: bool
+    messages: list[dict[str, Any]] = []
+    continuation: str | None = None
 
 
 class DeletedOut(Schema):
