@@ -96,6 +96,8 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        # The Home's step (FIX-SCHEDULE-SETUP-HOOKS).
+        *(text for step in config.setup for text in (step.title, step.description)),
         *models.WEEKDAY_NAMES,
         *module_texts(queries),
         *module_texts(services),

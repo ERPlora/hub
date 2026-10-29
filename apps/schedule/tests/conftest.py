@@ -5,9 +5,11 @@ import datetime as dt
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connections
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
 
@@ -53,6 +55,19 @@ def make_user(db):
         return user
 
     return make
+
+
+@pytest.fixture
+def db_dsn(django_db_setup):
+    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    params = connections["default"].settings_dict
+    return make_conninfo(
+        dbname=params["NAME"],
+        user=params["USER"],
+        password=params["PASSWORD"],
+        host=params["HOST"],
+        port=params["PORT"],
+    )
 
 
 @pytest.fixture
