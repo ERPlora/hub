@@ -170,7 +170,7 @@ def test_spanish_texts():
             "Han pasado más de 24 horas desde el último mensaje del cliente: WhatsApp solo deja escribirle "
             "con una plantilla aprobada."
         )
-        assert str(services.RECONNECT_NEEDED) == "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
+        assert str(queries.RECONNECT_NEEDED) == "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
 
 
 @pytest.mark.django_db

@@ -1112,7 +1112,8 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 - `Message`: dirección (`inbound`, `outbound`), origen (`customer`, `phone_app`, `hub`), procedencia
   (`live`, `history`), tipo de Meta, texto, adjunto por URL de erplora.com (`media_url`, solo https y de
   su origen; tipo MIME, nombre, pie), estado (`received`; los del Hub: `queued` → `sending` → `sent` →
-  `delivered` → `read`, o `failed`) con el código y el motivo del último intento o de Meta,
+  `delivered` → `read`, o `failed`) con el código del último intento o de Meta (`error_code`) y, solo en un
+  rechazo que el Hub no nombra, el motivo tal como llegó (`error_message`; ver «Un motivo se dice…»),
   `wa_message_id` (único; vacío mientras no ha salido), `client_message_id` (la clave del envío, única,
   obligatoria), el negocio que lo envió desde el Hub (`host`, fase 1, desde la migración `0007`; vacío en lo que
   llega), plantilla usada y sus variables, quién lo envió, hora en que se dijo, objeto de Meta
@@ -1128,8 +1129,8 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   (`header_format`: vacío, `TEXT` o un archivo o lugar hecho en WhatsApp Manager; `header`), cuerpo,
   ejemplos (`body_examples`), pie, botones, número de variables, motivo de rechazo, `meta_id`,
   `synced_at`; el cambio que espera llegar a Meta (`draft`); la entrega a erplora.com (`submit_state`:
-  vacío, `queued`, `sending`, `failed`; `submit_key`, la clave del guardado, única; `submit_error_code` y
-  `submit_error`; `submit_at`); el borrado (`deleted_at`, que conserva la fila, y `delete_state`:
+  vacío, `queued`, `sending`, `failed`; `submit_key`, la clave del guardado, única; `submit_error_code` y,
+  solo en un rechazo de Meta que el Hub no nombra, su motivo tal como llegó en `submit_error`; `submit_at`); el borrado (`deleted_at`, que conserva la fila, y `delete_state`:
   `pending` hasta que Meta lo confirma, `done`); y `supported` (si el Hub la escribe y la sabe rellenar:
   ni código de verificación, ni cabecera con archivo o con variable, ni variables con nombre, solo
   respuestas rápidas, enlaces fijos y llamadas).
@@ -1185,6 +1186,16 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   sin respuesta →
   `sending`, y `template.retry` la entrega con la misma clave; un `failed` reintentado va con clave nueva
   (la misma daría el mismo rechazo).
+- **Un motivo se dice en el idioma de quien lo lee, nunca en el de quien lo escribió.** La fila de un mensaje o
+  de una plantilla guarda el código del Hub (`error_code`, `submit_error_code`) y, solo en un rechazo que el Hub
+  no nombra (`whatsapp_inbox.send_refused`, `whatsapp_inbox.template_refused`), las palabras de Meta o de
+  erplora.com tal como llegaron (`error_message`, `submit_error`). Las palabras del Hub para sus códigos
+  (`cap_reached`, `reconnect_needed`, `saas_unreachable`, `send_unknown`, `conversation_erased`,
+  `meta_unreachable`, `meta_rate_limited`, `channel_not_connected`; con `saas_unreachable` y `send_unknown`,
+  las del borrado mientras la plantilla se está borrando) se ponen al leer (`message.list`, `template.list` y
+  las respuestas de sus escrituras), en el idioma de quien mira. Así el reintento del worker, que escribe en
+  inglés, no cambia el idioma de lo que ve la persona, y una fila de antes, con el texto ya guardado, se lee
+  igual por su código.
 - **La lista de Meta nunca pisa al Hub**: una plantilla `DRAFT` que va de camino conserva lo escrito, un
   cambio pendiente espera en `draft` (el veredicto de Meta nunca cae sobre un texto cambiado después) y
   una borrada aquí no vuelve (ni por nombre mientras su borrado está `pending`, ni por su `meta_id`).
@@ -1360,8 +1371,12 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
 
    Respuestas: 200 `{"meta_id": "…", "status": "PENDING" | "APPROVED" | "REJECTED" | …}` (Meta la
    recibió); 409 `{"error": {"code": "whatsapp.template_invalid" | "whatsapp.meta_unreachable" |
-   "whatsapp.meta_rate_limited" | "whatsapp.not_connected", "message": "<motivo de Meta>"}}` = no
-   aceptada; el resto como en la puerta 5. erplora.com **nunca registra dos veces la misma clave**.
+   "whatsapp.meta_rate_limited" | "whatsapp.not_connected" | "whatsapp.reconnect_needed", "message": "<motivo
+   de Meta>"}}` = no aceptada (`reconnect_needed`: el permiso caducó o se retiró, el 190 de Meta, y erplora.com
+   marca el número «Hay que reconectar» con foto nueva, como en la puerta 5; el Hub deja la plantilla `failed`
+   con `whatsapp_inbox.reconnect_needed` y su propio texto (`RECONNECT_NEEDED`), nunca el de Meta: la fila dice
+   «No aceptada: El permiso de WhatsApp para tu número caducó: vuelve a conectarlo.»); el resto como en la
+   puerta 5. erplora.com **nunca registra dos veces la misma clave**.
 9. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/templates/delete` (F31):
 
    ```json
@@ -1371,7 +1386,11 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
    Borra en Meta esa plantilla en ese idioma (no las demás del mismo nombre). 200 `{"deleted": true}` o
    404 `{"error": {"code": "whatsapp.template_not_found", …}}` (Meta ya no la tiene) = borrada; cualquier
    otro 404 (una puerta que no existe, una dirección mal puesta: gh:whatsapp_inbox#296), 409 con su
-   motivo, otro 4xx, 5xx o sin respuesta = sigue `pending` y el Hub lo vuelve a pedir.
+   motivo (`whatsapp.meta_unreachable`, `whatsapp.meta_rate_limited`, `whatsapp.not_connected`,
+   `whatsapp.reconnect_needed` o `whatsapp.meta_rejected`), otro 4xx, 5xx o sin respuesta = sigue `pending` y
+   el Hub lo vuelve a pedir. Los cuatro primeros se dicen con palabras del Hub, como en la puerta 8:
+   con `reconnect_needed` (el mismo 190, y erplora.com marca el número) la fila dice «Borrándose en Meta» con
+   el texto `RECONNECT_NEEDED`, y el borrado solo sale bien cuando el número se vuelve a conectar.
 
 Las tres de **conectar el número desde Ajustes** (F01, F02; `whatsapp_inbox.channel.prepare`, `.connect` y
 `.disconnect`, en la petición de la persona y sin transacción abierta). En las tres, el sobre de errores de

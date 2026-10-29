@@ -44,6 +44,13 @@ from apps.whatsapp_inbox import clock, events, gateway
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.queries import (
+    CAP_REACHED,
+    META_RATE_LIMITED,
+    NOT_CONNECTED,
+    SAAS_UNREACHABLE_CODE,
+    SEND_REFUSED_CODE,
+    SEND_UNKNOWN_CODE,
+    TEMPLATE_REFUSED_CODE,
     actor_id,
     channel,
     conversation_out,
@@ -124,28 +131,13 @@ WINDOW_CLOSED = _(
     "More than 24 hours have passed since the customer's last message: WhatsApp only lets you write to "
     "them with an approved template."
 )
-NOT_CONNECTED = _(
-    "WhatsApp is not connected. Connect the business's number in Settings to receive and send messages."
-)
 SAAS_UNCONFIGURED = _(
     "This server cannot reach erplora.com, so nothing can be sent from it."
 )
-CAP_REACHED = _(
-    "You have used every WhatsApp message of your plan this month: nothing can be sent until next month "
-    "or until you upgrade the plan."
-)
 #: A plan that includes no WhatsApp messages (0, ADR-0474): no month brings any, so not «until next month».
 NO_PLAN_MESSAGES = _("Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan.")
-SEND_REFUSED = _("erplora.com did not send the message.")
-#: Meta's 190, as erplora.com says it (``whatsapp.reconnect_needed``): only connecting the number again fixes it.
-RECONNECT_NEEDED = _("WhatsApp's permission for your number expired: connect it again.")
-SAAS_UNREACHABLE = _("erplora.com did not answer: the message has not left. Try again.")
-SEND_UNKNOWN = _(
-    "erplora.com did not confirm the message. Try again: it is never sent twice."
-)
 NOT_RETRYABLE = _("This message cannot be sent again: write a new one.")
 MESSAGE_NOT_FOUND = _("That message no longer exists.")
-CONVERSATION_ERASED = _("The conversation was erased before the message left.")
 TEMPLATE_NOT_FOUND = _("There is no template called “%(name)s”.")
 TEMPLATE_LANGUAGE = _("That template exists in several languages: say which one.")
 TEMPLATE_NOT_APPROVED = _(
@@ -164,13 +156,6 @@ TEMPLATE_IN_REVIEW = _("Meta is reviewing this template: wait for its verdict to
 TEMPLATE_SUBMITTING = _("This template is on its way to Meta: wait a moment.")
 TEMPLATE_CATEGORY_FIXED = _("Meta only lets you change the category of a template it rejected.")
 TEMPLATE_NOT_RETRYABLE = _("There is nothing of this template to hand to Meta again.")
-TEMPLATE_REFUSED = _("Meta did not accept the template.")
-META_UNREACHABLE = _("Meta did not answer. Try again in a few minutes.")
-META_RATE_LIMITED = _("Meta asks to wait before trying again. Try again in a few minutes.")
-TEMPLATE_SAAS_UNREACHABLE = _("erplora.com did not answer: the template has not left. Try again.")
-TEMPLATE_UNKNOWN = _("erplora.com did not confirm the template. Try again: it is never registered twice.")
-DELETE_SAAS_UNREACHABLE = _("erplora.com did not answer: Meta still has the template. Try again.")
-DELETE_UNKNOWN = _("erplora.com did not confirm that Meta deleted the template. Try again.")
 ALREADY_ASSIGNED = _("This conversation is already with %(name)s.")
 ONLY_YOURSELF = _("You may only assign conversations to yourself.")
 NOBODY_CALLED = _("Nobody in this business is called “%(reference)s”.")
@@ -197,19 +182,19 @@ _ON_ITS_WAY = (Message.Status.QUEUED, Message.Status.SENDING)
 _VARIABLE = re.compile(r"\{\{\s*(\d+)\s*\}\}")
 #: A number exactly in international format: a plus, the country and its digits, nothing else.
 _INTERNATIONAL = re.compile(r"\+[1-9]\d{6,14}")
-#: erplora.com's 409 codes the Hub knows by name → (its code, its own words or ``None`` for erplora.com's); any
-#: other is «erplora.com did not send it», with Meta's reason.
+#: erplora.com's 409 codes the Hub knows by name → its code, said in its own words when read (queries); any other
+#: is «erplora.com did not send it», with Meta's reason as it came.
 _REFUSALS = {
-    "whatsapp.cap_reached": ("whatsapp_inbox.cap_reached", None),
-    "whatsapp.reconnect_needed": ("whatsapp_inbox.reconnect_needed", RECONNECT_NEEDED),
+    "whatsapp.cap_reached": "whatsapp_inbox.cap_reached",
+    "whatsapp.reconnect_needed": "whatsapp_inbox.reconnect_needed",
 }
-#: erplora.com's 409 codes for a template the Hub says in its own words (never blaming ERPlora for Meta:
-#: gh:hub#2731); any other is Meta's refusal, with Meta's reason.
+#: erplora.com's 409 codes for a template the Hub says in its own words when read (never blaming ERPlora for
+#: Meta: gh:hub#2731); any other is Meta's refusal, with Meta's reason as it came.
 _TEMPLATE_REFUSALS = {
-    "whatsapp.meta_unreachable": ("whatsapp_inbox.meta_unreachable", META_UNREACHABLE),
-    "whatsapp.meta_rate_limited": ("whatsapp_inbox.meta_rate_limited", META_RATE_LIMITED),
-    "whatsapp.not_connected": ("whatsapp_inbox.channel_not_connected", NOT_CONNECTED),
-    "whatsapp.reconnect_needed": ("whatsapp_inbox.reconnect_needed", RECONNECT_NEEDED),
+    "whatsapp.meta_unreachable": "whatsapp_inbox.meta_unreachable",
+    "whatsapp.meta_rate_limited": "whatsapp_inbox.meta_rate_limited",
+    "whatsapp.not_connected": "whatsapp_inbox.channel_not_connected",
+    "whatsapp.reconnect_needed": "whatsapp_inbox.reconnect_needed",
 }
 _TEMPLATE_ON_ITS_WAY = (Template.SubmitState.QUEUED, Template.SubmitState.SENDING)
 
@@ -1163,7 +1148,7 @@ def claim_delivery(ctx: OperationContext, data: MessageRefIn) -> dict:
     if message.conversation.erased_at is not None:
         message.status = Message.Status.FAILED
         message.error_code = "whatsapp_inbox.conversation_erased"
-        message.error_message = str(CONVERSATION_ERASED)
+        message.error_message = ""
         message.save(update_fields=["status", "error_code", "error_message"])
         return {"claimed": False}
     message.status = Message.Status.SENDING
@@ -1214,17 +1199,12 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
         return {"status": message.status}  # a status from Meta already settled it
     elif data.kind == gateway.REFUSED:
         message.status = Message.Status.FAILED
-        message.error_code, own = _REFUSALS.get(data.code, ("whatsapp_inbox.send_refused", None))
-        message.error_message = (str(own) if own else data.message or str(SEND_REFUSED))[:500]
+        message.error_code = _REFUSALS.get(data.code, SEND_REFUSED_CODE)
+        message.error_message = data.message[:500] if message.error_code == SEND_REFUSED_CODE else ""
     else:
         message.status = Message.Status.SENDING
-        unknown = data.kind == gateway.UNKNOWN
-        message.error_code = (
-            "whatsapp_inbox.send_unknown"
-            if unknown
-            else "whatsapp_inbox.saas_unreachable"
-        )
-        message.error_message = str(SEND_UNKNOWN if unknown else SAAS_UNREACHABLE)
+        message.error_code = SEND_UNKNOWN_CODE if data.kind == gateway.UNKNOWN else SAAS_UNREACHABLE_CODE
+        message.error_message = ""
     message.status_at = clock.now()
     message.save(
         update_fields=[
@@ -1950,16 +1930,15 @@ def claim_submit(ctx: OperationContext, data: TemplateRefIn) -> dict:
     }
 
 
-def _template_failure(kind: str, code: str, message: str, *, deleting: bool = False) -> tuple[str, str]:
-    """The Hub's code and reason of a hand-over that did not end well."""
+def _template_failure(kind: str, code: str, message: str) -> tuple[str, str]:
+    """The Hub's code of a hand-over or deletion that did not end well and, for a refusal of Meta's it has no name
+    for, Meta's reason as it came; the Hub's own words are said when the row is read (queries.template_reason)."""
     if kind == gateway.REFUSED:
         known = _TEMPLATE_REFUSALS.get(code)
         if known:
-            return known[0], str(known[1])
-        return "whatsapp_inbox.template_refused", (message or str(TEMPLATE_REFUSED))[:500]
-    if kind == gateway.UNKNOWN:
-        return "whatsapp_inbox.send_unknown", str(DELETE_UNKNOWN if deleting else TEMPLATE_UNKNOWN)
-    return "whatsapp_inbox.saas_unreachable", str(DELETE_SAAS_UNREACHABLE if deleting else TEMPLATE_SAAS_UNREACHABLE)
+            return known, ""
+        return TEMPLATE_REFUSED_CODE, message[:500]
+    return (SEND_UNKNOWN_CODE if kind == gateway.UNKNOWN else SAAS_UNREACHABLE_CODE), ""
 
 
 @operation(
@@ -2038,7 +2017,7 @@ def record_delete(ctx: OperationContext, data: RecordTemplateDeletionIn) -> dict
         row.delete_state = Template.DeleteState.DONE
         row.submit_error_code = row.submit_error = ""
     else:
-        row.submit_error_code, row.submit_error = _template_failure(data.kind, data.code, data.message, deleting=True)
+        row.submit_error_code, row.submit_error = _template_failure(data.kind, data.code, data.message)
     row.save(update_fields=["delete_state", "submit_error_code", "submit_error"])
     record_event(ctx, events.TEMPLATE_UPDATED, {"id": str(row.id)})
     return {"status": row.delete_state}

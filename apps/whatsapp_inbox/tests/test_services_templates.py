@@ -17,6 +17,7 @@ import httpx
 import pydantic
 import pytest
 import respx
+from django.utils import translation
 from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
@@ -275,8 +276,11 @@ def test_a_refusal_keeps_the_template_unsent_with_its_reason_never_blaming_erplo
     out = delivered(create)
     row = Template.objects.get(pk=out.id)
     assert (row.status, row.submit_state, row.submit_error_code) == ("DRAFT", "failed", kept)
-    assert words in row.submit_error
-    assert "ERPlora" not in row.submit_error and "erplora.com" not in row.submit_error
+    # The row keeps Meta's words only for a refusal the Hub has no name for; its own are said when it is read.
+    assert row.submit_error == ("Template name already exists" if kept == "whatsapp_inbox.template_refused" else "")
+    [shown] = listed()
+    assert words in shown.submit_error
+    assert "ERPlora" not in shown.submit_error and "erplora.com" not in shown.submit_error
 
 
 @pytest.mark.parametrize(
@@ -481,15 +485,33 @@ def test_deleting_takes_it_off_the_list_and_deletes_that_one_at_meta_after_the_c
 
 
 @pytest.mark.parametrize(
-    ("status", "body", "code"),
+    ("status", "body", "code", "words"),
     [
-        (409, {"error": {"code": "whatsapp.meta_unreachable", "message": "timeout"}}, "whatsapp_inbox.meta_unreachable"),
-        # erplora.com without the deletion door yet: its 404 is no confirmation (gh:whatsapp_inbox#296).
-        (404, {}, "whatsapp_inbox.saas_unreachable"),
+        (
+            409,
+            {"error": {"code": "whatsapp.meta_unreachable", "message": "timeout"}},
+            "whatsapp_inbox.meta_unreachable",
+            "Meta did not answer",
+        ),
+        # Meta's 190 (door 9): the Hub's own words, never Meta's; deleted only once the number is connected again.
+        (
+            409,
+            {"error": {"code": "whatsapp.reconnect_needed", "message": "Error validating access token"}},
+            "whatsapp_inbox.reconnect_needed",
+            "WhatsApp's permission for your number expired: connect it again.",
+        ),
+        # erplora.com without the deletion door yet: its 404 is no confirmation (gh:whatsapp_inbox#296); the
+        # deletion's own words, not the ones of a template that has not left.
+        (
+            404,
+            {},
+            "whatsapp_inbox.saas_unreachable",
+            "erplora.com did not answer: Meta still has the template. Try again.",
+        ),
     ],
 )
 @respx.mock
-def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_reason(delivered, status, body, code):
+def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_reason(delivered, status, body, code, words):
     row = approved()
     deleting(status, body)
     delivered(lambda: run("whatsapp_inbox.template.delete", {"id": str(row.id)}))
@@ -497,6 +519,8 @@ def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_rea
     assert (row.delete_state, row.submit_error_code) == ("pending", code)
     [shown] = listed()
     assert (shown.id, shown.deleting) == (row.id, True)
+    assert words in shown.submit_error
+    assert "Error validating access token" not in shown.submit_error
     # Not sendable while it is being deleted.
     assert listed(status="APPROVED", sendable=True) == []
 
@@ -597,3 +621,70 @@ def test_the_worker_hands_again_the_templates_whose_delivery_never_ended(deliver
     assert (resumed.templates, resumed.template_deletions) == (1, 1)
     assert Template.objects.get(pk=out.id).status == "PENDING"
     assert Template.objects.get(pk=with_pending.id).delete_state == "done"
+
+
+# ── The reason is said in the language of whoever reads it, never in the one of whoever wrote it ────
+
+EXPIRED = "WhatsApp's permission for your number expired: connect it again."
+EXPIRED_ES = "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
+EXPIRED_AT_META = {"error": {"code": "whatsapp.reconnect_needed", "message": "Error validating access token"}}
+
+
+@respx.mock
+def test_a_deletion_the_worker_asked_again_says_its_reason_in_the_reader_s_language(delivered, fixed_clock, monkeypatch):
+    """Door 9: the person deletes in Spanish and Meta's 190 keeps it pending; three minutes later the worker (the
+    system's context, in English) asks again and gets the same refusal. Read in Spanish, the row says it in Spanish."""
+    row = approved()
+    deleting(409, EXPIRED_AT_META)
+    with translation.override("es"):
+        delivered(lambda: run("whatsapp_inbox.template.delete", {"id": str(row.id)}, ctx_for(language="es")))
+    monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
+    assert delivered(lambda: system("whatsapp_inbox.delivery.resume", {})).template_deletions == 1
+    with translation.override("es"):
+        [shown] = listed()
+    assert (shown.deleting, shown.submit_error_code, shown.submit_error) == (
+        True,
+        "whatsapp_inbox.reconnect_needed",
+        EXPIRED_ES,
+    )
+    [shown] = listed()
+    assert shown.submit_error == EXPIRED
+
+
+@respx.mock
+def test_a_template_the_worker_handed_again_says_its_refusal_in_the_reader_s_language(delivered, fixed_clock, monkeypatch):
+    """Door 8: the first hand-over, written in Spanish, got no answer; the worker (in English) hands it again and
+    Meta's 190 refuses it. Each reader sees the reason in their own language, before and after."""
+    connect()
+    route = respx.post(REGISTER).mock(
+        side_effect=[httpx.ConnectError("refused"), httpx.Response(409, json=EXPIRED_AT_META)]
+    )
+    with translation.override("es"):
+        out = delivered(lambda: create(ctx=ctx_for(language="es")))
+    [shown] = listed()
+    assert (shown.submit_state, shown.submit_error) == (
+        "sending",
+        "erplora.com did not answer: the template has not left. Try again.",
+    )
+    monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
+    assert delivered(lambda: system("whatsapp_inbox.delivery.resume", {})).templates == 1
+    assert route.call_count == 2
+    with translation.override("es"):
+        [shown] = listed()
+    assert (shown.id, shown.submit_state, shown.submit_error_code, shown.submit_error) == (
+        out.id,
+        "failed",
+        "whatsapp_inbox.reconnect_needed",
+        EXPIRED_ES,
+    )
+
+
+@respx.mock
+def test_a_reason_kept_in_words_before_the_code_alone_is_still_said_in_the_reader_s_language(delivered):
+    """A row written before only the code was kept holds the words of whoever wrote it: its code says it again."""
+    row = approved()
+    deleting(409, EXPIRED_AT_META)
+    delivered(lambda: run("whatsapp_inbox.template.delete", {"id": str(row.id)}))
+    Template.objects.filter(pk=row.id).update(submit_error=EXPIRED_ES)
+    [shown] = listed()
+    assert (shown.submit_error_code, shown.submit_error) == ("whatsapp_inbox.reconnect_needed", EXPIRED)

@@ -13,6 +13,7 @@ import httpx
 import pydantic
 import pytest
 import respx
+from django.utils import translation
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
@@ -662,6 +663,79 @@ def test_erplora_s_cap_refusal_is_the_hub_s_own_cap_reached(delivered):
     assert (message.status, message.error_code) == ("failed", "whatsapp_inbox.cap_reached")
 
 
+@pytest.mark.parametrize(
+    ("again", "status", "code", "words"),
+    [
+        (
+            httpx.ReadTimeout("slow"),
+            "sending",
+            "whatsapp_inbox.send_unknown",
+            "erplora.com no ha confirmado el mensaje. Vuelve a intentarlo: nunca se envía dos veces.",
+        ),
+        (
+            httpx.Response(409, json={"error": {"code": "whatsapp.reconnect_needed", "message": "Invalid OAuth"}}),
+            "failed",
+            "whatsapp_inbox.reconnect_needed",
+            "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo.",
+        ),
+        (
+            httpx.Response(409, json={"error": {"code": "whatsapp.cap_reached", "message": "Monthly allowance spent."}}),
+            "failed",
+            "whatsapp_inbox.cap_reached",
+            "Has usado todos los mensajes de WhatsApp de tu plan este mes: no se puede enviar nada hasta el mes que "
+            "viene o hasta que mejores el plan.",
+        ),
+        # A refusal of Meta's the Hub has no name for keeps Meta's words as they came; without any, the Hub's.
+        (
+            httpx.Response(409, json={"error": {"code": "whatsapp.recipient_blocked", "message": "Blocked by user."}}),
+            "failed",
+            "whatsapp_inbox.send_refused",
+            "Blocked by user.",
+        ),
+        (
+            httpx.Response(409, json={"error": {"code": "whatsapp.meta_rejected", "message": ""}}),
+            "failed",
+            "whatsapp_inbox.send_refused",
+            "erplora.com no ha enviado el mensaje.",
+        ),
+    ],
+)
+@respx.mock
+def test_a_message_the_worker_handed_again_says_why_in_the_reader_s_language(
+    delivered, fixed_clock, monkeypatch, again, status, code, words
+):
+    """Written in Spanish, its first hand-over got no answer; the worker (the system's context, in English) hands it
+    again three minutes later. Whatever erplora.com answers, the thread read in Spanish says it in Spanish."""
+    c = ready()
+    respx.post(SEND).mock(side_effect=[httpx.ConnectError("refused"), again])
+    with translation.override("es"):
+        out = delivered(lambda: send({"id": str(c.id), "text": "Hola"}, ctx_for(language="es")))
+    [first] = [row for row in run("whatsapp_inbox.message.list", {"id": str(c.id)}).rows if row.id == out.id]
+    assert (first.status, first.error_message) == ("sending", "erplora.com did not answer: the message has not left. Try again.")
+    monkeypatch.setattr(fixed_clock, "now", lambda: NOW + dt.timedelta(minutes=3))
+    assert delivered(lambda: system("whatsapp_inbox.delivery.resume", {})).messages == 1
+    with translation.override("es"):
+        rows = run("whatsapp_inbox.message.list", {"id": str(c.id)}, ctx_for(language="es")).rows
+    [shown] = [row for row in rows if row.id == out.id]
+    assert (shown.status, shown.error_code, shown.error_message) == (status, code, words)
+
+
+@respx.mock
+def test_a_reason_kept_in_words_before_the_code_alone_is_still_said_in_the_reader_s_language(delivered):
+    """A message written before only the code was kept holds the words of whoever wrote it: its code says it again."""
+    c = ready()
+    respx.post(SEND).mock(side_effect=[httpx.ReadTimeout("slow")])
+    out = delivered(lambda: send({"id": str(c.id), "text": "Hola"}))
+    Message.objects.filter(pk=out.id).update(error_message="erplora.com did not confirm the message. Try again: it is never sent twice.")
+    with translation.override("es"):
+        rows = run("whatsapp_inbox.message.list", {"id": str(c.id)}, ctx_for(language="es")).rows
+    [shown] = [row for row in rows if row.id == out.id]
+    assert (shown.error_code, shown.error_message) == (
+        "whatsapp_inbox.send_unknown",
+        "erplora.com no ha confirmado el mensaje. Vuelve a intentarlo: nunca se envía dos veces.",
+    )
+
+
 @respx.mock
 def test_an_expired_permission_is_the_hub_s_reconnect_needed_in_its_own_words(delivered):
     """Meta's 190 (the business's permission expired or withdrawn) reaches the Hub as erplora.com's
@@ -669,14 +743,14 @@ def test_an_expired_permission_is_the_hub_s_reconnect_needed_in_its_own_words(de
     c = ready()
     raw = "Invalid OAuth access token - Cannot parse access token"
     answering(409, {"error": {"code": "whatsapp.reconnect_needed", "message": raw}})
-    message = stored(delivered(lambda: send({"id": str(c.id), "text": "Hola"})))
-    assert (message.status, message.error_code, message.error_message, message.wa_message_id) == (
-        "failed",
-        "whatsapp_inbox.reconnect_needed",
-        "WhatsApp's permission for your number expired: connect it again.",
-        None,
-    )
-    assert raw not in message.error_message and "ERPlora" not in message.error_message
+    out = delivered(lambda: send({"id": str(c.id), "text": "Hola"}))
+    message = stored(out)
+    assert (message.status, message.error_code, message.wa_message_id) == ("failed", "whatsapp_inbox.reconnect_needed", None)
+    # The row keeps the code only: the words are the Hub's, said when it is read.
+    assert message.error_message == ""
+    [shown] = [row for row in run("whatsapp_inbox.message.list", {"id": str(c.id)}).rows if row.id == out.id]
+    assert shown.error_message == "WhatsApp's permission for your number expired: connect it again."
+    assert raw not in shown.error_message and "ERPlora" not in shown.error_message
 
 
 @pytest.mark.parametrize(
