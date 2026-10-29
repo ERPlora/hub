@@ -48,6 +48,9 @@ export const PROBE_CODE = 'AQBe2e-probe-code';
 export const UPLOAD_SESSION = 'upload:ZTJlLWhlYWRlci1zYW1wbGU=';
 export const HEADER_HANDLE = '4::aW1hZ2UvanBlZw==:e2e-header-handle';
 export const TEMPLATE_ID = '880000000000200';
+/** The id Meta gives a header's file put on `a`'s number, and the id of the template message sent with it (F33). */
+export const MEDIA_ID = '880000000000300';
+export const SENT_WAMID = 'wamid.e2e-graph-template-with-file';
 
 /** Meta's refusal of an expired code (erplora.com's tests: `OAUTH_ERROR`). */
 const OAUTH_ERROR = {
@@ -95,6 +98,10 @@ export function graphAnswer(call: GraphCall): [number, unknown] {
   if (route === `POST /${META_APP.id}/uploads`) return [200, { id: UPLOAD_SESSION }];
   if (route === `POST /${UPLOAD_SESSION}`) return [200, { h: HEADER_HANDLE }];
   if (route === `POST /${WABA_ID}/message_templates`) return [200, { id: TEMPLATE_ID, status: 'PENDING', category: 'UTILITY' }];
+  if (route === `POST /${NUMBER_ID}/media`) return [200, { id: MEDIA_ID }];
+  if (route === `POST /${NUMBER_ID}/messages`) {
+    return [200, { messaging_product: 'whatsapp', contacts: [], messages: [{ id: SENT_WAMID }] }];
+  }
   return [400, { error: { message: `Unsupported request: ${route}.`, type: 'GraphMethodException', code: 100 } }];
 }
 

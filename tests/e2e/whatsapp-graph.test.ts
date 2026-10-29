@@ -27,6 +27,7 @@ import {
   graphProblem,
   graphToken,
   HEADER_HANDLE,
+  MEDIA_ID,
   messageSends,
   META_APP,
   NUMBER_ID,
@@ -35,6 +36,7 @@ import {
   startGraphThread,
   TEMPLATE_ID,
   TOKEN,
+  SENT_WAMID,
   UPLOAD_SESSION,
   WABA_ID,
 } from './whatsapp-graph';
@@ -95,6 +97,13 @@ describe('graphAnswer', () => {
       expect(answer[0], `${one.method} ${one.path}`).toBe(401);
       expect(answer[1]).toMatchObject({ error: { type: 'OAuthException', code: 190 } });
     }
+  });
+
+  it('takes a header’s file on `a`’s number and the template message naming it, with the business’s token (WHATSAPP_INBOX-F33)', () => {
+    expect(graphAnswer(call('POST', `/${NUMBER_ID}/media`, { token: TOKEN }))).toEqual([200, { id: MEDIA_ID }]);
+    const sent = graphAnswer(call('POST', `/${NUMBER_ID}/messages`, { token: TOKEN }));
+    expect(sent[0]).toBe(200);
+    expect((sent[1] as { messages: { id: string }[] }).messages[0].id).toBe(SENT_WAMID);
   });
 
   it('refuses the probe’s code with its own reason, and what Meta does not serve as unsupported', () => {

@@ -315,6 +315,18 @@ export async function meta(request: APIRequestContext, body: string): Promise<nu
   return answer.status();
 }
 
+/** Forgets at erplora.com the templates a spec made from this Hub (named `prefix…`). `cleanUp` deletes this Hub's
+ *  rows by hand, never erplora.com's copy: the next seed's push would bring that copy back as a new row made in
+ *  WhatsApp Manager, without the file it was made with (WHATSAPP_INBOX-F28). Never the seed's own (`e2e_seed_…`). */
+export function erploraForgetsTemplates(prefix: string): void {
+  const safe = prefix.replace(/[^a-z0-9_]/g, '');
+  if (!safe || safe.startsWith('e2e_seed')) throw new Error(`erploraForgetsTemplates: refusing the prefix «${prefix}».`);
+  execFileSync('docker', ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'hub', '-d', SAAS_DB, '-At', '-c', `delete from whatsapp_template where name like '${safe}%'`], {
+    cwd: REPO_DIR,
+    encoding: 'utf8',
+  });
+}
+
 /** What erplora.com's database recorded of its push of each of `ids` to this Hub (whatsapp-pushes.ts). */
 function pushesOf(ids: string[]): Push[] {
   const list = ids.map((id) => `'${id.replace(/'/g, '')}'`).join(',');
