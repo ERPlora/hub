@@ -183,6 +183,27 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
     expect(documentMeasures('d.ts', "const { scrollWidth, clientWidth } = document.querySelector('ion-title')!;")).toEqual([]);
   });
 
+  it('the count reads each other form those rules name: globalThis, the body, `?.`, `!`, `await`, a parenthesis, .inner-scroll and part="scroll"', () => {
+    const copies = [
+      ['const root = globalThis.document.documentElement;', 'return root.scrollWidth;'],
+      ['const root = document.body;', 'return root.scrollWidth > innerWidth;'],
+      ['const root = document.scrollingElement;', 'return root?.scrollWidth ?? 0;'],
+      ['const scroller = content.getScrollElement();', 'const { scrollWidth } = await scroller;'],
+      ['const { scrollWidth } = (document.scrollingElement ?? document.documentElement);'],
+      ["const { scrollWidth } = content.shadowRoot!.querySelector('.inner-scroll')!;"],
+      [`const { scrollWidth } = content.shadowRoot!.querySelector('[part~="scroll"]')!;`],
+      ["return content.shadowRoot?.querySelector('.inner-scroll')?.scrollWidth ?? 0;"],
+      ['return (document.scrollingElement as HTMLElement | null)!.scrollWidth - innerWidth;'],
+      ['return (await content.getScrollElement())!.scrollWidth > innerWidth;'],
+    ];
+    expect(copies.map((copy) => documentMeasures('e.ts', copy.join('\n')))).toEqual(copies.map((copy) => [`e.ts:${copy.length}`]));
+    const none = [
+      ['const { scrollWidth } = rows.find((row) => row !== document.body)!;'],
+      ['const html = document.documentElement;', 'const { scrollWidth } = htmlTable;'],
+    ];
+    expect(none.map((lines) => documentMeasures('e.ts', lines.join('\n')))).toEqual(none.map(() => []));
+  });
+
   it('the count leaves alone the vertical scroll of an ion-content and an element that is only put in the body', () => {
     const vertical = [
       "const content = document.querySelector('ion-content') as HTMLElement & { getScrollElement(): Promise<HTMLElement> };",
