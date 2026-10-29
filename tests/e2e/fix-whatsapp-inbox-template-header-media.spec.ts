@@ -86,7 +86,7 @@ test('WHATSAPP_INBOX-F29: a template with a photo header is kept with its file a
   await expect(field(page, 'header-file-rules')).toContainText('JPEG or PNG, up to 5 MB.');
   await expect(field(page, 'header-file-empty')).toContainText('No file chosen');
   await field(page, 'body').locator('textarea').fill('¡Llega el otoño! Ven a ver la carta nueva.');
-  await expect(field(page, 'submit')).toBeDisabled();
+  await expect(field(page, 'submit')).toHaveAttribute('aria-disabled', 'true');
 
   // A file of another type is said under the field and never uploaded.
   await field(page, 'header-file-input').setInputFiles({ name: 'e2e-carta.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\n') });
@@ -98,7 +98,7 @@ test('WHATSAPP_INBOX-F29: a template with a photo header is kept with its file a
   expect((await kept).status()).toBe(201);
   await expect(field(page, 'header-file-name')).toContainText(FILE_NAME);
   await expect(field(page, 'header-file-error')).toHaveCount(0);
-  await expect(field(page, 'submit')).toBeEnabled();
+  await expect(field(page, 'submit')).not.toHaveAttribute('aria-disabled', 'true');
   expect(psql(`select header_format || ' ' || content_type || ' ' || size from whatsapp_inbox_templatesample where name = '${FILE_NAME}' order by created_at desc limit 1`)).toBe(
     `IMAGE image/jpeg ${PHOTO.length}`,
   );
@@ -112,8 +112,13 @@ test('WHATSAPP_INBOX-F29: a template with a photo header is kept with its file a
   await expect(rowOf(page, name)).toContainText('In review', { timeout: 30_000 });
   await expect(rowOf(page, name)).toContainText(`Photo: ${FILE_NAME}`);
   await expect(rowOf(page, name)).toContainText("Can't be sent from the inbox yet: its header has a file.");
+  if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await shots(page, `${TASK}-list`, async (p) => {
-    await expect(rowOf(p, name)).toBeVisible();
+    // A new size paints the list again (table or cards): scrolled to once the row it ends with is there.
+    await expect(async () => {
+      await rowOf(p, name).scrollIntoViewIfNeeded({ timeout: 2_000 });
+      await expect(rowOf(p, name)).toBeInViewport({ timeout: 1_000 });
+    }).toPass();
   });
 
   // What Meta received: a session on the e2e Meta app for that file, its bytes, and the template with its handle.
