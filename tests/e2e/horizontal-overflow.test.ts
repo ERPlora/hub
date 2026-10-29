@@ -227,4 +227,23 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
     ];
     expect(none.map((lines) => documentMeasures('d.ts', lines.join('\n')))).toEqual(none.map(() => []));
   });
+
+  it('the count reads a chain going on with `?.`, a typed selector, a root named over lines or with no semicolon, and keeps a spread or a statement after a locator apart', () => {
+    const copies = [
+      ["return document.querySelector('html')", '  ?.scrollWidth ?? 0;'],
+      ["return document.querySelector<HTMLElement>('html')!.scrollWidth - innerWidth;"],
+      ['const root = document', '  .documentElement;', 'return root.scrollWidth;'],
+      ['const { documentElement: html } = document', 'return html.scrollWidth'],
+      ['const widths = [0,', '  ...[document.documentElement.scrollWidth]];'],
+    ];
+    expect(copies.map((copy) => documentMeasures('e.ts', copy.join('\n')))).toEqual([
+      ['e.ts:1'],
+      ['e.ts:1'],
+      ['e.ts:3'],
+      ['e.ts:2'],
+      ['e.ts:2'],
+    ]);
+    const after = "await page.locator('body').press('End'); const cut = await title.evaluate((el) => el.scrollWidth > el.clientWidth);";
+    expect(documentMeasures('e.ts', after)).toEqual([]);
+  });
 });

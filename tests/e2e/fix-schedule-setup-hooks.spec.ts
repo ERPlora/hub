@@ -142,7 +142,7 @@ for (const size of VIEWPORTS) {
       await unfolded(page);
       await expect(pill(page)).toHaveText('Recomendado');
       await step(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      await expect.poll(() => horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
+      expect(await horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await capture(page, `${KEY}-${size.label}`);
 
       // The week confirmed elsewhere (another device, the assistant): the step is done over the stream already open.
