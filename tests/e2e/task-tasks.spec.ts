@@ -7,7 +7,7 @@
 // flow: TASK-F01 TASK-F02 TASK-F04 TASK-F05 TASK-F06 TASK-F09 TASK-F10 TASK-F12 TASK-F13 TASK-F14
 import { expect, test } from '@playwright/test';
 
-import { api, A, shot, shown } from './helpers';
+import { api, A, capture, shown, untilStill } from './helpers';
 import { cleanUp, named, pick, post, rowAction, rowOf, signedIn, TAG, VIEWPORTS } from './task-helpers';
 
 test.beforeAll(cleanUp);
@@ -59,7 +59,9 @@ test('a task for a person of Staff, from its project to done, live', async ({ br
     await rowAction(page, 'task-tasks', taskId, 'start');
     await expect(page.locator('ion-toast')).toContainText('Task started');
     await expect(row).toContainText('In Progress');
-    await page.screenshot({ path: shot('task-tasks-desktop') });
+    // The notice is still sliding in: the capture waits until nothing moves.
+    await untilStill(page);
+    await capture(page, 'task-tasks-desktop');
 
     // TASK-F04, F10, F09: the sheet.
     await row.click();
@@ -75,7 +77,8 @@ test('a task for a person of Staff, from its project to done, live', async ({ br
     await sheet.locator('[data-testid=task-sheet-add-subtask]').click();
     await expect(sheet.locator('[data-testid=task-sheet-subtasks-heading]')).toHaveText('Subtasks (1)');
     await expect(sheet.locator('[data-testid^=task-sheet-subtask-]', { hasText: subtitle }).first()).toBeVisible();
-    await page.screenshot({ path: shot('task-sheet-desktop') });
+    await untilStill(page);
+    await capture(page, 'task-sheet-desktop');
     await sheet.locator('[data-testid^=task-sheet-subtask-open-]').first().click();
     await expect(sheet.locator('[data-testid=task-sheet-title]')).toContainText(subtitle);
     await sheet.locator('[data-testid=task-sheet-back]').click();
@@ -96,7 +99,8 @@ test('a task for a person of Staff, from its project to done, live', async ({ br
     await expect(projectSheet.locator('[data-testid=task-project-sheet-tasks-heading]')).toHaveText('Tasks in this project (2)');
     await projectSheet.locator('[data-testid=task-project-sheet-toggle]').click();
     await expect(projectSheet.locator('[data-testid=task-project-sheet-state]')).toHaveText('Inactive');
-    await page.screenshot({ path: shot('task-project-sheet-desktop') });
+    await untilStill(page);
+    await capture(page, 'task-project-sheet-desktop');
     await projectSheet.locator('[data-testid=task-project-sheet-delete]').click();
     await page.locator('[data-testid=task-project-sheet-delete-confirm-submit]').click();
     await expect(projectSheet).toBeHidden();
@@ -122,10 +126,12 @@ test('Tasks and Projects in the three viewports', async ({ browser }) => {
       await expect(view.locator('[data-testid=task-tasks-row]', { hasText: title }).first()).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow, `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`task-tasks-${name}`) });
+      await untilStill(page);
+      await capture(page, `task-tasks-${name}`);
       await page.goto(`${A}/task/projects`);
       await shown(page).locator('[data-testid=task-projects-row]').first().waitFor({ state: 'visible' });
-      await page.screenshot({ path: shot(`task-projects-${name}`) });
+      await untilStill(page);
+      await capture(page, `task-projects-${name}`);
     } finally {
       await context.close();
     }

@@ -7,7 +7,7 @@
 // flow: TASK-F02 TASK-F03 TASK-F06 TASK-F11 TASK-F12
 import { expect, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, shown, untilStill } from './helpers';
 import { cleanUp, named, post, recordOf, rowAction, rowOf, signedIn, TAG } from './task-helpers';
 
 test.beforeAll(cleanUp);
@@ -37,7 +37,8 @@ test('an employee works their own tasks and nobody else’s', async ({ browser }
     await page.goto(`${A}/task/tasks`);
     await expect(rowOf(page, 'task-tasks', ownTitle)).toBeVisible();
     await expect(rowOf(page, 'task-tasks', otherTitle)).toHaveCount(0);
-    await page.screenshot({ path: shot('task-employee-all') });
+    await untilStill(page);
+    await capture(page, 'task-employee-all');
 
     // «My tasks»: the open ones assigned to me; the one I complete stays in its slot, as Done.
     await shown(page).locator('[data-testid=task-view-mine]').click();
@@ -46,7 +47,9 @@ test('an employee works their own tasks and nobody else’s', async ({ browser }
     await expect(page.locator('ion-toast')).toContainText('Task completed');
     await expect(rowOf(page, 'task-mine', ownTitle)).toContainText('Done');
     await expect(rowOf(page, 'task-mine', ownTitle)).toBeVisible();
-    await page.screenshot({ path: shot('task-employee-mine') });
+    // The notice is still sliding in: the capture waits until nothing moves.
+    await untilStill(page);
+    await capture(page, 'task-employee-mine');
     // Leaving the tab lets it go.
     await shown(page).locator('[data-testid=task-view-all]').click();
     await shown(page).locator('[data-testid=task-view-mine]').click();
