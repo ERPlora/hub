@@ -6,8 +6,9 @@ each turn as scripted and its WhatsApp door (``/internal/whatsapp/send``) takes 
 real network code. The inbox's automatic answer is turned on as the owner does it; the customer's message comes in
 through the inbox's own door; one tick of the worker hands its event to Automatizaciones, whose run reads the message,
 thanks her, makes her card and asks the assistant with only what the answer was granted. «Ask me first»: the booking
-it wants waits in «Waiting for your answer»; the owner's yes books it with Citas' (or Reservas') real operation, and
-what the assistant says then goes to her. When the assistant fails, she gets the apology and her conversation stays
+it wants waits in «Waiting for your answer»; the owner's yes runs Citas' (or Reservas') real operation, whose answer
+goes back to the assistant, and what the assistant says then goes to her (Reservas books the table or the waiting
+list; Citas, today, refuses a booking made for a professional by an automation). When the assistant fails, she gets the apology and her conversation stays
 waiting for an answer, marked «Needs attention».
 """
 
@@ -23,7 +24,7 @@ from apps.appointment.models import Appointment
 from apps.appointment.tests.conftest import MONDAY, anytime, assign, make_member, make_service, wall  # noqa: F401
 from apps.customer.models import Customer
 from apps.flow.models import FlowRun, Question
-from apps.reservation.models import Reservation
+from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run
@@ -284,3 +285,40 @@ def test_a_guest_asks_for_a_table_and_after_the_owner_s_yes_it_is_booked_with_th
     assert Customer.objects.count() == 1
     assert outbound()[-1] == "¡Listo! Mesa para 4 el sábado a las 21:00."
     assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
+
+
+def test_with_no_room_the_guest_is_written_on_the_waiting_list_after_the_owner_s_yes(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    gateway.reply(
+        CHAT,
+        json=wants(
+            "reservation.waitlist.create",
+            {
+                "customer_id": str(card.id),
+                "guest_name": "Lucía",
+                "guest_phone": LUCIA,
+                "date": day.isoformat(),
+                "preferred_time": "21:00",
+                "party_size": 4,
+            },
+        ),
+    )
+    gateway.reply(CHAT, json=said("Te he apuntado en la lista de espera para el sábado a las 21:00."))
+    lucia_writes("Mesa para 4 el sábado a las 21")
+
+    tick()
+    assert WaitlistEntry.objects.count() == 0  # it waits for the owner's yes
+
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    entry = WaitlistEntry.objects.get()
+    assert (entry.customer_id, entry.guest_phone, entry.party_size) == (card.id, LUCIA, 4)
+    assert outbound()[-1] == "Te he apuntado en la lista de espera para el sábado a las 21:00."
