@@ -283,6 +283,8 @@ describe('«Ask the assistant» in words (FLOW-F37, F38)', () => {
 
   it('a run that waits for the assistant says so, not that it calls another system', () => {
     expect(runStatusPill('calling', en, [entry({})])).toEqual({ tone: 'info', label: 'Waiting for the assistant' });
+    // Between two turns (the assistant used a read and thinks again) it still waits for the assistant.
+    expect(runStatusPill('calling', en, [entry({}), entry({ outcome: 'assistant_used', operation: 'task.task.list', ok: true })]).label).toBe('Waiting for the assistant');
     expect(runStatusPill('calling', en, [entry({ kind: 'http', outcome: 'calling' })]).label).toBe('Calling another system');
   });
 

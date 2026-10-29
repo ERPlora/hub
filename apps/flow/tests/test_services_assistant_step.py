@@ -504,3 +504,49 @@ def test_saving_a_tool_the_business_lacks_or_the_assistant_may_not_use_is_refuse
         with pytest.raises(InvalidPayload) as refused:
             run("flow.flow.create", {"name": f"With {tool}", "trigger": {"kind": "manual"}, "steps": [step(tools=[tool])]}, ctx_for("hub_owner"))
         assert "steps.0.tools" in refused.value.fields
+
+
+def actors_of(name: str) -> set[str]:
+    """Who the outbox says did the events called ``name``."""
+    from live.models import OutboxEvent
+
+    return set(OutboxEvent.objects.filter(name=name).values_list("actor", flat=True))
+
+
+def test_a_yes_makes_the_change_as_the_automation_never_as_who_answered(gateway, clock, worker):
+    # FLOW-F38: the person's yes lends nothing: the change runs as the run («flow_run:<id>»), with the automation's
+    # own permission, as it would on its own; never as the person who answered.
+    clock(NOON)
+    flow = manual([step()])
+    gateway.reply(CHAT, json=wants("task__task__create", {"title": "Call Ana"}))
+    gateway.reply(CHAT, json=said("Done"))
+    ran = start(worker, flow)
+    worker()
+    question = Question.objects.get(run_id=ran.id)
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True}, ctx_for("hub_owner", actor="owner"))
+    worker()
+    assert titles() == ["Call Ana"]
+    assert actors_of("task.task.created") == {f"{services.RUN_ACTOR}{ran.id}"}
+
+
+def test_on_its_own_the_change_runs_as_the_automation_never_as_the_platform(gateway, clock, worker):
+    clock(NOON)
+    flow = manual([step(mode="auto")])
+    gateway.reply(CHAT, json=wants("task__task__create", {"title": "Call Ana"}))
+    gateway.reply(CHAT, json=said("Done"))
+    ran = start(worker, flow)
+    worker()
+    assert titles() == ["Call Ana"]
+    assert actors_of("task.task.created") == {f"{services.RUN_ACTOR}{ran.id}"}
+
+
+def test_a_turn_another_process_holds_is_left_alone(gateway, clock, worker):
+    # Two ticks of the worker (or a process that died while asking): the turn is one process's for
+    # CALL_LEASE_MINUTES; another claim meanwhile gets nothing and asks nothing.
+    clock(NOON)
+    flow = manual([step()])
+    ran = start(worker, flow)  # parked, and the worker never ran
+    system = system_context(A)
+    assert run("flow.run.claim_assistant", {"id": str(ran.id)}, system).claimed is True
+    assert run("flow.run.claim_assistant", {"id": str(ran.id)}, system).claimed is False  # someone else holds it
+    assert gateway.sent(CHAT) == []
