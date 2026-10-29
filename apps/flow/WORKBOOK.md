@@ -527,9 +527,10 @@ Pasos:
    error», «Esperando», «Cancelada»), el día y la hora, **Copiar la referencia** y ▾ para ver sus
    pasos en palabras («Hizo: Crear una tarea», «Encontró 3», «No encontró nada, y siguió», «Esperó 1
    hora», «Se paró aquí porque no se cumplió esto: Total mayor que 10000»).
-4. Una parada por error dice qué pasó y qué hacer («Ha intentado hacer algo que no le has autorizado,
-   así que ha parado. Abre Permisos y concédele lo que necesita.»); si el error es de la app que hizo la
-   acción, sale su frase tal cual, con el texto técnico plegado.
+4. Una parada por error dice qué pasó y qué hacer, en tu idioma aunque la automatización se guardara en
+   otro («Ha intentado hacer algo que no le has permitido («…»), así que ha parado. Abre Permisos y
+   concédele lo que necesita.»); si el error es de la app que hizo la acción, sale su frase tal cual, en el
+   idioma de la automatización, con el texto técnico plegado.
 Entra: las ejecuciones de esa automatización de los últimos 90 días, y todas las que siguen esperando.
 Sale: nada. El historial guarda cada ejecución terminada **90 días** y después la olvida; una que
 espera o está en marcha no se borra nunca. Lo que leyeron sus pasos (la ficha de un cliente) no se
@@ -1201,7 +1202,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   dato que no está nunca cumple salvo `exists: false`. Todo paso salvo `condition` admite `run_if` (una
   condición: si no se cumple, se salta, queda `skipped` en el log y, en una acción o consulta,
   `steps.<id>.skipped`), y `command`/`query` admiten `on_error: continue` (el fallo queda en el log con
-  `continued`, deja `steps.<id>.failed` y `error_code`/`error_message`, y la ejecución sigue). Sin ellos el
+  `continued`, deja `steps.<id>.failed` y `error_code`/`error_message`, este en el idioma de la automatización,
+  y la ejecución sigue). Sin ellos el
   paso se guarda como antes (`exclude_none`); un `run_if` ilegible para con `flow.run_if_unreadable`, que no
   se reanuda (FLOW-F25).
 - **Catálogo sin inventar nombres**: los avisos son los `events.ALL` de las apps activas (todas declaran
@@ -1216,7 +1218,19 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   puede hacer él mismo. Cada paso corre con el contexto `flow_run:<id>` (el actor queda en el outbox de
   lo que haga), **solo con el permiso de su propia operación y los de lectura de su app**
   (`<app>.view…`, para contestar con lo que hizo), nunca con todos: los controles internos de la
-  operación siguen valiendo (el «no elevation» del motor viejo); en el idioma de quien la guardó.
+  operación siguen valiendo (el «no elevation» del motor viejo); en el idioma de quien la guardó, que es el de
+  lo que escriben sus pasos y el del motivo que leen los pasos siguientes (`steps.<id>.error_message`).
+- **El motivo de una parada, en el idioma de quien lo lee** (FLOW-F16; mismo patrón que `message_reason` de
+  whatsapp_inbox, hub#384): la ejecución (`error_reason`) y la entrada del paso que falló (`error.reason`)
+  guardan el **nombre** del motivo propio del motor y sus datos (`queries.REASONS`: el código, salvo donde un
+  código dice cosas distintas, `flow.loop`/`flow.chain_too_long` y `flow.assistant_gone`), y `queries.say` lo
+  dice al leer (`flow.run.list`, y lo que devuelven `flow.flow.run` y `flow.run.retry`) en el idioma de quien
+  pregunta; `error_message` se guarda dicho en el de la automatización y es lo que se enseña de lo que no
+  tiene nombre: lo que contestó la acción de otra app, tal cual. Una ejecución guardada antes de que hubiera
+  nombre se dice por su código si su motivo no lleva datos y, si los lleva, tal cual se guardó (sin migración
+  de datos). Decisión de mercado del 2026-10-29: la plataforma dice lo suyo en el idioma de quien mira
+  (Business Central, Shopify, WordPress/WooCommerce, Square, Odoo, HubSpot) y enseña tal cual lo que
+  contestó la app conectada (Zapier, Make, Power Automate, n8n).
 - **Transacciones**: arrancar una ejecución es **una** operación (`flow.run.react`, `fire_due`,
   `resume_due`, `flow.flow.run`); cada paso es una operación anidada (un *savepoint*): un paso que falla
   no deja nada suyo y los anteriores se quedan. La ejecución, su historial y sus avisos se guardan en la

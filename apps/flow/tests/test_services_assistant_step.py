@@ -18,7 +18,7 @@ from django.utils import timezone, translation
 from live.context import system_context
 
 from apps.flow import gateway as flow_gateway
-from apps.flow import services
+from apps.flow import queries, services
 from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
 from base import relay
@@ -336,6 +336,19 @@ def test_a_yes_to_a_change_no_longer_granted_names_it_as_the_history_does(gatewa
     assert Task.objects.count() == 0
 
 
+def test_the_history_names_the_change_no_longer_granted_in_the_reader_s_language(gateway, clock, worker):
+    clock(NOON)
+    worker.gateway = gateway
+    flow = manual([step()])
+    Flow.objects.filter(pk=flow.pk).update(language="es")
+    ran, question = waiting_change(worker, flow)
+    Flow.objects.filter(pk=flow.pk).update(grants=["task.task.list"])
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
+    assert "«Crear una tarea»" in FlowRun.objects.get(pk=ran.id).error_message
+    [row] = run("flow.run.list", {"flow_id": str(flow.id)}, ctx_for(language="en")).rows
+    assert row.error_message == "«Create a task» is no longer allowed or available, so the assistant's change was not made."
+
+
 def test_a_yes_to_a_change_whose_action_no_longer_exists_says_so_with_no_technical_name(gateway, clock, worker):
     clock(NOON)
     worker.gateway = gateway
@@ -356,7 +369,7 @@ def test_a_yes_to_a_change_whose_action_no_longer_exists_says_so_with_no_technic
 def test_an_action_with_no_words_of_its_own_is_named_by_its_verb_app_and_thing(language, label):
     # What the History says of it (``actionLabel`` of frontend/lib/phrasing.ts), never its id.
     with translation.override(language):
-        said = services._gone("customer.tag.delete", language)
+        said = queries.say({"key": queries.ASSISTANT_GONE_KEY, "values": {"operation": "customer.tag.delete"}})
     assert label in said and "customer.tag.delete" not in said
 
 
