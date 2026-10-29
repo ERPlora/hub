@@ -22,7 +22,7 @@ import time
 import pytest
 from django.db import DatabaseError
 
-from base import catalog, relay, scheduler, worker
+from base import catalog, outbound, relay, scheduler, worker
 from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
 
 WRITTEN = RegisterResult(written=1, retired=0, docs_changed=1, skipped=False, apps=("demo",))
@@ -343,6 +343,27 @@ def test_a_stop_before_registering_schedules_nothing(monkeypatch, tasks):
 
     assert worker.run(stop, tick_seconds=TICK, wait=wait) == 0
     assert (tasks.synced, tasks.ticks) == ([], [])
+
+
+def test_on_its_way_out_it_gives_the_calls_in_flight_their_grace_within_ecss_30_seconds(calls, monkeypatch):
+    # A call to another system a reaction left (base.outbound) may be running: it gets its grace, what waited is
+    # dropped and their apps send them again (their lease); then the process ends, before ECS kills it.
+    stops: list[float] = []
+    monkeypatch.setattr(outbound, "stop", lambda grace: stops.append(grace) or True)
+
+    assert worker.run(stopped()) == 0
+
+    assert stops == [worker.OUTBOUND_GRACE_SECONDS]
+    assert 0 < worker.OUTBOUND_GRACE_SECONDS < 30
+
+
+def test_a_worker_that_never_worked_has_no_calls_to_wait_for(monkeypatch):
+    stops: list[float] = []
+    monkeypatch.setattr(outbound, "stop", lambda grace: stops.append(grace) or True)
+    registrations(monkeypatch, CatalogError("no shared schema user"))
+
+    assert worker.run(stopped()) == 1
+    assert stops == []
 
 
 def test_stop_ends_the_ticks(calls, tasks):

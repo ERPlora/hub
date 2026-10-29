@@ -22,7 +22,6 @@ import functools
 import json
 import logging
 import uuid
-from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -98,6 +97,7 @@ from apps.flow.schemas import (
     UpdateIn,
 )
 from base import assistant as hub_assistant
+from base import outbound
 
 logger = logging.getLogger(__name__)
 
@@ -1204,6 +1204,7 @@ def dispatch_assistant(scope: Scope, run_id: uuid.UUID) -> None:
         return
     messages, continuation = claimed.messages, claimed.continuation
     while True:
+        outbound.release()  # each turn waits on the assistant with no connection held
         try:
             answer = gateway.turn(
                 scope.key, messages=messages, tools=claimed.tools, instructions=claimed.instructions, continuation=continuation
@@ -1646,6 +1647,7 @@ def dispatch_call(scope: Scope, run_id: uuid.UUID) -> None:
     claimed = get("flow.run.claim_call")(system, RunRefIn(id=run_id))
     if not claimed.claimed:
         return
+    outbound.release()  # the call waits on the other system with no connection held
     reply = http.call(claimed.method, claimed.url, claimed.headers, claimed.body, claimed.timeout)
     get("flow.run.record_call")(
         system,
@@ -1677,7 +1679,7 @@ def call_parked(ctx: OperationContext, data: RunRefIn) -> dict:
     parked = FlowRun.objects.filter(pk=data.id, status=FlowRun.Status.CALLING).values("definition", "step_index").first()
     if parked is None:
         return {"count": 0}
-    transaction.on_commit(partial(_dispatcher(parked), ctx.scope, data.id), robust=True)
+    outbound.after_commit(_dispatcher(parked), ctx.scope, data.id)
     return {"count": 1}
 
 
@@ -2001,7 +2003,7 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
         .values("pk", "definition", "step_index")
     )
     for parked in stuck:
-        transaction.on_commit(partial(_dispatcher(parked), ctx.scope, parked["pk"]), robust=True)
+        outbound.after_commit(_dispatcher(parked), ctx.scope, parked["pk"])
         resumed += 1
     return {"count": resumed}
 
