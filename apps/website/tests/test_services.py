@@ -10,7 +10,7 @@ import uuid
 import pytest
 from django.core.cache import cache
 from django.db import connection, transaction
-from live.errors import InvalidPayload, NotFound, PermissionDenied
+from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 from PIL import Image as PILImage
@@ -18,7 +18,7 @@ from PIL import Image as PILImage
 from apps.website.models import Image, Site
 from apps.website.queries import catalog_cache_key, page_cache_key
 from apps.website import reviews
-from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews
+from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
 from base.models import Hub
 
 pytestmark = pytest.mark.django_db
@@ -389,6 +389,106 @@ def test_a_scope_that_is_no_hub_has_nowhere_to_keep_images(hub_files, every_app_
     every_app_on("nohub")  # the website on, so the upload reaches its own check of the registry
     with pytest.raises(NotFound):
         upload(png_bytes(), ctx=ctx_for(scope=Scope("host", "nohub")))
+
+
+# Images and the plan's space for files, the same as Files (WEBSITE-F04)
+
+
+def plan_space(limit: int, slug: str = "a") -> None:
+    """The SaaS's photo of ``slug`` includes ``limit`` bytes for the business's files."""
+    Hub.objects.filter(slug=slug).update(state={"plan": {"max_storage_bytes": limit}})
+
+
+def files_upload(content: bytes, name: str = "full.dat", ctx=None):
+    """Files (``base.file.upload``) keeps ``content`` at the top of the business's files."""
+    return run("base.file.upload", {"folder": "", "name": name, "content_base64": base64.b64encode(content).decode()}, ctx)
+
+
+def image_key_of(raw: bytes, slug: str = "a") -> str:
+    """Where the website keeps the PNG ``raw`` of ``slug`` in the hub file store."""
+    return f"hub-{Hub.objects.get(slug=slug).id.hex}/website/img/{hashlib.sha256(raw).hexdigest()[:16]}.png"
+
+
+#: What Files already keeps in the tests that fill the plan's space.
+KEPT = b"\0" * 1024
+
+
+def test_an_image_past_the_plans_space_is_refused_with_the_reason_and_code_of_files(hub_files):
+    raw = png_bytes()
+    plan_space(len(KEPT) + len(raw) - 1)
+    files_upload(KEPT)
+
+    said = {}
+    for language in ("en", "es"):
+        with pytest.raises(Conflict) as refused:
+            upload(raw, ctx=with_language(ctx_for(), language))
+        with pytest.raises(Conflict) as by_files:
+            files_upload(raw, "logo.png", with_language(ctx_for(), language))
+        assert (refused.value.status, refused.value.code) == (409, "base.file_no_space")
+        assert refused.value.message == by_files.value.message
+        said[language] = refused.value.message
+
+    assert said["en"] != said["es"]
+    assert not Image.objects.exists()
+    assert not hub_files.exists(image_key_of(raw))
+    assert not events("website.image.uploaded")
+
+
+def test_up_to_the_plans_space_the_image_is_kept_and_files_counts_it(hub_files):
+    raw = png_bytes()
+    plan_space(len(KEPT) + len(raw))
+    files_upload(KEPT)
+
+    image = upload(raw)
+
+    assert Image.objects.get(id=image.id).size == len(raw)
+    assert hub_files.exists(image_key_of(raw))
+    with pytest.raises(Conflict) as full:
+        files_upload(b"x", "one more.dat")
+    assert full.value.code == "base.file_no_space"
+
+
+def test_the_same_image_again_takes_no_more_space(hub_files):
+    raw = png_bytes()
+    plan_space(len(raw))
+    first = upload(raw)
+
+    again = upload(raw)
+
+    assert again.id == first.id
+    assert Image.objects.count() == 1
+
+
+def test_an_image_whose_file_is_already_kept_takes_no_more_space(hub_files):
+    # The file is in the store (named by its content) without its row: keeping the row adds nothing to the store.
+    raw = png_bytes()
+    hub_files.save(image_key_of(raw), io.BytesIO(raw))
+    plan_space(len(raw))
+
+    image = upload(raw)
+
+    assert Image.objects.get(id=image.id).key == image_key_of(raw)
+
+
+def test_one_business_full_does_not_refuse_another_ones_image(hub_files):
+    raw = png_bytes()
+    plan_space(len(KEPT), "a")
+    plan_space(len(raw), "b")
+    files_upload(KEPT)
+
+    with pytest.raises(Conflict):
+        upload(raw)
+    image = upload(raw, ctx=ctx_for(scope=B))
+
+    assert Image.objects.get(id=image.id).hub_id == Hub.objects.get(slug="b").id
+    assert hub_files.exists(image_key_of(raw, "b"))
+    assert not hub_files.exists(image_key_of(raw, "a"))
+
+
+def test_without_a_space_in_its_plan_an_image_is_kept_however_full_the_store(hub_files):
+    files_upload(KEPT)
+
+    assert upload(png_bytes()).size == len(png_bytes())
 
 
 # Two first saves at once (threads, real transactions)

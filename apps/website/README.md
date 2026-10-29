@@ -19,7 +19,8 @@ producto actual no tenía página por negocio.
 - **El editor** (F01–F04, F06, F11, F12): borrador con autoguardado; cuatro plantillas intercambiables sin perder el
   contenido, ocho paletas en claro y oscuro (WCAG AA) con dos colores propios y fondo claro, oscuro o automático;
   secciones que se ocultan sin borrarse; imágenes jpeg, png o webp de hasta 5 MB guardadas por su contenido en el
-  almacén del hub; galería de hasta 12 fotos en su orden; enlace de Google Maps o Place ID para las reseñas; vista
+  almacén del hub, dentro del espacio del plan que cuenta Archivos (409 `base.file_no_space`, su misma frase; la misma
+  imagen otra vez no ocupa más); galería de hasta 12 fotos en su orden; enlace de Google Maps o Place ID para las reseñas; vista
   previa pintada por el mismo código que la página pública.
 - **El catálogo** (F05): los productos a la venta de Inventario o los servicios ofrecidos de Servicios, por categoría y
   con su precio en la moneda del negocio (la de su país, con sus decimales), solo si esa app está activa en el hub (si

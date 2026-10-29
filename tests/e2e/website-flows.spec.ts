@@ -201,7 +201,13 @@ async function showView(page: Page, view: 'Edit' | 'Preview'): Promise<void> {
 
 /** At each of the three sizes: `target` in sight (after `before`, for a view that changes with the width), no sideways
  * scroll, and, once nothing moves (a toast entering, the views' segment), the screenshot `APP-WEBSITE-<key>-<width>`. */
-async function threeShots(page: Page, key: string, target: () => Locator, before?: () => Promise<void>): Promise<void> {
+async function threeShots(
+  page: Page,
+  key: string,
+  target: () => Locator,
+  before?: () => Promise<void>,
+  name: (label: string) => string = (label) => `APP-WEBSITE-${key}-${label}`,
+): Promise<void> {
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     if (before) await before();
@@ -212,7 +218,7 @@ async function threeShots(page: Page, key: string, target: () => Locator, before
     }, `${key} at ${vp.label}`).toPass();
     await expect.poll(() => horizontalOverflow(page), `${key} at ${vp.label}: sideways scroll`).toBeLessThanOrEqual(1);
     await settled(page);
-    await capture(page, `APP-WEBSITE-${key}-${vp.label}`);
+    await capture(page, name(vp.label));
   }
   await page.setViewportSize(WIDE);
 }
@@ -362,6 +368,62 @@ test('WEBSITE-F04: an image is uploaded from its field, a file that is no image 
   await expect(page.getByTestId('website-image-logo-image')).toHaveCount(0);
   await save(page);
   expect((await getSite()).content.topbar.logo).toBeNull();
+});
+
+// flow: WEBSITE-F04
+test('WEBSITE-F04: with the plan’s space full, an image is refused under its field with Files’ reason, and uploads once there is room', async () => {
+  const { page } = owner;
+  await reset(page);
+  const before = psql("select state::text from base_hub where slug = 'a'");
+  const listing = await api<{ space: { used_bytes: number } }>(owner.context, A, 'GET', '/files');
+  expect(listing.status).toBe(200);
+  // The space exactly as full as the store is now (a plan's space is never 0): any new file goes past it.
+  const full = Math.max(listing.data.space.used_bytes, 1);
+  psql(`update base_hub set state = state || '{\\"plan\\": {\\"max_storage_bytes\\": ${full}}}' where slug = 'a'`);
+  try {
+    // Files' own refusal of a new file is the sentence the website says (the same space, the same words).
+    const byFiles = await api<{ error: { code: string; message: string } }>(owner.context, A, 'POST', '/files/upload', {
+      folder: '',
+      name: 'one more.txt',
+      content_base64: Buffer.from('x').toString('base64'),
+    });
+    expect([byFiles.status, byFiles.data.error.code]).toEqual([409, 'base.file_no_space']);
+    await openSection(page, 'topbar');
+    const error = page.getByTestId('website-image-logo-error');
+    // This run's own photos: one kept by an earlier run (the same file again) would take no more space.
+    const run = Date.now().toString(36);
+    let shown = 0;
+    await threeShots(
+      page,
+      'F04-no-space',
+      () => page.getByTestId('website-image-logo'),
+      async () => {
+        await showView(page, 'Edit');
+        // A photo never kept before at each size; its own answer waited for, so the sentence read is never the one
+        // left by the size before.
+        const buffer = await photo(page, `Full ${run}-${(shown += 1)}`, 200);
+        const answered = page.waitForResponse((r) => r.url().includes('/api/website/images') && r.request().method() === 'POST');
+        await page.getByTestId('website-image-logo-file').setInputFiles({ name: 'logo.jpg', mimeType: 'image/jpeg', buffer });
+        expect((await answered).status()).toBe(409);
+        await expect(error).toHaveText(byFiles.data.error.message, { timeout: 15_000 });
+        await expect(page.getByTestId('website-image-logo-image')).toHaveCount(0);
+      },
+      (label) => `FIX-HUB-WEBSITE-IMAGES-IGNORE-PLAN-STORAGE-CAP-${label}`,
+    );
+    expect((await getSite()).content.topbar.logo).toBeNull();
+  } finally {
+    psql(`update base_hub set state = '${before.replaceAll('"', '\\"')}' where slug = 'a'`);
+  }
+  // With room again, the same field takes it.
+  await page.getByTestId('website-image-logo-file').setInputFiles({
+    name: 'logo.jpg',
+    mimeType: 'image/jpeg',
+    buffer: await photo(page, 'Room', 200),
+  });
+  await expect(page.getByTestId('website-image-logo-image')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('website-image-logo-error')).toHaveCount(0);
+  await page.getByTestId('website-image-logo-remove').click();
+  await save(page);
 });
 
 // flow: WEBSITE-F05

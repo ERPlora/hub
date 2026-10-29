@@ -156,6 +156,24 @@ def test_an_image_bigger_than_djangos_ceiling_still_uploads(admin_client, hub_fi
 
 
 @pytest.mark.django_db
+def test_an_image_past_the_plans_space_answers_409_with_the_code_of_files(admin_client, hub_files):
+    from apps.website.models import Image
+    from base.models import Hub
+
+    buffer = io.BytesIO()
+    PILImage.new("RGB", (4, 3), (200, 30, 30)).save(buffer, format="PNG")
+    body = {"filename": "logo.png", "content_type": "image/png", "data_base64": base64.b64encode(buffer.getvalue()).decode()}
+    Hub.objects.filter(slug="a").update(state={"plan": {"max_storage_bytes": len(buffer.getvalue()) - 1}})
+
+    response = post(admin_client, "/website/images", body)
+
+    assert (response.status_code, response.json()["error"]["code"]) == (409, "base.file_no_space")
+    assert not Image.objects.exists()
+    Hub.objects.filter(slug="a").update(state={"plan": {"max_storage_bytes": len(buffer.getvalue())}})
+    assert post(admin_client, "/website/images", body).status_code == 201
+
+
+@pytest.mark.django_db
 def test_an_upload_past_its_limit_is_refused_before_it_is_read(admin_client):
     response = post(admin_client, "/website/images", {"data_base64": "A" * 7_200_000})
     assert (response.status_code, response.json()["error"]["code"]) == (413, "payload_too_large")
