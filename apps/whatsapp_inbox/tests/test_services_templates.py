@@ -276,6 +276,8 @@ def test_a_refusal_keeps_the_template_unsent_with_its_reason_never_blaming_erplo
     out = delivered(create)
     row = Template.objects.get(pk=out.id)
     assert (row.status, row.submit_state, row.submit_error_code) == ("DRAFT", "failed", kept)
+    # The row keeps Meta's words only for a refusal the Hub has no name for; its own are said when it is read.
+    assert row.submit_error == ("Template name already exists" if kept == "whatsapp_inbox.template_refused" else "")
     [shown] = listed()
     assert words in shown.submit_error
     assert "ERPlora" not in shown.submit_error and "erplora.com" not in shown.submit_error
