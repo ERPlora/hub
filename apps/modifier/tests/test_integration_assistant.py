@@ -34,7 +34,7 @@ def test_no_datum_of_a_write_of_modifier_reaches_a_spanish_card_by_its_technical
     Spanish, never the one pydantic makes up."""
     screen = named_by_the_screen()
     writes = modifier_writes()
-    assert len(writes) >= 10  # positive control: the registry has modifier's writes
+    assert len(writes) >= 8  # positive control: the registry has modifier's writes (not the platform's own)
     technical: dict[str, list[str]] = {}
     for op in writes:
         props = op.input.model_json_schema().get("properties", {})

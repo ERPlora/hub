@@ -2985,7 +2985,9 @@ Implicados: ACCOUNTS-F38
   del shell y del Inicio. `base/assistant.py` (sin ORM) tiene el catálogo de herramientas (`catalog`: toda
   `@operation` de las apps activas cuyo `ai=` tiene descripción y cuyo permiso tiene la persona, o que su app deja
   aprobar a un responsable (`approvals.label_of`), salvo las «Not an assistant tool» / «System only», las sin permiso,
-  las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
+  las de la plataforma (un permiso que ninguna app declara, `<app>.system` o `system.<app>`: sus reacciones y tareas
+  programadas, que solo alcanza `*`; `declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga
+  su `ai=`), las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
   preguntas; `base.setup.status` y `base.business.get` siempre), la tarjeta (`card`: `ai={"risk": "high"}` pide
   `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `base`, o el número de `ids`; sin `ids`, `blocked`; cada
   dato con su nombre en el idioma de la persona, `_label`: el `title` del esquema si un catálogo lo traduce, o tal
