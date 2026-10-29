@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a9dc2fa6b47bc1bc08f0a7583bb4a544057568324c2a44557920192e88938452 -->
+<!-- generated from WORKBOOK.md sha256:660af8765f721c80cfc0cca1ba161cd1e3d280f7749bf4b61151776a8a1a6036 -->
 
 ## What it is for and who it is for
 
@@ -357,7 +357,7 @@ Involved: INVOICE-F01, INVOICE-F03, SALE-F01
 
 ### TAX-F12 Create several rules at once
 Status: done
-Actor: owner, administrator, manager (through the API; in phase 2, also the assistant)
+Actor: owner, administrator, manager (through the assistant or through the API with their session; an API key does not reach it)
 Screen: none (API)
 Steps:
 1. Up to 100 root rules are sent at once (for example, "the VAT rates of Spain 2026").
@@ -458,7 +458,7 @@ Involved: none
 
 ### TAX-F18 Calculate the tax of an amount
 Status: done
-Actor: employee, manager, administrator, owner (through the API; in phase 2, also the assistant)
+Actor: employee, manager, administrator, owner (through the assistant or through the API with their session; an API key does not reach it)
 Screen: none (API)
 Steps:
 1. The amount (in cents), the category and, if needed, the country, the region, the date and whether the
@@ -500,8 +500,10 @@ SALE-F07, SERVICE-F01
 
 ## Services: what goes in and what comes out
 
-Everything can be asked for through the screens, the assistant (phase 2, by voice or text, with the
-person's own session) and the API, with the same rules and the same permissions. Designed for voice: a
+Everything can be asked for through the screens, the assistant (by voice or text, with the person's own
+session) and the API, with the same rules and the same permissions. A business's API key reaches less, the
+same as in the current product: seeing the categories, the rules and the aliases, reading a text as a
+category, and setting an end date on a rule or restoring it. Designed for voice: a
 category is named by its key, by its name (in Spanish or in English) or by an alias ("Restaurant — food",
 "food", `restaurant.food`), and a rule by its id or by its country, region and category ("the VAT one for
 food in Spain": when deactivating it or setting its end date, the one in force today; when restoring it,

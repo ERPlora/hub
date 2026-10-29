@@ -383,7 +383,7 @@ Implicados: INVOICE-F01, INVOICE-F03, SALE-F01
 ### TAX-F12 Crear varias reglas de golpe
 <!-- origen: fi:modules/taxes#command-handler-wasm-taxes-rules-bulk_create-bulk_create_rules old:taxes/WORKFLOW.md#taxes-f12 -->
 Estado: hecho
-Actor: propietario, administrador, responsable (por la API; en la fase 2, también el asistente)
+Actor: propietario, administrador, responsable (por el asistente o por la API con su sesión; una llave de API no llega)
 Pantalla: ninguna (API)
 Pasos:
 1. Se envían hasta 100 reglas raíz de una vez (por ejemplo, «los tipos de IVA de España 2026»).
@@ -491,7 +491,7 @@ Implicados: ninguno
 ### TAX-F18 Calcular el impuesto de un importe
 <!-- origen: wf:cadena-fiscal#rec_fiscal-f04 fi:modules/taxes#command-handler-wasm-taxes-calculate-calculate_tax old-hub:HUB-F18 old:taxes/WORKFLOW.md#taxes-f18 qa:modules/taxes/vat-rates-and-breakdown -->
 Estado: hecho
-Actor: empleado, responsable, administrador, propietario (por la API; en la fase 2, también el asistente)
+Actor: empleado, responsable, administrador, propietario (por el asistente o por la API con su sesión; una llave de API no llega)
 Pantalla: ninguna (API)
 Pasos:
 1. Se indica el importe (en céntimos), la categoría y, si hace falta, el país, la región, la fecha y si
@@ -534,8 +534,10 @@ SALE-F07, SERVICE-F01
 
 ## Servicios: lo que entra y lo que sale
 
-Todo se puede pedir por las pantallas, el asistente (fase 2, por voz o por texto, con la sesión de la
-propia persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: una
+Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
+persona) y la API, con las mismas reglas y los mismos permisos. Una llave de API del negocio llega a menos,
+lo mismo que en el producto actual: ver las categorías, las reglas y los alias, leer un texto como
+categoría, y poner fecha de fin a una regla o reactivarla. Pensado para la voz: una
 categoría se nombra por su clave, por su nombre (en español o en inglés) o por un alias («Restauración
 — comida», «comida», `restaurant.food`), y una regla por su id o por su país, región y categoría
 («la del IVA de la comida en España»: al desactivarla o ponerle fecha de fin, la vigente hoy; al
@@ -735,9 +737,6 @@ cajero del producto actual es un empleado.
   dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`).
 - **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
   (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
-- **El asistente (chat y voz) y las llaves de API del negocio** son de la plataforma, que aún no los tiene:
-  Impuestos ya declara cada operación para el asistente (`ai=`) y abre siete a las llaves (`expose_api`);
-  mientras tanto, TAX-F12 y TAX-F18 se piden por la API con la sesión.
 - **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en
   [`UI-REQUESTS.md`](UI-REQUESTS.md), sin llegar a `ui`; propuestos para `## 6` de `MIGRATION.md` como
   `tax:ui-live-server-table` y `tax:ui-percent-date-format`.
