@@ -7,7 +7,7 @@
 // checks and sales — is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shown } from './helpers';
+import { A, api, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp, VIEWPORTS } from './sale-helpers';
@@ -69,7 +69,7 @@ async function cartReady(page: Page): Promise<void> {
   await tillReady(page);
   await openTillCart(page);
   await shown(page).locator('[data-testid=pos-total]').waitFor({ state: 'visible' });
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+  await untilStill(page);
 }
 
 const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: name }).first();

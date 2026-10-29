@@ -6,7 +6,7 @@
 // kitchen tickets and fiscal documents — is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
@@ -63,9 +63,9 @@ async function shots(page: Page, key: string, ready: () => Promise<void>): Promi
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready();
-    // A resize slides the phone's cart drawer: the picture waits until nothing moves.
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
-    await page.screenshot({ path: shot(`APP-SALE-${key}-${size.label}`) });
+    // A resize slides the phone's cart drawer: the picture waits until nothing moves (Ionic's own animations too).
+    await untilStill(page);
+    await capture(page, `APP-SALE-${key}-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
@@ -220,7 +220,7 @@ test('SALE-F20: «Current order» says what waits and sends it to the kitchen as
     // The phone keeps the check in a drawer: its button opens it.
     await openTillCart(page);
     await expect(shown(page).locator('[data-testid=pos-kitchen-send]')).toBeVisible();
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    await untilStill(page);
     // The check's bar fits each width: «Assign customer» once sat on «Open checks» on a phone.
     expect(await toolbarOverlaps(page), `the check's bar at ${page.viewportSize()?.width}px`).toEqual([]);
   });
