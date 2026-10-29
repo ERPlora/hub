@@ -35,6 +35,7 @@ TEMPLATE_LANGUAGE_RULE = _("Choose the template's language.")
 TEMPLATE_NUMBERING = _("Number the variables 1, 2, 3… in order, without skipping any.")
 TEMPLATE_EXAMPLES = _("Write an example for each variable.")
 TEMPLATE_NO_VARIABLES = _("The header and the footer cannot have variables.")
+TEMPLATE_FILE_NO_TEXT = _("A header with a photo, a video or a document has no text.")
 BUTTON_URL = _("A link button needs an https:// address without variables.")
 BUTTON_PHONE = _("A call button needs a number with its country code (+34…).")
 BUTTON_KINDS = _("At most 2 link buttons and 1 call button.")
@@ -70,6 +71,11 @@ TemplateStatus = Literal[
 #: Meta's verdicts erplora.com reports (``DRAFT`` is the Hub's own: Meta never had it).
 MetaTemplateStatus = Literal["APPROVED", "PENDING", "REJECTED", "PAUSED", "DISABLED", "DELETED"]
 HeaderFormat = Literal["", "TEXT", "IMAGE", "VIDEO", "DOCUMENT", "LOCATION"]
+#: What the form writes: none or a text (derived from ``header`` when empty), or a photo, a video or a document.
+WritableHeaderFormat = Literal["", "TEXT", "IMAGE", "VIDEO", "DOCUMENT"]
+#: The headers with a file.
+FileHeaderFormat = Literal["IMAGE", "VIDEO", "DOCUMENT"]
+FILE_HEADER_FORMATS = ("IMAGE", "VIDEO", "DOCUMENT")
 SubmitState = Literal["", "queued", "sending", "failed"]
 SortDir = Literal["asc", "desc"]
 
@@ -712,7 +718,17 @@ class TemplateWriteIn(Schema):
     category: WritableCategory = Field(
         "UTILITY", description="UTILITY (about something the customer asked or booked) or MARKETING (offers)."
     )
+    header_format: WritableHeaderFormat = Field(
+        "",
+        description="Its header: empty or TEXT (the text of header, if any), or IMAGE, VIDEO or DOCUMENT with the file "
+        "of header_sample.",
+    )
     header: _text(60) = Field("", description="An optional title in bold, up to 60 characters, without variables.")
+    header_sample: UUID | None = Field(
+        None,
+        description="For an IMAGE, VIDEO or DOCUMENT header: the id whatsapp_inbox.template.upload_sample answered "
+        "for its file (Meta reviews the template with it; the same one again keeps it).",
+    )
     body: _text(1024, 1) = Field(description="The text, up to 1024 characters, with {{1}}, {{2}}… where the variables go.")
     body_examples: list[_text(1024)] = Field(
         default_factory=list, max_length=100, description="An example of each variable, in order: Meta reviews the template with them."
@@ -729,9 +745,11 @@ class TemplateWriteIn(Schema):
 
     @field_validator("header", "footer")
     @classmethod
-    def _plain(cls, value: str) -> str:
+    def _plain(cls, value: str, info: ValidationInfo) -> str:
         if _ANY_VARIABLE.search(value):
             raise ValueError(TEMPLATE_NO_VARIABLES)
+        if info.field_name == "header" and value and info.data.get("header_format") in FILE_HEADER_FORMATS:
+            raise ValueError(TEMPLATE_FILE_NO_TEXT)
         return value
 
     @field_validator("body")
@@ -793,6 +811,29 @@ class TemplateRefIn(Schema):
     id: UUID = Field(description="The template's id in the Hub.")
 
 
+#: A 25 MB document in base64 is 34 952 536 characters; a little more still reads «too heavy» under its field.
+MAX_SAMPLE_BASE64 = 36_000_000
+
+
+class TemplateSampleUploadIn(Schema):
+    header_format: FileHeaderFormat = Field(
+        description="The header it is for: IMAGE (a JPEG or PNG photo, 5 MB at most), VIDEO (an MP4, 16 MB) or "
+        "DOCUMENT (a PDF, 25 MB)."
+    )
+    name: _text(255, 1) = Field(description="The file's name, as Meta shows it in its review (carta.pdf).")
+    content_base64: str = Field(
+        max_length=MAX_SAMPLE_BASE64, title=gettext_noop("File"), description="The file, in base64."
+    )
+
+
+class TemplateSampleOut(Schema):
+    id: UUID = Field(description="The file's id: give it as header_sample when creating or changing the template.")
+    header_format: FileHeaderFormat = Field(description="IMAGE, VIDEO or DOCUMENT, as its bytes say.")
+    content_type: str = Field(description="image/jpeg, image/png, video/mp4 or application/pdf.")
+    size: int = Field(description="Its size in bytes.")
+    name: str = Field(description="The name it was chosen with.")
+
+
 class TemplateButtonOut(Schema):
     type: str = Field(description="QUICK_REPLY, URL, PHONE_NUMBER, or another of Meta's (made in WhatsApp Manager).")
     text: str = Field(description="What the button says.")
@@ -802,7 +843,9 @@ class TemplateButtonOut(Schema):
 
 class TemplateDraftOut(Schema):
     category: TemplateCategory = Field(description="The category of the edit.")
+    header_format: HeaderFormat = Field("", description="The header type of the edit.")
     header: str = Field(description="The header of the edit.")
+    header_sample: TemplateSampleOut | None = Field(None, description="The header's file of the edit.")
     body: str = Field(description="The text of the edit.")
     body_examples: list[str] = Field(description="Its examples.")
     footer: str = Field(description="Its footer.")
@@ -833,8 +876,14 @@ class TemplateOut(Schema):
         description="UTILITY, MARKETING or AUTHENTICATION."
     )
     status: TemplateStatus = Field(description="What Meta says of it (DRAFT: Meta never had it).")
-    header_format: HeaderFormat = Field(description="Its header: none, TEXT, or a file or a place (made in WhatsApp Manager).")
+    header_format: HeaderFormat = Field(
+        description="Its header: none, TEXT, IMAGE, VIDEO or DOCUMENT (a file), or LOCATION (made in WhatsApp Manager)."
+    )
     header: str = Field(description="Its header text.")
+    header_sample: TemplateSampleOut | None = Field(
+        description="The file of its IMAGE, VIDEO or DOCUMENT header when it was chosen here (none for one made in "
+        "WhatsApp Manager)."
+    )
     body: str = Field(description="Its text, with {{1}}… where the variables go.")
     body_examples: list[str] = Field(description="An example of each variable.")
     footer: str = Field(description="Its footer.")

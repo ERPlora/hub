@@ -2540,6 +2540,7 @@
       "body_examples": "Ejemplos de las variables",
       "buttons": "Botones",
       "header_format": "Tipo de cabecera",
+      "header_sample": "Archivo de la cabecera",
       "meta_id": "ID en Meta",
       "draft": "Cambio pendiente en Meta",
       "editable": "Se puede cambiar aquí",

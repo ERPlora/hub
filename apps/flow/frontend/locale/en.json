@@ -2540,6 +2540,7 @@
       "body_examples": "Examples of the variables",
       "buttons": "Buttons",
       "header_format": "Header type",
+      "header_sample": "Header file",
       "meta_id": "ID at Meta",
       "draft": "Change waiting for Meta",
       "editable": "Can be changed here",

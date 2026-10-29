@@ -7,10 +7,12 @@ pushes (a message, a delivery status, the channel's state) has no route here: ``
 
 from live.ninja import bind, run_operation
 from ninja import Query, Router
+from ninja.decorators import decorate_view
 
 from apps.whatsapp_inbox import queries, services
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.schemas import (
+    MAX_SAMPLE_BASE64,
     AgentListIn,
     AssignIn,
     ByPhoneIn,
@@ -29,10 +31,15 @@ from apps.whatsapp_inbox.schemas import (
     TemplateCreateIn,
     TemplateListIn,
     TemplateRefIn,
+    TemplateSampleUploadIn,
     TemplateUpdateIn,
 )
+from base.request_body import accept_body_up_to
 
 router = Router(tags=["whatsapp_inbox"])
+
+#: The header file's body (F29): a 25 MB document in base64 at most (``schemas.MAX_SAMPLE_BASE64``) and its JSON.
+MAX_SAMPLE_BODY = MAX_SAMPLE_BASE64 + 4096
 
 
 # Conversations
@@ -208,6 +215,12 @@ async def agent_list(request, params: Query[AgentListIn]):
 @bind(router, "whatsapp_inbox.template.create", "/whatsapp_inbox/templates", status=201)
 async def template_create(request, data: TemplateCreateIn):
     return await run_operation(request, services.create_template, data)
+
+
+@bind(router, "whatsapp_inbox.template.upload_sample", "/whatsapp_inbox/templates/samples", status=201)
+@decorate_view(accept_body_up_to(MAX_SAMPLE_BODY))
+async def template_upload_sample(request, data: TemplateSampleUploadIn):
+    return await run_operation(request, services.upload_sample, data)
 
 
 @bind(router, "whatsapp_inbox.template.update", "/whatsapp_inbox/templates/update")

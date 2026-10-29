@@ -32,6 +32,8 @@ CHANNEL_DISCONNECTED = "whatsapp_inbox.channel.disconnected"
 TEMPLATE_CREATED = "whatsapp_inbox.template.created"
 TEMPLATE_UPDATED = "whatsapp_inbox.template.updated"
 TEMPLATE_DELETED = "whatsapp_inbox.template.deleted"
+#: The file of a template's header with a photo, a video or a document, kept in the hub's store (F29).
+TEMPLATE_SAMPLE_UPLOADED = "whatsapp_inbox.template_sample.uploaded"
 
 ALL = [
     MESSAGE_RECEIVED,
@@ -50,6 +52,7 @@ ALL = [
     TEMPLATE_CREATED,
     TEMPLATE_UPDATED,
     TEMPLATE_DELETED,
+    TEMPLATE_SAMPLE_UPLOADED,
 ]
 
 #: What changes whether a conversation waits for an answer (WHATSAPP_INBOX-F09; the bell's count): a message arrives

@@ -254,6 +254,34 @@ def test_a_template_is_posted_signed_with_its_key_and_200_is_meta_s_verdict():
     assert request.headers[SIGNATURE_HEADER] == sign("s3cret", timestamp, request.content)
 
 
+@pytest.mark.parametrize(
+    ("template", "read"),
+    [
+        (TEMPLATE, 15.0),
+        ({**TEMPLATE, "header": "", "header_format": "IMAGE", "header_sample": {"name": "a.jpg", "content_base64": "/9j/"}}, 90.0),
+    ],
+)
+def test_a_template_with_a_header_file_is_waited_for_longer_but_within_the_resume(monkeypatch, template, read):
+    """F29: erplora.com uploads the file to Meta before registering it; still answered before the worker's
+    ``delivery.resume`` hands it over again (``STUCK_AFTER``, 2 minutes)."""
+    from apps.whatsapp_inbox.services import STUCK_AFTER
+
+    used = []
+    real = httpx.Client
+
+    def client(*args, **kwargs):
+        used.append(kwargs["timeout"])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(gateway.httpx, "Client", client)
+    with respx.mock:
+        respx.post(TEMPLATES).mock(return_value=httpx.Response(200, json={"meta_id": "1", "status": "PENDING"}))
+        gateway.submit_template(hub="a", idempotency_key=KEY, template=template)
+
+    assert (used[0].connect, used[0].read) == (5.0, read)
+    assert used[0].connect + used[0].read < STUCK_AFTER.total_seconds()
+
+
 @respx.mock
 def test_a_409_on_a_template_is_a_refusal_with_meta_s_reason():
     respx.post(TEMPLATES).mock(

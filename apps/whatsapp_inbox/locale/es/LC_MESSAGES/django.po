@@ -759,3 +759,51 @@ msgstr "Tu número"
 
 msgid "Business portfolio at Meta"
 msgstr "Portfolio empresarial de Meta"
+
+msgid "template header file"
+msgstr "archivo de cabecera de plantilla"
+
+msgid "template header files"
+msgstr "archivos de cabecera de plantilla"
+
+msgid "header file"
+msgstr "archivo de la cabecera"
+
+msgid "file in the store"
+msgstr "archivo en el almacén"
+
+msgid "sha256"
+msgstr "sha256"
+
+msgid "size in bytes"
+msgstr "tamaño en bytes"
+
+msgid "The header's file is no longer in the business's files: choose it again with Edit."
+msgstr "El archivo de la cabecera ya no está en los archivos del negocio: vuelve a elegirlo con Editar."
+
+msgid "A header with a photo, a video or a document has no text."
+msgstr "Una cabecera con foto, vídeo o documento no lleva texto."
+
+msgid "File"
+msgstr "Archivo"
+
+msgid "Choose the header's file: Meta reviews the template with it."
+msgstr "Elige el archivo de la cabecera: Meta revisa la plantilla con él."
+
+msgid "The file did not arrive whole. Choose it again."
+msgstr "El archivo no llegó entero. Vuelve a elegirlo."
+
+msgid "Choose a JPEG or PNG photo."
+msgstr "Elige una foto JPEG o PNG."
+
+msgid "Choose an MP4 video."
+msgstr "Elige un vídeo MP4."
+
+msgid "Choose a PDF document."
+msgstr "Elige un documento PDF."
+
+msgid "This file weighs more than %(mb)s MB: choose a lighter one."
+msgstr "Este archivo pesa más de %(mb)s MB: elige uno más ligero."
+
+msgid "The file could not be kept: the business's file store did not answer. Try again in a moment."
+msgstr "No se pudo guardar el archivo: el almacén de archivos del negocio no contestó. Inténtalo de nuevo en un momento."
