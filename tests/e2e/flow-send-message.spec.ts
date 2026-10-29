@@ -17,7 +17,9 @@
 //   CONFIRMED-RECIPE-<width>); with «Confirmar solas las reservas nuevas» off, «Confirmar» in Reservas on a reservation
 //   whose number has a conversation; the relay pass hands it over and the notice, with its day, time and guests in
 //   Spanish, is in the conversation of the inbox once (a second pass, or cancelling it, sends nothing more; one
-//   screenshot per size, …-chat-<width>). Reservas' settings are put back after.
+//   screenshot per size, …-chat-<width>). Reservas' settings are put back after. The reservation is always on a
+//   Saturday, so the notice names «sábado», accent included, and it must name that very day, written as the Hub
+//   writes any weekday and month (checked against its `day_label`).
 // What it creates is «E2E Fsm …», `e2e.`/`+3469900…` (whatsapp-helpers.ts), the recipes' automations, a slot (its
 // maximum is `SLOT_SENTINEL`) and a day open in Schedules («E2E Fsm …»), and goes.
 import { spawnSync } from 'node:child_process';
@@ -294,6 +296,40 @@ function madridDay(days: number): { date: string; weekday: number } {
   return { date, weekday: (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7 };
 }
 
+/** The first Saturday at least `days` from today on the business's wall clock: the reservation's day is a Saturday
+ *  on purpose, so its notice always says «sábado», accent included (it failed only on the runs that fell on one). */
+function madridSaturday(days: number): { date: string; weekday: number } {
+  const soon = madridDay(days);
+  const saturday = new Date(`${soon.date}T00:00:00Z`);
+  saturday.setUTCDate(saturday.getUTCDate() + ((5 - soon.weekday + 7) % 7));
+  return { date: saturday.toISOString().slice(0, 10), weekday: 5 };
+}
+
+/** `date` (`YYYY-MM-DD`) as the Hub says a day in Spanish, weekday first («sábado, 7 de noviembre de 2026»: `day_label`
+ *  of apps/schedule): what a notice must name, not just any word with a shape of day. */
+const spanishDay = (date: string): string =>
+  new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(`${date}T00:00:00Z`),
+  );
+
+// flow: flow-send-message
+test('flow-send-message: the day a notice is expected to name reads as the Hub writes it, any weekday and month', () => {
+  // Seven days in a row (`miércoles` and `sábado` carry an accent) and the twelve months, against `day_label` itself.
+  const week = Array.from({ length: 7 }, (_, n) => `2026-11-${String(2 + n).padStart(2, '0')}`);
+  const months = Array.from({ length: 12 }, (_, n) => `2027-${String(n + 1).padStart(2, '0')}-15`);
+  const dates = [...week, ...months];
+  const code = [
+    'import datetime as dt, json',
+    'from apps.schedule.queries import day_label',
+    `print(json.dumps([day_label(dt.date.fromisoformat(d), "es") for d in ${JSON.stringify(dates)}]))`,
+  ].join('\n');
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  expect(out.status, `day_label: ${out.stderr}`).toBe(0);
+  const hub = JSON.parse(out.stdout.trim().split('\n').at(-1) ?? '[]') as string[];
+  expect(dates.map(spanishDay)).toEqual(hub);
+  expect(new Set(hub.slice(0, 7).map((label) => label.split(',')[0])).size).toBe(7);
+});
+
 /** The owner on `a` in Spanish (the Hub's language cookie, as the sign-in sets it), at `next`. */
 async function spanishOwner(browser: Browser, next: string, viewport: { width: number; height: number }) {
   const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
@@ -311,7 +347,7 @@ test('WHATSAPP_INBOX-F26 (y RESERVATION-F19): confirming a reservation in Reserv
 }) => {
   test.setTimeout(240_000);
   const { context, page } = await spanishOwner(browser, '/flow/automations', FLOW_VIEWPORTS[2]);
-  const day = madridDay(3);
+  const day = madridSaturday(3);
   const current = await api<Record<string, unknown>>(context, A, 'GET', '/reservation/settings');
   expect(current.status).toBe(200);
   try {
@@ -372,7 +408,12 @@ test('WHATSAPP_INBOX-F26 (y RESERVATION-F19): confirming a reservation in Reserv
     relayPass();
     await expect.poll(() => sentTo(phone).length).toBe(1);
     const [notice] = sentTo(phone);
-    expect(notice).toMatch(/^text\|[a-z]+\|¡Confirmada! Te esperamos el [a-zé]+, \d{1,2} de [a-z]+ de \d{4} a las 21:00, mesa para 4\.\|/);
+    expect(spanishDay(day.date)).toMatch(/^sábado, /);
+    expect(notice.split('|').slice(0, 3)).toEqual([
+      'text',
+      expect.stringMatching(/^[a-z]+$/),
+      `¡Confirmada! Te esperamos el ${spanishDay(day.date)} a las 21:00, mesa para 4.`,
+    ]);
     await expect.poll(() => handedOver(sentTo(phone)[0])).toBe(true);
     relayPass();
     expect(sentTo(phone)).toHaveLength(1);
@@ -396,7 +437,7 @@ test('WHATSAPP_INBOX-F26 (y RESERVATION-F19): confirming a reservation in Reserv
     for (const viewport of FLOW_VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await expect(bubble).toBeVisible();
-      await expect(bubble).toContainText('a las 21:00, mesa para 4.');
+      await expect(bubble).toContainText(`Te esperamos el ${spanishDay(day.date)} a las 21:00, mesa para 4.`);
       await settled(page);
       await noHorizontalScroll(page, `WHATSAPP_INBOX-F26 chat ${viewport.label}`);
       await page.screenshot({ path: shot(`${TABLE_TASK}-chat-${viewport.label}`) });
