@@ -1142,9 +1142,10 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 
 - **Nada espera a erplora.com dentro de una transacción.** `message.send` valida y guarda el mensaje
   `queued` con su clave en una transacción corta (con su evento) y lo entrega **después del COMMIT**
-  (`transaction.on_commit`): `message.claim_delivery` lo toma con `SKIP LOCKED` y lo pone `sending`
-  (transacción corta), la llamada HTTP a erplora.com va sin transacción ni bloqueo, y
-  `message.record_delivery` guarda la respuesta en otra transacción corta. Lo mismo al borrar
+  (`base.outbound.after_commit`, nunca tras un rollback): `message.claim_delivery` lo toma con `SKIP LOCKED`
+  y lo pone `sending` (transacción corta), la llamada HTTP a erplora.com va sin transacción, sin bloqueo y
+  sin conexión a la BD (`outbound.release()` entre el claim y la llamada), y `message.record_delivery`
+  guarda la respuesta en otra transacción corta. Lo mismo al borrar
   (`conversation.claim_erasure` → HTTP → `conversation.record_erasure`) y con las plantillas
   (`template.claim_submit` → HTTP → `template.record_submit`; `template.claim_delete` → HTTP →
   `template.record_delete`). Un erplora.com lento nunca bloquea la conversación (`receive`, `mark_read`,
@@ -1154,9 +1155,12 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   `connect` y `disconnect` guardan su respuesta en la fila del negocio, en una transacción corta con su
   evento. La foto que erplora.com empuja entretanto dice lo mismo con una versión mayor, y la siguiente
   sigue ganando.
-- **Fase 1** entrega al terminar la petición (el `on_commit` corre en ella); **fase 2**: el trabajo
-  diferido entra con `use_hub(hub)` explícito (corre fuera de la petición que eligió el hub). La tarea
-  del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
+- **Cada entrega corre en un hilo propio del proceso** (`base.outbound`: 4 a la vez, hasta 1000 en cola),
+  en el contexto de BD de la operación que la pidió (su `use_hub` o la BD compartida de la fase 1), nunca en
+  el bucle que hizo el COMMIT: ni la petición, ni el relay del outbox de todos los hubs, ni las tareas
+  programadas del worker esperan a erplora.com (hasta 20 s por llamada) (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY,
+  `tests/test_outbound.py`). Un trabajo que se pierde (cola llena, el worker que se para en un despliegue)
+  lo recupera el barrido, que lo entrega con la misma clave. La tarea del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
   `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. En la
   fase 1 el worker la corre con un solo ámbito fijo (`WORKER_SCOPE_SLUG`, `base/scheduler.py`): retoma lo de
@@ -1166,6 +1170,9 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   entonces. En la fase 2 corre en la BD de cada hub. «Reintentar» (`message.retry`) y volver a borrar un
   número ya borrado (`conversation.erase` por su id) entregan igual, con el negocio de la fila y no con el de
   quien lo pide desde la bandeja compartida; sin negocio guardado (anterior a `0007`), con el de quien lo pide.
+  Desde una petición de otro hub (la bandeja compartida de la fase 1), esa entrega aún no sale en el acto: su
+  hilo trabaja en el contexto de BD de la petición, que no es el del negocio de la fila (`HubContextMismatch`
+  en el log, igual que antes con `on_commit`), y la entrega el barrido a los 2–5 minutos.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`; `whatsapp.reconnect_needed`, el 190 de Meta, como
@@ -1460,7 +1467,7 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 - El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased` a
   `apps.whatsapp_inbox.events.react` (ya en la fase 1, `base/relay.py`); en la fase 2, el worker ejecuta
   la tarea `resume_deliveries` de `apps.py` en cada hub (`hub_due`), y el trabajo diferido de esta app
-  entra con `use_hub(hub)`.
+  corre en el hub de la operación que lo pidió (`base.outbound`).
 - La campana de la barra superior lee `whatsapp_inbox.conversation.count_awaiting_reply` (la declaración `bell`
   de `apps.py`, con el permiso `whatsapp_inbox.view`), que comparte con `summary` la única definición de
   «esperando respuesta» (`AWAITING_REPLY` de `queries.py`); se refresca con `AWAITING_REPLY_EVENTS` de `events.py`.
