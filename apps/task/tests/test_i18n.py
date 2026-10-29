@@ -124,8 +124,9 @@ def test_the_compiled_catalog_is_current():
 
 
 def test_the_card_says_each_title_with_tasks_own_spanish():
-    """A title task shares with an app installed before it («Assigned to» with the WhatsApp inbox) is said with that
-    app's Spanish, so task's own entry would be dead text: they have to say the same."""
+    """A title task shares with another app («Assigned to» with the WhatsApp inbox) is said with the Spanish of the
+    one that comes first in ``INSTALLED_APPS`` (today task) and the other's entry is dead text: they have to say the
+    same, or the card's word would hang on the order of the apps."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     titles = schema_titles()
