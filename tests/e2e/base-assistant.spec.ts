@@ -137,17 +137,24 @@ async function confirmationReady(page: Page): Promise<void> {
 /** The dangerous card's «Confirmation» as its capture must show it: focused, its label floated and, in the same frame,
  *  nothing moving on the page, the label's move included (rv-ui-35: the first size caught the first frame of the label's
  *  move, with a gap in the outline). Stillness is asked of the e2e's one detector, put in the page by
- *  `exposeMovingInPage` (helpers.ts), never of the label's own animations. */
+ *  `exposeMovingInPage` (helpers.ts), never of the label's own animations; and, as the detector leaves endless moves out
+ *  (a spinner's), the label must also look the same two frames apart. */
 async function confirmationSettled(page: Page): Promise<boolean> {
   await exposeMovingInPage(page);
   return card(page)
     .locator('[data-testid="assistant-confirm-input"]')
-    .evaluate((field) => {
+    .evaluate(async (field) => {
+      const label = field.querySelector('.label-text-wrapper');
+      const look = () =>
+        label && `${JSON.stringify(label.getBoundingClientRect())} ${getComputedStyle(label).transform} ${getComputedStyle(label).opacity}`;
+      const before = look();
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
       const moving = (window as unknown as { __movingInPage: () => string[] }).__movingInPage();
       return (
         field.classList.contains('has-focus') &&
         field.classList.contains('label-floating') &&
-        field.querySelector('.label-text-wrapper') !== null &&
+        label !== null &&
+        look() === before &&
         moving.length === 0
       );
     });

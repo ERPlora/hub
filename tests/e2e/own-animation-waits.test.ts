@@ -6,7 +6,8 @@
 // keep the copies out of their own app's files; this one keeps them out of every file of the e2e, as a ratchet:
 // `own-animation-waits.json` holds, for each file that still asks for animations itself, how many times; a file can only
 // lose them (and then its count goes down, or its line away), never gain them, and a new file has none.
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -71,11 +72,11 @@ function scanned(name: string): boolean {
   return !parts.some((part) => part.startsWith('.') || part === 'node_modules');
 }
 
-/** Each file of the e2e that reaches for `getAnimations`, and how many times. */
-function readsByFile(): Record<string, number> {
+/** Each file under `dir` (the e2e's folder) that reaches for `getAnimations`, and how many times. */
+function readsByFile(dir = E2E_DIR): Record<string, number> {
   const found: Record<string, number> = {};
-  for (const name of readdirSync(E2E_DIR, { recursive: true, encoding: 'utf8' }).filter(scanned)) {
-    const reads = animationReads(readFileSync(join(E2E_DIR, name), 'utf8'), name);
+  for (const name of readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(scanned)) {
+    const reads = animationReads(readFileSync(join(dir, name), 'utf8'), name);
     if (reads > 0) found[name.split(/[\\/]/).join('/')] = reads;
   }
   return found;
@@ -83,20 +84,27 @@ function readsByFile(): Record<string, number> {
 
 const allowed = (name: string): number => ALLOWED[name] ?? RATCHET[name] ?? 0;
 
+/** The files of `found` that ask for animations more times than they may: their number in `ALLOWED`, else the ratchet's, else none. */
+function overTheRatchet(found: Record<string, number>): string[] {
+  return Object.entries(found)
+    .filter(([name, reads]) => reads > allowed(name))
+    .map(([name, reads]) => `${name}: ${reads} getAnimations reads, ${allowed(name)} allowed`);
+}
+
+/** The files of `ALLOWED` and the ratchet that `found` shows asking for animations fewer times than their number. */
+function staleInTheRatchet(found: Record<string, number>): string[] {
+  return Object.keys({ ...ALLOWED, ...RATCHET })
+    .filter((name) => (found[name] ?? 0) < allowed(name))
+    .map((name) => `${name}: ${found[name] ?? 0} getAnimations reads, the ratchet says ${allowed(name)}`);
+}
+
 describe('the e2e waits for «nothing moves» with the one detector of helpers.ts', () => {
   it('no file asks for animations more times than the ratchet lists: a new wait is settled(page) or untilStill(page)', () => {
-    const over = Object.entries(readsByFile())
-      .filter(([name, reads]) => reads > allowed(name))
-      .map(([name, reads]) => `${name}: ${reads} getAnimations reads, ${allowed(name)} allowed`);
-    expect(over, WAIT_WITH_THE_DETECTOR).toEqual([]);
+    expect(overTheRatchet(readsByFile()), WAIT_WITH_THE_DETECTOR).toEqual([]);
   });
 
   it('the ratchet only goes down: a file that asks for animations fewer times lowers its count in own-animation-waits.json', () => {
-    const found = readsByFile();
-    const stale = Object.keys({ ...ALLOWED, ...RATCHET })
-      .filter((name) => (found[name] ?? 0) < allowed(name))
-      .map((name) => `${name}: ${found[name] ?? 0} getAnimations reads, the ratchet says ${allowed(name)}`);
-    expect(stale, LOWER_THE_RATCHET).toEqual([]);
+    expect(staleInTheRatchet(readsByFile()), LOWER_THE_RATCHET).toEqual([]);
   });
 
   it('the ratchet lists only files with own waits left, none of the allowed ones, in order', () => {
@@ -104,6 +112,29 @@ describe('the e2e waits for «nothing moves» with the one detector of helpers.t
     expect(Object.entries(RATCHET).filter(([, reads]) => !(Number.isInteger(reads) && reads > 0))).toEqual([]);
     expect(names.filter((name) => name in ALLOWED)).toEqual([]);
     expect(names).toEqual([...names].sort());
+  });
+
+  it('a new file has none, at any depth, a listed one not one more, and one that lost a read lowers its number', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'own-animation-waits-'));
+    try {
+      mkdirSync(join(dir, 'lib'));
+      mkdirSync(join(dir, '.artifacts'));
+      writeFileSync(join(dir, 'zz-new.spec.ts'), 'await page.waitForFunction(() => document.getAnimations().length === 0);\n');
+      writeFileSync(join(dir, 'lib', 'wait.ts'), "export const moving = (page) => page.evaluate('document.getAnimations().length');\n");
+      writeFileSync(join(dir, 'helpers.ts'), 'const moving = document.getAnimations();\nconst more = root.getAnimations();\n');
+      writeFileSync(join(dir, '.artifacts', 'report.js'), 'document.getAnimations();\n');
+      writeFileSync(join(dir, 'zz-wait.test.ts'), 'document.getAnimations();\n');
+      expect(overTheRatchet(readsByFile(dir)).sort()).toEqual([
+        'helpers.ts: 2 getAnimations reads, 1 allowed',
+        'lib/wait.ts: 1 getAnimations reads, 0 allowed',
+        'zz-new.spec.ts: 1 getAnimations reads, 0 allowed',
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    expect(staleInTheRatchet({ ...ALLOWED, ...RATCHET, 'settled.spec.ts': 2 })).toEqual([
+      'settled.spec.ts: 2 getAnimations reads, the ratchet says 3',
+    ]);
   });
 
   it('the count reads every way of reaching getAnimations in code, and comments and the detector’s helpers as none', () => {
