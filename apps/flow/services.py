@@ -18,11 +18,9 @@ started by an event that a run of the same automation caused, or by a chain of m
 """
 
 import datetime as dt
-import functools
 import json
 import logging
 import uuid
-from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -32,13 +30,13 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
-from live.operations import Operation, UnknownOperation, get, operation
+from live.operations import Operation, get, operation
 from live.outbox import record_event
 
 from apps.flow import document, events, gateway, http, recipes, vault
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
-    HIGH_RISK,
+    ASSISTANT_GONE_KEY,
     HIGH_RISK_CODE,
     LEAVES,
     ANSWER,
@@ -61,6 +59,7 @@ from apps.flow.queries import (
     recipe_flow,
     resolve_flow,
     run_row,
+    say,
     validation_fields,
     can_answer,
 )
@@ -109,53 +108,6 @@ DISABLED = _("This automation is paused: turn it on to run it.")
 DRAFT_DECIDED = _("That draft was already decided.")
 GRANT_BEYOND_CALLER = _("You cannot allow what you may not do yourself: «%(name)s».")
 DRAFT_NOT_FOUND = _("That draft does not exist in this business.")
-NOT_ALLOWED = _(
-    "It tried to do something you have not allowed it to do («%(name)s»), so it stopped. "
-    "Open Permissions and allow what it needs."
-)
-UNAVAILABLE = _(
-    "«%(name)s» is not available in this business any more (its app is off), so it stopped."
-)
-INVALID_PARAMS = _("«%(name)s» did not accept the data it was given, so it stopped.")
-CRASHED = _(
-    "Something went wrong while doing «%(name)s», so it stopped. Nothing of that step was kept."
-)
-LOOP = _(
-    "It was started by something its own steps did, so it stopped before doing anything."
-)
-CHAIN_TOO_LONG = _(
-    "A chain of %(count)s automations started it, more than the %(max)s allowed, so it stopped before doing "
-    "anything."
-)
-FILTER_UNREADABLE = _(
-    "Its «Only when…» can no longer be read, so it did not go on. Open it, check «Only when…» and save it "
-    "again."
-)
-CONDITION_UNREADABLE = _(
-    "This «Only continue if…» can no longer be read, so it stopped. Open the automation, check this step "
-    "and save it again."
-)
-RUN_IF_UNREADABLE = _(
-    "The «Only if…» of this step can no longer be read, so it stopped. Open the automation, check this step "
-    "and save it again."
-)
-HTTP_STATUS = _("«%(host)s» answered %(status)s, so it stopped.")
-HTTP_BLOCKED = _("«%(host)s» is inside a private network, so it was not called.")
-HTTP_FAILED = _("It could not reach «%(host)s», so it stopped.")
-HTTP_TIMEOUT = _("«%(host)s» did not answer within %(seconds)s seconds, so it stopped.")
-HTTP_INVALID = _("The address of this step is not a plain https address, so it was not called.")
-SECRET_GONE = _(
-    "The secret «%(name)s» no longer exists, so it stopped before calling. Save it again in this step."
-)
-SECRET_UNREADABLE = _(
-    "The secret «%(name)s» cannot be opened with this server's key, so it stopped before calling. Save it "
-    "again in this step."
-)
-SECRETS_KEY_GONE = _(
-    "This server cannot use secrets (its encryption key is missing), so it stopped before calling."
-)
-CANCELLED_PAUSED = _("Cancelled: the automation was paused while it waited.")
-CANCELLED_DELETED = _("Cancelled: the automation was deleted.")
 RUN_NOT_FOUND = _("That run does not exist in this business.")
 RECIPE_NOT_ON = _("This business has not turned that automation on: there is nothing to change.")
 SECRETS_KEY_MISSING = _(
@@ -167,19 +119,7 @@ QUESTION_NOT_YOURS = _("This question was asked of someone else: you cannot answ
 QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.")
 QUESTION_CLOSED = _("This question is closed: its automation no longer waits for it.")
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
-ANSWERED_NO = _("Cancelled: %(who)s answered no to «%(title)s».")
-NOBODY_ANSWERED = _("Cancelled: nobody answered «%(title)s» in time.")
 ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
-ASSISTANT_ROUNDS = _("The assistant took its %(n)s turns without finishing, so it stopped.")
-ASSISTANT_QUOTA = _(
-    "The assistant's messages of this month are spent, so it stopped. They come back on the 1st; for more, "
-    "upgrade the plan."
-)
-ASSISTANT_UNAVAILABLE = _("The assistant could not answer now, so it stopped: resume the run in a while.")
-ASSISTANT_UNREACHABLE = _("It could not reach the assistant on erplora.com, so it stopped: resume the run in a while.")
-ASSISTANT_REFUSED = _("erplora.com's assistant did not take the task, so it stopped.")
-ASSISTANT_GONE = _("«%(name)s» is no longer allowed or available, so the assistant's change was not made.")
-ASSISTANT_GONE_UNNAMED = _("That action is no longer allowed or available, so the assistant's change was not made.")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
@@ -201,13 +141,13 @@ IDEMPOTENCY_NAMESPACE = uuid.UUID("0199f6a0-6b1f-7c3e-9a51-3f1b2c4d5e6f")
 #: How long a call that left holds its run: after it, a call that never answered is sent again, with the
 #: same key (at least once; the old hub's 5 minutes).
 CALL_LEASE_MINUTES = 5
-#: How a call that did not answer 2xx ends: code and message.
+#: How a call that did not answer 2xx ends: its code (and the name of its reason, ``queries.REASONS``).
 _CALL_FAILURES = {
-    http.STATUS: ("flow.http_status", HTTP_STATUS),
-    http.BLOCKED: ("flow.http_blocked", HTTP_BLOCKED),
-    http.FAILED: ("flow.http_failed", HTTP_FAILED),
-    http.TIMEOUT: ("flow.http_timeout", HTTP_TIMEOUT),
-    http.INVALID: ("flow.http_url_invalid", HTTP_INVALID),
+    http.STATUS: "flow.http_status",
+    http.BLOCKED: "flow.http_blocked",
+    http.FAILED: "flow.http_failed",
+    http.TIMEOUT: "flow.http_timeout",
+    http.INVALID: "flow.http_url_invalid",
 }
 
 
@@ -483,14 +423,7 @@ def delete_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
             Question.objects.filter(run=waiting, status=Question.Status.PENDING).update(
                 status=Question.Status.CANCELLED, decided_at=now
             )
-            _finish(
-                ctx,
-                waiting,
-                FlowRun.Status.CANCELLED,
-                now,
-                "flow.deleted",
-                str(CANCELLED_DELETED),
-            )
+            _finish(ctx, waiting, FlowRun.Status.CANCELLED, now, _own("flow.deleted"))
     flow.deleted_at = now
     flow.enabled = False
     flow.next_fire_at = None
@@ -807,15 +740,25 @@ def dismiss_draft(ctx: OperationContext, data: DraftRefIn) -> dict:
 
 
 class StepFailed(Exception):
+    """Why a step (or a run) stopped: ``message`` in the automation's language, for the steps after it; ``reason``,
+    the engine's own reason by name and values (``_own``), said again when the History is read, in the reader's
+    language; none for what an action of another app answered, which is said as it answered."""
+
     def __init__(
-        self, code: str, message: str, fields: dict | None = None, technical: str = ""
+        self,
+        code: str,
+        message: str,
+        fields: dict | None = None,
+        technical: str = "",
+        reason: dict | None = None,
     ) -> None:
         super().__init__(message)
-        self.code, self.message, self.fields, self.technical = (
+        self.code, self.message, self.fields, self.technical, self.reason = (
             code,
             message,
             fields,
             technical,
+            reason or {},
         )
 
     def entry(self) -> dict:
@@ -824,7 +767,16 @@ class StepFailed(Exception):
             error["fields"] = self.fields
         if self.technical:
             error["technical"] = self.technical
+        if self.reason:
+            error["reason"] = self.reason
         return error
+
+
+def _own(code: str, key: str = "", *, fields: dict | None = None, technical: str = "", **values: Any) -> StepFailed:
+    """A failure in the engine's own words (``queries.REASONS[key or code]``), said now in the active language (the
+    automation's) and kept by name and values for whoever reads it later."""
+    reason = {"key": key or code, "values": values}
+    return StepFailed(code, say(reason), fields=fields, technical=technical, reason=reason)
 
 
 def _log(run: FlowRun, step: dict, outcome: str, now: dt.datetime, **more: Any) -> None:
@@ -868,8 +820,7 @@ def _finish(
     run: FlowRun,
     status: str,
     now: dt.datetime,
-    code: str = "",
-    message: str = "",
+    failure: StepFailed | None = None,
 ) -> None:
     run.status = status
     run.finished_at = now
@@ -878,8 +829,9 @@ def _finish(
     # except by one that stopped by an error, which may be resumed for RESUME_DAYS (FLOW-F24).
     if status != FlowRun.Status.FAILED:
         run.outputs = {}
-    run.error_code = code
-    run.error_message = message
+    run.error_code = failure.code if failure else ""
+    run.error_message = failure.message if failure else ""
+    run.error_reason = failure.reason if failure else {}
     run.save()
     record_event(
         ctx,
@@ -923,12 +875,12 @@ def _operation_step(
     name = step["operation"]
     grantable = grantable_operations().get(name)
     if grantable is not None and needs_a_person(grantable):
-        raise StepFailed(HIGH_RISK_CODE, str(HIGH_RISK) % {"name": name})
+        raise _own(HIGH_RISK_CODE, name=name)
     if name not in flow.grants:
-        raise StepFailed("flow.not_allowed", str(NOT_ALLOWED) % {"name": name})
+        raise _own("flow.not_allowed", name=name)
     op = catalog_operations().get(name)
     if op is None or op.kind != step["kind"]:
-        raise StepFailed("flow.action_unavailable", str(UNAVAILABLE) % {"name": name})
+        raise _own("flow.action_unavailable", name=name)
     step_ctx = _step_context(ctx, run, flow, op)
     values, _, _ = map_params(step.get("params", {}), data)
     try:
@@ -936,11 +888,7 @@ def _operation_step(
             prepared(op, step["kind"], step.get("result", "first"), values)
         )
     except pydantic.ValidationError as invalid:
-        raise StepFailed(
-            "flow.invalid_params",
-            str(INVALID_PARAMS) % {"name": name},
-            fields=validation_fields(invalid),
-        ) from None
+        raise _own("flow.invalid_params", fields=validation_fields(invalid), name=name) from None
     try:
         result = op(step_ctx, payload)
     except NotFound:
@@ -953,11 +901,7 @@ def _operation_step(
         logger.exception(
             "flow: step %s (%s) of run %s crashed", step["id"], name, step_ctx.actor
         )
-        raise StepFailed(
-            "flow.step_crashed",
-            str(CRASHED) % {"name": name},
-            technical=f"{type(crash).__name__}: {crash}",
-        ) from None
+        raise _own("flow.step_crashed", technical=f"{type(crash).__name__}: {crash}", name=name) from None
     output = result.model_dump(mode="json")
     if step["kind"] == "query":
         left, outcome, count = _read_output(step, output)
@@ -979,7 +923,7 @@ def _fail(
         run.step_index += 1
         return True
     _log(run, step, "failed", now, error=failure.entry())
-    _finish(ctx, run, FlowRun.Status.FAILED, now, failure.code, failure.message)
+    _finish(ctx, run, FlowRun.Status.FAILED, now, failure)
     return False
 
 
@@ -990,7 +934,7 @@ def _skipped(ctx: OperationContext, run: FlowRun, step: dict, data: dict, now: d
     if not run_if:
         return False
     if not document.readable(run_if):
-        _fail(ctx, run, {**step, "on_error": "stop"}, StepFailed("flow.run_if_unreadable", str(RUN_IF_UNREADABLE)), now)
+        _fail(ctx, run, {**step, "on_error": "stop"}, _own("flow.run_if_unreadable"), now)
         return None
     failed = document.failed_clauses(run_if, data)
     if not failed:
@@ -1041,7 +985,7 @@ def _advance(ctx: OperationContext, run: FlowRun, flow: Flow, now: dt.datetime) 
                 return
             if step["kind"] == "condition":
                 if not document.readable(step.get("when")):
-                    failure = StepFailed("flow.condition_unreadable", str(CONDITION_UNREADABLE))
+                    failure = _own("flow.condition_unreadable")
                     _fail(ctx, run, {**step, "on_error": "stop"}, failure, now)
                     return
                 failed = document.failed_clauses(step["when"], data)
@@ -1085,9 +1029,9 @@ def _call_allowed(run: FlowRun, flow: Flow, step: dict) -> StepFailed | None:
     """Why the automation may not make this call (its origin not granted), or ``None``."""
     grant = document.http_grant(str(step.get("url") or ""))
     if grant is None:
-        return StepFailed("flow.http_url_invalid", str(HTTP_INVALID))
+        return _own("flow.http_url_invalid")
     if grant not in flow.grants:
-        return StepFailed("flow.not_allowed", str(NOT_ALLOWED) % {"name": document.host_of(step["url"])})
+        return _own("flow.not_allowed", name=document.host_of(step["url"]))
     return None
 
 
@@ -1252,7 +1196,7 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
         return {"claimed": False}
     with translation.override(flow.language):
         if flow.deleted_at is not None:
-            _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.deleted", str(CANCELLED_DELETED))
+            _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.deleted"))
             return {"claimed": False}
         turn = run.outputs.get(TURN) or {
             "messages": [{"role": "user", "content": document.fill(step["prompt"], {"input": run.input, "steps": run.outputs})}],
@@ -1368,14 +1312,14 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
     return {"go_on": True, "messages": messages, "continuation": data.continuation}
 
 
-#: How a turn that did not come back ends: the gateway's code → ours and its message.
+#: How a turn that did not come back ends: the gateway's code → ours (and the name of its reason).
 _ASSISTANT_FAILURES = {
-    "assistant.quota_exceeded": ("flow.assistant_quota_exceeded", ASSISTANT_QUOTA),
-    "assistant.unreachable": ("flow.assistant_unreachable", ASSISTANT_UNREACHABLE),
-    "assistant.provider_unavailable": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
-    "assistant.internal_error": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
-    "assistant.unavailable": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
-    "rate_limited": ("flow.assistant_unavailable", ASSISTANT_UNAVAILABLE),
+    "assistant.quota_exceeded": "flow.assistant_quota_exceeded",
+    "assistant.unreachable": "flow.assistant_unreachable",
+    "assistant.provider_unavailable": "flow.assistant_unavailable",
+    "assistant.internal_error": "flow.assistant_unavailable",
+    "assistant.unavailable": "flow.assistant_unavailable",
+    "rate_limited": "flow.assistant_unavailable",
 }
 
 
@@ -1401,8 +1345,8 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
     run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
     with translation.override(flow.language):
         if data.failure:
-            code, message = _ASSISTANT_FAILURES.get(data.failure, ("flow.assistant_refused", ASSISTANT_REFUSED))
-            _call_failed(ctx, run, flow, step, StepFailed(code, str(message), technical=data.failure), now)
+            code = _ASSISTANT_FAILURES.get(data.failure, "flow.assistant_refused")
+            _call_failed(ctx, run, flow, step, _own(code, technical=data.failure), now)
             return {"count": 1}
         run.outputs = {**run.outputs, step["id"]: {"text": data.text, **answered}}
         _log(run, step, "assistant_answered", now, text=data.text[:2000])
@@ -1411,44 +1355,12 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
     return {"count": 1}
 
 
-#: The words of the app's screens, by language: how the History names an action («Create a task»).
-LOCALES = Path(__file__).resolve().parent / "frontend" / "locale"
-
-
-@functools.cache
-def _screen_words(language: str) -> dict:
-    path = LOCALES / f"{language}.json"
-    return json.loads((path if path.exists() else LOCALES / "en.json").read_text(encoding="utf-8"))["flow"]
-
-
-def _action_label(op: Operation, language: str) -> str:
-    """``op`` as the History names it: its own words or, without them, its verb, app and thing (``actionLabel`` of
-    ``frontend/lib/phrasing.ts``)."""
-    words = _screen_words(language)
-    curated = words["actions"].get(op.name.replace(".", "__"))
-    if curated:
-        return curated
-    _app, entity, verb = ([*op.name.split(".", 2), "", ""])[:3]
-    verb_word = words["verbs"].get(verb) or verb.replace("_", " ")
-    return f"{verb_word} · {hub_assistant.app_name(op)} ({entity.replace('_', ' ')})"
-
-
-def _gone(name: str, language: str) -> str:
-    """Why a yes did not make the assistant's change: the action, named for a person, is no longer granted or
-    active; one that no longer exists is not named at all."""
-    try:
-        op = get(name)
-    except UnknownOperation:
-        return str(ASSISTANT_GONE_UNNAMED)
-    return str(ASSISTANT_GONE) % {"name": _action_label(op, language)}
-
-
 def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:
     """Stops the step when the assistant spent its turns (``max_rounds``) and says so; ``True`` when it did."""
     if rounds < int(step.get("max_rounds", 6)):
         return False
     run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
-    failure = StepFailed("flow.assistant_too_many_rounds", str(ASSISTANT_ROUNDS) % {"n": rounds})
+    failure = _own("flow.assistant_too_many_rounds", n=rounds)
     _call_failed(ctx, run, flow, step, failure, now)
     return True
 
@@ -1465,7 +1377,7 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     op = _offered(flow, step).get(name)
     if op is None:
         run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
-        if _fail(ctx, run, step, StepFailed("flow.not_allowed", _gone(name, flow.language)), now):
+        if _fail(ctx, run, step, _own("flow.not_allowed", ASSISTANT_GONE_KEY, operation=name), now):
             _go_on(ctx, run, flow, now)
         return
     outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, str(proposal.get("arguments") or "{}"))
@@ -1585,8 +1497,8 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
             left = {"approved": data.approve, "expired": False, "note": data.note, "answered_by": who}
             _carry_on(ctx, run, flow, step, left, now)
         else:
-            message = str(ANSWERED_NO) % {"who": who, "title": question.title}
-            _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.question_rejected", message)
+            no = _own("flow.question_rejected", who=who, title=question.title)
+            _finish(ctx, run, FlowRun.Status.CANCELLED, now, no)
     return {"id": question.id, "run_id": run.id, "status": run.status}
 
 
@@ -1627,12 +1539,12 @@ def expire_questions(ctx: OperationContext, data: DueIn) -> dict:
         with translation.override(flow.language):
             _log(run, step, "expired", now)
             if policy != "continue":
-                message = str(NOBODY_ANSWERED) % {"title": question.title}
-                _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.question_expired", message)
+                silence = _own("flow.question_expired", title=question.title)
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, silence)
             elif flow.deleted_at is not None:
-                _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.deleted", str(CANCELLED_DELETED))
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.deleted"))
             elif not flow.enabled:
-                _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.paused", str(CANCELLED_PAUSED))
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.paused"))
             else:
                 left = {"approved": False, "expired": True, "note": "", "answered_by": ""}
                 _carry_on(ctx, run, flow, step, left, now)
@@ -1715,7 +1627,7 @@ def claim_call(ctx: OperationContext, data: RunRefIn) -> dict:
     step = run.definition["steps"][run.step_index]
     with translation.override(flow.language):
         if flow.deleted_at is not None:
-            _finish(ctx, run, FlowRun.Status.CANCELLED, now, "flow.deleted", str(CANCELLED_DELETED))
+            _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.deleted"))
             return {"claimed": False}
         refused = _call_allowed(run, flow, step)
         if refused is None:
@@ -1745,16 +1657,16 @@ def _open_secrets(names: list[str]) -> tuple[dict[str, str], StepFailed | None]:
     if not names:
         return {}, None
     if not vault.available():
-        return {}, StepFailed("flow.secrets_key_missing", str(SECRETS_KEY_GONE))
+        return {}, _own("flow.secrets_key_missing")
     kept = dict(Secret.objects.filter(name__in=names).values_list("name", "ciphertext"))
     opened: dict[str, str] = {}
     for name in names:
         if name not in kept:
-            return {}, StepFailed("flow.secret_not_found", str(SECRET_GONE) % {"name": name})
+            return {}, _own("flow.secret_not_found", name=name)
         try:
             opened[name] = vault.open_value(kept[name])
         except vault.Unreadable:
-            return {}, StepFailed("flow.secret_unreadable", str(SECRET_UNREADABLE) % {"name": name})
+            return {}, _own("flow.secret_unreadable", name=name)
     return opened, None
 
 
@@ -1788,11 +1700,12 @@ def record_call(ctx: OperationContext, data: RecordCallIn) -> dict:
             run.step_index += 1
             _go_on(ctx, run, flow, now)
             return {"count": 1}
-        code, message = _CALL_FAILURES[data.kind]
-        failure = StepFailed(
-            code,
-            str(message) % {"host": host, "status": data.status, "seconds": step.get("timeout", 10)},
+        failure = _own(
+            _CALL_FAILURES[data.kind],
             technical=data.detail,
+            host=host,
+            status=data.status,
+            seconds=step.get("timeout", 10),
         )
         _call_failed(ctx, run, flow, step, failure, now, {"status": data.status})
     return {"count": 1}
@@ -1856,14 +1769,7 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
             )
             started += 1
             with translation.override(flow.language):
-                _finish(
-                    ctx,
-                    run,
-                    FlowRun.Status.FAILED,
-                    now,
-                    "flow.filter_unreadable",
-                    str(FILTER_UNREADABLE),
-                )
+                _finish(ctx, run, FlowRun.Status.FAILED, now, _own("flow.filter_unreadable"))
             continue
         if not document.holds(
             flow.trigger_filter, {"input": data.payload, "steps": {}}
@@ -1883,18 +1789,13 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         started += 1
         with translation.override(flow.language):
             if str(flow.id) in chain:
-                _finish(
-                    ctx, run, FlowRun.Status.FAILED, now, "flow.loop_stopped", str(LOOP)
-                )
+                _finish(ctx, run, FlowRun.Status.FAILED, now, _own("flow.loop_stopped", "flow.loop"))
                 continue
             if len(chain) >= document.MAX_CHAIN:
-                message = str(CHAIN_TOO_LONG) % {
-                    "count": len(chain) + 1,
-                    "max": document.MAX_CHAIN,
-                }
-                _finish(
-                    ctx, run, FlowRun.Status.FAILED, now, "flow.loop_stopped", message
+                too_long = _own(
+                    "flow.loop_stopped", "flow.chain_too_long", count=len(chain) + 1, max=document.MAX_CHAIN
                 )
+                _finish(ctx, run, FlowRun.Status.FAILED, now, too_long)
                 continue
         _advance(ctx, run, flow, now)
     return {"started": started, "skipped": skipped}
@@ -1965,24 +1866,10 @@ def resume_due(ctx: OperationContext, data: DueIn) -> dict:
         flow = run.flow
         with translation.override(flow.language):
             if flow.deleted_at is not None:
-                _finish(
-                    ctx,
-                    run,
-                    FlowRun.Status.CANCELLED,
-                    now,
-                    "flow.deleted",
-                    str(CANCELLED_DELETED),
-                )
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.deleted"))
                 continue
             if not flow.enabled:
-                _finish(
-                    ctx,
-                    run,
-                    FlowRun.Status.CANCELLED,
-                    now,
-                    "flow.paused",
-                    str(CANCELLED_PAUSED),
-                )
+                _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.paused"))
                 continue
         waited = [dict(entry) for entry in run.log]
         if waited and waited[-1].get("outcome") == "waiting":
@@ -2036,7 +1923,8 @@ def run_now(ctx: OperationContext, data: RunIn) -> dict:
         now=now,
     )
     _advance(ctx, started, flow, now)
-    return run_row(started)
+    with translation.override(ctx.language):
+        return run_row(started)
 
 
 @operation(
@@ -2072,9 +1960,11 @@ def retry_run(ctx: OperationContext, data: RunRefIn) -> dict:
     failed.status = FlowRun.Status.RUNNING
     failed.finished_at = None
     failed.error_code = failed.error_message = ""
+    failed.error_reason = {}
     record_event(ctx, events.RUN_RESUMED, {"id": str(failed.id), "flow_id": str(flow.id)})
     _advance(ctx, failed, flow, now)
-    return run_row(failed)
+    with translation.override(ctx.language):
+        return run_row(failed)
 
 
 @operation(

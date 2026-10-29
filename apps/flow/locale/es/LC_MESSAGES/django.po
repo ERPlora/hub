@@ -151,6 +151,9 @@ msgstr "código de error"
 msgid "error"
 msgstr "error"
 
+msgid "reason of the error"
+msgstr "motivo del error"
+
 msgid "resumes at"
 msgstr "sigue el"
 
