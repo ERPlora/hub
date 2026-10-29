@@ -282,6 +282,29 @@ def test_a_template_with_a_header_file_is_waited_for_longer_but_within_the_resum
     assert used[0].connect + used[0].read < STUCK_AFTER.total_seconds()
 
 
+def test_a_send_with_a_header_file_is_waited_for_longer_but_within_the_resume(monkeypatch):
+    """F33: erplora.com puts the file on the number before sending; a text or a template without file keeps 15 s."""
+    from apps.whatsapp_inbox.services import STUCK_AFTER
+
+    used = []
+    real = httpx.Client
+
+    def client(*args, **kwargs):
+        used.append(kwargs["timeout"])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(gateway.httpx, "Client", client)
+    with_file = {"name": "oferta", "language": "es", "variables": [], "header_format": "IMAGE",
+                 "header_sample": {"name": "carta.jpg", "content_base64": "/9j/"}}
+    with respx.mock:
+        respx.post(SEND).mock(return_value=httpx.Response(200, json={"wa_message_id": "wamid.1"}))
+        gateway.send(hub="a", to="+34600111222", idempotency_key=KEY, template=with_file)
+        gateway.send(hub="a", to="+34600111222", idempotency_key=KEY, text="Hola")
+
+    assert [(t.connect, t.read) for t in used] == [(5.0, 90.0), (5.0, 15.0)]
+    assert used[0].connect + used[0].read < STUCK_AFTER.total_seconds()
+
+
 @respx.mock
 def test_a_409_on_a_template_is_a_refusal_with_meta_s_reason():
     respx.post(TEMPLATES).mock(

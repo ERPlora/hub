@@ -116,3 +116,33 @@ def test_messages_and_erasures_go_forward_with_no_business_and_back_without_the_
         assert old.get_model(APP, "Conversation").objects.count() == 2
     finally:
         migrate(latest())
+
+
+HEADER_FILES = [(APP, "0008_template_header_files")]
+BEFORE_HEADER_FILES = [(APP, "0007_deliveries_per_business")]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_templates_with_a_file_header_the_hub_now_sends_are_marked_and_back_unmarked():
+    """F33: a photo header the Hub fills with the file chosen; one with named variables or a code still not."""
+    try:
+        old = migrate(BEFORE_HEADER_FILES)
+        Template = old.get_model(APP, "Template")
+        for name, fields in {
+            "foto": {"header_format": "IMAGE", "body": "Hola {{1}}"},
+            "foto_con_nombre": {"header_format": "IMAGE", "body": "Hola {{nombre}}"},
+            "codigo": {"header_format": "DOCUMENT", "category": "AUTHENTICATION", "body": "{{1}}"},
+            "texto": {"header_format": "TEXT", "header": "Tu cita", "body": "Hola {{1}}"},
+        }.items():
+            Template.objects.create(host="a", name=name, language="es", supported=name == "texto", **fields)
+
+        new = migrate(HEADER_FILES)
+        marked = dict(new.get_model(APP, "Template").objects.values_list("name", "supported"))
+        assert marked == {"foto": True, "foto_con_nombre": False, "codigo": False, "texto": True}
+
+        old = migrate(BEFORE_HEADER_FILES)
+        back = dict(old.get_model(APP, "Template").objects.values_list("name", "supported"))
+        assert back == {"foto": False, "foto_con_nombre": False, "codigo": False, "texto": True}
+    finally:
+        migrate(latest())
+
