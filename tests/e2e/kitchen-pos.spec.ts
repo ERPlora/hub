@@ -8,7 +8,7 @@
 // kitchen tickets — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
@@ -73,10 +73,6 @@ async function tillReady(page: Page): Promise<void> {
   await shown(page).locator(`[data-testid=pos-product-${burger.id}]`).waitFor({ state: 'visible' });
 }
 
-async function still(page: Page): Promise<void> {
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
-}
-
 const sheet = (page: Page): Locator => page.locator('ion-modal[data-testid=pos-kitchen-tickets]');
 const card = (page: Page, round: number): Locator => sheet(page).locator(`[data-testid^=pos-kitchen-ticket-][data-round="${round}"]`);
 
@@ -118,8 +114,8 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
     await expect(view.locator('[data-testid=pos-kitchen-send]')).toBeInViewport({ ratio: 1 });
     if ((await flame.getAttribute('aria-pressed')) !== 'true') await flame.click();
     await expect(view.locator('[data-testid=pos-kitchen-send]')).toContainText('Send RUSH (1)');
-    await still(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-KITCHEN-F18-${size.label}`) });
+    await untilStill(page);
+    await capture(page, `APP-KITCHEN-KITCHEN-F18-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await view.locator('[data-testid=pos-kitchen-send]').click();
@@ -171,8 +167,8 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await expect(card(page, 1)).toBeVisible();
-    await still(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-KITCHEN-F19-${size.label}`) });
+    await untilStill(page);
+    await capture(page, `APP-KITCHEN-KITCHEN-F19-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -189,8 +185,8 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
     await page.setViewportSize({ width: size.width, height: size.height });
     await expect(rush).toBeVisible();
     await rush.scrollIntoViewIfNeeded();
-    await still(page);
-    await page.screenshot({ path: shot(`APP-KITCHEN-KITCHEN-F20-${size.label}`) });
+    await untilStill(page);
+    await capture(page, `APP-KITCHEN-KITCHEN-F20-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await rush.click();

@@ -120,8 +120,6 @@
   "kitchen-board.spec.ts": 1,
   "kitchen-business-currency.spec.ts": 2,
   "kitchen-history-settings.spec.ts": 1,
-  "kitchen-menu-options.spec.ts": 1,
-  "kitchen-pos.spec.ts": 3,
   "kitchen-stations.spec.ts": 1,
   "kitchen-tickets.spec.ts": 1,
   "list-filters-stats.spec.ts": 4,
