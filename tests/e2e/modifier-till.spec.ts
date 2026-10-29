@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
+import { A, api, capture, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -78,8 +78,9 @@ async function shots(page: Page, key: string, ready: () => Promise<void>): Promi
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready();
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
-    await page.screenshot({ path: shot(`APP-MODIFIER-${key}-${size.label}`) });
+    // The picture waits until nothing moves: Ionic's sheets and notices animate in their shadow roots.
+    await untilStill(page);
+    await capture(page, `APP-MODIFIER-${key}-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }

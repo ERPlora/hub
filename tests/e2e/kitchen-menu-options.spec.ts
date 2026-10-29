@@ -9,7 +9,7 @@
 // «E2E KMO <run> Grill», its checks and tickets — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -199,8 +199,9 @@ test('KITCHEN-F06 y KITCHEN-F07: the round sent from the till reaches the displa
     await page.setViewportSize({ width: size.width, height: size.height });
     await expect(header).toBeVisible();
     await card.scrollIntoViewIfNeeded();
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
-    await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
+    // The picture waits until nothing moves, Ionic's own animations in their shadow roots too.
+    await untilStill(page);
+    await capture(page, `${KEY}-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 

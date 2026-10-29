@@ -10,6 +10,8 @@ database with others that frontier cannot be kept, so there its keys are «not a
 
 import hashlib
 import json
+import time
+from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -33,6 +35,16 @@ def as_in_production(monkeypatch):
     cache.clear()
     yield
     cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def pace_clock(monkeypatch):
+    """A key's pace counts per minute of the clock, so a test's requests could fall in two minutes, depending on the
+    second the suite runs. Its clock stands still at a minute's last instant, the worst case: every request of the test
+    counts in that minute until the test moves ``pace_clock.now``. Only the pace's clock: the rest keeps the real one."""
+    clock = SimpleNamespace(now=time.time() // 60 * 60 + 59.9)
+    monkeypatch.setattr(api_keys, "time", SimpleNamespace(time=lambda: clock.now))
+    return clock
 
 
 def member(slug: str, role: str = "hub_admin", username: str = "saas:1"):
@@ -206,12 +218,16 @@ class TestUse:
         waiting = get(client, host(hub_a), CARTS, **bearer("erpk_live_" + "n" * 43))
         assert (waiting.status_code, code(waiting)) == (429, "base.too_many_api_key_tries")
 
-    def test_its_pace_is_its_requests_a_minute(self, admin_on_a, client, hub_a):
+    def test_its_pace_is_its_requests_a_minute(self, admin_on_a, client, hub_a, pace_clock):
+        """The pace's clock stands still at the minute's last instant (``pace_clock``): on the wall clock the third
+        request now and then fell in the next minute and went through (the CI of hub#377)."""
         token = create(admin_on_a, hub_a, rate_per_minute=2)["token"]
         client.logout()
         assert [get(client, host(hub_a), CARTS, **bearer(token)).status_code for _ in range(2)] == [200, 200]
         third = get(client, host(hub_a), CARTS, **bearer(token))
         assert (third.status_code, code(third)) == (429, "base.api_key_rate_limited")
+        pace_clock.now += 0.2  # the next minute counts again
+        assert get(client, host(hub_a), CARTS, **bearer(token)).status_code == 200
 
     def test_a_key_of_one_business_never_opens_another(self, admin_on_a, client, hub_a, hub_b):
         """The frontier is the database: the key of A does not exist in B's (PLAN-HUB §3)."""

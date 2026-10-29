@@ -9,7 +9,7 @@
 // and `afterAll` deletes exactly them.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, hostPage, login, painted, psql, shown, untilStill } from './helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
 const SKU = `E2E-MOD-${STAMP}`;
@@ -126,12 +126,13 @@ async function shoot(page: Page, key: string, ready: () => Promise<void> = async
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready();
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    // The page laid out at its new size, then nothing moving: Ionic's sheets and notices animate in their shadow roots.
+    await painted(page);
+    await untilStill(page);
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${size.label}` })
       .toBeLessThanOrEqual(0);
-    await page.screenshot({ path: shot(`APP-MODIFIER-${key}-${size.label}`) });
+    await capture(page, `APP-MODIFIER-${key}-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
