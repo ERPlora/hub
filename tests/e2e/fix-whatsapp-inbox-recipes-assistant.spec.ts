@@ -163,6 +163,7 @@ for (const viewport of VIEWPORTS) {
       await expect(shown(page).locator('[data-testid=whatsapp-inbox-autoreply-appointments-on]')).toBeVisible();
       expect(built(ANSWER)).toBe('false true');
       expect(built(NOTICE)).toBe('false true');
+      if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
     } finally {
       await context.close();
     }

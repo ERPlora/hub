@@ -284,7 +284,10 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           :class="{ 'wa-inbox__contact--unread': row.unread_count > 0 }"
         >
           <span class="wa-inbox__name">
-            {{ row.display_name }}
+            <span
+              class="wa-inbox__display"
+              data-testid="whatsapp-inbox-name"
+            >{{ row.display_name }}</span>
             <StatusPill
               v-if="row.flagged"
               tone="warning"
@@ -346,6 +349,13 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
   align-items: center;
   gap: 4px 8px;
   min-width: 0;
+}
+/* The table's cell gives «…» to its own span only: in the row with the mark, the name has its own. */
+.wa-inbox__display {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .wa-inbox__contact--unread {
   font-weight: 700;
