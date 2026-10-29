@@ -237,10 +237,11 @@ hacerlo, falla diciéndolo y no escribe nada; si no, la deja en `.artifacts/<nam
 moviéndose a los 10 s, falla con `capture <name>: still moving`, nombrando lo que se mueve, y no escribe nada: antes, una
 spec que olvidaba esperar dejaba la captura con el aviso a medio entrar y nadie lo veía (WEBSITE-F07/F08). Lo que tiene
 que estar en pantalla antes (datos, un diálogo) lo espera la spec. `helpers-capture.spec.ts` falla si vuelve a pasar.
-Una franja de un solo color, o que es la misma fila repetida (un fondo cruzado por un borde), no cuenta: es fondo,
-pintado o no. Lo que repite una captura antes de pintar es la barra superior, con filas distintas entre sí. Sin esa
-regla, el panel del asistente a 390 (toda la pantalla, blanco arriba y abajo con su borde izquierdo) y la tarjeta de
-confirmación encima no se podían capturar (FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE).
+Una franja cuyas filas son cada una de un solo color (un fondo, una línea fina que lo cruza), o que es la misma fila
+repetida (un fondo cruzado por un borde), no cuenta: es fondo, pintado o no. Lo que repite una captura antes de pintar
+es la barra superior, con filas distintas entre sí. Sin esa regla, el panel del asistente a 390 (toda la pantalla,
+blanco arriba y abajo con su borde izquierdo) y la tarjeta de confirmación encima no se podían capturar
+(FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE).
 
 `settled(page)` (`helpers.ts`; `service-helpers.ts` y `schedule-helpers.ts` reparten el mismo, sin copias) espera a que
 nada se mueva (`untilStill`) y a un fotograma pintado. «Nada se mueve» se lee en el documento **y en cada shadow root

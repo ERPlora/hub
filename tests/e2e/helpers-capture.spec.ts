@@ -36,14 +36,24 @@ const ROUNDS = 12;
  * A PNG of `width`×`height` drawn in `page`'s browser: a horizontal gradient (no row of it is one flat colour) on
  * white, or white only. With `border`, a grey line of 1 px down its left edge from top to bottom (the assistant's panel
  * on a phone); with `card` too, a box across the whole width half-way down covers it (a card over that panel). With
- * `stripe`, its first `stripe` rows are painted again at its bottom, as a capture taken before the page was painted at
- * its size.
+ * `line`, a grey hairline of 1 px across the whole width near its top; with `icon`, a square near its top right corner
+ * (a phone's topbar, its bell at the right). With `stripe`, its first `stripe` rows are painted again at its bottom, as
+ * a capture taken before the page was painted at its size.
  */
 async function picture(
   page: Page,
-  options: { width: number; height: number; stripe?: number; flat?: boolean; border?: boolean; card?: boolean },
+  options: {
+    width: number;
+    height: number;
+    stripe?: number;
+    flat?: boolean;
+    border?: boolean;
+    card?: boolean;
+    line?: boolean;
+    icon?: boolean;
+  },
 ): Promise<Buffer> {
-  const base64 = await page.evaluate(async ({ width, height, stripe, flat, border, card }) => {
+  const base64 = await page.evaluate(async ({ width, height, stripe, flat, border, card, line, icon }) => {
     const canvas = new OffscreenCanvas(width, height);
     const context = canvas.getContext('2d');
     if (!context) throw new Error('picture: no 2d context');
@@ -65,6 +75,14 @@ async function picture(
     if (card) {
       context.fillStyle = '#f4f5f8';
       context.fillRect(0, height / 3, width, height / 3);
+    }
+    if (line) {
+      context.fillStyle = '#e3e5e8';
+      context.fillRect(0, 3, width, 1);
+    }
+    if (icon) {
+      context.fillStyle = '#16a34a';
+      context.fillRect(width - 40, 13, 24, 24);
     }
     if (stripe) context.drawImage(canvas, 0, 0, width, stripe, 0, height - stripe, width, stripe);
     const blob = await canvas.convertToBlob({ type: 'image/png' });
@@ -137,6 +155,8 @@ test.describe('repeatedTop: the stripe of a capture taken before the page was pa
     expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, flat: true }))).toBe(0);
     // A background of one colour at both ends is no stripe, even as tall as one.
     expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, flat: true, stripe: 87 }))).toBe(0);
+    // Nor are ends whose rows are each one flat colour, though not all the same one (a hairline across a background).
+    expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, flat: true, line: true, stripe: 87 }))).toBe(0);
   });
 
   test('a stripe under 8 rows is no stripe: one line of the same colour at both ends is common', async ({ page }) => {
@@ -152,6 +172,8 @@ test.describe('repeatedTop: the stripe of a capture taken before the page was pa
     expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, flat: true, border: true, card: true }))).toBe(0);
     // That border does not hide the top painted again at the bottom.
     expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, border: true, stripe: 87 }))).toBe(87);
+    // Nor a top whose only content is at its right (a phone's topbar, its bell): the whole width of each row counts.
+    expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, flat: true, border: true, icon: true, stripe: 50 }))).toBe(50);
   });
 });
 
