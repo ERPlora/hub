@@ -239,8 +239,10 @@ Sale: la imagen guardada en el almacén de ficheros del negocio bajo un nombre s
 dos veces es un solo fichero), servida desde la propia dirección del negocio y guardada un año en el navegador. Aviso
 `website.image.uploaded`.
 Si falla: bajo el campo: «El archivo no llegó entero: vuelve a elegirlo.», «El archivo está vacío.», «La imagen puede
-pesar 5 MB como mucho.», «Este archivo no es una imagen PNG.» (o JPEG, WEBP) o «La imagen puede medir 8000 píxeles
-por lado como mucho.».
+pesar 5 MB como mucho.», «Este archivo no es una imagen PNG.» (o JPEG, WEBP), «La imagen puede medir 8000 píxeles
+por lado como mucho.» o, si la imagen no cabe en el espacio de tu plan (el mismo que gastan los archivos de
+Archivos), «No queda espacio para ese archivo: tu plan incluye {space}.», como en Archivos. Una imagen que ya se subió
+antes no ocupa más y se acepta igual.
 Implicados: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Mostrar el catálogo
