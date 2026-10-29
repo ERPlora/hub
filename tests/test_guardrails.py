@@ -380,7 +380,6 @@ SHARED_DATABASE_USERS: dict[str, str] = {
 #: transaction is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a
 #: rollback). The first step of S2 moves them to ``live.operations.on_commit`` and empties this list.
 PENDING_S2_ON_COMMIT: dict[str, int] = {
-    "apps/flow/services.py": 2,
     "apps/website/services.py": 4,
     "apps/whatsapp_inbox/services.py": 2,
 }
@@ -1005,7 +1004,9 @@ def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
 
     assert on_commit_problems(listed) == {}
     assert on_commit_problems({**listed, "apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
-    assert on_commit_problems({**listed, "apps/flow/services.py": 3}) == {"apps/flow/services.py": (3, 2)}
+    assert on_commit_problems({**listed, "apps/whatsapp_inbox/services.py": 3}) == {"apps/whatsapp_inbox/services.py": (3, 2)}
+    # Moved off (flow's calls go through base.outbound): a file that is no longer listed may not come back.
+    assert on_commit_problems({**listed, "apps/flow/services.py": 1}) == {"apps/flow/services.py": (1, 0)}
     # One moved to live.operations.on_commit: its entry shrinks, so the list never hides a new one.
     assert on_commit_problems({**listed, "apps/website/services.py": 3}) == {"apps/website/services.py": (3, 4)}
 
@@ -1018,7 +1019,7 @@ def test_the_modules_run_after_the_commit_only_through_live():
     assert problems == {}, (
         "A module runs after the COMMIT with live.operations.on_commit, on its operation's alias; a bare "
         "transaction.on_commit registers on default, outside the hub's transaction. PENDING_S2_ON_COMMIT lists the "
-        f"8 calls S2 moves first (shrink an entry once moved, never add one): {{file: (found, listed)}} {problems}"
+        f"6 calls S2 moves first (shrink an entry once moved, never add one): {{file: (found, listed)}} {problems}"
     )
 
 

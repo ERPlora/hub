@@ -111,6 +111,37 @@ def spa_manifest(settings, tmp_path):
     return manifest
 
 
+# ── Slow I/O after the COMMIT, off the worker's loop (base.outbound) ─────────────────────────────────────────────────
+
+
+class _InlineOutbound:
+    """``base.outbound`` in the tests: a job runs at once, in the thread that committed, as Django's own ``on_commit``
+    runs it (``django_capture_on_commit_callbacks`` included): a test's transaction is invisible to another thread."""
+
+    def submit(self, job) -> bool:
+        job.run()
+        return True
+
+    def stop(self, grace: float) -> bool:
+        return True
+
+
+@pytest.fixture(autouse=True)
+def outbound_pool(request, monkeypatch):
+    """Every test runs ``base.outbound``'s jobs at once (``_InlineOutbound``). One marked ``outbound_threads`` gets the
+    real pool, on committed data (``django_db(transaction=True)``), stopped after it: a job still running fails it."""
+    from base import outbound
+
+    if request.node.get_closest_marker("outbound_threads") is None:
+        monkeypatch.setattr(outbound, "_pool", _InlineOutbound())
+        yield
+        return
+    pool = outbound.Pool()
+    monkeypatch.setattr(outbound, "_pool", pool)
+    yield
+    assert pool.stop(grace=10), "a job of base.outbound was still running when the test ended"
+
+
 # ── Phase 2's tenancy (plan docs/plans/2026-10-22-fase-2-tenencia.md, S1) ─────────────────────────────────────────
 
 

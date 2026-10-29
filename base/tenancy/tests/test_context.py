@@ -124,6 +124,36 @@ def test_a_thread_of_its_own_starts_without_one():
     assert len(seen) == 1
 
 
+@pytest.mark.parametrize("kind", [context.HUB, context.SHARED, context.CONTROL])
+def test_a_thread_handed_work_enters_again_the_context_it_was_given_and_leaves_none_behind(kind):
+    # base.outbound: the job of an operation runs in another thread, in the database of the hub that asked.
+    a = shared_hub("a")
+    entered = {
+        context.HUB: lambda: context.use_hub(a),
+        context.SHARED: context.use_shared_database,
+        context.CONTROL: context.use_control,
+    }[kind]
+    seen = []
+
+    def in_thread(given):
+        with context.use_again(given):
+            seen.append((context.current().kind, context.current_hub(), context.current_alias()))
+        try:
+            context.current()
+        except HubContextMissing:
+            seen.append("none after it")
+
+    def probe():
+        with entered():
+            given = context.current()
+        thread = threading.Thread(target=in_thread, args=(given,))
+        thread.start()
+        thread.join()
+
+    fresh(probe)
+    assert seen == [(kind, a if kind == context.HUB else None, "default"), "none after it"]
+
+
 # ── The database of an operation (live's LIVE["operation_database"]) ──────────────────────────────────────────
 
 

@@ -2856,6 +2856,14 @@ Implicados: ACCOUNTS-F38
   fallara en él se alimentaría solo). `base/live.py` re-ejecuta `base.failed_event.list`, `base.event.list` y
   `base.bell.counters` con `created`, `retried` y `discarded`; `base.system.status`, con `base.hub.state_applied`. Tests:
   `base/tests/test_services_system.py`, `test_relay.py`, `test_live.py`.
+- Lo que una reacción o una tarea programada deja para después del COMMIT y espera a la red va por
+  `base.outbound.after_commit(fn, *args)` (FIX-HUB-BASE-RELAY-BLOCKED-BY-SLOW-REACTION-CALLS): `THREADS` (4) hilos del
+  worker en el contexto de BD de la operación que lo pidió (`base.tenancy.context.use_again`), `QUEUED` (1000) en
+  espera, sin encolar dos veces lo que ya espera; `release()` suelta la conexión antes de esperar a la red; al parar, el
+  worker da `OUTBOUND_GRACE_SECONDS` (15) a lo que corre y tira lo que espera. Un trabajo puede perderse: solo vale para
+  lo que su app recupera sola (reclamo con plazo y barrido, como `flow.run.claim_call`). En los tests corre en línea
+  (`conftest.py`); la marca `outbound_threads` da los hilos de verdad. Tests: `base/tests/test_outbound.py` y
+  `apps/flow/tests/test_relay.py`.
 - Informe de errores de la pantalla: `base/frontend/lib/error-report.ts` (`error`, `unhandledrejection` y
   `app.config.errorHandler`; `navigator.sendBeacon`, el mismo error una vez cada 30 s, 50 recordados), instalado en
   `frontend/main.ts`. No envía los avisos del navegador de `BROWSER_NOTICES` («ResizeObserver loop completed with
