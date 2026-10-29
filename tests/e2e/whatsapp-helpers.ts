@@ -418,5 +418,7 @@ export function cleanUp(): void {
     psql(`delete from whatsapp_inbox_conversation where id in (${list})`);
   }
   psql("delete from whatsapp_inbox_template where name like 'e2e_%'");
+  // The files of their photo, video or document headers (F29), once no template of theirs is left.
+  psql("delete from whatsapp_inbox_templatesample where name like 'e2e%' and id not in (select header_sample_id from whatsapp_inbox_template where header_sample_id is not null)");
   psql('delete from whatsapp_inbox_channel where version >= 900000000');
 }

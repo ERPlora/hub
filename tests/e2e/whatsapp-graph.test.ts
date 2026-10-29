@@ -25,13 +25,17 @@ import {
   graphAnswer,
   type GraphCall,
   graphProblem,
+  graphToken,
+  HEADER_HANDLE,
   messageSends,
   META_APP,
   NUMBER_ID,
   PROBE_CODE,
   startGraph,
   startGraphThread,
+  TEMPLATE_ID,
   TOKEN,
+  UPLOAD_SESSION,
   WABA_ID,
 } from './whatsapp-graph';
 
@@ -60,6 +64,18 @@ describe('graphAnswer', () => {
     expect(graphAnswer(call('POST', `/${NUMBER_ID}/register`, { token: TOKEN }))).toEqual([200, { success: true }]);
   });
 
+  it('takes a template’s header sample and the template made with it, with the business’s token (WHATSAPP_INBOX-F29)', () => {
+    // Meta's Resumable Upload API: a session on the e2e Meta app (Bearer), the bytes to it (OAuth), then the template.
+    const session = graphAnswer(call('POST', `/${META_APP.id}/uploads`, { token: TOKEN, query: { file_type: 'image/jpeg' } }));
+    expect(session).toEqual([200, { id: UPLOAD_SESSION }]);
+    expect(graphAnswer(call('POST', `/${UPLOAD_SESSION}`, { token: TOKEN }))).toEqual([200, { h: HEADER_HANDLE }]);
+    const made = graphAnswer(call('POST', `/${WABA_ID}/message_templates`, { token: TOKEN }));
+    expect(made).toEqual([200, { id: TEMPLATE_ID, status: 'PENDING', category: 'UTILITY' }]);
+    // The upload's second hop carries the token as OAuth, the others as Bearer: both are the token.
+    expect(graphToken('OAuth EAAGe2e-business-token')).toBe(TOKEN);
+    expect(graphToken(`Bearer ${TOKEN}`)).toBe(TOKEN);
+  });
+
   it('refuses every call made with a permission it never gave (the seed’s made-up one) as Meta does: 401, code 190', () => {
     const asked = [
       call('POST', `/${NUMBER_ID}/messages`, { token: SEED_TOKEN }),
@@ -70,6 +86,8 @@ describe('graphAnswer', () => {
       call('DELETE', `/${WABA_ID}/subscribed_apps`, { token: SEED_TOKEN }),
       call('GET', '/e2e.media.photo', { token: SEED_TOKEN }),
       call('GET', `/${WABA_ID}/phone_numbers`, { token: SEED_TOKEN }),
+      call('POST', `/${META_APP.id}/uploads`, { token: SEED_TOKEN }),
+      call('POST', `/${UPLOAD_SESSION}`, { token: SEED_TOKEN }),
       call('GET', '/debug_token', { query: { input_token: SEED_TOKEN } }),
     ];
     for (const one of asked) {
