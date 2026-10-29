@@ -24,7 +24,7 @@ negocio. Ventas y Facturación calculan con ella cada línea; no fija precios ni
   territorios solo vale la regla del territorio, nunca el IVA nacional, y lo que no tiene regla se declara con
   el impuesto del territorio.
 - **Cálculo y entrega** (F16–F19): el catálogo de España sembrado al crear las tablas, el aviso «Tus impuestos»
-  y un único cálculo (`resolve_tax`/`calculate_tax`) que usan Ventas y Facturación dentro de su operación.
+  (y su paso en «Termina de configurar tu negocio» del Inicio) y un único cálculo (`resolve_tax`/`calculate_tax`) que usan Ventas y Facturación dentro de su operación.
 
 ## Ficha
 
@@ -54,7 +54,8 @@ cd hub   # o tu worktree
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/tax
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/sale/tests/test_integration_tax.py apps/inventory/tests/test_integration_tax.py apps/service/tests/test_integration_tax.py apps/modifier/tests/test_integration_tax.py apps/invoice/tests/test_integration_sale.py
 pnpm test apps/tax
-pnpm e2e tests/e2e/tax-flows.spec.ts tests/e2e/tax-categories.spec.ts tests/e2e/tax-rules.spec.ts tests/e2e/tax-employee.spec.ts tests/e2e/tax-region-sale.spec.ts tests/e2e/tax-region-no-national-fallback.spec.ts
+pnpm e2e tests/e2e/tax-flows.spec.ts tests/e2e/tax-categories.spec.ts tests/e2e/tax-rules.spec.ts tests/e2e/tax-employee.spec.ts tests/e2e/tax-region-sale.spec.ts tests/e2e/tax-region-no-national-fallback.spec.ts \
+  tests/e2e/fix-tax-setup-hooks.spec.ts
 ```
 
 - `test_queries.py` prueba la resolución y el cálculo (región frente a país, territorios con impuesto propio,
@@ -66,12 +67,12 @@ pnpm e2e tests/e2e/tax-flows.spec.ts tests/e2e/tax-categories.spec.ts tests/e2e/
   `apps/invoice/tests/test_integration_sale.py` y `test_integration_verifactu.py` (el `Impuesto` 01, 02 o 03
   del registro sellado).
 - `tax-flows.spec.ts` recorre un test por flujo, en 390, 834 y 1440 los que tienen pantalla.
+- `test_integration_home.py` lleva el paso «Tus impuestos» del Inicio por la consulta real de `base` (con dos
+  hubs y con Impuestos apagada); `fix-tax-setup-hooks.spec.ts` lo recorre en 390, 834 y 1440.
 
 ## Qué queda fuera
 
-- El paso «Tus impuestos» de «Termina de configurar tu negocio» del Inicio: `FIX-TAX-SETUP-HOOKS`, bloqueada
-  hasta que se mergee APP-BASE-1 (hub#168).
-- Que el aviso «Tus impuestos» mire el país y el territorio del negocio (hoy cuenta reglas de cualquiera), el
+- Que el aviso y el paso «Tus impuestos» miren el país y el territorio del negocio (hoy cuenta reglas de cualquiera), el
   país del negocio llegado del SaaS (fase 2) y «hoy» en la zona del negocio: «Lo que queda fuera» del WORKBOOK.
 - `useServerTable`/`useLiveList` y los formateadores de porcentaje y fecha en `@erplora/ui`:
   [`UI-REQUESTS.md`](UI-REQUESTS.md).
