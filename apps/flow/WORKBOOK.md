@@ -1025,15 +1025,20 @@ Pasos:
 4. Lo que quiere cambiar:
    - con «Que me lo pregunte», no se hace: espera en **Esperan tu respuesta** como «El asistente quiere cambiar
      algo en «…»», con los datos que mandaría, y la ejecución se para ahí («El asistente quiere «…»: espera un
-     sí hasta el ….»). Un sí lo hace en ese momento, como la automatización, y la ejecución sigue; un no, o nadie
-     contesta en 72 horas, la cancela sin hacer nada (FLOW-F29, F30);
+     sí hasta el ….»). Espera un cambio cada vez: si pide varios a la vez, los de detrás del primero no se hacen.
+     Un sí lo hace en ese momento, como la automatización, y el paso vuelve al asistente con lo que ha pasado (el
+     cambio hecho, o lo que la acción no aceptó, y que los demás no se han hecho), para que lo cuente o pida el
+     siguiente, que vuelve a esperar su sí; la ejecución no sigue hasta que contesta sin pedir nada. Esa vuelta no
+     gasta otro mensaje si el sí llega en 15 minutos; más tarde cuenta como una primera vuelta (un mensaje del mes,
+     FLOW-F39). Un no, o nadie contesta en 72 horas, cancela la ejecución sin hacer nada (FLOW-F29, F30);
    - con «Que lo haga por su cuenta», se hace en el acto, como la automatización, con las mismas comprobaciones
-     que su botón en la pantalla.
-5. Cuando contesta, el historial dice «El asistente ha contestado: «…»» y la ejecución sigue con los pasos de
-   después.
+     que su botón en la pantalla; si pide varios a la vez, se hacen todos y se le devuelve lo que pasó con cada uno.
+5. Cuando contesta sin pedir nada más, el historial dice «El asistente ha contestado: «…»» y la ejecución sigue
+   con los pasos de después.
 Entra: el encargo, lo que el paso nombra y la automatización tiene concedido, y los datos de la ejecución.
-Sale: lo que contestó, para los pasos de después y en el historial; con «Que me lo pregunte», además, la
-respuesta de la persona. Lo que consulta o cambia avisa como si lo hiciera la automatización.
+Sale: lo que contestó al final, después de los cambios, para los pasos de después y en el historial; con «Que me
+lo pregunte», además, la última respuesta de la persona. Lo que consulta o cambia avisa como si lo hiciera la
+automatización.
 Si falla: lo que no le has concedido no se le ofrece y, si lo pide, no se hace; lo que la acción rechaza
 («El asistente ha intentado «…», que no lo ha aceptado.») se lo dice al asistente para que lo cuente. Si llega
 al tope de vueltas sin terminar, se para: «El asistente ha usado sus … vueltas sin terminar, así que ha parado.».
@@ -1055,7 +1060,8 @@ Pasos:
 1. Cada vez que el paso necesita al asistente, el Hub llama a erplora.com con la llave del negocio, sin persona
    delante, igual que un turno del chat que no se pinta (en erplora.com, ASSISTANT-F13): no hay una puerta aparte.
 2. erplora.com gasta los mismos mensajes del mes que el chat: la primera vuelta de cada paso, uno; las vueltas que
-   le devuelven lo que consultó o hizo, ninguno.
+   le devuelven lo que consultó o hizo en los 15 minutos siguientes, ninguno (pasado ese tiempo, por ejemplo tras
+   esperar el sí de una persona, la vuelta cuenta uno).
 3. Contesta lo que dice el asistente y lo que quiere consultar o hacer, y no guarda nada de la conversación.
 Entra: el encargo, lo que el paso puede usar y, en las vueltas siguientes, lo ya hablado.
 Sale: la respuesta para el Hub y el gasto del mes del negocio (`assistant.message.claimed`, del lado de

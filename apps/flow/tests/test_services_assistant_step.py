@@ -145,25 +145,183 @@ def test_hub_1595_a_read_runs_at_once_and_asks_nobody(gateway, clock, worker):
     assert [entry["outcome"] for entry in done.log] == ["thinking", "assistant_used", "assistant_answered"]
 
 
+def two_changes(token: str = "token-1") -> dict:
+    """One answer that asks for two changes at once."""
+    calls = [
+        *wants("task__task__create", {"title": "Call Ana"})["output"],
+        *wants("task__task__create", {"title": "Email Ana"}, call_id="call_2")["output"],
+    ]
+    return {"output": calls, "continuation": token, "quota": QUOTA}
+
+
+def results(sent) -> list[tuple[str, dict]]:
+    """The tool results a turn sends back, after the assistant's last message: ``(call id, content)``."""
+    told = []
+    for message in reversed(sent.body["messages"]):
+        if message["role"] != "tool":
+            break
+        told.insert(0, (message["tool_call_id"], json.loads(message["content"])))
+    return told
+
+
+def titles() -> list[str]:
+    return sorted(Task.objects.values_list("title", flat=True))
+
+
 def test_ask_me_first_leaves_a_change_waiting_for_an_answer_and_a_yes_does_it(gateway, clock, worker):
+    # FLOW-F38: a yes makes the change and takes the step back to the assistant with what happened; the run goes on
+    # with what it answers then (OpenAI Agents SDK approvals, LangGraph's interrupt), never with the text before it.
     clock(NOON)
     flow = manual([step(), {"id": "s2", "kind": "command", "operation": "task.task.create", "params": {"title": "After"}}])
     gateway.reply(CHAT, json={**wants("task__task__create", {"title": "Call Ana"}), "output": [
         {"type": "message", "content": [{"type": "output_text", "text": "I will leave a task."}]},
         *wants("task__task__create", {"title": "Call Ana"})["output"],
     ]})
+    gateway.reply(CHAT, json=said("Done: I left the task"))
     ran = start(worker, flow)
     worker()
     assert Task.objects.count() == 0
     waiting = FlowRun.objects.get(pk=ran.id)
     assert waiting.status == FlowRun.Status.ASKING
     question = Question.objects.get(run_id=ran.id)
-    assert question.step_id == "s1"
     assert "Call Ana" in question.details
     answered = worker.request("flow.question.answer", {"id": str(question.id), "approve": True, "note": "fine"})
-    assert answered.status == FlowRun.Status.SUCCEEDED
-    assert sorted(Task.objects.values_list("title", flat=True)) == ["After", "Call Ana"]
-    assert len(gateway.sent(CHAT)) == 1  # a yes does the change, it does not ask the model again
+    assert answered.status == FlowRun.Status.CALLING
+    assert titles() == ["Call Ana"]
+    worker()
+    assert titles() == ["After", "Call Ana"]
+    second = gateway.sent(CHAT)[1]
+    assert second.body["continuation"] == "token-1"  # its answer to the change costs no other message (FLOW-F39)
+    [(call_id, made)] = results(second)
+    assert call_id == "call_1"
+    assert made["title"] == "Call Ana"
+    done = FlowRun.objects.get(pk=ran.id)
+    assert done.status == FlowRun.Status.SUCCEEDED
+    assert [entry["outcome"] for entry in done.log] == [
+        "thinking", "assistant_proposed", "answered", "assistant_used", "thinking", "assistant_answered", "done",
+    ]
+
+
+def test_ask_me_first_two_changes_at_once_the_second_is_not_made_and_the_assistant_is_told(gateway, clock, worker):
+    # FLOW-F38: one change waits at a time. After the yes to the first, the step goes back to the assistant with its
+    # result and, for the second, that it was not made: the run never goes on without it hearing so.
+    clock(NOON)
+    flow = manual([step()])
+    gateway.reply(CHAT, json=two_changes())
+    gateway.reply(CHAT, json=said("I left «Call Ana»; «Email Ana» is still to do"))
+    ran = start(worker, flow)
+    worker()
+    question = Question.objects.get(run_id=ran.id)
+    assert "Call Ana" in question.details and "Email Ana" not in question.details
+    answered = worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
+    assert answered.status == FlowRun.Status.CALLING
+    assert titles() == ["Call Ana"]
+    worker()
+    second = gateway.sent(CHAT)[1]
+    assert second.body["continuation"] == "token-1"
+    (first_id, made), (second_id, not_made) = results(second)
+    assert (first_id, made["title"]) == ("call_1", "Call Ana")
+    assert (second_id, not_made["error"]["code"]) == ("call_2", "not_made")
+    assert titles() == ["Call Ana"]
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
+
+
+def test_ask_me_first_the_steps_after_read_what_it_answered_after_the_change(gateway, clock, worker):
+    clock(NOON)
+    title = "{{steps.s1.text}} (yes from {{steps.s1.answered_by}}: {{steps.s1.note}})"
+    after = {"id": "s2", "kind": "command", "operation": "task.task.create", "params": {"title": title}}
+    flow = manual([step(), after | {"run_if": {"steps.s1.approved": {"eq": True}}}])
+    gateway.reply(CHAT, json={**two_changes(), "output": [
+        {"type": "message", "content": [{"type": "output_text", "text": "I will leave two tasks."}]},
+        *two_changes()["output"],
+    ]})
+    gateway.reply(CHAT, json=said("Left one task; the other was not made"))
+    ran = start(worker, flow)
+    worker()
+    question = Question.objects.get(run_id=ran.id)
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True, "note": "fine"})
+    worker()
+    assert titles() == ["Call Ana", "Left one task; the other was not made (yes from tester: fine)"]
+
+
+def test_ask_me_first_the_next_change_it_asks_for_waits_for_its_own_yes(gateway, clock, worker):
+    clock(NOON)
+    flow = manual([step()])
+    gateway.reply(CHAT, json=two_changes())
+    gateway.reply(CHAT, json=wants("task__task__create", {"title": "Email Ana"}, call_id="call_3", token="token-2"))
+    gateway.reply(CHAT, json=said("Both left"))
+    ran = start(worker, flow)
+    worker()
+    first = Question.objects.get(run_id=ran.id)
+    worker.request("flow.question.answer", {"id": str(first.id), "approve": True})
+    worker()
+    assert titles() == ["Call Ana"]
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.ASKING
+    second = Question.objects.filter(run_id=ran.id, status=Question.Status.PENDING).get()
+    assert second.id != first.id and "Email Ana" in second.details
+    worker.request("flow.question.answer", {"id": str(second.id), "approve": True})
+    worker()
+    assert titles() == ["Call Ana", "Email Ana"]
+    assert gateway.sent(CHAT)[2].body["continuation"] == "token-2"
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
+
+
+def test_ask_me_first_nobody_answers_the_change_in_time_and_the_run_is_cancelled(gateway, clock, worker):
+    clock(NOON)
+    flow = manual([step()])
+    gateway.reply(CHAT, json=wants("task__task__create", {"title": "Call Ana"}))
+    ran = start(worker, flow)
+    worker()
+    clock(NOON + dt.timedelta(hours=73))
+    worker.request("flow.question.expire_due", {}, system_context(A))
+    assert Question.objects.get(run_id=ran.id).status == Question.Status.EXPIRED
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.CANCELLED
+    assert Task.objects.count() == 0
+
+
+def test_ask_me_first_a_yes_that_spends_the_last_round_stops_the_step_and_says_so(gateway, clock, worker):
+    clock(NOON)
+    flow = manual([step(max_rounds=1)])
+    gateway.reply(CHAT, json=wants("task__task__create", {"title": "Call Ana"}))
+    ran = start(worker, flow)
+    worker()
+    question = Question.objects.get(run_id=ran.id)
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
+    worker()
+    assert titles() == ["Call Ana"]
+    assert len(gateway.sent(CHAT)) == 1
+    failed = FlowRun.objects.get(pk=ran.id)
+    assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.assistant_too_many_rounds")
+
+
+def test_ask_me_first_a_change_its_operation_refuses_after_the_yes_goes_back_to_the_assistant(gateway, clock, worker):
+    # The refusal is what it would get on its own: it can say it or try again; the step does not stop on it.
+    clock(NOON)
+    flow = manual([step()])
+    gateway.reply(CHAT, json=wants("task__task__create", {"title": ""}))
+    gateway.reply(CHAT, json=said("The task needs a title"))
+    ran = start(worker, flow)
+    worker()
+    question = Question.objects.get(run_id=ran.id)
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
+    worker()
+    [(call_id, refused)] = results(gateway.sent(CHAT)[1])
+    assert (call_id, refused["error"]["code"]) == ("call_1", "invalid_payload")
+    assert Task.objects.count() == 0
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
+
+
+def test_on_its_own_two_changes_at_once_are_both_made_and_both_told(gateway, clock, worker):
+    clock(NOON)
+    flow = manual([step(mode="auto")])
+    gateway.reply(CHAT, json=two_changes())
+    gateway.reply(CHAT, json=said("Both left"))
+    ran = start(worker, flow)
+    worker()
+    assert titles() == ["Call Ana", "Email Ana"]
+    told = results(gateway.sent(CHAT)[1])
+    assert [(call_id, made["title"]) for call_id, made in told] == [("call_1", "Call Ana"), ("call_2", "Email Ana")]
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
 
 
 def test_a_no_to_the_assistants_change_does_nothing_and_cancels_the_run(gateway, clock, worker):
