@@ -8,7 +8,7 @@
 // and linked back after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, newestSaleOf, openTillCart, stamp } from './sale-helpers';
@@ -90,8 +90,8 @@ test('SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»): without a
     // The sheet slides up from the bottom: the shot waits until all of it, the warning and «Cancel», is in view.
     await expect(warning).toBeInViewport({ ratio: 1 });
     await expect(page.locator('[data-testid=pos-staff-cancel]:visible')).toBeInViewport({ ratio: 1 });
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
-    await page.screenshot({ path: shot(`FIX-SALE-SERVED-BY-ME-NOT-ATTRIBUTED-${viewport.label}`) });
+    await untilStill(page);
+    await capture(page, `FIX-SALE-SERVED-BY-ME-NOT-ATTRIBUTED-${viewport.label}`);
     await closePicker(page);
   }
 });

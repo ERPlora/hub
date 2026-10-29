@@ -7,7 +7,7 @@
 // What this file creates is deleted after it (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown } from './helpers';
+import { A, api, capture, login, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, pick } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, shots, stamp } from './sale-helpers';
@@ -166,8 +166,8 @@ test('FIX-DATATABLE-HUB-FILTERS-2A: Sales filter by total in euros and by paymen
     await expect(shown(page).locator('[data-testid=sales-range]')).toBeVisible();
     await toggle.click();
     await expect(panel).toBeVisible();
-    await page.waitForTimeout(400);
-    await page.screenshot({ path: shot(`FIX-DATATABLE-HUB-FILTERS-2A-sale-${vp.label}`) });
+    await untilStill(page);
+    await capture(page, `FIX-DATATABLE-HUB-FILTERS-2A-sale-${vp.label}`);
     await panel.locator('[data-testid=sales-table-filters-clear]').click();
     await expect(count).toHaveCount(0);
     await panel.locator('[data-testid=sales-table-filters-close]').click();
