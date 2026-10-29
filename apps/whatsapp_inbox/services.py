@@ -1698,13 +1698,13 @@ def delete_note(ctx: OperationContext, data: NoteRefIn) -> dict:
 
 
 def _content(data: TemplateWriteIn) -> dict:
-    """What the form wrote, as the template keeps it and door 8 takes it: a header with a file names it, and has no
-    text; any other is a text header when it has one."""
+    """What the form wrote, as the template keeps it and door 8 takes it: a header with a file names it (its text is
+    refused by ``TemplateWriteIn``); any other is a text header when it has one."""
     with_file = data.header_format in samples.FILE_HEADERS
     return {
         "category": data.category,
         "header_format": data.header_format if with_file else ("TEXT" if data.header else ""),
-        "header": "" if with_file else data.header,
+        "header": data.header,
         "header_sample": str(data.header_sample) if with_file else None,
         "body": data.body,
         "body_examples": list(data.body_examples),

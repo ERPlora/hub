@@ -326,6 +326,24 @@ def test_a_file_gone_from_the_store_is_said_and_fixed_with_edit(delivered, hub_f
     assert "Edit" in run("whatsapp_inbox.template.list", {}).rows[0].submit_error
 
 
+@respx.mock
+def test_the_store_not_answering_leaves_it_on_its_way_to_be_sent_again(delivered, hub_files, monkeypatch):
+    """The file could not be read, not refused: nothing reaches erplora.com and it goes again with the same key."""
+    connect()
+    route = registering()
+    sample = upload()
+
+    def not_answering(*args, **kwargs):
+        raise OSError("the store did not answer")
+
+    monkeypatch.setattr(hub_files, "open", not_answering)
+    out = delivered(lambda: create(with_file(sample.id)))
+
+    assert route.call_count == 0
+    row = Template.objects.get(pk=out.id)
+    assert (row.submit_state, row.submit_error_code) == ("sending", "whatsapp_inbox.saas_unreachable")
+
+
 # ── What the list says of it (F27, F28, F33) ────────────────────────────────────────────────────
 
 
