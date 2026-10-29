@@ -14,6 +14,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     BeforeValidator,
@@ -85,6 +86,9 @@ D_INTERVALS = (
     "in any order. Required when it is open."
 )
 D_SEARCH = "Free text to search."
+
+# How the assistant's card names a datum the models do not (its Spanish in this app's catalog), as the screens say it.
+T_INTERVALS = gettext_noop("Opening intervals")
 D_DIRECTION = "Sort direction: asc or desc."
 D_SPECIAL_DAY_ID = (
     "The id of the special day; or say it by name or date in special_day."
@@ -178,6 +182,7 @@ def _intervals_field(**options: Any) -> Any:
         default_factory=list,
         max_length=MAX_INTERVALS,
         validate_default=True,
+        title=T_INTERVALS,
         description=D_INTERVALS,
         **options,
     )
@@ -356,7 +361,7 @@ class SpecialDayPatchIn(SpecialDayRefIn):
     name: Name | None = Field(None, description="The new name.")
     is_closed: bool | None = Field(None, description=D_IS_CLOSED)
     intervals: list[IntervalIn] | None = Field(
-        None, max_length=MAX_INTERVALS, description=D_INTERVALS
+        None, max_length=MAX_INTERVALS, title=T_INTERVALS, description=D_INTERVALS
     )
     recurring_yearly: bool | None = Field(
         None, description="True: it repeats on the same day and month every year."
@@ -370,6 +375,7 @@ class BulkSpecialDayIn(Schema):
     special_days: list[SpecialDayFields] = Field(
         min_length=1,
         max_length=MAX_BULK,
+        title=gettext_noop("Special days"),
         description="The special days to create, 1 to 366.",
     )
 
@@ -474,7 +480,7 @@ class OverridePatchIn(OverrideRefIn):
     reason: Name | None = Field(None, description="The new reason.")
     is_closed: bool | None = Field(None, description=D_IS_CLOSED)
     intervals: list[IntervalIn] | None = Field(
-        None, max_length=MAX_INTERVALS, description=D_INTERVALS
+        None, max_length=MAX_INTERVALS, title=T_INTERVALS, description=D_INTERVALS
     )
 
 
