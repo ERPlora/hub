@@ -17,15 +17,18 @@ const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 /** The file of the one measure. */
 const HELPERS = 'helpers.ts';
 
-/** The ways of reading how wide the document is: its root's, its scrolling element's or its body's `scrollWidth`. */
-const DOCUMENT_WIDTH = /\b(?:documentElement|scrollingElement|document\s*\.\s*body)\s*!?\s*\??\.\s*scrollWidth\b/;
+/** The ways of reading how wide the document is: its root's, its scrolling element's or its body's `scrollWidth`, also
+ *  closed in a parenthesis or through `as` (`(document.scrollingElement ?? document.documentElement).scrollWidth`). */
+const DOCUMENT_WIDTH =
+  /\b(?:documentElement|scrollingElement|document\s*\.\s*body)\s*!?(?:\s*as\s+[^);]+)?\s*\)?\s*!?\s*\??\.\s*scrollWidth\b/;
 
-/** An `ion-content`'s scroll box read right there: `(await content.getScrollElement()).scrollWidth`, `….scrollWidth` of its
- *  `.inner-scroll` or its `part="scroll"`. */
-const SCROLL_BOX_WIDTH = /(?:getScrollElement\(\)|inner-scroll|part~?=["']?scroll)[^;\n]*?\)\s*!?\s*\??\.\s*scrollWidth\b/;
+/** An `ion-content`'s scroll box read right there: `(await content.getScrollElement()).scrollWidth`, its `then()`, `….scrollWidth`
+ *  of its `.inner-scroll` or its `part="scroll"`. */
+const SCROLL_BOX_WIDTH =
+  /(?:getScrollElement\(\)|inner-scroll|part~?=["']?scroll)[^;\n]*?(?:\)|=>\s*\w+)\s*!?\s*\??\.\s*scrollWidth\b/;
 
 /** The document's root by any of its names (`document.documentElement`, `.scrollingElement`, `.body`). */
-const ROOT = String.raw`document\s*\.\s*(?:documentElement|scrollingElement|body)\s*!?`;
+const ROOT = String.raw`(?:(?:window|globalThis)\s*\.\s*)?document\s*\.\s*(?:documentElement|scrollingElement|body)\s*!?`;
 
 /** A name given to the root (`const root = document.documentElement`, `?? document.body`, `as HTMLElement`). */
 const ROOT_NAME = new RegExp(
@@ -37,6 +40,12 @@ const ROOT_DESTRUCTURED = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*document\s*[;
 
 /** A name given to an `ion-content`'s scroll box: from its `getScrollElement()`, its `.inner-scroll` or its `part="scroll"`. */
 const SCROLL_BOX_NAME = /\b(?:const|let|var)\s+(\w+)(?:\s*:[^=]+)?\s*=[^;\n]*(?:getScrollElement\(|inner-scroll|part~?=["']?scroll)/;
+
+/** A `scrollWidth` taken out by destructuring (`const { scrollWidth } = …`, also nested), and what it is taken from. */
+const WIDTH_DESTRUCTURED = /\{[^{}]*\bscrollWidth\b[^{}]*\}[\s}]*=\s*(?:await\s+)?\(?\s*([^;\n]*)/;
+
+/** What that destructuring measures by hand: the root (or `document`, destructured down to it) or a scroll box. */
+const MEASURED_BOX = new RegExp(String.raw`^(?:${ROOT}|document\s*$)|getScrollElement\(|inner-scroll|part~?=["']?scroll`);
 
 /** The names `source` gives to the document's root or to an `ion-content`'s scroll box. */
 function boxNames(source: string): string[] {
@@ -60,10 +69,17 @@ function boxNames(source: string): string[] {
 function documentMeasures(name: string, source: string): string[] {
   const names = boxNames(source);
   const named = names.length ? new RegExp(String.raw`\b(?:${names.join('|')})\s*!?\s*\??\.\s*scrollWidth\b`) : null;
+  const namedBox = names.length ? new RegExp(String.raw`^(?:${names.join('|')})\b`) : null;
+  const destructured = (line: string) => {
+    const from = line.match(WIDTH_DESTRUCTURED)?.[1];
+    return from !== undefined && (MEASURED_BOX.test(from) || !!namedBox?.test(from));
+  };
   return source
     .split('\n')
     .flatMap((line, index) =>
-      DOCUMENT_WIDTH.test(line) || SCROLL_BOX_WIDTH.test(line) || named?.test(line) ? [`${name}:${index + 1}`] : [],
+      DOCUMENT_WIDTH.test(line) || SCROLL_BOX_WIDTH.test(line) || named?.test(line) || destructured(line)
+        ? [`${name}:${index + 1}`]
+        : [],
     );
 }
 
@@ -129,6 +145,21 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
     ];
     expect(documentMeasures('b.ts', shadow.join('\n'))).toEqual(['b.ts:2']);
     expect(documentMeasures('b.ts', `return content.shadowRoot?.querySelector('[part~="scroll"]')?.scrollWidth ?? 0;`)).toEqual(['b.ts:1']);
+  });
+
+  it('the count reads the root or a scroll box measured through `??` or `as` in line, a then() or a destructured scrollWidth', () => {
+    const inline = [
+      'return (document.scrollingElement ?? document.documentElement).scrollWidth - innerWidth;',
+      'return (document.scrollingElement as HTMLElement | null)?.scrollWidth ?? 0;',
+      'return content.getScrollElement().then((element) => element.scrollWidth - innerWidth);',
+      'const { scrollWidth, clientWidth } = document.documentElement;',
+      'const { scrollWidth } = await content.getScrollElement();',
+      'const { documentElement: { scrollWidth } } = document;',
+    ];
+    expect(inline.map((line) => documentMeasures('d.ts', line))).toEqual(inline.map(() => ['d.ts:1']));
+    const named = ['const root = window.document.documentElement;', 'const { scrollWidth } = root;', 'return root.scrollWidth;'];
+    expect(documentMeasures('d.ts', named.join('\n'))).toEqual(['d.ts:2', 'd.ts:3']);
+    expect(documentMeasures('d.ts', "const { scrollWidth, clientWidth } = document.querySelector('ion-title')!;")).toEqual([]);
   });
 
   it('the count leaves alone the vertical scroll of an ion-content and an element that is only put in the body', () => {
