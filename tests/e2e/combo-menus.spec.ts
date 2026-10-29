@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, HUB_DIR, login, psql, shot, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, HUB_DIR, login, painted, psql, shown, untilStill } from './helpers';
 
 const TAG = 'E2E Combo';
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -188,10 +188,12 @@ async function nothingPastTheEdge(page: Page, selector: string, label: string): 
 async function shoot(page: Page, name: string, inside?: string): Promise<void> {
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    // The page laid out at its new size, then nothing moving: Ionic's sheets and notices animate in their shadow roots.
+    await painted(page);
+    await untilStill(page);
     await noHorizontalScroll(page, `${name} ${viewport.label}`);
     if (inside) await nothingPastTheEdge(page, inside, `${name} ${viewport.label}`);
-    await page.screenshot({ path: shot(`${name}-${viewport.label}`) });
+    await capture(page, `${name}-${viewport.label}`);
   }
   await page.setViewportSize({ width: 1280, height: 860 });
 }
@@ -487,8 +489,8 @@ test('combo-searchbar: in Spanish the search box of «Añadir varios» is named 
     await expect(search.locator('input')).toHaveAttribute('aria-label', 'Busca un producto…');
     await expect(bulk.getByRole('searchbox', { name: 'Busca un producto…', exact: true })).toBeVisible();
     await expect(page.locator(`[data-testid=combo-bulk-item-${made.LEN}]`)).toContainText('Ya está en este plato');
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await page.screenshot({ path: shot(`FIX-HUB-COMBO-SEARCHBAR-NAMED-IN-ENGLISH-${viewport.label}`) });
+    // The sheet has just opened: the capture waits until it has stopped entering (`capture` waits with untilStill).
+    await capture(page, `FIX-HUB-COMBO-SEARCHBAR-NAMED-IN-ENGLISH-${viewport.label}`);
     await page.locator('[data-testid=combo-bulk-cancel]:visible').click();
     await expect(bulk).toBeHidden();
   }
