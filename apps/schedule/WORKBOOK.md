@@ -2,8 +2,7 @@
 Prefijo: SCHEDULE
 Alcance MVP: peluquería y restaurante (la agenda de Citas lo lee para no reservar con el negocio cerrado)
 Estado de la app: completa (2026-10-22)
-Lo que no entra todavía: ver «Lo que queda fuera». El paso «Confirma tu horario» de la lista «Termina de configurar
-tu negocio» del Inicio espera a que el Inicio tenga esa lista.
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `schedule`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -90,7 +89,8 @@ Y se decide aquí (mismo contraste):
 2. La zona horaria del negocio es la del Hub (SCHEDULE-F09): con ese reloj se lee todo el horario. En la
    fase 1 es la de Madrid.
 3. En **Horarios → Horario**, pulsa **Sí, este es mi horario** si la semana por defecto es la tuya
-   (SCHEDULE-F03), o edita los días que cambian (SCHEDULE-F02).
+   (SCHEDULE-F03), o edita los días que cambian (SCHEDULE-F02). Hasta que lo hagas, el Inicio te lo
+   recuerda con «Confirma tu horario».
 4. En **Días especiales**, añade los festivos y cierres (SCHEDULE-F04) y, para varios días seguidos, un
    cambio temporal (SCHEDULE-F05).
 5. Si quieres que la semana empiece en domingo, cámbialo en **Ajustes** (SCHEDULE-F08).
@@ -209,23 +209,30 @@ cerrado».
 Implicados: Citas y Reservas (leen el horario en la reserva siguiente)
 
 ### SCHEDULE-F03 Confirmar la semana por defecto
-<!-- origen: old-hub:HUB_SHELL-F31 old:schedules/WORKFLOW.md#schedules-f03 wf:peluqueria-dia#rec_peluqueria-f02 -->
+<!-- origen: old-hub:HUB_SHELL-F31 old:schedules/WORKFLOW.md#schedules-f03 wf:peluqueria-dia#rec_peluqueria-f02 gh:schedules#42 -->
 Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
-Pantalla: Horario
+Pantalla: Inicio, Horario
 Pasos:
-1. Con el aviso amarillo «Este es un horario por defecto…» a la vista, comprueba que los días son los de
+1. En el **Inicio**, mientras la semana sea la de por defecto, «Termina de configurar tu negocio» trae
+   «Confirma tu horario» («Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a
+   18:00). Si coincide con el de tu negocio, confírmalo de un toque; si no, edita los días que cambien:
+   las reservas fuera de tu horario se rechazan.»), «Recomendado», a quien puede cambiar el horario.
+   «Configurar» lleva a **Horario**.
+2. Con el aviso amarillo «Este es un horario por defecto…» a la vista, comprueba que los días son los de
    tu negocio.
-2. Pulsa **Sí, este es mi horario**; el botón se desactiva mientras trabaja.
-3. El aviso desaparece.
+3. Pulsa **Sí, este es mi horario**; el botón se desactiva mientras trabaja.
+4. El aviso desaparece.
 Entra: la semana que ya está guardada; no se manda ninguna hora, así que nadie confirma un horario que no
 se le ha enseñado.
 Sale: la semana marcada como confirmada, sin cambiar ni una hora, y un aviso `schedule.week.updated`. Desde
 entonces la semana rige también las reservas de mesa (SCHEDULE-F12). Confirmar dos veces no cambia nada ni
-avisa.
+avisa. «Confirma tu horario» queda «Hecho» en el Inicio sin recargar; también si en vez de confirmar se
+guarda un día (SCHEDULE-F02), aunque sea como cerrado. Cambiar «Semana empieza», un día especial o un
+cambio temporal no confirma la semana.
 Si falla: arriba de la tabla: «No hay horario semanal que confirmar.» (409 `schedule.no_week`) si no hay
 ningún día guardado (no se llega desde la pantalla: el aviso solo sale cuando hay semana).
-Implicados: ninguno
+Implicados: BASE-F01
 
 ### SCHEDULE-F04 Añadir un día especial
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f02 fi:modules/schedules#command-schedules-special_days-create-handler-wasm-create_special_day fi:modules/schedules#query-schedules-special_days-list old:schedules/WORKFLOW.md#schedules-f04 qa:modules/schedules/absences-and-holidays -->
@@ -431,7 +438,7 @@ pide que elija (`schedule.ambiguous_reference`).
 | La semana: los siete días en el orden de «Semana empieza», cada uno cerrado, sin definir o con sus tramos, y si está confirmada | ver | F01, F03 | `schedule.week.get` |
 | Los días especiales con sus tramos, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F04, F06, F13 | `schedule.special_day.list` |
 | Los cambios temporales con sus tramos, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F05, F06, F13 | `schedule.override.list` |
-| Los ajustes y la zona horaria del negocio | ver | F08, F09 | `schedule.settings.get` |
+| Los ajustes y la zona horaria del negocio, y si la semana está confirmada (el paso «Confirma tu horario» del Inicio) | ver | F03, F08, F09 | `schedule.settings.get` |
 | ¿Está abierto en un momento? | ver | F10 | `schedule.business.is_open` |
 | El horario de cada día de un rango | ver | F11 | `schedule.hours.for_range` |
 
@@ -475,7 +482,8 @@ reserva de mesa) leen el horario de un rango de días (SCHEDULE-F11) y se ponen 
 Horarios. Reservas cuenta siempre con los días especiales y los cambios temporales, pero con la semana
 solo cuando el negocio la guarda o la confirma (SCHEDULE-F03): la semana por defecto, sin confirmar, no le
 limita. Las dos dicen sus días con la misma forma que da Horarios («martes, 5 de marzo de 2030»). Horarios
-no sabe de ellas.
+no sabe de ellas. La plataforma (el Inicio) lee si la semana está confirmada para el paso «Confirma tu
+horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 
 ### Quién puede qué
 
@@ -560,14 +568,16 @@ no sabe de ellas.
   `demo`; lo que sí se separa son los avisos en vivo.
 - La semana por defecto la planta la migración `0002_default_week` (con su vuelta atrás, que solo quita
   la semana si sigue sin confirmar).
+- **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SCHEDULE-SETUP-HOOKS): `ScheduleConfig.setup` declara el
+  `setup` del módulo viejo (`module.json`, schedules#42): clave `schedule.hours`, sobre `schedule.settings.get`,
+  hecho con `hours_confirmed` (el `confirmed_hours` del viejo), orden 101, sin `required` (nivel «Recomendado»),
+  permiso `schedule.change`, ruta `/schedule/hours` y `refresh_on` `schedule.week.updated`, el único aviso de las
+  dos escrituras que ponen la marca (guardar un día y confirmar). La marca no se quita nunca (no hay operación que
+  borre un día de la semana), así que el paso no vuelve a pendiente. Sin paneles ni campana: el módulo viejo no
+  los declaraba. Pruebas: `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
 
 ## Lo que queda fuera
 
-- **El paso «Confirma tu horario» de «Termina de configurar tu negocio» del Inicio** (SCHEDULE-F03,
-  old-hub:HUB_SHELL-F31): es `FIX-SCHEDULE-SETUP-HOOKS` de la cola, bloqueada hasta que se mergee APP-BASE-1
-  (hub#168, que trae `base.setup.status`); el punto de extensión `LiveAppConfig.setup` ya está en
-  `packages/live` (hub#167). Ni está hecho ni se simula: `schedule.week.get` ya dice si la semana está
-  confirmada (`confirmed`), que es lo que el paso leerá.
 - **La semana de la peluquería** que plantaba el catálogo de arranque del producto actual (lunes a
   viernes 09:30–20:00 con descanso de 14:00 a 16:00, sábado 09:30–14:00): es de los catálogos de
   arranque, que no están portados.

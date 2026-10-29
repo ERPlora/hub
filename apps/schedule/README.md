@@ -57,11 +57,11 @@ pnpm e2e tests/e2e/schedule-flows.spec.ts tests/e2e/schedule-hours.spec.ts tests
 - Lo que leen Citas y Reservas se prueba contra Horarios real en
   `apps/appointment/tests/test_integration_schedule.py` y `apps/reservation/tests/test_integration_schedule.py`.
 - `schedule-flows.spec.ts` recorre los flujos con pantalla en 390, 834 y 1440.
+- El paso «Confirma tu horario» del Inicio (SCHEDULE-F03) se prueba contra `base.setup.status` real en
+  `tests/test_integration_home.py`, y en pantalla con `fix-schedule-setup-hooks.spec.ts` en 390, 834 y 1440.
 
 ## Qué queda fuera
 
-- El paso «Confirma tu horario» de «Termina de configurar tu negocio» del Inicio: `FIX-SCHEDULE-SETUP-HOOKS`,
-  bloqueada hasta que se mergee APP-BASE-1 (hub#168).
 - El icono de estrella de Días especiales y los campos de fecha y hora en el orden del idioma del Hub de
   [`UI-REQUESTS.md`](UI-REQUESTS.md).
 - Calendario de festivos precargado, horario por sede o varias plantillas de horario: «Lo que queda fuera» y
