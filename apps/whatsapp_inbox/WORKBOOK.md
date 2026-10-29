@@ -789,10 +789,12 @@ Pasos:
 1. El negocio crea una plantilla en WhatsApp Manager.
 2. Aparece en **Ajustes → Plantillas de Meta** en cuanto erplora.com la manda, con su texto, sus
    variables, sus botones y su estado.
-3. Las que el Hub no sabe rellenar al enviar (cabecera con foto, vídeo, documento o una variable;
-   variables con nombre en vez de número; códigos de verificación) se ven con su estado y «No se puede
-   enviar ni editar aquí: se gestiona en WhatsApp Manager.», pero no se ofrecen para enviar ni se editan
-   aquí; sí se pueden borrar.
+3. Las que el Hub no sabe rellenar al enviar (cabecera con ubicación o con una variable; variables con
+   nombre en vez de número; códigos de verificación) se ven con su estado y «No se puede enviar ni editar
+   aquí: se gestiona en WhatsApp Manager.», pero no se ofrecen para enviar ni se editan aquí; sí se pueden
+   borrar.
+4. Las que llevan una foto, un vídeo o un documento en la cabecera se envían desde la bandeja eligiendo el
+   archivo (F33), pero se editan allí: dicen «Se edita en WhatsApp Manager.».
 Entra: la lista de plantillas que erplora.com trae de Meta.
 Sale: cada plantilla guardada como la tiene Meta.
 Si falla: nunca pisa una plantilla del Hub que todavía va hacia Meta ni trae de vuelta una borrada aquí.
@@ -814,8 +816,7 @@ Pasos:
    Meta revisa la plantilla con ese archivo; sin él no se puede enviar a revisión.
 4. Pulsar **Enviar a revisión de Meta**: la plantilla sale en la lista «Sin enviar a Meta» con
    «Enviándose a Meta…» y pasa a «En revisión» en cuanto Meta la recibe. La de una cabecera con archivo
-   nombra el suyo («Foto: …») y dice «Aún no se puede enviar desde la bandeja: la cabecera lleva un
-   archivo.».
+   nombra el suyo («Foto: …»).
 5. Cuando Meta decide, pasa sola a «Aprobada» (ya se puede enviar, F33) o a «Rechazada» con su motivo.
 Entra: nombre, idioma, categoría, cabecera (un texto, o una foto, un vídeo o un documento), texto,
 ejemplos, pie, botones y una clave del guardado (la misma al reintentar).
@@ -915,20 +916,32 @@ Pasos:
 1. En **Responder**, pulsar **Plantilla**: se abre «Enviar una plantilla» con las plantillas
    **aprobadas** que el Hub sabe rellenar (nombre, idioma, categoría y texto).
 2. Elegir una y rellenar sus variables (`{{1}}`, `{{2}}`…); la vista previa enseña el texto final.
-3. Pulsar **Enviar**: el mensaje aparece en el hilo como en F32.
+3. Si su cabecera lleva una foto, un vídeo o un documento, la hecha aquí trae ya el suyo (su nombre y su
+   peso, con **Cambiar archivo**) y la hecha en WhatsApp Manager pide **Elegir archivo** («Ningún archivo
+   elegido»): se guarda al momento en los archivos del negocio, con lo que admite («JPEG o PNG, hasta 5 MB.»)
+   y «El cliente recibe la plantilla con este archivo.».
+4. Pulsar **Enviar**: el mensaje aparece en el hilo como en F32; el de una cabecera con archivo lo nombra
+   («Foto · carta.jpg»).
 También por el asistente o la API a un número que aún no ha escrito («envía la plantilla de
 recordatorio a este número»): se crea su conversación. Una automatización no usa este envío sino uno más
 estrecho, que nunca crea una conversación: solo escribe a la que ya existe con el número internacional exacto
 (FLOW-F31, F23). Un número escrito a mano es del país del negocio
 salvo que lleve su prefijo.
-Entra: la plantilla (nombre e idioma), sus variables, una clave del mensaje y la conversación o el
-número.
+Entra: la plantilla (nombre e idioma), sus variables, el archivo de su cabecera (si lleva foto, vídeo o
+documento: el suyo o el elegido), una clave del mensaje y la conversación o el número. Una automatización
+solo envía las que no piden nada más que sus variables: las de cabecera con archivo, con el suyo.
 Sale: el mensaje guardado y entregado como en F32; aviso `whatsapp_inbox.message.sent`.
 Si falla: una plantilla de **Marketing** solo se envía a una clienta con ficha y con el consentimiento
 de marketing por WhatsApp dado en Clientes («Esta clienta no ha dado su consentimiento para recibir
 publicidad por WhatsApp.»); una plantilla no aprobada, borrada o que el Hub no sabe rellenar no se
 puede elegir; faltan variables: «Rellena todas las variables de la plantilla.»; un número incompleto:
-«Esto no es un número de teléfono.» y no se guarda nada; el resto, como en F32.
+«Esto no es un número de teléfono.» y no se guarda nada; sin el archivo de su cabecera: «Elige el archivo de
+la cabecera: la plantilla se envía con él.»; un archivo que no es del tipo o pesa de más se dice debajo
+(«Elige una foto JPEG o PNG.») y no se guarda. Si al entregarlo el archivo ya no está en los archivos del
+negocio, el mensaje dice «El archivo de la cabecera ya no está en los archivos del negocio: vuelve a enviar
+la plantilla eligiendo su archivo.»; si Meta no toma el archivo o no contesta, «Meta no ha contestado.
+Inténtalo de nuevo en unos minutos.» y se vuelve a entregar con la misma clave (nunca culpa a ERPlora); el
+resto, como en F32.
 Implicados: Clientes (el consentimiento de marketing), erplora.com, Meta
 
 ### WHATSAPP_INBOX-F34 Saber si un mensaje llegó y se leyó
@@ -1149,10 +1162,14 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   `synced_at`; el cambio que espera llegar a Meta (`draft`); la entrega a erplora.com (`submit_state`:
   vacío, `queued`, `sending`, `failed`; `submit_key`, la clave del guardado, única; `submit_error_code` y,
   solo en un rechazo de Meta que el Hub no nombra, su motivo tal como llegó en `submit_error`; `submit_at`); el borrado (`deleted_at`, que conserva la fila, y `delete_state`:
-  `pending` hasta que Meta lo confirma, `done`); y `supported` (si el Hub la escribe y la sabe rellenar:
-  ni código de verificación, ni cabecera con archivo o con variable, ni variables con nombre, solo
-  respuestas rápidas, enlaces fijos y llamadas). Una con archivo elegido aquí no es `supported` (la
-  bandeja no rellena su cabecera, F33), pero el Hub la escribe (`models.hub_writes`): se edita aquí.
+  `pending` hasta que Meta lo confirma, `done`); y `supported` (si el Hub la sabe rellenar al enviar: ni
+  código de verificación, ni cabecera con ubicación o con variable, ni variables con nombre, solo respuestas
+  rápidas, enlaces fijos y llamadas; una cabecera con archivo se envía con el archivo elegido, F33). La
+  migración 0008 marca `supported` las de cabecera con archivo que ya cumplían el resto. El Hub escribe
+  (`models.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
+  de WhatsApp Manager se editan allí. En la lista, `sendable` es «se envía tal cual» (lo que una
+  automatización puede enviar: la de cabecera con archivo, solo con el suyo) y `fillable` «la bandeja la
+  envía» (pidiendo el archivo si no tiene).
 - `TemplateSample` (de cada negocio, `host`): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
   `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
@@ -1370,7 +1387,17 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
    {"hub": "a", "to": "+34600111222", "type": "text", "text": "Sí, mañana a las 10"}
    {"hub": "a", "to": "+34600111222", "type": "template",
     "template": {"name": "recordatorio", "language": "es", "variables": ["Ana", "viernes"]}}
+   {"hub": "a", "to": "+34600111222", "type": "template",
+    "template": {"name": "oferta_otono", "language": "es", "variables": ["Ana"], "header_format": "IMAGE",
+                 "header_sample": {"name": "carta.jpg", "content_base64": "…"}}}
    ```
+
+   Una plantilla con foto, vídeo o documento en la cabecera lleva su archivo (el que nombra el mensaje,
+   `Message.header_sample`, de su negocio), leído del almacén tras el COMMIT y sin conexión abierta, y la
+   puerta se espera hasta 90 s; erplora.com lo sube al número y envía la plantilla con él. Si el archivo ya no
+   está, no sale nada y el mensaje queda `failed` con `whatsapp_inbox.header_sample_missing`; si el almacén no
+   contesta, sigue en camino. Un 503 `whatsapp.meta_unreachable` (Meta no tomó el archivo: no salió nada) deja
+   el mensaje en camino con `whatsapp_inbox.meta_unreachable`, dicho como de Meta.
 
    Respuestas: 200 `{"wa_message_id": "wamid…"}` (aceptado por Meta); 409
    `{"error": {"code": "whatsapp.cap_reached" | "whatsapp.not_connected" | "whatsapp.reconnect_needed" |
@@ -1582,7 +1609,7 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
 | «Necesita atención» lo ponían las recetas | Filtro **Sin leer** + la campana **Clientes de WhatsApp esperando respuesta** (`awaiting_reply`) | Sin recetas no hay quien la ponga |
 | La app instalada avisaba cuando subía el contador de la campana (hub#2303) | Un aviso del dispositivo por cada mensaje de un cliente que queda sin contestar | Mercado (WhatsApp Business, Shopify Inbox, Square, Fresha avisan de cada mensaje); un aviso por subida del contador callaría al cliente que vuelve a escribir tras cerrarse sin respuesta |
 | Fotos y audio dentro del hilo, descargados por una puerta del Hub | Fotos y notas de voz dentro del hilo, servidas por erplora.com; vídeos y documentos con **Abrir el adjunto** | El Hub no guarda ni pasa archivos: erplora.com los sirve con la sesión de la persona y la CSP del Hub permite su origen (ver «Contrato con `base`») |
-| Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31): el archivo de la cabecera se guarda en los archivos del negocio y erplora.com lo sube a Meta como muestra | La bandeja aún no envía una plantilla con archivo en la cabecera (F33) |
+| Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31): el archivo de la cabecera se guarda en los archivos del negocio y erplora.com lo sube a Meta como muestra; la bandeja envía la plantilla con su archivo o el elegido (F33) | Mercado: WATI, respond.io, Twilio y WhatsApp Manager piden el archivo al enviar |
 | Repaso cada 15 min de conversaciones sin ficha | Se une al recibir y al guardar la ficha | No hay conversaciones anteriores a la app nueva que repasar |
 | `templates.list` y ajustes solo para el administrador | Elegir plantilla para enviar: quien contesta; Ajustes: propietario y administrador | Quien contesta necesita las plantillas |
 
@@ -1590,9 +1617,8 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
 
 - **No guarda credenciales de Meta**: la cuenta de WhatsApp Business, el webhook y el token viven en
   erplora.com, que es quien habla con Meta.
-- **No envía todavía desde la bandeja una plantilla con foto, vídeo o documento en la cabecera** (F33):
-  se crea, se edita y Meta la revisa desde aquí, pero rellenar su cabecera al enviar queda para después;
-  las hechas en WhatsApp Manager se siguen gestionando allí.
+- **No edita las plantillas con foto, vídeo o documento hechas en WhatsApp Manager** (F28): se envían desde
+  aquí eligiendo el archivo, pero se cambian allí.
 - **No contesta sola ni reserva todavía** (F14–F22, F24, F25): las respuestas automáticas que reservan cita o
   mesa necesitan el asistente, que aún no está en el Hub («Respuestas automáticas: lo que falta»). Los avisos de
   la cita y de la mesa confirmadas (F23, F26) sí salen.
