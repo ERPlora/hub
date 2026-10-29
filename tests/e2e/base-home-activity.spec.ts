@@ -6,7 +6,7 @@
 // flow: BASE-F09
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, exposeMovingInPage, login, shot, shown, untilStill } from './helpers';
+import { A, exposeMovingInPage, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 
@@ -212,7 +212,7 @@ test('BASE-F09 — a sale shows up live in «Activity», its date and time whole
       const widest = await widestDate(date);
       expect(widest.width, `«${widest.text}» in ${widest.room.toFixed(1)} px at ${vp.label}`).toBeLessThanOrEqual(widest.room + 0.5);
     }
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const overflow = await horizontalOverflow(page);
     expect(overflow, `no sideways scroll at ${vp.label}`).toBeLessThanOrEqual(0);
     // The list/cards switch slides its indicator when the width changes the view: capture it settled.
     await untilStill(page);

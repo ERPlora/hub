@@ -14,7 +14,7 @@
 // series are `E2E…`, which the cleanup removes.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { stamp, VIEWPORTS } from './inventory-helpers';
 import { ensureIssuer } from './invoice-helpers';
 
@@ -222,7 +222,7 @@ test('INVOICE-F21 and INVOICE-F14: an employee is told about the ⛔ without «C
     // On a phone the note reads whole, never a narrow column broken into three lines.
     expect(await lines(strip.locator('.blocking-strip-note')), 'the note in at most two lines').toBeLessThanOrEqual(2);
     await untilStill(page);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const overflow = await horizontalOverflow(page);
     expect(overflow, 'no sideways scroll at 390').toBeLessThanOrEqual(0);
     await page.screenshot({ path: shot(`${KEY}-INVOICE-F21-employee-390`) });
   } finally {
@@ -234,7 +234,7 @@ for (const size of VIEWPORTS) {
   test(`INVOICE-F21 and INVOICE-F14 at ${size.label}: the ⛔ and the numbering pending as the owner reads them`, async ({ browser }) => {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height });
     try {
-      const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = () => horizontalOverflow(page);
       await expect(pill(page, IDENTITY)).toHaveText('Necesario para facturar');
       await row(page, IDENTITY).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
@@ -269,7 +269,7 @@ for (const size of VIEWPORTS) {
         await expect(shown(page).locator('[data-testid="blocking-strip"], .inline-feedback[data-tone="danger"]')).toHaveCount(1);
         await expect(shown(page).locator('[data-testid="invoice-issuer-notice"]')).toHaveCount(0);
         await untilStill(page);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        const overflow = await horizontalOverflow(page);
         expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
         await page.screenshot({ path: shot(`${name}-${size.label}`) });
       }

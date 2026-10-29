@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
+import { A, api, horizontalOverflow, HUB_DIR, login, psql, shot, shown } from './helpers';
 
 const TAG = 'E2E Combo';
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -160,7 +160,7 @@ async function fill(page: Page, testid: string, value: string): Promise<void> {
 /** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
 async function noHorizontalScroll(page: Page, label: string): Promise<void> {
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
 }
 

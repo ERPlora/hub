@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { GREETING, type Provider, startProvider } from './assistant-provider';
-import { api, compactBar, type Credentials, HUB_DIR, login, MAIL_DIR, openApps, openBell, psql, REPO_DIR, SAAS, shot, shown, untilStill } from './helpers';
+import { api, compactBar, type Credentials, horizontalOverflow, HUB_DIR, login, MAIL_DIR, openApps, openBell, psql, REPO_DIR, SAAS, shot, shown, untilStill } from './helpers';
 import { readMailCode } from './mail';
 import { STACK } from './stack';
 import { type Language, loadCatalog, normalText, rawKeys, wrongLanguage } from './translations';
@@ -175,7 +175,7 @@ async function settled(page: Page, where: string): Promise<void> {
   await expect(page.locator('ion-skeleton-text:visible, [data-testid$="-loading"]:visible')).toHaveCount(0);
   await expect(page.locator('[data-testid$="-error"]:visible, [data-testid$="-load-error"]:visible'), `${where}: an error on view`).toHaveCount(0);
   await untilStill(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${where}: no sideways scroll`).toBeLessThanOrEqual(0);
 }
 

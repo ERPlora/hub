@@ -6,7 +6,7 @@
 // capture `FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT[-en]-<width>`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-HOME-WIDGET-OPTIONS-LAZY-TEXT';
 const PANEL = 'verifactu.contingency';
@@ -69,7 +69,7 @@ for (const language of LANGUAGES) {
         // The board in sight, with no sideways scroll.
         await queue.evaluate((element) => element.scrollIntoView({ block: 'center' }));
         await untilStill(page);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        const overflow = await horizontalOverflow(page);
         expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
         await page.screenshot({ path: shot(`${language.shot}-${size.label}`) });
       } finally {

@@ -12,7 +12,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-VERIFACTU-SETUP-HOOKS';
@@ -196,7 +196,7 @@ for (const size of SIZES) {
       // The checklist and the board in sight, as far as the page scrolls, with no sideways scroll.
       await row(page).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
     } finally {

@@ -9,7 +9,7 @@
 // creates is deleted after it and `a`'s registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { A, api, horizontalOverflow, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-STAFF-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
@@ -62,7 +62,7 @@ async function openCommissions(page: Page): Promise<void> {
 
 const noHorizontalScroll = (page: Page, size: string) =>
   expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${size}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${size}` })
     .toBeLessThanOrEqual(0);
 
 test.beforeAll(async ({ browser }) => {

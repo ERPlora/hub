@@ -8,7 +8,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp, code, orderFrom, signedIn, VIEWPORTS } from './cart-checkout-helpers';
-import { record, shot, shown, untilStill } from './helpers';
+import { horizontalOverflow, record, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-UI-DATATABLE-EMAIL-COLUMN-834';
 const TABLE = 'cart-checkout-orders';
@@ -162,7 +162,7 @@ test('UI DataTable anchos de columna at 390: a phone keeps its cards', async ({ 
     const table = view.locator('.data-table').first();
     await expect(table.locator('.data-table__card').first()).toBeVisible();
     await expect(table.locator('.data-table__row--data')).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
     await page.screenshot({ path: shot(`${KEY}-390`) });
   } finally {
     await context.close();
