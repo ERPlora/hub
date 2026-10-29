@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:660af8765f721c80cfc0cca1ba161cd1e3d280f7749bf4b61151776a8a1a6036 -->
+<!-- generated from WORKBOOK.md sha256:a96f2af5a216b788834f261af6dedfd06ce1171254a9c251cdf8e8acece87ea6 -->
 
 ## What it is for and who it is for
 
@@ -50,8 +50,8 @@ country.
   chosen in **Taxes → Settings** (TAX-F11). Sales, Invoicing, the screens and the assistant calculate with
   both as long as no other country is asked for.
 - The factory rules are only Spain's. A business of another country (when the ERPlora account brings it)
-  will have to create its own (TAX-F04); the "Your taxes" notice (TAX-F17) does not detect it yet, because it
-  counts the rules of any country.
+  will have to create its own (TAX-F04); neither the "Your taxes" notice nor the step of the Home (TAX-F17)
+  detect it yet, because they count the rules of any country.
 - **"Today" is Madrid time** in phase 1: Taxes does not use the business's time zone yet. The day a rate
   changes (TAX-F07) starts at midnight in Madrid; in the Canary Islands (TAX-F11), one hour before their
   midnight. When it uses the business's, "today" will be its own.
@@ -70,7 +70,8 @@ Initial setup, step by step:
 
 Taxes opens from the **Taxes** menu and has four tabs in the bottom bar: **Categories**, **Rules**,
 **Aliases** and **Settings**. While no rate is in force, the first three carry the "Your taxes" notice at the
-top for whoever can manage them (TAX-F17). All of them follow the permission of whoever looks: with view
+top for whoever can manage them, the same step the Home brings in "Finish setting up your business" (TAX-F17).
+All of them follow the permission of whoever looks: with view
 only, the notice "You can view the tax rules but not change them." shows, the **+** button disappears and,
 in Rules, so do the row actions. The app requires the permission on every action even if the screen shows
 the button.
@@ -440,21 +441,27 @@ Involved: none
 ### TAX-F17 Warn that rates are missing for the business's country
 Status: done
 Actor: owner, administrator, manager
-Screen: Categories, Rules and Aliases
+Screen: Home, Categories, Rules and Aliases
 Steps:
-1. Open **Taxes**: while no active root rule is in force today, at the top of Categories, Rules and Aliases
-   the "Your taxes" notice shows ("Set up the VAT rates of the country you sell in so the till can price a
-   sale."), only for whoever can manage taxes.
-2. Tap "Set up": it takes you to the Rules tab, where the missing one is created with **+** (TAX-F04). In
+1. On the **Home**, while no active root rule is in force today, "Finish setting up your business" brings
+   "Your taxes" ("Set up the VAT rates of the country you sell in so the till can price a sale."),
+   "Important", to whoever can manage taxes. "Set up" takes you to the **Rules** tab of Taxes.
+2. Open **Taxes**: meanwhile, at the top of Categories, Rules and Aliases the same "Your taxes" notice
+   shows, only for whoever can manage taxes.
+3. Tap "Set up": it takes you to the Rules tab, where the missing one is created with **+** (TAX-F04). In
    Rules the notice carries no button.
-3. As soon as an active root rule is in force today, the notice disappears by itself.
-In: the rules of any country (the notice does not look at the business's yet).
-Out: how many rules apply today and whether taxes are set up. It does not block selling by itself.
+4. As soon as an active root rule is in force today, the notice disappears by itself and the step of the
+   Home is "Done" without a reload.
+In: the rules of any country (neither the notice nor the step look at the business's yet).
+Out: how many rules apply today and whether taxes are set up. It does not block selling by itself. If the
+last rule in force ends (TAX-F07) or is deactivated (TAX-F08), the step of the Home goes back to pending by
+itself, and restoring it (TAX-F08) or creating another one (TAX-F04, TAX-F12) makes it "Done" again.
+Changing the tax region (TAX-F11) does not move it.
 If it fails: a single rule of any category is enough to consider it done. Today it counts the rules of any
 country and of any region: a Canary Islands business without any IGIC rule does not see the notice,
 although the till explains the reason when charging and the help of Settings says so (TAX-F11). An exempt or
 IGIC rule also counts: a business that only sells exempt services is properly set up.
-Involved: none
+Involved: BASE-F01
 
 ### TAX-F18 Calculate the tax of an amount
 Status: done
@@ -516,7 +523,7 @@ the last deactivated one).
 | The categories, with search, origin filter, pages (up to 100) and their rate in force today in a country and region | view | F01, F19 | `tax.category.list` |
 | A category by its key, with its translated name | view | F02, F19 | `tax.category.get` |
 | The rules, with search, filters (country, region, category, type, qualification, status) and pages | view | F03 | `tax.rule.list` |
-| How many root rules apply today in the business's country and whether taxes are set up | view | F17 | `tax.rule.status` |
+| How many root rules apply today in the business's country and whether taxes are set up (the notice and the step "Your taxes" of the Home) | view | F17 | `tax.rule.status` |
 | The root rules a component can hang from in a country, region and category: the same ones the creation accepts (also a root that starts in the future; one without tax, only for a component at 0 %) | view | F06 | `tax.rule.parent_candidates` |
 | The countries in which the business has rules (all, active or deactivated), for the Country filter | view | F03, F11 | `tax.rule.countries` |
 | The aliases, with search, filters (category, source) and pages | view | F13, F15 | `tax.alias.list` |
