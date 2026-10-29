@@ -698,7 +698,10 @@ cajero del producto actual es un empleado.
   `tax.rule.activate`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en las de
   reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas.py` su
-  `description` (el JSON Schema de la herramienta).
+  `description` (el JSON Schema de la herramienta). La tarjeta de confirmación nombra cada dato por el
+  `verbose_name` del modelo; el que ningún modelo nombra (`tax_category_key`) lleva un `title` en inglés con
+  `gettext_noop` y su español en el catálogo de Impuestos, la palabra de las pantallas («Categoría»). Lo
+  vigila `tests/test_integration_assistant.py`, que recorre todas las escrituras `tax.*` del registro.
 - **País y región** salen de `pycountry` (ISO 3166-1 y 3166-2), no de una lista copiada.
 - **Decisión de mercado: «Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de
   los tipos que faltan en una lista de primeros pasos del inicio (Square, Odoo, Lightspeed, Business
