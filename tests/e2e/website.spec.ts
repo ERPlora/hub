@@ -12,7 +12,8 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, HUB_DIR, hostPage, SAAS, shot } from './helpers';
+import { A, api, capture, HUB_DIR, hostPage, SAAS, settled } from './helpers';
+import { atRest } from './website-helpers';
 
 const WIDTHS = {
   390: { width: 390, height: 844 },
@@ -174,13 +175,6 @@ async function publish(page: Page): Promise<void> {
   await expect(page.getByTestId('website-status-live')).toBeVisible({ timeout: 15_000 });
 }
 
-/** The page at rest for its capture: no focus ring, no colour still in transition (Bootstrap's buttons fade 150 ms,
- * and the dev server injects the stylesheets after the first paint). */
-async function settled(page: Page): Promise<void> {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
-}
-
 /** A visitor: a fresh context without a session, as a phone, a tablet or a computer, in light or dark. */
 async function visitor(
   browser: Browser,
@@ -260,8 +254,8 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
     await expect(toggler).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('#ws-nav a[href="#contact"]')).toBeVisible();
     await expect(page.locator('header a[href="/auth/login"]')).toBeVisible();
-    await settled(page);
-    await page.screenshot({ path: shot(`WEBSITE-${template}-${width}-${mode}-menu`), fullPage: false });
+    await atRest(page);
+    await capture(page, `WEBSITE-${template}-${width}-${mode}-menu`);
     await toggler.click();
     await expect(page.locator('#ws-nav')).toBeHidden();
   } else {
@@ -273,8 +267,8 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
   const login = page.locator('header a[href="/auth/login"]');
   await expect(login).toHaveCSS('color', rgb(bar.link));
   await expect(login).toHaveCSS('border-top-color', rgb(bar.link));
-  await settled(page);
-  await page.screenshot({ path: shot(`WEBSITE-${template}-${width}-${mode}`), fullPage: true });
+  await atRest(page);
+  await capture(page, `WEBSITE-${template}-${width}-${mode}`, { fullPage: true });
   await context.close();
 }
 
@@ -380,7 +374,8 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
       await expect(page.getByTestId('website-editor')).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow, `the editor does not scroll sideways at ${width} px`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`WEBSITE-editor-${width}`) });
+      await settled(page);
+      await capture(page, `WEBSITE-editor-${width}`);
     }
     await page.setViewportSize(WIDTHS[1440]);
 

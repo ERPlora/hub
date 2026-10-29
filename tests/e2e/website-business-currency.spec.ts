@@ -9,7 +9,8 @@
 // after it, the site saved as it was found and taken offline, and `a`'s registration put back, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, psql, registerBusinessIn, registrationOf, type Registration, shot } from './helpers';
+import { A, api, capture, hostPage, psql, registerBusinessIn, registrationOf, type Registration } from './helpers';
+import { atRest } from './website-helpers';
 
 const KEY = 'FIX-HUB-WEBSITE-PRICES-IN-EUR-WHATEVER-THE-COUNTRY';
 const SIZES = [
@@ -71,12 +72,6 @@ async function publicLabel(context: BrowserContext): Promise<string> {
   const item = catalog.groups.flatMap((group) => group.items).find((row) => row.name === SERVICE);
   expect(item, `${SERVICE} in the public catalog`).toBeTruthy();
   return item?.price_label ?? '';
-}
-
-/** The public page at rest for its capture: no focus ring, no colour still in transition. */
-async function settled(page: Page): Promise<void> {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
 }
 
 /** The editor's «Preview» on a phone or a tablet; a computer shows it beside the editor. */
@@ -144,8 +139,8 @@ test(`${KEY}: website-business-currency a business in Poland sees its prices in 
     await expect(block).not.toContainText('€');
     expect(await publicLabel(context)).toMatch(ZLOTY);
     await card(page).scrollIntoViewIfNeeded();
-    await settled(page);
-    await page.screenshot({ path: shot(`${KEY}-${size.name}`) });
+    await atRest(page);
+    await capture(page, `${KEY}-${size.name}`);
     await context.close();
     // The editor's preview paints the same page.
     const editor = owner.page;
@@ -157,8 +152,8 @@ test(`${KEY}: website-business-currency a business in Poland sees its prices in 
     await expect(card(preview)).toContainText(ZLOTY);
     await expect(preview.locator('[data-ep-block="catalog"]')).not.toContainText('€');
     await card(preview).scrollIntoViewIfNeeded();
-    await settled(editor);
-    await editor.screenshot({ path: shot(`${KEY}-preview-${size.name}`) });
+    await atRest(editor);
+    await capture(editor, `${KEY}-preview-${size.name}`);
   }
   // A visitor speaking Spanish reads the same złoty in Spanish.
   const { context, page } = await visitor(browser, WIDE, 'es-ES');
@@ -176,7 +171,7 @@ test(`${KEY}: website-business-currency back in Spain, the same page is in euros
   await expect(page.locator('[data-ep-block="catalog"]')).not.toContainText('PLN');
   expect(await publicLabel(context)).toMatch(EUROS);
   await card(page).scrollIntoViewIfNeeded();
-  await settled(page);
-  await page.screenshot({ path: shot(`${KEY}-es-1440`) });
+  await atRest(page);
+  await capture(page, `${KEY}-es-1440`);
   await context.close();
 });
