@@ -1512,6 +1512,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
     permission="whatsapp_inbox.reply",
     input=ConversationRefIn,
     output=FlaggedOut,
+    expose_api=True,
     ai={
         "description": "Marks an open WhatsApp conversation «Needs attention»: an automatic answer could not answer "
         "the customer, so she waits for a person even after its apology; somebody of the business answering, or "

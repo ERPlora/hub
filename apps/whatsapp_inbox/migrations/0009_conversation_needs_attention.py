@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='conversation',
             name='needs_attention',
-            field=models.BooleanField(default=False, verbose_name='needs attention'),
+            field=models.BooleanField(db_default=False, default=False, verbose_name='needs attention'),
         ),
     ]

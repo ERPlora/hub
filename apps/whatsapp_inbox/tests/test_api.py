@@ -69,7 +69,13 @@ ROUTES = {
         "/whatsapp_inbox/conversations/erase",
         "whatsapp_inbox.conversation.erase",
     ),
+    (
+        "POST",
+        "/whatsapp_inbox/conversations/flag",
+        "whatsapp_inbox.conversation.flag",
+    ),
     ("GET", "/whatsapp_inbox/messages", "whatsapp_inbox.message.list"),
+    ("GET", "/whatsapp_inbox/messages/detail", "whatsapp_inbox.message.get"),
     ("POST", "/whatsapp_inbox/messages/send", "whatsapp_inbox.message.send"),
     ("POST", "/whatsapp_inbox/messages/retry", "whatsapp_inbox.message.retry"),
     ("POST", "/whatsapp_inbox/messages/notify", "whatsapp_inbox.message.notify"),
@@ -193,6 +199,20 @@ def test_who_waits_for_an_answer_over_http(employee_client):
     assert told.status_code == 200
     assert [(row["display_name"], row["last_message_preview"]) for row in told.json()["rows"]] == [("Ana", "Hola, ¿tenéis hora mañana?")]
     assert get(employee_client, "/whatsapp_inbox/conversations/notices", limit=101).status_code == 422
+
+
+@pytest.mark.django_db
+def test_a_message_is_read_and_its_conversation_marked_over_http(employee_client):
+    # WHATSAPP_INBOX-F20, F21: what the automatic answers read and mark, for an integration as for Automatizaciones.
+    receive("wamid.1", contact_name="Ana")
+    message = Message.objects.get()
+    read = get(employee_client, "/whatsapp_inbox/messages/detail", id=str(message.id))
+    assert read.status_code == 200
+    assert (read.json()["body"], read.json()["display_name"]) == ("Hola, ¿tenéis hora mañana?", "Ana")
+    gone = get(employee_client, "/whatsapp_inbox/messages/detail", id="0199e000-0000-7000-8000-000000000000")
+    assert gone.status_code == 404
+    marked = post(employee_client, "/whatsapp_inbox/conversations/flag", {"id": str(message.conversation_id)})
+    assert (marked.status_code, marked.json()["flagged"]) == (200, True)
 
 
 @pytest.mark.django_db

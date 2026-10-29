@@ -614,6 +614,7 @@ def list_messages(ctx: OperationContext, params: MessageListIn) -> dict:
     permission="whatsapp_inbox.view",
     input=MessageRefIn,
     output=MessageGetOut,
+    expose_api=True,
     ai={
         "description": "One WhatsApp message by its id (the one an automation started on): what it says, who said it "
         "and when, its conversation's exact international number, what to call the customer and whether anything "
