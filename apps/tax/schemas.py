@@ -17,6 +17,7 @@ from uuid import UUID
 import pycountry
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     AfterValidator,
@@ -138,6 +139,8 @@ Direction = Literal["asc", "desc"]
 COUNTRY = "Country, ISO 3166-1 alpha-2 (ES, PT…)."
 REGION = "Region inside the country, ISO 3166-2 (ES-CN Canary Islands, ES-CE Ceuta, ES-ML Melilla); empty = the whole country."
 CATEGORY_REF = "The tax category: its key (product.generic), its name (Restaurant — food) or an alias (beer)."
+#: How the assistant's card names the category a write refers to, as the Rules and Aliases screens do.
+CATEGORY = gettext_noop("Category")
 SEARCH = "Free text to search."
 DIRECTION = "Sort direction: asc or desc."
 TAX_TYPE = "Tax family: vat, igic (Canary Islands), ipsi (Ceuta and Melilla), surcharge, sales_tax, withholding, excise or import_duty."
@@ -323,7 +326,7 @@ class RuleFields(_RegionOfTheCountry, Schema):
 
     country_code: CountryCode = Field(description=COUNTRY)
     region_code: OptionalRegion = Field(None, description=REGION)
-    tax_category_key: CategoryRef = Field(description=CATEGORY_REF)
+    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF)
     operation_class: OperationClass = Field("subject", description=OPERATION_CLASS)
     rate_pct: Rate = Field(
         description="The rate in %, 0 to 100, two decimals; 0 for a class that charges no tax."
@@ -406,7 +409,7 @@ class RuleRefIn(_RegionOfTheCountry, Schema):
     )
     region_code: OptionalRegion = Field(None, description=REGION)
     tax_category_key: CategoryRef | None = Field(
-        None, description=CATEGORY_REF + " With the country, instead of the id."
+        None, title=CATEGORY, description=CATEGORY_REF + " With the country, instead of the id."
     )
 
     @model_validator(mode="after")
@@ -456,7 +459,7 @@ class AliasIn(Schema):
     alias: AliasText = Field(
         description="The outside text; kept lowercase with single spaces."
     )
-    tax_category_key: CategoryRef = Field(description=CATEGORY_REF)
+    tax_category_key: CategoryRef = Field(title=CATEGORY, description=CATEGORY_REF)
     source: AliasSource = Field(
         "learned", description="learned (the default) or shipped (factory)."
     )
