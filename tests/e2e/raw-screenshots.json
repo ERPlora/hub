@@ -127,8 +127,6 @@
   "list-filters-stats.spec.ts": 4,
   "login-and-shell.spec.ts": 3,
   "modifier-business-currency.spec.ts": 3,
-  "modifier-groups.spec.ts": 1,
-  "modifier-till.spec.ts": 1,
   "no-outfitkit.spec.ts": 1,
   "online-booking-flow.spec.ts": 1,
   "optimistic-add-line.spec.ts": 2,
