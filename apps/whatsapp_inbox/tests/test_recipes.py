@@ -202,13 +202,16 @@ def test_an_answer_asks_the_assistant_ask_me_first_with_only_what_it_needs(ref):
 
 
 #: The assistant's step of each answer, and the reads pinned to the customer who writes that come before it.
-ASSISTANT = {BOOKING_REF: "s10", TABLE_REF: "s8"}
+ASSISTANT = {BOOKING_REF: "s10", TABLE_REF: "s10"}
 PINNED = {
     BOOKING_REF: {
         "customer.customer.by_phone": {"phone": "steps.s1.phone"},
         "appointment.appointment.list_for_customer": {"customer_id": "steps.s6.id", "limit": 1},
     },
-    TABLE_REF: {"reservation.reservation.list": {"guest_phone": "steps.s1.phone", "sort": "-starts_at", "limit": 1}},
+    TABLE_REF: {
+        "customer.customer.by_phone": {"phone": "steps.s1.phone"},
+        "reservation.reservation.list": {"guest_phone": "steps.s1.phone", "sort": "-starts_at", "limit": 1},
+    },
 }
 
 
@@ -228,8 +231,9 @@ def test_an_answer_tells_the_assistant_what_she_wrote_and_her_number(ref):
     assert "«whatsapp»" in prompt
 
 
-def test_the_appointment_answer_books_only_on_her_card():
-    assert "{{steps.s6.id}}{{steps.s7.id}}" in assistant_step(BOOKING_REF)["prompt"]  # found by her number, or just made
+@pytest.mark.parametrize("ref", ANSWERS)
+def test_an_answer_books_only_on_her_card(ref):
+    assert "{{steps.s6.id}}{{steps.s7.id}}" in assistant_step(ref)["prompt"]  # found by her number, or just made
 
 
 @pytest.mark.parametrize("ref", ANSWERS)
@@ -292,8 +296,9 @@ def test_the_table_answer_thanks_and_says_sorry_in_the_business_s_language():
     )
 
 
-def test_a_customer_with_no_card_gets_one_from_whatsapp_and_one_with_it_does_not():
-    by_id = {step["id"]: step for step in recipes.build(offered()[BOOKING_REF], "en")["steps"]}
+@pytest.mark.parametrize("ref", ANSWERS)
+def test_a_customer_with_no_card_gets_one_from_whatsapp_and_one_with_it_does_not(ref):
+    by_id = {step["id"]: step for step in recipes.build(offered()[ref], "en")["steps"]}
     made = by_id["s7"]
     assert made["operation"] == "customer.customer.create"
     assert made["params"] == {"name": "steps.s1.display_name", "phone": "steps.s1.phone", "source": "whatsapp"}

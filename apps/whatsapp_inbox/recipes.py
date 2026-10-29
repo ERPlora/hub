@@ -149,8 +149,8 @@ RECIPES = [
 # nothing goes), it thanks her at once and asks the assistant, «Ask me first» (FLOW-F37, F38): a read runs at once, a
 # booking or a move waits for the owner's yes in «Waiting for your answer». The assistant may only use the free times
 # and the booking's own changes: a read that names other people (the diary, the customer list, who a time clashes
-# with) is never offered, because what it answers goes out to whoever writes; her own card and latest booking are read
-# before, pinned to her number. What it answers goes to her; when it fails or says nothing, a fixed apology and the
+# with) is never offered, because what it answers goes out to whoever writes; her own card (made from WhatsApp when she
+# has none) and her latest booking are read before, pinned to her number. What it answers goes to her; when it fails or says nothing, a fixed apology and the
 # mark. Cancelling is not offered: Citas and Reservas only cancel with a person in front.
 
 #: Sends to exactly the customer who wrote, in her own conversation (FLOW-F31).
@@ -197,13 +197,31 @@ _APPOINTMENT_HEAD, _APPOINTMENT_TAIL = _answer_steps(
     _("Sorry, I cannot check the diary right now. Someone from the team will answer you here as soon as they can."),
 )
 _TABLE_HEAD, _TABLE_TAIL = _answer_steps(
-    "s8",
+    "s10",
     _("Thanks for writing! Let me check the reservations book and I will come straight back to you."),
     _(
         "Sorry, I cannot check the reservations right now. Someone from the team will answer you here as soon as "
         "they can."
     ),
 )
+
+#: Her card: the one of her number or, with none, a new one marked as come by WhatsApp (CUSTOMER-F26). Booking on it by
+#: its id is also what lets Citas and Reservas book without looking anyone up.
+_CARD = [
+    {"id": "s6", "kind": "query", "operation": "customer.customer.by_phone", "params": {"phone": "steps.s1.phone"}},
+    {
+        "id": "s7",
+        "kind": "command",
+        "operation": "customer.customer.create",
+        "params": {"name": "steps.s1.display_name", "phone": "steps.s1.phone", "source": "whatsapp"},
+        "run_if": {"steps.s6.found": {"eq": False}},
+        "on_error": "continue",
+    },
+]
+_CARD_REASONS = {
+    "customer.customer.by_phone": _("Looks the customer up by the number she writes from, and by nothing else."),
+    "customer.customer.create": _("Creates the card of a customer who is new, marked as having come by WhatsApp."),
+}
 
 APPOINTMENT_PROMPT = _(
     "A customer wrote to the salon on WhatsApp from {{steps.s1.phone}}:\n"
@@ -228,13 +246,16 @@ APPOINTMENT_PROMPT = _(
 TABLE_PROMPT = _(
     "A guest wrote to the restaurant on WhatsApp from {{steps.s1.phone}}:\n"
     "«{{steps.s1.body}}»\n\n"
-    "They are {{steps.s1.display_name}}; never tell them anything about other guests. Their latest reservation, if "
-    "they have one: {{steps.s7.date_label}} at {{steps.s7.time_label}}, {{steps.s7.party_size}} guests "
-    "({{steps.s7.status}}, id {{steps.s7.id}}). New reservations confirm by themselves: {{steps.s6.auto_confirm}}.\n\n"
+    "They are {{steps.s1.display_name}} and their customer card is {{steps.s6.id}}{{steps.s7.id}}: book and change "
+    "only on that card, never on another person's, and never tell them anything about other guests. Their latest "
+    "reservation, if they have one: {{steps.s9.date_label}} at {{steps.s9.time_label}}, {{steps.s9.party_size}} "
+    "guests ({{steps.s9.status}}, id {{steps.s9.id}}). New reservations confirm by themselves: "
+    "{{steps.s8.auto_confirm}}.\n\n"
     "Do what they ask, and only that:\n"
     "- To book a table: the day, the time and how many come are theirs to say, never yours. When they are said and "
-    "there is room, book it with the phone {{steps.s1.phone}}, the name they give (or {{steps.s1.display_name}}) and "
-    "source «whatsapp»; with no room, offer them a short numbered list of other times, or the waiting list.\n"
+    "there is room, book it on their card with the phone {{steps.s1.phone}}, the name they give (or "
+    "{{steps.s1.display_name}}) and source «whatsapp»; with no room, offer them a short numbered list of other times, "
+    "or the waiting list.\n"
     "- To change their reservation: change only that same reservation, by its id.\n"
     "- You cannot cancel: tell them someone from the team will do it.\n\n"
     "Then write only the WhatsApp to send them, in the language they wrote in, short and friendly: what was booked "
@@ -264,15 +285,7 @@ RECIPES += [
         },
         "steps": [
             *_APPOINTMENT_HEAD,
-            {"id": "s6", "kind": "query", "operation": "customer.customer.by_phone", "params": {"phone": "steps.s1.phone"}},
-            {
-                "id": "s7",
-                "kind": "command",
-                "operation": "customer.customer.create",
-                "params": {"name": "steps.s1.display_name", "phone": "steps.s1.phone", "source": "whatsapp"},
-                "run_if": {"steps.s6.found": {"eq": False}},
-                "on_error": "continue",
-            },
+            *_CARD,
             {"id": "s8", "kind": "query", "operation": "appointment.settings.get", "params": {}},
             {
                 "id": "s9",
@@ -296,8 +309,7 @@ RECIPES += [
             "whatsapp_inbox.message.get": _READ_REASON,
             "whatsapp_inbox.conversation.flag": _FLAG_REASON,
             "whatsapp_inbox.message.notify": _SEND_REASON,
-            "customer.customer.by_phone": _("Looks the customer up by the number she writes from, and by nothing else."),
-            "customer.customer.create": _("Creates the card of a customer who is new, marked as having come by WhatsApp."),
+            **_CARD_REASONS,
             "appointment.settings.get": _("Reads your booking rules, to follow them. It only reads them."),
             "appointment.appointment.list_for_customer": _(
                 "Reads the latest appointment of the customer who writes, and nobody else's, to move the right one."
@@ -323,7 +335,8 @@ RECIPES += [
             "full the day is, and every booking, change or place on the waiting list it wants waits for your yes in "
             "«Waiting for your answer». The time and the guests are theirs to say, never the assistant's. It never "
             "reads other guests' data and never cancels. When it cannot answer, they get an apology and their "
-            "conversation is marked «Needs attention» in the inbox."
+            "conversation is marked «Needs attention» in the inbox. A guest with no card gets one, marked as having "
+            "come by WhatsApp."
         ),
         "trigger": {
             "kind": "event",
@@ -332,15 +345,16 @@ RECIPES += [
         },
         "steps": [
             *_TABLE_HEAD,
-            {"id": "s6", "kind": "query", "operation": "reservation.settings.get", "params": {}},
+            *_CARD,
+            {"id": "s8", "kind": "query", "operation": "reservation.settings.get", "params": {}},
             {
-                "id": "s7",
+                "id": "s9",
                 "kind": "query",
                 "operation": "reservation.reservation.list",
                 "params": {"guest_phone": "steps.s1.phone", "sort": "-starts_at", "limit": 1},
             },
             {
-                "id": "s8",
+                "id": "s10",
                 "kind": "assistant",
                 "prompt": TABLE_PROMPT,
                 "tools": [
@@ -360,6 +374,7 @@ RECIPES += [
             "whatsapp_inbox.message.get": _READ_REASON,
             "whatsapp_inbox.conversation.flag": _FLAG_REASON,
             "whatsapp_inbox.message.notify": _SEND_REASON,
+            **_CARD_REASONS,
             "reservation.settings.get": _("Reads your book's rules, to follow them. It only reads them."),
             "reservation.reservation.list": _(
                 "Reads the latest reservation of the number that writes, and nobody else's, to change the right one."
