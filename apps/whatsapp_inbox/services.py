@@ -1770,7 +1770,7 @@ def _sample_bytes(data: TemplateSampleUploadIn) -> tuple[bytes, str]:
 
 
 @operation(
-    "whatsapp_inbox.template.upload_sample",
+    "whatsapp_inbox.template_sample.upload",
     kind="command",
     permission="whatsapp_inbox.configure",
     input=TemplateSampleUploadIn,

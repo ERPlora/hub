@@ -217,7 +217,7 @@ async def template_create(request, data: TemplateCreateIn):
     return await run_operation(request, services.create_template, data)
 
 
-@bind(router, "whatsapp_inbox.template.upload_sample", "/whatsapp_inbox/templates/samples", status=201)
+@bind(router, "whatsapp_inbox.template_sample.upload", "/whatsapp_inbox/templates/samples", status=201)
 @decorate_view(accept_body_up_to(MAX_SAMPLE_BODY))
 async def template_upload_sample(request, data: TemplateSampleUploadIn):
     return await run_operation(request, services.upload_sample, data)

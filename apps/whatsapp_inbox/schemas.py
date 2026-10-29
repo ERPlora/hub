@@ -726,7 +726,7 @@ class TemplateWriteIn(Schema):
     header: _text(60) = Field("", description="An optional title in bold, up to 60 characters, without variables.")
     header_sample: UUID | None = Field(
         None,
-        description="For an IMAGE, VIDEO or DOCUMENT header: the id whatsapp_inbox.template.upload_sample answered "
+        description="For an IMAGE, VIDEO or DOCUMENT header: the id whatsapp_inbox.template_sample.upload answered "
         "for its file (Meta reviews the template with it; the same one again keeps it).",
     )
     body: _text(1024, 1) = Field(description="The text, up to 1024 characters, with {{1}}, {{2}}… where the variables go.")

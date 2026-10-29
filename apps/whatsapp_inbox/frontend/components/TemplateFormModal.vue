@@ -2,7 +2,7 @@
 // WHATSAPP_INBOX-F29 «Create a template and send it for review» and F30 «Edit a template», from Settings →
 // «Meta templates» (the old module's panel): Name (lowercase, numbers and underscores; it never changes),
 // Language, Category (Utility or Marketing), Header — a text, or a photo, a video or a document whose file is
-// kept in the business's files at once (`whatsapp_inbox.template.upload_sample`, checked here first by type and
+// kept in the business's files at once (`whatsapp_inbox.template_sample.upload`, checked here first by type and
 // size) and goes with the template to Meta's review —, Text with an «Example» box per variable it uses, Footer
 // and up to 10 buttons — quick replies together, at most 2 links (https://) and 1 call (+34…). New sends
 // `whatsapp_inbox.template.create`; Edit sends the whole content with `whatsapp_inbox.template.update` (what
@@ -71,7 +71,7 @@ const t = useT();
 const locale = useLocale();
 const creation = useCommand('whatsapp_inbox.template.create');
 const update = useCommand('whatsapp_inbox.template.update');
-const sampleUpload = useCommand('whatsapp_inbox.template.upload_sample');
+const sampleUpload = useCommand('whatsapp_inbox.template_sample.upload');
 const uploading = computed(() => sampleUpload.pending.value);
 const pending = computed(() => creation.pending.value || update.pending.value);
 const refusal = computed(() => (props.template ? update.error.value : creation.error.value));

@@ -2011,7 +2011,7 @@
     "method": "post",
     "path": "/api/whatsapp_inbox/templates/delete"
   },
-  "whatsapp_inbox.template.upload_sample": {
+  "whatsapp_inbox.template_sample.upload": {
     "method": "post",
     "path": "/api/whatsapp_inbox/templates/samples"
   },

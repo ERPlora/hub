@@ -1044,7 +1044,7 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 | `whatsapp_inbox.conversation.link_customer` | Une a una ficha, crea la ficha o desune |
 | `whatsapp_inbox.conversation.erase` | Borra los datos de un número (irreversible) |
 | `whatsapp_inbox.note.add` / `whatsapp_inbox.note.delete` | Notas internas |
-| `whatsapp_inbox.template.upload_sample` | Guarda el archivo de una cabecera con foto, vídeo o documento en los archivos del negocio y devuelve su id |
+| `whatsapp_inbox.template_sample.upload` | Guarda el archivo de una cabecera con foto, vídeo o documento en los archivos del negocio y devuelve su id |
 | `whatsapp_inbox.template.create` | Crea una plantilla y la entrega a erplora.com para Meta; pide una clave por guardado |
 | `whatsapp_inbox.template.update` | Cambia una plantilla; la aprobada sigue enviándose hasta que Meta recibe el cambio |
 | `whatsapp_inbox.template.retry` | Vuelve a entregar la plantilla (o su borrado) que no llegó a Meta; un rechazo va con clave nueva |

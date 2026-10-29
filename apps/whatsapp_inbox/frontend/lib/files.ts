@@ -1,6 +1,6 @@
 // The file of a template's header with a photo, a video or a document (WHATSAPP_INBOX-F29): what each kind takes,
 // checked here before the upload so a wrong one is said at once — the Hub checks again by the file's bytes
-// (`samples.py`) — and the file in base64, as `whatsapp_inbox.template.upload_sample` takes it.
+// (`samples.py`) — and the file in base64, as `whatsapp_inbox.template_sample.upload` takes it.
 import type { FileHeaderFormat } from '../operations';
 
 const MB = 1024 * 1024;

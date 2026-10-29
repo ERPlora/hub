@@ -406,7 +406,7 @@ declare module '@erplora/ui/sdk' {
     'whatsapp_inbox.template.update': { input: TemplateUpdateIn; output: TemplateOut };
     'whatsapp_inbox.template.retry': { input: TemplateRefIn; output: TemplateOut };
     'whatsapp_inbox.template.delete': { input: TemplateRefIn; output: TemplateOut };
-    'whatsapp_inbox.template.upload_sample': { input: TemplateSampleUploadIn; output: TemplateSampleOut };
+    'whatsapp_inbox.template_sample.upload': { input: TemplateSampleUploadIn; output: TemplateSampleOut };
     'whatsapp_inbox.channel.get': { input: ChannelGetIn; output: ChannelOut };
     'whatsapp_inbox.channel.prepare': { input: ChannelPrepareIn; output: ChannelPrepareOut };
     'whatsapp_inbox.channel.connect': { input: ChannelConnectIn; output: ChannelConnectOut };

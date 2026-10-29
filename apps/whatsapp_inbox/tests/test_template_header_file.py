@@ -54,7 +54,7 @@ def b64(content: bytes) -> str:
 
 def upload(content: bytes = JPEG, header_format: str = "IMAGE", name: str = "carta.jpg", ctx=None):
     return run(
-        "whatsapp_inbox.template.upload_sample",
+        "whatsapp_inbox.template_sample.upload",
         {"header_format": header_format, "name": name, "content_base64": b64(content)},
         ctx,
     )
@@ -138,7 +138,7 @@ def test_a_file_its_header_does_not_take_is_refused_under_its_field_and_nothing_
 def test_a_file_that_did_not_arrive_whole_is_said_so():
     with pytest.raises(InvalidPayload) as refused:
         run(
-            "whatsapp_inbox.template.upload_sample",
+            "whatsapp_inbox.template_sample.upload",
             {"header_format": "IMAGE", "name": "carta.jpg", "content_base64": "@@not base64@@"},
         )
 
