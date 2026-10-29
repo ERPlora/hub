@@ -13,7 +13,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
 import { capture, compactBar, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
-import { confirmDialog, idFromUrl, signedIn } from './flow-helpers';
+import { confirmDialog, idFromUrl, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
 import { pick } from './task-helpers';
@@ -54,25 +54,14 @@ test.afterAll(async () => {
   await provider?.close();
 });
 
-const RELAY = `
-import os
-from django.db import transaction
-from live.models import OutboxEvent
-from base import relay
-event = OutboxEvent.objects.get(pk=os.environ["FLOW_EVENT"])
-with transaction.atomic():
-    relay.deliver("flow", event)
-`;
-
 /** The worker's part of the step (FLOW-F38): the newest `flow.run.parked` of the automation, handed to flow's reaction
- *  as the outbox relay does on every tick; the assistant is asked after that COMMIT. Unlike `workerCalls`, it does not
- *  block this process while it waits: the provider the SaaS asks lives here, and must answer. */
+ *  as the outbox relay does on every tick (`RELAY`); the assistant is asked after that COMMIT. Unlike `workerCalls`, it
+ *  does not block this process while it waits: the provider the SaaS asks lives here, and must answer. */
 async function workerAsks(flowId: string): Promise<void> {
-  const event = psql(
-    `select id from live_outboxevent where name = 'flow.run.parked' and payload->>'flow_id' = '${flowId}' order by created_at desc, id desc limit 1`,
-  );
-  expect(event, `flow.run.parked of ${flowId} in the outbox`).not.toBe('');
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], { cwd: HUB_DIR, env: { ...process.env, FLOW_EVENT: event } });
+  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+    cwd: HUB_DIR,
+    env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
+  });
 }
 
 /** The run of the history that says `status`, opened. */

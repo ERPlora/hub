@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
 import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, shown } from './helpers';
+import { OUTBOUND_AT_ONCE } from './whatsapp-helpers';
 
 export async function signedIn(
   browser: Browser,
@@ -48,7 +49,12 @@ export async function manualFlow(context: BrowserContext, name: string, steps: u
   return id;
 }
 
-const RELAY = `
+/** Python for a one-shot `manage.py shell` playing the worker's relay to flow (this stack runs no worker): the
+ *  outbox event `FLOW_EVENT`, handed to flow's reaction as the relay does on every tick. What that reaction leaves
+ *  for after its COMMIT (the call of FLOW-F27, the question to the assistant of FLOW-F38) goes to `base.outbound`'s
+ *  threads, which would die with this process before making it: `OUTBOUND_AT_ONCE` makes it at once
+ *  (FIX-HUB-FLOW-E2E-WORKER-CALLS-DIE-WITH-ONE-SHOT-SHELL). */
+export const RELAY = `${OUTBOUND_AT_ONCE}
 import os
 from django.db import transaction
 from live.models import OutboxEvent
@@ -58,17 +64,22 @@ with transaction.atomic():
     relay.deliver("flow", event)
 `;
 
-/** The worker's part of a call (FLOW-F27): the newest `flow.run.parked` of the automation `flowId`, read from
- *  the outbox, handed to flow's reaction as the outbox relay does on every tick; the call goes out after that
- *  COMMIT, never from the request that parked it. */
-export function workerCalls(flowId: string): void {
+/** The newest `flow.run.parked` of the automation `flowId` in the outbox: what the worker hands flow's reaction. */
+export function parkedEvent(flowId: string): string {
   const event = psql(
     `select id from live_outboxevent where name = 'flow.run.parked' and payload->>'flow_id' = '${flowId}' order by created_at desc, id desc limit 1`,
   );
   expect(event, `flow.run.parked of ${flowId} in the outbox`).not.toBe('');
+  return event;
+}
+
+/** The worker's part of a call (FLOW-F27): the newest `flow.run.parked` of the automation `flowId`, handed to
+ *  flow's reaction as the outbox relay does on every tick (`RELAY`); the call goes out after that COMMIT, never
+ *  from the request that parked it. */
+export function workerCalls(flowId: string): void {
   execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
     cwd: HUB_DIR,
     encoding: 'utf8',
-    env: { ...process.env, FLOW_EVENT: event },
+    env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
   });
 }
