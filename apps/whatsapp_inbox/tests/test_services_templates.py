@@ -496,8 +496,14 @@ def test_deleting_takes_it_off_the_list_and_deletes_that_one_at_meta_after_the_c
             "whatsapp_inbox.reconnect_needed",
             "WhatsApp's permission for your number expired: connect it again.",
         ),
-        # erplora.com without the deletion door yet: its 404 is no confirmation (gh:whatsapp_inbox#296).
-        (404, {}, "whatsapp_inbox.saas_unreachable", "erplora.com did not answer"),
+        # erplora.com without the deletion door yet: its 404 is no confirmation (gh:whatsapp_inbox#296); the
+        # deletion's own words, not the ones of a template that has not left.
+        (
+            404,
+            {},
+            "whatsapp_inbox.saas_unreachable",
+            "erplora.com did not answer: Meta still has the template. Try again.",
+        ),
     ],
 )
 @respx.mock
