@@ -3,7 +3,7 @@
 // creates (named «E2E …»), and the waits and row actions of the two screens.
 import { expect, type Page } from '@playwright/test';
 
-import { psql, shown } from './helpers';
+import { horizontalOverflow, psql, shown } from './helpers';
 
 /** The three sizes of a flow's screenshots: a phone, a tablet and a desk. */
 export const VIEWPORTS = [
@@ -82,7 +82,7 @@ export async function rowAction(page: Page, table: string, id: string, action: s
 
 export async function noHorizontalScroll(page: Page, label: string): Promise<void> {
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
 }
 

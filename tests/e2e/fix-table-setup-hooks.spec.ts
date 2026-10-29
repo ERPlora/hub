@@ -8,7 +8,7 @@
 // off for the run and back on after it; the run's own zones are «E2E Tsh …», deleted with their tables before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -158,7 +158,7 @@ for (const size of VIEWPORTS) {
       await expect(pill(page)).toHaveText('Recomendado');
       await step(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
 

@@ -15,7 +15,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, hostPage, psql, shot, shown, turnOn, untilStill } from './helpers';
+import { A, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, turnOn, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = {
@@ -76,7 +76,7 @@ test.afterAll(() => {
 async function snap(page: Page, key: string, width: number): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="apps-loading"]:visible')).toHaveCount(0);
   await untilStill(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${key} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APP-BASE-4-${key}-${width}`) });
 }

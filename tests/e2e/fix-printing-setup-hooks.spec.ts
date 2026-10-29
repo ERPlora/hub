@@ -11,7 +11,7 @@
 // for the run and put back after it.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
 
@@ -178,7 +178,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       const row = stalledRow(page);
       await expect(row).toHaveText(`Nadie está imprimiendo «Recibo» (${before.stalled + 1})`);
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${label}`) });
 

@@ -199,6 +199,24 @@ export async function capture(page: Page, name: string, options: CaptureOptions 
 /** What `capture` hands to `page.screenshot`: everything but the path, which is `shot(name)`. */
 export type CaptureOptions = Omit<NonNullable<Parameters<Page['screenshot']>[0]>, 'path'>;
 
+/**
+ * How many pixels of the page lie past the right edge of their box, 0 when everything fits its width: the document's
+ * and, in every `ion-content` (the shown page's, the pinned side menu's, an open sheet's), its scroll box, in its shadow
+ * root (`part="scroll"`; a hidden one is 0 wide). Ionic pins the `body` to the window, so a screen that runs past the
+ * right edge is cut inside its `ion-content` and the document never grows: the document alone read 0 with a 1600 px
+ * block on a page at 390. The one «no horizontal scroll» measure of the e2e (`horizontal-overflow.test.ts` keeps it so).
+ */
+export async function horizontalOverflow(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const boxes: Element[] = [document.documentElement];
+    for (const content of document.querySelectorAll('ion-content')) {
+      const scroll = content.shadowRoot?.querySelector('[part~="scroll"]');
+      if (scroll) boxes.push(scroll);
+    }
+    return Math.max(0, ...boxes.map((box) => box.scrollWidth - box.clientWidth));
+  });
+}
+
 /** Writes the measurements of a check to `.artifacts/metrics/<key>.json` for the report. */
 export function record(key: string, data: unknown): void {
   mkdirSync(METRICS, { recursive: true });

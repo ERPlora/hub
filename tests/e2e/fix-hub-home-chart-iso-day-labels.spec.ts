@@ -6,7 +6,7 @@
 // this file creates is deleted after it (`cleanSales()`, `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -152,7 +152,7 @@ for (const size of SIZES) {
       }
       const tops = await labelTops(chart);
       expect(tops, `the days on one line at ${size.label}`).toEqual(tops.map(() => tops[0]));
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
 

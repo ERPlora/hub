@@ -7,7 +7,7 @@
 // `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown, untilStill } from './helpers';
+import { A, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -110,7 +110,7 @@ for (const size of SIZES) {
       await timeline.evaluate((element) => element.scrollIntoView({ block: 'center' }));
       await untilStill(page);
       expect(await cutTexts(timeline), `no text cut at ${size.label}`).toEqual([]);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
     } finally {

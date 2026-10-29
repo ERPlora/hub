@@ -9,7 +9,7 @@
 // Citas's settings are put back as they were.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
 import { FLOW_VIEWPORTS, post } from './service-helpers';
 
 const KEY = 'FIX-APPOINTMENT-SETUP-HOOKS';
@@ -211,7 +211,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
       await expect(row).toHaveText(`Citas por confirmar (${before.toConfirm + 1})`);
       await expect(row).toHaveAttribute('data-reachable', 'true');
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${label}`) });
 

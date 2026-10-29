@@ -7,7 +7,7 @@
 // flow: BASE-F02 BASE-F01 BASE-F03 BASE-F05 BASE-F06 BASE-F07 BASE-F08 BASE-F09 BASE-F10 BASE-F11
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, clearItems, hostPage, login, openBell, psql, shot, shown, uniqueName, untilStill } from './helpers';
+import { A, api, bellBadge, clearItems, horizontalOverflow, hostPage, login, openBell, psql, shot, shown, uniqueName, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -44,7 +44,7 @@ async function snap(page: Page, flow: string, width: number): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
   await page.waitForFunction(() => ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0);
   await untilStill(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APP-BASE-1-${flow}-${width}`) });
 }
@@ -299,7 +299,7 @@ test.describe('BASE-F06 — a panel row without its value', () => {
 
         await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
         await untilStill(page);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        const overflow = await horizontalOverflow(page);
         expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
         await page.screenshot({ path: shot(`${KEY}-${label}`) });
       } finally {
@@ -478,7 +478,7 @@ test.describe('BASE-F06 — a bar-list with negatives', () => {
 
         await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
         await untilStill(page);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        const overflow = await horizontalOverflow(page);
         expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
         await page.screenshot({ path: shot(`${KEY}-${label}`) });
       } finally {
@@ -595,7 +595,7 @@ test.describe('BASE-F06 — a bar-list with the colour of its row', () => {
 
         await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
         await untilStill(page);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        const overflow = await horizontalOverflow(page);
         expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
         await page.screenshot({ path: shot(`${KEY}-${label}`) });
       } finally {

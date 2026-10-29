@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
+import { A, api, horizontalOverflow, HUB_DIR, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -87,7 +87,7 @@ async function shots(page: Page, key: string, ready: () => Promise<void>): Promi
     // A resize slides the phone's cart drawer and the sheets: the picture waits until nothing moves.
     await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
     await expect
-      .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${key} ${size.label}` })
+      .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${key} ${size.label}` })
       .toBeLessThanOrEqual(0);
     await page.screenshot({ path: shot(`APP-COMBO-${key}-${size.label}`) });
   }

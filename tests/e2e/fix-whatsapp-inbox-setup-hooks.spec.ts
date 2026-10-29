@@ -9,7 +9,7 @@
 // names, the number's row) is removed before and after.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, bellBadge, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
 import { FLOW_VIEWPORTS } from './service-helpers';
 import { cleanUp, e2ePhone, PREFIX, pushChannel, receive } from './whatsapp-helpers';
 
@@ -106,7 +106,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await expect(row).toHaveText(`${LABEL} (${before.waiting + 1})`);
       await expect(row).toHaveAttribute('data-reachable', 'true');
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${label}`) });
 

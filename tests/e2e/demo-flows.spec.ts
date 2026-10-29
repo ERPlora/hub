@@ -8,7 +8,7 @@
 // flow: DEMO-F01 DEMO-F02 DEMO-F03 DEMO-F04 DEMO-F05 DEMO-F06
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, createItem, EMPLOYEE, hostPage, listReady, row, rowNames, rowOf, settled, shown, uniqueName } from './helpers';
+import { A, api, capture, createItem, EMPLOYEE, horizontalOverflow, hostPage, listReady, row, rowNames, rowOf, settled, shown, uniqueName } from './helpers';
 
 const FLOW_VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -24,7 +24,7 @@ type Envelope = { id: string; error?: { code: string } };
  */
 async function snap(page: Page, flow: string, width: string): Promise<void> {
   await settled(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await capture(page, `APP-DEMO-${flow}-${width}`);
 }

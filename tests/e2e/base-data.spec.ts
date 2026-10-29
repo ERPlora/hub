@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, ARTIFACTS, emptyOfTemplateData, hostPage, shot, shown, untilStill } from './helpers';
+import { A, api, ARTIFACTS, emptyOfTemplateData, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
 
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
 test.use({ actionTimeout: 30_000 });
@@ -77,7 +77,7 @@ function partialFile(stamp: string): string {
 async function snap(page: Page, flow: string, width: number): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
   await untilStill(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APP-BASE-2-${flow}-${width}`), fullPage: false });
 }

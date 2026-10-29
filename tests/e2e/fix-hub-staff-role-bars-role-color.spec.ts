@@ -8,7 +8,7 @@
 // Everything this file creates is named «E2E-ROLECOLOR …» and removed after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -140,7 +140,7 @@ for (const viewport of VIEWPORTS) {
 
       await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${viewport.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${viewport.label}`) });
     } finally {
