@@ -14,6 +14,7 @@ from uuid import UUID
 
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     AfterValidator,
@@ -275,7 +276,9 @@ class TaskIn(In):
     )
     assigned_to_id: UUID | None = Field(None, description="Id of the staff member who will do it.")
     assignee: MemberName | None = Field(
-        None, description="Name of the staff member who will do it, when the id is not known."
+        None,
+        title=gettext_noop("Assigned to"),
+        description="Name of the staff member who will do it, when the id is not known.",
     )
     tags: Tags = Field(default_factory=list, description=D_TAGS)
 
@@ -301,9 +304,11 @@ class SetStatusIn(TaskRefIn):
 class AssignIn(TaskRefIn):
     """One person (by id, by name or the caller); nobody unassigns the task."""
 
-    member_id: UUID | None = Field(None, description=D_MEMBER_ID)
-    member: MemberName | None = Field(None, description=D_MEMBER)
-    to_me: bool = Field(False, description="true: assign it to the caller's own staff record.")
+    member_id: UUID | None = Field(None, title=gettext_noop("Assigned to"), description=D_MEMBER_ID)
+    member: MemberName | None = Field(None, title=gettext_noop("Assigned to"), description=D_MEMBER)
+    to_me: bool = Field(
+        False, title=gettext_noop("Assign to me"), description="true: assign it to the caller's own staff record."
+    )
 
     @field_validator("member")
     @classmethod
