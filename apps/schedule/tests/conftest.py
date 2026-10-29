@@ -77,6 +77,19 @@ def empty_week(db):
     ScheduleSettings.objects.all().delete()
 
 
+@pytest.fixture
+def default_week(db):
+    """The week migration 0002 plants (Monday to Friday 09:00–18:00, the weekend closed), not confirmed: a
+    transactional test flushes every table, seeded rows included, so the transactional tests run after it (pytest-django
+    runs them last) find no week unless they plant it back."""
+    if not WeekDay.objects.exists():
+        for weekday in range(5):
+            make_day(weekday, ("09:00", "18:00"))
+        for weekday in (5, 6):
+            make_day(weekday, closed=True)
+    ScheduleSettings.objects.update(hours_confirmed=False)
+
+
 def t(text: str) -> dt.time:
     return dt.time.fromisoformat(text)
 

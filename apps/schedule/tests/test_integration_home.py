@@ -196,9 +196,10 @@ def received(session, timeout=WAIT):
     return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
 
 
-# Transactional: the notice leaves after a real COMMIT.
+# Transactional: the notice leaves after a real COMMIT. The week planted again: a transactional test run before this
+# one (the suite runs them last, in any order) flushed the seeded one away, and there is nothing to confirm without it.
 @pytest.mark.django_db(transaction=True)
-def test_a_week_confirmed_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen):
+def test_a_week_confirmed_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(listen, default_week):
     on_a, on_b = listen(A), listen(B)
     run("schedule.week.confirm", {}, person("hub_manager", B))
 
