@@ -57,8 +57,11 @@ negocio:
 
 En las tres, en este orden: sin `hub`, 422 `internal.payload_invalid`; el negocio responde como su host (404
 `not_found` si el registro no lo conoce, 410 `base.hub_gone`, 503 `base.hub_preparing`, 402 `base.hub_suspended`);
-la app apagada en él, 404 `app_inactive` (erplora.com guarda el mensaje y reintenta); un cuerpo fuera de contrato, 422
-con `fields`; y el sobre de cualquier otra negativa de la operación, tal cual.
+la app apagada en él, 404 `app_inactive` (erplora.com guarda el mensaje y reintenta), leída en la BD del propio negocio
+(ya dentro de su hub: el host por el que entra el SaaS no abre ninguno); si esa BD falla ahora, 503
+`base.hub_unavailable`, con su línea en el log (`base.hub_unreachable`, o `base.hub_unavailable` si la BD dice ser de
+otro hub), y erplora.com también reintenta; un cuerpo fuera de contrato, 422 con `fields`; y el sobre de cualquier otra
+negativa de la operación, tal cual.
 
 ## Tenencia: una BD por hub (fase 2, tajada S1)
 
