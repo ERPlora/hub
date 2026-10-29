@@ -31,6 +31,7 @@ from django.core.files.storage import storages
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Value
 from django.db.models.functions import Concat, Lower
+from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
 from live.errors import (
@@ -128,7 +129,8 @@ from apps.whatsapp_inbox.schemas import (
     template_variables,
 )
 from base import outbound
-from base.files import STORE_ERRORS
+from base.files import STORE_ERRORS, human_space, space_limit, used_bytes
+from base.models import Hub
 from base.operations import hub_id
 
 logger = logging.getLogger(__name__)
@@ -181,6 +183,8 @@ SAMPLE_WRONG_TYPE = {
 }
 SAMPLE_TOO_HEAVY = _("This file weighs more than %(mb)s MB: choose a lighter one.")
 SAMPLE_NOT_KEPT = _("The file could not be kept: the business's file store did not answer. Try again in a moment.")
+#: Files' own refusal (``base.file_no_space``): the header's files take the plan's space as the business's files do.
+NO_SPACE = _("There is no space left for that file: your plan includes %(space)s.")
 ALREADY_ASSIGNED = _("This conversation is already with %(name)s.")
 ONLY_YOURSELF = _("You may only assign conversations to yourself.")
 NOBODY_CALLED = _("Nobody in this business is called “%(reference)s”.")
@@ -1810,6 +1814,11 @@ def _sample_bytes(data: TemplateSampleUploadIn) -> tuple[bytes, str]:
     return content, kind[1]
 
 
+def _space_limit(ctx: OperationContext) -> int | None:
+    """The space for files the business's plan includes (the SaaS's photo), as Files reads it; ``None``: no limit."""
+    return space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
+
+
 @operation(
     "whatsapp_inbox.template_sample.upload",
     kind="command",
@@ -1831,8 +1840,15 @@ def upload_sample(ctx: OperationContext, data: TemplateSampleUploadIn) -> dict:
     sha = hashlib.sha256(content).hexdigest()
     key = samples.sample_key(hub_id(ctx.scope), sha, content_type)
     store = storages["hub_files"]
+    limit = _space_limit(ctx)
     try:
         if not store.exists(key):
+            # A new file takes the plan's space as one kept in Files does (the same file again is the same object).
+            if limit is not None and used_bytes(store, hub_id(ctx.scope)) + len(content) > limit:
+                # Said in the caller's language, as Files says it (the assistant's call has no request).
+                with translation.override(ctx.language):
+                    said = str(NO_SPACE) % {"space": human_space(limit)}
+                raise Conflict(said, code="base.file_no_space")
             key = store.save(key, ContentFile(content))
     except STORE_ERRORS as exc:
         raise OperationError(str(SAMPLE_NOT_KEPT), code="whatsapp_inbox.sample_not_kept", status=503) from exc

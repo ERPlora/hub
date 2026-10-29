@@ -828,8 +828,10 @@ variables sin numerar en orden o con nombre, una variable sin ejemplo, una varia
 el pie, más de 60 caracteres en la cabecera o el pie, botones mezclados o de más); el mismo nombre en el
 mismo idioma: «Ya hay una plantilla «…» en ese idioma.». Un archivo que no es del tipo elegido se dice
 debajo y no se guarda («Elige una foto JPEG o PNG.», «Elige un vídeo MP4.», «Elige un documento PDF.»), y
-uno que pesa de más también («Este archivo pesa más de 5 MB: elige uno más ligero.»); si no se pudo
-subir: «No se pudo subir el archivo. Inténtalo de nuevo.». Si al entregarla el archivo ya no está en los
+uno que pesa de más también («Este archivo pesa más de 5 MB: elige uno más ligero.»); uno que no cabe en el
+espacio para archivos del plan (lo cuentan juntos los archivos del negocio y los de las cabeceras), como
+en Archivos: «No queda espacio para ese archivo: tu plan incluye {space}.»; si no se pudo subir: «No se pudo
+subir el archivo. Inténtalo de nuevo.». Si al entregarla el archivo ya no está en los
 archivos del negocio, la lista dice «No aceptada: El archivo de la cabecera ya no está en los archivos del
 negocio: vuelve a elegirlo con Editar.». Si Meta no la acepta o pide esperar, la lista
 dice «No aceptada: …» con el motivo de Meta («Meta no ha contestado. Inténtalo de nuevo en unos
@@ -937,7 +939,8 @@ publicidad por WhatsApp.»); una plantilla no aprobada, borrada o que el Hub no 
 puede elegir; faltan variables: «Rellena todas las variables de la plantilla.»; un número incompleto:
 «Esto no es un número de teléfono.» y no se guarda nada; sin el archivo de su cabecera: «Elige el archivo de
 la cabecera: la plantilla se envía con él.»; un archivo que no es del tipo o pesa de más se dice debajo
-(«Elige una foto JPEG o PNG.») y no se guarda. Si al entregarlo el archivo ya no está en los archivos del
+(«Elige una foto JPEG o PNG.») y no se guarda, igual que uno que no cabe en el espacio del plan (F29). Si al
+entregarlo el archivo ya no está en los archivos del
 negocio, el mensaje dice «El archivo de la cabecera ya no está en los archivos del negocio: vuelve a enviar
 la plantilla eligiendo su archivo.»; si Meta no toma el archivo o no contesta, «Meta no ha contestado.
 Inténtalo de nuevo en unos minutos.» y se vuelve a entregar con la misma clave (nunca culpa a ERPlora); el
@@ -1175,7 +1178,10 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
   `sha256`, tipo, tamaño y nombre. No se sirve en `/p/media/`; una plantilla lo referencia con `PROTECT`.
   Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.MAX_FILE_BYTES`,
-  25 MB; Meta admite 100).
+  25 MB; Meta admite 100). Un archivo nuevo cabe en el espacio del plan como en Archivos
+  (`base.files.space_limit` del `plan.max_storage_bytes` de la foto del SaaS frente a `base.files.used_bytes`,
+  que ya cuenta `whatsapp_inbox/`): fuera de él, 409 `base.file_no_space` con el texto de Archivos en el idioma
+  de quien llama; el mismo archivo otra vez no ocupa más.
 
 Mensajes recibidos y enviados: el admin los enseña en **solo lectura** (son lo que llevó WhatsApp; se
 corrigen borrando los datos de la conversación, nunca editando), con borrado para el staff.

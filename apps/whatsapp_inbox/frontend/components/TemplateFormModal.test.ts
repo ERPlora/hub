@@ -339,6 +339,16 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     expect(s.field('header-file-name')).toBeNull();
   });
 
+  it('no space left in the plan for files is said under the field, as Files says it', async () => {
+    const s = await setup(null, 'es');
+    await s.choose('header-format', 'IMAGE');
+    const message = 'No queda espacio para ese archivo: tu plan incluye 1 GB.';
+    s.answer(409, { error: { code: 'base.file_no_space', message } });
+    await pick(s, photo());
+    expect(s.field('header-file-error').textContent).toContain(message);
+    expect(s.field('header-file-name')).toBeNull();
+  });
+
   it('a refusal of the template’s file on saving is said under it', async () => {
     const s = await setup();
     await s.choose('header-format', 'IMAGE');

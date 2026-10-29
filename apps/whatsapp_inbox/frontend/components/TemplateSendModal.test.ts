@@ -200,5 +200,17 @@ describe('TemplateSendModal: a header with a file (WHATSAPP_INBOX-F33)', () => {
     expect(s.sent()).toHaveLength(before);
     expect(s.send().disabled).toBe(true);
   });
+
+  it('no space left in the plan for files is said under the field and nothing is chosen', async () => {
+    const s = await setup('es');
+    await s.result(OP, PHOTO_TEMPLATES);
+    await s.pick('t4');
+    const message = 'No queda espacio para ese archivo: tu plan incluye 1 GB.';
+    s.answer(409, { error: { code: 'base.file_no_space', message } });
+    await choose(s, photo());
+    expect(s.inDoc('whatsapp-inbox-template-file-error')?.textContent).toContain(message);
+    expect(s.inDoc('whatsapp-inbox-template-file-empty')?.textContent).toContain('Ningún archivo elegido');
+    expect(s.send().disabled).toBe(true);
+  });
 });
 

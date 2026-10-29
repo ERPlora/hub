@@ -4,9 +4,10 @@ The file is chosen in the template's sheet and kept in the hub's file store (``s
 ``hub-<hex>/whatsapp_inbox/samples/``, named by its content, as the website keeps its images); the template names it,
 and its hand-over to erplora.com (door 8, after the COMMIT, with no transaction open) carries it in base64 so that
 erplora.com uploads it to Meta as the header's sample before registering the template. Meta asks for the sample on
-every review, so an edit and «Send to Meta again» carry it too, with the same key. The Hub does not fill such a header
-when sending yet (F33): the template is edited here but not offered to send. Cases of the old product
-(gh:hub#2232, gh:saas#2377) and «Meta did not answer» never blamed on ERPlora (gh:hub#2731).
+every review, so an edit and «Send to Meta again» carry it too, with the same key. The file takes the plan's space
+for files as Files counts it, and past it is refused as Files refuses. Sending such a template is F33
+(``test_template_send_header_file.py``). Cases of the old product (gh:hub#2232, gh:saas#2377) and «Meta did not
+answer» never blamed on ERPlora (gh:hub#2731).
 """
 
 import base64
@@ -154,6 +155,65 @@ def test_whoever_answers_uploads_a_file_but_a_viewer_does_not():
     assert upload(ctx=ctx_for("hub_employee")).name == "carta.jpg"
     with pytest.raises(PermissionDenied):
         upload(ctx=replace(ctx_for("hub_employee"), permissions=frozenset({"whatsapp_inbox.view"})))
+
+
+# ── The plan's space for files, the same as Files ───────────────────────────────────────────────
+
+
+def plan_space(limit: int, slug: str = "a") -> None:
+    """The SaaS's photo of ``slug`` includes ``limit`` bytes for the business's files."""
+    Hub.objects.filter(slug=slug).update(state={"plan": {"max_storage_bytes": limit}})
+
+
+def files_upload(content: bytes, name: str = "lleno.pdf", ctx=None):
+    """Files (``base.file.upload``) keeps ``content`` at the root of the business's files."""
+    return run("base.file.upload", {"folder": "", "name": name, "content_base64": b64(content)}, ctx)
+
+
+def test_a_file_past_the_plans_space_is_refused_with_the_reason_and_code_of_files(hub_files):
+    plan_space(len(PDF) + 10)
+    files_upload(PDF)
+
+    said = {}
+    for language in ("en", "es"):
+        with pytest.raises(Conflict) as refused:
+            upload(ctx=ctx_for(language=language))
+        with pytest.raises(Conflict) as by_files:
+            files_upload(JPEG, "carta.jpg", ctx_for(language=language))
+        assert (refused.value.status, refused.value.code) == (409, "base.file_no_space")
+        assert refused.value.message == by_files.value.message
+        said[language] = refused.value.message
+
+    assert said["en"] != said["es"]
+    assert not TemplateSample.objects.exists()
+    assert hub_files.listdir(f"hub-{Hub.objects.get(slug='a').id.hex}")[0] == ["files"]
+
+
+def test_up_to_the_plans_space_the_file_is_kept_and_files_counts_it(hub_files):
+    plan_space(len(PDF) + len(JPEG))
+    files_upload(PDF)
+
+    out = upload()
+
+    assert TemplateSample.objects.get(pk=out.id).size == len(JPEG)
+    with pytest.raises(Conflict) as full:
+        files_upload(b"%PDF-1.7\n", "otro.pdf")
+    assert full.value.code == "base.file_no_space"
+
+
+def test_the_same_file_again_takes_no_more_space(hub_files):
+    plan_space(len(JPEG))
+    first = upload(name="carta.jpg")
+
+    again = upload(name="menu.jpg")
+
+    assert TemplateSample.objects.get(pk=again.id).key == TemplateSample.objects.get(pk=first.id).key
+
+
+def test_without_a_space_in_its_plan_another_business_keeps_its_file(hub_files):
+    plan_space(len(JPEG) - 1)
+
+    assert upload(ctx=ctx_for(scope=B)).name == "carta.jpg"
 
 
 # ── Creating a template with it (F29) ───────────────────────────────────────────────────────────
