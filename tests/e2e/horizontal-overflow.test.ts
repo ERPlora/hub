@@ -176,4 +176,34 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
     const child = ['const element = document.body.appendChild(document.createElement(tag));', 'return element.scrollWidth;'];
     expect(documentMeasures('c.ts', child.join('\n'))).toEqual([]);
   });
+
+  it('the count reads the width taken from the root, the root found by its selector or its locator, and a measure split over lines', () => {
+    const copies = [
+      ['const { scrollWidth, clientWidth } = document.documentElement;', 'return scrollWidth - clientWidth;'],
+      ["const html = document.querySelector('html')!;", 'return html.scrollWidth - innerWidth;'],
+      ["return document.querySelector('body')?.scrollWidth ?? 0;"],
+      ["const overflow = await page.locator('html').evaluate((html) => html.scrollWidth - html.clientWidth);"],
+      ["const wide = await page.$eval('body', (body) => body.scrollWidth > innerWidth);"],
+      ['const { scrollWidth } = await content.getScrollElement();'],
+      ['page.evaluate(() =>', '  document.documentElement', '    .scrollWidth - window.innerWidth)'],
+      ['const overflow = await page', "  .locator(':root')", '  .evaluate((root) => root.scrollWidth - root.clientWidth);'],
+    ];
+    expect(copies.map((copy) => documentMeasures('d.ts', copy.join('\n')))).toEqual([
+      ['d.ts:1'],
+      ['d.ts:2'],
+      ['d.ts:1'],
+      ['d.ts:1'],
+      ['d.ts:1'],
+      ['d.ts:1'],
+      ['d.ts:2'],
+      ['d.ts:1'],
+    ]);
+    const none = [
+      ['const { scrollWidth } = table;'],
+      ['const { scrollHeight, clientHeight } = document.documentElement;'],
+      ["await page.locator('body').press('Escape');"],
+      ['const cut = await page', "  .locator('.label')", '  .evaluate((label) => label.scrollWidth > label.clientWidth);'],
+    ];
+    expect(none.map((lines) => documentMeasures('d.ts', lines.join('\n')))).toEqual(none.map(() => []));
+  });
 });
