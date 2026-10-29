@@ -8,7 +8,7 @@ import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { errorFrame, flush, MANAGER, type MountOptions, mountInbox } from '../__tests__/mount-inbox';
+import { ADMIN, errorFrame, flush, MANAGER, type MountOptions, mountInbox } from '../__tests__/mount-inbox';
 import type { ChannelOut, TemplateOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
 
@@ -291,6 +291,22 @@ describe('SettingsPage: making, changing and deleting templates (WHATSAPP_INBOX-
     s.table().vm.$emit('action', { actionId: 'retry', row: template({ submit_state: 'failed' }) });
     await flush();
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/whatsapp_inbox/templates/retry', query: {}, body: { id: 't1' } }]);
+  });
+});
+
+describe('SettingsPage: «What do you use it for?» (WHATSAPP_INBOX-F14, F15)', () => {
+  it('offers the automatic answers between the month and the templates when Citas or Reservas is on', async () => {
+    const session = { ...ADMIN, apps: [{ label: 'flow', state: 'on' as const }, { label: 'appointment', state: 'on' as const }] };
+    const s = await setup({ session });
+    const blocks = s.wrapper.findAll('.wa-settings__block').map((block) => block.attributes('data-testid'));
+    expect(blocks.indexOf('whatsapp-inbox-autoreply')).toBe(blocks.indexOf('whatsapp-inbox-settings-month') + 1);
+    expect(s.params('flow.recipe.list')).toEqual([{}]);
+  });
+
+  it('a business with neither Citas nor Reservas sees no such block and asks nothing of Automatizaciones', async () => {
+    const s = await setup();
+    expect(s.find('whatsapp-inbox-autoreply').exists()).toBe(false);
+    expect(s.params('flow.recipe.list')).toEqual([]);
   });
 });
 

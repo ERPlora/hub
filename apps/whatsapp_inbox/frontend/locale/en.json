@@ -52,7 +52,8 @@
       "goToSettings": "Go to Settings",
       "capReached": "You have used all the WhatsApp messages of your plan this month. Messages keep arriving here, but nothing can be sent until next month or until you upgrade the plan.",
       "notIncluded": "Your plan does not include WhatsApp messages. Messages keep arriving here, but nothing can be sent until you upgrade the plan.",
-      "erased": "The data of this number has been erased."
+      "erased": "The data of this number has been erased.",
+      "needsAttention": "Needs attention"
     },
     "conversation": {
       "close": "Close",
@@ -294,6 +295,52 @@
         "disconnectStays": "The conversations kept stay.",
         "disconnected": "WhatsApp disconnected.",
         "noNumber": "erplora.com had no number connected for this business."
+      }
+    },
+    "autoReplies": {
+      "title": "What do you use it for?",
+      "loadError": "The automatic answers could not be loaded.",
+      "on": "On",
+      "off": "Off",
+      "turnOn": "Turn on",
+      "turnOff": "Turn off",
+      "notNow": "Not now",
+      "exclusive": "Only one automatic answer can answer on your number: turning this one on turns «{other}» off.",
+      "both": "“{other}” is on too: each message gets two automatic answers. Turn off the one you do not use.",
+      "onlyOwner": "Only an owner or an admin can turn it on.",
+      "needsApp": "“{name}” needs the app {apps}.",
+      "seeApps": "See apps",
+      "outdated": "There is an improved version of this automatic answer.",
+      "update": "Update",
+      "updateTitle": "Update the automatic answer",
+      "updateConfirm": "The new one replaces the current one, also the changes made by hand, and it stays on or paused as it is.",
+      "updated": "Done: this automatic answer already works with the latest version.",
+      "gone": "This automatic answer no longer exists here: turn it on again.",
+      "updateFailed": "Could not update. Try again.",
+      "reviewFirst": "I review them first",
+      "apps": {
+        "flow": "Automations",
+        "appointment": "Appointments",
+        "reservation": "Reservations",
+        "customer": "Customers"
+      },
+      "appointments": {
+        "name": "Book appointments",
+        "explain": "WhatsApp answers by itself: it reads your diary, offers the free times, and books or moves the appointment of the customer who writes once you say yes.",
+        "confirm": "WhatsApp will answer by itself: it reads your diary, offers the free times, and books or moves the appointment of the customer who writes once you say yes.",
+        "done": "Done. Write to yourself from another phone: “I want an appointment tomorrow”.",
+        "confirmSelf": "Appointments confirm by themselves",
+        "review": "Each new appointment waits for you in the Diary with “Confirm”.",
+        "confirmError": "Could not save how appointments confirm. Try again."
+      },
+      "tables": {
+        "name": "Book a table",
+        "explain": "WhatsApp answers by itself: it checks the free tables, books the table of whoever writes once you say yes, and answers them.",
+        "confirm": "WhatsApp will answer by itself: it checks the free tables, books the table of whoever writes once you say yes, and answers them. Turn it on?",
+        "done": "Done. Write to yourself from another phone: “I want a table for two tomorrow”.",
+        "confirmSelf": "Reservations confirm by themselves",
+        "review": "Each new reservation waits for you in Reservations with “Confirm”.",
+        "confirmError": "Could not save how reservations confirm. Try again."
       }
     }
   }

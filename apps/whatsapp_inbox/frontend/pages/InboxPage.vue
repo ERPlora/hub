@@ -6,7 +6,8 @@
 // 50 a page, the latest activity first. «Open» (or the row) opens the conversation in a panel above the
 // list, kept in the address (`?conversation=`). Above it: «Reconnecting…», the number not connected or to
 // reconnect («Go to Settings», where it is connected, for whoever configures), the month's messages spent or a plan
-// that includes none (with «Upgrade plan», erplora.com's plans, for whoever configures), a number erased.
+// that includes none (with «Upgrade plan», erplora.com's plans, for whoever configures), a number erased. A
+// conversation an automatic answer could not answer says «Needs attention» by its name (F20).
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -14,6 +15,7 @@ import {
   DataTable,
   EmptyState,
   InlineFeedback,
+  StatusPill,
 } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -281,7 +283,16 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           class="wa-inbox__contact"
           :class="{ 'wa-inbox__contact--unread': row.unread_count > 0 }"
         >
-          {{ row.display_name }}
+          <span class="wa-inbox__name">
+            {{ row.display_name }}
+            <StatusPill
+              v-if="row.flagged"
+              tone="warning"
+              size="sm"
+              data-testid="whatsapp-inbox-flagged"
+              :label="t('whatsapp_inbox.inbox.needsAttention')"
+            />
+          </span>
           <small
             v-if="previewOf(row)"
             class="wa-inbox__preview"
@@ -327,6 +338,13 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
 .wa-inbox__contact {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+.wa-inbox__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
   min-width: 0;
 }
 .wa-inbox__contact--unread {

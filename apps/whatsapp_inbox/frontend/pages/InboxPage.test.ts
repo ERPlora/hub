@@ -39,6 +39,7 @@ const row = (over: Partial<ConversationOut> = {}): ConversationOut => ({
   last_message_direction: 'inbound',
   last_message_kind: 'text',
   last_inbound_at: '2026-03-10T08:00:00Z',
+  flagged: false,
   created_at: '2026-03-10T08:00:00Z',
   ...over,
 });
@@ -109,6 +110,12 @@ describe('InboxPage: the live list', () => {
     const s = await setup();
     await s.result(LIST, PAGE);
     expect(s.wrapper.findAll('[data-testid="whatsapp-inbox-unread"]').map((cell) => cell.text())).toEqual(['2', '—']);
+  });
+
+  it('a conversation an automatic answer could not answer says «Needs attention» next to its name (WHATSAPP_INBOX-F20)', async () => {
+    const s = await setup();
+    await s.result(LIST, { ...PAGE, rows: [row({ flagged: true }), row({ id: 'c2' })], total: 2 });
+    expect(s.wrapper.findAll('[data-testid="whatsapp-inbox-flagged"]').map((chip) => chip.text())).toEqual(['Needs attention']);
   });
 
   it('a last message without text is named by its type, in the reader’s language', async () => {
