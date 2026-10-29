@@ -25,7 +25,7 @@ from apps.appointment.tests.conftest import MONDAY, anytime, assign, make_member
 from apps.customer.models import Customer
 from apps.flow.models import FlowRun, Question
 from apps.reservation.models import Reservation, WaitlistEntry
-from apps.reservation.tests.conftest import open_week, set_rules
+from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run
 from base import catalog, worker
@@ -322,3 +322,30 @@ def test_with_no_room_the_guest_is_written_on_the_waiting_list_after_the_owner_s
     entry = WaitlistEntry.objects.get()
     assert (entry.customer_id, entry.guest_phone, entry.party_size) == (card.id, LUCIA, 4)
     assert outbound()[-1] == "Te he apuntado en la lista de espera para el sábado a las 21:00."
+
+
+def test_a_guest_moves_their_table_and_after_the_owner_s_yes_it_is_at_the_new_time(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    booked = make_reservation(date=day, time="21:00", customer_id=card.id, guest_name="Lucía", guest_phone=LUCIA, party_size=4)
+    gateway.reply(CHAT, json=wants("reservation.reservation.update", {"id": str(booked.id), "time": "22:00"}))
+    gateway.reply(CHAT, json=said("Hecho: os esperamos el sábado a las 22:00."))
+    lucia_writes("¿Podemos pasarla a las 22?")
+
+    tick()
+    booked.refresh_from_db()
+    assert booked.time == dt.time(21, 0)  # it waits for the owner's yes
+    assert str(booked.id) in gateway.sent(CHAT)[0].body["messages"][0]["content"]  # her latest, read before
+
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    booked.refresh_from_db()
+    assert booked.time == dt.time(22, 0)
+    assert outbound()[-1] == "Hecho: os esperamos el sábado a las 22:00."
