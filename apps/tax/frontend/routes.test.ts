@@ -52,4 +52,11 @@ describe('tax routes.ts', () => {
     const paths = [...appsPy.matchAll(/Nav\(.*"(\/tax\/[a-z]+)"\)/g)].map((m) => m[1]);
     expect(paths).toEqual(routes.map((r) => r.path));
   });
+
+  it('has a page where the Home sends its step «Your taxes» (the `route` of apps.py)', () => {
+    const appsPy = readFileSync(join(HERE, '..', 'apps.py'), 'utf8');
+    const sent = [...appsPy.matchAll(/route="(\/tax\/[a-z]+)"/g)].map((m) => m[1]);
+    expect(sent).toEqual(['/tax/rules']);
+    expect(routes.map((r) => r.path)).toContain(sent[0]);
+  });
 });

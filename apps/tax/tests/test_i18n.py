@@ -90,6 +90,8 @@ def visible_texts() -> set[str]:
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        # The Home's step (FIX-TAX-SETUP-HOOKS).
+        *(text for step in config.setup for text in (step.title, step.description)),
         *MESSAGES,
         *(v.message for v in TaxCategory._meta.get_field("key").validators if isinstance(v, RegexValidator)),
     ]

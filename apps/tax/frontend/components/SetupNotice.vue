@@ -4,7 +4,8 @@
 // manage taxes: the step is for whoever can fix it. The Hub does
 // not keep the business's country yet, so a rule of any country counts (`tax.rule.status` without one).
 // The market warns where taxes are set up (WooCommerce, Shopify, Toast) as well as in a start checklist
-// (Square, Odoo, Lightspeed); the Hub has no such checklist yet, so the tax screens carry it.
+// (Square, Odoo, Lightspeed): the Home's «Finish setting up your business» carries the same step, with the
+// same query and words (apps.py `setup`, FIX-TAX-SETUP-HOOKS).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';
