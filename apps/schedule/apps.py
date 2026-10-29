@@ -6,7 +6,9 @@ app knows nobody of the team and requires no other app (WORKBOOK «Referencia ad
 
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
-from live.meta import Category, LiveAppConfig, Nav
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
+
+from apps.schedule.events import WEEK_UPDATED
 
 
 class ScheduleConfig(LiveAppConfig):
@@ -58,4 +60,27 @@ class ScheduleConfig(LiveAppConfig):
             "/schedule/special-days",
         ),
         Nav("settings", pgettext_lazy("schedule section", "Settings"), "ion:settings-outline", "/schedule/settings"),
+    ]
+    # The Home's hook (PLAN-HUB round 2026-10-21): the old module's own item «Confirm your opening hours» (module.json
+    # `setup`, schedules#42), order 101 and recommended, done once a person confirmed the default week or saved a day of
+    # it (the settings' ``hours_confirmed``), for whoever changes the hours, leading to the week. Refreshed on the only
+    # event that sets it. The old module declared no panel and no bell row.
+    setup = [
+        SetupStep(
+            key="hours",
+            operation="schedule.settings.get",
+            configured_when=[SetupCheck(field="hours_confirmed", truthy=True)],
+            title=_("Confirm your opening hours"),
+            description=_(
+                "We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches your business, "
+                "confirm it in one tap; if not, edit the days that differ — bookings outside your opening hours are "
+                "refused."
+            ),
+            icon="ion:time-outline",
+            route="/schedule/hours",
+            permission="schedule.change",
+            order=101,
+            required=False,
+            refresh_on=[WEEK_UPDATED],
+        )
     ]

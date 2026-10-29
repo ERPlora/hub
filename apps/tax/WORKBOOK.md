@@ -2,8 +2,7 @@
 Prefijo: TAX
 Alcance MVP: transversal
 Estado de la app: completa (2026-10-22)
-Lo que no entra todavía: ver «Lo que queda fuera». El paso «Tus impuestos» de la lista «Termina de configurar
-tu negocio» del Inicio espera a que el Inicio tenga esa lista.
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `tax`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -60,8 +59,8 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
   **Impuestos → Ajustes** (TAX-F11). Ventas, Facturación, las pantallas y el asistente calculan con los
   dos mientras no se pregunte por otro país.
 - Las reglas de fábrica son solo de España. Un negocio de otro país (cuando la cuenta de ERPlora lo traiga)
-  tendrá que crear las suyas (TAX-F04); el aviso «Tus impuestos» (TAX-F17) todavía no lo detecta, porque
-  cuenta las reglas de cualquier país.
+  tendrá que crear las suyas (TAX-F04); ni el aviso «Tus impuestos» ni el paso del Inicio (TAX-F17) lo
+  detectan todavía, porque cuentan las reglas de cualquier país.
 - **«Hoy» es la hora de Madrid** en la fase 1: Impuestos todavía no usa la zona horaria del negocio.
   El día en que cambia un tipo (TAX-F07) empieza a medianoche de Madrid; en Canarias (TAX-F11), una
   hora antes de su medianoche. Cuando use la del negocio, «hoy» será el suyo.
@@ -79,7 +78,8 @@ Configuración inicial, paso a paso:
 
 Impuestos se abre desde el menú **Impuestos** y tiene cuatro pestañas en la barra de abajo:
 **Categorías**, **Reglas**, **Alias** y **Ajustes**. Mientras ningún tipo esté vigente, las tres primeras llevan arriba el
-aviso «Tus impuestos» para quien puede gestionarlos (TAX-F17). Todas siguen el permiso de quien mira: con solo consulta
+aviso «Tus impuestos» para quien puede gestionarlos, el mismo paso que trae el Inicio en «Termina de configurar tu
+negocio» (TAX-F17). Todas siguen el permiso de quien mira: con solo consulta
 sale el aviso «Puedes consultar las reglas fiscales pero no modificarlas.», desaparece el botón **+** y,
 en Reglas, las acciones de fila. La app exige el permiso en cada acción aunque la pantalla enseñe el
 botón.
@@ -469,24 +469,31 @@ Si falla: nunca pisa una fila que ya existe ni duplica nada.
 Implicados: ninguno
 
 ### TAX-F17 Avisar de que faltan tipos para el país del negocio
-<!-- origen: old:taxes/WORKFLOW.md#taxes-f17 wf:alta#rec_alta-f09 -->
+<!-- origen: old:taxes/WORKFLOW.md#taxes-f17 wf:alta#rec_alta-f09 old-hub:HUB_SHELL-F27 gh:taxes#19 -->
 Estado: hecho
 Actor: propietario, administrador, responsable
-Pantalla: Categorías, Reglas y Alias
+Pantalla: Inicio, Categorías, Reglas y Alias
 Pasos:
-1. Abre **Impuestos**: mientras ninguna regla raíz activa esté vigente hoy, arriba de Categorías, Reglas y
-   Alias sale el aviso «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el
-   TPV pueda calcular el precio de una venta.»), solo para quien puede gestionar impuestos.
-2. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+** (TAX-F04). En
+1. En el **Inicio**, mientras ninguna regla raíz activa esté vigente hoy, «Termina de configurar tu negocio»
+   trae «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular
+   el precio de una venta.»), «Importante», a quien puede gestionar impuestos. «Configurar» lleva a la
+   pestaña **Reglas** de Impuestos.
+2. Abre **Impuestos**: mientras tanto, arriba de Categorías, Reglas y Alias sale el mismo aviso «Tus
+   impuestos», solo para quien puede gestionar impuestos.
+3. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+** (TAX-F04). En
    Reglas el aviso no lleva botón.
-3. En cuanto una regla raíz activa está vigente hoy, el aviso desaparece solo.
-Entra: las reglas de cualquier país (el aviso todavía no mira el del negocio).
-Sale: cuántas reglas aplican hoy y si los impuestos están configurados. No bloquea vender por sí mismo.
+4. En cuanto una regla raíz activa está vigente hoy, el aviso desaparece solo y el paso del Inicio queda
+   «Hecho» sin recargar.
+Entra: las reglas de cualquier país (ni el aviso ni el paso miran todavía el del negocio).
+Sale: cuántas reglas aplican hoy y si los impuestos están configurados. No bloquea vender por sí mismo. Si
+la última regla vigente termina (TAX-F07) o se desactiva (TAX-F08), el paso del Inicio vuelve a pendiente
+solo, y al reactivarla (TAX-F08) o crear otra (TAX-F04, TAX-F12) vuelve a «Hecho». Cambiar el territorio
+fiscal (TAX-F11) no lo mueve.
 Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Hoy cuenta las reglas de
 cualquier país y de cualquier territorio: un negocio de Canarias sin ninguna regla de IGIC no ve el aviso,
 aunque el TPV le explica el motivo al cobrar y la ayuda de Ajustes lo dice (TAX-F11). Una regla exenta o
 de IGIC también cuenta: un negocio que solo vende servicios exentos está bien configurado.
-Implicados: ninguno
+Implicados: BASE-F01
 
 ### TAX-F18 Calcular el impuesto de un importe
 <!-- origen: wf:cadena-fiscal#rec_fiscal-f04 fi:modules/taxes#command-handler-wasm-taxes-calculate-calculate_tax old-hub:HUB-F18 old:taxes/WORKFLOW.md#taxes-f18 qa:modules/taxes/vat-rates-and-breakdown -->
@@ -550,7 +557,7 @@ reactivarla, la última desactivada).
 | Las categorías, con búsqueda, filtro de origen, páginas (hasta 100) y su tipo vigente hoy en un país y región | ver | F01, F19 | `tax.category.list` |
 | Una categoría por su clave, con su nombre traducido | ver | F02, F19 | `tax.category.get` |
 | Las reglas, con búsqueda, filtros (país, región, categoría, tipo, calificación, estado) y páginas | ver | F03 | `tax.rule.list` |
-| Cuántas reglas raíz aplican hoy en el país del negocio y si los impuestos están configurados | ver | F17 | `tax.rule.status` |
+| Cuántas reglas raíz aplican hoy en el país del negocio y si los impuestos están configurados (el aviso y el paso «Tus impuestos» del Inicio) | ver | F17 | `tax.rule.status` |
 | Las reglas raíz de las que puede colgar un componente en un país, región y categoría: las mismas que acepta el alta (también una raíz que empieza en el futuro; una sin impuesto, solo para un componente al 0 %) | ver | F06 | `tax.rule.parent_candidates` |
 | Los países en los que el negocio tiene reglas (todas, activas o desactivadas), para el filtro País | ver | F03, F11 | `tax.rule.countries` |
 | Los alias, con búsqueda, filtros (categoría, origen) y páginas | ver | F13, F15 | `tax.alias.list` |
@@ -710,7 +717,17 @@ cajero del producto actual es un empleado.
   Central) y en la propia pantalla de impuestos (WooCommerce, Shopify, Toast). El aviso va en Categorías,
   Reglas y Alias y lee `tax.rule.status` sin país; el paso «Tus impuestos» de la lista «Termina de
   configurar tu negocio» del Inicio (ronda 2026-10-21 de `PLAN-HUB.md`, que trae esa lista a `base`)
-  leerá la misma consulta (ver «Lo que queda fuera»).
+  lee la misma consulta y dice las mismas palabras (FIX-TAX-SETUP-HOOKS).
+- **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-TAX-SETUP-HOOKS): `TaxConfig.setup` declara el `setup` del
+  módulo viejo (`module.json`, taxes#19): clave `tax.rules`, sobre `tax.rule.status` sin país, hecho con
+  `configured` (el mismo campo que lee el aviso; el viejo miraba `matching_rules`, que es lo mismo), orden 20,
+  `required` (nivel «Importante»), permiso `tax.manage`, ruta `/tax/rules` y `refresh_on`
+  `events.RULE_IN_FORCE_EVENTS` (regla creada, una o varias; terminada; desactivada; reactivada). El cambio de
+  territorio (`tax.settings.updated`) no entra: el paso cuenta reglas de cualquier país y región. Una regla con
+  fecha de inicio futura que empieza a regir no emite evento: el Inicio la ve al volver a abrirse, como el aviso.
+  El título y la descripción son los del aviso (el viejo decía `Set the VAT rates for the country you sell in,
+  so the till can price a sale.`), con su español en `locale/`. Sin paneles ni campana: el módulo viejo no los
+  declaraba. Pruebas: `tests/test_apps.py` y `tests/test_integration_home.py` (con `base` real y dos hubs).
 - **Decisión de mercado: el territorio fiscal del negocio (TAX-F11)**: vive en Impuestos, en la pestaña
   **Ajustes**, como el «país fiscal» de Odoo en los ajustes de Contabilidad y el régimen IGIC de Holded o Sage
   en los de impuestos; Square, Shopify y Toast lo sacan de la dirección del local. El país no se edita aquí:
@@ -719,13 +736,8 @@ cajero del producto actual es un empleado.
 
 ## Lo que queda fuera
 
-- **El paso «Tus impuestos» de «Termina de configurar tu negocio» del Inicio** (TAX-F17): es
-  `FIX-TAX-SETUP-HOOKS` de la cola, bloqueada hasta que se mergee APP-BASE-1 (hub#168, que trae
-  `base.setup.status`); el punto de extensión `LiveAppConfig.setup` ya está en `packages/live` (hub#167).
-  Ni está hecho ni se simula: `tax.rule.status` ya dice si los impuestos están configurados
-  (`configured`), que es lo que el paso leerá, con su texto en el idioma de quien mira (hub#2356).
-- **Que «Tus impuestos» mire el país y el territorio del negocio**: `SetupNotice.vue` pide
-  `tax.rule.status` sin país, así que cuenta las reglas raíz de cualquier país y territorio; un negocio de
+- **Que «Tus impuestos» mire el país y el territorio del negocio**: `SetupNotice.vue` y el paso del Inicio
+  piden `tax.rule.status` sin país, así que cuenta las reglas raíz de cualquier país y territorio; un negocio de
   Canarias, Ceuta o Melilla con solo las reglas de fábrica (IVA) no ve el aviso, aunque el TPV no le deja
   cobrar esas categorías y le dice por qué. Es comportamiento nuevo: aplazado de la migración (ronda
   FIX-TAX-REGION-NATIONAL-FALLBACK de `PLAN-HUB.md`).
@@ -778,9 +790,9 @@ cajero del producto actual es un empleado.
    para llevar o a domicilio, al 21 %, tiene su categoría: `retail.alcohol`. Un hub que ya tuviera la
    semilla anterior recibe `retail.alcohol` (migración 0005) y conserva su regla de
    `restaurant.alcohol`: una migración nunca reescribe un tipo; se cambia con TAX-F07.
-11. **«Tus impuestos» sale en las pantallas de Impuestos** (TAX-F17). En el producto actual era un paso de
-   la lista de primeros pasos del inicio (hub#2356); esa lista vuelve con el Inicio del hub viejo (ronda
-   2026-10-21) y su paso es `FIX-TAX-SETUP-HOOKS` (ver «Lo que queda fuera»).
+11. **«Tus impuestos» sale también en las pantallas de Impuestos** (TAX-F17). En el producto actual era solo un
+   paso de la lista de primeros pasos del inicio (hub#2356); el paso sigue en «Termina de configurar tu negocio»
+   del Inicio, con las mismas palabras que el aviso de Categorías, Reglas y Alias.
 12. **El territorio fiscal se elige en una pantalla** (Impuestos → Ajustes, TAX-F11): antes solo se fijaba
    por la API de ajustes, y Ajustes del Hub dejaba elegir el país (España o Portugal), que ahora es el de
    la cuenta de ERPlora. Solo se admiten los territorios con impuestos propios (Canarias, Ceuta, Melilla),

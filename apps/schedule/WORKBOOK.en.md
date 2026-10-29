@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6dfcc26c1d674d0fad24643ea692fd2cff7b09c08723b39f20fcd3db00649cd7 -->
+<!-- generated from WORKBOOK.md sha256:eb7a16224a983b028946f3cd5bbb0d248707387d282dba462696fbceb3838539 -->
 
 ## What it is for and who it is for
 
@@ -80,7 +80,8 @@ And this is decided here (same comparison):
 2. The business's time zone is the Hub's (SCHEDULE-F09): the whole schedule is read with that clock. In
    phase 1 it is Madrid's.
 3. In **Schedules → Hours**, tap **Yes, these are my hours** if the default week is yours
-   (SCHEDULE-F03), or edit the days that change (SCHEDULE-F02).
+   (SCHEDULE-F03), or edit the days that change (SCHEDULE-F02). Until you do, the Home reminds you with
+   "Confirm your opening hours".
 4. In **Special days**, add the holidays and closures (SCHEDULE-F04) and, for several days in a row, a
    temporary change (SCHEDULE-F05).
 5. If you want the week to start on Sunday, change it in **Settings** (SCHEDULE-F08).
@@ -197,19 +198,26 @@ Involved: Appointments and Reservations (they read the hours on the next booking
 ### SCHEDULE-F03 Confirm the default week
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
-Screen: Hours
+Screen: Home, Hours
 Steps:
-1. With the yellow notice "These are default opening hours…" in sight, check that the days are your
+1. On the **Home**, while the week is the default one, "Finish setting up your business" brings "Confirm
+   your opening hours" ("We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches
+   your business, confirm it in one tap; if not, edit the days that differ — bookings outside your
+   opening hours are refused."), "Recommended", to whoever may change the hours. "Set up" leads to
+   **Hours**.
+2. With the yellow notice "These are default opening hours…" in sight, check that the days are your
    business's.
-2. Tap **Yes, these are my hours**; the button is disabled while it works.
-3. The notice disappears.
+3. Tap **Yes, these are my hours**; the button is disabled while it works.
+4. The notice disappears.
 In: the week that is already saved; no hour is sent, so nobody confirms hours they have not been shown.
 Out: the week marked as confirmed, without changing a single hour, and a notice `schedule.week.updated`. From
 then on the week also governs table reservations (SCHEDULE-F12). Confirming twice changes nothing and
-announces nothing.
+announces nothing. "Confirm your opening hours" is "Done" on the Home without a reload; also if, instead
+of confirming, a day is saved (SCHEDULE-F02), even as closed. Changing "Week starts", a special day or
+a temporary change does not confirm the week.
 If it fails: above the table: "There are no weekly opening hours to confirm." (409 `schedule.no_week`) if
 no day is saved (it cannot be reached from the screen: the notice only shows when there is a week).
-Involved: none
+Involved: BASE-F01
 
 ### SCHEDULE-F04 Add a special day
 Status: done (server and screen)
@@ -408,7 +416,7 @@ choose (`schedule.ambiguous_reference`).
 | The week: the seven days in the order of "Week starts", each one closed, not set or with its intervals, and whether it is confirmed | view | F01, F03 | `schedule.week.get` |
 | The special days with their intervals, with search, filters, sorting and pages (up to 100) | view | F04, F06, F13 | `schedule.special_day.list` |
 | The temporary changes with their intervals, with search, filters, sorting and pages (up to 100) | view | F05, F06, F13 | `schedule.override.list` |
-| The settings and the business's time zone | view | F08, F09 | `schedule.settings.get` |
+| The settings and the business's time zone, and whether the week is confirmed (the "Confirm your opening hours" step of the Home) | view | F03, F08, F09 | `schedule.settings.get` |
 | Is it open at a moment? | view | F10 | `schedule.business.is_open` |
 | The hours of each day of a range | view | F11 | `schedule.hours.for_range` |
 
@@ -452,7 +460,8 @@ booking) and **Reservations** (each table reservation) read the hours of a range
 and catch up with every Schedules notice. Reservations always counts the special days and the temporary
 changes, but the week only once the business saves or confirms it (SCHEDULE-F03): the default week,
 unconfirmed, does not limit it. Both say their days in the same form that Schedules gives ("Tuesday, March
-5, 2030"). Schedules knows nothing of them.
+5, 2030"). Schedules knows nothing of them. The platform (the Home) reads whether the week is confirmed for
+the "Confirm your opening hours" step of "Finish setting up your business" (SCHEDULE-F03).
 
 ### Who can do what
 

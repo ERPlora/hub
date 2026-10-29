@@ -21,5 +21,7 @@ ALL = [
     RULE_ACTIVATED,
     SETTINGS_UPDATED,
 ]
+#: Every event that may change which rules apply today (TAX-F17, the Home's «Your taxes»): a rule, never the region.
+RULE_IN_FORCE_EVENTS = [RULE_CREATED, RULE_ENDED, RULE_DEACTIVATED, RULE_ACTIVATED]
 #: Every event that changes which rate applies: a rule, or the business's region.
-RULE_EVENTS = [RULE_CREATED, RULE_ENDED, RULE_DEACTIVATED, RULE_ACTIVATED, SETTINGS_UPDATED]
+RULE_EVENTS = [*RULE_IN_FORCE_EVENTS, SETTINGS_UPDATED]
