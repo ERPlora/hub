@@ -9,14 +9,16 @@ the message ``queued`` in a short transaction and hands it over after the COMMIT
 (``message.claim_delivery``, ``sending``), the HTTP call with no transaction and no lock, and the answer
 in another short transaction (``message.record_delivery``: ``sent``, ``failed`` with erplora.com's
 reason, or still ``sending`` with why, to retry with the same key). Erasing does the same with the
-number erplora.com has to forget (``forget``). What a crash leaves half-way, the worker's
-``delivery.resume`` hands over again (phase 2). A message is never «sent» without Meta's id.
+number erplora.com has to forget (``forget``), and a template with its registration and deletion at Meta
+(``submit_template``, ``remove_template``). Each hand-over runs in a thread of the process's own
+(``base.outbound``), never in the loop that committed: the worker's relay and tick go on for every hub
+while erplora.com answers. What a crash or a stopping worker leaves half-way, the worker's
+``delivery.resume`` hands over again. A message is never «sent» without Meta's id.
 """
 
 import datetime as dt
 import logging
 import re
-from functools import partial
 from urllib.parse import urlsplit
 from uuid import UUID, uuid7
 
@@ -116,6 +118,7 @@ from apps.whatsapp_inbox.schemas import (
     TemplateWriteIn,
     template_variables,
 )
+from base import outbound
 
 logger = logging.getLogger(__name__)
 
@@ -209,19 +212,18 @@ def _save(instance, *fields: str) -> None:
 
 
 def _after_commit(ctx: OperationContext, job, *args) -> None:
-    """Run ``job(scope, *args)`` once this command's transaction committed: outside it, with no lock.
-
-    Phase 1 runs it at the end of the request; phase 2 also from the worker (``delivery.resume``), and
-    the job enters ``use_hub(hub)`` itself, since it runs outside the request that chose the hub.
-    """
-    transaction.on_commit(partial(job, ctx.scope, *args), robust=True)
+    """Run ``job(scope, *args)`` once this command's transaction committed (never after a rollback): outside it, with
+    no lock, in a thread of the process's own (``base.outbound``) and in this command's database, so that the
+    request, the worker's relay or its tick that committed never waits for erplora.com. A job lost on the way (the
+    process stopped) is found again by ``delivery.resume``: each one claims its row first."""
+    outbound.after_commit(job, ctx.scope, *args)
 
 
 def _after_commit_as(host: str, ctx: OperationContext, job, *args) -> None:
     """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as. A row made
     before its business was recorded (empty ``host``) goes as ``ctx``'s, as it did."""
     scope = Scope(ctx.scope.kind, host) if host else ctx.scope
-    transaction.on_commit(partial(job, scope, *args), robust=True)
+    outbound.after_commit(job, scope, *args)
 
 
 def _conversation_for(phone: str, contact_name: str = "") -> Conversation:
@@ -1099,6 +1101,7 @@ def deliver(scope: Scope, message_id: UUID) -> None:
     claimed = claim(system, MessageRefIn(id=message_id))
     if not claimed.claimed:
         return
+    outbound.release()  # erplora.com is waited for with no connection held
     try:
         reply = gateway.send(
             hub=scope.key,
@@ -1519,6 +1522,7 @@ def forget(scope: Scope, conversation_id: UUID) -> None:
     claimed = claim(system, ConversationRefIn(id=conversation_id))
     if not claimed.claimed:
         return
+    outbound.release()  # erplora.com is waited for with no connection held
     try:
         confirmed = gateway.erase(
             hub=scope.key, phone=claimed.phone, wa_message_ids=claimed.wa_message_ids
@@ -1859,6 +1863,7 @@ def submit_template(scope: Scope, template_id: UUID) -> None:
     claimed = get("whatsapp_inbox.template.claim_submit")(system, TemplateRefIn(id=template_id))
     if not claimed.claimed:
         return
+    outbound.release()  # erplora.com is waited for with no connection held
     try:
         reply = gateway.submit_template(
             hub=scope.key, idempotency_key=str(claimed.submit_key), template=claimed.template
@@ -1885,6 +1890,7 @@ def remove_template(scope: Scope, template_id: UUID) -> None:
     claimed = get("whatsapp_inbox.template.claim_delete")(system, TemplateRefIn(id=template_id))
     if not claimed.claimed:
         return
+    outbound.release()  # erplora.com is waited for with no connection held
     try:
         reply = gateway.delete_template(
             hub=scope.key, name=claimed.name, language=claimed.language, meta_id=claimed.meta_id
