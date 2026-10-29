@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2e40b9469c72a40e14e0d76eee58213bc85fc52db0c7ae2de74de438bafa7fce -->
+<!-- generated from WORKBOOK.md sha256:22e3edf446a9536d235faeb3e5de36f038f4be54f9f85965d5a78d7790670721 -->
 
 ## What it is for and who it is for
 
@@ -223,8 +223,10 @@ In: a jpeg, png or webp file of up to 5 MB and 8000 pixels a side; its content i
 Out: the image kept in the business's file store under a name taken from its content (the same image twice is one
 file), served from the business's own address and kept a year by the browser. Notice `website.image.uploaded`.
 If it fails: under the field: «The file did not arrive whole: choose it again.», «The file is empty.», «The image may
-weigh 5 MB at most.», «This file is not a PNG image.» (or JPEG, WEBP) or «The image may be 8000 pixels a side at
-most.».
+weigh 5 MB at most.», «This file is not a PNG image.» (or JPEG, WEBP), «The image may be 8000 pixels a side at
+most.» or, if the image does not fit in your plan's space (the same one Files' files take), «There is no space left
+for that file: your plan includes {space}.», as in Files. An image uploaded before takes no more and is accepted
+anyway.
 Involved: WEBSITE-F01, WEBSITE-F11
 
 ### WEBSITE-F05 Show the catalog
