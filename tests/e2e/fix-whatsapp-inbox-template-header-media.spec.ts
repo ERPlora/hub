@@ -10,7 +10,7 @@
 // sizes (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-HEADER-MEDIA-NOW-STORABLE-390|834|1440) and the list (…-list-…).
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
+import { A, capture, login, psql, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { BUSINESS_ID, CODE, type GraphThread, HEADER_HANDLE, META_APP, NUMBER_ID, UPLOAD_SESSION, WABA_ID } from './whatsapp-graph';
 import { cleanUp, metaGraph, restorePhoto, seedErplora, system } from './whatsapp-helpers';
@@ -68,7 +68,7 @@ async function shots(page: Page, name: string, ready: (page: Page) => Promise<vo
     await ready(page);
     await settled(page);
     await noHorizontalScroll(page, `${name} ${viewport.label}`);
-    await page.screenshot({ path: shot(`${name}-${viewport.label}`) });
+    await capture(page, `${name}-${viewport.label}`);
   }
   await page.setViewportSize({ width: 1280, height: 860 });
 }

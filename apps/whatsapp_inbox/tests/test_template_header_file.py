@@ -388,3 +388,38 @@ def test_metas_list_with_the_same_photo_header_keeps_the_file(delivered):
 
     row.refresh_from_db()
     assert (row.header_format, row.header_sample_id is not None) == ("IMAGE", True)
+
+
+# ── Never another business's file ───────────────────────────────────────────────────────────────
+
+
+@respx.mock
+def test_a_file_of_another_business_named_by_a_template_is_never_shown_nor_sent(delivered):
+    """Phase 1 shares the tables: a template of ``a`` whose row or edit names ``b``'s file (which the operations never
+    write: they check it) shows no file, and its hand-over carries none, said as a file to choose again."""
+    connect()
+    route = registering()
+    out = delivered(lambda: create(with_file(upload().id)))
+    foreign = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
+    row = Template.objects.get(pk=out.id)
+    edit = {
+        "category": row.category,
+        "header_format": "IMAGE",
+        "header": "",
+        "header_sample": str(foreign.id),
+        "body": row.body,
+        "body_examples": row.body_examples,
+        "footer": row.footer,
+        "buttons": row.buttons,
+    }
+    Template.objects.filter(pk=row.pk).update(header_sample_id=foreign.id, draft=edit, submit_state="failed")
+    calls = route.call_count
+
+    [listed] = run("whatsapp_inbox.template.list", {}).rows
+    assert (listed.header_sample, listed.draft.header_sample) == (None, None)
+
+    delivered(lambda: run("whatsapp_inbox.template.retry", {"id": str(row.id)}))
+
+    assert route.call_count == calls, "b's file never leaves for erplora.com"
+    row.refresh_from_db()
+    assert (row.submit_state, row.submit_error_code) == ("failed", "whatsapp_inbox.header_sample_missing")

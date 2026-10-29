@@ -2065,7 +2065,7 @@ def claim_submit(ctx: OperationContext, data: TemplateRefIn) -> dict:
     if header_format in samples.FILE_HEADERS:
         # Read after the claim's COMMIT, with no connection held (``submit_template``): the key, not the bytes.
         sample = TemplateSample.objects.filter(pk=sample_id, host=row.host).first() if sample_id else None
-        template.update(header_format=header_format, header="")
+        template.update(header_format=header_format)
         if sample is not None:
             template.update(sample_key=sample.key, sample_name=sample.name)
         else:

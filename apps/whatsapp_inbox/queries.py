@@ -689,6 +689,12 @@ def sample_out(sample: TemplateSample | None) -> dict | None:
     }
 
 
+def _its_own(row: Template) -> TemplateSample | None:
+    """The template's header file, only if it is its business's (phase 1 shares the tables)."""
+    sample = row.header_sample
+    return sample if sample is not None and sample.host == row.host else None
+
+
 def _draft_out(row: Template) -> dict | None:
     draft = row.draft
     if not draft:
@@ -712,7 +718,7 @@ def template_out(row: Template) -> dict:
         "status": row.status,
         "header_format": row.header_format,
         "header": row.header,
-        "header_sample": sample_out(row.header_sample),
+        "header_sample": sample_out(_its_own(row)),
         "body": row.body,
         "body_examples": list(row.body_examples or []),
         "footer": row.footer,
