@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils.functional import Promise
+from django.utils.translation import gettext as gettext_
 from django.utils.translation import override
+from live.operations import registry
 
 from apps.whatsapp_inbox import queries, schemas, services
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
@@ -107,7 +109,20 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with override("en"):
-        return {str(text) for text in lazies}
+        return {str(text) for text in lazies} | schema_titles()
+
+
+def schema_titles() -> set[str]:
+    """The titles the inbox's operations give their input data (``gettext_noop``): the assistant's card names each
+    datum by them, so each one needs its Spanish. Only the ones whatsapp_inbox wrote: pydantic leaves ``title``
+    empty otherwise."""
+    return {
+        field.title
+        for op in registry.values()
+        if op.app_label == "whatsapp_inbox"
+        for field in op.input.model_fields.values()
+        if field.title
+    }
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -129,6 +144,17 @@ def test_the_compiled_catalog_is_current():
         msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
     }
     assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+
+
+def test_the_card_says_each_title_with_whatsapp_inboxs_own_spanish():
+    """A title the inbox shares with an app installed before it («Phone», «Template») is said with that app's
+    Spanish, so the inbox's own entry would be dead text: they have to say the same."""
+    with (LOCALE / "django.mo").open("rb") as compiled:
+        own = gettext.GNUTranslations(compiled)
+    titles = schema_titles()
+    assert {"Assigned to", "Template", "WhatsApp Business account"} <= titles
+    with override("es"):
+        assert {title: gettext_(title) for title in titles} == {title: own.gettext(title) for title in titles}
 
 
 def test_spanish_texts():

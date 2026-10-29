@@ -6,6 +6,7 @@ and «a text or a template» is the same rule as sending from the inbox.
 
 from uuid import UUID
 
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ValidationInfo, field_validator
 
@@ -19,6 +20,7 @@ class NotifyIn(Schema):
     )
     template: TemplateSendIn | None = Field(
         None,
+        title=gettext_noop("Template"),
         description="An approved template, for when more than 24 hours have passed since the customer's last "
         "message (WhatsApp lets nothing else through then).",
     )
