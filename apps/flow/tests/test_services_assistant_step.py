@@ -14,10 +14,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import system_context
 
 from apps.flow import gateway as flow_gateway
+from apps.flow import services
 from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
 from base import relay
@@ -309,6 +310,54 @@ def test_ask_me_first_a_change_its_operation_refuses_after_the_yes_goes_back_to_
     assert (call_id, refused["error"]["code"]) == ("call_1", "invalid_payload")
     assert Task.objects.count() == 0
     assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
+
+
+def waiting_change(worker, flow, name="task__task__create"):
+    """A run whose assistant asked for a change that now waits for a yes: its question."""
+    worker.gateway.reply(CHAT, json=wants(name, {"title": "Call Ana"}))
+    ran = start(worker, flow)
+    worker()
+    return ran, Question.objects.get(run_id=ran.id)
+
+
+@pytest.mark.parametrize(("language", "label"), [("en", "«Create a task»"), ("es", "«Crear una tarea»")])
+def test_a_yes_to_a_change_no_longer_granted_names_it_as_the_history_does(gateway, clock, worker, language, label):
+    clock(NOON)
+    worker.gateway = gateway
+    flow = manual([step()])
+    Flow.objects.filter(pk=flow.pk).update(language=language)
+    ran, question = waiting_change(worker, flow)
+    Flow.objects.filter(pk=flow.pk).update(grants=["task.task.list"])
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
+    failed = FlowRun.objects.get(pk=ran.id)
+    assert (failed.status, failed.error_code) == (FlowRun.Status.FAILED, "flow.not_allowed")
+    assert label in failed.error_message
+    assert "task.task.create" not in failed.error_message
+    assert Task.objects.count() == 0
+
+
+def test_a_yes_to_a_change_whose_action_no_longer_exists_says_so_with_no_technical_name(gateway, clock, worker):
+    clock(NOON)
+    worker.gateway = gateway
+    flow = manual([step()])
+    Flow.objects.filter(pk=flow.pk).update(language="es")
+    ran, question = waiting_change(worker, flow)
+    parked = FlowRun.objects.get(pk=ran.id)
+    turn = parked.outputs["_turn"]
+    parked.outputs = {**parked.outputs, "_turn": {**turn, "proposal": {**turn["proposal"], "operation": "gone.thing.create"}}}
+    parked.save(update_fields=["outputs"])
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
+    failed = FlowRun.objects.get(pk=ran.id)
+    assert failed.error_code == "flow.not_allowed"
+    assert failed.error_message == "Esa acción ya no está permitida o disponible, así que el cambio del asistente no se ha hecho."
+
+
+@pytest.mark.parametrize(("language", "label"), [("en", "«Delete · Customers (tag)»"), ("es", "«Borrar · Clientes (tag)»")])
+def test_an_action_with_no_words_of_its_own_is_named_by_its_verb_app_and_thing(language, label):
+    # What the History says of it (``actionLabel`` of frontend/lib/phrasing.ts), never its id.
+    with translation.override(language):
+        said = services._gone("customer.tag.delete", language)
+    assert label in said and "customer.tag.delete" not in said
 
 
 def test_on_its_own_two_changes_at_once_are_both_made_and_both_told(gateway, clock, worker):

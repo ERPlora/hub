@@ -1048,7 +1048,9 @@ repetir nada del negocio y, si sigue igual, se para con el motivo («El asistent
 funciona, no se reintentan («Los mensajes del asistente de este mes se han acabado…»). Todas se pueden reanudar
 (FLOW-F24) o seguir con «Si falla, sigue» (FLOW-F25). Si el proceso se cae mientras piensa, se lo vuelve a pedir a
 los 5 minutos, desde lo que ya había hecho. Si alguien dice que sí cuando la acción ya no está concedida, no se
-hace: ««…» ya no está permitida o disponible, así que el cambio del asistente no se ha hecho.».
+hace, y el aviso la nombra como el historial: ««…» ya no está permitida o disponible, así que el cambio del
+asistente no se ha hecho.»; si la acción ya no existe, «Esa acción ya no está permitida o disponible, así que el
+cambio del asistente no se ha hecho.».
 Implicados: FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F29, FLOW-F30, FLOW-F37, FLOW-F39
 
 ### FLOW-F39 El SaaS atiende el paso de IA de una automatización

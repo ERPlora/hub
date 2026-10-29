@@ -18,10 +18,12 @@ started by an event that a run of the same automation caused, or by a chain of m
 """
 
 import datetime as dt
+import functools
 import json
 import logging
 import uuid
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import pydantic
@@ -31,7 +33,7 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
-from live.operations import Operation, get, operation
+from live.operations import Operation, UnknownOperation, get, operation
 from live.outbox import record_event
 
 from apps.flow import document, events, gateway, http, recipes, vault
@@ -177,6 +179,7 @@ ASSISTANT_UNAVAILABLE = _("The assistant could not answer now, so it stopped: re
 ASSISTANT_UNREACHABLE = _("It could not reach the assistant on erplora.com, so it stopped: resume the run in a while.")
 ASSISTANT_REFUSED = _("erplora.com's assistant did not take the task, so it stopped.")
 ASSISTANT_GONE = _("«%(name)s» is no longer allowed or available, so the assistant's change was not made.")
+ASSISTANT_GONE_UNNAMED = _("That action is no longer allowed or available, so the assistant's change was not made.")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
@@ -1407,8 +1410,36 @@ def record_assistant(ctx: OperationContext, data: RecordAssistantIn) -> dict:
     return {"count": 1}
 
 
-def _gone(name: str) -> str:
-    return str(ASSISTANT_GONE) % {"name": name}
+#: The words of the app's screens, by language: how the History names an action («Create a task»).
+LOCALES = Path(__file__).resolve().parent / "frontend" / "locale"
+
+
+@functools.cache
+def _screen_words(language: str) -> dict:
+    path = LOCALES / f"{language}.json"
+    return json.loads((path if path.exists() else LOCALES / "en.json").read_text(encoding="utf-8"))["flow"]
+
+
+def _action_label(op: Operation, language: str) -> str:
+    """``op`` as the History names it: its own words or, without them, its verb, app and thing (``actionLabel`` of
+    ``frontend/lib/phrasing.ts``)."""
+    words = _screen_words(language)
+    curated = words["actions"].get(op.name.replace(".", "__"))
+    if curated:
+        return curated
+    _app, entity, verb = ([*op.name.split(".", 2), "", ""])[:3]
+    verb_word = words["verbs"].get(verb) or verb.replace("_", " ")
+    return f"{verb_word} · {hub_assistant.app_name(op)} ({entity.replace('_', ' ')})"
+
+
+def _gone(name: str, language: str) -> str:
+    """Why a yes did not make the assistant's change: the action, named for a person, is no longer granted or
+    active; one that no longer exists is not named at all."""
+    try:
+        op = get(name)
+    except UnknownOperation:
+        return str(ASSISTANT_GONE_UNNAMED)
+    return str(ASSISTANT_GONE) % {"name": _action_label(op, language)}
 
 
 def _out_of_rounds(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, rounds: int, now: dt.datetime) -> bool:
@@ -1433,7 +1464,7 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
     op = _offered(flow, step).get(name)
     if op is None:
         run.outputs = {key: value for key, value in run.outputs.items() if key != TURN}
-        if _fail(ctx, run, step, StepFailed("flow.not_allowed", _gone(name)), now):
+        if _fail(ctx, run, step, StepFailed("flow.not_allowed", _gone(name, flow.language)), now):
             _go_on(ctx, run, flow, now)
         return
     outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, str(proposal.get("arguments") or "{}"))
