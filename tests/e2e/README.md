@@ -255,6 +255,16 @@ documento y 1 en su shadow root). Las infinitas (spinners, un brillo de carga) n
 que lista `raw-screenshots.json` (los que quedaban al llegar `capture`), y una spec nueva no hace ninguno. Al pasar
 capturas de un fichero a `capture`, baja su número en el JSON (o quita su línea): la lista solo encoge.
 
+`own-animation-waits.test.ts` (Vitest) es el trinquete de las esperas: ninguna spec ni helper de `tests/e2e`, a cualquier
+profundidad, pide las animaciones por su cuenta (`getAnimations`) más veces de las que lista `own-animation-waits.json`
+(las esperas propias que quedaban al llegar el guardarraíl), y un fichero nuevo no lo hace ninguna: «nada se mueve» se
+espera con `settled(page)` o `untilStill(page)`, que miran también los shadow roots. Cuenta toda referencia en el código,
+sin los comentarios: la llamada, guardada con otro nombre (`const a = document.getAnimations`), entre corchetes
+(`document['getAnimations']()`) o dentro de una cadena que va a `page.evaluate`. Solo `helpers.ts` (el detector) y las dos
+specs que lo miden desde fuera (`settled.spec.ts` y `helpers-capture.spec.ts`) tienen su número fijo en el propio test.
+Al retirar una copia, baja su número en el JSON (o quita su línea). Los `<app>-wait.test.ts` (Ventas, Cocina, Menús,
+Modificadores, Tareas) siguen: prohíben además, en los ficheros de su app, las esperas fijas y los recuentos propios.
+
 ## Sin scroll horizontal
 
 Toda comprobación de «nada se sale por la derecha» pasa por `horizontalOverflow(page)` (`helpers.ts`): los píxeles que
