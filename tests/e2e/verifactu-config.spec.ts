@@ -2,9 +2,10 @@
 //   - VERIFACTU-F02, F03: «Mi certificado» uploads a .p12 made for the test (never a real certificate), shows its
 //     holder, NIF and expiry, and removes it after asking;
 //   - VERIFACTU-F05: «Lo remite ERPlora» refuses a signed model that is no PDF (by its bytes, not its name) with the
-//     Spanish text, and takes four minimal PDFs on to ERPlora's account. The local SaaS knows no hub with the id of
-//     `a` (each e2e database gives it its own), so it answers 404 and the Hub says «not linked yet»: the Hub's own
-//     checks passed and the documents reached the SaaS. A 201 needs a hub the SaaS registered;
+//     Spanish text, and takes four minimal PDFs on to ERPlora's account. The spec points VeriFactu at a hub id no
+//     SaaS registered (`unknownToTheSaas`), so the SaaS answers 404 and the Hub says «not linked yet»: the Hub's own
+//     checks passed and the documents reached the SaaS. A 201 needs a hub the SaaS registered, and the SaaS of the
+//     run may know `a` by its own id (WhatsApp's seed, `whatsapp_hub_seed.py`, registers it there);
 //   - VERIFACTU-F05: «Descargar el modelo» downloads the SaaS's model with the issuer of Invoicing (legal name, NIF and
 //     address) already written in its blanks: the query signed by v2, as the SaaS verifies it, or a 401 and no PDF;
 //   - VERIFACTU-F06: an authorisation in review offers «Volver a enviar», which opens the form again with what the new
@@ -19,7 +20,7 @@
 // run changes in VeriFactu's configuration, the own certificate and that row's photo is put back after it (or
 // removed, if the run made it), and so is the issuer.
 import { execFileSync } from 'node:child_process';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -104,6 +105,13 @@ async function pushPhoto(representation: Representation): Promise<void> {
   const answer = await response.text();
   expect(response.status, answer).toBe(200);
   expect(JSON.parse(answer)).toMatchObject({ applied: true, version });
+}
+
+/** Points VeriFactu at a hub id made here, one no SaaS registered, so the SaaS answers it 404 whatever seed ran there
+ *  before: WhatsApp's (`whatsapp_hub_seed.py`) registers `a` with this Hub's own id, and the photo hands VeriFactu
+ *  that id. The next photo puts `a`'s back, and `restoreConfig` the one before the run. */
+function unknownToTheSaas(): void {
+  psql(`update verifactu_config set hub_id = '${randomUUID()}'`);
 }
 
 /** A .p12 made here (self-signed, the issuer's NIF as its organisation identifier), valid for a year. */
@@ -294,6 +302,7 @@ test('Mi certificado: upload a .p12, see its holder and expiry, remove it', asyn
 
 test('Lo remite ERPlora: a signed model that is no PDF is refused in Spanish; four PDFs go on to the SaaS', async ({ browser }) => {
   await pushPhoto('none');
+  unknownToTheSaas();
   const { context, page } = await spanishPage(browser, '/verifactu/config');
   const grant = shown(page).locator('[data-testid=verifactu-config-erplora]');
   await expect(grant.locator('[data-testid=verifactu-grant-form]')).toBeVisible();
@@ -332,7 +341,7 @@ test('Lo remite ERPlora: a signed model that is no PDF is refused in Spanish; fo
   const forwarded = page.waitForResponse((r) => r.url().endsWith('/api/verifactu/representation') && r.request().method() === 'POST');
   await submit.click();
   const answer = await forwarded;
-  // Past every check of the Hub (a 422 otherwise): the SaaS was asked and knows no hub with this id.
+  // Past every check of the Hub (a 422 otherwise): the SaaS was asked and knows no hub with this id (`unknownToTheSaas`).
   expect(answer.status()).toBe(409);
   expect(((await answer.json()) as { error: { code: string } }).error.code).toBe('verifactu.hub_unregistered');
   await expect(error).toHaveText('ERPlora todavía no ha vinculado este negocio. Inténtalo en unos minutos.');
