@@ -143,7 +143,7 @@ class FlowRun(UUIDModel):
     error_message = models.TextField(_("error"), blank=True)
     # The engine's own reason by name and values (``{"key", "values"}``), said when it is read, in the reader's
     # language (``queries.say``); empty for what another app answered and for a run kept before it existed.
-    error_reason = models.JSONField(_("reason of the error"), default=dict, blank=True)
+    error_reason = models.JSONField(_("reason of the error"), default=dict, db_default={}, blank=True)
     # When a wait ends; for a call (``calling``), when it may be sent (again): a lease of CALL_LEASE_MINUTES.
     resume_at = models.DateTimeField(_("resumes at"), null=True, blank=True)
     # The automations whose steps caused the event that started this one (loop guard).

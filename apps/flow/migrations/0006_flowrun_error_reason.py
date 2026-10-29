@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='flowrun',
             name='error_reason',
-            field=models.JSONField(blank=True, default=dict, verbose_name='reason of the error'),
+            field=models.JSONField(blank=True, db_default={}, default=dict, verbose_name='reason of the error'),
         ),
     ]
