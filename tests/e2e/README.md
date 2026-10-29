@@ -260,7 +260,12 @@ pantalla que se sale por la derecha queda cortada ahí y el documento nunca crec
 (`documentElement.scrollWidth` contra la ventana) daba 0 con un bloque de 1600 px en una página a 390, y la spec pasaba
 con la barra cortada en su propia captura (lo vio el revisor de hub#386). `helpers-overflow.spec.ts` comprueba que lo ve
 en la página, en el menú, en una hoja y en una página sin Ionic (la web pública). `horizontal-overflow.test.ts` (Vitest),
-sin trinquete: ningún fichero de `tests/e2e` salvo `helpers.ts` vuelve a medir el documento a mano.
+sin trinquete: ningún fichero de `tests/e2e` salvo `helpers.ts` vuelve a medir el documento a mano, ni un solo
+`ion-content` (`getScrollElement()`, `.inner-scroll`, `part="scroll"`). Caza también el raíz por un nombre que se le dé
+(`const root = document.documentElement`), leído con `??` o `as` en línea o por un `then()`, su `scrollWidth`
+desestructurado, el raíz hallado por su selector (`querySelector('html')`) o por un localizador de Playwright
+(`page.locator('html')`, `$eval('body', …)`) y la medida partida en varias líneas (`.scrollWidth` en la línea de abajo).
+El scroll vertical (`scrollTop`, `scrollHeight`) sigue libre.
 
 ## Medir cuándo acaba una petición
 
