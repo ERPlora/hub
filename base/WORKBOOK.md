@@ -2999,7 +2999,13 @@ Implicados: ACCOUNTS-F38
   último trozo del nombre de la operación (`action`), por su verbo en `base.assistant.card.actions` de los catálogos
   `en` y `es` de `base` (`actionKey` de `lib/assistant-card.ts`, por clave exacta; sin clave, «Do this»): una app con
   una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
-  `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`), la vista previa de una
+  `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`; un dato secreto, el que su
+  esquema marca `format: password` o `writeOnly` (`SecretStr`), a cualquier profundidad, sale tapado con `HIDDEN`,
+  «••••••••», igual en todos los idiomas (`_hidden`, desde `_field`, el mismo en la tarjeta y en la vista previa): ni
+  la pantalla ni lo que recibe el navegador lo llevan tal como se escribió, y la escritura lo recibe entero al
+  aceptarla; uno vacío sale vacío; lo comprueban `test_no_operation_lets_a_secret_reach_its_card_in_clear`, que
+  recorre el registro entero, y
+  `test_a_secret_reaches_the_browser_hidden_on_its_card_and_its_write_as_typed`), la vista previa de una
   escritura peligrosa (BASE-F98, `preview`: su `ai=` lleva `"preview": {"operation": "<una query de su app>",
   "fields": [<datos de su respuesta>]}`; el turno la corre como la persona, `_run` con su `ctx`, con los datos de la
   escritura que su entrada toma, antes de la tarjeta; quita los vacíos y los `None`, lo que la lectura oculta; si no
