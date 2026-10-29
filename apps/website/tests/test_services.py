@@ -483,6 +483,13 @@ def test_one_business_full_does_not_refuse_another_ones_image(hub_files):
     assert Image.objects.get(id=image.id).hub_id == Hub.objects.get(slug="b").id
     assert hub_files.exists(image_key_of(raw, "b"))
     assert not hub_files.exists(image_key_of(raw, "a"))
+    # And B's own space is the one that counts: its plan, exactly filled by that image, refuses one more of its images
+    # (A's plan, with room to spare for it, would let it through).
+    another = png_bytes(colour=(30, 200, 30))
+    with pytest.raises(Conflict) as full:
+        upload(another, ctx=ctx_for(scope=B))
+    assert full.value.code == "base.file_no_space"
+    assert not hub_files.exists(image_key_of(another, "b"))
 
 
 def test_without_a_space_in_its_plan_an_image_is_kept_however_full_the_store(hub_files):
