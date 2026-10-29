@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
-import { A, api, capture, compactBar, EMPLOYEE, login, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = [
@@ -134,18 +134,21 @@ async function confirmationReady(page: Page): Promise<void> {
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
-/** The dangerous card's «Confirmation» as its capture must show it: focused, its label floated and still (rv-ui-35: the
- *  first size caught the first frame of the label's move, with a gap in the outline). */
+/** The dangerous card's «Confirmation» as its capture must show it: focused, its label floated and, in the same frame,
+ *  nothing moving on the page, the label's move included (rv-ui-35: the first size caught the first frame of the label's
+ *  move, with a gap in the outline). Stillness is asked of the e2e's one detector, put in the page by
+ *  `exposeMovingInPage` (helpers.ts), never of the label's own animations. */
 async function confirmationSettled(page: Page): Promise<boolean> {
+  await exposeMovingInPage(page);
   return card(page)
     .locator('[data-testid="assistant-confirm-input"]')
     .evaluate((field) => {
-      const label = field.querySelector('.label-text-wrapper');
+      const moving = (window as unknown as { __movingInPage: () => string[] }).__movingInPage();
       return (
         field.classList.contains('has-focus') &&
         field.classList.contains('label-floating') &&
-        label !== null &&
-        label.getAnimations().length === 0
+        field.querySelector('.label-text-wrapper') !== null &&
+        moving.length === 0
       );
     });
 }
