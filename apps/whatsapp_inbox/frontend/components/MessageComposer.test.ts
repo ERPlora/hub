@@ -154,7 +154,7 @@ describe('MessageComposer: reply (WHATSAPP_INBOX-F32)', () => {
     const modal = s.wrapper.findComponent(TemplateSendModal);
     expect(modal.props('conversationId')).toBe('c1');
     expect(modal.props('open')).toBe(true);
-    expect(s.params('whatsapp_inbox.template.list')).toEqual([{ sendable: true, limit: 100 }]);
+    expect(s.params('whatsapp_inbox.template.list')).toEqual([{ fillable: true, limit: 100 }]);
   });
 });
 

@@ -196,6 +196,21 @@ describe('ThreadView', () => {
     expect(es.find('whatsapp-inbox-message-kind').text()).toBe('Contacto');
   });
 
+  it('a template sent with a photo, video or document header names its file (WHATSAPP_INBOX-F33)', async () => {
+    const sent = (id: string, mime: string, name: string) =>
+      message({ id, kind: 'template', template_name: 'oferta', direction: 'outbound', origin: 'hub', status: 'sent', body: '¡Hola Ana!', media_mime_type: mime, media_filename: name });
+    for (const [locale, photo, doc] of [
+      ['en', 'Photo · carta.jpg', 'Document · carta.pdf'],
+      ['es', 'Foto · carta.jpg', 'Documento · carta.pdf'],
+    ] as const) {
+      const s = await setup({ messages: [sent('a', 'image/jpeg', 'carta.jpg'), { ...sent('b', 'application/pdf', 'carta.pdf'), sent_at: '2026-10-15T09:21:00Z' }] }, locale);
+      const [withPhoto, withDocument] = s.bubbles();
+      expect(withPhoto.find('[data-testid="whatsapp-inbox-message-header-file"]').text(), locale).toBe(photo);
+      expect(withDocument.find('[data-testid="whatsapp-inbox-message-header-file"]').text(), locale).toBe(doc);
+      expect(withPhoto.text()).toContain('¡Hola Ana!');
+    }
+  });
+
   it('a reaction is not a bubble: it sits on the message it answers', async () => {
     const s = await setup({
       messages: [message({ id: 'r', kind: 'reaction', body: '👍', reply_to: 'wamid.1', sent_at: '2026-10-15T09:10:00Z' }), message()],

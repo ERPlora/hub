@@ -50,6 +50,8 @@ const columns = computed<DataTableColumn<TemplateOut>[]>(() => [
   { key: 'body', label: t('whatsapp_inbox.templates.columns.body'), priority: 'low', format: (value, row) => bodyText(String(value), row) },
 ]);
 
+const FILE_HEADERS: readonly string[] = ['IMAGE', 'VIDEO', 'DOCUMENT'];
+
 /** The text, after the file of a photo, video or document header chosen here (F29). */
 function bodyText(body: string, row: TemplateOut): string {
   const sample = row.header_sample;
@@ -70,10 +72,10 @@ function statusText(status: string, row: TemplateOut): string {
   else if (row.submit_state === 'sending' && row.submit_error)
     parts.push(row.status === 'DRAFT' ? row.submit_error : t('whatsapp_inbox.templates.state.notSent', { reason: row.submit_error }));
   else if (row.submit_state === 'queued' || row.submit_state === 'sending') parts.push(t('whatsapp_inbox.templates.state.sending'));
-  // One the Hub cannot fill (F28: a file header, named variables, a code…) is only seen here; one whose file header
-  // was chosen here is changed here, but the inbox does not fill that header when sending yet (F33).
-  if (!row.supported)
-    parts.push(t(row.header_sample ? 'whatsapp_inbox.templates.state.notSendableYet' : 'whatsapp_inbox.templates.state.unfillable'));
+  // One the Hub cannot fill (F28: a place header, named variables, a code…) is only seen here; one with a photo, video
+  // or document header made in WhatsApp Manager is sent here with a file chosen (F33) and changed there.
+  if (!row.supported) parts.push(t('whatsapp_inbox.templates.state.unfillable'));
+  else if (FILE_HEADERS.includes(row.header_format) && !row.header_sample) parts.push(t('whatsapp_inbox.templates.state.editedInManager'));
   return parts.join(' · ');
 }
 

@@ -173,6 +173,8 @@ export interface TemplateSendIn {
   name: string;
   language?: string;
   variables?: string[];
+  /** A photo, video or document header's file (`template_sample.upload`); without it, the template's own. */
+  header_sample?: string | null;
 }
 
 export interface SendIn {
@@ -219,7 +221,10 @@ export interface TemplateListIn extends PageIn {
   category?: TemplateCategory;
   language?: string;
   /** true: only what the Hub can send now (approved, not being deleted, no file header). */
+  /** Only what goes as it is (an automation's): a file header only with its own file. */
   sendable?: boolean;
+  /** What the inbox can send: a file header asking for its file when it has none. */
+  fillable?: boolean;
 }
 
 /** A button as Meta lists it (made here: QUICK_REPLY, URL, PHONE_NUMBER; others only in WhatsApp Manager). */

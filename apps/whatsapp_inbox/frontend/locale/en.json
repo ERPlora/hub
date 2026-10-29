@@ -143,6 +143,7 @@
     },
     "templates": {
       "sendTitle": "Send a template",
+      "sendFile": "The customer receives the template with this file.",
       "pick": "Template",
       "none": "There are no approved templates yet. They are made in Settings → Meta templates or in WhatsApp Manager.",
       "variable": "Variable {n}",
@@ -252,7 +253,7 @@
         "notSent": "Changes not sent: {reason}",
         "deleting": "Being deleted at Meta",
         "unfillable": "Can't be sent or edited here: it is managed in WhatsApp Manager.",
-        "notSendableYet": "Can't be sent from the inbox yet: its header has a file.",
+        "editedInManager": "Edited in WhatsApp Manager.",
         "headerFile": "{kind}: {name}"
       }
     },

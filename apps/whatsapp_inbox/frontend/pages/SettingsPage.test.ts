@@ -172,7 +172,7 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
     }
   });
 
-  it('one with a photo made here names its file and says it is not sent from the inbox yet (F29, F33)', async () => {
+  it('one with a photo made here names its file and is sent from the inbox; one from WhatsApp Manager is edited there (F29, F33, F28)', async () => {
     const photo = template({
       id: 't5',
       name: 'promo_otono',
@@ -180,18 +180,20 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
       header_sample: { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 120_000, name: 'carta.jpg' },
       body: '¡Oferta de otoño!',
       editable: true,
-      sendable: false,
-      supported: false,
+      sendable: true,
+      supported: true,
     });
-    for (const [locale, said, text] of [
-      ['en', "Approved · Can't be sent from the inbox yet: its header has a file.", 'Photo: carta.jpg · ¡Oferta de otoño!'],
-      ['es', 'Aprobada · Aún no se puede enviar desde la bandeja: la cabecera lleva un archivo.', 'Foto: carta.jpg · ¡Oferta de otoño!'],
+    const fromManager = template({ id: 't6', name: 'promo_foto', header_format: 'IMAGE', header_sample: null, editable: false, sendable: false, supported: true });
+    for (const [locale, said, text, manager] of [
+      ['en', 'Approved', 'Photo: carta.jpg · ¡Oferta de otoño!', 'Approved · Edited in WhatsApp Manager.'],
+      ['es', 'Aprobada', 'Foto: carta.jpg · ¡Oferta de otoño!', 'Aprobada · Se edita en WhatsApp Manager.'],
     ] as const) {
       const s = await setup({ locale });
-      await s.result(TEMPLATES, { ...PAGE, rows: [photo], total: 1 });
+      await s.result(TEMPLATES, { ...PAGE, rows: [photo, fromManager], total: 2 });
       const columns = s.prop<{ key: string; format?: (v: unknown, r: TemplateOut) => string }[]>('columns');
       expect(columns.find((c) => c.key === 'status')!.format!('APPROVED', photo), locale).toBe(said);
       expect(columns.find((c) => c.key === 'body')!.format!(photo.body, photo), locale).toBe(text);
+      expect(columns.find((c) => c.key === 'status')!.format!('APPROVED', fromManager), locale).toBe(manager);
       // A text one keeps its text alone.
       expect(columns.find((c) => c.key === 'body')!.format!('Hola', template()), locale).toBe('Hola');
     }

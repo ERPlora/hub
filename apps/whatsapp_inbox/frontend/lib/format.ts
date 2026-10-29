@@ -66,6 +66,12 @@ export function mediaKind(message: { kind: string; media_url: string; media_mime
   return 'document';
 }
 
+/** The kind of a template header's file the Hub sent (F33), by its type: kept in the Hub, never linked. */
+export function headerFileKind(mimeType: string): 'image' | 'video' | 'document' {
+  const mime = mimeType.toLowerCase();
+  return mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'document';
+}
+
 /** The attachment's address when it may be opened: https, or the local SaaS in development. */
 export function safeMediaUrl(url: string): string | null {
   return /^https:\/\/[^\s]+$/.test(url) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url) ? url : null;

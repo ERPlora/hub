@@ -143,6 +143,7 @@
     },
     "templates": {
       "sendTitle": "Enviar una plantilla",
+      "sendFile": "El cliente recibe la plantilla con este archivo.",
       "pick": "Plantilla",
       "none": "No hay plantillas aprobadas todavía. Se hacen en Ajustes → Plantillas de Meta o en WhatsApp Manager.",
       "variable": "Variable {n}",
@@ -252,7 +253,7 @@
         "notSent": "Cambios sin enviar: {reason}",
         "deleting": "Borrándose en Meta",
         "unfillable": "No se puede enviar ni editar aquí: se gestiona en WhatsApp Manager.",
-        "notSendableYet": "Aún no se puede enviar desde la bandeja: la cabecera lleva un archivo.",
+        "editedInManager": "Se edita en WhatsApp Manager.",
         "headerFile": "{kind}: {name}"
       }
     },
