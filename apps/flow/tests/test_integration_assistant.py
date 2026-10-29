@@ -165,3 +165,24 @@ def test_the_card_names_how_a_call_ended_with_the_words_of_its_step():
         SCREENS_EN["fields"]["truncated"],
         "Technical text",
     ]
+
+
+@pytest.mark.django_db
+def test_flow_f17_the_assistant_may_leave_a_draft_automation_and_only_a_draft():
+    """FLOW-F17: «create a flow that creates a task when a sale over 100 € is completed», said in the Hub's chat, is
+    ``flow.draft.propose`` run as the person: a draft waits in Automations; nothing is created, granted or run."""
+    from apps.flow.models import Draft, Flow
+
+    owner = ctx_for("hub_owner")
+    propose = assistant.catalog(owner).get("flow.draft.propose")
+    assert propose is not None and propose.kind == "command"
+    definition = {
+        "trigger": {"kind": "event", "event": "sale.sale.completed", "filter": {"input.total": {"gt": 10000}}},
+        "steps": [{"id": "s1", "kind": "command", "operation": "task.task.create", "params": {"title": "Big sale"}}],
+    }
+    outcome = assistant.run_tool(owner, propose, json.dumps({"name": "Big sales", "definition": definition, "notes": []}))
+    assert outcome.outcome == "ok", outcome.content
+    draft = Draft.objects.get()
+    assert (draft.name, draft.status) == ("Big sales", Draft.Status.PENDING)
+    assert Flow.objects.count() == 0
+    assert "flow.draft.propose" not in assistant.catalog(ctx_for("hub_employee"))

@@ -73,7 +73,7 @@ const RAN_NOTICE: Partial<Record<string, string>> = {
   asking: 'flow.editor.ranAsking',
 };
 type Adder = StepKind | 'message';
-const ADDERS: readonly Adder[] = ['command', 'query', 'condition', 'delay', 'message', 'http', 'ask'];
+const ADDERS: readonly Adder[] = ['command', 'query', 'condition', 'delay', 'message', 'http', 'ask', 'assistant'];
 /** «Send a message» only where the WhatsApp inbox is (its narrow send is in the catalog, FLOW-F31). */
 const adders = computed(() => ADDERS.filter((kind) => kind !== 'message' || !!catalog.value?.actions.some((action) => action.name === NOTIFY_OPERATION)));
 
@@ -262,6 +262,8 @@ async function run(): Promise<void> {
   try {
     const ran = await runNow.run({ id: props.flow.id });
     if (ran.status === 'failed') problem.value = t('flow.editor.ranFailed', { message: ran.error_message });
+    // A run parked on «Ask the assistant» waits for the assistant, not for another system (FLOW-F38).
+    else if (ran.status === 'calling' && doc.value.steps[ran.step_index]?.kind === 'assistant') void toastSuccess(t('flow.editor.ranThinking'));
     else void toastSuccess(t(RAN_NOTICE[ran.status] ?? 'flow.editor.ran'));
   } catch (failure) {
     problem.value = wording(failure, phrasing.value.t('flow.errors.action'));

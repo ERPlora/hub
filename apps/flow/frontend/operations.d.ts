@@ -87,7 +87,20 @@ export interface AskStep {
   run_if?: Condition;
 }
 export type QuestionRole = '' | 'manager' | 'employee';
-export type Step = CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep;
+/** «Ask the assistant» (FLOW-F37): it does the task with nobody in front, with what the step names and was granted. */
+export interface AssistantStep extends StepOptions {
+  id: string;
+  kind: 'assistant';
+  /** What it is asked; `{{…}}` data are filled in when it runs. */
+  prompt: string;
+  /** The reads and actions it may use, by name: each one a permission of the automation. */
+  tools: string[];
+  /** `ask`: a change waits for a yes in «Waiting for your answer»; `auto`: it makes it on its own. */
+  mode: 'ask' | 'auto';
+  /** Most turns: 1 to 10. */
+  max_rounds: number;
+}
+export type Step = CommandStep | QueryStep | ConditionStep | DelayStep | HttpStep | AskStep | AssistantStep;
 export type StepKind = Step['kind'];
 
 export type RunStatus = 'running' | 'waiting' | 'calling' | 'asking' | 'succeeded' | 'stopped' | 'failed' | 'cancelled';
@@ -176,7 +189,15 @@ export interface LogEntry {
     | 'called'
     | 'asking'
     | 'answered'
-    | 'expired';
+    | 'expired'
+    | 'thinking'
+    | 'assistant_used'
+    | 'assistant_answered'
+    | 'assistant_proposed';
+  /** Whether a read or an action the assistant used went well (`assistant_used`). */
+  ok?: boolean;
+  /** What the assistant answered (`assistant_answered`). */
+  text?: string;
   /** Who a question was asked of (`asking`). */
   role?: QuestionRole;
   /** The answer (`answered`) and its note. */
@@ -331,6 +352,8 @@ export interface CatalogActionOut {
   description: string;
   fields: FieldOut[];
   outputs: string[];
+  /** Whether «Ask the assistant» may use it (absent: it may not). */
+  assistant?: boolean;
 }
 
 export interface CatalogOut {
@@ -376,6 +399,7 @@ export type TestOutcome =
   | 'skipped'
   | 'would_call'
   | 'would_ask'
+  | 'would_ask_assistant'
   | 'high_risk'
   | 'would_run'
   | 'stops_here'
