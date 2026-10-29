@@ -3,8 +3,9 @@ gateway (``saas`` ``assistant/internal.py``), without the ORM.
 
 - **Its tools** (``catalog``) are the operations of the apps on in this business that this person may run (the
   operation's own permission), told to the assistant by their ``ai=`` description: never one that says «Not an
-  assistant tool» or «System only», one without a permission (the system's), the assistant's own, nor what is never
-  done from the chat (``NOT_FROM_CHAT``: emptying the business, a file to download). A turn offers only the few of
+  assistant tool» or «System only», one without a permission (the system's), one only the platform runs (a permission
+  no app declares, whatever its ``ai=`` says), the assistant's own, nor what is never done from the chat
+  (``NOT_FROM_CHAT``: emptying the business, a file to download). A turn offers only the few of
   what was asked (``relevant``, at most ``MAX_TOOLS``), never the whole catalogue. A tool runs as the person, by its
   own operation (``run_tool``): the same permission, transaction and refusals as the button on the screen.
 - **A write never runs without the person's yes**: its card (``card``) says what it will send, each datum by its name
@@ -102,11 +103,21 @@ def risk(op: Operation) -> str:
     return "high" if ai.get("risk") == "high" else "normal"
 
 
+@cache
+def declared_permissions() -> frozenset[str]:
+    """Every permission an app declares: all the owner and the admin of a business hold, and the most a role is
+    given. One no app declares (``<app>.system``, ``system.<app>``: the platform's reactions and scheduled tasks) only
+    «*» reaches: a superuser and the system."""
+    return frozenset(permission for config in all_live_app_configs() for permission in config.permissions)
+
+
 def is_tool(op: Operation) -> bool:
     text = description(op)
     return (
         bool(text)
         and op.permission is not None
+        # Only the platform runs it, whatever its ``ai=`` says («Platform reaction…»): no tool, even of a superuser.
+        and op.permission in declared_permissions()
         and not text.startswith(NOT_A_TOOL)
         and op.name not in NOT_FROM_CHAT
         and not op.name.startswith("base.assistant.")

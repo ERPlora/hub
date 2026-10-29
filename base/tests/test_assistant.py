@@ -21,6 +21,8 @@ from ninja import Field, Schema
 from pydantic import SecretStr
 
 from base import assistant, entitlement
+from base.models import Membership
+from base.permissions import permissions_for
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 
 A = Scope("host", "a")
@@ -76,6 +78,46 @@ def test_an_app_the_business_has_no_right_to_offers_no_tool(monkeypatch):
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
 def test_the_assistants_own_operations_are_not_its_tools():
     assert not [name for name in assistant.catalog(ctx({"*"})) if name.startswith("base.assistant.")]
+
+
+#: Writes only the platform runs, of both shapes their permission takes (``<app>.system``, ``system.<app>``), each with
+#: an ``ai=`` that does not start with «System only»: «Platform reaction…», «Platform only…», «Lower the stock…».
+PLATFORM_WRITES = {
+    "appointment.customer.erase",
+    "online_booking.customer.erase",
+    "table.hold.expire",
+    "inventory.stock.apply_sale",
+    "service.grant.reassign",
+}
+
+
+def platform_operations(owner: OperationContext) -> list[str]:
+    """The operations only who holds «*» reaches (a superuser, the system): not even the owner of the business, who
+    holds every permission its apps declare, may run them."""
+    return sorted(name for name, op in registry.items() if op.permission is not None and not owner.has(op.permission))
+
+
+@pytest.fixture
+def owner(make_user) -> OperationContext:
+    """The owner of business A with the permissions a request of theirs carries (``base.permissions``)."""
+    return ctx(permissions_for(make_user("olga", host=A.key, role=Membership.Role.OWNER), A))
+
+
+def test_no_operation_of_the_platform_is_a_tool_whatever_its_ai_says(owner):
+    """FIX-HUB-BASE-ASSISTANT-OFFERS-PLATFORM-WRITES-AS-TOOLS: the platform's reactions and scheduled tasks (erasing or
+    reassigning the customer of an appointment, expiring a hold, lowering the stock of a sale) were tools of whoever
+    holds «*», because their ``ai=`` does not start with «System only». Its permission says so, not its words."""
+    platform = platform_operations(owner)
+    assert PLATFORM_WRITES <= set(platform)  # not an empty sweep
+    assert [name for name in platform if assistant.is_tool(registry[name])] == []
+
+
+def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, superuser):
+    """The tools a superuser's turn gets (``base.assistant.turn``: ``catalog`` of the person's own permissions, «*»):
+    every write of the business's apps, none that only the platform runs."""
+    tools = assistant.catalog(ctx(permissions_for(superuser, A), actor=superuser))
+    assert "demo.item.create" in tools
+    assert sorted(set(tools) & set(platform_operations(owner))) == []
 
 
 # ── By relevance: a turn offers the tools of what was asked, never the whole catalogue (PLAN §30) ─────────────────

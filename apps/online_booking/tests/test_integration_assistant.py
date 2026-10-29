@@ -69,7 +69,7 @@ def test_no_datum_of_a_write_of_online_booking_reaches_a_spanish_card_by_its_tec
     """Every write of online_booking the assistant may ask for, with all its data: each datum by a name of its own in
     Spanish, never the one pydantic makes up. By where the name comes from, not by the word."""
     screen = named_by_the_screen()
-    assert len(TOOLS) >= 9  # positive control: the registry has online_booking's writes
+    assert len(TOOLS) >= 8  # positive control: the registry has online_booking's writes (not the platform's own)
     technical: dict[str, list[str]] = {}
     for name in TOOLS:
         op = get(name)
