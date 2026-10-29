@@ -1112,7 +1112,8 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 - `Message`: dirección (`inbound`, `outbound`), origen (`customer`, `phone_app`, `hub`), procedencia
   (`live`, `history`), tipo de Meta, texto, adjunto por URL de erplora.com (`media_url`, solo https y de
   su origen; tipo MIME, nombre, pie), estado (`received`; los del Hub: `queued` → `sending` → `sent` →
-  `delivered` → `read`, o `failed`) con el código y el motivo del último intento o de Meta,
+  `delivered` → `read`, o `failed`) con el código del último intento o de Meta (`error_code`) y, solo en un
+  rechazo que el Hub no nombra, el motivo tal como llegó (`error_message`; ver «Un motivo se dice…»),
   `wa_message_id` (único; vacío mientras no ha salido), `client_message_id` (la clave del envío, única,
   obligatoria), el negocio que lo envió desde el Hub (`host`, fase 1, desde la migración `0007`; vacío en lo que
   llega), plantilla usada y sus variables, quién lo envió, hora en que se dijo, objeto de Meta
@@ -1128,8 +1129,8 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   (`header_format`: vacío, `TEXT` o un archivo o lugar hecho en WhatsApp Manager; `header`), cuerpo,
   ejemplos (`body_examples`), pie, botones, número de variables, motivo de rechazo, `meta_id`,
   `synced_at`; el cambio que espera llegar a Meta (`draft`); la entrega a erplora.com (`submit_state`:
-  vacío, `queued`, `sending`, `failed`; `submit_key`, la clave del guardado, única; `submit_error_code` y
-  `submit_error`; `submit_at`); el borrado (`deleted_at`, que conserva la fila, y `delete_state`:
+  vacío, `queued`, `sending`, `failed`; `submit_key`, la clave del guardado, única; `submit_error_code` y,
+  solo en un rechazo de Meta que el Hub no nombra, su motivo tal como llegó en `submit_error`; `submit_at`); el borrado (`deleted_at`, que conserva la fila, y `delete_state`:
   `pending` hasta que Meta lo confirma, `done`); y `supported` (si el Hub la escribe y la sabe rellenar:
   ni código de verificación, ni cabecera con archivo o con variable, ni variables con nombre, solo
   respuestas rápidas, enlaces fijos y llamadas).
@@ -1185,6 +1186,16 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   sin respuesta →
   `sending`, y `template.retry` la entrega con la misma clave; un `failed` reintentado va con clave nueva
   (la misma daría el mismo rechazo).
+- **Un motivo se dice en el idioma de quien lo lee, nunca en el de quien lo escribió.** La fila de un mensaje o
+  de una plantilla guarda el código del Hub (`error_code`, `submit_error_code`) y, solo en un rechazo que el Hub
+  no nombra (`whatsapp_inbox.send_refused`, `whatsapp_inbox.template_refused`), las palabras de Meta o de
+  erplora.com tal como llegaron (`error_message`, `submit_error`). Las palabras del Hub para sus códigos
+  (`cap_reached`, `reconnect_needed`, `saas_unreachable`, `send_unknown`, `conversation_erased`,
+  `meta_unreachable`, `meta_rate_limited`, `channel_not_connected`; con `saas_unreachable` y `send_unknown`,
+  las del borrado mientras la plantilla se está borrando) se ponen al leer (`message.list`, `template.list` y
+  las respuestas de sus escrituras), en el idioma de quien mira. Así el reintento del worker, que escribe en
+  inglés, no cambia el idioma de lo que ve la persona, y una fila de antes, con el texto ya guardado, se lee
+  igual por su código.
 - **La lista de Meta nunca pisa al Hub**: una plantilla `DRAFT` que va de camino conserva lo escrito, un
   cambio pendiente espera en `draft` (el veredicto de Meta nunca cae sobre un texto cambiado después) y
   una borrada aquí no vuelve (ni por nombre mientras su borrado está `pending`, ni por su `meta_id`).

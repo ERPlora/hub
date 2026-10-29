@@ -185,7 +185,8 @@ test('WHATSAPP_INBOX-F03, F08, F34, F38, F32 and F02: what Meta says reaches the
   const kept = psql(
     `select m.status || '|' || m.error_code || '|' || m.error_message from whatsapp_inbox_message m join whatsapp_inbox_conversation c on c.id = m.conversation_id where c.phone = '${phone}' and m.origin = 'hub' order by m.created_at desc limit 1`,
   ).split('|');
-  expect(kept).toEqual(['failed', 'whatsapp_inbox.reconnect_needed', "WhatsApp's permission for your number expired: connect it again."]);
+  // The row keeps the Hub's code only: its words are said when the thread is read, in the reader's language.
+  expect(kept).toEqual(['failed', 'whatsapp_inbox.reconnect_needed', '']);
   const why = reply.locator('[data-testid=whatsapp-inbox-message-error]');
   await expect(why).toHaveAttribute('data-code', 'whatsapp_inbox.reconnect_needed');
   await expect(reply).not.toContainText(/OAuth|Meta's reason/);
