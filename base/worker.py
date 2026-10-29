@@ -17,7 +17,10 @@ A tick that fails (the database went away) is logged and the next one tries agai
 ends the loop at once. Every tick, after the tasks and whatever they did, it relays the outbox
 (``base.relay``, round 2026-10-20 of PLAN-HUB): each new event to the reactions of the apps that listen
 to it, exactly once, in the scope of the hub that recorded it; a pass that fails is logged and the next
-tick tries again. On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
+tick tries again. What a reaction or a task leaves for after its COMMIT that waits on the network (a call to another
+system) runs off this loop, in ``base.outbound``'s threads, so it never holds the next delivery nor the next task; on
+its way out the worker gives what still runs ``OUTBOUND_GRACE_SECONDS`` and drops what waits (their lease sends them
+again). On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
 demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
 pass that fails is logged and the next one tries again, and the worker never stops for it. Every pass
 releases its connection. Phase 1 runs the tasks on one fixed scope (``WORKER_SCOPE_SLUG``) and relays the
@@ -37,7 +40,7 @@ from collections.abc import Callable
 from django.db import close_old_connections
 from django.utils import timezone
 
-from base import catalog, relay, scheduler
+from base import catalog, outbound, relay, scheduler
 from base.services import reap_demos
 from base.tenancy.context import use_control, use_shared_database
 
@@ -50,6 +53,9 @@ RETRY_FIRST_SECONDS = 5
 RETRY_MAX_SECONDS = 60
 #: How often the demo reaper purges the demos that ended (their hosts answer 410 from their end anyway).
 REAPER_INTERVAL_SECONDS = 60
+#: What the calls in flight (``base.outbound``) get when the worker stops: ECS kills the task 30 s after SIGTERM, and
+#: the loop's step ends first. What still runs then is left to its lease.
+OUTBOUND_GRACE_SECONDS = 15
 
 
 def run(
@@ -111,6 +117,7 @@ def run(
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
         wait(tick_seconds)
+    outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
     return 0
 

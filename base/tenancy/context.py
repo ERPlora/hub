@@ -11,6 +11,8 @@ hub again in theirs).
   ``db_name=""`` still shares control's (``default``): phase 1's hubs until the cut of S5 (plan, decision 1).
 - :func:`use_control` — the platform: the registry and the demos (``base.hub.*``, ``base.demo.*``); a hub's model
   here is ``HubContextMissing``, the outbox goes to control.
+- :func:`use_again` — the context :func:`current` gave elsewhere, entered again by a thread handed work
+  (``base.outbound``: what an operation leaves for after its COMMIT runs off the worker's loop, in its hub).
 - :func:`use_shared_database` — **transitional (S1–S4)**: phase 1's one database where every hub with
   ``db_name=""`` keeps its data, for what has no single hub yet (the worker's relay and tasks over all of them, the
   admin with no hub chosen, ``manage.py shell``, the platform hub that has no registry row yet). S5 removes it with
@@ -22,7 +24,7 @@ before the tenancy (threads included): never outside the tests.
 """
 
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
@@ -93,6 +95,15 @@ def use_control() -> Iterator[DatabaseContext]:
 def use_shared_database() -> Iterator[DatabaseContext]:
     """Transitional (S1–S4): phase 1's one database, every hub with ``db_name=""`` at once."""
     return _entered(SHARED_DATABASE)
+
+
+def use_again(active: DatabaseContext) -> AbstractContextManager[DatabaseContext]:
+    """Work again, until the block ends, in a context :func:`current` gave elsewhere: what a thread handed work does
+    (``base.outbound``), since it starts without one. A hub's goes through :func:`use_hub` (its alias, open in this
+    process); control's and the shared database's are entered as they were."""
+    if active.kind == HUB:
+        return use_hub(active.hub)
+    return _entered(active)
 
 
 def current() -> DatabaseContext:
