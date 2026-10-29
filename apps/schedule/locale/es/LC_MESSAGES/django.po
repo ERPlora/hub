@@ -191,3 +191,15 @@ msgstr "No hay horario semanal que confirmar."
 # How the assistant's card names each datum of a write (the titles of the schemas, as the screens say them)
 msgid "Opening intervals"
 msgstr "Tramos horarios"
+
+msgid "Confirm your opening hours"
+msgstr "Confirma tu horario"
+
+msgid ""
+"We set up a default week for you (Monday to Friday, 09:00–18:00). If it "
+"matches your business, confirm it in one tap; if not, edit the days that "
+"differ — bookings outside your opening hours are refused."
+msgstr ""
+"Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a "
+"18:00). Si coincide con el de tu negocio, confírmalo de un toque; si no, "
+"edita los días que cambien: las reservas fuera de tu horario se rechazan."

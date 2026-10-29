@@ -5,9 +5,11 @@ import datetime as dt
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connections
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from psycopg.conninfo import make_conninfo
 
 from base.models import Membership
 
@@ -56,10 +58,36 @@ def make_user(db):
 
 
 @pytest.fixture
+def db_dsn(django_db_setup):
+    """DSN of the test database, for raw psycopg sessions (reading only what is committed)."""
+    params = connections["default"].settings_dict
+    return make_conninfo(
+        dbname=params["NAME"],
+        user=params["USER"],
+        password=params["PASSWORD"],
+        host=params["HOST"],
+        port=params["PORT"],
+    )
+
+
+@pytest.fixture
 def empty_week(db):
     """No weekly day at all: the seeded default week (migration 0002) taken away."""
     WeekDay.objects.all().delete()
     ScheduleSettings.objects.all().delete()
+
+
+@pytest.fixture
+def default_week(db):
+    """The week migration 0002 plants (Monday to Friday 09:00–18:00, the weekend closed), not confirmed: a
+    transactional test flushes every table, seeded rows included, so the transactional tests run after it (pytest-django
+    runs them last) find no week unless they plant it back."""
+    if not WeekDay.objects.exists():
+        for weekday in range(5):
+            make_day(weekday, ("09:00", "18:00"))
+        for weekday in (5, 6):
+            make_day(weekday, closed=True)
+    ScheduleSettings.objects.update(hours_confirmed=False)
 
 
 def t(text: str) -> dt.time:

@@ -35,6 +35,13 @@ msgstr "Alias"
 msgid "Settings"
 msgstr "Ajustes"
 
+# The Home's step «Finish setting up your business» (FIX-TAX-SETUP-HOOKS): the words of the notice (TAX-F17)
+msgid "Your taxes"
+msgstr "Tus impuestos"
+
+msgid "Set up the VAT rates of the country you sell in so the till can price a sale."
+msgstr "Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular el precio de una venta."
+
 msgid "Restaurant — food"
 msgstr "Restauración — comida"
 
