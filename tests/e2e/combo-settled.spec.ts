@@ -8,7 +8,7 @@
 // creates — the products `E2E-CST-<run>-…` and the menu «e2e Combo Settled <run>» — is deleted after it, and nothing else.
 import { type BrowserContext, type CDPSession, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, exposeMovingInPage, hostPage, psql, shown } from './helpers';
+import { A, api, capture, exposeMovingInPage, hostPage, psql, shown, untilStill } from './helpers';
 import { createProduct } from './inventory-helpers';
 import { drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -99,13 +99,13 @@ test('combo-e2e-wait: after the Menus specs’ wait the till’s menu sheet has 
       await page.goto(`${A}/sale/pos`);
       const tile = shown(page).locator(`[data-testid=pos-menu-${menuId}]`);
       await expect(tile).toBeVisible({ timeout: 30_000 });
-      await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+      await untilStill(page);
       await playbackRate(devtools, 0.2);
       await tile.click();
       const sheet = page.locator('ion-modal[data-testid=pos-menu]');
       await expect(sheet).toBeVisible();
       await expect(sheet.locator('[data-testid=pos-menu-add]')).toContainText('Choose 1 in «Starters»');
-      await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+      await untilStill(page);
       expect.soft(await moving(page), `still moving after the Menus specs’ wait at ${size.label}`).toEqual([]);
       await capture(page, `${KEY}-${size.label}`);
     }

@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, HUB_DIR, login, psql, shot, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -87,12 +87,13 @@ async function shots(page: Page, key: string, ready: () => Promise<void>): Promi
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready();
-    // A resize slides the phone's cart drawer and the sheets: the picture waits until nothing moves.
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    // A resize slides the phone's cart drawer and the sheets: the picture waits until nothing moves, Ionic's sheets
+    // and notices included (they animate in their shadow roots).
+    await untilStill(page);
     await expect
       .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${key} ${size.label}` })
       .toBeLessThanOrEqual(0);
-    await page.screenshot({ path: shot(`APP-COMBO-${key}-${size.label}`) });
+    await capture(page, `APP-COMBO-${key}-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
@@ -360,13 +361,14 @@ test('SALE-F12: two repeatable dishes taken twice keep each name on its line bes
     });
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    // The sheet, an `ion-modal`, animates in its shadow root: the measures wait until nothing moves.
+    await untilStill(page);
     for (const code of ['COF', 'DEC']) {
       await expect(sheet.locator(`[data-testid=pos-menu-dish-count-${picks[code]}]`)).toHaveText('× 2');
       await expect(sheet.locator(`[data-testid=pos-menu-dish-less-${picks[code]}]`)).toBeVisible();
       await expect.poll(() => lines(code), { message: `the name of ${code} at ${size.label} is one or two lines` }).toBeLessThanOrEqual(2);
     }
-    await page.screenshot({ path: shot(`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-${size.label}`) });
+    await capture(page, `FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await sheet.locator('[data-testid=pos-menu-close]').click();

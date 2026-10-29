@@ -36,8 +36,6 @@
   "cash-register-flows.spec.ts": 1,
   "cash-register-shift.spec.ts": 4,
   "combo-business-currency.spec.ts": 5,
-  "combo-menus.spec.ts": 2,
-  "combo-till.spec.ts": 2,
   "create-edit-pages.spec.ts": 7,
   "csp.spec.ts": 1,
   "customer-business-currency.spec.ts": 3,
