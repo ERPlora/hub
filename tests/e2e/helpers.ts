@@ -86,13 +86,13 @@ function navigating(error: unknown): string[] {
 
 /**
  * Waits until nothing moves on screen (`movingInPage`): a capture taken mid-animation shows a state the screen is
- * leaving. A page that reloads meanwhile is asked again; one that still moves after `STILL_TIMEOUT_MS` fails the spec,
- * naming what moves.
+ * leaving. A page that reloads meanwhile is asked again; one that still moves after `STILL_TIMEOUT_MS` fails the spec
+ * with `message`, naming what moves.
  */
-export async function untilStill(page: Page): Promise<void> {
+export async function untilStill(page: Page, message = 'untilStill(): still moving'): Promise<void> {
   await expect
     .poll(() => page.evaluate(movingInPage).catch(navigating), {
-      message: 'untilStill(): still moving',
+      message,
       timeout: STILL_TIMEOUT_MS,
       intervals: [16],
     })
@@ -171,15 +171,17 @@ export async function settled(page: Page): Promise<void> {
 const CAPTURE_TRIES = 10;
 
 /**
- * The screenshot of `page` as painted at its size, written as `.artifacts/<name>.png` and returned: every capture of the
- * e2e goes through here (`raw-screenshots.test.ts` keeps it so). It waits for a painted frame, and a screenshot that
- * still repeats the top of the page at its bottom (`repeatedTop`) is taken again, a frame later, up to
- * `CAPTURE_TRIES` times; if every one does, it fails saying so and writes nothing. What is on screen (data, a dialog,
- * nothing moving: `settled`, `untilStill`) is the spec's to wait for before.
+ * The screenshot of `page` as painted at its size, still, written as `.artifacts/<name>.png` and returned: every capture
+ * of the e2e goes through here (`raw-screenshots.test.ts` keeps it so). It waits until nothing finite moves
+ * (`untilStill`: an overlay of Ionic entering, endless spinners aside; one that still moves after its wait fails the
+ * spec naming it, and nothing is written) and for a painted frame, and a screenshot that still repeats the top of the
+ * page at its bottom (`repeatedTop`) is taken again, a frame later, up to `CAPTURE_TRIES` times; if every one does, it
+ * fails saying so and writes nothing. What is on screen (data, a dialog) is the spec's to wait for before.
  */
 export async function capture(page: Page, name: string, options: CaptureOptions = {}): Promise<Buffer> {
   let rows = 0;
   for (let tries = 0; tries < CAPTURE_TRIES; tries++) {
+    await untilStill(page, `capture ${name}: still moving`);
     await painted(page);
     const png = await page.screenshot(options);
     rows = await repeatedTop(page, png);
