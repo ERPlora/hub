@@ -30,6 +30,7 @@ import {
   metaHandsOver,
   metaNow,
   notice,
+  OUTBOUND_AT_ONCE,
   PREFIX,
   restorePhoto,
   seedErplora,
@@ -297,8 +298,9 @@ test('WHATSAPP_INBOX-F11: erasing a customer’s card empties her conversations 
   await expect.poll(() => erasure(id), { timeout: 30_000 }).toBe('done||');
 });
 
-/** Delivers every pending `customer.customer.erased` to the inbox, as the outbox relay does on every tick. */
-const RELAY = `
+/** Delivers every pending `customer.customer.erased` to the inbox, as the outbox relay does on every tick; what its
+ *  reaction hands erplora.com (door 6) is called before this process ends (`OUTBOUND_AT_ONCE`). */
+const RELAY = `${OUTBOUND_AT_ONCE}
 from django.db import transaction
 from live.models import OutboxEvent
 from base import relay

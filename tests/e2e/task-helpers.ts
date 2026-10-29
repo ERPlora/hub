@@ -4,7 +4,7 @@
 // named «E2E Task …» (projects `e2e-…`) and deleted from the hub's database (phase 1: `a` and `b` share it).
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, type Credentials, horizontalOverflow, login, psql, shown } from './helpers';
+import { A, api, capture, type Credentials, horizontalOverflow, login, psql, shown, untilStill } from './helpers';
 
 /** Every name a task spec gives starts like this. */
 export const TAG = 'E2E Task';
@@ -22,26 +22,11 @@ export const VIEWPORTS = {
 export const FLOW_VIEWPORTS = { 390: VIEWPORTS.phone, 834: VIEWPORTS.tablet, 1440: VIEWPORTS.desktop } as const;
 
 /**
- * Counts, in the page, the Ionic modals and popovers still sliding in or out (between their «will» and
- * «did» events): their animations run in shadow roots, out of `document.getAnimations()`.
- */
-function countMovingOverlays(): void {
-  const page = window as unknown as { __overlaysMoving: number };
-  page.__overlaysMoving = 0;
-  for (const kind of ['Modal', 'Popover']) {
-    for (const [start, end] of [['WillPresent', 'DidPresent'], ['WillDismiss', 'DidDismiss']]) {
-      document.addEventListener(`ion${kind}${start}`, () => (page.__overlaysMoving += 1));
-      document.addEventListener(`ion${kind}${end}`, () => (page.__overlaysMoving = Math.max(0, page.__overlaysMoving - 1)));
-    }
-  }
-}
-
-/**
- * Captures what the page shows for `flow` at `width` once no modal or popover is moving (a sheet or a
- * dialog is still sliding in right after it is «visible»), after checking nothing scrolls sideways.
+ * Captures what the page shows for `flow` at `width` once nothing moves (`untilStill`: a sheet or a dialog is
+ * still sliding in right after it is «visible», and so is a notice), after checking nothing scrolls sideways.
  */
 export async function snap(page: Page, flow: string, width: number | string): Promise<void> {
-  await page.waitForFunction(() => ((window as unknown as { __overlaysMoving?: number }).__overlaysMoving ?? 0) === 0);
+  await untilStill(page);
   const overflow = await horizontalOverflow(page);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await capture(page, `APP-TASK-${flow}-${width}`);
@@ -77,7 +62,6 @@ export async function signedIn(
   viewport: { width: number; height: number } = VIEWPORTS.desktop,
 ): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: A, viewport, locale: 'en-US' });
-  await context.addInitScript(countMovingOverlays);
   const page = await context.newPage();
   await login(page, A, next, credentials);
   return { context, page };

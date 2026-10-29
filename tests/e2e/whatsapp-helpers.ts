@@ -94,6 +94,21 @@ export function system<T = unknown>(op: string, payload: unknown): T {
   return JSON.parse(line) as T;
 }
 
+/** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (this stack runs no worker).
+ *  What a reaction hands erplora.com after its COMMIT goes to `base.outbound`'s threads, which in the worker outlive
+ *  the tick but here would die with this process (daemon threads) before erplora.com is called: this process makes
+ *  those calls at once, as the suite's `conftest.py` does (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY). */
+export const OUTBOUND_AT_ONCE = `
+from base import outbound
+class _AtOnce:
+    def submit(self, job):
+        job.run()
+        return True
+    def stop(self, grace):
+        return True
+outbound._pool = _AtOnce()
+`;
+
 /** A WhatsApp id of this run. */
 export const waId = (): string => `${PREFIX}wamid.${Date.now()}.${Math.floor(Math.random() * 1e6)}`;
 

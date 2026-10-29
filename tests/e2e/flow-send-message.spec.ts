@@ -33,6 +33,7 @@ import {
   cleanUp as cleanUpInbox,
   e2ePhone,
   metaGraph,
+  OUTBOUND_AT_ONCE,
   pushChannel,
   receive,
   restorePhoto,
@@ -100,9 +101,11 @@ test.afterAll(() => {
   restorePhoto();
 });
 
-/** The outbox relay as the worker runs it on every tick, pass after pass until one finds nothing to do. */
+/** The outbox relay as the worker runs it on every tick, pass after pass until one finds nothing to do; what the
+ *  automation hands erplora.com (door 5) is called before this process ends (`OUTBOUND_AT_ONCE`). */
 function relayPass(): void {
   const code = [
+    OUTBOUND_AT_ONCE,
     'from django.utils import timezone',
     'from base import relay',
     'for _ in range(200):',
