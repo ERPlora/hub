@@ -278,3 +278,7 @@ msgstr "Esta región no tiene impuestos propios en el país de tu negocio: elige
 
 msgid "Choose a hub first (its link in the SaaS admin): the region is kept on that hub."
 msgstr "Elige antes un hub (su enlace en el admin del SaaS): la región se guarda en ese hub."
+
+# How the assistant's card names each datum of a write (the titles of the schemas, as the screens say them)
+msgid "Category"
+msgstr "Categoría"

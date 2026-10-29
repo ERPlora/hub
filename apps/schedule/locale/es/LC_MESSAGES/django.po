@@ -187,3 +187,7 @@ msgstr "Esas fechas se solapan con el cambio temporal «%(reason)s» (%(start)s 
 
 msgid "There are no weekly opening hours to confirm."
 msgstr "No hay horario semanal que confirmar."
+
+# How the assistant's card names each datum of a write (the titles of the schemas, as the screens say them)
+msgid "Opening intervals"
+msgstr "Tramos horarios"
