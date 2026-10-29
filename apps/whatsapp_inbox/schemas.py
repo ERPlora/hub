@@ -14,6 +14,7 @@ from uuid import UUID
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
@@ -277,16 +278,20 @@ class NoticesOut(Schema):
 
 class AssignIn(ConversationRefIn):
     assignee_id: int | None = Field(
-        None, description="The id of the person to assign it to."
+        None, title=gettext_noop("Assigned to"), description="The id of the person to assign it to."
     )
-    unassign: bool = Field(False, description="True: assign it to nobody.")
+    unassign: bool = Field(
+        False, title=gettext_noop("Remove assignment"), description="True: assign it to nobody."
+    )
     assignee: Reference | None = Field(
         None,
         validate_default=True,
+        title=gettext_noop("Assigned to"),
         description="The person's name, username or email, or «me» for the caller, when the id is not known.",
     )
     only_if_unassigned: bool = Field(
         False,
+        title=gettext_noop("Only if unassigned"),
         description="True («Assign to me»): refuse instead of taking it from somebody else.",
     )
 
@@ -315,9 +320,12 @@ class LinkCustomerIn(ConversationRefIn):
     )
     create: bool = Field(
         False,
+        title=gettext_noop("Create card"),
         description="True: create a card with the WhatsApp name and number, and join it.",
     )
-    unlink: bool = Field(False, description="True: take the card off the conversation.")
+    unlink: bool = Field(
+        False, title=gettext_noop("Unlink"), description="True: take the card off the conversation."
+    )
     customer: Reference | None = Field(
         None,
         validate_default=True,
@@ -405,6 +413,7 @@ class SendIn(Schema):
     id: UUID | None = Field(None, description="The conversation's id.")
     to: _text(32) | None = Field(
         None,
+        title=gettext_noop("Phone"),
         description="A number to write to (a template to somebody who has not written yet).",
     )
     conversation: Reference | None = Field(
@@ -412,6 +421,7 @@ class SendIn(Schema):
     )
     template: TemplateSendIn | None = Field(
         None,
+        title=gettext_noop("Template"),
         description="An approved template; the only way to write after the 24-hour window.",
     )
     text: _text(4096) | None = Field(
@@ -972,21 +982,26 @@ class ChannelPrepareOut(Schema):
 
 class ChannelConnectIn(Schema):
     code: _text(2048, 1) = Field(
-        description="The one-time code Meta's window returned (it lasts 30 seconds)."
+        title=gettext_noop("Meta connection code"),
+        description="The one-time code Meta's window returned (it lasts 30 seconds).",
     )
     event: Annotated[str, StringConstraints(pattern=r"^FINISH[A-Z_]{0,58}$")] = Field(
         "FINISH",
+        title=gettext_noop("How Meta's window finished"),
         description="How Meta's window finished (FINISH, or FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING for a "
         "number of the WhatsApp Business app); a window cancelled or failed connects nothing.",
     )
     waba_id: Annotated[str, StringConstraints(strip_whitespace=True, pattern=META_ID)] = Field(
-        description="The WhatsApp Business account chosen in Meta's window."
+        title=gettext_noop("WhatsApp Business account"),
+        description="The WhatsApp Business account chosen in Meta's window.",
     )
     phone_number_id: Annotated[str, StringConstraints(strip_whitespace=True, pattern=META_ID_OR_EMPTY)] = Field(
-        "", description="The number chosen in Meta's window (empty: the account's only number)."
+        "",
+        title=gettext_noop("Your number"),
+        description="The number chosen in Meta's window (empty: the account's only number).",
     )
     business_id: Annotated[str, StringConstraints(strip_whitespace=True, pattern=META_ID_OR_EMPTY)] = Field(
-        "", description="The business portfolio at Meta."
+        "", title=gettext_noop("Business portfolio at Meta"), description="The business portfolio at Meta."
     )
 
 

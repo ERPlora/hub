@@ -722,3 +722,40 @@ msgstr "Lee la reserva, para saber su número, su día, su hora y los comensales
 
 msgid "Sends the guest the WhatsApp, only in their own conversation and within your plan's messages."
 msgstr "Manda el WhatsApp al cliente, solo en su propia conversación y dentro de los mensajes de tu plan."
+
+# How the assistant's card names each datum of a write (the titles of the schemas, as the screens say them)
+msgid "Assigned to"
+msgstr "Asignada a"
+
+msgid "Remove assignment"
+msgstr "Quitar asignación"
+
+msgid "Only if unassigned"
+msgstr "Solo si está sin asignar"
+
+msgid "Create card"
+msgstr "Crear ficha"
+
+msgid "Unlink"
+msgstr "Desunir"
+
+msgid "Phone"
+msgstr "Teléfono"
+
+msgid "Template"
+msgstr "Plantilla"
+
+msgid "Meta connection code"
+msgstr "Código de conexión de Meta"
+
+msgid "How Meta's window finished"
+msgstr "Cómo terminó la ventana de Meta"
+
+msgid "WhatsApp Business account"
+msgstr "Cuenta de WhatsApp Business"
+
+msgid "Your number"
+msgstr "Tu número"
+
+msgid "Business portfolio at Meta"
+msgstr "Portfolio empresarial de Meta"
