@@ -128,6 +128,9 @@ class Conversation(UUIDModel):
     status = models.CharField(
         _("status"), max_length=10, choices=Status.choices, default=Status.OPEN
     )
+    # «Needs attention» (WHATSAPP_INBOX-F20): an automatic answer could not answer her, so she waits for a person even
+    # after its apology went out; somebody of the business answering, or a new status, takes it away.
+    needs_attention = models.BooleanField(_("needs attention"), default=False)
     unread_count = models.PositiveIntegerField(_("unread"), default=0)
     last_message_at = models.DateTimeField(_("last message"), null=True, blank=True)
     last_message_preview = models.CharField(

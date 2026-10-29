@@ -43,8 +43,10 @@ from apps.whatsapp_inbox.schemas import (
     ConversationListIn,
     ConversationPage,
     ConversationRefIn,
+    MessageGetOut,
     MessageListIn,
     MessagePage,
+    MessageRefIn,
     NoteListIn,
     NotePage,
     NoticesIn,
@@ -178,12 +180,13 @@ def live_conversations() -> QuerySet:
     return Conversation.objects.filter(erased_at__isnull=True)
 
 
-#: A customer waiting for an answer (WHATSAPP_INBOX-F09): an open conversation whose last message is the customer's.
-#: The summary, the bell's count and the device's notices read this one definition.
-AWAITING_REPLY = Q(
-    status=Conversation.Status.OPEN,
-    last_message_direction=Message.Direction.INBOUND,
+#: A customer waiting for an answer (WHATSAPP_INBOX-F09): an open conversation whose last message is the customer's, or
+#: that an automatic answer marked «Needs attention» because it could not answer her (F20). The summary, the bell's
+#: count and the device's notices read this one definition.
+AWAITING_REPLY = Q(status=Conversation.Status.OPEN) & (
+    Q(last_message_direction=Message.Direction.INBOUND) | Q(needs_attention=True)
 )
+MESSAGE_NOT_FOUND = _("That message no longer exists.")
 
 
 def _matching_ids(reference: str) -> list[UUID]:
@@ -297,6 +300,7 @@ def conversation_out(row: Conversation) -> dict:
         "last_message_direction": row.last_message_direction,
         "last_message_kind": row.last_message_kind,
         "last_inbound_at": row.last_inbound_at,
+        "flagged": row.needs_attention,
         "created_at": row.created_at,
     }
 
@@ -602,6 +606,34 @@ def list_messages(ctx: OperationContext, params: MessageListIn) -> dict:
         .order_by("-sent_at", "-id")
     )
     return page(rows, params, message_out)
+
+
+@operation(
+    "whatsapp_inbox.message.get",
+    kind="query",
+    permission="whatsapp_inbox.view",
+    input=MessageRefIn,
+    output=MessageGetOut,
+    ai={
+        "description": "One WhatsApp message by its id (the one an automation started on): what it says, who said it "
+        "and when, its conversation's exact international number, what to call the customer and whether anything "
+        "can be sent now."
+    },
+)
+def get_message(ctx: OperationContext, data: MessageRefIn) -> dict:
+    row = (
+        Message.objects.select_related("sent_by", "conversation__customer")
+        .filter(pk=data.id, conversation__erased_at__isnull=True)
+        .first()
+    )
+    if row is None:
+        raise NotFound(str(MESSAGE_NOT_FOUND), code="whatsapp_inbox.message_not_found")
+    return {
+        **message_out(row),
+        "phone": row.conversation.phone,
+        "display_name": display_name(row.conversation),
+        "can_send": send_blocked(channel(ctx.scope)) is None,
+    }
 
 
 @operation(

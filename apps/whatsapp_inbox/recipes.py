@@ -139,3 +139,242 @@ RECIPES = [
         },
     },
 ]
+
+
+# ── The answers that read what the customer writes (WHATSAPP_INBOX-F14, F15, F20, F21, F22, F24, F25) ────────────
+#
+# Each one starts on a live message of the customer (never the echo of what the business wrote from its phone, never
+# the old chats connecting the number brought) and stops at once for a message with no text. Unless WhatsApp cannot
+# send now (the number unconnected, the month's messages spent: the conversation is marked «Needs attention» and
+# nothing goes), it thanks her at once and asks the assistant, «Ask me first» (FLOW-F37, F38): a read runs at once, a
+# booking or a move waits for the owner's yes in «Waiting for your answer». The assistant may only use the free times
+# and the booking's own changes: a read that names other people (the diary, the customer list, who a time clashes
+# with) is never offered, because what it answers goes out to whoever writes; her own card and latest booking are read
+# before, pinned to her number. What it answers goes to her; when it fails or says nothing, a fixed apology and the
+# mark. Cancelling is not offered: Citas and Reservas only cancel with a person in front.
+
+#: Sends to exactly the customer who wrote, in her own conversation (FLOW-F31).
+_SEND_REASON = _("Sends the customer the WhatsApp, only in her own conversation and within your plan's messages.")
+_READ_REASON = _("Reads the message the customer wrote, the number of her conversation and what to call her.")
+_FLAG_REASON = _(
+    "Marks her conversation «Needs attention» when it cannot answer her, so somebody of your team does."
+)
+
+
+def _answer_steps(assistant: str, thanks, sorry) -> tuple[list[dict], list[dict]]:
+    """``(head, tail)``: the steps every answer shares around its own. The head reads the message, stops on one with no
+    text and, when nothing can be sent, marks the conversation and stops; then it thanks her. The tail, after the
+    assistant's step ``assistant``, sends what it answered or, when it failed or said nothing, the apology and the mark."""
+    flag = {"id": "", "kind": "command", "operation": "whatsapp_inbox.conversation.flag", "params": {"id": "steps.s1.conversation_id"}}
+    failed = {f"steps.{assistant}.failed": {"eq": True}}
+    silent = {f"steps.{assistant}.text": {"eq": ""}}
+
+    def send(step_id: str, text, run_if: dict | None = None) -> dict:
+        step = {"id": step_id, "kind": "command", "operation": "whatsapp_inbox.message.notify", "params": {"phone": "steps.s1.phone", "text": text}}
+        return {**step, "run_if": run_if} if run_if else step
+
+    head = [
+        {"id": "s1", "kind": "query", "operation": "whatsapp_inbox.message.get", "params": {"id": "input.id"}},
+        {"id": "s2", "kind": "condition", "when": {"steps.s1.body": {"exists": True, "neq": ""}}},
+        {**flag, "id": "s3", "run_if": {"steps.s1.can_send": {"eq": False}}},
+        {"id": "s4", "kind": "condition", "when": {"steps.s1.can_send": {"eq": True}}},
+        send("s5", thanks),
+    ]
+    number = int(assistant[1:])
+    tail = [
+        send(f"s{number + 1}", "{{steps.%s.text}}" % assistant, {f"steps.{assistant}.text": {"exists": True, "neq": ""}}),
+        send(f"s{number + 2}", sorry, failed),
+        {**flag, "id": f"s{number + 3}", "run_if": failed},
+        send(f"s{number + 4}", sorry, silent),
+        {**flag, "id": f"s{number + 5}", "run_if": silent},
+    ]
+    return head, tail
+
+
+_APPOINTMENT_HEAD, _APPOINTMENT_TAIL = _answer_steps(
+    "s10",
+    _("Thanks for writing! Let me check the diary and I will come straight back to you."),
+    _("Sorry, I cannot check the diary right now. Someone from the team will answer you here as soon as they can."),
+)
+_TABLE_HEAD, _TABLE_TAIL = _answer_steps(
+    "s8",
+    _("Thanks for writing! Let me check the reservations book and I will come straight back to you."),
+    _(
+        "Sorry, I cannot check the reservations right now. Someone from the team will answer you here as soon as "
+        "they can."
+    ),
+)
+
+APPOINTMENT_PROMPT = _(
+    "A customer wrote to the salon on WhatsApp from {{steps.s1.phone}}:\n"
+    "«{{steps.s1.body}}»\n\n"
+    "She is {{steps.s1.display_name}} and her customer card is {{steps.s6.id}}{{steps.s7.id}}: book and move only "
+    "on that card, never on another person's, and never tell her anything about other customers. Her latest "
+    "appointment, if she has one: number {{steps.s9.number}}, {{steps.s9.start}}, {{steps.s9.service_names}} with "
+    "{{steps.s9.staff_name}} ({{steps.s9.status}}). Appointments a customer books herself confirm by themselves: "
+    "{{steps.s8.auto_confirm_online}}.\n\n"
+    "Do what she asks, and only that:\n"
+    "- To book: when her message says the service, the day and the time and that time is free, book it on her card "
+    "with source «whatsapp» and the professional who works then; otherwise look up the free times and offer her a "
+    "short numbered list. Never choose the time for her.\n"
+    "- To move her appointment: move that same appointment to the time she asks for, with the same service and the "
+    "same professional.\n"
+    "- You cannot cancel: tell her someone from the team will do it.\n\n"
+    "Then write only the WhatsApp to send her, in the language she wrote in, short and friendly: what was booked or "
+    "moved (day, time and professional, and whether it is confirmed or the salon will confirm it), or the times on "
+    "offer, or why it could not be done."
+)
+
+TABLE_PROMPT = _(
+    "A guest wrote to the restaurant on WhatsApp from {{steps.s1.phone}}:\n"
+    "«{{steps.s1.body}}»\n\n"
+    "They are {{steps.s1.display_name}}; never tell them anything about other guests. Their latest reservation, if "
+    "they have one: {{steps.s7.date_label}} at {{steps.s7.time_label}}, {{steps.s7.party_size}} guests "
+    "({{steps.s7.status}}, id {{steps.s7.id}}). New reservations confirm by themselves: {{steps.s6.auto_confirm}}.\n\n"
+    "Do what they ask, and only that:\n"
+    "- To book a table: the day, the time and how many come are theirs to say, never yours. When they are said and "
+    "there is room, book it with the phone {{steps.s1.phone}}, the name they give (or {{steps.s1.display_name}}) and "
+    "source «whatsapp»; with no room, offer them a short numbered list of other times, or the waiting list.\n"
+    "- To change their reservation: change only that same reservation, by its id.\n"
+    "- You cannot cancel: tell them someone from the team will do it.\n\n"
+    "Then write only the WhatsApp to send them, in the language they wrote in, short and friendly: what was booked "
+    "or changed (day, time and guests, and whether it is confirmed or the restaurant will confirm it), the times on "
+    "offer, or why it could not be done."
+)
+
+RECIPES += [
+    {
+        "id": "appointment_from_whatsapp",
+        "name": _("WhatsApp → appointment booked"),
+        "summary": _(
+            "WhatsApp answers by itself: it reads your diary, offers the free times, and books or moves the "
+            "appointment of the customer who writes, after your yes."
+        ),
+        "description": _(
+            "Each message of a customer is answered at once with a thanks; the assistant reads what she asks and "
+            "your free times, and every booking or move it wants waits for your yes in «Waiting for your answer». "
+            "It never reads other customers' data and never cancels. A customer with no card gets one, marked as "
+            "having come by WhatsApp. When it cannot answer, she gets an apology and her conversation is marked "
+            "«Needs attention» in the inbox."
+        ),
+        "trigger": {
+            "kind": "event",
+            "event": "whatsapp_inbox.message.received",
+            "filter": {"input.direction": {"eq": "inbound"}, "input.source": {"eq": "live"}},
+        },
+        "steps": [
+            *_APPOINTMENT_HEAD,
+            {"id": "s6", "kind": "query", "operation": "customer.customer.by_phone", "params": {"phone": "steps.s1.phone"}},
+            {
+                "id": "s7",
+                "kind": "command",
+                "operation": "customer.customer.create",
+                "params": {"name": "steps.s1.display_name", "phone": "steps.s1.phone", "source": "whatsapp"},
+                "run_if": {"steps.s6.found": {"eq": False}},
+                "on_error": "continue",
+            },
+            {"id": "s8", "kind": "query", "operation": "appointment.settings.get", "params": {}},
+            {
+                "id": "s9",
+                "kind": "query",
+                "operation": "appointment.appointment.list_for_customer",
+                "params": {"customer_id": "steps.s6.id", "limit": 1},
+                "run_if": {"steps.s6.found": {"eq": True}},
+            },
+            {
+                "id": "s10",
+                "kind": "assistant",
+                "prompt": APPOINTMENT_PROMPT,
+                "tools": ["appointment.availability.slots", "appointment.appointment.create", "appointment.appointment.reschedule"],
+                "mode": "ask",
+                "max_rounds": 8,
+                "on_error": "continue",
+            },
+            *_APPOINTMENT_TAIL,
+        ],
+        "grants": {
+            "whatsapp_inbox.message.get": _READ_REASON,
+            "whatsapp_inbox.conversation.flag": _FLAG_REASON,
+            "whatsapp_inbox.message.notify": _SEND_REASON,
+            "customer.customer.by_phone": _("Looks the customer up by the number she writes from, and by nothing else."),
+            "customer.customer.create": _("Creates the card of a customer who is new, marked as having come by WhatsApp."),
+            "appointment.settings.get": _("Reads your booking rules, to follow them. It only reads them."),
+            "appointment.appointment.list_for_customer": _(
+                "Reads the latest appointment of the customer who writes, and nobody else's, to move the right one."
+            ),
+            "appointment.availability.slots": _("Asks which times are really free on the day she wants."),
+            "appointment.appointment.create": _(
+                "Books the appointment she chose on her card, after your yes in «Waiting for your answer»."
+            ),
+            "appointment.appointment.reschedule": _(
+                "Moves her appointment to the time she asks for, after your yes in «Waiting for your answer»."
+            ),
+        },
+    },
+    {
+        "id": "reservation_from_whatsapp",
+        "name": _("WhatsApp → table booked"),
+        "summary": _(
+            "WhatsApp answers by itself: it checks the free tables, and books or changes the table of whoever writes, "
+            "after your yes."
+        ),
+        "description": _(
+            "Each message of a guest is answered at once with a thanks; the assistant reads what they ask and how "
+            "full the day is, and every booking, change or place on the waiting list it wants waits for your yes in "
+            "«Waiting for your answer». The time and the guests are theirs to say, never the assistant's. It never "
+            "reads other guests' data and never cancels. When it cannot answer, they get an apology and their "
+            "conversation is marked «Needs attention» in the inbox."
+        ),
+        "trigger": {
+            "kind": "event",
+            "event": "whatsapp_inbox.message.received",
+            "filter": {"input.direction": {"eq": "inbound"}, "input.source": {"eq": "live"}},
+        },
+        "steps": [
+            *_TABLE_HEAD,
+            {"id": "s6", "kind": "query", "operation": "reservation.settings.get", "params": {}},
+            {
+                "id": "s7",
+                "kind": "query",
+                "operation": "reservation.reservation.list",
+                "params": {"guest_phone": "steps.s1.phone", "sort": "-starts_at", "limit": 1},
+            },
+            {
+                "id": "s8",
+                "kind": "assistant",
+                "prompt": TABLE_PROMPT,
+                "tools": [
+                    "reservation.availability.day",
+                    "reservation.availability.tables",
+                    "reservation.reservation.create",
+                    "reservation.reservation.update",
+                    "reservation.waitlist.create",
+                ],
+                "mode": "ask",
+                "max_rounds": 8,
+                "on_error": "continue",
+            },
+            *_TABLE_TAIL,
+        ],
+        "grants": {
+            "whatsapp_inbox.message.get": _READ_REASON,
+            "whatsapp_inbox.conversation.flag": _FLAG_REASON,
+            "whatsapp_inbox.message.notify": _SEND_REASON,
+            "reservation.settings.get": _("Reads your book's rules, to follow them. It only reads them."),
+            "reservation.reservation.list": _(
+                "Reads the latest reservation of the number that writes, and nobody else's, to change the right one."
+            ),
+            "reservation.availability.day": _("Looks how full the day is: its opening, its slots and its covers."),
+            "reservation.availability.tables": _("Looks which tables are free at the time and for the guests asked."),
+            "reservation.reservation.create": _(
+                "Books the table they asked for, with their number, after your yes in «Waiting for your answer»."
+            ),
+            "reservation.reservation.update": _(
+                "Changes their reservation to what they ask, after your yes in «Waiting for your answer»."
+            ),
+            "reservation.waitlist.create": _(
+                "Puts them on the waiting list when there is no room, after your yes in «Waiting for your answer»."
+            ),
+        },
+    },
+]

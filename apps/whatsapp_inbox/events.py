@@ -21,6 +21,8 @@ MESSAGE_STATUS_CHANGED = "whatsapp_inbox.message.status_changed"
 CONVERSATION_READ = "whatsapp_inbox.conversation.read"
 ASSIGNED = "whatsapp_inbox.conversation.assigned"
 STATUS_CHANGED = "whatsapp_inbox.conversation.status_changed"
+#: An automatic answer could not answer the customer: her conversation needs a person (WHATSAPP_INBOX-F20).
+FLAGGED = "whatsapp_inbox.conversation.flagged"
 CUSTOMER_LINKED = "whatsapp_inbox.conversation.customer_linked"
 ERASED = "whatsapp_inbox.conversation.erased"
 NOTE_ADDED = "whatsapp_inbox.note.added"
@@ -42,6 +44,7 @@ ALL = [
     CONVERSATION_READ,
     ASSIGNED,
     STATUS_CHANGED,
+    FLAGGED,
     CUSTOMER_LINKED,
     ERASED,
     NOTE_ADDED,
@@ -56,9 +59,10 @@ ALL = [
 ]
 
 #: What changes whether a conversation waits for an answer (WHATSAPP_INBOX-F09; the bell's count): a message arrives
-#: (the customer's, or the echo of one sent from the business's phone), one is sent from the Hub, its status changes or
-#: it is erased. Never a read, an assignment, a note nor a card joined.
-AWAITING_REPLY_EVENTS = [MESSAGE_RECEIVED, MESSAGE_SENT, STATUS_CHANGED, ERASED]
+#: (the customer's, or the echo of one sent from the business's phone), one is sent from the Hub, its status changes,
+#: an automatic answer marks it «Needs attention» (F20) or it is erased. Never a read, an assignment, a note nor a card
+#: joined.
+AWAITING_REPLY_EVENTS = [MESSAGE_RECEIVED, MESSAGE_SENT, STATUS_CHANGED, FLAGGED, ERASED]
 #: What may leave a customer waiting anew (the device's notices): a message of hers, or a conversation opened again.
 NOTICE_EVENTS = [MESSAGE_RECEIVED, STATUS_CHANGED]
 

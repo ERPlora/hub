@@ -1,7 +1,7 @@
 """Live queries of the WhatsApp inbox and the events that re-run them after the COMMIT.
 
-The inbox is live (WHATSAPP_INBOX-F03): a message arriving, sent or read, an assignment, a status, a
-card joined or the channel's state (erplora.com's photo, or its answer when the number is connected or disconnected
+The inbox is live (WHATSAPP_INBOX-F03): a message arriving, sent or read, an assignment, a status, the «Needs
+attention» an automatic answer leaves (F20), a card joined or the channel's state (erplora.com's photo, or its answer when the number is connected or disconnected
 from Settings, F01, F02) re-run what shows them; who waits for an answer (F09) follows what changes it. A customer card renamed, merged, deleted or erased
 re-runs the lists that paint its name. The exact-number lookup (for other apps) and the team (a picker)
 are asked once, not followed.
@@ -17,6 +17,7 @@ INBOX = [
     E.CONVERSATION_READ,
     E.ASSIGNED,
     E.STATUS_CHANGED,
+    E.FLAGGED,
     E.CUSTOMER_LINKED,
     E.ERASED,
 ]
@@ -34,6 +35,7 @@ live(
         E.MESSAGE_SENT,
         E.CONVERSATION_READ,
         E.STATUS_CHANGED,
+        E.FLAGGED,
         E.ERASED,
         *CHANNEL,
     ],
