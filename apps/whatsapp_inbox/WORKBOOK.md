@@ -1360,8 +1360,12 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
 
    Respuestas: 200 `{"meta_id": "…", "status": "PENDING" | "APPROVED" | "REJECTED" | …}` (Meta la
    recibió); 409 `{"error": {"code": "whatsapp.template_invalid" | "whatsapp.meta_unreachable" |
-   "whatsapp.meta_rate_limited" | "whatsapp.not_connected", "message": "<motivo de Meta>"}}` = no
-   aceptada; el resto como en la puerta 5. erplora.com **nunca registra dos veces la misma clave**.
+   "whatsapp.meta_rate_limited" | "whatsapp.not_connected" | "whatsapp.reconnect_needed", "message": "<motivo
+   de Meta>"}}` = no aceptada (`reconnect_needed`: el permiso caducó o se retiró, el 190 de Meta, y erplora.com
+   marca el número «Hay que reconectar» con foto nueva, como en la puerta 5; el Hub deja la plantilla `failed`
+   con `whatsapp_inbox.reconnect_needed` y su propio texto (`RECONNECT_NEEDED`), nunca el de Meta: la fila dice
+   «No aceptada: El permiso de WhatsApp para tu número caducó: vuelve a conectarlo.»); el resto como en la
+   puerta 5. erplora.com **nunca registra dos veces la misma clave**.
 9. `POST {SAAS_INTERNAL_URL}/internal/whatsapp/templates/delete` (F31):
 
    ```json
@@ -1371,7 +1375,11 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
    Borra en Meta esa plantilla en ese idioma (no las demás del mismo nombre). 200 `{"deleted": true}` o
    404 `{"error": {"code": "whatsapp.template_not_found", …}}` (Meta ya no la tiene) = borrada; cualquier
    otro 404 (una puerta que no existe, una dirección mal puesta: gh:whatsapp_inbox#296), 409 con su
-   motivo, otro 4xx, 5xx o sin respuesta = sigue `pending` y el Hub lo vuelve a pedir.
+   motivo (`whatsapp.meta_unreachable`, `whatsapp.meta_rate_limited`, `whatsapp.not_connected`,
+   `whatsapp.reconnect_needed` o `whatsapp.meta_rejected`), otro 4xx, 5xx o sin respuesta = sigue `pending` y
+   el Hub lo vuelve a pedir. Los cuatro primeros se dicen con palabras del Hub, como en la puerta 8:
+   con `reconnect_needed` (el mismo 190, y erplora.com marca el número) la fila dice «Borrándose en Meta» con
+   el texto `RECONNECT_NEEDED`, y el borrado solo sale bien cuando el número se vuelve a conectar.
 
 Las tres de **conectar el número desde Ajustes** (F01, F02; `whatsapp_inbox.channel.prepare`, `.connect` y
 `.disconnect`, en la petición de la persona y sin transacción abierta). En las tres, el sobre de errores de
