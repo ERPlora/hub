@@ -10,7 +10,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile, type Card } from './customer-helpers';
-import { A, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { A, horizontalOverflow, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-CUSTOMER-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
@@ -63,7 +63,7 @@ async function openCard(page: Page): Promise<Locator> {
 
 const noHorizontalScroll = (page: Page, size: string) =>
   expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${size}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${size}` })
     .toBeLessThanOrEqual(0);
 
 test.beforeAll(async ({ browser }) => {

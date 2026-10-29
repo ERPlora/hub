@@ -4,28 +4,13 @@
 // «My apps» sheet in the topbar, and no Back on the list, the root of the app.
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, api, createItem, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
+import { A, api, createItem, horizontalOverflow, listReady, login, openApps, record, shot, shown, uniqueName } from './helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1194 },
   { label: '1440', width: 1440, height: 900 },
 ];
-
-async function overflow(page: Page) {
-  return page.evaluate(async () => {
-    const content = document.querySelector('ion-router-outlet > .ion-page:not(.ion-page-hidden) ion-content') as
-      | (HTMLElement & { getScrollElement?: () => Promise<HTMLElement> })
-      | null;
-    const inner = content?.getScrollElement ? await content.getScrollElement() : null;
-    return {
-      documentScrollWidth: document.documentElement.scrollWidth,
-      innerWidth: window.innerWidth,
-      contentScrollWidth: inner?.scrollWidth ?? null,
-      contentClientWidth: inner?.clientWidth ?? null,
-    };
-  });
-}
 
 async function chromeState(page: Page) {
   const bar = shown(page);
@@ -49,7 +34,7 @@ test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; t
     await page.goto('/demo/items');
     await listReady(page);
     await page.waitForTimeout(600);
-    const list = await overflow(page);
+    const list = await horizontalOverflow(page);
     const chrome = await chromeState(page);
     await page.screenshot({ path: shot(`08-list-${vp.label}`) });
 
@@ -63,30 +48,25 @@ test('390 / 834 / 1440: no horizontal scroll on list, detail, create and edit; t
     await page.goto(`/demo/items/${item.id}`);
     await expect(page.locator('[data-testid=demo-detail-status]')).toBeVisible();
     await page.waitForTimeout(600);
-    const detail = await overflow(page);
+    const detail = await horizontalOverflow(page);
     await page.screenshot({ path: shot(`08-detail-${vp.label}`) });
 
     // «New item» and «Edit item» are pages too (second pass).
     await page.goto('/demo/items/new');
     await expect(shown(page).locator('[data-testid=demo-form]')).toBeVisible();
     await page.waitForTimeout(400);
-    const create = await overflow(page);
+    const create = await horizontalOverflow(page);
     await page.screenshot({ path: shot(`08-create-${vp.label}`) });
     await page.goto(`/demo/items/${item.id}/edit`);
     await expect(shown(page).locator('[data-testid=demo-form-name] input')).toHaveValue(item.name);
     await page.waitForTimeout(400);
-    const edit = await overflow(page);
+    const edit = await horizontalOverflow(page);
     await page.screenshot({ path: shot(`08-edit-${vp.label}`) });
 
     results[vp.label] = { list, detail, create, edit, chrome };
-    for (const [screen, measured] of Object.entries({ create, edit })) {
-      expect(measured.documentScrollWidth, `${vp.label} ${screen}`).toBeLessThanOrEqual(measured.innerWidth);
-      expect(measured.contentScrollWidth!, `${vp.label} ${screen} content`).toBeLessThanOrEqual(measured.contentClientWidth!);
+    for (const [screen, measured] of Object.entries({ list, detail, create, edit })) {
+      expect(measured, `${vp.label} ${screen}`).toBeLessThanOrEqual(0);
     }
-    expect(list.documentScrollWidth, `${vp.label} list`).toBeLessThanOrEqual(list.innerWidth);
-    expect(detail.documentScrollWidth, `${vp.label} detail`).toBeLessThanOrEqual(detail.innerWidth);
-    expect(list.contentScrollWidth!, `${vp.label} list content`).toBeLessThanOrEqual(list.contentClientWidth!);
-    expect(detail.contentScrollWidth!, `${vp.label} detail content`).toBeLessThanOrEqual(detail.contentClientWidth!);
     const pinned = vp.width >= 992;
     expect(chrome, `${vp.label} chrome`).toEqual({ pinnedMenu: pinned, drawerButton: !pinned, railToggle: pinned, back: false, apps: true });
   }

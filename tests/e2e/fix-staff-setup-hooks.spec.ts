@@ -9,7 +9,7 @@
 // figures and the roles). Everything this file creates is named «E2E-HOOKS …» and removed after it; it parks nothing.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -235,7 +235,7 @@ for (const size of VIEWPORTS) {
   test(`STAFF-F20 and STAFF-F23 at ${size.label}: the five panels with the server's figures`, async ({ browser }) => {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height }, { board: ALL });
     try {
-      const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = () => horizontalOverflow(page);
       for (const key of ALL) {
         await expect(panel(page, key)).toHaveAttribute('aria-busy', 'false');
         await expect(panel(page, key).locator('[data-testid="widget-error"]')).toHaveCount(0);

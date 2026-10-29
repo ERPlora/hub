@@ -6,7 +6,7 @@
 // `FIX-ATTENDANCE-SETUP-HOOKS-<width>`. Everything this file creates is named «E2E-PRESENCE …» and removed after it.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -135,7 +135,7 @@ for (const size of VIEWPORTS) {
   test(`ATTENDANCE-F11 at ${size.label}: «Fichados ahora» on the default board with the server's count`, async ({ browser }) => {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height });
     try {
-      const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = () => horizontalOverflow(page);
       await expect(panel(page, CLOCKED_IN_NOW)).toHaveAttribute('aria-busy', 'false');
       await expect(panel(page, CLOCKED_IN_NOW).locator('[data-testid="widget-error"]')).toHaveCount(0);
       await expect(value(page, CLOCKED_IN_NOW)).toHaveText(count.format(await presence(context)));

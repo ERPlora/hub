@@ -12,7 +12,7 @@
 // open per business), as cash-register-shift.spec.ts does.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
 import { stamp } from './sale-helpers';
 
@@ -257,7 +257,7 @@ for (const size of VIEWPORTS) {
   test(`CASH_REGISTER-F01 and CASH_REGISTER-F12 at ${size.label}: «Tu caja» pending, then the two panels with the server's figures`, async ({ browser }) => {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height }, { board: [EXPECTED, RECENT] });
     try {
-      const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = () => horizontalOverflow(page);
       await unfolded(page);
       await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Recomendado');
       await row(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));

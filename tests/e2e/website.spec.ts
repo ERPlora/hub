@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, HUB_DIR, hostPage, SAAS, settled } from './helpers';
+import { A, api, capture, horizontalOverflow, HUB_DIR, hostPage, SAAS, settled } from './helpers';
 import { atRest } from './website-helpers';
 
 const WIDTHS = {
@@ -241,7 +241,7 @@ async function visit(browser: Browser, template: string, width: keyof typeof WID
   }
   // Bootstrap's own stylesheet reached the page (the bundle, under the public CSP).
   await expect(page.locator('header .navbar')).toHaveCSS('display', 'flex');
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `nothing scrolls sideways at ${width} px`).toBeLessThanOrEqual(0);
   if (width === 390) {
     // On a phone the sections fold into the top bar's menu, and «Log in» stays on the bar.
@@ -372,7 +372,7 @@ test('the owner publishes the website and a visitor sees it on the hub’s addre
     for (const width of [1440, 820, 390] as const) {
       await page.setViewportSize(WIDTHS[width]);
       await expect(page.getByTestId('website-editor')).toBeVisible();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `the editor does not scroll sideways at ${width} px`).toBeLessThanOrEqual(0);
       await settled(page);
       await capture(page, `WEBSITE-editor-${width}`);

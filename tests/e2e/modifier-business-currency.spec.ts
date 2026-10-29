@@ -8,7 +8,7 @@
 // registration put back, also when a test fails.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { A, api, horizontalOverflow, hostPage, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
 import { settled } from './service-helpers';
 
 const KEY = 'FIX-HUB-MODIFIER-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
@@ -87,7 +87,7 @@ test(`${KEY}: MODIFIER-F04 a business in Poland reads and types the supplements 
     await expect(sheet(page).locator('[data-testid^=modifier-sheet-options-row-]').first(), size.name).not.toContainText('€');
     await settled(page);
     await expect
-      .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${size.name}` })
+      .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${size.name}` })
       .toBeLessThanOrEqual(0);
     await page.screenshot({ path: shot(`${KEY}-${size.name}`) });
   }

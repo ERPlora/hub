@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, hostPage, HUB_DIR, MAIL_DIR, OWNER, psql, SAAS, settled, topbarApps } from './helpers';
+import { A, api, capture, horizontalOverflow, hostPage, HUB_DIR, MAIL_DIR, OWNER, psql, SAAS, settled, topbarApps } from './helpers';
 import { readMailCode } from './mail';
 import { atRest } from './website-helpers';
 
@@ -197,19 +197,6 @@ async function confirmDialog(page: Page, title: string): Promise<void> {
 async function showView(page: Page, view: 'Edit' | 'Preview'): Promise<void> {
   const tabs = page.getByTestId('website-view');
   if (await tabs.isVisible()) await tabs.locator('ion-segment-button').filter({ hasText: view }).click();
-}
-
-/** How many pixels the page scrolls sideways (0 when everything fits its width), the editor's content included. */
-async function horizontalOverflow(page: Page): Promise<number> {
-  return page.evaluate(async () => {
-    const content = document.querySelector('ion-router-outlet > .ion-page:not(.ion-page-hidden) ion-content') as
-      | (HTMLElement & { getScrollElement?: () => Promise<HTMLElement> })
-      | null;
-    const inner = content?.getScrollElement ? await content.getScrollElement() : null;
-    const outer = document.documentElement.scrollWidth - window.innerWidth;
-    const own = inner ? inner.scrollWidth - inner.clientWidth : 0;
-    return Math.max(outer, own);
-  });
 }
 
 /** At each of the three sizes: `target` in sight (after `before`, for a view that changes with the width), no sideways
@@ -560,7 +547,7 @@ test('WEBSITE-F10: a visitor opens the address and gets the page in any design, 
       await expect(visiting.locator('[data-ep-section="contact"]')).toContainText(PHONE);
       await expect(visiting.locator('[data-ep-section="location"]')).toContainText('Gran Vía 1');
       await expect(visiting.locator('header .navbar')).toHaveCSS('display', 'flex');
-      expect(await visiting.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+      expect(await horizontalOverflow(visiting)).toBeLessThanOrEqual(0);
       expect(await context.cookies(), 'nothing was left in the browser').toEqual([]);
       await atRest(visiting);
       await capture(visiting, `APP-WEBSITE-F10-${template}-${vp.label}`, { fullPage: true });

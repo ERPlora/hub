@@ -250,6 +250,23 @@ documento y 1 en su shadow root). Las infinitas (spinners, un brillo de carga) n
 que lista `raw-screenshots.json` (los que quedaban al llegar `capture`), y una spec nueva no hace ninguno. Al pasar
 capturas de un fichero a `capture`, baja su número en el JSON (o quita su línea): la lista solo encoge.
 
+## Sin scroll horizontal
+
+Toda comprobación de «nada se sale por la derecha» pasa por `horizontalOverflow(page)` (`helpers.ts`): los píxeles que
+quedan más allá del borde derecho de su caja, 0 si todo cabe. Mide el documento **y la caja de scroll de cada
+`ion-content`** (la de la página que se ve, la del menú lateral fijo y la de una hoja abierta), en su shadow root
+(`part="scroll"`). Ionic fija el `body` a la ventana y cada pantalla se desplaza dentro de su `ion-content`, así que una
+pantalla que se sale por la derecha queda cortada ahí y el documento nunca crece: mirar solo el documento
+(`documentElement.scrollWidth` contra la ventana) daba 0 con un bloque de 1600 px en una página a 390, y la spec pasaba
+con la barra cortada en su propia captura (lo vio el revisor de hub#386). `helpers-overflow.spec.ts` comprueba que lo ve
+en la página, en el menú, en una hoja y en una página sin Ionic (la web pública). `horizontal-overflow.test.ts` (Vitest),
+sin trinquete: ningún fichero de `tests/e2e` salvo `helpers.ts` vuelve a medir el documento a mano, ni un solo
+`ion-content` (`getScrollElement()`, `.inner-scroll`, `part="scroll"`). Caza también el raíz por un nombre que se le dé
+(`const root = document.documentElement`), leído con `??` o `as` en línea o por un `then()`, su `scrollWidth`
+desestructurado, el raíz hallado por su selector (`querySelector('html')`) o por un localizador de Playwright
+(`page.locator('html')`, `$eval('body', …)`) y la medida partida en varias líneas (`.scrollWidth` en la línea de abajo).
+El scroll vertical (`scrollTop`, `scrollHeight`) sigue libre.
+
 ## Medir cuándo acaba una petición
 
 En la pila de desarrollo Vite sirve cada módulo de la SPA por separado, y llenan el búfer de Resource Timing de

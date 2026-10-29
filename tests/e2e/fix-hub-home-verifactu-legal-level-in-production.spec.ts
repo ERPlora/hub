@@ -12,7 +12,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-HOME-VERIFACTU-LEGAL-LEVEL-IN-PRODUCTION';
@@ -164,7 +164,7 @@ for (const size of SIZES) {
       await expect(configure).toHaveText('Configurar');
       await expect(shown(page).locator('[data-testid="home-activity-loading"]')).toHaveCount(0);
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
 

@@ -7,7 +7,7 @@
 // Everything created here is named «E2E…» and removed after the run (and before, if a run died half-way).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
 
 const TAG = 'E2E';
 const VIEWPORTS = [
@@ -47,19 +47,6 @@ async function signedIn(browser: Browser, next: string, credentials?: Credential
   const page = await context.newPage();
   await login(page, A, next, credentials);
   return { context, page };
-}
-
-/** How many pixels the shown page scrolls sideways (0 when everything fits its width). */
-async function horizontalOverflow(page: Page): Promise<number> {
-  return page.evaluate(async () => {
-    const content = document.querySelector('ion-router-outlet > .ion-page:not(.ion-page-hidden) ion-content') as
-      | (HTMLElement & { getScrollElement?: () => Promise<HTMLElement> })
-      | null;
-    const inner = content?.getScrollElement ? await content.getScrollElement() : null;
-    const outer = document.documentElement.scrollWidth - window.innerWidth;
-    const own = inner ? inner.scrollWidth - inner.clientWidth : 0;
-    return Math.max(outer, own);
-  });
 }
 
 /** At each of the three sizes: `target` in sight, no sideways scroll, and the screenshot (also saved as

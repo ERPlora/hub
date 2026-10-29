@@ -7,7 +7,7 @@
 // run and put back as it was after it.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
 
 const KEY = 'FIX-HUB-BASE-BLOCKING-STRIP-SAYS-TICKET-WHERE-INVOICING-SAYS-TIQUE';
@@ -51,7 +51,7 @@ for (const size of VIEWPORTS) {
       await expect(shown(page).locator('[data-testid="invoice-issuer-notice"]')).toHaveCount(0);
       await expect(strip).not.toContainText(/\btickets?\b/i);
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
     } finally {
