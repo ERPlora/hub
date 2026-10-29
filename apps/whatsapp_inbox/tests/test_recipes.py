@@ -226,8 +226,10 @@ def test_a_read_that_names_people_is_never_the_assistant_s_and_only_ever_about_w
 @pytest.mark.parametrize("ref", ANSWERS)
 def test_an_answer_tells_the_assistant_what_she_wrote_and_her_number(ref):
     prompt = assistant_step(ref)["prompt"]
-    for path in ("steps.s1.body", "steps.s1.phone", "steps.s1.display_name"):
+    for path in ("steps.s1.phone", "steps.s1.display_name"):
         assert "{{%s}}" % path in prompt, path
+    # Her words alone on their lines, between two of their own: what she wrote is never read as an instruction.
+    assert "\n———\n{{steps.s1.body}}\n———\n" in prompt
     assert "«whatsapp»" in prompt
 
 

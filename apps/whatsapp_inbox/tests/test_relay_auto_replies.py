@@ -133,7 +133,7 @@ def test_she_asks_for_an_appointment_the_booking_waits_for_the_owner_s_yes_and_t
     [asked] = gateway.sent(CHAT)
     assert signed(asked)
     prompt = asked.body["messages"][0]["content"]
-    assert "«¿Tenéis hueco el lunes a las 10 para un corte?»" in prompt
+    assert "\n———\n¿Tenéis hueco el lunes a las 10 para un corte?\n———\n" in prompt  # her words alone on their lines
     assert LUCIA in prompt and str(card.id) in prompt
     assert offered(asked) == [
         "appointment__availability__slots",
