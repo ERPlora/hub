@@ -24,12 +24,3 @@ icono.
   entrega, «Ver anteriores», desplazamiento al último) para `@erplora/ui/components`: lo usarán también
   el asistente y cualquier canal (correo, SMS).
 - **Hoy**: `components/ThreadView.vue`, propio de esta app.
-
-## Muestra de la cabecera de una plantilla (archivo)
-
-- **Qué**: para crear desde el Hub plantillas con foto, vídeo o documento en la cabecera
-  (WHATSAPP_INBOX-F29; el producto actual lo hacía), la plataforma tiene que ofrecer subir un archivo
-  (almacenamiento y una ruta de subida fuera de una operación con transacción) que erplora.com entregue a
-  Meta como muestra.
-- **Hoy**: esas plantillas se hacen en WhatsApp Manager; en **Ajustes → Plantillas de Meta** se ven, pero
-  no se editan ni se ofrecen para enviar.

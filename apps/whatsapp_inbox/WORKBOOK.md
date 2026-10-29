@@ -6,8 +6,8 @@ borran desde el Hub, y el número, que se conecta, se vuelve a conectar y se des
 tiene su mitad desde saas#63 (2026-10-21) y los flujos que cruzan con él están probados de punta a punta contra
 el erplora.com real con un número de pruebas (solo Meta se simula): recibir, el eco del móvil, los estados,
 la opción tocada, contestar, enviar una plantilla, editarla y borrarla, olvidar un número, conectar el número,
-llegar al tope del mes (F13) y la lista de plantillas que erplora.com trae de Meta (F27, F28). Queda en parcial
-la cabecera con archivo (F29). Los avisos de la cita y de la mesa confirmadas (F23, F26) ya salen por WhatsApp; las
+llegar al tope del mes (F13), la lista de plantillas que erplora.com trae de Meta (F27, F28) y crear una plantilla
+con foto en la cabecera (F29). Los avisos de la cita y de la mesa confirmadas (F23, F26) ya salen por WhatsApp; las
 respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F22, F24, F25) están escritas y esperan al asistente
 del Hub.
 
@@ -139,7 +139,10 @@ aquí.».
 ### Plantilla (hoja)
 Se abre con **Añadir plantilla** («Nueva plantilla») o **Editar** («Editar plantilla — nombre»), encima
 de Ajustes. Campos: **Nombre** («Minúsculas, números y guiones bajos. No se puede cambiar después.»),
-**Idioma** y **Categoría** (Utilidad o Marketing), **Cabecera (opcional)**, **Texto** («Donde va una
+**Idioma** y **Categoría** (Utilidad o Marketing), **Tipo de cabecera** (Texto, Foto, Vídeo o Documento) con
+**Cabecera (opcional)** si es de texto o, si lleva archivo, **Elegir archivo** («Ningún archivo elegido»; elegido,
+su nombre y su peso con **Cambiar archivo**, lo que admite, p. ej. «JPEG o PNG, hasta 5 MB.», y «Meta revisa la
+plantilla con este archivo.»), **Texto** («Donde va una
 variable, escribe su número entre dobles llaves, empezando por el 1.»), un **Ejemplo de la variable n**
 por cada variable («Meta revisa la plantilla con estos ejemplos.»), **Pie (opcional)** y **Botones**
 (**Añadir botón**: Respuesta rápida, Enlace o Llamada, con su texto y su dirección o su número;
@@ -189,7 +192,7 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F26 | El cliente recibe el aviso cuando el restaurante confirma | hecho | restaurante |
 | WHATSAPP_INBOX-F27 | Ver las plantillas y lo que dice Meta de cada una | hecho | comun |
 | WHATSAPP_INBOX-F28 | Traer las plantillas creadas en WhatsApp Manager | hecho | comun |
-| WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | parcial — la cabecera con foto, vídeo o documento no se ofrece (el Hub no guarda archivos: se hace en WhatsApp Manager) | comun |
+| WHATSAPP_INBOX-F29 | Crear una plantilla y mandarla a revisión | hecho | comun |
 | WHATSAPP_INBOX-F30 | Editar una plantilla | hecho | comun |
 | WHATSAPP_INBOX-F31 | Borrar una plantilla | hecho | comun |
 | WHATSAPP_INBOX-F32 | Contestar desde la bandeja | hecho | comun |
@@ -797,8 +800,7 @@ Implicados: erplora.com, WhatsApp Manager
 
 ### WHATSAPP_INBOX-F29 Crear una plantilla y mandarla a revisión
 <!-- origen: old:whatsapp_inbox/workflow/plantillas.md#whatsapp_inbox-f29 -->
-Estado: parcial — la cabecera con foto, vídeo o documento no se ofrece (el Hub no guarda archivos: se
-hace en WhatsApp Manager)
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
 Pasos:
@@ -806,17 +808,29 @@ Pasos:
 2. Escribir el nombre, elegir idioma y categoría (Utilidad o Marketing) y escribir el texto con `{{1}}`,
    `{{2}}`… donde van las variables, con un ejemplo de cada una; si se quiere, cabecera, pie y botones
    (respuestas rápidas juntas, hasta dos enlaces y una llamada; diez como mucho).
-3. Pulsar **Enviar a revisión de Meta**: la plantilla sale en la lista «Sin enviar a Meta» con
-   «Enviándose a Meta…» y pasa a «En revisión» en cuanto Meta la recibe.
-4. Cuando Meta decide, pasa sola a «Aprobada» (ya se puede enviar, F33) o a «Rechazada» con su motivo.
-Entra: nombre, idioma, categoría, cabecera, texto, ejemplos, pie, botones y una clave del guardado (la
-misma al reintentar).
-Sale: la plantilla guardada y, tras el guardado, entregada a erplora.com para que la registre en Meta;
-aviso `whatsapp_inbox.template.created`.
+3. Para una cabecera con foto, vídeo o documento, elegir «Foto», «Vídeo» o «Documento» en **Tipo de
+   cabecera** y pulsar **Elegir archivo** (una foto JPEG o PNG hasta 5 MB, un vídeo MP4 hasta 16 MB o un
+   PDF hasta 25 MB): se guarda al momento en los archivos del negocio y la hoja enseña su nombre y su peso.
+   Meta revisa la plantilla con ese archivo; sin él no se puede enviar a revisión.
+4. Pulsar **Enviar a revisión de Meta**: la plantilla sale en la lista «Sin enviar a Meta» con
+   «Enviándose a Meta…» y pasa a «En revisión» en cuanto Meta la recibe. La de una cabecera con archivo
+   nombra el suyo («Foto: …») y dice «Aún no se puede enviar desde la bandeja: la cabecera lleva un
+   archivo.».
+5. Cuando Meta decide, pasa sola a «Aprobada» (ya se puede enviar, F33) o a «Rechazada» con su motivo.
+Entra: nombre, idioma, categoría, cabecera (un texto, o una foto, un vídeo o un documento), texto,
+ejemplos, pie, botones y una clave del guardado (la misma al reintentar).
+Sale: el archivo de la cabecera guardado en los archivos del negocio al elegirlo (aviso
+`whatsapp_inbox.template_sample.uploaded`); la plantilla guardada y, tras el guardado, entregada a
+erplora.com con su archivo para que la registre en Meta; aviso `whatsapp_inbox.template.created`.
 Si falla: lo que Meta no aceptaría se dice debajo de su campo (un nombre con mayúsculas o espacios,
 variables sin numerar en orden o con nombre, una variable sin ejemplo, una variable en la cabecera o
 el pie, más de 60 caracteres en la cabecera o el pie, botones mezclados o de más); el mismo nombre en el
-mismo idioma: «Ya hay una plantilla «…» en ese idioma.». Si Meta no la acepta o pide esperar, la lista
+mismo idioma: «Ya hay una plantilla «…» en ese idioma.». Un archivo que no es del tipo elegido se dice
+debajo y no se guarda («Elige una foto JPEG o PNG.», «Elige un vídeo MP4.», «Elige un documento PDF.»), y
+uno que pesa de más también («Este archivo pesa más de 5 MB: elige uno más ligero.»); si no se pudo
+subir: «No se pudo subir el archivo. Inténtalo de nuevo.». Si al entregarla el archivo ya no está en los
+archivos del negocio, la lista dice «No aceptada: El archivo de la cabecera ya no está en los archivos del
+negocio: vuelve a elegirlo con Editar.». Si Meta no la acepta o pide esperar, la lista
 dice «No aceptada: …» con el motivo de Meta («Meta no ha contestado. Inténtalo de nuevo en unos
 minutos.» cuando Meta no contesta: nunca culpa a ERPlora) y se corrige con **Editar** o se repite con
 **Volver a enviar a Meta**. Si erplora.com no contesta, la lista lo dice y **Volver a enviar a Meta** la
@@ -831,8 +845,9 @@ Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
 Pasos:
 1. En **Ajustes → Plantillas de Meta**, pulsar **Editar** en la fila (o tocarla).
-2. Cambiar el texto, los ejemplos, la cabecera, el pie o los botones (la categoría, solo si Meta la
-   rechazó; el nombre y el idioma no cambian) y pulsar **Guardar y enviar a Meta**.
+2. Cambiar el texto, los ejemplos, la cabecera (también su archivo, con **Cambiar archivo**), el pie o los
+   botones (la categoría, solo si Meta la rechazó; el nombre y el idioma no cambian) y pulsar **Guardar y
+   enviar a Meta**.
 3. Una plantilla aprobada se sigue enviando tal como Meta la aprobó mientras el cambio va de camino
    («Hasta que Meta apruebe los cambios, se sigue enviando la aprobada.»); en cuanto Meta lo recibe, pasa
    a «En revisión» con el texto nuevo.
@@ -1029,6 +1044,7 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 | `whatsapp_inbox.conversation.link_customer` | Une a una ficha, crea la ficha o desune |
 | `whatsapp_inbox.conversation.erase` | Borra los datos de un número (irreversible) |
 | `whatsapp_inbox.note.add` / `whatsapp_inbox.note.delete` | Notas internas |
+| `whatsapp_inbox.template.upload_sample` | Guarda el archivo de una cabecera con foto, vídeo o documento en los archivos del negocio y devuelve su id |
 | `whatsapp_inbox.template.create` | Crea una plantilla y la entrega a erplora.com para Meta; pide una clave por guardado |
 | `whatsapp_inbox.template.update` | Cambia una plantilla; la aprobada sigue enviándose hasta que Meta recibe el cambio |
 | `whatsapp_inbox.template.retry` | Vuelve a entregar la plantilla (o su borrado) que no llegó a Meta; un rechazo va con clave nueva |
@@ -1055,7 +1071,8 @@ las reacciones a Clientes (`whatsapp_inbox.conversation.claim_for_customer`,
 `whatsapp_inbox.conversation.assigned`, `whatsapp_inbox.conversation.status_changed`,
 `whatsapp_inbox.conversation.customer_linked`, `whatsapp_inbox.conversation.erased`,
 `whatsapp_inbox.note.added`, `whatsapp_inbox.note.deleted`, `whatsapp_inbox.channel.synced`,
-`whatsapp_inbox.channel.connected`, `whatsapp_inbox.channel.disconnected`, `whatsapp_inbox.template.created`, `whatsapp_inbox.template.updated`, `whatsapp_inbox.template.deleted`.
+`whatsapp_inbox.channel.connected`, `whatsapp_inbox.channel.disconnected`, `whatsapp_inbox.template.created`, `whatsapp_inbox.template.updated`, `whatsapp_inbox.template.deleted`,
+`whatsapp_inbox.template_sample.uploaded`.
 Llevan identificadores, nunca un número, un nombre ni un texto de la conversación.
 
 ### A qué reacciona y lo que necesita de otras apps
@@ -1126,14 +1143,22 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   reversible: las copias de antes quedan sin negocio, solo en el admin, y la foto de cada negocio trae de Meta
   las suyas), nombre + idioma (únicos por negocio entre las no borradas), categoría, estado en Meta (`DRAFT` mientras
   Meta nunca la tuvo, `APPROVED`, `PENDING`, `REJECTED`, `PAUSED`, `DISABLED`, `DELETED`), cabecera
-  (`header_format`: vacío, `TEXT` o un archivo o lugar hecho en WhatsApp Manager; `header`), cuerpo,
+  (`header_format`: vacío, `TEXT`, `IMAGE`, `VIDEO`, `DOCUMENT` o `LOCATION`; `header`; `header_sample`, el
+  archivo elegido aquí, que se queda vacío si la lista de Meta trae otro tipo de cabecera), cuerpo,
   ejemplos (`body_examples`), pie, botones, número de variables, motivo de rechazo, `meta_id`,
   `synced_at`; el cambio que espera llegar a Meta (`draft`); la entrega a erplora.com (`submit_state`:
   vacío, `queued`, `sending`, `failed`; `submit_key`, la clave del guardado, única; `submit_error_code` y,
   solo en un rechazo de Meta que el Hub no nombra, su motivo tal como llegó en `submit_error`; `submit_at`); el borrado (`deleted_at`, que conserva la fila, y `delete_state`:
   `pending` hasta que Meta lo confirma, `done`); y `supported` (si el Hub la escribe y la sabe rellenar:
   ni código de verificación, ni cabecera con archivo o con variable, ni variables con nombre, solo
-  respuestas rápidas, enlaces fijos y llamadas).
+  respuestas rápidas, enlaces fijos y llamadas). Una con archivo elegido aquí no es `supported` (la
+  bandeja no rellena su cabecera, F33), pero el Hub la escribe (`models.hub_writes`): se edita aquí.
+- `TemplateSample` (de cada negocio, `host`): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
+  `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
+  (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
+  `sha256`, tipo, tamaño y nombre. No se sirve en `/p/media/`; una plantilla lo referencia con `PROTECT`.
+  Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.MAX_FILE_BYTES`,
+  25 MB; Meta admite 100).
 
 Mensajes recibidos y enviados: el admin los enseña en **solo lectura** (son lo que llevó WhatsApp; se
 corrigen borrando los datos de la conversación, nunca editando), con borrado para el staff.
@@ -1376,6 +1401,13 @@ erplora.com desde saas#63 (2026-10-21), con su webhook de Meta (`saas/whatsapp/i
     "footer": "Peluquería Ana", "buttons": [{"type": "QUICK_REPLY", "text": "Confirmar"}], "meta_id": ""}
    ```
 
+   Una cabecera con archivo va con `"header_format": "IMAGE" | "VIDEO" | "DOCUMENT"`, `"header": ""` y
+   `"header_sample": {"name": "carta.jpg", "content_base64": "…"}`: el archivo se lee del almacén tras el
+   COMMIT, sin conexión abierta, y la puerta se espera hasta 90 s (dentro de `STUCK_AFTER`); erplora.com lo
+   sube a Meta como muestra (*Resumable Upload API*) antes de registrarla, con la misma clave. Si el archivo
+   ya no está, no sale nada y la plantilla queda `failed` con `whatsapp_inbox.header_sample_missing` (se
+   corrige con Editar); si el almacén no contesta, sigue en camino y se vuelve a entregar.
+
    Respuestas: 200 `{"meta_id": "…", "status": "PENDING" | "APPROVED" | "REJECTED" | …}` (Meta la
    recibió); 409 `{"error": {"code": "whatsapp.template_invalid" | "whatsapp.meta_unreachable" |
    "whatsapp.meta_rate_limited" | "whatsapp.not_connected" | "whatsapp.reconnect_needed", "message": "<motivo
@@ -1550,7 +1582,7 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
 | «Necesita atención» lo ponían las recetas | Filtro **Sin leer** + la campana **Clientes de WhatsApp esperando respuesta** (`awaiting_reply`) | Sin recetas no hay quien la ponga |
 | La app instalada avisaba cuando subía el contador de la campana (hub#2303) | Un aviso del dispositivo por cada mensaje de un cliente que queda sin contestar | Mercado (WhatsApp Business, Shopify Inbox, Square, Fresha avisan de cada mensaje); un aviso por subida del contador callaría al cliente que vuelve a escribir tras cerrarse sin respuesta |
 | Fotos y audio dentro del hilo, descargados por una puerta del Hub | Fotos y notas de voz dentro del hilo, servidas por erplora.com; vídeos y documentos con **Abrir el adjunto** | El Hub no guarda ni pasa archivos: erplora.com los sirve con la sesión de la persona y la CSP del Hub permite su origen (ver «Contrato con `base`») |
-| Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31), con la entrega a Meta por erplora.com; sin cabecera con archivo | El Hub no guarda archivos; la cabecera con foto, vídeo o documento se hace en WhatsApp Manager |
+| Plantillas: crear, editar y borrar desde el Hub, subiendo la muestra de la cabecera | Igual (F29–F31): el archivo de la cabecera se guarda en los archivos del negocio y erplora.com lo sube a Meta como muestra | La bandeja aún no envía una plantilla con archivo en la cabecera (F33) |
 | Repaso cada 15 min de conversaciones sin ficha | Se une al recibir y al guardar la ficha | No hay conversaciones anteriores a la app nueva que repasar |
 | `templates.list` y ajustes solo para el administrador | Elegir plantilla para enviar: quien contesta; Ajustes: propietario y administrador | Quien contesta necesita las plantillas |
 
@@ -1558,8 +1590,9 @@ conversación «Necesita atención» (hoy la bandeja solo tiene **Sin leer**).
 
 - **No guarda credenciales de Meta**: la cuenta de WhatsApp Business, el webhook y el token viven en
   erplora.com, que es quien habla con Meta.
-- **No sube la muestra de una cabecera con foto, vídeo o documento**: esas plantillas se hacen en
-  WhatsApp Manager y aquí se ven, pero no se envían.
+- **No envía todavía desde la bandeja una plantilla con foto, vídeo o documento en la cabecera** (F33):
+  se crea, se edita y Meta la revisa desde aquí, pero rellenar su cabecera al enviar queda para después;
+  las hechas en WhatsApp Manager se siguen gestionando allí.
 - **No contesta sola ni reserva todavía** (F14–F22, F24, F25): las respuestas automáticas que reservan cita o
   mesa necesitan el asistente, que aún no está en el Hub («Respuestas automáticas: lo que falta»). Los avisos de
   la cita y de la mesa confirmadas (F23, F26) sí salen.
