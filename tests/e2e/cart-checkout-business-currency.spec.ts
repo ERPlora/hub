@@ -11,7 +11,7 @@
 // deleted before and after the run, and `a`'s registration is put back, also when a test fails.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, psql, registerBusinessIn, registrationOf, type Registration, settled, shot, shown } from './helpers';
+import { A, horizontalOverflow, psql, registerBusinessIn, registrationOf, type Registration, settled, shot, shown } from './helpers';
 import { type Cart, cleanUp, code, FLOW_VIEWPORTS, listShown, type Order, post, rowOf, signedIn } from './cart-checkout-helpers';
 
 const KEY = 'FIX-HUB-CART_CHECKOUT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
@@ -54,7 +54,7 @@ async function totalFrom(page: Page, value: string): Promise<void> {
 /** Waits until nothing moves (`settled`) and nothing scrolls sideways, then captures `name`. */
 async function capture(page: Page, name: string): Promise<void> {
   await settled(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(name) });
 }

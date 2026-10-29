@@ -7,7 +7,7 @@
 // flow: PRINTING-F01 BASE-F10
 import { expect, test } from '@playwright/test';
 
-import { A, api, bellBadge, clearItems, hostPage, openBell, shot, shown, uniqueName, untilStill } from './helpers';
+import { A, api, bellBadge, clearItems, horizontalOverflow, hostPage, openBell, shot, shown, uniqueName, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -42,7 +42,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toContainText('(1)');
     await untilStill(page);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const overflow = await horizontalOverflow(page);
     expect(overflow, `the bell at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
     await page.screenshot({ path: shot(`FIX-HUB-BASE-PRINT-BELL-IGNORES-DEVICE-PRESENCE-${width}`) });
 

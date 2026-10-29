@@ -14,7 +14,7 @@
 // Each flow leaves its capture `APP-BASE-6-<key>-<width>`.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { api, type Credentials, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
+import { api, type Credentials, horizontalOverflow, login, MAIL_DIR, psql, SAAS, shot, shown, turnOn, untilStill } from './helpers';
 import { readMailCode } from './mail';
 import { STACK } from './stack';
 
@@ -251,7 +251,7 @@ test('BASE-G98 — the Home of a business in Poland writes its amounts in złoty
   await atEverySize(page, ['BASE-G98-HOME'], async () => {
     await expect(amount).toHaveText(zloty[6]);
     await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const overflow = await horizontalOverflow(page);
     expect(overflow, `no sideways scroll at ${page.viewportSize()!.width}`).toBeLessThanOrEqual(0);
   });
   await owner.context.close();

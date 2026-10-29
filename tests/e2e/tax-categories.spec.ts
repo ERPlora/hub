@@ -7,7 +7,7 @@
 // deleted after the file (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shot, shown } from './helpers';
 
 const SEED = [
   'product.generic',
@@ -39,7 +39,7 @@ test.afterAll(() => {
 /** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
 async function noHorizontalScroll(page: Page, label: string): Promise<void> {
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
 }
 

@@ -16,7 +16,8 @@ import time
 
 import psycopg
 import pytest
-from django.db import connections
+from django.db import OperationalError, connections
+from django.test import Client
 from live.context import Scope, system_context
 from live.errors import OperationError
 from live.models import OutboxEvent
@@ -25,8 +26,12 @@ from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
 from apps.whatsapp_inbox.models import Channel, Message
-from base import relay
-from base.models import Hub
+from base import activation, internal, relay
+from base.models import AppActivation, Hub
+from base.tenancy import context
+from base.tenancy.context import use_hub
+from base.tenancy.identity import HubIdentityMismatch
+from base.tenancy.tests import hubs
 from base.tests.test_internal import HUB_ID, PATH as STATE_PATH, SECRET, code, signed
 
 INBOUND = "/internal/whatsapp/inbound"
@@ -289,6 +294,114 @@ def test_the_app_is_asked_about_the_business_of_the_body(client, acme, other, mo
     assert post(client, INBOUND, message(hub="other")).status_code == 404
     assert post(client, INBOUND, message(hub="acme")).status_code == 200
     assert asked == [OTHER, ACME]
+
+
+# Which apps are on, asked as production asks it: on the hosts erplora.com calls, no test fallback, the cache cold
+
+#: The Hub's private name, the host erplora.com calls in AWS (``HUB_INTERNAL_URL``; ``ALLOWED_HOSTS`` names it there).
+PRIVATE_NAME = "hub.erplora.internal"
+#: The hosts erplora.com calls the doors on: the private name, and ``localhost`` in local development and the e2e.
+#: Neither is a hub's host nor the platform's: no database context is open when the door starts (``base.middleware``).
+SAAS_HOSTS = [PRIVATE_NAME, "localhost"]
+
+
+@pytest.fixture
+def production(settings, monkeypatch):
+    """``() -> Client``: from now on, as in production: no shared database to fall back on (a hub's model without
+    ``use_hub`` is ``HubContextMissing``) and a client that answers a failure as the server does (500), not by raising.
+    Called after the rows the test needs are written."""
+    settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, PRIVATE_NAME]
+
+    def enter() -> Client:
+        monkeypatch.setattr(context, "_test_fallback", None)
+        return Client(raise_request_exception=False)
+
+    return enter
+
+
+def cold(*slugs: str) -> None:
+    """Nothing kept of the apps off of ``slugs``: the next question reads the business's rows."""
+    for slug in slugs:
+        activation.forget(slug)
+
+
+@pytest.mark.parametrize("host", SAAS_HOSTS)
+@pytest.mark.parametrize("path", DOORS)
+def test_each_door_answers_with_the_cache_of_the_apps_off_cold(acme, production, path, host):
+    door = production()
+    cold("acme")
+
+    answer = post(door, path, door_body(path), host=host)
+
+    assert answer.status_code == 200
+
+
+@pytest.mark.parametrize("path", DOORS)
+def test_the_app_off_in_its_rows_is_404_app_inactive_with_the_cache_cold(acme, production, path):
+    AppActivation.objects.filter(host="acme", app="whatsapp_inbox").update(state="off", chosen=False)
+    door = production()
+    cold("acme")
+
+    answer = post(door, path, door_body(path), host=PRIVATE_NAME)
+
+    assert answer.status_code == 404 and code(answer) == "app_inactive"
+    with use_hub(acme):
+        assert not Message.objects.exists() and not Channel.objects.exists()
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize("host", [PRIVATE_NAME, "hubs.localhost"])
+def test_each_business_answers_from_its_own_database(hub_a, hub_b, production, monkeypatch, host):
+    # WhatsApp on in tenant-a's database, off in tenant-b's: each door reads the business it names, never the other
+    # one nor phase 1's shared database (which the platform host opens: there tenant-a has no rows, every app off).
+    # The inbox's tables are not in a hub's own database yet (they reference control's users until phase 2's own
+    # staff: base/tenancy/tests/hubs.py), so the operation is probed where it would start.
+    with use_hub(hub_b):
+        AppActivation.objects.filter(host=hub_b.slug, app="whatsapp_inbox").update(state="off", chosen=False)
+    reached = []
+
+    def operation(name, body, ctx):
+        reached.append((name, context.current_hub().slug, ctx.scope.key))
+        return None, internal.refuse(418, "probe", "reached")
+
+    monkeypatch.setattr(internal, "_operation_call", operation)
+    door = production()
+    cold(hub_a.slug, hub_b.slug)
+
+    to_b = post(door, INBOUND, message("wamid.b", hub=hub_b.slug), host=host)
+    to_a = post(door, INBOUND, message("wamid.a", hub=hub_a.slug), host=host)
+
+    assert to_b.status_code == 404 and code(to_b) == "app_inactive"
+    assert to_a.status_code == 418
+    assert reached == [("whatsapp_inbox.message.receive", hub_a.slug, hub_a.slug)]
+
+
+@pytest.mark.parametrize(
+    ("failure", "level"),
+    [
+        # Unreachable now: it passes, a warning.
+        (OperationalError("connection refused"), "WARNING"),
+        # A database that says it is another hub: an alarm, as on a hub's host (base.middleware).
+        (HubIdentityMismatch("tenant-b's database"), "CRITICAL"),
+    ],
+)
+@pytest.mark.parametrize("path", DOORS)
+def test_a_database_that_fails_asking_for_the_apps_is_503_and_logged(
+    acme, production, monkeypatch, caplog, path, failure, level
+):
+    # erplora.com keeps the message and tries again; the Hub's log says which business and why.
+    def failing(scope):
+        raise failure
+
+    monkeypatch.setattr(relay, "active_apps", failing)
+    door = production()
+
+    answer = post(door, path, door_body(path), host=PRIVATE_NAME)
+
+    assert answer.status_code == 503 and code(answer) == "base.hub_unavailable"
+    [logged] = [record for record in caplog.records if record.name == "base.internal"]
+    assert logged.levelname == level and "hub=acme" in logged.getMessage()
+    assert logged.exc_info[1] is failure
 
 
 @pytest.mark.parametrize("path", DOORS)

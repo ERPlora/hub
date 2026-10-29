@@ -9,7 +9,7 @@
 // the run creates is deleted after it and `a`'s registration put back, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, psql, registerBusinessIn, registrationOf, type Registration, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-PAYMENT-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY';
 const TAG = 'E2E PayCur';
@@ -95,7 +95,7 @@ async function choose(page: Page, testid: string, text: string): Promise<void> {
 
 const noHorizontalScroll = (page: Page, size: string) =>
   expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${size}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${size}` })
     .toBeLessThanOrEqual(0);
 
 test.beforeAll(() => {

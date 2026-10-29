@@ -5,7 +5,7 @@
 // the hub's database (phase 1: hubs `a` and `b` share it), the appointments of its customers included.
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, login, psql, shown } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shown } from './helpers';
 
 /** Every name a service spec gives starts like this. */
 export const TAG = 'E2E Svc';
@@ -33,7 +33,7 @@ export { settled } from './helpers';
 /** The page does not scroll sideways: everything fits its width. */
 export async function noHorizontalScroll(page: Page, label: string): Promise<void> {
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
 }
 

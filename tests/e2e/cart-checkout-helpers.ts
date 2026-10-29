@@ -5,7 +5,7 @@
 // and `b` share it), with the day counter of the orders it numbered.
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, type Credentials, login, psql, settled, shown } from './helpers';
+import { A, api, capture, type Credentials, horizontalOverflow, login, psql, settled, shown } from './helpers';
 
 /** Every session code a cart_checkout spec gives starts like this. */
 export const TAG = 'e2e-cc';
@@ -28,7 +28,7 @@ export const FLOW_VIEWPORTS = { 390: VIEWPORTS.phone, 834: VIEWPORTS.tablet, 144
  */
 export async function snap(page: Page, flow: string, width: number | string): Promise<void> {
   await settled(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${flow} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await capture(page, `APP-CART_CHECKOUT-${flow}-${width}`);
 }

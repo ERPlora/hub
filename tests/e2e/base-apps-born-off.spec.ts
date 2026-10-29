@@ -12,7 +12,7 @@
 // flow: BASE-G131 BASE-G67
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, emptyOfTemplateData, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, api, emptyOfTemplateData, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -37,7 +37,7 @@ const appRow = (page: Page, id: string) => shown(page).locator(`[data-testid="ap
 async function snap(page: Page, step: string, width: number): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
   await untilStill(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${step} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APPS-BORN-OFF-${step}-${width}`) });
 }

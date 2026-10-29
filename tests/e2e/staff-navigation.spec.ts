@@ -5,7 +5,7 @@
 // old module's screens; the page never scrolls sideways.
 import { type Browser, expect, test } from '@playwright/test';
 
-import { A, api, login, openApps, psql, shot, shown, topbarApps } from './helpers';
+import { A, api, horizontalOverflow, login, openApps, psql, shot, shown, topbarApps } from './helpers';
 
 const TAG = 'E2E';
 const VIEWPORTS = {
@@ -100,7 +100,7 @@ for (const [size, viewport] of Object.entries(VIEWPORTS)) {
         await expect
           .poll(async () => view.locator('[data-testid$=-loading], [data-testid$=-loading-members]').count(), { message: `${name} loaded` })
           .toBe(0);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        const overflow = await horizontalOverflow(page);
         expect(overflow, `${name} scrolls sideways`).toBeLessThanOrEqual(0);
         await page.screenshot({ path: shot(`staff-${name}-${size}`) });
       }

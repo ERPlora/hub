@@ -1,12 +1,15 @@
-// flow: ninguno — FIX base
+// flow: internal-whatsapp-doors
 // erplora.com's WhatsApp doors into the Hub, in a hidden Chrome (README «Las puertas de WhatsApp»; the contract is
 // apps/whatsapp_inbox/WORKBOOK.md, «Contrato con el SaaS», doors 1–3). With the inbox of hub `a` open, the spec calls
 // the doors as erplora.com does — over HTTP, signed with the stack's INTERNAL_SHARED_SECRET (HMAC-SHA256 of
 // `<timestamp>.<body>`) — and the page follows by itself, never reloaded: the number connected (`PUT …/channel`)
 // lifts «WhatsApp is not connected»; a customer's message (`POST …/inbound`) arrives with its unread; the same
 // WhatsApp id again is `created: false` and adds nothing; an unsigned call is 401 and adds nothing; the echo of the
-// owner's reply from the phone shows in the thread, and Meta's «read» (`POST …/status`) marks it «Read». The final
-// screen in three sizes (FIX-HUB-INTERNAL-WHATSAPP-RECEIVERS-390|834|1440). What it creates is deleted after the file.
+// owner's reply from the phone shows in the thread, and Meta's «read» (`POST …/status`) marks it «Read». The first door
+// is called before anything else asked which apps are on (a fresh runserver: the cache of the apps off is cold) and on
+// 127.0.0.1, a host that opens no database context: it answers 200, never 500
+// (FIX-HUB-BASE-INTERNAL-WHATSAPP-DOORS-500-ON-COLD-ACTIVATION-CACHE). The final screen in three sizes
+// (`${SHOTS}-390|834|1440`). What it creates is deleted after the file.
 import { createHmac } from 'node:crypto';
 
 import { expect, type Page, test } from '@playwright/test';
@@ -15,6 +18,9 @@ import { A, login, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
 import { cleanUp, e2ePhone, PREFIX, waId } from './whatsapp-helpers';
+
+/** The name of the final screen's shots. */
+const SHOTS = 'FIX-HUB-BASE-INTERNAL-WHATSAPP-DOORS-500-ON-COLD-ACTIVATION-CACHE';
 
 /** The secret this stack's Hub signs `/internal` with (its local default unless the run exports another). */
 const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
@@ -84,11 +90,11 @@ test.afterAll(() => {
   cleanUp();
 });
 
-test('erplora.com pushes WhatsApp through the signed doors and the open inbox follows without a reload (ninguno — FIX base)', async ({ page }) => {
+test('erplora.com pushes WhatsApp through the signed doors and the open inbox follows without a reload (internal-whatsapp-doors)', async ({ page }) => {
   const phone = e2ePhone();
   const name = `${PREFIX}Lucía ${Date.now().toString(36)}`;
 
-  // Door 3: the number not connected yet.
+  // Door 3: the number not connected yet — the first question of the run about which apps are on in `a`.
   const off = await door('PUT', 'channel', channel('not_connected'));
   expect(off).toEqual({ status: 200, body: { applied: true, version } });
 
@@ -150,7 +156,7 @@ test('erplora.com pushes WhatsApp through the signed doors and the open inbox fo
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toContainText('Read');
     await settled(page);
-    await noHorizontalScroll(page, `FIX-HUB-INTERNAL-WHATSAPP-RECEIVERS ${viewport.label}`);
-    await page.screenshot({ path: shot(`FIX-HUB-INTERNAL-WHATSAPP-RECEIVERS-${viewport.label}`) });
+    await noHorizontalScroll(page, `${SHOTS} ${viewport.label}`);
+    await page.screenshot({ path: shot(`${SHOTS}-${viewport.label}`) });
   }
 });

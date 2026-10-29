@@ -4,7 +4,7 @@
 // `ion-select` popover, a row action inline or behind the row's «⋮»).
 import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, psql, shown } from './helpers';
 
 /** 390×844, 834×1112 and 1440×900: a phone, a tablet and a desk. */
 export const FLOW_VIEWPORTS = [
@@ -28,18 +28,7 @@ export function cleanUp(): void {
   );
 }
 
-/** How many pixels the shown page scrolls sideways (0 when everything fits its width). */
-export async function horizontalOverflow(page: Page): Promise<number> {
-  return page.evaluate(async () => {
-    const content = document.querySelector('ion-router-outlet > .ion-page:not(.ion-page-hidden) ion-content') as
-      | (HTMLElement & { getScrollElement?: () => Promise<HTMLElement> })
-      | null;
-    const inner = content?.getScrollElement ? await content.getScrollElement() : null;
-    const outer = document.documentElement.scrollWidth - window.innerWidth;
-    const own = inner ? inner.scrollWidth - inner.clientWidth : 0;
-    return Math.max(outer, own);
-  });
-}
+export { horizontalOverflow };
 
 /** At each of the three sizes: `target` in sight, no sideways scroll, and `APP-TAX-<key>-<width>.png`. */
 export async function threeShots(page: Page, key: string, target: () => Locator): Promise<void> {

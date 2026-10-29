@@ -10,12 +10,13 @@
 // the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-Fnn-<w>`).
 // SALE-F12: in a course of 1 to 4 whose dishes repeat, the rule says both and two dishes taken twice keep each name
 // on its line beside its counter and its minus, in the three sizes (`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-<w>`).
-// What a run makes — products `E2E-CMT-<run>-…`, its menus «e2e Combo …», checks, sales and kitchen tickets — goes.
+// What a run makes — products `E2E-CMT-<run>-…`, its menus and service «e2e Combo …», checks, sales and kitchen
+// tickets — goes.
 import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, HUB_DIR, login, psql, shot, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, HUB_DIR, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -23,6 +24,7 @@ const RUN = stamp();
 const SKU = `E2E-CMT-${RUN}`;
 const MENU = `e2e Combo Menu ${RUN}`;
 const PACK = `e2e Combo Pack ${RUN}`;
+const SERVICE = `e2e Combo Service ${RUN}`;
 const FOOD = 'restaurant.food';
 const SIZES = [
   { label: '390', width: 390, height: 844 },
@@ -54,6 +56,7 @@ function cleanRun(): void {
       `delete from combo_choiceoption where group_id in (select id from combo_choicegroup where combo_id in (${combos}))`,
       `delete from combo_choicegroup where combo_id in (${combos})`,
       `delete from combo_combo where id in (${combos})`,
+      "delete from service_service where name like 'e2e Combo %'",
     ].join('; '),
   );
 }
@@ -84,12 +87,13 @@ async function shots(page: Page, key: string, ready: () => Promise<void>): Promi
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await ready();
-    // A resize slides the phone's cart drawer and the sheets: the picture waits until nothing moves.
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    // A resize slides the phone's cart drawer and the sheets: the picture waits until nothing moves, Ionic's sheets
+    // and notices included (they animate in their shadow roots).
+    await untilStill(page);
     await expect
-      .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${key} ${size.label}` })
+      .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${key} ${size.label}` })
       .toBeLessThanOrEqual(0);
-    await page.screenshot({ path: shot(`APP-COMBO-${key}-${size.label}`) });
+    await capture(page, `APP-COMBO-${key}-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
@@ -174,6 +178,9 @@ test.beforeAll(async ({ browser }) => {
     await post(context, '/combo/groups', { combo: PACK, name: course });
     await post(context, '/combo/options', { combo: PACK, group: course, product: `${SKU}-${code}` });
   }
+  // A service on sale, as any business with Services has (and as other specs leave): «Services» keeps its own grid
+  // in the till, hidden while «All» is chosen, and the menus still go first in «All» (COMBO-F07).
+  await post(context, '/service/services', { name: SERVICE, price: 1500, duration_minutes: 30, tax_category_key: 'service.generic' });
   const methods = await api<{ rows: { id: string; type: string }[] }>(context, A, 'GET', '/sale/payment_methods');
   card = methods.data.rows.find((row) => row.type === 'card')?.id ?? '';
   expect(card, 'a card method').not.toBe('');
@@ -192,7 +199,15 @@ test('COMBO-F07, COMBO-F08: the menu goes first in «All», its sheet asks every
   const tile = shown(page).locator(`[data-testid=pos-menu-${menuId}]`);
   await expect(tile).toContainText(MENU);
   await expect(tile.locator(`[data-testid=pos-menu-${menuId}-badge]`)).toHaveText('Menu');
-  await expect(shown(page).locator('.pos-grid > button').first()).toHaveAttribute('data-testid', /^pos-menu-/);
+  // The till opens in «All», and the grid on screen starts with the menus, before any product. «Services» keeps
+  // its own grid in the page, hidden, and earlier in it: the order is read in the grid that shows.
+  await expect(shown(page).locator('[data-testid=pos-category-all]')).toHaveClass(/segment-button-checked/);
+  const grid = shown(page).locator('.pos-grid').filter({ visible: true });
+  await expect(grid).toHaveCount(1);
+  await expect(grid.locator(':scope > button').first()).toHaveAttribute('data-testid', /^pos-menu-/);
+  // Once this run's products are on screen, none of the grid's products goes before this run's menu.
+  await expect(grid.locator(`[data-testid=pos-product-${products.LEN.id}]`)).toBeVisible();
+  await expect(grid.locator(`xpath=./*[starts-with(@data-testid, 'pos-product-')][following-sibling::*[@data-testid='pos-menu-${menuId}']]`)).toHaveCount(0);
   const picks = await offer(context, menuId);
   // The sold-out flan is not offered, and its optional course, with nothing left on offer, is not either.
   expect(Object.keys(picks).sort()).toEqual(['COF', 'HAK', 'LEN', 'SAL', 'STK']);
@@ -346,13 +361,14 @@ test('SALE-F12: two repeatable dishes taken twice keep each name on its line bes
     });
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
-    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
+    // The sheet, an `ion-modal`, animates in its shadow root: the measures wait until nothing moves.
+    await untilStill(page);
     for (const code of ['COF', 'DEC']) {
       await expect(sheet.locator(`[data-testid=pos-menu-dish-count-${picks[code]}]`)).toHaveText('× 2');
       await expect(sheet.locator(`[data-testid=pos-menu-dish-less-${picks[code]}]`)).toBeVisible();
       await expect.poll(() => lines(code), { message: `the name of ${code} at ${size.label} is one or two lines` }).toBeLessThanOrEqual(2);
     }
-    await page.screenshot({ path: shot(`FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-${size.label}`) });
+    await capture(page, `FIX-SALE-MENU-SHEET-REPEATABLE-CHOICE-NAME-BREAKS-${size.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await sheet.locator('[data-testid=pos-menu-close]').click();

@@ -7,7 +7,7 @@
 // flow: TASK-F01 TASK-F02 TASK-F04 TASK-F05 TASK-F06 TASK-F09 TASK-F10 TASK-F12 TASK-F13 TASK-F14
 import { expect, test } from '@playwright/test';
 
-import { api, A, capture, shown, untilStill } from './helpers';
+import { api, A, capture, horizontalOverflow, shown, untilStill } from './helpers';
 import { cleanUp, named, pick, post, rowAction, rowOf, signedIn, TAG, VIEWPORTS } from './task-helpers';
 
 test.beforeAll(cleanUp);
@@ -124,7 +124,7 @@ test('Tasks and Projects in the three viewports', async ({ browser }) => {
     try {
       const view = shown(page);
       await expect(view.locator('[data-testid=task-tasks-row]', { hasText: title }).first()).toBeVisible();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
       await untilStill(page);
       await capture(page, `task-tasks-${name}`);

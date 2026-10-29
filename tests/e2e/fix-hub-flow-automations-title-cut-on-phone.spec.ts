@@ -7,7 +7,7 @@
 // `FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE-<width>`. Nothing is created.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown, untilStill } from './helpers';
+import { A, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE';
 const SIZES = [
@@ -53,7 +53,7 @@ for (const size of SIZES) {
       const words = await shown(page).locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
       expect(words, `the words of the action at ${size.label}`).toBe(size.phone ? '' : 'Nueva automatización');
 
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
 

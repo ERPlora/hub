@@ -9,7 +9,7 @@
 // What it creates is deleted after the file (`afterAll`).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shot, shown } from './helpers';
 
 /** Categories are never deleted by the app: what this file made goes with the database's own hand
  *  (the hub `a`'s), components first, then rules, aliases and the categories. */
@@ -27,7 +27,7 @@ test.afterAll(() => {
 /** No horizontal scroll: the page is not wider than the window (polled while the layout settles). */
 async function noHorizontalScroll(page: Page, label: string): Promise<void> {
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), { message: `no horizontal scroll at ${label}` })
+    .poll(() => horizontalOverflow(page), { message: `no horizontal scroll at ${label}` })
     .toBeLessThanOrEqual(0);
 }
 

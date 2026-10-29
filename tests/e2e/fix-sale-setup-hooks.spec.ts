@@ -8,7 +8,7 @@
 // is deleted after it (`cleanSales()`, `cleanInventory()`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 
@@ -149,7 +149,7 @@ for (const size of SIZES) {
       // The board at the top of the screen, as far as the page scrolls.
       await panel(page, 'sale.today').evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
     } finally {

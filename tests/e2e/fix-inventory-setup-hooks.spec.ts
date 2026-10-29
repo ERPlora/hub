@@ -10,7 +10,7 @@
 // which `cleanInventory()` removes.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, login, psql, shot, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, stamp, VIEWPORTS } from './inventory-helpers';
 
 const KEY = 'FIX-INVENTORY-SETUP-HOOKS';
@@ -161,7 +161,7 @@ for (const size of VIEWPORTS) {
       await expect(panel(page, 'inventory.low_stock_products').locator('[data-testid="widget-empty"]')).toHaveText('Sin datos');
       await row(page).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
-      const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      const overflow = () => horizontalOverflow(page);
       expect(await overflow(), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-INVENTORY-F28-${size.label}`) });
 

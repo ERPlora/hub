@@ -4,10 +4,10 @@
 // 1440×900 (desktop) without horizontal scroll, with a screenshot of each for the comparison with the
 // product's screens. On the phone the list shows cards and the side menu is a closed drawer. The list
 // filters behind the table's funnel, with its count, at every width.
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { cleanUp, createCard, customersReady, e2eName, rowNamed, searchList, spanishMobile } from './customer-helpers';
-import { A, login, record, shot, shown } from './helpers';
+import { A, horizontalOverflow, login, record, shot, shown } from './helpers';
 
 test.afterAll(() => cleanUp());
 
@@ -24,18 +24,6 @@ const FILTER_VIEWPORTS = [
   { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ];
-
-async function horizontalOverflow(page: Page): Promise<number> {
-  return page.evaluate(async () => {
-    const content = document.querySelector('ion-router-outlet > .ion-page:not(.ion-page-hidden) ion-content') as
-      | (HTMLElement & { getScrollElement?: () => Promise<HTMLElement> })
-      | null;
-    const inner = content?.getScrollElement ? await content.getScrollElement() : null;
-    const page = document.documentElement.scrollWidth - window.innerWidth;
-    const own = inner ? inner.scrollWidth - inner.clientWidth : 0;
-    return Math.max(page, own);
-  });
-}
 
 test('the footer tabs move between Customers, Groups, Tags and Fields; a row opens the card and Back returns', async ({ page, context }) => {
   await login(page, A, '/customer/customers');

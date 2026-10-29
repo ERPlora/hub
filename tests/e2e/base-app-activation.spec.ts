@@ -20,7 +20,7 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, HUB_DIR, hostPage, login, psql, shot, shown, untilStill } from './helpers';
+import { A, api, horizontalOverflow, HUB_DIR, hostPage, login, psql, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
@@ -115,7 +115,7 @@ async function search(page: Page, name: string): Promise<void> {
 async function snap(page: Page, key: string, width: number): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
   await untilStill(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${key} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APP-BASE-ACTIVATION-${key}-${width}`) });
 }

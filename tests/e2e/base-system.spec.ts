@@ -12,7 +12,7 @@
 // flow: BASE-G87 BASE-G88 BASE-G89 BASE-G90 BASE-G91 BASE-G92 BASE-G93 BASE-G94 BASE-G95
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, EMPLOYEE, hostPage, openBell, psql, shot, shown, untilStill } from './helpers';
+import { A, EMPLOYEE, horizontalOverflow, hostPage, openBell, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -51,7 +51,7 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
   await page.mouse.move(0, 0);
   await expect(shown(page).locator('[data-testid$="-loading"]:visible')).toHaveCount(0);
   await untilStill(page);
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const overflow = await horizontalOverflow(page);
   expect(overflow, `${key} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APP-BASE-7-${key}-${width}`) });
 }
