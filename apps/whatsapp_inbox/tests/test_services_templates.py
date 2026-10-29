@@ -481,15 +481,27 @@ def test_deleting_takes_it_off_the_list_and_deletes_that_one_at_meta_after_the_c
 
 
 @pytest.mark.parametrize(
-    ("status", "body", "code"),
+    ("status", "body", "code", "words"),
     [
-        (409, {"error": {"code": "whatsapp.meta_unreachable", "message": "timeout"}}, "whatsapp_inbox.meta_unreachable"),
+        (
+            409,
+            {"error": {"code": "whatsapp.meta_unreachable", "message": "timeout"}},
+            "whatsapp_inbox.meta_unreachable",
+            "Meta did not answer",
+        ),
+        # Meta's 190 (door 9): the Hub's own words, never Meta's; deleted only once the number is connected again.
+        (
+            409,
+            {"error": {"code": "whatsapp.reconnect_needed", "message": "Error validating access token"}},
+            "whatsapp_inbox.reconnect_needed",
+            "WhatsApp's permission for your number expired: connect it again.",
+        ),
         # erplora.com without the deletion door yet: its 404 is no confirmation (gh:whatsapp_inbox#296).
-        (404, {}, "whatsapp_inbox.saas_unreachable"),
+        (404, {}, "whatsapp_inbox.saas_unreachable", "erplora.com did not answer"),
     ],
 )
 @respx.mock
-def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_reason(delivered, status, body, code):
+def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_reason(delivered, status, body, code, words):
     row = approved()
     deleting(status, body)
     delivered(lambda: run("whatsapp_inbox.template.delete", {"id": str(row.id)}))
@@ -497,6 +509,8 @@ def test_a_deletion_meta_has_not_confirmed_stays_listed_as_deleting_with_its_rea
     assert (row.delete_state, row.submit_error_code) == ("pending", code)
     [shown] = listed()
     assert (shown.id, shown.deleting) == (row.id, True)
+    assert words in shown.submit_error
+    assert "Error validating access token" not in shown.submit_error
     # Not sendable while it is being deleted.
     assert listed(status="APPROVED", sendable=True) == []
 
