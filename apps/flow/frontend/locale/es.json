@@ -241,7 +241,7 @@
         "items": [
           "Bifurcaciones: una automatización es una columna; «Solo sigue si…» la termina cuando no se cumple. Dos desenlaces son dos automatizaciones.",
           "Contar hacia atrás desde una fecha del aviso («el día antes de la cita»): una espera cuenta desde el paso anterior.",
-          "Pedírselo al asistente: llega en una versión posterior. Los mensajes a un cliente salen solo por WhatsApp, no por correo.",
+          "Los mensajes a un cliente salen solo por WhatsApp, no por correo.",
           "El asistente escribe borradores: nunca enciende una automatización ni le concede nada."
         ]
       }
@@ -280,7 +280,8 @@
       "ranWaiting": "Se ejecutó y está esperando: mírala en Historial.",
       "runSaveFirst": "Guárdala primero: «Ejecutar ahora» ejecuta lo guardado.",
       "ranCalling": "Se ejecutó y está llamando a otro sistema: mírala en Historial.",
-      "ranAsking": "Se ejecutó y espera una respuesta en «Esperan tu respuesta»."
+      "ranAsking": "Se ejecutó y espera una respuesta en «Esperan tu respuesta».",
+      "ranThinking": "Se ha ejecutado y el asistente está en ello: míralo en Historial."
     },
     "trigger": {
       "when": "Cuando pase esto…",
@@ -333,7 +334,8 @@
         "delay": "Esperar",
         "message": "Enviar un mensaje",
         "http": "Llamar a otro sistema",
-        "ask": "Preguntar antes a alguien"
+        "ask": "Preguntar antes a alguien",
+        "assistant": "Pedírselo al asistente"
       },
       "remove": "Quitar este paso",
       "reorder": "Arrastra para ordenar",
@@ -398,7 +400,9 @@
         "http": "Llamar a {host}",
         "noHttp": "Llamar a otro sistema",
         "ask": "Preguntar: {title}",
-        "noAsk": "Preguntar antes a alguien"
+        "noAsk": "Preguntar antes a alguien",
+        "assistant": "Pedírselo al asistente: {prompt}",
+        "noAssistant": "Pedírselo al asistente"
       },
       "options": {
         "toggle": "Más opciones",
@@ -441,7 +445,8 @@
         "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo",
         "skipped": "Se saltaría: no se cumple su «Solo si…»",
         "would_call": "Llamaría a {host} con esto",
-        "would_ask": "Preguntaría a {who} y esperaría hasta {hours} horas"
+        "would_ask": "Preguntaría a {who} y esperaría hasta {hours} horas",
+        "would_ask_assistant": "Se lo pediría al asistente: {prompt}"
       },
       "empty": "Saldría vacío: {fields}",
       "unknown": "Sale de un paso anterior que no ha corrido: {fields}",
@@ -476,7 +481,8 @@
         "failed": "Se paró por un error",
         "cancelled": "Cancelada",
         "calling": "Llamando a otro sistema",
-        "asking": "Esperando una respuesta"
+        "asking": "Esperando una respuesta",
+        "thinking": "Esperando al asistente"
       },
       "log": {
         "done": "Hizo: {action}",
@@ -495,7 +501,12 @@
         "asking": "Preguntó a {who}; espera una respuesta hasta el {date}",
         "answeredYes": "{who} contestó que sí",
         "answeredNo": "{who} contestó que no",
-        "expired": "Nadie contestó a tiempo"
+        "expired": "Nadie contestó a tiempo",
+        "thinking": "Se lo ha pedido al asistente; contesta en un momento.",
+        "assistantUsed": "El asistente ha usado «{action}».",
+        "assistantRefused": "El asistente ha intentado «{action}», que no lo ha aceptado.",
+        "assistantAnswered": "El asistente ha contestado: «{text}»",
+        "assistantProposed": "El asistente quiere «{action}»: espera un sí hasta el {date}."
       },
       "advice": {
         "flow__not_allowed": "Abre Permisos y concédele lo que necesita.",
@@ -2639,6 +2650,26 @@
       "reject": "No",
       "approved": "Aprobada: la automatización sigue.",
       "rejected": "Contestada que no."
+    },
+    "assistant": {
+      "prompt": "Qué le pides",
+      "tools": "Qué puede usar",
+      "toolsHint": "Solo consultas y acciones que el asistente puede usar; cada una es un permiso que das en «Permisos».",
+      "addTool": "Añadir una consulta o una acción",
+      "chooseTool": "Elige una",
+      "noTools": "Nada todavía: solo puede contestar con palabras.",
+      "removeTool": "Quitar «{action}»",
+      "mode": "Cambios",
+      "modes": {
+        "ask": "Que me lo pregunte",
+        "auto": "Que lo haga por su cuenta"
+      },
+      "modeHints": {
+        "ask": "Lo que quiera cambiar espera un sí en Automatizaciones, en «Esperan tu respuesta». Lo que solo consulta nunca espera.",
+        "auto": "Hace los cambios por su cuenta, como esta automatización, con los permisos que le has dado."
+      },
+      "rounds": "Vueltas como mucho",
+      "answerHint": "Los pasos de después pueden insertar «Texto», lo que ha contestado."
     }
   }
 }

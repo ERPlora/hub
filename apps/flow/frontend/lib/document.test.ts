@@ -287,3 +287,22 @@ describe('a question before going on', () => {
   });
 });
 
+
+describe('«Ask the assistant» (FLOW-F37)', () => {
+  const assistant: Step = { id: 's2', kind: 'assistant', prompt: 'Book it', tools: ['appointment.slot.list', 'task.task.create'], mode: 'ask', max_rounds: 6 };
+
+  it('what it may use are permissions of the automation, once each', () => {
+    const command: Step = { id: 's1', kind: 'command', operation: 'task.task.create', params: {} };
+    expect(requiredGrants([command, assistant])).toEqual(['task.task.create', 'appointment.slot.list']);
+  });
+
+  it('later steps can insert what it answered and the answer to its change', () => {
+    expect(dataChoices([assistant, assistant], 1, null, null).map((choice) => choice.path)).toEqual([
+      'steps.s2.text', 'steps.s2.approved', 'steps.s2.note', 'steps.s2.answered_by',
+    ]);
+  });
+
+  it("the server's refusal of one of its fields shows next to it", () => {
+    expect(fieldErrors({ 'steps.0.assistant.prompt': 'Required' })).toEqual({ 'steps.0.prompt': 'Required' });
+  });
+});

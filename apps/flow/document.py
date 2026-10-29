@@ -39,7 +39,7 @@ MAX_DELAY_SECONDS = 30 * 24 * 3600
 #: event it delivers (base/ and the apps' `react`), not this app.
 MAX_CHAIN = 8
 #: The kinds of step this engine runs.
-STEP_KINDS = ("command", "query", "condition", "delay", "http")
+STEP_KINDS = ("command", "query", "condition", "delay", "http", "ask", "assistant")
 #: What a call's texts may read besides the automation's data: a kept secret, and the call's own key.
 CALL_ONLY_RE = re.compile(r"^(?:secret\.[A-Z][A-Z0-9_]{0,63}|run\.idempotency_key)$")
 #: The prefix of a call's permission: ``http:https://host[:port]``.
@@ -269,6 +269,11 @@ def required_grants(steps: list[dict]) -> list[str]:
             grant = http_grant(str(step.get("url") or ""))
             if grant and grant not in names:
                 names.append(grant)
+        elif step.get("kind") == "assistant":
+            for tool in step.get("tools") or []:
+                name = str(tool).strip()
+                if name and name not in names:
+                    names.append(name)
     return names
 
 

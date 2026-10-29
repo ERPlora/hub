@@ -141,7 +141,7 @@ const attentionText = computed(() => {
       :data-testid="`flow-run-${run.id}`"
     >
       <div class="flow-history__head">
-        <StatusPill v-bind="runStatusPill(run.status, phrasing)" />
+        <StatusPill v-bind="runStatusPill(run.status, phrasing, run.log)" />
         <span class="flow-history__when">{{ when(run) }}<template v-if="run.trigger_kind === 'manual'"> · {{ $t('flow.history.byHand') }}</template></span>
         <button
           type="button"

@@ -78,7 +78,7 @@ export function pathLabel(path: string, steps: readonly Step[], catalog: Catalog
     const index = steps.findIndex((step) => step.id === rest[0]);
     const step = steps[index];
     if (!step || step.kind === 'condition' || step.kind === 'delay') return path;
-    const what = step.kind === 'http' || step.kind === 'ask' ? describeStep(step, steps, catalog, p) : actionLabel(step.operation, catalog, p);
+    const what = step.kind === 'http' || step.kind === 'ask' || step.kind === 'assistant' ? describeStep(step, steps, catalog, p) : actionLabel(step.operation, catalog, p);
     return `${index + 1}. ${what} › ${rest.slice(1).map((part) => fieldLabel(part, p)).join(' › ')}`;
   }
   return path;
@@ -159,13 +159,20 @@ export function describeStep(step: Step, steps: readonly Step[], catalog: Catalo
       .trim();
     return title ? p.t('flow.steps.describe.ask', { title }) : p.t('flow.steps.describe.noAsk');
   }
+  if (step.kind === 'assistant') {
+    const prompt = valueToParts(step.prompt)
+      .map((part) => (part.kind === 'field' ? `«${pathLabel(part.path, steps, catalog, p)}»` : part.text))
+      .join('')
+      .trim();
+    return prompt ? p.t('flow.steps.describe.assistant', { prompt }) : p.t('flow.steps.describe.noAssistant');
+  }
   if (!step.operation) return p.t('flow.steps.noAction');
   const action = actionLabel(step.operation, catalog, p);
   return step.kind === 'query' ? p.t('flow.steps.describe.query', { action }) : action;
 }
 
 /** How a run ended, with the tone of what it means (a condition that stopped it is no error). */
-export function runStatusPill(status: RunStatus, p: Phrasing): { tone: StatusPillTone; label: string } {
+export function runStatusPill(status: RunStatus, p: Phrasing, log: readonly LogEntry[] = []): { tone: StatusPillTone; label: string } {
   const tones: Record<RunStatus, StatusPillTone> = {
     running: 'info',
     waiting: 'warning',
@@ -176,6 +183,9 @@ export function runStatusPill(status: RunStatus, p: Phrasing): { tone: StatusPil
     failed: 'danger',
     cancelled: 'neutral',
   };
+  // A run parked on «Ask the assistant» waits for the assistant, not for another system (FLOW-F38): also between
+  // two of its turns, when its last line is what the assistant used.
+  if (status === 'calling' && log.at(-1)?.kind === 'assistant') return { tone: tones.calling, label: p.t('flow.history.statuses.thinking') };
   return { tone: tones[status], label: p.t(`flow.history.statuses.${status}`) };
 }
 
@@ -220,6 +230,14 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
     }
     case 'expired':
       return p.t('flow.history.log.expired');
+    case 'thinking':
+      return p.t('flow.history.log.thinking');
+    case 'assistant_used':
+      return p.t(entry.ok ? 'flow.history.log.assistantUsed' : 'flow.history.log.assistantRefused', { action });
+    case 'assistant_answered':
+      return p.t('flow.history.log.assistantAnswered', { text: entry.text ?? '' });
+    case 'assistant_proposed':
+      return p.t('flow.history.log.assistantProposed', { action, date: formatDate(entry.until ?? entry.at, p.locale) });
     case 'skipped':
       return p.t('flow.history.log.skipped', {
         clauses: (entry.failed ?? []).map((clause) => describeClause(clause, steps, catalog, p)).join('; '),
