@@ -7,7 +7,8 @@
 // turned on is paused and what it turned off is on again. A card is on when its answer is on, from here or from
 // Automatizaciones; both on warns. A newer version of what it turned on is offered with «Update» (`flow.recipe.restore`,
 // F18). Under a card that is on, how the bookings confirm (AutoReplyRule, F16). Without Citas (Reservas) its card does
-// not show; without Automatizaciones each card says so, with «See apps».
+// not show; without Automatizaciones, or without an app its answer needs (Automatizaciones sets it aside: Clientes), the
+// card names the app, with «See apps», and never offers «Turn on».
 import { InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -60,6 +61,8 @@ const appOn = (label: string) => (session.me.value?.apps ?? []).some((app) => ap
 const flowOn = computed(() => appOn('flow'));
 const shown = computed(() => CARDS.filter((card) => appOn(card.app)));
 const recipes = computed(() => new Map((shelf.data.value?.recipes ?? []).map((recipe) => [recipe.ref, recipe])));
+const setAside = computed(() => new Map((shelf.data.value?.set_aside ?? []).map((recipe) => [recipe.ref, recipe])));
+const KNOWN_APPS = ['flow', 'appointment', 'reservation', 'customer'];
 const loading = computed(() => flowOn.value && shelf.data.value === undefined && !shelf.error.value);
 
 const enabled = (ref: string) => recipes.value.get(ref)?.installed?.enabled === true;
@@ -73,8 +76,18 @@ const ownRefs = (card: Card) => [card.answer, card.notice].filter((ref) => recip
 /** What is on of the card, as it goes off: the notice first and the answer last. */
 const onRefs = (card: Card) => [card.notice, card.answer].filter(enabled);
 
+/** The apps the card's answer needs that this business does not have: Automatizaciones itself, or those it names when
+ *  it sets the answer aside. */
+function missing(card: Card): string[] {
+  if (!flowOn.value) return ['flow'];
+  const aside = setAside.value.get(card.answer);
+  return aside?.code === 'flow.recipe_needs_apps' ? aside.apps : [];
+}
+
+const appName = (label: string) => (KNOWN_APPS.includes(label) ? t(`whatsapp_inbox.autoReplies.apps.${label}`) : label);
+
 function needsApp(card: Card): string {
-  return t('whatsapp_inbox.autoReplies.needsApp', { name: name(card), apps: t('whatsapp_inbox.autoReplies.apps.flow') });
+  return t('whatsapp_inbox.autoReplies.needsApp', { name: name(card), apps: missing(card).map(appName).join(', ') });
 }
 
 function both(card: Card): string | null {
@@ -220,7 +233,7 @@ async function update(card: Card): Promise<void> {
         <header class="wa-autoreply__head">
           <h3>{{ name(card) }}</h3>
           <StatusPill
-            v-if="flowOn"
+            v-if="!missing(card).length"
             :tone="isOn(card) ? 'success' : 'neutral'"
             :label="isOn(card) ? t('whatsapp_inbox.autoReplies.on') : t('whatsapp_inbox.autoReplies.off')"
           />
@@ -229,7 +242,7 @@ async function update(card: Card): Promise<void> {
           {{ t(`whatsapp_inbox.autoReplies.${card.key}.explain`) }}
         </p>
 
-        <template v-if="!flowOn">
+        <template v-if="missing(card).length">
           <InlineFeedback
             tone="warning"
             :heading="needsApp(card)"

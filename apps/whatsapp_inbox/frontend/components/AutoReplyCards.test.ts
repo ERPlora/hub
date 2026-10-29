@@ -149,6 +149,21 @@ describe('the cards', () => {
     expect(page.router.currentRoute.value.path).toBe('/apps');
   });
 
+  it('without Clientes the card names the app its answer needs, offers «See apps» and never «Turn on»', async () => {
+    const page = await mount({
+      locale: 'es',
+      recipes: shelf({}, [{ ref: BOOKING, apps: ['customer'] }, { ref: BOOKING_NOTICE, apps: ['customer'] }]),
+    });
+    expect(card(page, 'appointments').text()).toContain('“Reservar citas” necesita la aplicación Clientes.');
+    expect(page.find('whatsapp-inbox-autoreply-appointments-on').exists()).toBe(false);
+    expect(card(page, 'appointments').text()).not.toContain('Desactivada');
+    expect(page.find('whatsapp-inbox-autoreply-tables-on').exists()).toBe(true);
+    await click(page.find('whatsapp-inbox-autoreply-appointments-apps').element);
+    await flush();
+    expect(page.router.currentRoute.value.path).toBe('/apps');
+    expect(commands(page)).toEqual([]);
+  });
+
   it('says why the list could not be read, with «Try again»', async () => {
     const page = await mount();
     page.net.lastStream().push(errorFrame(page.subId(RECIPES), 'boom'));
