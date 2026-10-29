@@ -62,11 +62,14 @@ app off in it is 404 ``app_inactive`` (erplora.com keeps the message and tries a
 system on that business, whose refusals (422 out of contract…) are answered with their own envelope.
 
 Their databases (phase 2, S1; plan 2026-10-22): the registry's and the demos' operations run on control
-(``base.tenancy.context.operation_database``); the WhatsApp doors enter the business's hub (``use_hub``); ERPlora's
-invoices run on phase 1's shared database, where the platform hub keeps its data until S2.
+(``base.tenancy.context.operation_database``); the WhatsApp doors enter the business's hub (``use_hub``) before they ask
+whether the app is on in it (its rows are in its database: the host erplora.com calls, ``hub.erplora.internal``, opens
+no context), and a database that fails them there is 503 ``base.hub_unavailable``, logged; ERPlora's invoices run on
+phase 1's shared database, where the platform hub keeps its data until S2.
 """
 
 import json
+import logging
 from collections.abc import Callable
 from functools import wraps
 from uuid import UUID
@@ -92,6 +95,8 @@ from base.throttle import AttemptLimit, RateLimited, client_key
 # ``SIGNATURE_V2_HEADER`` and ``sign_v2`` stay importable from here for the apps that sign their own calls to the
 # SaaS (``apps/verifactu/representation.py``); they are ``base.signing``'s.
 from base.signing import SIGNATURE_V2_HEADER, sign_v2, verify_request  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 #: The business's commercial status as the photo says it (PLAN-SAAS §2.3).
 HUB_STATUSES = ("active", "past_due", "suspended")
@@ -296,16 +301,28 @@ def _whatsapp_call(request: HttpRequest, name: str) -> HttpResponse:
     if closed is not None:
         return refuse(closed.status, closed.code, closed.message)
     scope = Scope("host", slug)
-    if WHATSAPP_APP not in relay.active_apps(scope):
-        return refuse(404, "app_inactive", "WhatsApp is not on in this business.")
     try:
         with use_hub(hub):
+            # Which apps are on is the business's (its database): asked inside it, as the photo asks it.
+            if WHATSAPP_APP not in relay.active_apps(scope):
+                return refuse(404, "app_inactive", "WhatsApp is not on in this business.")
             answer, refused = _operation_call(name, body, system_context(scope))
-    except (HubIdentityMismatch, DatabaseError):
-        # Not its own, or unreachable now: erplora.com keeps the message and tries again.
-        unavailable = registry.unavailable()
-        return refuse(unavailable.status, unavailable.code, unavailable.message)
+    except HubIdentityMismatch:
+        # Not its own: nothing is served from it and an alarm is raised, as on its host (base.middleware).
+        logger.critical(
+            "base.hub_unavailable hub=%s: its database is not its own; %s refused.", slug, name, exc_info=True
+        )
+        return _unavailable()
+    except DatabaseError:
+        # Unreachable now: erplora.com keeps the message and tries again.
+        logger.warning("base.hub_unreachable hub=%s: %s could not reach its database now.", slug, name, exc_info=True)
+        return _unavailable()
     return refused or JsonResponse(answer.model_dump(mode="json"))
+
+
+def _unavailable() -> JsonResponse:
+    unavailable = registry.unavailable()
+    return refuse(unavailable.status, unavailable.code, unavailable.message)
 
 
 @internal_view
