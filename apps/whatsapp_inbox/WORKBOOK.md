@@ -1111,7 +1111,7 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
 | Permiso | Propietario | Administrador | Responsable | Empleado |
 |---|---|---|---|---|
 | `whatsapp_inbox.view` (leer, marcar leída) | sí | sí | sí | sí |
-| `whatsapp_inbox.reply` (enviar, avisar a un número exacto, reintentar, notas, estado, ficha, asignarse una libre) | sí | sí | sí | sí |
+| `whatsapp_inbox.reply` (enviar, también eligiendo el archivo de la cabecera de una plantilla; avisar a un número exacto, reintentar, notas, estado, ficha, asignarse una libre) | sí | sí | sí | sí |
 | `whatsapp_inbox.assign` (asignar a otro, quitársela a otro, borrar notas ajenas) | sí | sí | sí | no |
 | `whatsapp_inbox.configure` (Ajustes; conectar, volver a conectar y desconectar el número; crear, editar, reenviar y borrar plantillas) | sí | sí | no | no |
 | `whatsapp_inbox.erase` (borrar datos de un número) | sí | sí | no | no |

@@ -319,11 +319,12 @@ def test_a_header_file_past_the_largest_is_refused_before_it_is_read(admin_clien
 
 
 @pytest.mark.django_db
-def test_an_employee_picks_templates_but_neither_makes_nor_deletes_them(employee_client):
+def test_an_employee_picks_templates_and_keeps_a_header_file_but_neither_makes_nor_deletes_them(employee_client, hub_files):
     connect(templates=[{"name": "recordatorio", "language": "es", "body": "Hola", "meta_id": "m"}])
     [row] = get(employee_client, "/whatsapp_inbox/templates", sendable="true").json()["rows"]
     body = {"name": "otra", "language": "es", "body": "Hola", "submit_key": "0199e000-0000-7000-8000-0000000000c4"}
     assert post(employee_client, "/whatsapp_inbox/templates", body).status_code == 403
     assert post(employee_client, "/whatsapp_inbox/templates/delete", {"id": row["id"]}).status_code == 403
+    # F33: a template from WhatsApp Manager asks for its file when sending, and the employee sends.
     sample = {"header_format": "IMAGE", "name": "carta.jpg", "content_base64": "/9j/4AAQ"}
-    assert post(employee_client, "/whatsapp_inbox/templates/samples", sample).status_code == 403
+    assert post(employee_client, "/whatsapp_inbox/templates/samples", sample).status_code == 201

@@ -145,11 +145,15 @@ def test_a_file_that_did_not_arrive_whole_is_said_so():
     assert "whole" in refused.value.fields["content_base64"]
 
 
-def test_only_who_configures_the_channel_uploads_a_file():
+def test_whoever_answers_uploads_a_file_but_a_viewer_does_not():
+    """Choosing the header's file is part of sending a template (F33, also the employee's), not of Settings."""
+    from dataclasses import replace
+
     from live.errors import PermissionDenied
 
+    assert upload(ctx=ctx_for("hub_employee")).name == "carta.jpg"
     with pytest.raises(PermissionDenied):
-        upload(ctx=ctx_for("employee"))
+        upload(ctx=replace(ctx_for("hub_employee"), permissions=frozenset({"whatsapp_inbox.view"})))
 
 
 # ── Creating a template with it (F29) ───────────────────────────────────────────────────────────

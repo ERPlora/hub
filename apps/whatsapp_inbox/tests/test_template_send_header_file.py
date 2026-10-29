@@ -272,3 +272,26 @@ def test_metas_list_keeps_a_photo_template_made_here_editable_and_sendable_with_
     [listed] = run("whatsapp_inbox.template.list", {}).rows
     assert (listed.id, listed.editable, listed.sendable) == (row.id, True, True)
     assert listed.header_sample.id == row.header_sample_id
+
+
+# ── Whoever answers chooses the file (F33's actor is also the employee) ─────────────────────────
+
+
+@respx.mock
+def test_whoever_answers_chooses_the_file_of_a_whatsapp_manager_template_and_sends_it(delivered):
+    """F33: an employee, who only replies (never Settings), sends a photo template made in WhatsApp Manager choosing
+    its file: keeping the header's file is part of sending, not of configuring the channel."""
+    c = from_manager()
+    employee = ctx_for("hub_employee")
+    chosen = upload(name="foto.jpg", ctx=employee)
+    route = answering()
+
+    out = delivered(
+        lambda: send(
+            {"id": str(c.id), "template": {"name": MANAGER_PHOTO, "variables": ["Ana"], "header_sample": str(chosen.id)}},
+            employee,
+        )
+    )
+
+    assert door_5(route)["template"]["header_sample"]["name"] == "foto.jpg"
+    assert out.media_filename == "foto.jpg"
