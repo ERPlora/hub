@@ -193,3 +193,10 @@ msgstr "Ya hay un proyecto con ese código."
 
 msgid "You can only change your own tasks."
 msgstr "Solo puedes cambiar tus propias tareas."
+
+# How the assistant's card names each datum of a write (the titles of the schemas, as the screens say them)
+msgid "Assigned to"
+msgstr "Asignada a"
+
+msgid "Assign to me"
+msgstr "Asignármela"
