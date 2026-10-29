@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
-import { A, api, compactBar, EMPLOYEE, login, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, login, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = [
@@ -120,7 +120,7 @@ async function shots(
     await ready();
     await untilStill(page);
     if (settled) expect(await settled(), `APP-BASE-9-${key}-${vp.label} caught before it settled`).toBe(true);
-    await page.screenshot({ path: shot(`APP-BASE-9-${key}-${vp.label}`) });
+    await capture(page, `APP-BASE-9-${key}-${vp.label}`);
   }
 }
 
@@ -199,8 +199,7 @@ test('BASE-G110 — the sparkles open the panel on the right (on a phone, from �
       expect(Math.round(pane!.x + pane!.width)).toBe(Math.round(aside!.x));
       await expect(page.locator('[data-testid="assistant-veil"]')).toHaveCount(0);
     }
-    await untilStill(page);
-    await page.screenshot({ path: shot(`APP-BASE-9-BASE-G110-${vp.label}`) });
+    await capture(page, `APP-BASE-9-BASE-G110-${vp.label}`);
     // A phone of 420 px or less is all panel (the veil is under it): its ×; wider, Escape wherever the focus is.
     if (vp.width <= 420) await panel(page).locator('[data-testid="assistant-close"]').click();
     else await page.keyboard.press('Escape');
@@ -227,6 +226,23 @@ test('BASE-G110 — the sparkles open the panel on the right (on a phone, from �
   await expect(panel(page)).toHaveAttribute('data-open', 'false');
   await page.reload();
   await expect(panel(page)).toHaveAttribute('data-open', 'false');
+});
+
+test('hub-e2e-capture — capture() keeps the panel open after a turn at 390, 834 and 1440: on a phone it is all the screen, its border from top to bottom', async ({ page }) => {
+  // FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE: at 390 every capture of the open panel failed as one taken
+  // before the page was painted at its size (its first and last 8 rows, white with its left border, are the same).
+  const KEY = 'FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE';
+  await login(page, A, '/');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await home(page);
+  await openPanel(page);
+  await ask(page, 'Hola');
+  await expect(lastAnswer(page)).toHaveText(GREETING);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(lastAnswer(page)).toBeVisible();
+    await capture(page, `${KEY}-${vp.label}`);
+  }
 });
 
 test('BASE-G121 — «Ask the assistant» on the setup card opens it on the setup; a shortcut asks at once', async ({ page }) => {
@@ -350,8 +366,7 @@ test('BASE-F101 — several things in a row: what each round says is its own par
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(lastAnswer(page)).toBeVisible();
-    await untilStill(page);
-    await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
+    await capture(page, `${KEY}-${vp.label}`);
   }
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
@@ -417,7 +432,7 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
     await confirmationReady(page);
     await untilStill(page);
     expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
+    await capture(page, `${KEY}-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
@@ -459,7 +474,7 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
     await confirmationReady(page);
     await untilStill(page);
     expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
+    await capture(page, `${KEY}-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
