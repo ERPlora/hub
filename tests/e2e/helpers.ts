@@ -112,8 +112,10 @@ const STRIPE_MIN_ROWS = 8;
  * How many rows at the bottom of `png`, a screenshot of `page`, repeat the first rows of the image: 0 when none. It is
  * what a capture taken before the browser painted the page at its new size shows (the area the resize uncovered,
  * filled with the top of the page): evidence of a screen nobody saw. A stripe of one flat colour (a background at both
- * ends) does not count. Decoded in `page`'s browser: the e2e has no image library. Ported from erplora.com's e2e
- * (`repeatedTop` of its tests/e2e/panel/fixtures.ts).
+ * ends) does not count, nor one that is the same row over and over, whatever its colours across: a background crossed
+ * by a border (the assistant's panel, all the screen on a phone, with its left border; a card's veil over it). The top
+ * of the page a capture before the paint repeats is its topbar, rows unlike each other. Decoded in `page`'s browser:
+ * the e2e has no image library. Ported from erplora.com's e2e (`repeatedTop` of its tests/e2e/panel/fixtures.ts).
  */
 export async function repeatedTop(page: Page, png: Buffer): Promise<number> {
   return page.evaluate(
@@ -136,11 +138,13 @@ export async function repeatedTop(page: Page, png: Buffer): Promise<number> {
       for (let rows = Math.floor(height / 2); rows >= minRows; rows--) {
         let repeated = true;
         let flat = true;
+        let uniform = true;
         for (let row = 0; row < rows && repeated; row++) {
           repeated = sameRow(height - rows + row, row);
           flat &&= flatRow(row);
+          uniform &&= sameRow(row, 0);
         }
-        if (repeated && !flat) return rows;
+        if (repeated && !flat && !uniform) return rows;
       }
       return 0;
     },

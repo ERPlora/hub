@@ -8,6 +8,10 @@
 // FIX-HUB-E2E-CAPTURE-WITHOUT-WAIT-UNCHECKED: a spec that forgot to wait before `capture` got a frame of an overlay of
 // Ionic still entering (WEBSITE-F07/F08 with their toast sliding in), and nothing said so. `capture` now waits itself
 // until nothing finite moves (`untilStill`, endless spinners aside), or fails naming what still moves.
+// FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE: the assistant's panel open at 390, painted, failed every
+// capture, and so did a card over it: their first and last 8 rows are the same row, white (or the card's veil) crossed
+// by the panel's left border. A stripe of the same row over and over is a background, whatever its colours across;
+// the top a capture before the paint repeats is the topbar, rows unlike each other.
 import { readFileSync, rmSync } from 'node:fs';
 
 import { expect, type Page, test } from '@playwright/test';
@@ -17,6 +21,7 @@ import { settled } from './service-helpers';
 
 const TASK = 'FIX-HUB-E2E-SHOT-BEFORE-RESIZE-UNCHECKED';
 const WAIT_TASK = 'FIX-HUB-E2E-CAPTURE-WITHOUT-WAIT-UNCHECKED';
+const PANEL_TASK = 'FIX-HUB-E2E-CAPTURE-REFUSES-ASSISTANT-PANEL-ON-PHONE';
 
 const SIZES = [
   { label: '390', width: 390, height: 844 },
@@ -29,11 +34,16 @@ const ROUNDS = 12;
 
 /**
  * A PNG of `width`×`height` drawn in `page`'s browser: a horizontal gradient (no row of it is one flat colour) on
- * white, or white only. With `stripe`, its first `stripe` rows are painted again at its bottom, as a capture taken
- * before the page was painted at its size.
+ * white, or white only. With `border`, a grey line of 1 px down its left edge from top to bottom (the assistant's panel
+ * on a phone); with `card` too, a box across the whole width half-way down covers it (a card over that panel). With
+ * `stripe`, its first `stripe` rows are painted again at its bottom, as a capture taken before the page was painted at
+ * its size.
  */
-async function picture(page: Page, options: { width: number; height: number; stripe?: number; flat?: boolean }): Promise<Buffer> {
-  const base64 = await page.evaluate(async ({ width, height, stripe, flat }) => {
+async function picture(
+  page: Page,
+  options: { width: number; height: number; stripe?: number; flat?: boolean; border?: boolean; card?: boolean },
+): Promise<Buffer> {
+  const base64 = await page.evaluate(async ({ width, height, stripe, flat, border, card }) => {
     const canvas = new OffscreenCanvas(width, height);
     const context = canvas.getContext('2d');
     if (!context) throw new Error('picture: no 2d context');
@@ -47,6 +57,14 @@ async function picture(page: Page, options: { width: number; height: number; str
       context.fillRect(0, 0, width, 40);
       context.fillStyle = '#16a34a';
       context.fillRect(10, 50, width / 3, 20);
+    }
+    if (border) {
+      context.fillStyle = '#e3e5e8';
+      context.fillRect(0, 0, 1, height);
+    }
+    if (card) {
+      context.fillStyle = '#f4f5f8';
+      context.fillRect(0, height / 3, width, height / 3);
     }
     if (stripe) context.drawImage(canvas, 0, 0, width, stripe, 0, height - stripe, width, stripe);
     const blob = await canvas.convertToBlob({ type: 'image/png' });
@@ -124,6 +142,17 @@ test.describe('repeatedTop: the stripe of a capture taken before the page was pa
   test('a stripe under 8 rows is no stripe: one line of the same colour at both ends is common', async ({ page }) => {
     expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, stripe: 7 }))).toBe(0);
   });
+
+  test('hub-e2e-capture: the same row over and over is no stripe: a background crossed by a border at both ends is a background', async ({
+    page,
+  }) => {
+    // The assistant's panel on a phone: white above its head and under its box, its left border from top to bottom.
+    expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, flat: true, border: true }))).toBe(0);
+    // A card over that panel covers the border half-way down: its ends are still the same row.
+    expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, flat: true, border: true, card: true }))).toBe(0);
+    // That border does not hide the top painted again at the bottom.
+    expect(await repeatedTop(page, await picture(page, { width: 390, height: 844, border: true, stripe: 87 }))).toBe(87);
+  });
 });
 
 test.describe('capture: the screenshot of the page as painted at its size', () => {
@@ -147,17 +176,43 @@ test.describe('capture: the screenshot of the page as painted at its size', () =
 
   test('fails saying so when every capture repeats the top, and writes nothing', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    // A page whose top and bottom are the same band: what a capture of the page before it is painted looks like.
+    // A page whose top and bottom are the same band with something in it, as a topbar: what a capture of the page
+    // before it is painted looks like. (A band of the same row over and over is a background, painted or not.)
     await page.setContent(`<!doctype html><style>
       body { margin: 0; height: 844px; position: relative; }
       .band { position: absolute; left: 0; right: 0; height: 50px; background: linear-gradient(90deg, #1d4ed8 50%, #f97316 50%); }
-    </style><div class="band" style="top: 0"></div><div class="band" style="bottom: 0"></div>`);
+      .band i { position: absolute; left: 16px; top: 13px; width: 24px; height: 24px; background: #16a34a; }
+    </style><div class="band" style="top: 0"><i></i></div><div class="band" style="bottom: 0"><i></i></div>`);
     const name = `${TASK}-always-striped`;
     rmSync(shot(name), { force: true });
     await expect(capture(page, name)).rejects.toThrow(
       `capture ${name}: every screenshot repeats the top 50 rows of the page at its bottom`,
     );
     expect(() => readFileSync(shot(name))).toThrow(/ENOENT/);
+  });
+
+  test('hub-e2e-capture: it keeps a page painted at its size whose ends are a background crossed by a border, the assistant panel on a phone', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    // The geometry of the assistant's panel at 390 (AssistantPanel.vue, AssistantComposer.vue): the whole width, a
+    // 1 px border down its left side from top to bottom, white above its head and under its box. Its first and last
+    // rows are the same: white with the border.
+    await page.setContent(`<!doctype html><style>
+      body { margin: 0; font: 16px sans-serif; }
+      aside { position: fixed; inset: 0; display: flex; flex-direction: column; box-sizing: border-box;
+        border-left: 1px solid #e3e5e8; background: #fff; color: #1a1c20; }
+      header { display: flex; align-items: center; min-height: 52px; padding: 0 16px; border-bottom: 1px solid #e3e5e8; }
+      main { flex: 1 1 auto; padding: 16px; }
+      footer { padding: 8px 10px; }
+      footer div { height: 40px; border: 1px solid #c4c7cc; border-radius: 12px; }
+    </style><aside><header>Assistant</header><main><p>Hola</p><p>¡Hola! ¿En qué te ayudo?</p></main>
+      <footer><div></div></footer></aside>`);
+    const name = `${PANEL_TASK}-fixture`;
+    rmSync(shot(name), { force: true });
+    const png = await capture(page, name);
+    expect(await repeatedTop(page, png)).toBe(0);
+    expect(readFileSync(shot(name)).equals(png), `${name}.png is the capture returned`).toBe(true);
   });
 });
 

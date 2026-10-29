@@ -13,7 +13,7 @@
   "base-apps-born-off.spec.ts": 1,
   "base-apps.spec.ts": 1,
   "base-assistant-microphone.spec.ts": 2,
-  "base-assistant.spec.ts": 6,
+  "base-assistant.spec.ts": 1,
   "base-bell-clock.spec.ts": 1,
   "base-blocking-strip.spec.ts": 1,
   "base-chrome.spec.ts": 5,
