@@ -50,6 +50,8 @@ test.afterAll(() => {
 });
 
 const TABLE = 'whatsapp-inbox-templates';
+/** The Hub's words for Meta's 190 (`whatsapp_inbox.reconnect_needed`), never Meta's. */
+const EXPIRED = "WhatsApp's permission for your number expired: connect it again.";
 const rowOf = (page: Page, name: string) => shown(page).locator(`[data-testid=${TABLE}-row]`, { hasText: name });
 const idOf = (name: string): string => psql(`select id from whatsapp_inbox_template where name = '${name}' and deleted_at is null`);
 
@@ -152,8 +154,9 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
   });
 
   // F29: «Add template». What Meta would refuse is said under its field; a valid one is kept «Not sent to
-  // Meta» and handed to erplora.com, which takes it to Meta: Meta refuses the seed's made-up permission and
-  // erplora.com says the number is not connected, so the row says «Not accepted» with it, never «In review».
+  // Meta» and handed to erplora.com, which takes it to Meta: Meta refuses the seed's made-up permission with its
+  // 190, which erplora.com says as `whatsapp.reconnect_needed` (door 8, saas#116), so the row says «Not accepted»
+  // with the Hub's words for it, never Meta's nor «In review».
   await shown(page).locator(`[data-testid=${TABLE}-add]`).click();
   await expect(editor).toBeVisible();
   await editor.locator('[data-testid=whatsapp-inbox-template-editor-name] input').fill(made);
@@ -172,7 +175,7 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
   await editor.locator('[data-testid=whatsapp-inbox-template-editor-submit]').click();
   await expect(editor).toBeHidden();
   await expect(rowOf(page, made)).toContainText('Not sent to Meta');
-  await expect(rowOf(page, made)).toContainText('Not accepted: WhatsApp is not connected.', { timeout: 30_000 });
+  await expect(rowOf(page, made)).toContainText(`Not accepted: ${EXPIRED}`, { timeout: 30_000 });
   await expect(rowOf(page, made)).not.toContainText('In review');
 
   // F30: «Edit» an approved one: it stays approved (and sendable) while the change waits for Meta.
@@ -188,10 +191,11 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
   // erplora.com takes the change to Meta, which refuses the seed's permission: the row says the change was not
   // accepted, and the approved text is still the one in use.
   await expect(rowOf(page, approved)).toContainText('Approved');
-  await expect(rowOf(page, approved)).toContainText('Not accepted: WhatsApp is not connected.', { timeout: 30_000 });
+  await expect(rowOf(page, approved)).toContainText(`Not accepted: ${EXPIRED}`, { timeout: 30_000 });
   await expect(rowOf(page, approved)).toContainText('Hola {{1}}, te esperamos mañana.');
 
-  // F31: «Delete» asks first, naming it and what it costs; it then waits for Meta, «Being deleted at Meta».
+  // F31: «Delete» asks first, naming it and what it costs; it then waits for Meta, «Being deleted at Meta»: Meta
+  // refuses the seed's permission there too (door 9), so it stays being deleted, with the Hub's words for why.
   await rowAction(page, TABLE, idOf(rejected), 'delete');
   const confirm = page.locator('ion-modal[data-testid=whatsapp-inbox-template-delete]');
   await expect(confirm).toContainText(rejected);
@@ -202,4 +206,5 @@ test('the owner sees Meta’s templates and makes, changes and deletes them from
   await confirm.locator('[data-testid=whatsapp-inbox-template-delete-submit]').click();
   await expect(confirm).toBeHidden();
   await expect(rowOf(page, rejected)).toContainText('Being deleted at Meta');
+  await expect(rowOf(page, rejected)).toContainText(`Being deleted at Meta · ${EXPIRED}`, { timeout: 30_000 });
 });
