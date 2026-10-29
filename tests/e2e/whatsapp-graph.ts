@@ -43,6 +43,14 @@ export const SHOWN_NAME = 'E2E Peluquería';
 const SHOWN_DISPLAY = '+34 910 00 01 01';
 /** The code of the check before a spec: only this Graph receives it, and refuses it (nothing is connected). */
 export const PROBE_CODE = 'AQBe2e-probe-code';
+/** A template's header sample (WHATSAPP_INBOX-F29, Meta's Resumable Upload API): the session it opens on the e2e Meta
+ *  app, the handle the bytes get, and the id of the template registered with it. */
+export const UPLOAD_SESSION = 'upload:ZTJlLWhlYWRlci1zYW1wbGU=';
+export const HEADER_HANDLE = '4::aW1hZ2UvanBlZw==:e2e-header-handle';
+export const TEMPLATE_ID = '880000000000200';
+/** The id Meta gives a header's file put on `a`'s number, and the id of the template message sent with it (F33). */
+export const MEDIA_ID = '880000000000300';
+export const SENT_WAMID = 'wamid.e2e-graph-template-with-file';
 
 /** Meta's refusal of an expired code (erplora.com's tests: `OAUTH_ERROR`). */
 const OAUTH_ERROR = {
@@ -56,13 +64,19 @@ const PROBE_REFUSED = {
   error: { message: 'e2e probe: this run’s Meta Graph never exchanges this code.', type: 'OAuthException', code: 100, error_subcode: 36007 },
 };
 
-/** What erplora.com asked Meta's Graph: the method, the path without its version, the query and the bearer token. */
+/** What erplora.com asked Meta's Graph: the method, the path without its version, the query and the bearer token;
+ *  how many bytes its body had and, for a JSON body, the body itself. */
 export interface GraphCall {
   method: string;
   path: string;
   query: Record<string, string>;
   token: string;
+  bytes?: number;
+  json?: unknown;
 }
+
+/** The permission an `Authorization` header carries: `Bearer <token>`, or `OAuth <token>` (the upload's bytes). */
+export const graphToken = (authorization: string): string => authorization.replace(/^(Bearer|OAuth) /, '');
 
 /** Meta's Graph for the run: door 11's exchange and calls with the business's token (connect-return), the probe's
  *  code refused, and any other permission refused as Meta refuses one it never gave — the seed's, with which every
@@ -81,6 +95,13 @@ export function graphAnswer(call: GraphCall): [number, unknown] {
     return [200, { data: [{ id: NUMBER_ID, display_phone_number: SHOWN_DISPLAY, verified_name: SHOWN_NAME }] }];
   }
   if (route === `POST /${WABA_ID}/subscribed_apps` || route === `POST /${NUMBER_ID}/register`) return [200, { success: true }];
+  if (route === `POST /${META_APP.id}/uploads`) return [200, { id: UPLOAD_SESSION }];
+  if (route === `POST /${UPLOAD_SESSION}`) return [200, { h: HEADER_HANDLE }];
+  if (route === `POST /${WABA_ID}/message_templates`) return [200, { id: TEMPLATE_ID, status: 'PENDING', category: 'UTILITY' }];
+  if (route === `POST /${NUMBER_ID}/media`) return [200, { id: MEDIA_ID }];
+  if (route === `POST /${NUMBER_ID}/messages`) {
+    return [200, { messaging_product: 'whatsapp', contacts: [], messages: [{ id: SENT_WAMID }] }];
+  }
   return [400, { error: { message: `Unsupported request: ${route}.`, type: 'GraphMethodException', code: 100 } }];
 }
 
@@ -220,6 +241,16 @@ leaf = (base(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "${GRAPH_HOST}")
 `;
 
 /** The run's Graph, listening. */
+/** A JSON body of up to 64 KB, read (`undefined` for any other). */
+function jsonOf(request: IncomingMessage, body: Buffer): unknown {
+  if (!String(request.headers['content-type'] ?? '').includes('application/json') || body.length > 64 * 1024) return undefined;
+  try {
+    return JSON.parse(body.toString('utf8')) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface Graph {
   /** The port of its proxy (erplora.com's `HTTPS_PROXY`). */
   port: number;
@@ -261,14 +292,20 @@ export async function startGraph(options: GraphOptions): Promise<Graph> {
   const graph = createHttpsServer(
     { cert: readFileSync(join(options.certs, 'cert.pem')), key: readFileSync(join(options.certs, 'key.pem')) },
     (request: IncomingMessage, response: ServerResponse) => {
-      request.resume();
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
       request.on('end', () => {
         const url = new URL(request.url ?? '/', `https://${GRAPH_HOST}`);
+        const received = Buffer.concat(chunks);
+        const json = jsonOf(request, received);
         const call: GraphCall = {
           method: request.method ?? 'GET',
           path: url.pathname.replace(/^\/v\d+\.\d+/, ''),
           query: Object.fromEntries(url.searchParams),
-          token: (request.headers.authorization ?? '').replace(/^Bearer /, ''),
+          token: graphToken(request.headers.authorization ?? ''),
+          // Only a call with a body says it.
+          ...(received.length ? { bytes: received.length } : {}),
+          ...(json === undefined ? {} : { json }),
         };
         calls.push(call);
         appendFileSync(log, `${JSON.stringify({ method: call.method, path: call.path })}\n`);

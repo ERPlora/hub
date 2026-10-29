@@ -19,7 +19,17 @@ from live.operations import operation
 from apps.customer.phones import DEFAULT_COUNTRY, InvalidPhone, candidates, to_e164
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock, gateway
-from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template, name_key
+from apps.whatsapp_inbox.models import (
+    FILE_HEADERS,
+    Channel,
+    Conversation,
+    Message,
+    Note,
+    Template,
+    TemplateSample,
+    hub_writes,
+    name_key,
+)
 from apps.whatsapp_inbox.schemas import (
     AgentListIn,
     AgentPage,
@@ -82,6 +92,12 @@ TEMPLATE_SAAS_UNREACHABLE = _("erplora.com did not answer: the template has not 
 TEMPLATE_UNKNOWN = _("erplora.com did not confirm the template. Try again: it is never registered twice.")
 DELETE_SAAS_UNREACHABLE = _("erplora.com did not answer: Meta still has the template. Try again.")
 DELETE_UNKNOWN = _("erplora.com did not confirm that Meta deleted the template. Try again.")
+#: The Hub's own code of a hand-over that could not take the header's file: it is no longer in the business's store.
+HEADER_SAMPLE_MISSING_CODE = "whatsapp_inbox.header_sample_missing"
+HEADER_SAMPLE_MISSING = _("The header's file is no longer in the business's files: choose it again with Edit.")
+MESSAGE_HEADER_SAMPLE_MISSING = _(
+    "The header's file is no longer in the business's files: send the template again choosing its file."
+)
 
 SEND_REFUSED_CODE = "whatsapp_inbox.send_refused"
 TEMPLATE_REFUSED_CODE = "whatsapp_inbox.template_refused"
@@ -89,6 +105,8 @@ SAAS_UNREACHABLE_CODE = "whatsapp_inbox.saas_unreachable"
 SEND_UNKNOWN_CODE = "whatsapp_inbox.send_unknown"
 #: A message's code → the Hub's words for it.
 _MESSAGE_REASONS = {
+    "whatsapp_inbox.meta_unreachable": META_UNREACHABLE,
+    HEADER_SAMPLE_MISSING_CODE: MESSAGE_HEADER_SAMPLE_MISSING,
     "whatsapp_inbox.cap_reached": CAP_REACHED,
     "whatsapp_inbox.reconnect_needed": RECONNECT_NEEDED,
     SAAS_UNREACHABLE_CODE: SAAS_UNREACHABLE,
@@ -101,6 +119,7 @@ _TEMPLATE_REASONS = {
     "whatsapp_inbox.meta_rate_limited": META_RATE_LIMITED,
     "whatsapp_inbox.channel_not_connected": NOT_CONNECTED,
     "whatsapp_inbox.reconnect_needed": RECONNECT_NEEDED,
+    HEADER_SAMPLE_MISSING_CODE: HEADER_SAMPLE_MISSING,
 }
 
 #: What a phone typed in the search box may hold besides digits.
@@ -630,16 +649,28 @@ def listed_templates(scope: Scope) -> QuerySet:
 
 
 def template_editable(row: Template) -> bool:
-    """Whether the Hub may change it now: content it handles, not under Meta's review, not gone."""
+    """Whether the Hub may change it now: content it writes (``hub_writes``: what it sends, or a file header chosen
+    here), not under Meta's review, not gone."""
     return (
-        row.supported
+        hub_writes(row)
         and row.deleted_at is None
         and row.status not in (Template.Status.PENDING, Template.Status.DISABLED, Template.Status.DELETED)
     )
 
 
-def template_sendable(row: Template) -> bool:
+def template_fillable(row: Template) -> bool:
+    """Whether the inbox can send it now (F33): approved and filled by the Hub, a file header with a file chosen."""
     return row.supported and row.deleted_at is None and row.status == Template.Status.APPROVED
+
+
+def template_sendable(row: Template) -> bool:
+    """Whether it goes as it is, with nothing to choose: a file header only with its own file (an automation's)."""
+    return template_fillable(row) and (row.header_format not in FILE_HEADERS or row.header_sample_id is not None)
+
+
+#: The approved templates the Hub fills (``template_fillable``), and those that go as they are (``template_sendable``).
+_FILLABLE = Q(status=Template.Status.APPROVED, supported=True, deleted_at__isnull=True)
+_SENDABLE = _FILLABLE & ~Q(header_format__in=FILE_HEADERS, header_sample__isnull=True)
 
 
 def _buttons_out(buttons) -> list[dict]:
@@ -672,8 +703,39 @@ def template_reason(row: Template) -> str:
     return row.submit_error
 
 
-def template_out(row: Template) -> dict:
+def sample_out(sample: TemplateSample | None) -> dict | None:
+    if sample is None:
+        return None
+    return {
+        "id": sample.id,
+        "header_format": sample.header_format,
+        "content_type": sample.content_type,
+        "size": sample.size,
+        "name": sample.name,
+    }
+
+
+def _its_own(row: Template) -> TemplateSample | None:
+    """The template's header file, only if it is its business's (phase 1 shares the tables)."""
+    sample = row.header_sample
+    return sample if sample is not None and sample.host == row.host else None
+
+
+def _draft_out(row: Template) -> dict | None:
     draft = row.draft
+    if not draft:
+        return None
+    sample = draft.get("header_sample")
+    kept = TemplateSample.objects.filter(pk=sample, host=row.host).first() if sample else None
+    return {
+        **draft,
+        "header_format": draft.get("header_format", "TEXT" if draft.get("header") else ""),
+        "header_sample": sample_out(kept),
+        "buttons": _buttons_out(draft.get("buttons")),
+    }
+
+
+def template_out(row: Template) -> dict:
     return {
         "id": row.id,
         "name": row.name,
@@ -682,6 +744,7 @@ def template_out(row: Template) -> dict:
         "status": row.status,
         "header_format": row.header_format,
         "header": row.header,
+        "header_sample": sample_out(_its_own(row)),
         "body": row.body,
         "body_examples": list(row.body_examples or []),
         "footer": row.footer,
@@ -690,7 +753,7 @@ def template_out(row: Template) -> dict:
         "rejected_reason": row.rejected_reason,
         "meta_id": row.meta_id,
         "synced_at": row.synced_at,
-        "draft": {**draft, "buttons": _buttons_out(draft.get("buttons"))} if draft else None,
+        "draft": _draft_out(row),
         "submit_state": row.submit_state,
         "submit_error_code": row.submit_error_code,
         "submit_error": template_reason(row),
@@ -714,7 +777,7 @@ def template_out(row: Template) -> dict:
     },
 )
 def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
-    rows = listed_templates(ctx.scope)
+    rows = listed_templates(ctx.scope).select_related("header_sample")
     if params.search:
         rows = rows.filter(name__icontains=params.search.strip())
     for field in ("status", "category", "language"):
@@ -722,8 +785,9 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
         if value:
             rows = rows.filter(**{field: value})
     if params.sendable is not None:
-        sendable = Q(status=Template.Status.APPROVED, supported=True, deleted_at__isnull=True)
-        rows = rows.filter(sendable if params.sendable else ~sendable)
+        rows = rows.filter(_SENDABLE if params.sendable else ~_SENDABLE)
+    if params.fillable is not None:
+        rows = rows.filter(_FILLABLE if params.fillable else ~_FILLABLE)
     return page(rows.order_by("name", "language", "id"), params, template_out)
 
 

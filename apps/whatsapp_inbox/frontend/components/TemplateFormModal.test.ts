@@ -25,6 +25,7 @@ const approved = (over: Partial<TemplateOut> = {}): TemplateOut => ({
   status: 'APPROVED',
   header_format: 'TEXT',
   header: 'Tu cita',
+  header_sample: null,
   body: 'Hola {{1}}, te esperamos el {{2}}.',
   body_examples: ['Ana', 'viernes'],
   footer: 'Peluquería Ana',
@@ -205,7 +206,9 @@ describe('TemplateFormModal: editing a template (WHATSAPP_INBOX-F30)', () => {
       approved({
         draft: {
           category: 'UTILITY',
+          header_format: '',
           header: '',
+          header_sample: null,
           body: 'Hola {{1}}, nueva hora el {{2}}.',
           body_examples: ['Ana', 'lunes'],
           footer: '',
@@ -257,5 +260,140 @@ describe('TemplateFormModal: editing a template (WHATSAPP_INBOX-F30)', () => {
     expect(s.inDoc(ID)?.getAttribute('aria-label')).toBe('Nueva plantilla');
     expect(s.field('name').label).toBe('Nombre');
     expect(s.submit().textContent).toContain('Enviar a revisión de Meta');
+  });
+});
+
+// ── A header with a photo, a video or a document (WHATSAPP_INBOX-F29) ───────────────────────────────────────────────
+
+const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+const photo = (name = 'carta.jpg', bytes: BlobPart = JPEG, type = 'image/jpeg') => new File([bytes], name, { type });
+const SAMPLE = { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 6, name: 'carta.jpg' } as const;
+
+type Setup = Awaited<ReturnType<typeof setup>>;
+
+/** Picks `file` in the header's file input, as the browser's picker does. */
+async function pick(s: Setup, file: File): Promise<void> {
+  const input = s.field('header-file-input') as HTMLInputElement;
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new Event('change'));
+  await flush();
+  await settle();
+}
+
+describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
+  it('«Photo» asks for its file, keeps it in the business’s files and sends the template with it', async () => {
+    const s = await setup();
+    expect(s.field('header-format').value).toBe('TEXT');
+    await s.choose('header-format', 'IMAGE');
+    expect(s.field('header')).toBeNull();
+    expect(s.field('header-file-rules').textContent).toContain('JPEG or PNG, up to 5 MB');
+    expect(s.field('header-file-input').getAttribute('accept')).toBe('image/jpeg,image/png');
+    await s.type('name', 'promo_otono');
+    await s.type('body', '¡Oferta de otoño!');
+    expect(s.submit().disabled).toBe(true); // no file yet
+    s.answer(201, SAMPLE);
+    await pick(s, photo());
+    expect(s.field('header-file-name').textContent).toContain('carta.jpg');
+    expect(s.submit().disabled).toBe(false);
+    s.answer(201, approved({ id: 't9', name: 'promo_otono', status: 'DRAFT', header_format: 'IMAGE', header: '', header_sample: SAMPLE }));
+    await click(s.submit());
+    await flush();
+    const [upload, creation] = s.sent();
+    expect(upload).toEqual({
+      method: 'POST',
+      path: '/api/whatsapp_inbox/templates/samples',
+      query: {},
+      body: { header_format: 'IMAGE', name: 'carta.jpg', content_base64: '/9j/4AAQ' },
+    });
+    expect(creation.path).toBe('/api/whatsapp_inbox/templates');
+    expect(creation.body).toMatchObject({ header_format: 'IMAGE', header: '', header_sample: 's1' });
+  });
+
+  it('a video or a document asks for its own type', async () => {
+    const s = await setup();
+    await s.choose('header-format', 'VIDEO');
+    expect(s.field('header-file-rules').textContent).toContain('MP4, up to 16 MB');
+    await s.choose('header-format', 'DOCUMENT');
+    expect(s.field('header-file-rules').textContent).toContain('PDF, up to 25 MB');
+    expect(s.field('header-file-input').getAttribute('accept')).toBe('application/pdf');
+  });
+
+  it('a file of another type, or too heavy, is said under the field and never uploaded', async () => {
+    const s = await setup();
+    await s.choose('header-format', 'IMAGE');
+    await pick(s, photo('anim.gif', new Uint8Array([0x47, 0x49, 0x46]), 'image/gif'));
+    expect(s.field('header-file-error').textContent).toContain('Choose a JPEG or PNG photo.');
+    await pick(s, photo('enorme.jpg', new Uint8Array(5 * 1024 * 1024 + 1)));
+    expect(s.field('header-file-error').textContent).toContain('This file weighs more than 5 MB: choose a lighter one.');
+    expect(s.sent()).toEqual([]);
+    expect(s.field('header-file-name')).toBeNull();
+  });
+
+  it('the Hub refusing the file says its reason under the field', async () => {
+    const s = await setup();
+    await s.choose('header-format', 'IMAGE');
+    const message = 'Choose a JPEG or PNG photo.';
+    s.answer(422, { error: { code: 'invalid_payload', message, fields: { content_base64: message } } });
+    await pick(s, photo());
+    expect(s.field('header-file-error').textContent).toContain(message);
+    expect(s.field('header-file-name')).toBeNull();
+  });
+
+  it('no space left in the plan for files is said under the field, as Files says it', async () => {
+    const s = await setup(null, 'es');
+    await s.choose('header-format', 'IMAGE');
+    const message = 'No queda espacio para ese archivo: tu plan incluye 1 GB.';
+    s.answer(409, { error: { code: 'base.file_no_space', message } });
+    await pick(s, photo());
+    expect(s.field('header-file-error').textContent).toContain(message);
+    expect(s.field('header-file-name')).toBeNull();
+  });
+
+  it('a refusal of the template’s file on saving is said under it', async () => {
+    const s = await setup();
+    await s.choose('header-format', 'IMAGE');
+    await s.type('name', 'promo_otono');
+    await s.type('body', 'Hola');
+    s.answer(201, SAMPLE);
+    await pick(s, photo());
+    const message = "Choose the header's file: Meta reviews the template with it.";
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { header_sample: message } } });
+    await click(s.submit());
+    await flush();
+    await settle();
+    expect(s.field('header-file-error').textContent).toContain(message);
+  });
+
+  it('editing a template with a photo shows its file and keeps it without uploading it again', async () => {
+    const s = await setup(approved({ header_format: 'IMAGE', header: '', header_sample: SAMPLE, supported: false, sendable: false }));
+    expect(s.field('header-format').value).toBe('IMAGE');
+    expect(s.field('header-file-name').textContent).toContain('carta.jpg');
+    expect(s.field('header-file-choose').textContent).toContain('Change file');
+    s.answer(200, approved());
+    await click(s.submit());
+    await flush();
+    const [update] = s.sent();
+    expect(update.path).toBe('/api/whatsapp_inbox/templates/update');
+    expect(update.body).toMatchObject({ id: 't1', header_format: 'IMAGE', header: '', header_sample: 's1' });
+  });
+
+  it('a text header sends what it always sent', async () => {
+    const s = await setup(approved());
+    s.answer(200, approved());
+    await click(s.submit());
+    await flush();
+    const [update] = s.sent();
+    expect(update.body).not.toHaveProperty('header_format');
+    expect(update.body).not.toHaveProperty('header_sample');
+    expect(update.body).toMatchObject({ header: 'Tu cita' });
+  });
+
+  it('speaks Spanish', async () => {
+    const s = await setup(null, 'es');
+    await s.choose('header-format', 'DOCUMENT');
+    expect(s.field('header-format').label).toBe('Tipo de cabecera');
+    expect(s.field('header-file-rules').textContent).toContain('PDF, hasta 25 MB');
+    expect(s.field('header-file-choose').textContent).toContain('Elegir archivo');
+    expect(s.field('header-file-empty').textContent).toContain('Ningún archivo elegido');
   });
 });

@@ -21,7 +21,9 @@ contributors): 5 s to connect, 15 s to read. How a call ended is the reply's ``k
 its messages (WHATSAPP_INBOX-F10, F11); only ``200 {"erased": true}`` confirms it.
 
 ``submit_template`` → ``POST {SAAS_INTERNAL_URL}/internal/whatsapp/templates`` (door 8, WHATSAPP_INBOX-F29,
-F30) with an ``Idempotency-Key``: erplora.com registers (or edits) the template at Meta once per key and
+F30) with an ``Idempotency-Key``: erplora.com registers (or edits) the template at Meta once per key (a header with a
+file carries it in ``header_sample``, which erplora.com uploads to Meta first: waited for 90 s, still within
+``services.STUCK_AFTER``) and
 answers ``200 {"meta_id", "status"}`` (``accepted``: Meta took it for review); a 409 carries its code and
 Meta's reason (``refused``); the rest reads as for ``send``. ``delete_template`` → ``POST …/templates/delete``
 (door 9, F31): ``200 {"deleted": true}`` or its 404 ``whatsapp.template_not_found`` (Meta no longer has
@@ -55,6 +57,8 @@ CONNECT_PATH = "/internal/whatsapp/connect"
 DISCONNECT_PATH = "/internal/whatsapp/disconnect"
 IDEMPOTENCY_HEADER = "Idempotency-Key"
 TIMEOUT = httpx.Timeout(15.0, connect=5.0)
+#: Door 8 with a header's file: erplora.com uploads it to Meta (up to 25 MB) before registering the template.
+SAMPLE_TIMEOUT = httpx.Timeout(90.0, connect=5.0)
 
 SENT = "sent"
 REFUSED = "refused"
@@ -116,7 +120,9 @@ def _url(path: str) -> str:
     return f"{url}{path}"
 
 
-def _post(path: str, payload: dict, idempotency_key: str | None = None) -> httpx.Response | Reply:
+def _post(
+    path: str, payload: dict, idempotency_key: str | None = None, timeout: httpx.Timeout = TIMEOUT
+) -> httpx.Response | Reply:
     """POST ``payload`` signed to erplora.com's ``path``: its response, or the ``Reply`` of a call that
     ended without one (never an exception)."""
     url = _url(path)
@@ -124,7 +130,7 @@ def _post(path: str, payload: dict, idempotency_key: str | None = None) -> httpx
     if idempotency_key is not None:
         headers[IDEMPOTENCY_HEADER] = str(idempotency_key)
     try:
-        with httpx.Client(timeout=TIMEOUT) as client:
+        with httpx.Client(timeout=timeout) as client:
             return client.post(url, content=body, headers=headers)
     except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as error:
         return Reply(kind=UNREACHABLE, message=f"erplora.com could not be reached: {error}.")
@@ -149,8 +155,15 @@ def send(
         payload.update(type="template", template=template)
     else:
         payload.update(type="text", text=text or "")
-    response = _post(SEND_PATH, payload, idempotency_key)
-    return response if isinstance(response, Reply) else _read(response)
+    with_file = template is not None and template.get("header_sample")
+    response = _post(SEND_PATH, payload, idempotency_key, SAMPLE_TIMEOUT if with_file else TIMEOUT)
+    if isinstance(response, Reply):
+        return response
+    reply = _read(response)
+    if reply.kind == UNKNOWN and _error_code(response) == "whatsapp.meta_unreachable":
+        # erplora.com says Meta did not answer and nothing left: Meta's silence, never ERPlora's (gh:hub#2731).
+        return Reply(kind=UNREACHABLE, code="whatsapp.meta_unreachable", message=reply.message)
+    return reply
 
 
 def _settled(response: httpx.Response) -> Reply | None:
@@ -217,7 +230,8 @@ def erase(*, hub: str, phone: str, wa_message_ids: list[str]) -> bool:
 
 def submit_template(*, hub: str, idempotency_key: str, template: dict) -> Reply:
     """Ask erplora.com to register ``template`` at Meta for ``hub`` (new, or an edit of its ``meta_id``)."""
-    response = _post(TEMPLATES_PATH, {"hub": hub, **template}, idempotency_key)
+    timeout = SAMPLE_TIMEOUT if template.get("header_sample") else TIMEOUT
+    response = _post(TEMPLATES_PATH, {"hub": hub, **template}, idempotency_key, timeout)
     if isinstance(response, Reply):
         return response
     settled = _settled(response)

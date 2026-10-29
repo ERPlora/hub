@@ -81,6 +81,7 @@ ROUTES = {
     ("POST", "/whatsapp_inbox/templates/update", "whatsapp_inbox.template.update"),
     ("POST", "/whatsapp_inbox/templates/retry", "whatsapp_inbox.template.retry"),
     ("POST", "/whatsapp_inbox/templates/delete", "whatsapp_inbox.template.delete"),
+    ("POST", "/whatsapp_inbox/templates/samples", "whatsapp_inbox.template_sample.upload"),
     ("GET", "/whatsapp_inbox/channel", "whatsapp_inbox.channel.get"),
     ("POST", "/whatsapp_inbox/channel/prepare", "whatsapp_inbox.channel.prepare"),
     ("POST", "/whatsapp_inbox/channel/connect", "whatsapp_inbox.channel.connect"),
@@ -279,10 +280,51 @@ def test_templates_over_http_are_201_registered_after_the_commit_and_422_under_t
     assert (taken.status_code, taken.json()["error"]["code"]) == (409, "whatsapp_inbox.template_exists")
 
 
+@pytest.fixture
+def hub_files(settings):
+    """``storages["hub_files"]`` in memory, empty for each test."""
+    from django.core.files.storage import storages
+
+    settings.STORAGES = {**settings.STORAGES, "hub_files": {"BACKEND": "django.core.files.storage.InMemoryStorage"}}
+    storages._storages.pop("hub_files", None)
+    yield storages["hub_files"]
+    storages._storages.pop("hub_files", None)
+
+
 @pytest.mark.django_db
-def test_an_employee_picks_templates_but_neither_makes_nor_deletes_them(employee_client):
+def test_a_header_video_bigger_than_djangos_ceiling_still_uploads(admin_client, hub_files):
+    """F29: a 16 MB MP4 is far above the 2.5 MB every other route takes; its file comes back as the template's."""
+    import base64
+
+    video = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * (3 * 1024 * 1024)
+    assert len(video) > settings.DATA_UPLOAD_MAX_MEMORY_SIZE
+    body = {"header_format": "VIDEO", "name": "visita.mp4", "content_base64": base64.b64encode(video).decode()}
+
+    response = post(admin_client, "/whatsapp_inbox/templates/samples", body)
+
+    assert response.status_code == 201
+    assert {key: response.json()[key] for key in ("header_format", "content_type", "size", "name")} == {
+        "header_format": "VIDEO",
+        "content_type": "video/mp4",
+        "size": len(video),
+        "name": "visita.mp4",
+    }
+
+
+@pytest.mark.django_db
+def test_a_header_file_past_the_largest_is_refused_before_it_is_read(admin_client):
+    response = post(admin_client, "/whatsapp_inbox/templates/samples", {"content_base64": "A" * 36_100_000})
+
+    assert (response.status_code, response.json()["error"]["code"]) == (413, "payload_too_large")
+
+
+@pytest.mark.django_db
+def test_an_employee_picks_templates_and_keeps_a_header_file_but_neither_makes_nor_deletes_them(employee_client, hub_files):
     connect(templates=[{"name": "recordatorio", "language": "es", "body": "Hola", "meta_id": "m"}])
     [row] = get(employee_client, "/whatsapp_inbox/templates", sendable="true").json()["rows"]
     body = {"name": "otra", "language": "es", "body": "Hola", "submit_key": "0199e000-0000-7000-8000-0000000000c4"}
     assert post(employee_client, "/whatsapp_inbox/templates", body).status_code == 403
     assert post(employee_client, "/whatsapp_inbox/templates/delete", {"id": row["id"]}).status_code == 403
+    # F33: a template from WhatsApp Manager asks for its file when sending, and the employee sends.
+    sample = {"header_format": "IMAGE", "name": "carta.jpg", "content_base64": "/9j/4AAQ"}
+    assert post(employee_client, "/whatsapp_inbox/templates/samples", sample).status_code == 201

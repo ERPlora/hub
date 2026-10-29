@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // WHATSAPP_INBOX-F29 «Create a template and send it for review» and F30 «Edit a template», from Settings →
 // «Meta templates» (the old module's panel): Name (lowercase, numbers and underscores; it never changes),
-// Language, Category (Utility or Marketing), Header, Text with an «Example» box per variable it uses, Footer
+// Language, Category (Utility or Marketing), Header — a text, or a photo, a video or a document whose file is
+// kept in the business's files at once (`whatsapp_inbox.template_sample.upload`, checked here first by type and
+// size) and goes with the template to Meta's review —, Text with an «Example» box per variable it uses, Footer
 // and up to 10 buttons — quick replies together, at most 2 links (https://) and 1 call (+34…). New sends
 // `whatsapp_inbox.template.create`; Edit sends the whole content with `whatsapp_inbox.template.update` (what
 // Meta has, or the changes still on their way), with its verdict and reason on top; the category only changes
@@ -11,11 +13,19 @@
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import type { TemplateButtonIn, TemplateButtonType, TemplateOut, WritableCategory } from '../operations';
+import { acceptsSample, fileToBase64, formatSize, SAMPLE_RULES } from '../lib/files';
+import type {
+  FileHeaderFormat,
+  TemplateButtonIn,
+  TemplateButtonType,
+  TemplateOut,
+  TemplateSampleOut,
+  WritableCategory,
+} from '../operations';
 
 const props = defineProps<{
   /** The template being edited; `null` = «New template». */
@@ -29,6 +39,10 @@ const MAX_BUTTONS = 10;
 const LANGUAGES = ['es', 'es_ES', 'es_MX', 'es_AR', 'ca', 'eu', 'gl', 'en', 'en_US', 'en_GB', 'fr', 'de', 'it', 'pt_PT', 'pt_BR', 'nl', 'ro', 'ar'];
 const CATEGORIES: WritableCategory[] = ['UTILITY', 'MARKETING'];
 const BUTTON_TYPES: TemplateButtonType[] = ['QUICK_REPLY', 'URL', 'PHONE_NUMBER'];
+/** A text header (empty: none), or one with a file. */
+const HEADER_FORMATS = ['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT'] as const;
+type HeaderKind = (typeof HEADER_FORMATS)[number];
+const MB = 1024 * 1024;
 const VARIABLE = /\{\{\s*(\d+)\s*\}\}/g;
 const NAME = /^[a-z0-9_]+$/;
 const PHONE = /^\+[1-9]\d{6,14}$/;
@@ -43,7 +57,10 @@ interface Form {
   name: string;
   language: string;
   category: WritableCategory;
+  headerFormat: HeaderKind;
   header: string;
+  /** The file of a photo, video or document header, kept in the business's files. */
+  sample: TemplateSampleOut | null;
   body: string;
   examples: string[];
   footer: string;
@@ -54,6 +71,8 @@ const t = useT();
 const locale = useLocale();
 const creation = useCommand('whatsapp_inbox.template.create');
 const update = useCommand('whatsapp_inbox.template.update');
+const sampleUpload = useCommand('whatsapp_inbox.template_sample.upload');
+const uploading = computed(() => sampleUpload.pending.value);
 const pending = computed(() => creation.pending.value || update.pending.value);
 const refusal = computed(() => (props.template ? update.error.value : creation.error.value));
 /** The server's field names of what was changed since the last refusal: their errors are stale. */
@@ -75,20 +94,38 @@ const title = computed(() =>
 const form = ref<Form>(empty());
 /** One key per save, kept until the Hub takes it (a silence may have reached it). */
 const key = ref(crypto.randomUUID());
+/** What is wrong with the header's file just chosen, said under it (the Hub's refusal, or the check here). */
+const fileError = ref('');
 
 function empty(): Form {
-  return { name: '', language: 'es', category: 'UTILITY', header: '', body: '', examples: [], footer: '', buttons: [] };
+  return {
+    name: '',
+    language: 'es',
+    category: 'UTILITY',
+    headerFormat: 'TEXT',
+    header: '',
+    sample: null,
+    body: '',
+    examples: [],
+    footer: '',
+    buttons: [],
+  };
 }
+
+const isFileKind = (kind: string): kind is FileHeaderFormat => kind === 'IMAGE' || kind === 'VIDEO' || kind === 'DOCUMENT';
 
 function fromTemplate(template: TemplateOut | null): Form {
   if (!template) return empty();
   // The changes still on their way, if any; else what Meta has.
   const content = template.draft ?? template;
+  const withFile = isFileKind(content.header_format);
   return {
     name: template.name,
     language: template.language,
     category: content.category === 'MARKETING' ? 'MARKETING' : 'UTILITY',
-    header: content.header,
+    headerFormat: withFile ? (content.header_format as FileHeaderFormat) : 'TEXT',
+    header: withFile ? '' : content.header,
+    sample: withFile ? content.header_sample : null,
     body: content.body,
     examples: [...content.body_examples],
     footer: content.footer,
@@ -109,6 +146,7 @@ watch(
     key.value = crypto.randomUUID();
     creation.error.value = null;
     update.error.value = null;
+    fileError.value = '';
   },
   { immediate: true },
 );
@@ -132,10 +170,20 @@ function buttonComplete(button: ButtonForm): boolean {
   return true;
 }
 
+/** The header's kind when it carries a file. */
+const fileKind = computed<FileHeaderFormat | null>(() => (isFileKind(form.value.headerFormat) ? form.value.headerFormat : null));
+const headerFileReady = computed(() => fileKind.value === null || (form.value.sample !== null && !uploading.value));
+
 const complete = computed(() => {
   const f = form.value;
   const identity = props.template ? true : NAME.test(f.name.trim()) && f.language !== '';
-  return identity && f.body.trim() !== '' && f.examples.every((example) => example.trim() !== '') && f.buttons.every(buttonComplete);
+  return (
+    identity &&
+    headerFileReady.value &&
+    f.body.trim() !== '' &&
+    f.examples.every((example) => example.trim() !== '') &&
+    f.buttons.every(buttonComplete)
+  );
 });
 
 const languageNames = computed(() => {
@@ -169,7 +217,9 @@ const SERVER_FIELD: Record<keyof Form, string> = {
   name: 'name',
   language: 'language',
   category: 'category',
+  headerFormat: 'header_format',
   header: 'header',
+  sample: 'header_sample',
   body: 'body',
   examples: 'body_examples',
   footer: 'footer',
@@ -190,6 +240,43 @@ function setButton(index: number, patch: Partial<ButtonForm>): void {
     form.value.buttons.map((button, at) => (at === index ? { ...button, ...patch } : button)),
   );
 }
+// ── The header's file ──────────────────────────────────────────────────────────────────────────────
+
+const picker = shallowRef<HTMLInputElement | null>(null);
+
+function setHeaderFormat(value: string): void {
+  const kind: HeaderKind = (HEADER_FORMATS as readonly string[]).includes(value) ? (value as HeaderKind) : 'TEXT';
+  if (kind === form.value.headerFormat) return;
+  fileError.value = '';
+  set('headerFormat', kind);
+  // A file of another kind does not go with this header.
+  if (form.value.sample && form.value.sample.header_format !== kind) set('sample', null);
+}
+
+async function onPick(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = ''; // choosing the same file again is a change too
+  const kind = fileKind.value;
+  if (!file || !kind) return;
+  fileError.value = '';
+  const verdict = acceptsSample(file, kind);
+  if (verdict !== 'ok') {
+    fileError.value =
+      verdict === 'type'
+        ? t(`whatsapp_inbox.templates.editor.fileWrongType.${kind}`)
+        : t('whatsapp_inbox.templates.editor.fileTooHeavy', { mb: SAMPLE_RULES[kind].maxBytes / MB });
+    return;
+  }
+  try {
+    const sample = await sampleUpload.run({ header_format: kind, name: file.name, content_base64: await fileToBase64(file) });
+    set('sample', sample);
+  } catch {
+    const refused = sampleUpload.error.value;
+    fileError.value = refused?.fields?.content_base64 ?? refused?.message ?? t('whatsapp_inbox.templates.editor.fileUploadFailed');
+  }
+}
+
 function addButton(): void {
   if (form.value.buttons.length >= MAX_BUTTONS) return;
   set('buttons', [...form.value.buttons, { type: 'QUICK_REPLY', text: '', url: '', phone_number: '' }]);
@@ -209,9 +296,12 @@ function written() {
     if (button.type === 'PHONE_NUMBER') out.phone_number = button.phone_number.trim();
     return out;
   });
+  const kind = fileKind.value;
+  // A text header goes as it always went; one with a file names it, without text.
+  const header = kind ? { header_format: kind, header: '', header_sample: f.sample?.id ?? null } : { header: f.header.trim() };
   return {
     category: f.category,
-    header: f.header.trim(),
+    ...header,
     body: f.body.trim(),
     body_examples: f.examples.map((example) => example.trim()),
     footer: f.footer.trim(),
@@ -334,7 +424,90 @@ async function save(): Promise<void> {
           </ion-select-option>
         </ion-select>
 
+        <ion-select
+          :data-testid="`${ID}-header-format`"
+          :value="form.headerFormat"
+          :label="$t('whatsapp_inbox.templates.editor.headerFormat')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          interface="popover"
+          @ion-change="setHeaderFormat(text($event.detail.value))"
+        >
+          <ion-select-option
+            v-for="kind in HEADER_FORMATS"
+            :key="kind"
+            :value="kind"
+          >
+            {{ t(`whatsapp_inbox.templates.editor.headerFormats.${kind}`) }}
+          </ion-select-option>
+        </ion-select>
+        <div
+          v-if="fileKind"
+          class="wa-template-form__file"
+          :data-testid="`${ID}-header-file`"
+        >
+          <div class="wa-template-form__file-row">
+            <p
+              v-if="form.sample"
+              class="wa-template-form__file-name"
+              :data-testid="`${ID}-header-file-name`"
+            >
+              <strong>{{ form.sample.name }}</strong> · {{ formatSize(form.sample.size, locale) }}
+            </p>
+            <p
+              v-else
+              class="wa-template-form__hint"
+              :data-testid="`${ID}-header-file-empty`"
+            >
+              {{ $t('whatsapp_inbox.templates.editor.noFile') }}
+            </p>
+            <ion-button
+              fill="outline"
+              size="small"
+              :disabled="uploading"
+              :data-testid="`${ID}-header-file-choose`"
+              @click="picker?.click()"
+            >
+              <ion-spinner
+                v-if="uploading"
+                slot="start"
+                name="crescent"
+              />
+              <HubIcon
+                v-else
+                slot="start"
+                name="ion:cloud-upload-outline"
+              />
+              {{ uploading ? $t('whatsapp_inbox.templates.editor.uploading') : form.sample ? $t('whatsapp_inbox.templates.editor.changeFile') : $t('whatsapp_inbox.templates.editor.chooseFile') }}
+            </ion-button>
+          </div>
+          <p
+            class="wa-template-form__hint"
+            :data-testid="`${ID}-header-file-rules`"
+          >
+            {{ t(`whatsapp_inbox.templates.editor.fileRules.${fileKind}`) }}
+            {{ $t('whatsapp_inbox.templates.editor.fileReview') }}
+          </p>
+          <p
+            v-if="fileError || fieldErrors.header_sample"
+            class="wa-template-form__rule"
+            role="alert"
+            :data-testid="`${ID}-header-file-error`"
+          >
+            {{ fileError || fieldErrors.header_sample }}
+          </p>
+          <input
+            ref="picker"
+            type="file"
+            hidden
+            :accept="SAMPLE_RULES[fileKind].accept"
+            :data-testid="`${ID}-header-file-input`"
+            @change="onPick"
+          >
+        </div>
         <ion-input
+          v-else
           :data-testid="`${ID}-header`"
           :value="form.header"
           :label="$t('whatsapp_inbox.templates.editor.header')"
@@ -521,6 +694,22 @@ async function save(): Promise<void> {
 }
 .wa-template-form__identity strong {
   color: var(--ion-text-color);
+}
+.wa-template-form__file {
+  display: grid;
+  gap: 6px;
+}
+.wa-template-form__file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wa-template-form__file-name {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .wa-template-form__rule {
   margin: 4px 0 0;

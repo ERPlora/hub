@@ -18,7 +18,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMessageTime, mediaKind, safeMediaUrl } from '../lib/format';
+import { formatMessageTime, headerFileKind, mediaKind, safeMediaUrl } from '../lib/format';
 import { kindLabel, reactionsByMessage, timeline } from '../lib/thread';
 import type { MessageOut, NoteOut } from '../operations';
 
@@ -166,6 +166,11 @@ watch(
           v-if="item.message.kind === 'template'"
           class="wa-bubble__kind"
         >{{ $t('whatsapp_inbox.thread.template', { name: item.message.template_name }) }}</span>
+        <span
+          v-if="item.message.kind === 'template' && item.message.media_filename && !item.message.media_url"
+          class="wa-bubble__kind"
+          data-testid="whatsapp-inbox-message-header-file"
+        >{{ $t(`whatsapp_inbox.thread.kinds.${headerFileKind(item.message.media_mime_type)}`) }} · {{ item.message.media_filename }}</span>
         <div
           v-if="mediaKind(item.message)"
           class="wa-bubble__media"

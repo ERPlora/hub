@@ -258,6 +258,15 @@ class Message(UUIDModel):
     )
     # The values of a template's {{1}}…{{n}}, kept to hand it to erplora.com again on a retry.
     template_variables = models.JSONField(_("template variables"), default=list, blank=True)
+    # The file of a template's photo, video or document header it was sent with (F33): handed over again on a retry.
+    header_sample = models.ForeignKey(
+        "TemplateSample",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("header file"),
+    )
     status = models.CharField(
         _("status"), max_length=10, choices=Status.choices, default=Status.RECEIVED
     )
@@ -358,11 +367,23 @@ HUB_BUTTONS = frozenset({"QUICK_REPLY", "URL", "PHONE_NUMBER"})
 NAMED_VARIABLE = re.compile(r"\{\{(?!\s*\d+\s*\}\})")
 
 
+#: The headers that carry a file: a photo, a video or a document.
+FILE_HEADERS = ("IMAGE", "VIDEO", "DOCUMENT")
+
+
+def hub_writes(row) -> bool:
+    """Whether the Hub's form makes this content: what its sending fills (``supported``), a header with a file only
+    when that file was chosen here (``header_sample``; one made in WhatsApp Manager is changed there)."""
+    if row.header_format in FILE_HEADERS:
+        return row.supported and row.header_sample_id is not None
+    return row.supported
+
+
 def hub_handles(category: str, header_format: str, header: str, body: str, buttons: list) -> bool:
-    """Whether the Hub's form makes this content and its sending fills it: no authentication code, no file or
-    place header, no variable outside the body, only numbered variables in it, and only quick replies, fixed
-    links and calls."""
-    if category == "AUTHENTICATION" or header_format not in ("", "TEXT") or "{{" in (header or ""):
+    """Whether the Hub's sending fills this content: no authentication code, no place header, a header of text
+    without variables or of a file (sent with the file chosen), only numbered variables in the body, and only quick
+    replies, fixed links and calls."""
+    if category == "AUTHENTICATION" or header_format not in ("", "TEXT", *FILE_HEADERS) or "{{" in (header or ""):
         return False
     if NAMED_VARIABLE.search(body or ""):
         return False
@@ -372,6 +393,44 @@ def hub_handles(category: str, header_format: str, header: str, body: str, butto
         and "{{" not in str(button.get("url", ""))
         for button in buttons or []
     )
+
+
+class TemplateSample(UUIDModel):
+    """The file of a template's header with a photo, a video or a document (WHATSAPP_INBOX-F29), kept in the hub file
+    store at ``key`` (``samples.sample_key``: named by its content, so two rows may share one object). Meta reviews
+    the template with it: its hand-over to erplora.com (door 8) carries it every time. Rows are never deleted: a
+    template, its edit waiting in ``draft`` or a hand-over on its way may still name one.
+
+    Phase 1 shares the tables, so a sample belongs to the business in ``host`` (as ``Template``); phase 2 keeps it in
+    each hub's database."""
+
+    class Kind(models.TextChoices):
+        IMAGE = "IMAGE", pgettext_lazy("whatsapp template header", "Image")
+        VIDEO = "VIDEO", pgettext_lazy("whatsapp template header", "Video")
+        DOCUMENT = "DOCUMENT", pgettext_lazy("whatsapp template header", "Document")
+
+    host = models.CharField(
+        _("host"),
+        max_length=63,
+        editable=False,
+        help_text=_("First label of the host of the business, e.g. “a” for a.localhost."),
+    )
+    header_format = models.CharField(_("header type"), max_length=10, choices=Kind.choices)
+    key = models.CharField(_("file in the store"), max_length=255, editable=False)
+    sha256 = models.CharField(_("sha256"), max_length=64, editable=False)
+    content_type = models.CharField(_("type"), max_length=64)
+    size = models.PositiveBigIntegerField(_("size in bytes"))
+    # The name it was chosen with, as Meta shows it in the review.
+    name = models.CharField(_("name"), max_length=255)
+    created_at = models.DateTimeField(_("created at"), default=timezone.now)
+
+    class Meta:
+        verbose_name = _("template header file")
+        verbose_name_plural = _("template header files")
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Template(UUIDModel):
@@ -443,6 +502,16 @@ class Template(UUIDModel):
         _("header type"), max_length=10, choices=HeaderFormat.choices, default=HeaderFormat.NONE, blank=True
     )
     header = models.CharField(_("header"), max_length=200, blank=True)
+    # The file of a photo, video or document header chosen here: Meta reviews the template with it (one made in
+    # WhatsApp Manager has none, and is changed there).
+    header_sample = models.ForeignKey(
+        TemplateSample,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("header file"),
+    )
     body = models.TextField(_("body"), blank=True)
     # An example of each body variable, in order: Meta reviews the template with them.
     body_examples = models.JSONField(_("examples of the variables"), default=list, blank=True)
@@ -454,8 +523,8 @@ class Template(UUIDModel):
     rejected_reason = models.CharField(_("Meta's reason"), max_length=500, blank=True)
     meta_id = models.CharField(_("Meta id"), max_length=64, blank=True)
     synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
-    # An edit of a template Meta has, waiting for erplora.com to register it (category, header, body,
-    # body_examples, footer, buttons); empty when there is none.
+    # An edit of a template Meta has, waiting for erplora.com to register it (category, header_format, header,
+    # header_sample, body, body_examples, footer, buttons); empty when there is none.
     draft = models.JSONField(_("changes not yet at Meta"), null=True, blank=True)
     submit_state = models.CharField(
         _("sending to Meta"), max_length=10, choices=SubmitState.choices, default=SubmitState.NONE, blank=True

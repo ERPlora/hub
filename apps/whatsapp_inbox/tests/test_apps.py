@@ -145,8 +145,8 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
 
     ops = {name: op for name, op in registry.items() if name.startswith("whatsapp_inbox.")}
     # FLOW-F31 added message.notify, the narrow send an automation may be granted; WHATSAPP_INBOX-F09 the bell's
-    # count and the device's notices.
-    assert len(ops) == 44
+    # count and the device's notices; WHATSAPP_INBOX-F29 template_sample.upload, the file of a header.
+    assert len(ops) == 45
     for name, op in ops.items():
         assert isinstance(op.ai, dict) and len(str(op.ai.get("description", ""))) > 20, name
         if op.kind == "command":

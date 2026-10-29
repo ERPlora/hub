@@ -315,6 +315,18 @@ export async function meta(request: APIRequestContext, body: string): Promise<nu
   return answer.status();
 }
 
+/** Forgets at erplora.com the templates a spec made from this Hub (named `prefix…`). `cleanUp` deletes this Hub's
+ *  rows by hand, never erplora.com's copy: the next seed's push would bring that copy back as a new row made in
+ *  WhatsApp Manager, without the file it was made with (WHATSAPP_INBOX-F28). Never the seed's own (`e2e_seed_…`). */
+export function erploraForgetsTemplates(prefix: string): void {
+  const safe = prefix.replace(/[^a-z0-9_]/g, '');
+  if (!safe || safe.startsWith('e2e_seed')) throw new Error(`erploraForgetsTemplates: refusing the prefix «${prefix}».`);
+  execFileSync('docker', ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'hub', '-d', SAAS_DB, '-At', '-c', `delete from whatsapp_template where name like '${safe}%'`], {
+    cwd: REPO_DIR,
+    encoding: 'utf8',
+  });
+}
+
 /** What erplora.com's database recorded of its push of each of `ids` to this Hub (whatsapp-pushes.ts). */
 function pushesOf(ids: string[]): Push[] {
   const list = ids.map((id) => `'${id.replace(/'/g, '')}'`).join(',');
@@ -418,5 +430,7 @@ export function cleanUp(): void {
     psql(`delete from whatsapp_inbox_conversation where id in (${list})`);
   }
   psql("delete from whatsapp_inbox_template where name like 'e2e_%'");
+  // The files of their photo, video or document headers (F29), once no template of theirs is left.
+  psql("delete from whatsapp_inbox_templatesample where name like 'e2e%' and id not in (select header_sample_id from whatsapp_inbox_template where header_sample_id is not null)");
   psql('delete from whatsapp_inbox_channel where version >= 900000000');
 }

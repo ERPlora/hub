@@ -559,7 +559,8 @@ def test_a_template_deleted_here_is_never_brought_back_but_a_new_one_of_that_nam
 @pytest.mark.parametrize(
     "fields",
     [
-        {"header_format": "IMAGE", "header": ""},
+        # A place header (a photo, video or document one is sent with its file: F33).
+        {"header_format": "LOCATION", "header": ""},
         # gh:whatsapp_inbox#226, #230: a variable in the title.
         {"header": "Tu cita, {{1}}", "body": "Te esperamos el {{2}}."},
         # gh:whatsapp_inbox#186: named variables; the Hub fills them by number only.
@@ -586,7 +587,8 @@ def test_a_template_made_in_whatsapp_manager_the_hub_cannot_fill_is_brought_but_
 @pytest.mark.parametrize(
     "fields",
     [
-        {"header_format": "IMAGE", "header": ""},
+        # A place header (a photo, video or document one is sent with its file: F33).
+        {"header_format": "LOCATION", "header": ""},
         {"body": "Hola {{nombre}}, te damos la bienvenida."},
         {"category": "AUTHENTICATION"},
     ],
