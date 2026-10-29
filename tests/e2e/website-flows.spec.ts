@@ -14,8 +14,9 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, HUB_DIR, MAIL_DIR, OWNER, psql, SAAS, shot, topbarApps } from './helpers';
+import { A, api, capture, hostPage, HUB_DIR, MAIL_DIR, OWNER, psql, SAAS, settled, topbarApps } from './helpers';
 import { readMailCode } from './mail';
+import { atRest } from './website-helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -212,7 +213,7 @@ async function horizontalOverflow(page: Page): Promise<number> {
 }
 
 /** At each of the three sizes: `target` in sight (after `before`, for a view that changes with the width), no sideways
- * scroll, and the screenshot `APP-WEBSITE-<key>-<width>`. */
+ * scroll, and, once nothing moves (a toast entering, the views' segment), the screenshot `APP-WEBSITE-<key>-<width>`. */
 async function threeShots(page: Page, key: string, target: () => Locator, before?: () => Promise<void>): Promise<void> {
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -223,16 +224,10 @@ async function threeShots(page: Page, key: string, target: () => Locator, before
       await expect(seen).toBeInViewport({ timeout: 1000 });
     }, `${key} at ${vp.label}`).toPass();
     await expect.poll(() => horizontalOverflow(page), `${key} at ${vp.label}: sideways scroll`).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: shot(`APP-WEBSITE-${key}-${vp.label}`) });
+    await settled(page);
+    await capture(page, `APP-WEBSITE-${key}-${vp.label}`);
   }
   await page.setViewportSize(WIDE);
-}
-
-/** The public page at rest for its capture: no focus ring, no colour still in transition (Bootstrap's buttons fade
- * 150 ms, and the dev server injects the stylesheets after the first paint). */
-async function settled(page: Page): Promise<void> {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== 'running'));
 }
 
 /** A visitor: a fresh context without a session, at `width`, speaking `locale`. */
@@ -567,9 +562,9 @@ test('WEBSITE-F10: a visitor opens the address and gets the page in any design, 
       await expect(visiting.locator('header .navbar')).toHaveCSS('display', 'flex');
       expect(await visiting.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
       expect(await context.cookies(), 'nothing was left in the browser').toEqual([]);
-      await settled(visiting);
-      await visiting.screenshot({ path: shot(`APP-WEBSITE-F10-${template}-${vp.label}`), fullPage: true });
-      if (template === 'classic') await visiting.screenshot({ path: shot(`APP-WEBSITE-F10-${vp.label}`) });
+      await atRest(visiting);
+      await capture(visiting, `APP-WEBSITE-F10-${template}-${vp.label}`, { fullPage: true });
+      if (template === 'classic') await capture(visiting, `APP-WEBSITE-F10-${vp.label}`);
       await context.close();
     }
   }
@@ -729,8 +724,8 @@ test('WEBSITE-F12: the business’s Google Maps link is checked, and its rating 
   );
   await expect(visiting.locator('header a[href="#reviews"]')).toHaveCount(1);
   await section.scrollIntoViewIfNeeded();
-  await settled(visiting);
-  await visiting.screenshot({ path: shot('APP-WEBSITE-F12-page-390') });
+  await atRest(visiting);
+  await capture(visiting, 'APP-WEBSITE-F12-page-390');
   expect(google, 'the visitor’s browser never talks to Google').toEqual([]);
   await context.close();
 });
