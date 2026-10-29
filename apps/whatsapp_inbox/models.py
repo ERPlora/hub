@@ -258,6 +258,15 @@ class Message(UUIDModel):
     )
     # The values of a template's {{1}}…{{n}}, kept to hand it to erplora.com again on a retry.
     template_variables = models.JSONField(_("template variables"), default=list, blank=True)
+    # The file of a template's photo, video or document header it was sent with (F33): handed over again on a retry.
+    header_sample = models.ForeignKey(
+        "TemplateSample",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name=_("header file"),
+    )
     status = models.CharField(
         _("status"), max_length=10, choices=Status.choices, default=Status.RECEIVED
     )
@@ -358,21 +367,23 @@ HUB_BUTTONS = frozenset({"QUICK_REPLY", "URL", "PHONE_NUMBER"})
 NAMED_VARIABLE = re.compile(r"\{\{(?!\s*\d+\s*\}\})")
 
 
+#: The headers that carry a file: a photo, a video or a document.
+FILE_HEADERS = ("IMAGE", "VIDEO", "DOCUMENT")
+
+
 def hub_writes(row) -> bool:
-    """Whether the Hub's form makes this content: what its sending fills (``supported``) or, with a photo, video or
-    document header chosen here (its file kept, ``header_sample``), all the rest of it."""
-    if row.supported:
-        return True
-    return row.header_sample_id is not None and row.header_format in ("IMAGE", "VIDEO", "DOCUMENT") and hub_handles(
-        row.category, "", "", row.body, row.buttons
-    )
+    """Whether the Hub's form makes this content: what its sending fills (``supported``), a header with a file only
+    when that file was chosen here (``header_sample``; one made in WhatsApp Manager is changed there)."""
+    if row.header_format in FILE_HEADERS:
+        return row.supported and row.header_sample_id is not None
+    return row.supported
 
 
 def hub_handles(category: str, header_format: str, header: str, body: str, buttons: list) -> bool:
-    """Whether the Hub's form makes this content and its sending fills it: no authentication code, no file or
-    place header, no variable outside the body, only numbered variables in it, and only quick replies, fixed
-    links and calls."""
-    if category == "AUTHENTICATION" or header_format not in ("", "TEXT") or "{{" in (header or ""):
+    """Whether the Hub's sending fills this content: no authentication code, no place header, a header of text
+    without variables or of a file (sent with the file chosen), only numbered variables in the body, and only quick
+    replies, fixed links and calls."""
+    if category == "AUTHENTICATION" or header_format not in ("", "TEXT", *FILE_HEADERS) or "{{" in (header or ""):
         return False
     if NAMED_VARIABLE.search(body or ""):
         return False

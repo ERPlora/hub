@@ -159,8 +159,8 @@ TEMPLATE_NOT_APPROVED = _(
 )
 TEMPLATE_VARIABLES = _("Fill in every variable of the template (%(count)d).")
 TEMPLATE_NOT_SENDABLE = _(
-    "This template has a photo, video, document or place header, or buttons with something to fill in: send it "
-    "from WhatsApp Manager."
+    "This template has a place header, or a header or buttons with something to fill in: send it from WhatsApp "
+    "Manager."
 )
 MARKETING_CONSENT = _("This customer has not agreed to receive marketing by WhatsApp.")
 TEMPLATE_EXISTS = _("There is already a template “%(name)s” in that language.")
@@ -171,6 +171,8 @@ TEMPLATE_SUBMITTING = _("This template is on its way to Meta: wait a moment.")
 TEMPLATE_CATEGORY_FIXED = _("Meta only lets you change the category of a template it rejected.")
 TEMPLATE_NOT_RETRYABLE = _("There is nothing of this template to hand to Meta again.")
 HEADER_FILE_MISSING = _("Choose the header's file: Meta reviews the template with it.")
+SEND_HEADER_FILE_MISSING = _("Choose the header's file: the template is sent with it.")
+NO_HEADER_FILE = _("This template's header has no file.")
 SAMPLE_NOT_WHOLE = _("The file did not arrive whole. Choose it again.")
 SAMPLE_WRONG_TYPE = {
     "IMAGE": _("Choose a JPEG or PNG photo."),
@@ -210,6 +212,7 @@ _INTERNATIONAL = re.compile(r"\+[1-9]\d{6,14}")
 _REFUSALS = {
     "whatsapp.cap_reached": "whatsapp_inbox.cap_reached",
     "whatsapp.reconnect_needed": "whatsapp_inbox.reconnect_needed",
+    HEADER_SAMPLE_MISSING_CODE: HEADER_SAMPLE_MISSING_CODE,
 }
 #: erplora.com's 409 codes for a template the Hub says in its own words when read (never blaming ERPlora for
 #: Meta: gh:hub#2731); any other is Meta's refusal, with Meta's reason as it came.
@@ -969,7 +972,26 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
         conversation = _conversation_for(phone)
         _link_by_phone(ctx, conversation, card_id)
     variables = list(data.template.variables) if template else []
-    return _queue_message(ctx, conversation, data.text, template, variables, data.client_message_id, now)
+    sample = _file_to_send(ctx, template, data.template.header_sample) if template else None
+    return _queue_message(ctx, conversation, data.text, template, variables, data.client_message_id, now, sample)
+
+
+def _file_to_send(ctx: OperationContext, template: Template, chosen: UUID | None) -> TemplateSample | None:
+    """The file a template's photo, video or document header goes with (F33): the one chosen, else the template's own;
+    one of this business's kept files of the header's kind. ``None`` for any other header."""
+    if template.header_format not in samples.FILE_HEADERS:
+        if chosen is not None:
+            raise InvalidPayload(str(NO_HEADER_FILE), fields={"header_sample": str(NO_HEADER_FILE)})
+        return None
+    wanted = chosen or template.header_sample_id
+    sample = (
+        TemplateSample.objects.filter(pk=wanted, host=ctx.scope.key, header_format=template.header_format).first()
+        if wanted
+        else None
+    )
+    if sample is None:
+        raise InvalidPayload(str(SEND_HEADER_FILE_MISSING), fields={"header_sample": str(SEND_HEADER_FILE_MISSING)})
+    return sample
 
 
 def _queue_message(
@@ -980,6 +1002,7 @@ def _queue_message(
     variables: list[str],
     key: UUID,
     now: dt.datetime,
+    sample: TemplateSample | None = None,
 ) -> dict:
     """Keep the message ``queued`` in ``conversation`` and hand it to erplora.com after the COMMIT (``deliver``):
     the one way out of the Hub, for the inbox (F32, F33) and for an automation (``notify``)."""
@@ -995,6 +1018,9 @@ def _queue_message(
                 template_name=template.name if template else "",
                 template_language=template.language if template else "",
                 template_variables=variables,
+                header_sample=sample,
+                media_mime_type=sample.content_type if sample else "",
+                media_filename=sample.name if sample else "",
                 status=Message.Status.QUEUED,
                 status_at=now,
                 client_message_id=key,
@@ -1114,7 +1140,10 @@ def notify(ctx: OperationContext, data: NotifyIn) -> dict:
         ):
             raise Conflict(str(MARKETING_CONSENT), code="whatsapp_inbox.marketing_consent_missing")
     variables = list(data.template.variables) if template else []
-    return _queue_message(ctx, conversation, data.text if template is None else None, template, variables, key, now)
+    sample = _file_to_send(ctx, template, data.template.header_sample) if template else None
+    return _queue_message(
+        ctx, conversation, data.text if template is None else None, template, variables, key, now, sample
+    )
 
 
 def deliver(scope: Scope, message_id: UUID) -> None:
@@ -1126,18 +1155,20 @@ def deliver(scope: Scope, message_id: UUID) -> None:
     if not claimed.claimed:
         return
     outbound.release()  # erplora.com is waited for with no connection held
-    try:
-        reply = gateway.send(
-            hub=scope.key,
-            to=claimed.to,
-            idempotency_key=str(claimed.client_message_id),
-            text=claimed.text,
-            template=claimed.template,
-        )
-    except gateway.NotConfigured:
-        reply = gateway.Reply(
-            kind=gateway.UNREACHABLE, message="SAAS_INTERNAL_URL is not set."
-        )
+    template, reply = _with_its_file(claimed.template) if claimed.template is not None else (None, None)
+    if reply is None:
+        try:
+            reply = gateway.send(
+                hub=scope.key,
+                to=claimed.to,
+                idempotency_key=str(claimed.client_message_id),
+                text=claimed.text,
+                template=template,
+            )
+        except gateway.NotConfigured:
+            reply = gateway.Reply(
+                kind=gateway.UNREACHABLE, message="SAAS_INTERNAL_URL is not set."
+            )
     record = get("whatsapp_inbox.message.record_delivery")
     record(
         system,
@@ -1190,6 +1221,13 @@ def claim_delivery(ctx: OperationContext, data: MessageRefIn) -> dict:
         if message.kind == "template"
         else None
     )
+    if template is not None and message.header_sample_id is not None:
+        # Read after the claim's COMMIT, with no connection held (``deliver``): only a file of its own business.
+        sample = TemplateSample.objects.filter(pk=message.header_sample_id, host=message.host).first()
+        if sample is not None:
+            template.update(header_format=sample.header_format, sample_key=sample.key, sample_name=sample.name)
+        else:
+            template.update(sample_key="", sample_name="")
     return {
         "claimed": True,
         "to": message.conversation.phone,
@@ -1230,7 +1268,10 @@ def record_delivery(ctx: OperationContext, data: RecordDeliveryIn) -> dict:
         message.error_message = data.message[:500] if message.error_code == SEND_REFUSED_CODE else ""
     else:
         message.status = Message.Status.SENDING
-        message.error_code = SEND_UNKNOWN_CODE if data.kind == gateway.UNKNOWN else SAAS_UNREACHABLE_CODE
+        if data.code == "whatsapp.meta_unreachable":
+            message.error_code = "whatsapp_inbox.meta_unreachable"  # Meta's silence, never ERPlora's (gh:hub#2731)
+        else:
+            message.error_code = SEND_UNKNOWN_CODE if data.kind == gateway.UNKNOWN else SAAS_UNREACHABLE_CODE
         message.error_message = ""
     message.status_at = clock.now()
     message.save(

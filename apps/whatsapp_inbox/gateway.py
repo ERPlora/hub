@@ -155,8 +155,15 @@ def send(
         payload.update(type="template", template=template)
     else:
         payload.update(type="text", text=text or "")
-    response = _post(SEND_PATH, payload, idempotency_key)
-    return response if isinstance(response, Reply) else _read(response)
+    with_file = template is not None and template.get("header_sample")
+    response = _post(SEND_PATH, payload, idempotency_key, SAMPLE_TIMEOUT if with_file else TIMEOUT)
+    if isinstance(response, Reply):
+        return response
+    reply = _read(response)
+    if reply.kind == UNKNOWN and _error_code(response) == "whatsapp.meta_unreachable":
+        # erplora.com says Meta did not answer and nothing left: Meta's silence, never ERPlora's (gh:hub#2731).
+        return Reply(kind=UNREACHABLE, code="whatsapp.meta_unreachable", message=reply.message)
+    return reply
 
 
 def _settled(response: httpx.Response) -> Reply | None:

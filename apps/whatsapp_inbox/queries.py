@@ -19,7 +19,17 @@ from live.operations import operation
 from apps.customer.phones import DEFAULT_COUNTRY, InvalidPhone, candidates, to_e164
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock, gateway
-from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template, TemplateSample, hub_writes, name_key
+from apps.whatsapp_inbox.models import (
+    FILE_HEADERS,
+    Channel,
+    Conversation,
+    Message,
+    Note,
+    Template,
+    TemplateSample,
+    hub_writes,
+    name_key,
+)
 from apps.whatsapp_inbox.schemas import (
     AgentListIn,
     AgentPage,
@@ -85,6 +95,9 @@ DELETE_UNKNOWN = _("erplora.com did not confirm that Meta deleted the template. 
 #: The Hub's own code of a hand-over that could not take the header's file: it is no longer in the business's store.
 HEADER_SAMPLE_MISSING_CODE = "whatsapp_inbox.header_sample_missing"
 HEADER_SAMPLE_MISSING = _("The header's file is no longer in the business's files: choose it again with Edit.")
+MESSAGE_HEADER_SAMPLE_MISSING = _(
+    "The header's file is no longer in the business's files: send the template again choosing its file."
+)
 
 SEND_REFUSED_CODE = "whatsapp_inbox.send_refused"
 TEMPLATE_REFUSED_CODE = "whatsapp_inbox.template_refused"
@@ -92,6 +105,8 @@ SAAS_UNREACHABLE_CODE = "whatsapp_inbox.saas_unreachable"
 SEND_UNKNOWN_CODE = "whatsapp_inbox.send_unknown"
 #: A message's code → the Hub's words for it.
 _MESSAGE_REASONS = {
+    "whatsapp_inbox.meta_unreachable": META_UNREACHABLE,
+    HEADER_SAMPLE_MISSING_CODE: MESSAGE_HEADER_SAMPLE_MISSING,
     "whatsapp_inbox.cap_reached": CAP_REACHED,
     "whatsapp_inbox.reconnect_needed": RECONNECT_NEEDED,
     SAAS_UNREACHABLE_CODE: SAAS_UNREACHABLE,
@@ -643,8 +658,19 @@ def template_editable(row: Template) -> bool:
     )
 
 
-def template_sendable(row: Template) -> bool:
+def template_fillable(row: Template) -> bool:
+    """Whether the inbox can send it now (F33): approved and filled by the Hub, a file header with a file chosen."""
     return row.supported and row.deleted_at is None and row.status == Template.Status.APPROVED
+
+
+def template_sendable(row: Template) -> bool:
+    """Whether it goes as it is, with nothing to choose: a file header only with its own file (an automation's)."""
+    return template_fillable(row) and (row.header_format not in FILE_HEADERS or row.header_sample_id is not None)
+
+
+#: The approved templates the Hub fills (``template_fillable``), and those that go as they are (``template_sendable``).
+_FILLABLE = Q(status=Template.Status.APPROVED, supported=True, deleted_at__isnull=True)
+_SENDABLE = _FILLABLE & ~Q(header_format__in=FILE_HEADERS, header_sample__isnull=True)
 
 
 def _buttons_out(buttons) -> list[dict]:
@@ -759,8 +785,9 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
         if value:
             rows = rows.filter(**{field: value})
     if params.sendable is not None:
-        sendable = Q(status=Template.Status.APPROVED, supported=True, deleted_at__isnull=True)
-        rows = rows.filter(sendable if params.sendable else ~sendable)
+        rows = rows.filter(_SENDABLE if params.sendable else ~_SENDABLE)
+    if params.fillable is not None:
+        rows = rows.filter(_FILLABLE if params.fillable else ~_FILLABLE)
     return page(rows.order_by("name", "language", "id"), params, template_out)
 
 

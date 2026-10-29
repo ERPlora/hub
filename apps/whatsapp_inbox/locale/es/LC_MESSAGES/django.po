@@ -586,8 +586,8 @@ msgstr "Ya hay una plantilla «%(name)s» en ese idioma."
 msgid "There is nothing of this template to hand to Meta again."
 msgstr "No hay nada de esta plantilla que volver a enviar a Meta."
 
-msgid "This template has a photo, video, document or place header, or buttons with something to fill in: send it from WhatsApp Manager."
-msgstr "Esta plantilla lleva una cabecera con foto, vídeo, documento o ubicación, o botones con algo que rellenar: envíala desde WhatsApp Manager."
+msgid "This template has a place header, or a header or buttons with something to fill in: send it from WhatsApp Manager."
+msgstr "Esta plantilla lleva una cabecera con ubicación, o una cabecera o botones con algo que rellenar: envíala desde WhatsApp Manager."
 
 msgid "This template is changed in WhatsApp Manager: the Hub cannot change it."
 msgstr "Esta plantilla se cambia en WhatsApp Manager: el Hub no puede cambiarla."
@@ -807,3 +807,12 @@ msgstr "Este archivo pesa más de %(mb)s MB: elige uno más ligero."
 
 msgid "The file could not be kept: the business's file store did not answer. Try again in a moment."
 msgstr "No se pudo guardar el archivo: el almacén de archivos del negocio no contestó. Inténtalo de nuevo en un momento."
+
+msgid "This template's header has no file."
+msgstr "La cabecera de esta plantilla no lleva archivo."
+
+msgid "Choose the header's file: the template is sent with it."
+msgstr "Elige el archivo de la cabecera: la plantilla se envía con él."
+
+msgid "The header's file is no longer in the business's files: send the template again choosing its file."
+msgstr "El archivo de la cabecera ya no está en los archivos del negocio: vuelve a enviar la plantilla eligiendo su archivo."

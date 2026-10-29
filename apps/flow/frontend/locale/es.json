@@ -2546,6 +2546,7 @@
       "editable": "Se puede cambiar aquí",
       "deleting": "Borrándose en Meta",
       "sendable": "Se puede enviar",
+      "fillable": "Se puede enviar eligiendo su archivo",
       "supported": "Se envía desde aquí",
       "submit_state": "Envío a Meta",
       "submit_error": "Motivo del fallo en Meta",

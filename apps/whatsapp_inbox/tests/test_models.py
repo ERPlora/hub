@@ -153,7 +153,8 @@ def test_one_save_of_a_template_per_key():
         ({}, True),
         ({"header_format": "TEXT", "header": "Tu cita"}, True),
         ({"header_format": "TEXT", "header": "Hola {{1}}"}, False),
-        ({"header_format": "IMAGE"}, False),
+        ({"header_format": "IMAGE"}, True),  # sent with the file chosen (F33)
+        ({"header_format": "LOCATION"}, False),
         ({"category": "AUTHENTICATION"}, False),
         ({"buttons": [{"type": "QUICK_REPLY", "text": "Sí"}, {"type": "URL", "text": "Web", "url": "https://p.test"}]}, True),
         ({"buttons": [{"type": "URL", "text": "Web", "url": "https://p.test/{{1}}"}]}, False),

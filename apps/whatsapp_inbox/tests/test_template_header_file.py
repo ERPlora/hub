@@ -348,13 +348,13 @@ def test_the_store_not_answering_leaves_it_on_its_way_to_be_sent_again(delivered
 
 
 @respx.mock
-def test_a_photo_template_made_here_is_edited_here_but_not_offered_to_send_yet(delivered):
+def test_a_photo_template_made_here_is_edited_and_sent_here_with_its_photo(delivered):
     approved_with_photo(delivered)
 
     [row] = run("whatsapp_inbox.template.list", {}).rows
-    assert (row.editable, row.sendable, row.supported) == (True, False, False)
+    assert (row.editable, row.sendable, row.supported) == (True, True, True)
     assert row.header_sample.name == "carta.jpg"
-    assert run("whatsapp_inbox.template.list", {"sendable": True}).rows == []
+    assert [r.id for r in run("whatsapp_inbox.template.list", {"sendable": True}).rows] == [row.id]
 
 
 def test_a_photo_template_from_whatsapp_manager_stays_managed_there():

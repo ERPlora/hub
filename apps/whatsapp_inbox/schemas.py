@@ -413,6 +413,12 @@ class TemplateSendIn(Schema):
         max_length=20,
         description="The values of {{1}}, {{2}}… in order.",
     )
+    header_sample: UUID | None = Field(
+        None,
+        title=gettext_noop("File"),
+        description="For a template whose header is a photo, a video or a document: the id "
+        "whatsapp_inbox.template_sample.upload answered for the file to send; without it, the template's own file.",
+    )
 
 
 class SendIn(Schema):
@@ -864,7 +870,14 @@ class TemplateListIn(PageIn):
         None, description="Only templates in this language."
     )
     sendable: bool | None = Field(
-        None, description="true: only the ones the Hub can send now (approved, not being deleted, no file header)."
+        None,
+        description="true: only the ones the Hub sends as they are (approved, not being deleted, a photo, video or "
+        "document header only with its own file): what an automation may send.",
+    )
+    fillable: bool | None = Field(
+        None,
+        description="true: the ones the inbox can send (approved, not being deleted), a photo, video or document "
+        "header asking for its file when it has none of its own.",
     )
 
 
