@@ -148,32 +148,46 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
-test('FLOW-F17 the Hub’s assistant leaves a draft automation, which waits in Automations', async ({ browser }) => {
-  test.setTimeout(120_000);
-  const name = `${TAG} draft ${Date.now().toString(36)}`;
-  const { context, page } = await signedIn(browser, '/', { width: 1440, height: 900 });
-  try {
-    const draft = {
-      name,
-      definition: { trigger: { kind: 'manual' }, steps: [{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Call back' } }] },
-      notes: ['I did not know who to assign it to.'],
-    };
-    const opener = shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
-    await opener.click();
-    const panel = page.locator('[data-testid="assistant-panel"]');
-    await expect(panel).toHaveAttribute('data-open', 'true');
-    const box = panel.locator('[data-testid="assistant-input"] textarea');
-    await box.fill(`E2E-ASK flow__draft__propose ${JSON.stringify(draft)}`);
-    await box.press('Enter');
-    const card = page.locator('ion-modal[data-testid="assistant-confirm"]');
-    await expect(card).toBeVisible();
-    await card.locator('[data-testid="assistant-confirm-submit"]').click();
-    await expect(card).toBeHidden();
-    await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText('Hecho.');
-    await page.goto('/flow/automations');
-    await expect(shown(page).locator('[data-testid=flow-drafts]')).toContainText(name);
-    expect(psql(`select count(*) from flow_flow where name = '${name}'`)).toBe('0');
-  } finally {
-    await context.close();
-  }
-});
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F17 the Hub’s assistant leaves a draft automation, which waits in Automations at ${viewport.label}`, async ({ browser }) => {
+    test.setTimeout(120_000);
+    const name = `${TAG} draft ${viewport.label} ${Date.now().toString(36)}`;
+    const { context, page } = await signedIn(browser, '/', viewport);
+    try {
+      const draft = {
+        name,
+        definition: { trigger: { kind: 'manual' }, steps: [{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Call back' } }] },
+        notes: ['I did not know who to assign it to.'],
+      };
+      // On a phone the chat lives under the top bar's «More» (its popover); wider, it has its own button.
+      const panel = page.locator('[data-testid="assistant-panel"]');
+      if (compactBar(page)) {
+        await shown(page).locator('[data-testid="topbar-chrome-more"]').click();
+        await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
+      } else {
+        await shown(page).locator('[data-testid="assistant-button"]').click();
+      }
+      await expect(panel).toHaveAttribute('data-open', 'true');
+      const box = panel.locator('[data-testid="assistant-input"] textarea');
+      await expect(box).toBeVisible();
+      await box.fill(`E2E-ASK flow__draft__propose ${JSON.stringify(draft)}`);
+      await box.press('Enter');
+      const card = page.locator('ion-modal[data-testid="assistant-confirm"]');
+      await expect(card).toBeVisible();
+      await card.locator('[data-testid="assistant-confirm-submit"]').click();
+      await expect(card).toBeHidden();
+      await expect(panel.locator('[data-testid="assistant-bubble-assistant"]').last()).toContainText('Hecho.');
+      // The chat stays open from page to page; on a phone it covers the page, so it is closed to look at Automations.
+      await panel.locator('[data-testid="assistant-close"]').click();
+      await expect(panel).not.toHaveAttribute('data-open', 'true');
+      await page.goto('/flow/automations');
+      await expect(shown(page).locator('[data-testid=flow-drafts]')).toContainText(name);
+      expect(psql(`select count(*) from flow_flow where name = '${name}'`)).toBe('0');
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await capture(page, `FIX-FLOW-ASSISTANT-STEP-draft-${viewport.label}`);
+    } finally {
+      await context.close();
+    }
+  });
+}
