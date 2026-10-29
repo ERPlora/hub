@@ -61,7 +61,7 @@ test('a task for a person of Staff, from its project to done, live', async ({ br
     await expect(row).toContainText('In Progress');
     // The notice is still sliding in: the capture waits until nothing moves.
     await untilStill(page);
-    await capture(page, 'task-tasks-desktop');
+    await capture(page, 'task-tasks-started-desktop');
 
     // TASK-F04, F10, F09: the sheet.
     await row.click();

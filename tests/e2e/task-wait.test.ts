@@ -36,6 +36,20 @@ function snapBody(source: string): string {
   return /export async function snap\([^)]*\)[^{]*\{([\s\S]*?)\n\}/.exec(source)?.[1] ?? '';
 }
 
+/** The keys of `VIEWPORTS` in task-helpers.ts (`desktop`, `tablet`, `phone`): what a capture's `${name}` spells. */
+function viewportNames(): string[] {
+  const body = /export const VIEWPORTS = \{([\s\S]*?)\} as const;/.exec(read('task-helpers.ts'))?.[1] ?? '';
+  return [...body.matchAll(/^\s*(\w+):/gm)].map(([, key]) => key);
+}
+
+/** The file each `capture(page, …)` of `source` writes, a `${name}` (a key of `VIEWPORTS`) spelled out once per size. */
+function captureNames(source: string, sizes: string[]): string[] {
+  const slot = '$' + '{name}';
+  return [...source.matchAll(/\bcapture\(page, ['`]([^'`]+)['`]/g)].flatMap(([, name]) =>
+    name.includes(slot) ? sizes.map((size) => name.replace(slot, size)) : [name],
+  );
+}
+
 /** Each offending line of the Tasks files by `find`, as `<file>: <line>`. */
 const offending = (find: (source: string) => string[]): string[] =>
   taskFiles().flatMap((name) => find(read(name)).map((line) => `${name}: ${line.trim()}`));
@@ -59,6 +73,13 @@ describe('the Tasks specs wait with untilStill() of helpers.ts', () => {
     const body = snapBody(read('task-helpers.ts'));
     expect(body).toContain('await untilStill(page);');
     expect(body.indexOf('await untilStill(page);')).toBeLessThan(body.indexOf('await capture('));
+  });
+
+  it('no two captures of the Tasks specs write the same file: a later one would hide the earlier', () => {
+    const sizes = viewportNames();
+    expect(sizes.length).toBeGreaterThan(0);
+    const names = taskFiles().flatMap((file) => captureNames(read(file), sizes));
+    expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
   });
 
   it('the checks read the waits the Tasks specs had, and untilStill() as none', () => {
