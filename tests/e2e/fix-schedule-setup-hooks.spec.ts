@@ -8,7 +8,7 @@
 // the hub had before the file are put back after it (`afterAll`).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, login, psql, shown } from './helpers';
 import { DEFAULT_WEEK, restoreWeek, snapshotWeek, VIEWPORTS, weekReady } from './schedule-helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -142,8 +142,7 @@ for (const size of VIEWPORTS) {
       await unfolded(page);
       await expect(pill(page)).toHaveText('Recomendado');
       await step(page).evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-      expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
+      await expect.poll(() => horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await capture(page, `${KEY}-${size.label}`);
 
       // The week confirmed elsewhere (another device, the assistant): the step is done over the stream already open.
