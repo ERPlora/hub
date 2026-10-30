@@ -22,7 +22,7 @@ import { createServer as createHttpServer, type IncomingMessage, type Server, ty
 import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo, Socket } from 'node:net';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
 
 export const GRAPH_HOST = 'graph.facebook.com';
@@ -209,7 +209,7 @@ export function graphProblem(answer: DoorAnswer, seen: { calls: GraphCall[]; tun
 /** A certificate authority of this run and `graph.facebook.com`'s certificate signed by it (what erplora.com's
  *  `SSL_CERT_FILE` trusts), made with the Hub's `cryptography`. */
 const MAKE_CERTS = `
-import datetime, pathlib, sys
+import datetime, os, pathlib, sys
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -238,15 +238,24 @@ leaf = (base(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "${GRAPH_HOST}")
         .add_extension(x509.KeyUsage(digital_signature=True, key_cert_sign=False, crl_sign=False, **usage), critical=True)
         .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
         .sign(ca_key, hashes.SHA256()))
-(out / "ca.pem").write_bytes(ca.public_bytes(serialization.Encoding.PEM))
-(out / "cert.pem").write_bytes(leaf.public_bytes(serialization.Encoding.PEM))
-(out / "key.pem").write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                                serialization.NoEncryption()))
+# Each file is replaced in one step: erplora.com reads ca.pem per call, also while a Graph makes a new one.
+def put(name, data):
+    (out / (name + ".new")).write_bytes(data)
+    os.replace(out / (name + ".new"), out / name)
+put("ca.pem", ca.public_bytes(serialization.Encoding.PEM))
+put("cert.pem", leaf.public_bytes(serialization.Encoding.PEM))
+put("key.pem", key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
 `;
 
-/** Makes a new authority of the run in `certs` (`ca.pem`, and the Graph's `cert.pem` and `key.pem` signed by it). */
+/** Makes a new authority of the run in `certs` (`ca.pem`, and the Graph's `cert.pem` and `key.pem` signed by it); when
+ *  it cannot, it throws the one line that says why (Python's error), not the whole command. */
 function makeAuthority(certs: string, hubDir: string): void {
-  execFileSync('uv', ['run', 'python', '-c', MAKE_CERTS, certs], { cwd: hubDir, encoding: 'utf8' });
+  try {
+    execFileSync('uv', ['run', 'python', '-c', MAKE_CERTS, certs], { cwd: hubDir, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] });
+  } catch (error) {
+    const why = String((error as { stderr?: unknown }).stderr ?? '').trim().split('\n').at(-1);
+    throw new Error(why || (error instanceof Error ? error.message : String(error)));
+  }
 }
 
 /** The command that starts the run's erplora.com: `node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL>` makes the
@@ -470,8 +479,9 @@ export function startGraphThread(options: GraphOptions): Promise<GraphThread> {
   });
 }
 
-// Run as a script (not imported by a spec or a test): the authority goes to this checkout's tests/e2e/.artifacts.
-if (isMainThread && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Run as a script (not imported by a spec or a test; `import.meta.main` holds through a symlinked path too, which
+// comparing process.argv[1] with import.meta.url did not): the authority goes to this checkout's tests/e2e/.artifacts.
+if (isMainThread && import.meta.main) {
   const here = dirname(fileURLToPath(import.meta.url));
   process.exitCode = runCli(process.argv.slice(2), {
     artifacts: join(here, '.artifacts'),

@@ -5,13 +5,13 @@
 // credentials (8 calls in one pass of the inbox), and one started with it failed the specs whose Graph had gone.
 // flow: WHATSAPP_INBOX-F01
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { connect as tlsConnect } from 'node:tls';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -185,7 +185,7 @@ describe('runCli', () => {
   });
 
   it('refuses what it does not understand, saying how it is called, and makes nothing', () => {
-    const wrong = [[], ['8240'], ['8240', 'http://localhost:8241', 'more'], ['8a', 'http://localhost:8241'], ['65530', 'http://localhost:8241'], ['8250', 'localhost:8251']];
+    const wrong = [[], ['8240'], ['8240', 'http://localhost:8241', 'more'], ['8a', 'http://localhost:8241'], ['0', 'http://localhost:8241'], ['65530', 'http://localhost:8241'], ['8250', 'localhost:8251']];
     for (const args of wrong) {
       said.errors.length = 0;
       expect(runCli(args, deps), args.join(' ')).toBe(2);
@@ -195,6 +195,58 @@ describe('runCli', () => {
     expect(said.errors.join('\n')).toContain('tests/e2e/README.md, «WhatsApp»');
     expect(readFileSync(join(HERE, 'README.md'), 'utf8')).toMatch(/^## WhatsApp /m);
   });
+
+  it('names nothing when the authority cannot be made: env $(…) never gets an SSL_CERT_FILE without it', () => {
+    const blocked = join(artifacts, 'a-file');
+    writeFileSync(blocked, '');
+    said.lines.length = 0;
+    said.errors.length = 0;
+    expect(runCli(['8260', 'http://localhost:8261'], { ...deps, artifacts: blocked })).toBe(1);
+    expect(said.lines).toEqual([]);
+    expect(said.errors).toHaveLength(1);
+    expect(said.errors[0]).toContain(`the authority ${join(blocked, 'meta-graph-8260', 'ca.pem')} could not be made: NotADirectoryError`);
+    expect(said.errors[0]).not.toContain('\n');
+  }, 60_000);
+
+  it('makes the authority the Graph trusts again in one step: a reader of the old one never finds it half written', async () => {
+    const before = readFileSync(ca);
+    const reader = openSync(ca, 'r');
+    const graph = await startGraph({ port: 0, certs: dirname(ca), hubDir: HUB_DIR });
+    try {
+      expect(readFileSync(reader)).toEqual(before);
+      expect(readFileSync(ca)).not.toEqual(before);
+    } finally {
+      closeSync(reader);
+      await graph.close();
+    }
+  }, 60_000);
+
+  it('does nothing when a spec or Vitest imports it, whatever the process was started with', () => {
+    const folder = join(HERE, '.artifacts', 'meta-graph-64970');
+    const importer = join(artifacts, 'imports-it.mjs');
+    writeFileSync(importer, `await import(${JSON.stringify(pathToFileURL(join(HERE, 'whatsapp-graph.ts')).href)});\n`);
+    rmSync(folder, { recursive: true, force: true });
+    try {
+      expect(execFileSync('node', [importer, '64970', 'http://localhost:64971'], { cwd: tmpdir(), encoding: 'utf8' })).toBe('');
+      expect(existsSync(folder)).toBe(false);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it('runs as a script through a symlinked path too (macOS reaches its tmp folder through one): it never prints nothing', () => {
+    const folder = join(HERE, '.artifacts', 'meta-graph-64980');
+    const linked = join(artifacts, 'linked-e2e');
+    symlinkSync(HERE, linked);
+    rmSync(folder, { recursive: true, force: true });
+    try {
+      const out = execFileSync('node', [join(linked, 'whatsapp-graph.ts'), '64980', 'http://localhost:64981'], { cwd: tmpdir(), encoding: 'utf8' });
+      expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
+      expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   it('runs as a script from erplora.com’s checkout, its authority in this checkout’s .artifacts', () => {
     const folder = join(HERE, '.artifacts', 'meta-graph-64990');
