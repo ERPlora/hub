@@ -14,11 +14,11 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.customer import queries as customer_queries
@@ -159,7 +159,7 @@ def _save_list(price_list: PriceList, *, make_default: bool) -> PriceList | None
     """Saves ``price_list`` (making it the general one if asked); the list that lost the mark, if any."""
     for attempt in range(DEFAULT_TRIES):
         try:
-            with transaction.atomic():
+            with atomic():
                 previous = None
                 if make_default:
                     previous = _take_default_mark(price_list)
@@ -382,7 +382,7 @@ def _check_step(quantity: Decimal, unit: str) -> None:
 
 def _save_item(item: PriceItem) -> None:
     try:
-        with transaction.atomic():
+        with atomic():
             item.save()
     except IntegrityError as error:
         if _constraint(error) in ITEM_UNIQUE:
@@ -565,7 +565,7 @@ def _set_target(ctx: OperationContext, rule: DiscountRule, values: dict[str, Any
 
 def _save_rule(rule: DiscountRule) -> None:
     try:
-        with transaction.atomic():
+        with atomic():
             rule.save()
     except IntegrityError as error:
         if _constraint(error) == RULE_CODE_UNIQUE:

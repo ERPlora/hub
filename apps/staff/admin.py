@@ -8,7 +8,7 @@ and only then checks what protects the record.
 """
 
 from django.contrib import admin
-from django.db import transaction
+from live.operations import atomic
 
 from apps.staff.models import (
     Member,
@@ -52,12 +52,12 @@ class MemberAdmin(admin.ModelAdmin):
     # record. Entering through the record first, as every write on that person does, it waits for a write
     # under way and then deletes what that write left, instead of waiting for it in a circle.
     def delete_model(self, request, obj):
-        with transaction.atomic():
+        with atomic():
             lock_members([obj.pk])
             super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
-        with transaction.atomic():
+        with atomic():
             lock_members(queryset.values_list("pk", flat=True))
             super().delete_queryset(request, queryset)
 
@@ -71,7 +71,7 @@ class MemberAdmin(admin.ModelAdmin):
 
     # The actions run outside a transaction; the lock above lasts until the deletion ends.
     def response_action(self, request, queryset, *args, **kwargs):
-        with transaction.atomic():
+        with atomic():
             return super().response_action(request, queryset, *args, **kwargs)
 
 

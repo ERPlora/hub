@@ -21,14 +21,14 @@ from fractions import Fraction
 from uuid import UUID
 
 from babel.numbers import get_currency_precision
-from django.db import DatabaseError, IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError
 from django.db.models import F, Max, Sum
 from django.utils import timezone, translation
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
-from live.operations import UnknownOperation, get, operation
+from live.operations import UnknownOperation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.customer.queries import find_customer
@@ -269,7 +269,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
     if settings is not None:
         return settings
     try:
-        with transaction.atomic():
+        with atomic():
             return Settings.objects.create(updated_by=actor(ctx))
     except IntegrityError:
         return Settings.objects.select_for_update().get()
@@ -615,7 +615,7 @@ def open_order(ctx: OperationContext, data: OrderOpenIn) -> dict:
         combo_lines=data.combo_lines,
     )
     try:
-        with transaction.atomic():
+        with atomic():
             order = Order.objects.create(
                 label=data.label,
                 notes=data.notes,
@@ -1452,7 +1452,7 @@ def set_appointment(ctx: OperationContext, data: OrderSetAppointmentIn) -> dict:
     order = _still_open(data.order_id)
     order.appointment_id = data.appointment_id
     try:
-        with transaction.atomic():
+        with atomic():
             order.save(update_fields=["appointment_id", "updated_at"])
     except IntegrityError:
         raise Conflict(
@@ -1816,7 +1816,7 @@ def _claim_counter(ctx: OperationContext, data: CompleteIn) -> Order | dict:
     """A counter sale's check, created FIRST and holding the attempt's key (unique): the same attempt
     sent twice at once waits here, then answers the sale the first one charged."""
     try:
-        with transaction.atomic():
+        with atomic():
             return Order.objects.create(
                 source=Order.Source.COUNTER,
                 attempt_key=data.idempotency_key,
@@ -1938,7 +1938,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     sequence = _number(day)
     principal = max(legs, key=lambda leg: leg["amount"]) if legs else None
     try:
-        with transaction.atomic():
+        with atomic():
             sale = Sale.objects.create(
                 number=sale_number(day, sequence),
                 business_day=day,
@@ -2512,7 +2512,7 @@ def refund(ctx: OperationContext, data: RefundIn) -> dict:
     if not legs and not sessions:
         raise Conflict(str(REFUND_NOTHING), code="sale.refund_nothing")
     try:
-        with transaction.atomic():
+        with atomic():
             record = Refund.objects.create(
                 sale=sale,
                 total=total,
@@ -2731,7 +2731,7 @@ def _queue_paper(ctx: OperationContext, request: dict) -> dict:
     except UnknownOperation:
         return dict(NOT_QUEUED)
     try:
-        with transaction.atomic():
+        with atomic():
             job = op(ctx, op.input.model_validate(request)).job
             if job is not None and job.printer_id is None:
                 raise _Unprintable

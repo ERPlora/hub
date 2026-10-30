@@ -63,6 +63,7 @@ export function prepareDatabase(name: string, { sql, manage }: { sql: AdminSql; 
     const create = sql(`create database "${name}"`);
     if (create.status !== 0) throw new Error(`Could not create the e2e database ${name}: psql ${said(create)}`);
   }
+  ensurePlatformTemplate(name, sql);
   for (const { args, failure } of STEPS) {
     const run = manage(args);
     if (run.status !== 0) throw new Error(`${failure} the e2e database ${name}: \`manage.py ${args.join(' ')}\` ${said(run)}`);
@@ -70,15 +71,46 @@ export function prepareDatabase(name: string, { sql, manage }: { sql: AdminSql; 
   return { created };
 }
 
-/** Drops the e2e database `name` (a missing one is no error); never while a connection is open. */
+/** Makes `<name>_template`, the platform's template every vertical's one is cloned from, when missing: in production
+ * db-bootstrap makes it (with its roles and grants), and `migrate_hubs` refuses to run without it
+ * (base/tenancy/migrator.py, `TemplateMissing`). Here one role does everything: it only closes it to PUBLIC. */
+function ensurePlatformTemplate(name: string, sql: AdminSql): void {
+  const template = `${name}_template`;
+  const found = sql(`select 1 from pg_database where datname = '${template}'`);
+  if (found.status !== 0) throw new Error(`Could not read Postgres's databases: psql ${said(found)}`);
+  if (found.stdout.trim() === '1') return;
+  for (const statement of [`create database "${template}"`, `revoke all on database "${template}" from public`]) {
+    const run = sql(statement);
+    if (run.status !== 0) {
+      throw new Error(`Could not create the template ${template} of the e2e database ${name}: psql ${said(run)}`);
+    }
+  }
+}
+
+/** Drops the e2e database `name` (a missing one is no error), then its templates (`<name>_template[_<vertical>]`,
+ * which `migrate_hubs` keeps); never while a connection is open. */
 export function dropDatabase(name: string, { sql }: { sql: AdminSql }): void {
   refuseUnlessE2e(name);
   const drop = sql(`drop database if exists "${name}"`);
-  if (drop.status === 0) return;
+  if (drop.status === 0) {
+    dropTemplates(name, sql);
+    return;
+  }
   if (drop.stderr.includes('is being accessed by other users')) {
     throw new Error(`The e2e database ${name} is still in use (its runserver?): stop it and retry.\n${drop.stderr.trim()}`);
   }
   throw new Error(`Could not drop the e2e database ${name}: psql ${said(drop)}`);
+}
+
+function dropTemplates(name: string, sql: AdminSql): void {
+  const pattern = `${name}_template`.replaceAll('_', '\\_');
+  const listed = sql(`select datname from pg_database where datname like '${pattern}%' order by datname`);
+  if (listed.status !== 0) throw new Error(`Could not read Postgres's databases: psql ${said(listed)}`);
+  const own = new RegExp(`^${name}_template(?:_[a-z0-9_]+)?$`);
+  for (const template of listed.stdout.split('\n').map((line) => line.trim()).filter((line) => own.test(line))) {
+    const drop = sql(`drop database if exists "${template}"`);
+    if (drop.status !== 0) throw new Error(`Could not drop the template ${template} of ${name}: psql ${said(drop)}`);
+  }
 }
 
 /** The keys runserver seals with: the test certificates' (verifactu) and the automations' secrets' (flow). */

@@ -24,13 +24,13 @@ import unicodedata
 from dataclasses import replace
 from typing import Any
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
-from live.operations import UnknownOperation, get, operation
+from live.operations import UnknownOperation, atomic, get, operation
 from live.models import OutboxEvent
 from live.outbox import record_event
 
@@ -981,7 +981,7 @@ def create_blocked(ctx: OperationContext, data: BlockedDateIn) -> dict:
     )
     _stamp(block, ctx, created=True)
     try:
-        with transaction.atomic():
+        with atomic():
             block.save()
     except IntegrityError:
         raise Conflict(
