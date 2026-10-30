@@ -1,7 +1,7 @@
 # Workbook — Servicios (app)
 Prefijo: SERVICE
 Alcance MVP: peluquería
-Estado de la app: completa (2026-10-21)
+Estado de la app: completa (2026-10-21) salvo F34 y F35 (la foto del servicio, decidida el 2026-10-30)
 Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `service`. Se escribe **antes** que el código: no se
@@ -106,6 +106,9 @@ histórico y las citas ya reservadas.» y, si Citas tiene citas próximas con é
 próxima(s) siguen usando este servicio. Conservan su reserva, precio y duración; solo dejan de
 admitirse reservas nuevas.».
 
+La foto del servicio (SERVICE-F34 y F35, sin hacer todavía) añadirá al formulario el campo «Foto», con
+«Elegir de la librería», «Subir foto» y «Quitar foto», para quien puede editar servicios.
+
 ### Categorías
 Tabla con buscador «Buscar categoría…» y columnas **Nombre, Categoría padre, Orden** y **Servicios**
 (cuántos servicios en oferta tiene). **Nueva categoría** abre el formulario: **Nombre, Categoría
@@ -203,6 +206,8 @@ Importes, duraciones y fechas salen con el formato del idioma de quien mira.
 | SERVICE-F31 | Asignar un profesional a un servicio | hecho |
 | SERVICE-F32 | Cambiar o quitar un profesional de un servicio | hecho |
 | SERVICE-F33 | Saber quién puede hacer un servicio | hecho |
+| SERVICE-F34 | Elegir la imagen de un servicio desde la librería | no hecho |
+| SERVICE-F35 | Subir una foto propia del servicio | no hecho |
 
 ### SERVICE-F01 Dar de alta un servicio
 <!-- origen: qa:verticals/beauty/01-services-professionals-and-schedules wf:peluqueria-dia#rec_peluqueria-f04 fi:modules/services#command-services-services-create-sql-transaccional fi:modules/services#navigation fi:modules/services#permission-role_permissions fi:modules/services#query-services-services-list fi:modules/services#validation-declarativa-bloque-validates old:services/workflow/catalogo.md#services-f01 qa:modules/services/create-service-with-duration-and-price old-hub:HUB_SHELL-F27 gh:services#26 -->
@@ -825,6 +830,65 @@ activo y reservable»: la regla «entonces lo hace todo el equipo reservable» e
 Si falla: un servicio que no existe, «Ese servicio no existe en este negocio.».
 Implicados: SERVICE-F31, APPOINTMENT-F01
 
+### SERVICE-F34 Elegir la imagen de un servicio desde la librería
+<!-- origen: nuevo (decisión de Ioan del 2026-10-30: los servicios de la plantilla de peluquería llevan una imagen de la librería compartida, carpetas beauty_hair/ y beauty_body/; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
+Estado: no hecho
+Actor: responsable, asistente
+Pantalla: Servicios
+Pasos:
+1. En el formulario del servicio (**Nuevo servicio** o «Editando servicio — <nombre>»), en «Foto», pulsa
+   «Elegir de la librería»: se abre la ventana «Librería de imágenes» con el buscador «Buscar imagen…» ya
+   escrito con el nombre del servicio; entre las pestañas de sector (las de INVENTORY-F30), «Peluquería» y
+   «Estética» van primero.
+2. Busca en español o en inglés («mechas», «balayage», «manicura»): el buscador mira el título y los
+   sinónimos de cada imagen, nunca el nombre de su archivo. Toca una: la ventana se cierra y el
+   formulario la enseña en «Foto», con «Cambiar» y «Quitar foto».
+3. Pulsa **Crear servicio** o **Guardar cambios**: la foto queda en el servicio. Cerrar el formulario
+   sin guardar la descarta.
+4. Por el asistente: «ponle foto al corte de mujer». El asistente enseña hasta cinco imágenes
+   candidatas por su título y pregunta cuál; nunca pone una por su cuenta. Al elegir una, pide la
+   tarjeta de confirmación y la pone.
+Entra: el servicio y la librería de imágenes de ERPlora, la misma que usa Inventario (INVENTORY-F30).
+Sale: el servicio con su imagen de la librería; el negocio no guarda una copia, solo cuál es, y no gasta
+espacio de su plan. Servicios avisa del cambio (`service.service.updated`). La baldosa del servicio en el
+TPV enseña la foto, con las iniciales si no hay o no carga, como la de un artículo (INVENTORY-F32).
+«Quitar foto» lo deja con sus iniciales. Las plantillas de peluquería traen cada servicio con su imagen.
+Las candidatas las da `service.service.suggest_image`, el buscador es `base.catalog_image.search` y la
+foto la pone o la quita `service.service.set_image`.
+Si falla: si la librería no contesta, «No se pudo cargar la librería de imágenes.» con «Reintentar», y el
+servicio se sigue pudiendo guardar sin foto. Sin resultados: «Ninguna imagen coincide con tu búsqueda.
+Prueba con otra palabra o sube una foto.». Una imagen que la librería ya no tiene se rechaza al guardar
+(«Esa imagen ya no está en la librería. Elige otra.») y no se guarda nada. Quien no puede editar
+servicios no ve «Foto», y la app lo rechaza también por el asistente o la API.
+Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+
+### SERVICE-F35 Subir una foto propia del servicio
+<!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda sus fotos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
+Estado: no hecho
+Actor: responsable
+Pantalla: Servicios
+Pasos:
+1. En el formulario del servicio, en «Foto», pulsa «Subir foto» y elige una imagen del dispositivo (en
+   el móvil o la tableta, también con la cámara): JPG, PNG o WebP de hasta 2 MB.
+2. El formulario la enseña en «Foto», recortada en cuadrado, con «Cambiar» y «Quitar foto».
+3. Pulsa **Crear servicio** o **Guardar cambios**: se guarda el servicio y después su foto («Subiendo
+   foto…»). Cerrar el formulario sin guardar la descarta.
+Entra: la imagen elegida y el servicio.
+Sale: la foto, convertida a WebP de 512 × 512 (recortada al centro), en la carpeta del negocio, que solo
+ven las personas del negocio y que cuenta en el espacio de su plan. Servicios avisa del cambio
+(`service.service.updated`) y el TPV la enseña en la baldosa del servicio (INVENTORY-F32). Subir otra,
+elegir una de la librería o «Quitar foto» borra la anterior de la carpeta; archivar el servicio la
+conserva, por si se restaura (SERVICE-F05). Al exportar el negocio (BASE-F35) la foto viaja dentro del
+archivo y se copia al negocio que lo importa, como las de los artículos (INVENTORY-F33). La subida es
+`service.service.upload_image`, también por la API.
+Si falla: junto a «Foto», y no se sube nada: una imagen de más de 2 MB, «La foto pesa más de 2 MB. Elige
+una más ligera.»; un archivo que no es una imagen, «Ese archivo no es una foto. Sube una imagen JPG, PNG
+o WebP.»; sin espacio en el plan, «No queda espacio para ese archivo: tu plan incluye <espacio>.»; si el
+almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.». Si el servicio se guardó y la
+foto no, el formulario lo dice («El servicio se ha guardado, pero la foto no: <motivo>») con
+«Reintentar», y el servicio se queda con la foto que tenía.
+Implicados: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -1073,8 +1137,19 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   Ajustes, y los modelos con «Mostrar precios» y «Mostrar duración», que requiere) y Tarifas
   (`service.service.list` y `.get`, sin requerirla). Menús no admite servicios (solo artículos de
   Inventario) y la respuesta automática de WhatsApp lo leerá por el asistente (WHATSAPP_INBOX-F21).
-
-## Cómo son las páginas (para quien lo mantiene)
+- **La foto del servicio (SERVICE-F34 y F35, sin hacer; decisión de Ioan del 2026-10-30)**: la misma pieza que
+  la foto del artículo (bullet «La foto del artículo» del WORKBOOK de Inventario, INVENTORY-F30 a F33).
+  `Service.image` guarda una referencia lógica, nunca una URL: `catalog:<carpeta>/<nombre>` (la librería
+  compartida de `ERPlora/blueprints`; para la peluquería, `beauty_hair/` y `beauty_body/`) o
+  `file:service/services/<uuid>.webp` (en `hub_files` bajo `hub-<id>/service/services/`, servida por
+  `/p/media/<hub>/service/services/…` declarando esa carpeta en `members_media`). Operaciones con `ai=` y nombres
+  de tres partes: `service.service.suggest_image` (consulta), `service.service.set_image` y
+  `service.service.upload_image` (acciones, permiso `service.change_service`; ≤ 2 MB, WebP 512×512, 409
+  `base.file_no_space`), más la búsqueda común `base.catalog_image.search`; reutilizan `service.service.updated`
+  y, al hacerlas, entran en «Lo que ofrece» y «Quién puede qué». El TPV pinta la foto en
+  `apps/sale/frontend/components/pos/ServiceTile.vue`, que hoy pinta `initials()` sobre `tileGradient()`, con las
+  iniciales de respaldo. Las semillas `base/seeds/hair_salon.<idioma>.json` (8 filas de `service.service`) llevan
+  `image` en cada servicio; las fotos propias viajan en el blueprint como las de Inventario.
 
 - `frontend/routes.ts`: `/service/services`, `/service/categories`, `/service/packages` y
   `/service/settings`; la barra de pestañas (`frontend/tabs.ts`) añade «Ajustes» solo a quien puede

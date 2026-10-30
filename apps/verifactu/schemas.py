@@ -557,10 +557,10 @@ class RecordListIn(PageIn):
         None, description="Invoices issued on this day or earlier."
     )
     total_amount_from: int | None = Field(
-        None, description="Total of at least this many cents."
+        None, description="Total of at least this many cents.", json_schema_extra={"money": True}
     )
     total_amount_to: int | None = Field(
-        None, description="Total of at most this many cents."
+        None, description="Total of at most this many cents.", json_schema_extra={"money": True}
     )
     sort: (
         Literal[

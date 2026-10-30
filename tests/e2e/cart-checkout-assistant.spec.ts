@@ -11,6 +11,7 @@
 // flow: cart-checkout-assistant-card
 // flow: base-assistant-card-verbs
 // flow: CART_CHECKOUT-F03 CART_CHECKOUT-F04 CART_CHECKOUT-F09 BASE-F97
+// flow: base-assistant-money-mark
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
@@ -235,5 +236,57 @@ test('cart-checkout-assistant-card — in Spanish marking an order paid names it
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   const after = await get<Order>(context, `/cart_checkout/orders/detail?order_id=${order.id}`);
   expect(after.status).toBe('initiated');
+  await context.close();
+});
+
+type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
+
+/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
+function confirmedCard(stream: string): SentCard | undefined {
+  const frames = stream
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
+  return frames.find((frame) => frame.type === 'confirm')?.card;
+}
+
+/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it (the
+ *  first one only asks for the tool). */
+async function sentCard(page: Page): Promise<SentCard> {
+  const answer = await page.waitForResponse(
+    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
+  );
+  return confirmedCard(await answer.text())!;
+}
+
+// flow: base-assistant-money-mark (BASE-F97)
+// FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS: a line added to a cart in dollars went as «12,50 €»: the
+// write names the cart, not its currency. The card reads the cart as the person and sends the price in its currency,
+// with its decimals (none in yen), as Shopify or Stripe show it. A normal card says its first three data in one line and
+// the price is the sixth: the screen that shows every datum (an automation's question, FLOW-F29) gets it from what the
+// server sends, checked here as it arrives. Cancelled: nothing is added.
+test('base-assistant-money-mark — in Spanish a line added to a cart in another currency carries its price in it', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const dollars = await post<Cart>(context, '/cart_checkout/carts', { session_token: code('usd'), currency: 'USD' }, 201);
+  const yen = await post<Cart>(context, '/cart_checkout/carts', { session_token: code('jpy'), currency: 'JPY' }, 201);
+  const line = { product_ref: 'p-3', product_name: MASK, quantity: '1', unit_price: 1250 };
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openPanel(page);
+  for (const [cart, money] of [
+    [dollars, { currency: 'USD', decimals: 2 }],
+    [yen, { currency: 'JPY', decimals: 0 }],
+  ] as const) {
+    const sent = sentCard(page);
+    await ask(page, `E2E-ASK cart_checkout__item__add ${JSON.stringify({ cart_id: cart.id, ...line })}`);
+    await expect(card(page)).toBeVisible();
+    await expect(card(page)).toContainText(`Añadir en Carrito y pago: ${cart.session_token}`);
+    expect((await sent).fields.find((field) => field.name === 'unit_price')).toMatchObject({ kind: 'money', value: 1250, money });
+    await decide(page, 'cancel');
+    await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  }
+  for (const cart of [dollars, yen]) expect((await detail(context, cart)).items).toEqual([]);
   await context.close();
 });

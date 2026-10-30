@@ -95,6 +95,7 @@ for (const viewport of VIEWPORTS) {
       const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
       await expect(card).toBeVisible();
       await expect(card).toContainText('The assistant wants to change something in «Appointments»');
+      await expect(card.locator('[data-testid^=flow-question-action-]')).toHaveText('Book an appointment');
       // Before: «Services: [{}]» in its details, as the model sent it.
       const text = await card.innerText();
       for (const raw of RAW) expect(text, `${raw} on the card`).not.toMatch(raw);

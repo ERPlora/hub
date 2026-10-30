@@ -5,7 +5,8 @@
 // who it was asked of, what silence and a no do, and takes an optional note and «Approve» or «No»; it leaves
 // when answered. A refusal (too late, already answered, the automation paused) stays on its card. With no
 // question the section hides, unless it is all the page shows (`alone`). The change the assistant wants
-// (FLOW-F38) lists each datum it would send as its card in the chat says it (BASE-F97 step 2, base's
+// (FLOW-F38) says its action first, right under the title, as the server names it for the reader («Cancel a
+// reservation»), and lists each datum it would send as its card in the chat says it (BASE-F97 step 2, base's
 // `fieldLines`): in words, an amount in the business's currency, the empty ones left out.
 import { InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
@@ -106,6 +107,11 @@ async function decide(question: QuestionOut, approve: boolean): Promise<void> {
         class="flow-inbox__title"
         :data-testid="`flow-question-title-${question.id}`"
       >{{ question.title }}</strong>
+      <span
+        v-if="question.action"
+        class="flow-inbox__action"
+        :data-testid="`flow-question-action-${question.id}`"
+      >{{ question.action }}</span>
       <p
         v-if="question.details"
         class="flow-inbox__details"
@@ -203,6 +209,10 @@ async function decide(question: QuestionOut, approve: boolean): Promise<void> {
   color: var(--ep-muted, var(--ion-color-medium));
 }
 .flow-inbox__title {
+  overflow-wrap: anywhere;
+}
+.flow-inbox__action {
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .flow-inbox__details {

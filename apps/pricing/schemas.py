@@ -30,6 +30,7 @@ from pydantic import (
 )
 
 from apps.pricing.models import CODE_MAX_LENGTH, DEFAULT_PRIORITY, NAME_MAX_LENGTH, DiscountRule
+from base.schemas import in_currency_of
 
 T = TypeVar("T")
 
@@ -88,8 +89,8 @@ Name = _text(NAME_MAX_LENGTH)
 Said = _text(200)
 Search = _text(120, 0)
 Currency = Annotated[str, AfterValidator(_iso_currency), BeforeValidator(_upper)]
-Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, strict=True)]
-PositiveCents = Annotated[int, Field(gt=0, le=MAX_CENTS, strict=True)]
+Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, strict=True, json_schema_extra={"money": True})]
+PositiveCents = Annotated[int, Field(gt=0, le=MAX_CENTS, strict=True, json_schema_extra={"money": True})]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=15, decimal_places=3)]
 Percent = Annotated[Decimal, Field(gt=0, le=100, max_digits=5, decimal_places=2)]
 Units = Annotated[int, Field(ge=1, le=MAX_UNITS)]
@@ -299,8 +300,10 @@ class _ArticleFields(In):
 
 
 class PriceItemIn(_ArticleFields):
-    price_list_id: UUID | None = Field(None, description=D_LIST_ID)
-    price_list: Said | None = Field(None, validate_default=True, description=D_LIST)
+    price_list_id: UUID | None = Field(None, description=D_LIST_ID, json_schema_extra=in_currency_of("pricing.price_list.get"))
+    price_list: Said | None = Field(
+        None, validate_default=True, description=D_LIST, json_schema_extra=in_currency_of("pricing.price_list.get", by="price_list")
+    )
     price: Cents = Field(description=D_PRICE)
     min_quantity: Quantity = Field(Decimal("1"), description=D_MIN_QUANTITY)
 

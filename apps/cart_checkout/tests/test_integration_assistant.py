@@ -305,3 +305,25 @@ def test_the_card_says_the_payment_method_as_cart_checkout_does(language, label)
     arguments = {"customer": "Ana", "payment_method": "card"}
     card = assistant.card(get("cart_checkout.checkout.initiate"), arguments, language)
     assert labels(card)[1] == label
+
+
+# ── A line in the currency of its cart (BASE-F97) ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize(
+    ("currency", "money"),
+    [("USD", {"currency": "USD", "decimals": 2}), ("JPY", {"currency": "JPY", "decimals": 0})],
+    ids=["dollars", "yen"],
+)
+@pytest.mark.parametrize("datum", ["cart_id", "session_token", "customer"])
+def test_a_line_added_to_a_cart_in_another_currency_is_priced_in_it(currency, money, datum, hub_a, no_fallback):
+    """«Añade una mascarilla a 9 al carrito de Ana», a cart in dollars: the price goes in the minor unit of the cart's
+    currency, and the card said it in the business's («9,00 €»). It reads the cart as the person, by what names it."""
+    with use_hub(hub_a):
+        ctx = in_hub(hub_a)
+        cart = run(ctx, "cart_checkout.cart.create", {"session_token": "sess_ana", "customer_name": "Ana García", "currency": currency})
+        which = {"cart_id": str(cart.id), "session_token": "sess_ana", "customer": "Ana García"}[datum]
+        card = assistant.card(get("cart_checkout.item.add"), {datum: which, **BESIDES["cart_checkout.item.add"]}, "es", ctx)
+    [price] = [field for field in card["fields"] if field["name"] == "unit_price"]
+    assert {key: price[key] for key in ("kind", "value", "money") if key in price} == {"kind": "money", "value": 900, "money": money}

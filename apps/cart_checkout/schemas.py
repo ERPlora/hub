@@ -30,7 +30,7 @@ from apps.cart_checkout.models import (
     SESSION_MAX_LENGTH,
     SKU_MAX_LENGTH,
 )
-from base.schemas import names
+from base.schemas import in_currency_of, names
 
 T = TypeVar("T")
 
@@ -115,7 +115,7 @@ Email = Annotated[_text(EMAIL_MAX_LENGTH), AfterValidator(_email)]
 SessionCode = _text(SESSION_MAX_LENGTH, 1)
 Said = _text(NAME_MAX_LENGTH, 1)
 Quantity = Annotated[Decimal, Field(max_digits=15, decimal_places=3, le=MAX_QUANTITY)]
-Money = Annotated[int, Field(ge=0, le=MAX_AMOUNT)]
+Money = Annotated[int, Field(ge=0, le=MAX_AMOUNT, json_schema_extra={"money": True})]
 FreeValue = Annotated[str, StringConstraints(max_length=FREE_VALUE_MAX_LENGTH)]
 FreeFields = Annotated[dict[str, FreeValue], Field(max_length=MAX_FREE_FIELDS)]
 
@@ -154,15 +154,20 @@ class Page(Schema, Generic[T]):
 
 
 class CartRefIn(In):
-    cart_id: UUID | None = Field(None, description="The cart's id.", json_schema_extra=A_CART)
+    cart_id: UUID | None = Field(
+        None, description="The cart's id.", json_schema_extra={**A_CART, **in_currency_of("cart_checkout.cart.get", by="cart_id")}
+    )
     session_token: SessionCode | None = Field(
-        None, description="The cart's session code (e.g. sess_a1b2c3), when its id is not known."
+        None,
+        description="The cart's session code (e.g. sess_a1b2c3), when its id is not known.",
+        json_schema_extra=in_currency_of("cart_checkout.cart.get", by="session_token"),
     )
     customer: Said | None = Field(
         None,
         title=gettext_noop("Customer"),
         description="The cart's customer, when neither its id nor its code is known: their exact email "
         "or part of their name (e.g. said aloud).",
+        json_schema_extra=in_currency_of("cart_checkout.cart.get", by="customer"),
     )
 
     @model_validator(mode="after")
@@ -236,8 +241,8 @@ class CartListIn(PageIn):
     notes: str | None = Field(None, max_length=200, description="Part of the notes.")
     total_items_min: Decimal | None = Field(None, ge=0, description="Fewest items (sum of the quantities).")
     total_items_max: Decimal | None = Field(None, ge=0, description="Most items (sum of the quantities).")
-    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
-    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
+    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units of the business's currency (1250 is 12.50 with two decimals).", json_schema_extra={"money": True})
+    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units of the business's currency (1250 is 12.50 with two decimals).", json_schema_extra={"money": True})
     expires_from: dt.datetime | None = Field(None, description="Expiring at this moment or later.")
     expires_to: dt.datetime | None = Field(None, description="Expiring at this moment or earlier.")
     last_activity_from: dt.datetime | None = Field(None, description="Last changed at this moment or later.")
@@ -349,10 +354,10 @@ class ItemListIn(PageIn):
     sku: str | None = Field(None, max_length=200, description="Part of the SKU.")
     quantity_min: Decimal | None = Field(None, ge=0, description="Lowest quantity.")
     quantity_max: Decimal | None = Field(None, ge=0, description="Highest quantity.")
-    unit_price_min: int | None = Field(None, ge=0, description="Lowest unit price, in minor units.")
-    unit_price_max: int | None = Field(None, ge=0, description="Highest unit price, in minor units.")
-    line_total_min: int | None = Field(None, ge=0, description="Lowest line total, in minor units.")
-    line_total_max: int | None = Field(None, ge=0, description="Highest line total, in minor units.")
+    unit_price_min: int | None = Field(None, ge=0, description="Lowest unit price, in minor units.", json_schema_extra={"money": True})
+    unit_price_max: int | None = Field(None, ge=0, description="Highest unit price, in minor units.", json_schema_extra={"money": True})
+    line_total_min: int | None = Field(None, ge=0, description="Lowest line total, in minor units.", json_schema_extra={"money": True})
+    line_total_max: int | None = Field(None, ge=0, description="Highest line total, in minor units.", json_schema_extra={"money": True})
     sort: ItemSort = Field("created_at", description="Order; a leading '-' reverses it. By default, as added.")
 
     @model_validator(mode="after")
@@ -428,8 +433,8 @@ class OrderListIn(PageIn):
     )
     currency: str | None = Field(None, max_length=3, description="Only this currency (ISO 4217, e.g. EUR).")
     notes: str | None = Field(None, max_length=200, description="Part of the notes.")
-    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
-    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units of the business's currency (1250 is 12.50 with two decimals).")
+    total_amount_min: int | None = Field(None, ge=0, description="Lowest total, in minor units of the business's currency (1250 is 12.50 with two decimals).", json_schema_extra={"money": True})
+    total_amount_max: int | None = Field(None, ge=0, description="Highest total, in minor units of the business's currency (1250 is 12.50 with two decimals).", json_schema_extra={"money": True})
     placed_from: dt.datetime | None = Field(None, description="Initiated at this moment or later.")
     placed_to: dt.datetime | None = Field(None, description="Initiated at this moment or earlier.")
     paid_from: dt.datetime | None = Field(None, description="Marked as paid at this moment or later.")

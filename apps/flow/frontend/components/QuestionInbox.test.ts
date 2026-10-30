@@ -23,6 +23,7 @@ const Q: QuestionOut = {
   on_timeout: 'no',
   expires_at: '2026-10-16T12:00:00+02:00',
   created_at: '2026-10-15T12:00:00+02:00',
+  action: '',
   fields: [],
 };
 
@@ -33,6 +34,7 @@ const CHANGE: QuestionOut = {
   id: 'q2',
   role: '',
   title: 'The assistant wants to change something in «Appointments»',
+  action: 'Book an appointment',
   details: 'I will book Ana.',
   fields: [
     { name: 'start', label: 'Starts at', kind: 'text', value: 'Nov 2, 2026, 10:00 AM' },
@@ -109,6 +111,25 @@ describe('QuestionInbox', () => {
   it('a question with no change of the assistant lists no data', async () => {
     const m = await setup();
     expect(m.find('flow-question-data-q1').exists()).toBe(false);
+  });
+
+  it("says the action the assistant wants first, right under the card's title (FLOW-F29, FLOW-F38)", async () => {
+    // The server names it as the History does, in the reader's language: a cancellation reads «Cancel a reservation»,
+    // never only «… wants to change something».
+    const m = await setup([CHANGE]);
+    const action = m.find('flow-question-action-q2');
+    expect(action.text()).toBe('Book an appointment');
+    const order = m.find('flow-question-q2').element.children;
+    const at = (testid: string) => [...order].findIndex((child) => child.getAttribute('data-testid') === testid);
+    expect(at('flow-question-action-q2')).toBe(at('flow-question-title-q2') + 1);
+    expect(at('flow-question-action-q2')).toBeLessThan(at('flow-question-data-q2'));
+    const es = await setup([{ ...CHANGE, title: 'El asistente quiere cambiar algo en «Citas»', action: 'Reservar una cita' }], {}, 'es');
+    expect(es.find('flow-question-action-q2').text()).toBe('Reservar una cita');
+  });
+
+  it('a question an automation step asks says no action of the assistant', async () => {
+    const m = await setup();
+    expect(m.find('flow-question-action-q1').exists()).toBe(false);
   });
 
   it('approves with a note', async () => {

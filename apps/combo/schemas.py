@@ -77,8 +77,8 @@ KitchenName = _text(NAME_MAX_LENGTH)
 Reference = _text(NAME_MAX_LENGTH, 1)
 Search = _text(120)
 TaxKey = _text(TAX_KEY_MAX_LENGTH)
-Cents = Annotated[int, Field(ge=0, le=MAX_CENTS)]
-Delta = Annotated[int, Field(ge=-MAX_CENTS, le=MAX_CENTS)]
+Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": True})]
+Delta = Annotated[int, Field(ge=-MAX_CENTS, le=MAX_CENTS, json_schema_extra={"money": True})]
 Picks = Annotated[int, Field(ge=0, le=MAX_PICKS)]
 Order = Annotated[int, Field(ge=0, le=MAX_ORDER)]
 SupplyKind = Literal["service", "goods"]

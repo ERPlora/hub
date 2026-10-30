@@ -113,7 +113,7 @@ Color = Annotated[
     str, StringConstraints(strip_whitespace=True, pattern=r"^#[0-9a-fA-F]{6}$|^$")
 ]
 Icon = _text(64)
-Cents = Annotated[int, Field(ge=0, le=MAX_CENTS)]
+Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": True})]
 Quantity = Annotated[Decimal, Field(max_digits=15, decimal_places=3)]
 #: How a person names a product (its SKU or name) or a category (its name or slug).
 Said = _text(200, 1)
