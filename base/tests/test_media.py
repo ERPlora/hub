@@ -4,7 +4,7 @@ The bucket stays private: a hub's public website shows its images from its own h
 never changes (cached for a year, immutable). No session and no permission (a visitor of the website sees them),
 but only the host's own hub: a URL naming another hub's id is not found, whatever its files (one hub never serves
 another's, the tenancy rule). A name that climbs out of the hub's prefix is not found either, nor one outside the
-folders the modules publish (``website/img/``): a private file of the store is never served.
+folders the apps declare (the website's ``website/img/``, for anyone): a private file of the store is never served.
 """
 
 import pytest
@@ -184,3 +184,193 @@ def test_a_folder_on_disk_is_not_found_rather_than_an_error(client, on_disk, nam
 
 def test_the_image_on_disk_is_served(client, on_disk):
     assert get(client, media_url(on_disk.id, "website/img/3f2a9c.png")).status_code == 200
+
+
+# ── The folders each app declares (FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES) ──────────────────────────
+#
+# An app says which folders of its own it serves in its LiveAppConfig: ``public_media`` (anyone, as the website's
+# images) and ``members_media`` (only a session of this hub, as the people's photos). base gathers them from the apps
+# installed; what no app declares is never served, and an app turned off in the business serves none of its own.
+
+TABLE_PLAN = "table/plans/3f2a9c.png"
+
+
+@pytest.fixture
+def table(monkeypatch):
+    """The table app, as one that keeps files of its own (none does today: any module would do)."""
+    from django.apps import apps
+
+    config = apps.get_app_config("table")
+    monkeypatch.setattr(config, "public_media", [], raising=False)
+    monkeypatch.setattr(config, "members_media", [], raising=False)
+    return config
+
+
+@pytest.fixture
+def plan(a, hub_files) -> str:
+    """A file of a's under the table app's folder: the URL it would be served at."""
+    hub_files.save(f"{hub_prefix(a.id)}/{TABLE_PLAN}", ContentFile(PNG))
+    return media_url(a.id, TABLE_PLAN)
+
+
+@pytest.fixture
+def member(client, make_user, a):
+    """A session of hub a, opened on its host."""
+    from base.middleware import SESSION_HOST_KEY
+
+    client.force_login(make_user("saas:7", host="a"))
+    session = client.session
+    session[SESSION_HOST_KEY] = "a"
+    session.save()
+    return client
+
+
+def test_a_folder_an_app_declares_for_its_members_is_served_to_a_session_of_the_hub(member, table, plan, monkeypatch):
+    monkeypatch.setattr(table, "members_media", ["table/plans/"])
+    response = get(member, plan)
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content) == PNG
+    # Only this browser keeps it, as the people's photos.
+    assert response["Cache-Control"] == "private, max-age=31536000, immutable"
+
+
+def test_a_visitor_without_a_session_never_sees_a_members_folder_nor_learns_it_exists(client, table, plan, monkeypatch):
+    monkeypatch.setattr(table, "members_media", ["table/plans/"])
+    # The same answer as a folder nobody serves: 404, never 401 or 403.
+    assert get(client, plan).status_code == 404
+
+
+def test_a_session_of_another_hub_never_sees_a_members_folder(client, make_user, a, table, plan, monkeypatch, hub_files):
+    from base.middleware import SESSION_HOST_KEY
+
+    monkeypatch.setattr(table, "members_media", ["table/plans/"])
+    b = Hub.objects.get(slug="b")
+    hub_files.save(f"{hub_prefix(b.id)}/{TABLE_PLAN}", ContentFile(PNG))
+    client.force_login(make_user("saas:8", host="b"))
+    session = client.session
+    session[SESSION_HOST_KEY] = "b"
+    session.save()
+    # b's session on b's host, asking for a's file: another hub's id.
+    assert get(client, plan, host="b.localhost:8000").status_code == 404
+    # b's session carried to a's host: no session there.
+    assert get(client, plan).status_code == 404
+    # On its own host, b's member sees b's file.
+    assert get(client, media_url(b.id, TABLE_PLAN), host="b.localhost:8000").status_code == 200
+
+
+def test_a_folder_an_app_declares_public_is_served_to_anyone(client, table, plan, monkeypatch):
+    monkeypatch.setattr(table, "public_media", ["table/plans/"])
+    response = get(client, plan)
+    assert (response.status_code, response["Cache-Control"]) == (200, YEAR)
+
+
+def test_a_folder_no_app_declares_is_never_served(member, table, plan):
+    assert get(member, plan).status_code == 404
+
+
+def test_a_members_folder_inside_a_public_one_stays_for_members(client, member, table, plan, monkeypatch):
+    monkeypatch.setattr(table, "public_media", ["table/"])
+    monkeypatch.setattr(table, "members_media", ["table/plans/"])
+    assert type(client)().get(plan, HTTP_HOST="a.localhost:8000").status_code == 404
+    assert get(member, plan).status_code == 200
+
+
+@pytest.mark.parametrize("declared", ["website/img/", "table/../website/img/", "table/plans", "table"])
+def test_an_app_never_opens_a_folder_that_is_not_its_own(client, table, a, hub_files, monkeypatch, declared):
+    # The table app declaring the website's folder (or climbing to it) serves nothing more: what it says is ignored
+    # here, and said at start (base.E010).
+    monkeypatch.setattr(table, "public_media", [declared])
+    hub_files.save(f"{hub_prefix(a.id)}/table/plansX/3f2a9c.png", ContentFile(PNG))
+    monkeypatch.setattr(apps_get("website"), "public_media", [], raising=False)
+    assert get(client, media_url(a.id, "website/img/3f2a9c.png")).status_code == 404
+    assert get(client, media_url(a.id, "table/plansX/3f2a9c.png")).status_code == 404
+
+
+def test_another_app_s_members_folder_is_not_opened_by_a_public_declaration(client, table, a, hub_files, monkeypatch):
+    # The leak this rule closes: an app cannot make another's private files public.
+    monkeypatch.setattr(table, "public_media", ["whatsapp_inbox/samples/"])
+    hub_files.save(f"{hub_prefix(a.id)}/whatsapp_inbox/samples/0123456789abcdef.jpg", ContentFile(PNG))
+    assert get(client, media_url(a.id, "whatsapp_inbox/samples/0123456789abcdef.jpg")).status_code == 404
+
+
+def test_the_website_s_images_are_served_because_the_website_declares_them(client, a, monkeypatch):
+    assert apps_get("website").public_media == ["website/img/"]
+    assert get(client, media_url(a.id, "website/img/3f2a9c.png")).status_code == 200
+    monkeypatch.setattr(apps_get("website"), "public_media", [])
+    assert get(client, media_url(a.id, "website/img/3f2a9c.png")).status_code == 404
+
+
+def test_the_people_s_photos_stay_base_s_for_the_hub_s_sessions(client, member, a, hub_files):
+    hub_files.save(f"{hub_prefix(a.id)}/avatars/0123456789abcdef.png", ContentFile(PNG))
+    url = media_url(a.id, "avatars/0123456789abcdef.png")
+    assert (get(member, url).status_code, type(client)().get(url, HTTP_HOST="a.localhost:8000").status_code) == (200, 404)
+
+
+def turn_off(slug: str, label: str) -> None:
+    from base import activation
+    from base.models import AppActivation
+
+    assert AppActivation.objects.filter(host=slug, app=label).update(state="off", chosen=False) == 1
+    activation.forget(slug)
+
+
+def test_an_app_turned_off_in_the_business_serves_none_of_its_folders(client, member, table, plan, monkeypatch):
+    monkeypatch.setattr(table, "public_media", ["table/plans/"])
+    monkeypatch.setattr(table, "members_media", ["table/members/"])
+    a = Hub.objects.get(slug="a")
+    storages["hub_files"].save(f"{hub_prefix(a.id)}/table/members/3f2a9c.png", ContentFile(PNG))
+    turn_off("a", "table")
+    assert get(client, plan).status_code == 404
+    assert get(member, media_url(a.id, "table/members/3f2a9c.png")).status_code == 404
+
+
+def test_an_app_turned_off_in_another_business_still_serves_here(client, table, plan, monkeypatch):
+    monkeypatch.setattr(table, "public_media", ["table/plans/"])
+    turn_off("b", "table")
+    assert get(client, plan).status_code == 200
+
+
+def apps_get(label: str):
+    from django.apps import apps
+
+    return apps.get_app_config(label)
+
+
+# ── What an app declares, checked at start (base.E010) ────────────────────────────────────────────────────────────
+
+
+def folder_errors() -> list:
+    from django.core import checks
+
+    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E010"]
+
+
+def test_the_folders_of_every_app_are_sound():
+    assert folder_errors() == []
+
+
+@pytest.mark.parametrize(
+    ("attribute", "declared", "why"),
+    [
+        ("public_media", ["website/img/"], "not under table/"),
+        ("members_media", ["whatsapp_inbox/samples/"], "not under table/"),
+        ("public_media", ["tables/plans/"], "not under table/"),
+        ("public_media", ["table/../website/img/"], "climbs"),
+        ("members_media", ["table/./plans/"], "climbs"),
+        ("public_media", ["table//plans/"], "climbs"),
+        ("public_media", ["/table/plans/"], "not under table/"),
+        ("public_media", ["table\\plans\\"], "climbs"),
+        ("public_media", ["table/plans"], "does not end in /"),
+        ("public_media", ["table/"], None),
+        ("members_media", "table/plans/", "not a list of folders"),
+        ("public_media", [7], "not a list of folders"),
+    ],
+)
+def test_a_folder_is_checked_at_start(table, monkeypatch, attribute, declared, why):
+    monkeypatch.setattr(table, attribute, declared)
+    errors = folder_errors()
+    if why is None:
+        assert errors == []
+        return
+    [error] = errors
+    assert "table" in error.msg and why in error.msg and error.obj is table

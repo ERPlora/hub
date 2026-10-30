@@ -34,6 +34,8 @@ class WebsiteConfig(LiveAppConfig):
     requires = []
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["website.view", "website.manage"]
+    # The published page's images, which any visitor sees (base.media serves them at /p/media/, cached for a year).
+    public_media = ["website/img/"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The page speaks for the
     # business: a manager sees it; only the owner and the admin change, publish or take it offline.
     role_permissions = {

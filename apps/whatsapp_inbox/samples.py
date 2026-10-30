@@ -7,7 +7,8 @@ MP4 video up to Meta's limits (5 and 16 MB), and a PDF document up to the Hub's 
 (``base.files.MAX_FILE_BYTES``, 25 MB; Meta takes up to 100 MB). Its key is
 ``hub-<hex>/whatsapp_inbox/samples/<first 16 hex of its sha256>.<ext>``: under its hub's prefix and named by its
 content, as the website keeps its images, so the same file chosen twice is one object. Nothing here is public:
-``/p/media/`` does not serve this folder. Key builders and rules only; ``services.upload_sample`` writes the bytes.
+``/p/media/`` serves this folder only to a session of the hub (``members_media`` in ``apps.py``, ``base.media``). Key
+builders and rules only; ``services.upload_sample`` writes the bytes.
 """
 
 import uuid

@@ -102,6 +102,31 @@ def test_a_photo_for_the_header_is_kept_in_the_hubs_file_store(hub_files):
     ]
 
 
+def test_the_people_of_the_hub_open_the_file_and_a_visitor_never_does(client):
+    # FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES: the inbox declares its samples' folder for the hub's
+    # sessions (``members_media``), so the template's sheet can show the photo; a visitor gets what a missing file gets.
+    from django.contrib.auth import get_user_model
+
+    from base.middleware import SESSION_HOST_KEY
+    from base.models import Membership
+    from base.storage import hub_prefix, media_url
+
+    row = TemplateSample.objects.get(pk=upload().id)
+    hub = Hub.objects.get(slug="a")
+    url = media_url(hub.id, row.key.removeprefix(f"{hub_prefix(hub.id)}/"))
+    assert client.get(url, HTTP_HOST="a.localhost:8000").status_code == 404
+    user = get_user_model().objects.create_user(username="saas:41", password="pw")
+    Membership.objects.create(user=user, host="a", role=Membership.Role.EMPLOYEE)
+    client.force_login(user)
+    session = client.session
+    session[SESSION_HOST_KEY] = "a"
+    session.save()
+    response = client.get(url, HTTP_HOST="a.localhost:8000")
+    assert (response.status_code, response["Content-Type"]) == (200, "image/jpeg")
+    assert b"".join(response.streaming_content) == JPEG
+    assert response["Cache-Control"].startswith("private")
+
+
 def test_the_same_file_twice_is_one_object_in_the_store(hub_files):
     first, second = upload(name="carta.jpg"), upload(name="menu.jpg")
 
