@@ -452,6 +452,42 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
   await context.close();
 });
 
+// flow: assistant-card (BASE-F97 BASE-F98)
+// FIX-HUB-BASE-ASSISTANT-CARD-OBJECT-SHOWS-INNER-KEYS-IN-ENGLISH: a datum that is an object went by its inner keys, in
+// English also in Spanish («Plantilla: name: cita_recordatorio · language: es»): now by its values, as a summary says an
+// address. Cancelled: nothing is sent.
+test('assistant-card — in Spanish an object datum (a WhatsApp template) is said by its values, never by its inner keys', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-OBJECT-SHOWS-INNER-KEYS-IN-ENGLISH';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const send = {
+    to: '+34600111222',
+    template: { name: 'cita_recordatorio', language: 'es', variables: ['Ana', '10:00'] },
+    client_message_id: '0192f5a0-0000-7000-8000-000000000001',
+  };
+  await ask(page, `E2E-ASK whatsapp_inbox__message__send ${JSON.stringify(send)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  await expect(card(page)).toContainText('Enviar en Bandeja de WhatsApp. Revisa cada dato antes de seguir.');
+  for (const inner of ['name:', 'language:', 'variables:']) await expect(card(page)).not.toContainText(inner);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Plantilla: cita_recordatorio · es · Ana, 10:00');
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await context.close();
+});
+
 // flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
 // FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what a dangerous write sends («Persona:
 // saas:3»), never what it will do. Base's own preview: «Remove the PIN» names whose PIN goes, as its read

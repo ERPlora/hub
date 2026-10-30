@@ -2374,8 +2374,10 @@ Pasos:
      céntimos), salvo uno de «Lo que va a pasar» que su app da en otra moneda, que sale en la suya: rectificar una
      factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
-     vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No», y
-     una lista, por cuántos elementos lleva. Todo sale en el idioma de la persona, también el nombre de cada dato
+     vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
+     una lista, por cuántos elementos lleva, y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
+     valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
+     quedan los billetes y monedas contados: «50: 2»). Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
      técnico. Una acción de la propia plataforma se nombra por la pantalla donde se hace, por ejemplo «Cambiar en
      Ajustes» o «Borrar en Archivos». Cada acción sale con su propio verbo, nunca con uno genérico: rectificar una
