@@ -11,7 +11,7 @@ import { crc32, deflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, api, capture, horizontalOverflow, hostPage, psql, shown } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -103,9 +103,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(toast(page, `No se pudo subir «second.dat»: ${NO_SPACE}`)).toBeVisible();
       await expect(item(page, 'second.dat')).toHaveCount(0);
       await page.mouse.move(0, 0);
-      await untilStill(page);
       expect(await horizontalOverflow(page), `${label}: no sideways scroll`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${label}`) });
+      await capture(page, `${KEY}-${label}`);
 
       // The space exactly full: any new byte goes past it, for Files and for the website's images alike.
       const fill = await api(context, A, 'POST', '/files/upload', {
