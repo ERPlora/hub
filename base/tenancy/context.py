@@ -12,7 +12,9 @@ hub again in theirs).
 - :func:`use_control` — the platform: the registry and the demos (``base.hub.*``, ``base.demo.*``); a hub's model
   here is ``HubContextMissing``, the outbox goes to control.
 - :func:`use_again` — the context :func:`current` gave elsewhere, entered again by a thread handed work
-  (``base.outbound``: what an operation leaves for after its COMMIT runs off the worker's loop, in its hub).
+  (``base.outbound``: what an operation leaves for after its COMMIT runs off the worker's loop, in its hub); for work
+  of another business than the operation's, the one :func:`current_for` gives (phase 1's shared database, or the
+  active one: never another hub's).
 - :func:`use_shared_database` — **transitional (S1–S4)**: phase 1's one database where every hub with
   ``db_name=""`` keeps its data, for what has no single hub yet (the worker's relay and tasks over all of them, the
   admin with no hub chosen, ``manage.py shell``, the platform hub that has no registry row yet). S5 removes it with
@@ -115,6 +117,23 @@ def current() -> DatabaseContext:
             "use_shared_database() (base.tenancy.context)."
         )
     return active
+
+
+def current_for(scope) -> DatabaseContext:
+    """The context where work for ``scope``'s business runs when the active context asks for it (``base.outbound``).
+
+    Phase 1's tables keep every business with ``db_name=""`` in one database, so a hub of phase 1 sees, and may ask for
+    work on, another business's row (the shared inbox's «Retry»): that work gets phase 1's shared database, where any of
+    those businesses' operations run, as the worker's sweep does; it sees nothing the asking hub did not already see.
+    Anything else keeps the active context: its own business, the platform, and a hub with its own database, which
+    holds only its own rows and where another hub's operation is refused (``HubContextMismatch``): no work ever reaches
+    another hub's database. S5 removes the phase 1 branch with ``db_name=""``.
+    """
+    active = current()
+    if active.kind != HUB or active.hub.db_name:
+        return active
+    another_business = scope.kind == HUB_SCOPE_KIND and scope.key != active.hub.slug
+    return SHARED_DATABASE if another_business else active
 
 
 def current_alias() -> str:

@@ -10,6 +10,8 @@ the test lets it (``WAIT`` at most, so a broken pool fails instead of hanging), 
 import logging
 import threading
 import time
+from dataclasses import FrozenInstanceError
+from types import SimpleNamespace
 
 import pytest
 from django.db import connection, connections
@@ -24,6 +26,9 @@ from base.tenancy import context
 from base.tenancy.tests import hubs
 
 A = Scope("host", "a")
+B = Scope("host", "b")
+#: The platform's (``base.registry.REGISTRY_SCOPE``): its operations run on control from anywhere.
+PLATFORM = Scope("platform", "registry")
 #: The most a test waits for a thread.
 WAIT = 5
 
@@ -170,6 +175,109 @@ def test_a_job_of_a_hub_with_its_own_database_reaches_it_from_a_fresh_thread(hub
 
     assert eventually(lambda: seen != [])
     assert seen == [job.database.alias] and seen != ["default"]
+
+
+# ── For the business of its row: phase 1's shared tables, never another hub's database ─────────────────────────────
+
+
+def phase_1_hub(slug: str):
+    """A hub of phase 1 (``db_name=""``): its data in the shared database, with every other one's."""
+    from control.models import Hub
+
+    hub, _ = Hub.objects.update_or_create(slug=slug, defaults={"status": Hub.Status.READY, "db_name": ""})
+    return hub
+
+
+def for_its_business(seen: list):
+    """A job that runs an operation of the business it is for, as the inbox's delivery does: where its thread works
+    (the context's kind, its alias, the identities of the hubs it sees) and whether that operation ran."""
+
+    def job(scope):
+        active = context.current()
+        identities = sorted(str(found) for found in HubIdentity.objects.values_list("hub_id", flat=True))
+        try:
+            command(lambda ctx, data: {"count": 1})(as_system(scope), Schema())
+            outcome = "ran"
+        except context.HubContextMismatch:
+            outcome = "HubContextMismatch"
+        seen.append((scope.key, active.kind, active.alias, identities, outcome))
+
+    return job
+
+
+@pytest.mark.outbound_threads
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    ("asked_for", "said", "expected"),
+    [
+        (B, B, ("b", context.SHARED, "default", [], "ran")),
+        (A, A, ("a", context.HUB, "default", [], "ran")),
+        (B, None, ("b", context.HUB, "default", [], "HubContextMismatch")),
+        (PLATFORM, PLATFORM, ("registry", context.HUB, "default", [], "ran")),
+    ],
+    ids=["another-business", "its-own", "not-said", "the-platform"],
+)
+def test_a_job_for_another_business_of_phase_1_runs_at_once_where_that_business_s_operations_run(
+    asked_for, said, expected, pool, monkeypatch
+):
+    """«Retry» from a's inbox on a row of b (phase 1 shares the tables): the job said to be for b runs in phase 1's
+    shared database, where b's operations run (as the worker's sweep hands it over), at once; one for a itself stays in
+    a's context, as one for the platform does (no business: its operations run on control from anywhere); one that does
+    not say whom it is for runs in the context that asked, where b's operation is refused."""
+    monkeypatch.setattr(context, "_test_fallback", None)  # as in production: a thread of its own starts without one
+    monkeypatch.setattr(outbound, "_pool", pool(threads=1))
+    seen: list = []
+    job = for_its_business(seen)
+
+    def retry(ctx, data):
+        if said is None:
+            outbound.after_commit(job, asked_for)
+        else:
+            outbound.after_commit(job, asked_for, scope=said)
+        return {"count": 1}
+
+    with context.use_hub(phase_1_hub("a")):
+        command(retry)(as_system(A), Schema())
+
+    assert eventually(lambda: seen != [])
+    assert seen == [expected]
+
+
+@pytest.mark.outbound_threads
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
+def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, monkeypatch):
+    """Phase 2: a hub with its own database holds only its own rows. A job it says is for another hub stays in its
+    database, sees only its rows and the other's operation is refused; one a hub of phase 1 says is for a hub with its
+    own database runs in the shared one. No job ever reaches another hub's database."""
+    monkeypatch.setattr(context, "_test_fallback", None)
+    monkeypatch.setattr(outbound, "_pool", pool(threads=1))
+    seen: list = []
+    job = for_its_business(seen)
+    tenant_a, tenant_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
+
+    def ask(ctx, data):
+        outbound.after_commit(job, tenant_b, scope=tenant_b)
+        return {"count": 1}
+
+    with context.use_hub(hub_a):
+        command(ask)(as_system(tenant_a), Schema())
+    with context.use_hub(phase_1_hub("a")):
+        command(ask)(as_system(A), Schema())
+
+    assert eventually(lambda: len(seen) == 2)
+    assert seen == [
+        ("tenant-b", context.HUB, hubs.HUB_A_ALIAS, [str(hubs.HUB_A_ID)], "HubContextMismatch"),
+        ("tenant-b", context.SHARED, "default", [], "ran"),
+    ]
+
+
+def test_whom_a_job_is_for_is_kept_from_when_it_is_asked():
+    """The context a job runs in is chosen when it is asked and never changes after: nobody hands it another hub's."""
+    with context.use_hub(SimpleNamespace(slug="a", db_name="")):
+        job = outbound.Job(print, (), context.current_for(B))
+    with pytest.raises(FrozenInstanceError):
+        job.database = context.CONTROL_DATABASE  # type: ignore[misc]
+    assert job.database is context.SHARED_DATABASE
 
 
 # ── Bounded: a few at once, a queue with a limit, the same job never twice ───────────────────────────────────────
