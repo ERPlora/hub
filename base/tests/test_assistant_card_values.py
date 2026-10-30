@@ -960,10 +960,11 @@ def test_an_amount_of_a_write_that_names_no_currency_is_in_the_businesss(argumen
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("sent", ["XYZ", "EURO", "€", "12"])
+@pytest.mark.parametrize("sent", ["XYZ", "EURO", "€", "12", 12], ids=["XYZ", "EURO", "euro sign", "12 as text", "12 as a number"])
 def test_an_amount_in_a_currency_that_is_none_is_shown_as_sent_never_in_another(sent):
-    """A code that is no ISO 4217 currency is refused by the write («That is not a currency code»): its card makes no
-    currency up, neither the business's nor another; its amounts go as sent, as the code itself."""
+    """A code that is no ISO 4217 currency — or no text at all, a number — is refused by the write («That is not a
+    currency code»): its card makes no currency up, neither the business's nor another; its amounts go as sent, as the
+    code itself."""
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
     shown = paid({"currency": sent})
     assert shown["amount"] == {"name": "amount", "kind": "text", "value": 1500}

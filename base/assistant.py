@@ -287,7 +287,10 @@ def _named_currency(value: Any, props: dict, defs: dict, words: "_Words") -> tup
 
 def _currency_code(sent: Any) -> tuple[bool, str | None]:
     """``sent`` as the writes take a currency — spaces and case aside, an ISO 4217 code —: ``(True, <code>)``;
-    ``(True, None)`` when empty; ``(False, None)`` when it is none."""
+    ``(True, None)`` when empty; ``(False, None)`` when it is none: a code no currency has, or no text at all (a
+    number), which the write refuses as well — never the business's in its place."""
+    if sent is not None and not isinstance(sent, str):
+        return False, None
     code = sent.strip().upper() if isinstance(sent, str) else ""
     if not code:
         return True, None

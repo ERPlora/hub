@@ -3120,7 +3120,6 @@ Implicados: ACCOUNTS-F38
   la del negocio, sin marca `currency` en su objeto ni encima; hoy Tarifas 1, `pricing.price_item.update`, que nombra
   el precio por su id y ninguna lectura de Tarifas da por ese id la moneda de su tarifa),
   `test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency` (dólares, yenes y « usd »),
-  `test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency` (dólares, yenes y « usd »),
   `test_an_amount_in_a_currency_that_is_none_is_shown_as_sent_never_in_another`,
   `test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts`, el trinquete
   `test_every_currency_a_write_names_beside_its_amount_is_marked_but_the_known_ones` (`UNMARKED_CURRENCIES`, que
