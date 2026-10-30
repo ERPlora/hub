@@ -102,9 +102,9 @@ Lo que pide la pantalla **Vender** (`pages/PosPage.vue`, `frontend/components/po
 - `ion:expand-outline` / `ion:contract-outline` — **Pantalla completa** / **Salir de pantalla completa**
   del menú ⋮. Hoy: `ion:chevron-expand-outline` para los dos.
 - `lucide:mic` / `lucide:square` — la tecla **Hablar** y su «Parar» (`components/pos/SpeakKey.vue`), los
-  mismos del micrófono del asistente que `base/UI-REQUESTS.md` ya pide registrar. Hoy: los de
-  `base/frontend/lib/assistant-icons.ts` (`ASSISTANT_ICONS.mic` y `.stop`); cuando el shell los registre,
-  la tecla pasa a `HubIcon` en el mismo cambio que borra ese fichero.
+  mismos del micrófono del asistente que `base/UI-REQUESTS.md` ya pide registrar. Hoy: `ASSISTANT_ICONS.mic` y
+  `.stop` de `@erplora/ui/components` (el chat compartido); cuando el shell los registre, la tecla pasa a `HubIcon`
+  en el mismo cambio que borra `ASSISTANT_ICONS`.
 - `ion:remove-outline` — el «−» del selector de cantidad. Hoy el selector pinta los signos «−» y «+»
   como texto (con su nombre accesible).
 - `ion:ellipse-outline` — el círculo vacío que marca una línea para cobrarla aparte. Hoy: un aro de CSS

@@ -4,7 +4,7 @@
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters,
 // an automation's `id` (or its name, `flow`) travels in the input. Dates are ISO strings.
 import type { Page } from '../../../frontend/sdk-types';
-import type { AssistantField } from '../../../base/frontend/lib/assistant-card';
+import type { AssistantField } from '@erplora/ui/components';
 
 export type TriggerKind = 'event' | 'schedule' | 'at' | 'manual';
 export type Operator = 'eq' | 'neq' | 'in' | 'exists' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte';
