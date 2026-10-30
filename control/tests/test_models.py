@@ -68,9 +68,24 @@ def test_a_cluster_is_named_once_and_says_where_its_pgbouncer_listens():
     cluster.refresh_from_db()
 
     assert (cluster.port, cluster.pooler_port, cluster.is_open, cluster.pk.version) == (5432, 6432, True, 7)
-    assert str(cluster) == "erplora-prod"
+    assert (cluster.max_hubs, cluster.secret_name) == (0, "")
+    assert str(cluster) == "erplora-prod (writer.example:5432)"
     hub = Hub.objects.create(slug="acme", cluster=cluster)
     assert hub.cluster == cluster
+
+
+def test_the_code_of_before_still_inserts_a_cluster():
+    """``max_hubs`` and ``secret_name`` have their default in the database (expand): 0 is no limit, empty the
+    environment's own credentials."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO control_cluster (id, name, host, port, pooler_host, pooler_port, is_open, created_at) "
+            "VALUES (%s, 'old-code', 'writer.example', 5432, '127.0.0.1', 6432, true, now())",
+            [uuid.uuid7()],
+        )
+    cluster = Cluster.objects.get(name="old-code")
+
+    assert (cluster.max_hubs, cluster.secret_name) == (0, "")
 
 
 def test_a_hub_is_due_once_keyed_by_the_hub():
@@ -162,6 +177,9 @@ def test_its_words_are_translated():
         assert str(Cluster._meta.get_field("host").verbose_name) == "host del escritor"
         assert str(Cluster._meta.get_field("pooler_port").verbose_name) == "puerto de PgBouncer"
         assert str(Cluster._meta.get_field("is_open").verbose_name) == "abierto a hubs nuevos"
+        assert str(Cluster._meta.get_field("max_hubs").verbose_name) == "máximo de hubs"
+        assert str(Cluster._meta.get_field("max_hubs").help_text) == "0 = sin límite."
+        assert str(Cluster._meta.get_field("secret_name").verbose_name) == "secreto de credenciales"
         assert str(HubDue._meta.verbose_name_plural) == "hubs con trabajo pendiente"
         assert str(HubDue._meta.get_field("lease_until").verbose_name) == "reservado hasta"
         assert str(HubIdentity._meta.verbose_name) == "identidad del hub"

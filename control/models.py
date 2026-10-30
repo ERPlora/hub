@@ -47,7 +47,10 @@ def db_name_validator(value: str) -> None:
 
 class Cluster(UUIDModel):
     """A database cluster that holds hubs' databases: its writer (the migrator's way in) and the PgBouncer of the
-    tasks in front of it (every request's). ``is_open``: new hubs may be placed on it (PLAN-DB §6, «Colocación»)."""
+    tasks in front of it (every request's). ``is_open``: new hubs may be placed on it (PLAN-DB §6, «Colocación»), up
+    to ``max_hubs`` of them (0: no limit); a new hub goes to the open one with the fewest
+    (``base.tenancy.provision``). ``secret_name`` names the Secrets Manager secret with this cluster's own roles
+    (``base.tenancy.credentials``); empty, the environment's, as the settings' own server."""
 
     name = models.CharField(_("name"), max_length=63, unique=True)
     host = models.CharField(_("writer host"), max_length=255)
@@ -55,6 +58,15 @@ class Cluster(UUIDModel):
     pooler_host = models.CharField(_("PgBouncer host"), max_length=255)
     pooler_port = models.PositiveIntegerField(_("PgBouncer port"), default=6432)
     is_open = models.BooleanField(_("open to new hubs"), default=True)
+    max_hubs = models.PositiveIntegerField(_("hub limit"), default=0, db_default=0, help_text=_("0 = no limit."))
+    secret_name = models.CharField(
+        _("credentials secret"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=_("The Secrets Manager secret with this cluster's roles; empty, the environment's own."),
+    )
     created_at = models.DateTimeField(pgettext_lazy("hub registry", "created at"), auto_now_add=True)
 
     class Meta:
@@ -63,7 +75,7 @@ class Cluster(UUIDModel):
         ordering = ["name"]
 
     def __str__(self) -> str:
-        return self.name
+        return f"{self.name} ({self.host}:{self.port})"
 
 
 class Hub(models.Model):

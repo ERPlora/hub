@@ -125,3 +125,15 @@ msgstr "último error"
 
 msgid "next attempt"
 msgstr "próximo intento"
+
+msgid "hub limit"
+msgstr "máximo de hubs"
+
+msgid "0 = no limit."
+msgstr "0 = sin límite."
+
+msgid "credentials secret"
+msgstr "secreto de credenciales"
+
+msgid "The Secrets Manager secret with this cluster's roles; empty, the environment's own."
+msgstr "El secreto de Secrets Manager con los roles de este clúster; vacío, los del entorno."
