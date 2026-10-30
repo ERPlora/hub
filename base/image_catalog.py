@@ -30,12 +30,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, Any
 
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.files.storage import Storage, storages
 from django.http import FileResponse, Http404, HttpRequest
 from django.views.decorators.http import require_safe
 
-from base.media import CACHE_CONTROL, FILE_CSP, NO_FILE
+from base.media import CACHE_CONTROL, FILE_CSP
 
 logger = logging.getLogger(__name__)
 
@@ -263,7 +264,7 @@ def library() -> Library:
         return kept[2]
     try:
         raw = source.manifest()
-    except (*NO_FILE, OSError) as exc:
+    except (OSError, BotoCoreError, ClientError) as exc:
         raise LibraryUnavailable(f"No manifest at {source.key}: {exc}") from None
     read = _parse(raw)
     _kept[source.key] = (stamp, now, read)
@@ -335,7 +336,7 @@ def catalog_image(request: HttpRequest, folder: str, name: str) -> FileResponse:
         raise Http404("No such image.")
     try:
         file = open_image(image)
-    except NO_FILE:
+    except (OSError, BotoCoreError, ClientError):
         raise Http404("No such image.") from None
     response = FileResponse(file, content_type=CONTENT_TYPE)
     response["Cache-Control"] = CACHE_CONTROL

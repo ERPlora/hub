@@ -76,3 +76,9 @@ def test_a_photo_the_card_cannot_name_is_left_out_of_it(owner, latte, image_libr
     )
 
     assert [field["name"] for field in card["fields"]] == ["product"]
+
+
+def test_the_card_names_the_product_by_its_name_when_the_write_names_it_by_its_id(owner, latte, image_library):  # noqa: F811
+    card = assistant.card(get("inventory.product.set_image"), {"id": str(latte.id), "image": LATTE}, "es", owner)
+
+    assert [field["value"] for field in card["fields"]] == ["Café con leche", "Café con leche"]

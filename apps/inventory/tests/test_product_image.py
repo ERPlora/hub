@@ -311,6 +311,20 @@ def test_a_photo_past_2_mb_is_refused_and_nothing_is_kept(hub_files):  # noqa: F
     assert Product.objects.get().image == ""
 
 
+def test_a_photo_the_store_fails_to_delete_is_logged_and_the_new_one_stands(
+    hub_files, django_capture_on_commit_callbacks, monkeypatch, caplog  # noqa: F811
+):
+    created = product()
+    upload(photo(), created.id)
+    monkeypatch.setattr(hub_files, "delete", lambda name: (_ for _ in ()).throw(OSError("the bucket did not answer")))
+
+    with django_capture_on_commit_callbacks(execute=True):
+        second = upload(photo("PNG", (300, 300)), created.id).image
+
+    assert Product.objects.get().image == second
+    assert "could not be deleted" in caplog.text
+
+
 def test_a_photo_somewhat_past_2_mb_is_told_it_weighs_too_much_not_a_length_of_text(hub_files):  # noqa: F811
     created = product()
 

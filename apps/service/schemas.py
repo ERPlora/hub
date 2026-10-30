@@ -197,6 +197,7 @@ AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ServiceImageIn(ServiceRefIn):
+    id: UUID | None = Field(None, description="The service's id.", json_schema_extra=names("service.service.get"))
     image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         title=gettext_noop("Image"),
         description="The image the service shows: an image of the shared library by its reference, "

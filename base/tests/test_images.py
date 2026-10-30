@@ -307,30 +307,6 @@ def test_a_store_that_does_not_answer_says_the_photo_could_not_be_saved(hub_file
     assert refused.value.message == "No se pudo guardar la foto. Inténtalo de nuevo."
 
 
-def test_a_photo_let_go_is_deleted_once_the_change_is_saved(hub_files, django_capture_on_commit_callbacks):
-    reference = images.keep_photo(ctx(), FOLDER, webp())
-    key = f"{hub_prefix(hub_a())}/{reference.removeprefix('file:')}"
-
-    with django_capture_on_commit_callbacks(execute=True) as callbacks:
-        images.let_go(ctx(), reference)
-        assert hub_files.exists(key)
-
-    assert len(callbacks) == 1
-    assert not hub_files.exists(key)
-
-
-def test_a_photo_the_store_fails_to_delete_is_logged_and_the_saved_change_stands(
-    hub_files, django_capture_on_commit_callbacks, monkeypatch, caplog
-):
-    reference = images.keep_photo(ctx(), FOLDER, webp())
-    monkeypatch.setattr(hub_files, "delete", lambda name: (_ for _ in ()).throw(OSError("the bucket did not answer")))
-
-    with django_capture_on_commit_callbacks(execute=True):
-        images.let_go(ctx(), reference)
-
-    assert "could not be deleted" in caplog.text
-
-
 def test_letting_go_an_image_of_the_library_or_nothing_deletes_nothing(django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks() as callbacks:
         images.let_go(ctx(), "catalog:hospitality/cafe_solo")
@@ -344,3 +320,16 @@ def test_a_photo_of_its_own_is_read_back_for_a_blueprint(hub_files):
 
     assert images.read_photo(A, reference) == webp("blue")
     assert images.read_photo(A, f"file:{FOLDER}{uuid.uuid7().hex}.webp") is None
+
+
+def test_a_photo_the_bucket_cannot_give_is_none(hub_files, monkeypatch):  # the bucket opens lazily, fails on reading
+    from botocore.exceptions import ClientError
+
+    reference = images.keep_photo(ctx(), FOLDER, webp())
+
+    def refused(name, mode="rb"):
+        raise ClientError({"Error": {"Code": "NoSuchKey", "Message": "missing"}}, "GetObject")
+
+    monkeypatch.setattr(hub_files, "open", refused)
+
+    assert images.read_photo(A, reference) is None

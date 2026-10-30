@@ -781,6 +781,8 @@ BASE_SCREENS = {
     "approval": "employees",
     "blueprint": "settings",
     "business": "settings",
+    # The shared image library opens from the form of a product, a service or a menu: no screen of the platform.
+    "catalog_image": "home",
     "dataset": "settings",
     "device": "settings",
     "event": "system",

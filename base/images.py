@@ -30,11 +30,11 @@ from collections.abc import Callable
 from botocore.exceptions import BotoCoreError, ClientError
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
-from django.db import transaction
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload, OperationError
+from live.operations import on_commit
 from PIL import Image as PILImage
 from PIL import ImageOps, UnidentifiedImageError
 
@@ -197,12 +197,14 @@ def keep_photo(ctx: OperationContext, folder: str, webp: bytes) -> str:
 
 def let_go(ctx: OperationContext, reference: str) -> None:
     """Delete the photo ``reference`` names from ``ctx``'s hub once the change that let it go is saved (rolled back:
-    it stays). An image of the library, or none, deletes nothing."""
+    it stays); called by the running operation (``live.operations.on_commit``). An image of the library, or none,
+    deletes nothing."""
     name = own_name(reference)
     if name is None:
         return
     key = f"{hub_prefix(hub_id(ctx.scope))}/{name}"
-    transaction.on_commit(_deleter(key))
+    # On the operation's own transaction (phase 2: the hub's database), never ``default``'s, where it would run at once.
+    on_commit(_deleter(key))
 
 
 def _deleter(key: str) -> Callable[[], None]:
@@ -226,5 +228,5 @@ def read_photo(scope: Scope, reference: str) -> bytes | None:
     try:
         with storages["hub_files"].open(f"{hub_prefix(hub_id(scope))}/{name}", "rb") as file:
             return file.read()
-    except (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError):
+    except (OSError, BotoCoreError, ClientError):
         return None

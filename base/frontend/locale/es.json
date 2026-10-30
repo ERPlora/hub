@@ -1348,6 +1348,7 @@
           "set_enabled": "Cambiar",
           "set_groups": "Cambiar",
           "set_guests": "Cambiar",
+          "set_image": "Cambiar",
           "set_label": "Cambiar",
           "set_line_discount": "Cambiar",
           "set_line_discount_over_limit": "Cambiar",

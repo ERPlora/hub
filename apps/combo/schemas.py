@@ -175,6 +175,7 @@ AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ComboImageIn(ComboRefIn):
+    id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=names("combo.combo.get"))
     image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         title=gettext_noop("Image"),
         description="The image the menu shows: an image of the shared library by its reference, "

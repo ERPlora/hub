@@ -188,6 +188,22 @@ def test_in_the_bucket_it_reads_the_shared_prefix_and_keeps_it_ten_minutes(setti
     assert image_catalog.open_image(image_catalog.library().get("hospitality", "cafe_con_leche")).read() == webp()
 
 
+def test_a_bucket_that_does_not_answer_makes_the_library_unavailable(settings, monkeypatch):
+    from botocore.exceptions import ClientError
+    from django.core.files.storage import storages
+
+    settings.CATALOG_DIR = ""
+    settings.STORAGES = {**settings.STORAGES, "hub_files": {"BACKEND": "django.core.files.storage.InMemoryStorage"}}
+
+    def refused(name, mode="rb"):
+        raise ClientError({"Error": {"Code": "NoSuchKey", "Message": "missing"}}, "GetObject")
+
+    monkeypatch.setattr(storages["hub_files"], "open", refused)
+
+    with pytest.raises(image_catalog.LibraryUnavailable):
+        image_catalog.library()
+
+
 # ── References ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
