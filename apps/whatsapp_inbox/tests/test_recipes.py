@@ -240,10 +240,13 @@ def test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_beh
     for language in ("en", "es"):
         step = assistant_step(TABLE_REF, language)
         assert step["pinned"] == {
+            "reservation.reservation.create": {"customer_id": THEIR_CARD},
             "reservation.reservation.update": {"on_behalf_of": THEIR_CARD},
             "reservation.reservation.cancel": {"on_behalf_of": THEIR_CARD},
+            "reservation.waitlist.create": {"customer_id": THEIR_CARD},
         }, language
         assert "on_behalf_of" not in step["prompt"], language
+        assert THEIR_CARD not in step["prompt"], language  # whose card is never the assistant's to say
         [line] = [line for line in step["prompt"].splitlines() if "{{steps.s9.id}}" in line and line.startswith("- ")]
         assert THEIR_CARD not in line, language
 
@@ -286,6 +289,8 @@ def test_who_has_the_table_answer_on_without_its_card_fixed_is_offered_the_versi
     [assistant] = [step for step in flow.steps if step["kind"] == "assistant"]
     assert assistant["pinned"]["reservation.reservation.cancel"] == {"on_behalf_of": THEIR_CARD}
     assert assistant["pinned"]["reservation.reservation.update"] == {"on_behalf_of": THEIR_CARD}
+    assert assistant["pinned"]["reservation.reservation.create"] == {"customer_id": THEIR_CARD}
+    assert assistant["pinned"]["reservation.waitlist.create"] == {"customer_id": THEIR_CARD}
 
 
 #: The assistant's step of each answer, and the reads pinned to the customer who writes that come before it.
@@ -318,7 +323,10 @@ def test_an_answer_tells_the_assistant_what_she_wrote_and_her_number(ref):
 
 @pytest.mark.parametrize("ref", ANSWERS)
 def test_an_answer_books_only_on_her_card(ref):
-    assert "{{steps.s6.id}}{{steps.s7.id}}" in assistant_step(ref)["prompt"]  # found by her number, or just made
+    """Her card, found by her number or just made, is fixed on a booking and on a place on the waiting list."""
+    pinned = assistant_step(ref)["pinned"]
+    for tool in ("reservation.reservation.create", "reservation.waitlist.create"):
+        assert pinned[tool] == {"customer_id": "{{steps.s6.id}}{{steps.s7.id}}"}, tool
 
 
 @pytest.mark.parametrize("ref", ANSWERS)

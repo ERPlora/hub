@@ -120,7 +120,7 @@ def test_a_guest_with_no_card_gets_one_from_whatsapp_and_the_assistant_hears_the
     assert signed(asked)
     prompt = asked.body["messages"][0]["content"]
     assert "\n———\nMesa para 4 el sábado a las 21\n———\n" in prompt  # their words alone on their lines
-    assert LUCIA in prompt and str(card.id) in prompt
+    assert LUCIA in prompt and str(card.id) not in prompt  # their card is fixed on a booking, never told
     assert outbound() == [THANKS, "¿Para cuántas personas?"]
 
 
@@ -135,7 +135,7 @@ def test_a_guest_with_a_card_is_booked_on_it_and_no_other_card_is_made(gateway, 
 
     assert Customer.objects.count() == 1
     [asked] = gateway.sent(CHAT)
-    assert str(mine.id) in asked.body["messages"][0]["content"]
+    assert str(mine.id) not in asked.body["messages"][0]["content"]  # fixed on a booking, never told
     assert outbound() == [THANKS, "¿Os va bien a las 21:00 o a las 22:30?"]
     assert Question.objects.count() == 0  # a read and an answer: nothing waits for the owner
 
@@ -212,7 +212,6 @@ def test_a_guest_asks_for_a_table_and_after_the_owner_s_yes_it_is_booked_with_th
         json=wants(
             "reservation.reservation.create",
             {
-                "customer_id": str(card.id),
                 "guest_name": "Lucía",
                 "guest_phone": LUCIA,
                 "date": day.isoformat(),
@@ -246,10 +245,37 @@ def test_a_guest_asks_for_a_table_and_after_the_owner_s_yes_it_is_booked_with_th
     assert (reservation.customer_id, reservation.guest_phone, reservation.party_size, reservation.source) == (
         card.id, LUCIA, 4, "whatsapp"
     )
-    assert str(card.id) in gateway.sent(CHAT)[0].body["messages"][0]["content"]
+    assert str(card.id) not in gateway.sent(CHAT)[0].body["messages"][0]["content"]  # fixed by the answer, never told
     assert Customer.objects.count() == 1
     assert outbound()[-1] == "¡Listo! Mesa para 4 el sábado a las 21:00."
     assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
+
+
+def test_a_guest_with_no_card_is_booked_on_the_card_whatsapp_made_for_them(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F24: with no card of their number, the one the answer makes (``steps.s7.id``) is the card it fixes on the booking,
+    which the assistant never names."""
+    restaurant()
+    door_takes(gateway, 2)
+    day = timezone.localdate() + dt.timedelta(days=3)
+    gateway.reply(
+        CHAT,
+        json=wants(
+            "reservation.reservation.create",
+            {"guest_name": "Lucía", "guest_phone": LUCIA, "date": day.isoformat(), "time": "21:00", "party_size": 4, "source": "whatsapp"},
+        ),
+    )
+    gateway.reply(CHAT, json=said("¡Listo! Mesa para 4 el sábado a las 21:00."))
+    lucia_writes()
+
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    card = Customer.objects.get()
+    assert (card.phone, card.source) == (LUCIA, "whatsapp")
+    assert Reservation.objects.get().customer_id == card.id
 
 
 def test_with_no_room_the_guest_is_written_on_the_waiting_list_after_the_owner_s_yes(
@@ -266,7 +292,6 @@ def test_with_no_room_the_guest_is_written_on_the_waiting_list_after_the_owner_s
         json=wants(
             "reservation.waitlist.create",
             {
-                "customer_id": str(card.id),
                 "guest_name": "Lucía",
                 "guest_phone": LUCIA,
                 "date": day.isoformat(),
@@ -463,3 +488,43 @@ def test_a_guest_cancels_their_own_table_without_the_assistant_saying_on_whose_b
     booked.refresh_from_db()
     assert booked.status == Reservation.Status.CANCELLED
     assert outbound()[-1] == "Hecho: tu reserva del sábado a las 21:00 queda anulada."
+
+
+@pytest.mark.parametrize("naming", ["by_her_name", "by_her_card"])
+@pytest.mark.parametrize(
+    ("tool", "booking"),
+    [
+        ("reservation.reservation.create", {"time": "21:00", "source": "whatsapp"}),
+        ("reservation.waitlist.create", {"preferred_time": "21:00"}),
+    ],
+    ids=["book", "waitlist"],
+)
+def test_the_answer_never_books_or_waitlists_on_another_guest_s_card_whatever_the_assistant_sends(
+    gateway, tick, django_capture_on_commit_callbacks, tool, booking, naming  # noqa: F811 - the fixture
+):
+    """F24: whose card a booking or a place on the waiting list goes on is fixed by the answer to the card of the
+    number that writes, never asked of the assistant (FLOW-F38). The assistant names Marta, by her name or by her card:
+    after the yes, it is on Lucía's card and Marta's has nothing."""
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    marta = run("customer.customer.create", {"name": "Marta Ruiz", "phone": "600999888"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    whose = {"by_her_name": {"customer": "Marta Ruiz"}, "by_her_card": {"customer_id": str(marta.id)}}[naming]
+    sent = {**whose, "guest_phone": LUCIA, "date": day.isoformat(), "party_size": 2, **booking}
+    gateway.reply(CHAT, json=wants(tool, sent))
+    gateway.reply(CHAT, json=said("Hecho."))
+    lucia_writes("Mesa para 2 el sábado a las 21 a nombre de Marta Ruiz")
+
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    model = Reservation if tool == "reservation.reservation.create" else WaitlistEntry
+    made = model.objects.get()
+    assert made.customer_id == card.id
+    assert not Reservation.objects.filter(customer_id=marta.id).exists()
+    assert not WaitlistEntry.objects.filter(customer_id=marta.id).exists()
+    assert "customer_id" not in tool_inputs(gateway.sent(CHAT)[0], tool)  # never the assistant's to say
