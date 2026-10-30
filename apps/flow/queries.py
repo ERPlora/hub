@@ -10,6 +10,8 @@
   texts) says each datum in words (``words_for``); what goes to a machine, as the code keeps it.
 - **«Try it»** (``flow.flow.test``) walks the steps against the last real event of this business and
   executes nothing: it validates each action's data against the action's own schema.
+- **One record by its id** (an automation, a draft, a run, a question waiting for an answer), with the words its
+  screen names it by: what the assistant's card says instead of the id (schemas.py, ``names``).
 """
 
 import datetime as dt
@@ -30,7 +32,7 @@ from babel.dates import format_date, format_time, get_datetime_format
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.context import OperationContext, Scope
-from live.errors import Conflict, InvalidPayload, NotFound, OperationError
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.meta import LiveAppConfig, module_configs
 from live.models import OutboxEvent
 from live.operations import Operation, operation, registry
@@ -46,16 +48,21 @@ from apps.flow.schemas import (
     CatalogOut,
     DraftListIn,
     DraftOut,
+    DraftRefIn,
     FlowListIn,
     FlowOut,
     FlowRefIn,
     Page,
     QuestionListIn,
+    QuestionOut,
     QuestionPageOut,
+    QuestionRefIn,
     RecipeListIn,
     RecipeListOut,
+    RunDetailOut,
     RunListIn,
     RunPageOut,
+    RunRefIn,
     SampleIn,
     SampleOut,
     SecretListIn,
@@ -80,6 +87,11 @@ ROLE_PERMISSION = {"": MANAGE, "manager": ANSWER_MANAGER, "employee": ANSWER}
 TURN = "_turn"
 
 FLOW_NOT_FOUND = _("That automation does not exist in this business.")
+DRAFT_NOT_FOUND = _("That draft does not exist in this business.")
+RUN_NOT_FOUND = _("That run does not exist in this business.")
+QUESTION_NOT_FOUND = _("That question does not exist in this business.")
+QUESTION_NOT_YOURS = _("This question was asked of someone else: you cannot answer it.")
+QUESTION_CLOSED = _("This question is closed: its automation no longer waits for it.")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
 UNKNOWN_EVENT = _("That does not happen in this business: «%(name)s».")
 UNKNOWN_ACTION = _("That action does not exist in this business: «%(name)s».")
@@ -867,6 +879,31 @@ def list_runs(ctx: OperationContext, data: RunListIn) -> dict:
     }
 
 
+def run_label(run: FlowRun, language: str) -> str:
+    """As the History names a run, with its automation in front (out of its History it says whose): «Welcome · Oct 15,
+    2026, 9:00 PM», when it started at the business's hour."""
+    return f"{run.flow.name} · {_moment_words(run.started_at.isoformat(), language)}"
+
+
+@operation(
+    "flow.run.get",
+    kind="query",
+    permission=VIEW,
+    input=RunRefIn,
+    output=RunDetailOut,
+    ai={
+        "description": "One run by its id (its reference in the History): how it ended or where it waits, each step, "
+        "the reason of a failure and whether it can be resumed; named by its automation and when it started."
+    },
+)
+def get_run(ctx: OperationContext, data: RunRefIn) -> dict:
+    found = FlowRun.objects.select_related("flow").filter(pk=data.id).first()
+    with translation.override(ctx.language):
+        if found is None:
+            raise NotFound(str(RUN_NOT_FOUND))
+        return {**run_row(found), "label": run_label(found, ctx.language)}
+
+
 def draft_row(draft: Draft) -> dict[str, Any]:
     return {
         "id": draft.id,
@@ -900,6 +937,25 @@ def list_drafts(ctx: OperationContext, data: DraftListIn) -> dict:
         "limit": data.limit,
         "offset": data.offset,
     }
+
+
+@operation(
+    "flow.draft.get",
+    kind="query",
+    permission=VIEW,
+    input=DraftRefIn,
+    output=DraftOut,
+    ai={
+        "description": "One draft the assistant proposed, by its id: its name, its steps, what it could not work out "
+        "and whether it still waits, was used or was discarded."
+    },
+)
+def get_draft(ctx: OperationContext, data: DraftRefIn) -> dict:
+    found = Draft.objects.filter(pk=data.id).first()
+    if found is None:
+        with translation.override(ctx.language):
+            raise NotFound(str(DRAFT_NOT_FOUND))
+    return draft_row(found)
 
 
 # --- The last real event and «Try it» ---------------------------------------------------------------
@@ -1305,6 +1361,30 @@ def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
         .order_by("expires_at", "id")[:100]
     )
     return {"rows": [question_row(question, proposal_fields(ctx, question)) for question in pending]}
+
+
+@operation(
+    "flow.question.get",
+    kind="query",
+    permission=ANSWER,
+    input=QuestionRefIn,
+    output=QuestionOut,
+    ai={
+        "description": "One question an automation asked and is waiting on, by its id, as «Waiting for your answer» "
+        "shows it: what it asks, its details, the change of the assistant it waits on, if any, and until when. Only "
+        "the role it was asked of, or whoever runs the business."
+    },
+)
+def get_question(ctx: OperationContext, data: QuestionRefIn) -> dict:
+    found = Question.objects.select_related("flow", "run").filter(pk=data.id).first()
+    with translation.override(ctx.language):
+        if found is None:
+            raise NotFound(str(QUESTION_NOT_FOUND), code="flow.question_not_found")
+        if not can_answer(ctx, found.role):
+            raise PermissionDenied(str(QUESTION_NOT_YOURS), code="flow.question_not_yours")
+        if found.status != Question.Status.PENDING or found.run.status != FlowRun.Status.ASKING:
+            raise NotFound(str(QUESTION_CLOSED), code="flow.question_closed")
+    return question_row(found, proposal_fields(ctx, found))
 
 
 # --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
