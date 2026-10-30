@@ -135,7 +135,7 @@ Color = Annotated[
     str, StringConstraints(strip_whitespace=True, pattern=r"^#[0-9a-fA-F]{6}$|^$")
 ]
 Icon = _text(80)
-Cents = Annotated[int, Field(ge=0, le=MAX_CENTS)]
+Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": True})]
 Minutes = Annotated[int, Field(ge=1, le=MAX_MINUTES)]
 Buffer = Annotated[int, Field(ge=0, le=MAX_MINUTES)]
 Order = Annotated[int, Field(ge=0, le=1_000_000)]

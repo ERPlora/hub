@@ -56,9 +56,9 @@ def _text(max_length: int, min_length: int = 0) -> type[str]:
 Name = _text(100, 1)
 SessionNumber = _text(24, 1)
 Notes = _text(1000)
-Cents = Annotated[int, Field(ge=0, le=MAX_CENTS)]
-PositiveCents = Annotated[int, Field(ge=1, le=MAX_CENTS)]
-SignedCents = Annotated[int, Field(ge=-MAX_CENTS, le=MAX_CENTS)]
+Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": True})]
+PositiveCents = Annotated[int, Field(ge=1, le=MAX_CENTS, json_schema_extra={"money": True})]
+SignedCents = Annotated[int, Field(ge=-MAX_CENTS, le=MAX_CENTS, json_schema_extra={"money": True})]
 #: A note or coin by its face value in major units («50», «0.50», «0.005»).
 FaceValue = Annotated[str, StringConstraints(pattern=r"^\d{1,6}(\.\d{1,3})?$")]
 Pieces = Annotated[int, Field(ge=0, le=MAX_PIECES)]
@@ -423,11 +423,12 @@ class ClosingSummaryOut(Schema):
     expected_balance: int | None = Field(
         title=gettext_noop("Expected in the drawer"),
         description="The cash there should be now, in cents; none when a blind count hides it from the reader.",
+        json_schema_extra={"money": True},
     )
     difference: int | None = Field(
         description="Counted − expected, in cents (positive = over, negative = short); none without a count or "
         "when the expected is hidden.",
-        json_schema_extra={"signed": True},
+        json_schema_extra={"signed": True, "money": True},
     )
     expected_hidden: bool = Field(
         description="A blind count hides the expected (and so the difference) from the reader: never guess them."

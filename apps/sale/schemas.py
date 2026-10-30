@@ -72,8 +72,8 @@ Said = _text(200, 1)
 Label = _text(120)
 Note = _text(255)
 Reason = _text(500, 1)
-Cents = Annotated[int, Field(ge=0, le=MAX_CENTS)]
-PositiveCents = Annotated[int, Field(ge=1, le=MAX_CENTS)]
+Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": True})]
+PositiveCents = Annotated[int, Field(ge=1, le=MAX_CENTS, json_schema_extra={"money": True})]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=15, decimal_places=3)]
 Percent = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)]
 AttemptKey = Annotated[

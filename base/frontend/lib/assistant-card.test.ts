@@ -188,6 +188,30 @@ describe('a datum that is an object', () => {
     );
   });
 
+  it('an amount within it is written as one on top: its currency, the same symbol, never the server’s words', () => {
+    // FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS: the server said an amount inside an object in its own
+    // words («1,50 US$», «1,50 PLN») and the screen the one on top in its own («1,50 $», «1,50 zł»), on one card.
+    const PLN = { currency: 'PLN', decimals: 2 };
+    const USD = { currency: 'USD', decimals: 2 };
+    const JPY = { currency: 'JPY', decimals: 0 };
+    const line = (amount: unknown) => ({ name: 'line', label: 'Línea', kind: 'object' as const, value: { text: 'Café', unit_price: amount } });
+    const top = (money?: typeof USD) => ({ name: 'price', label: 'Precio', kind: 'money' as const, value: 150, money });
+    // In the business's currency, the card's own.
+    expect(fieldText(line({ kind: 'money', value: 150 }), { ...opts, money: PLN })).toBe('Café · 1,50 zł');
+    expect(fieldText(top(), { ...opts, money: PLN })).toBe('1,50 zł');
+    // In the one its write names, with its decimals.
+    expect(fieldText(line({ kind: 'money', value: 150, money: USD }), opts)).toBe('Café · 1,50 $');
+    expect(fieldText(top(USD), opts)).toBe('1,50 $');
+    expect(fieldText(line({ kind: 'money', value: 1500, money: JPY }), opts)).toBe('Café · 1500 ¥');
+    // Inside a list inside an object, the same.
+    const order = { lines: [{ text: 'Té', unit_price: { kind: 'money', value: 1200 } }] };
+    expect(fieldText({ name: 'order', label: 'Pedido', kind: 'object', value: order }, opts)).toBe('Té · 12,00 €');
+    // What only looks like one is said by its values, as any other.
+    expect(fieldText(line({ kind: 'money', value: 150, note: 'x' }), opts)).toBe('Café · money · 150 · x');
+    expect(fieldText(line({ kind: 'money', value: '150' }), opts)).toBe('Café · money · 150');
+    expect(fieldText(line({ kind: 'cash', value: 150 }), opts)).toBe('Café · cash · 150');
+  });
+
   it('a secret stays hidden as the server sends it', () => {
     expect(fieldText({ name: 'login', label: 'Acceso', kind: 'object', value: { user: 'ana', password: '••••••••' } }, opts)).toBe(
       'ana · ••••••••',

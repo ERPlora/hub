@@ -267,10 +267,10 @@ class CustomerFilters(Schema):
         None, ge=0, description="Only customers with at most this many purchases."
     )
     spent_min: int | None = Field(
-        None, ge=0, description="Only customers who spent at least this, in cents."
+        None, ge=0, description="Only customers who spent at least this, in cents.", json_schema_extra={"money": True}
     )
     spent_max: int | None = Field(
-        None, ge=0, description="Only customers who spent at most this, in cents."
+        None, ge=0, description="Only customers who spent at most this, in cents.", json_schema_extra={"money": True}
     )
     last_purchase_from: date | None = Field(
         None, description="Only customers whose last purchase was on or after this day."

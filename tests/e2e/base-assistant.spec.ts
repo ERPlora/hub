@@ -13,6 +13,7 @@ import { type Browser, expect, type Locator, type Page, test } from '@playwright
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
 import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOn, untilStill } from './helpers';
+import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = [
@@ -540,6 +541,204 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   if (!wasOn) {
     const off = await api(context, A, 'POST', '/apps/disable', { app: 'printing' });
     expect(off.status, `turn off printing: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
+// flow: base-assistant-money-mark (BASE-F97)
+// FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS: the card knew an amount only by the words «in cents» of
+// its description, so a payment «in minor units of the currency» said «1500»: now by the mark its app declares, whatever
+// its words, «15,00 €». Cancelled: nothing is recorded.
+test('base-assistant-money-mark — in Spanish a payment says its amount in the business’s currency, never in its minor unit', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = before.data.apps.some((app) => app.id === 'payment' && app.state === 'on');
+  await turnOn(context, A, 'payment');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur' };
+  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s€/);
+    await expect(card(page)).not.toContainText('1500');
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  if (!wasOn) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
+    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
+// flow: base-assistant-money-mark (BASE-F97)
+// The same PR: a payment in dollars of a business in euros said «15,00 €», every amount in the business's currency. Now in
+// the currency its write names, with that currency's decimals (none in yen), as Stripe or Square show it. Cancelled.
+test('base-assistant-money-mark — in Spanish a payment in another currency says its amount in it, with its decimals', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-USD';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = before.data.apps.some((app) => app.id === 'payment' && app.state === 'on');
+  await turnOn(context, A, 'payment');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur', currency: 'USD' };
+  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s\$/);
+    await expect(card(page)).not.toContainText('€');
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  // In yen, without decimals: 1500 is ¥1,500, never «15,00».
+  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
+  await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1500\s¥/);
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  if (!wasOn) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
+    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
+type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
+
+/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
+function confirmedCard(stream: string): SentCard | undefined {
+  const frames = stream
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
+  return frames.find((frame) => frame.type === 'confirm')?.card;
+}
+
+/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it (the
+ *  first one only asks for the tool). */
+async function sentCard(page: Page): Promise<SentCard> {
+  const answer = await page.waitForResponse(
+    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
+  );
+  return confirmedCard(await answer.text())!;
+}
+
+// flow: base-assistant-money-mark (BASE-F97)
+// The same PR: a price set on a price list in dollars said «15,00 €»: the write names the list, not its currency. The
+// card reads the list as the person and says the price in its currency (a list is always in one with two decimals), as
+// Shopify shows a price of a market. Cancelled: no price is set. What it creates carries the pricing specs' code and
+// goes away.
+test('base-assistant-money-mark — in Spanish a price set on a list in another currency says it in that currency', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-LIST-USD';
+  const NEEDED = ['inventory', 'customer', 'pricing'];
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  await turnOn(context, A, ...NEEDED.filter((id) => !wasOn.has(id)));
+  cleanPricing();
+  const product = `${PRICING_TAG} Champú ${Date.now().toString(36)}`;
+  await createProduct(context, product, `${PRICING_CODE}-USD`, 1250);
+  for (const [code, currency] of [[`${PRICING_CODE}USD`, 'USD'], [`${PRICING_CODE}PLN`, 'PLN']]) {
+    await post(context, '/pricing/price_lists', { code, name: `${PRICING_TAG} ${currency}`, currency });
+  }
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const price = { product, price_list: `${PRICING_CODE}USD`, price: 1500 };
+  const sent = sentCard(page);
+  await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify(price)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  expect((await sent).fields.find((field) => field.name === 'price')).toMatchObject({
+    kind: 'money',
+    value: 1500,
+    money: { currency: 'USD', decimals: 2 },
+  });
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}USD · 15,00\\s\\$`));
+    await expect(card(page)).not.toContainText('€');
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  // In zlotys, the list's, never the business's euros.
+  await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify({ ...price, price_list: `${PRICING_CODE}PLN` })}`, { settle: false });
+  await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}PLN · 15,00\\szł`));
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  cleanPricing();
+  for (const app of [...NEEDED].reverse().filter((id) => !wasOn.has(id))) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
+// flow: base-assistant-money-mark (BASE-F97)
+// The same PR: an amount inside a datum went worded by the server («13,50 US$», «1,50 PLN») and the one on top by the
+// screen («1,50 $», «1,50 zł»): one currency, two ways on one card. Now the server sends every amount as money and the
+// screen writes them all: charging a sale, its discount on top and the amount of its payment inside the list of payments
+// arrive as the same money, in the same currency. Cancelled: nothing is charged.
+test('base-assistant-money-mark — in Spanish an amount inside a datum and one on top arrive as the same money', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-NESTED';
+  const NEEDED = ['customer', 'tax', 'sale'];
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  await turnOn(context, A, ...NEEDED.filter((id) => !wasOn.has(id)));
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const sale = { discount_amount: 150, payments: [{ method: 'Efectivo', amount: 1350 }] };
+  const sent = sentCard(page);
+  await ask(page, `E2E-ASK sale__sale__complete ${JSON.stringify(sale)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  const fields = (await sent).fields;
+  const top = fields.find((field) => field.name === 'discount_amount');
+  const payments = fields.find((field) => field.name === 'payments');
+  expect(top).toMatchObject({ kind: 'money', value: 150 });
+  expect(payments?.value).toEqual([{ method: 'Efectivo', amount: { kind: 'money', value: 1350 } }]);
+  // The same currency, the card's: neither carries one of its own, so the screen writes both with one symbol.
+  expect(top?.money ?? null).toBeNull();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(/1,50\s€/);
+    await expect(card(page)).not.toContainText(/EUR|US\$|1350/);
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  for (const app of [...NEEDED].reverse().filter((id) => !wasOn.has(id))) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
   }
   await context.close();
 });

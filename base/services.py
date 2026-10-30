@@ -2704,7 +2704,7 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     asked = [str(m.get("content")) for m in data.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
     business = _assistant_read(ctx, "base.business.get") or {}
     if card is not None:
-        # gh:hub#1045: the card paints an amount in cents in the business's currency, with its decimals.
+        # gh:hub#1045: the card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
     text = assistant.instructions(

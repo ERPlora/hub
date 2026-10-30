@@ -11,7 +11,8 @@ gateway (``saas`` ``assistant/internal.py``), without the ORM.
 - **A write never runs without the person's yes**: its card (``card``) says what it will send, each datum by its name
   in the person's language (the name its app's models give it: their metadata, no query) and in words — a moment as
   their language writes it, at the business's hour; a value of a closed list by its label; a record by its name, as
-  the read its schema marks answers it to them, or not at all: never by its id —; ``risk="high"`` asks
+  the read its schema marks answers it to them, or not at all: never by its id; an amount by its schema's mark
+  (``MONEY``), in the business's currency —; ``risk="high"`` asks
   to type a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many; such a write
   that names no record is not done from the chat (``blocked``). Such a write may show what it will do (``preview``):
   a read of its own app its ``ai=`` names, run as the person before the card; one that cannot be read shows no card.
@@ -28,12 +29,14 @@ import time
 import unicodedata
 import uuid
 from collections.abc import AsyncIterator, Iterable
+import dataclasses
 from dataclasses import dataclass
 from functools import cache
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
+import pycountry
 import pydantic
 from babel.dates import format_date, format_time, get_datetime_format
 from django.conf import settings
@@ -235,13 +238,96 @@ def _resolved(prop: dict, defs: dict) -> dict:
     return {**defs.get(ref.rsplit("/", 1)[-1], {}), **prop} if ref else prop
 
 
+#: The mark of an amount (``json_schema_extra={"money": True}``, on a whole number): in the minor unit of the currency
+#: it is in — 1250 is 12.50 €, ¥1,250 has no cents. The card paints it as money and the model is told so by its tool,
+#: whatever its description says: the words are for the model, the mark is the platform's
+#: (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS).
+MONEY = "money"
+
+
 def _is_money(name: str, prop: dict) -> bool:
-    return name.endswith("_cents") or "in cents" in str(prop.get("description", "")).lower()
+    """Whether the datum ``name`` is an amount: its schema's mark (``MONEY``). A name in ``_cents`` still counts while
+    the schemas of Automations' tests give one without its mark; no tool of the assistant does (the ratchet
+    ``UNMARKED_AMOUNTS`` of ``base/tests/test_assistant_card_values.py``). A description's words never do."""
+    return prop.get(MONEY) is True or name.endswith("_cents")
+
+
+#: The mark of the datum that names the currency of the amounts beside it, at any depth below it: a payment in dollars.
+#: ``True`` on a text, an ISO 4217 code; on a datum that names a record in a currency of its own (a cart, a price list),
+#: the read of its app that answers it — ``{"read": "<a query>", "by": "<its input>", "code": "<the datum of its
+#: answer that gives the currency>"}`` (``base.schemas.in_currency_of``) —, run as the person, as a record's name
+#: (``REFERS``). Without one, or empty, the business's. As Stripe, Square or Shopify show an amount: in the currency of
+#: its operation, with that currency's decimals. ``base.E011`` checks it at start.
+CURRENCY = "currency"
+
+
+def _named_currency(value: Any, props: dict, defs: dict, words: "_Words") -> tuple[bool, str | None]:
+    """The currency the first datum its schema marks ``CURRENCY`` among ``props`` that ``value`` (an object) sends
+    names — as the writes take a code (``_currency_code``), or as its record's read answers it to the person
+    (``_record_currency``) —: ``(True, <code>)``; ``(True, None)`` when none names one (no such datum, or empty: the
+    business's); ``(False, None)`` when it names one that is none, or a record whose currency cannot be read (not there,
+    not theirs to read, no person at hand), which its write refuses or decides: its amounts are said as sent, never in
+    a currency made up. A record is read only when ``value`` sends an amount."""
+    if not isinstance(value, dict):
+        return True, None
+    for name, prop in props.items():
+        declared = _resolved(prop, defs).get(CURRENCY)
+        sent = value.get(name)
+        if sent is None or sent == "":
+            continue
+        if declared is True:
+            return _currency_code(sent)
+        if isinstance(declared, dict):
+            if not _sends_amount(value, {"properties": props}, defs, ""):
+                return True, None
+            _, code = _currency_code(_record_currency(sent, declared, words))
+            return (True, code) if code else (False, None)
+    return True, None
+
+
+def _currency_code(sent: Any) -> tuple[bool, str | None]:
+    """``sent`` as the writes take a currency — spaces and case aside, an ISO 4217 code —: ``(True, <code>)``;
+    ``(True, None)`` when empty; ``(False, None)`` when it is none: a code no currency has, or no text at all (a
+    number), which the write refuses as well — never the business's in its place."""
+    if sent is not None and not isinstance(sent, str):
+        return False, None
+    code = sent.strip().upper() if isinstance(sent, str) else ""
+    if not code:
+        return True, None
+    known = len(code) == 3 and pycountry.currencies.get(alpha_3=code) is not None
+    return (True, code) if known else (False, None)
+
+
+def _record_currency(sent: Any, declared: dict, words: "_Words") -> Any:
+    """The currency the read ``declared`` answers to the person for the record ``sent`` names (``CURRENCY``), or
+    ``None``: no person at hand (an automation's card reads nothing for somebody else) or a read that fails."""
+    read = registry.get(declared.get("read"))
+    if read is None or words.ctx is None:
+        return None
+    failure, answer = _run(words.ctx, read, {declared.get("by"): sent})
+    return None if failure is not None else answer.model_dump(mode="json").get(declared.get("code"))
+
+
+def _sends_amount(value: Any, prop: dict, defs: dict, name: str, depth: int = 0) -> bool:
+    """Whether ``value`` carries an amount (``MONEY``) as its schema ``prop`` declares it, at any depth."""
+    prop = _fitting(value, prop, defs)
+    if depth > 8:  # a schema that names itself
+        return False
+    if isinstance(value, int) and not isinstance(value, bool):
+        return _is_money(name, prop)
+    if isinstance(value, dict):
+        props = prop.get("properties", {})
+        return any(_sends_amount(inner, props.get(key, {}), defs, key, depth + 1) for key, inner in value.items())
+    if isinstance(value, list):
+        items = prop.get("items")
+        items = items if isinstance(items, dict) else {}
+        return any(_sends_amount(item, items, defs, name, depth + 1) for item in value)
+    return False
 
 
 def _is_signed(prop: dict) -> bool:
-    """Whether the schema declares the datum signed (``json_schema_extra={"signed": True}``): an amount that says over
-    or short, as Cash register's difference, which the card writes with its sign («+» over)."""
+    """Whether the schema declares the datum signed (``json_schema_extra={"signed": True}``): an amount (``MONEY``) that
+    says over or short, as Cash register's difference, which the card writes with its sign («+» over)."""
     return prop.get("signed") is True
 
 
@@ -392,21 +478,50 @@ _LEFT_OUT = object()
 @dataclass
 class _Words:
     """What a card needs to say ``op``'s data in words: the person's language and the person (``ctx``: to read a
-    record's name as them and the business's zone; ``None`` for an automation's card, which names no record)."""
+    record's name and its currency as them, and the business's zone; ``None`` for an automation's card, which reads no
+    record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
+    the record it names, or a preview's read answers); ``priced`` false when the write names one that is none, or a
+    record whose currency cannot be read: its amounts go as sent."""
 
     op: Operation
     language: str
     ctx: OperationContext | None
-    _zone: Any = None
+    currency: str | None = None
+    priced: bool = True
+    _business: Any = None
+
+    def within(self, value: Any, props: dict, defs: dict) -> "_Words":
+        """The words of the data of the object ``value``: in the currency it names (``CURRENCY``), else in this one."""
+        priced, currency = _named_currency(value, props, defs, self)
+        if priced and currency is None:
+            return self
+        return dataclasses.replace(self, currency=currency, priced=priced)
+
+    def money(self) -> dict | None:
+        """The currency of its amounts as the card's screen takes it, when it is not the business's."""
+        return {"currency": self.currency, "decimals": currency_decimals(self.currency)} if self.currency else None
+
+    def business(self) -> Any:
+        """Settings › Business, read as the person once per card and only when a datum needs it; ``False`` when it
+        cannot be read (no person at hand, or a refusal)."""
+        if self._business is None:
+            failure, answer = (True, None) if self.ctx is None else _run(self.ctx, registry["base.business.get"], {})
+            self._business = answer if failure is None else False
+        return self._business
 
     def zone(self) -> Any:
-        """The business's zone (Settings › Business, read as the person) or else the deployment's, the one every app
-        reads a wall-clock time in; read once per card, only when a moment needs it."""
-        if self._zone is None:
-            failure, answer = (True, None) if self.ctx is None else _run(self.ctx, registry["base.business.get"], {})
-            business = _zone_named(answer.timezone) if failure is None else None
-            self._zone = business or timezone.get_current_timezone()
-        return self._zone
+        """The business's zone or else the deployment's, the one every app reads a wall-clock time in."""
+        business = self.business()
+        return (_zone_named(business.timezone) if business else None) or timezone.get_current_timezone()
+
+    def amount(self, value: int) -> Any:
+        """``value``, an amount in the minor unit of its currency, as the card's screen writes one on top
+        (``{"kind": "money", "value": …}``, with its ``money`` when it is in a currency of its own): every amount of a
+        card in one format, the screen's, nested or not; as sent when its write names a currency that is none."""
+        if not self.priced:
+            return value
+        money = self.money()
+        return {"kind": "money", "value": value, **({"money": money} if money else {})}
 
 
 def _zone_named(name: str) -> ZoneInfo | None:
@@ -500,17 +615,20 @@ def _fitting(value: Any, prop: dict, defs: dict, depth: int = 0) -> dict:
     return _resolved(prop, defs)
 
 
-def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words) -> Any:
+def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words, inner: bool = False) -> Any:
     """``value`` in words as its schema ``prop`` declares it, at any depth: a moment as the person's language writes it
     (``_moment``), a value of a closed list by the label its app's models give it (``_choice_label``), a record by
     its name (``_reference``) or else ``_LEFT_OUT`` — left out of an object, none in a list (which still says how many
-    it carries), as an attempt key (``ATTEMPT_KEY``) is, even empty; what is none of them, or not what its schema
-    declares (the write refuses it), as sent."""
+    it carries), as an attempt key (``ATTEMPT_KEY``) is, even empty; an amount (``MONEY``) inside an object or a list
+    as the screen writes one on top (``_Words.amount``), in the currency the object names, or the one of the record it
+    names (``CURRENCY``); what is none of them, or not what its schema declares (the write refuses it), as sent."""
     prop = _fitting(value, prop, defs)
     if _is_attempt_key(prop):
         return _LEFT_OUT
     if value is None or value == "":
         return value
+    if inner and _is_money(name, prop) and isinstance(value, int) and not isinstance(value, bool):
+        return words.amount(value)
     if REFERS in prop or (prop.get("format") == "uuid" and _is_uuid(value)):
         return _reference(value, prop, words)
     if prop.get("format") in MOMENTS and isinstance(value, str):
@@ -523,14 +641,18 @@ def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words) -> Any:
         props = prop.get("properties", {})
         extra = prop.get("additionalProperties")
         extra = extra if isinstance(extra, dict) else {}
+        own = words.within(value, props, defs)
         said = {
-            key: _said(inner, props.get(key, extra), defs, key if key in props else name, words) for key, inner in value.items()
+            key: _said(inner, props.get(key, extra), defs, key if key in props else name, own, inner=True)
+            for key, inner in value.items()
         }
         return {key: inner for key, inner in said.items() if inner is not _LEFT_OUT}
     if isinstance(value, list):
         items, prefix = prop.get("items"), prop.get("prefixItems", [])
         items = items if isinstance(items, dict) else {}
-        said = [_said(item, prefix[i] if i < len(prefix) else items, defs, name, words) for i, item in enumerate(value)]
+        said = [
+            _said(item, prefix[i] if i < len(prefix) else items, defs, name, words, inner=True) for i, item in enumerate(value)
+        ]
         return [None if item is _LEFT_OUT else item for item in said]
     return value
 
@@ -541,8 +663,9 @@ def _field(
     """One datum of a card, as its schema ``prop`` declares it: a secret hidden (``_hidden``) and, with the ``words``
     of its card, the rest in words (``_said``); ``None`` when it names a record the card cannot name or is an attempt
     key. An amount
-    carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (a preview's,
-    as its read answers it): without it, the card paints it in the business's. ``titled`` when ``label`` is the title
+    carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (the one its
+    write names, or a preview's, as its read answers it): without it, the card paints it in the business's; in a
+    currency its write names that is none, it is no amount but as sent. ``titled`` when ``label`` is the title
     its app wrote (``_own_title``): the screen calls it so over its own word for a datum it knows by its name
     (``assistant-card.ts`` ``FIELDS``: «Record» for an ``id`` Tables titles «Check»)."""
     # The title of the property itself, as its caller's ``label``: a ``$ref``'s own is its schema class's name.
@@ -557,7 +680,7 @@ def _field(
         kind = "empty"
     elif isinstance(value, bool):
         kind = "bool"
-    elif isinstance(value, int) and _is_money(name, prop):
+    elif isinstance(value, int) and _is_money(name, prop) and (words is None or words.priced):
         kind = "money"
     elif isinstance(value, list):
         kind = "list"
@@ -578,7 +701,8 @@ def _field(
 def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
     """What the person sees before ``op`` runs with ``arguments``: its app, its action, each datum it sends by its name
     in ``language`` (``_label``) and in words (``_said``: a moment, a value of a list, a record by its name, read as
-    ``ctx``'s person; an amount in cents marked ``money``, and ``signed`` when its schema declares it so), its risk
+    ``ctx``'s person; an amount its schema marks (``MONEY``) as ``money``, ``signed`` when it declares it so, in the
+    currency the write names, ``CURRENCY``), its risk
     and, for a dangerous one, what to type (``confirm_word``) — how many records when it names them by ``ids``, and
     ``blocked`` when it names none (not from the chat)."""
     schema = _schema(op)
@@ -593,11 +717,11 @@ def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | 
             count = len(ids)
         else:
             blocked = True
-    words = _Words(op, language, ctx)
+    words = _Words(op, language, ctx).within(arguments, props, defs)
     with translation.override(language):
         said = [
             # The title of the property itself: a ``$ref``'s own is its schema class's name.
-            _field(name, _label(op, name, prop.get("title")), prop, defs, arguments[name], words=words)
+            _field(name, _label(op, name, prop.get("title")), prop, defs, arguments[name], words.money(), words)
             for name, prop in props.items()
             if name in arguments
         ]
@@ -779,7 +903,7 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     """What the dangerous write ``op`` will do with ``arguments``, as its app says it: the read its ``ai=`` names
     (``"preview": {"operation": <a query of its app>, "fields": [<data of its answer>]}``), run as ``ctx``'s person
     — their permissions, their business — with the data of the write its input takes. The card's data, by their names
-    in the person's language and an amount in cents as money (``signed`` when its schema declares it so, as a
+    in the person's language and an amount (``MONEY``) as money (``signed`` when its schema declares it so, as a
     difference; in the currency the read answers, ``_answer_money``, when it answers one), in the order the app names
     them; what the read leaves empty or hides from this person (none: a blind count's expected cash) is not there.
     ``(None, None)`` without a preview; ``(outcome, None)`` when it cannot be read: the write is not confirmed blind."""
@@ -795,7 +919,7 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     defs = schema.get("$defs", {})
     props = schema.get("properties", {})
     money = _answer_money(answer)
-    words = _Words(read, ctx.language, ctx)
+    words = _Words(read, ctx.language, ctx, currency=money["currency"] if money else None)
     with translation.override(ctx.language):
         fields = [
             _field(
@@ -816,7 +940,7 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
 def check_previews(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     """``base.E005``: a preview names a read of the write's own app, the data of its answer the card shows and nothing
     the write does not send; only a dangerous write declares one (a normal one's card is a single line), and only an
-    amount in cents is declared signed."""
+    amount (``MONEY``, on a whole number) is declared signed."""
     errors: list[checks.CheckMessage] = []
     for op in registry.values():
         declared = preview_of(op)
@@ -855,7 +979,7 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     problems += [f"shows {name}, but {read.name} gives no field {name}" for name in fields if name not in given]
     shown = {name: _resolved(given[name], schema.get("$defs", {})) for name in fields if name in given}
     problems += [
-        f"marks {name} signed, but it is no amount in cents"
+        f"marks {name} signed, but it is no amount marked money"
         for name, prop in shown.items()
         if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(name, prop))
     ]
@@ -890,21 +1014,55 @@ def check_references(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     return errors
 
 
-def _marks(prop: dict, defs: dict, path: str = "", depth: int = 0) -> list[tuple[str, Any]]:
-    """Each ``REFERS`` mark of the schema ``prop`` at any depth, with the path of its datum."""
+def _marks(prop: dict, defs: dict, path: str = "", depth: int = 0, mark: str = REFERS) -> list[tuple[str, Any]]:
+    """Each ``mark`` (``REFERS``, else another) of the schema ``prop`` at any depth, with the path of its datum."""
     if depth > 8:  # a schema that names itself
         return []
     ref = prop.get("$ref")
     if ref:
         prop = {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
-    found = [(path, prop[REFERS])] if REFERS in prop else []
+    found = [(path, prop[mark])] if mark in prop else []
     for branch in [*prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]:
-        found += _marks(branch, defs, path, depth + 1)
+        found += _marks(branch, defs, path, depth + 1, mark)
     for name, inner in prop.get("properties", {}).items():
-        found += _marks(inner, defs, f"{path}.{name}" if path else name, depth + 1)
+        found += _marks(inner, defs, f"{path}.{name}" if path else name, depth + 1, mark)
     if isinstance(prop.get("items"), dict):
-        found += _marks(prop["items"], defs, f"{path}[]", depth + 1)
+        found += _marks(prop["items"], defs, f"{path}[]", depth + 1, mark)
     return found
+
+
+@checks.register("base")
+def check_currencies(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E011``: a datum marked ``CURRENCY`` is a code (``True``) or names a record by a read of the operation's
+    own app, of ``base`` or of one it requires, that takes the datum (``by``) and answers its currency (``code``)."""
+    errors: list[checks.CheckMessage] = []
+    for op in registry.values():
+        schema = _schema(op)
+        problems = [
+            f"{path} {problem}"
+            for path, declared in _marks(schema, schema.get("$defs", {}), mark=CURRENCY)
+            for problem in _currency_problems(op, declared)
+        ]
+        if problems:
+            errors.append(
+                checks.Error(
+                    f"{op.name} marks a currency that {'; '.join(problems)}.",
+                    hint='Mark a code json_schema_extra={"currency": True}, or the datum that names a record in a currency '
+                    'of its own base.schemas.in_currency_of("<app>.<entity>.<a query>", by="<its input>", '
+                    'code="<the datum of its answer that gives the currency>").',
+                    obj=op.name,
+                    id="base.E011",
+                )
+            )
+    return errors
+
+
+def _currency_problems(op: Operation, declared: Any) -> list[str]:
+    if declared is True:
+        return []
+    if not isinstance(declared, dict) or not all(isinstance(declared.get(key), str) for key in ("read", "by", "code")):
+        return ["is not true nor a read, by and code"]
+    return _reference_problems(op, {"read": declared["read"], "by": declared["by"], "name": declared["code"]})
 
 
 def _reference_problems(op: Operation, declared: Any) -> list[str]:
@@ -964,9 +1122,11 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   or a date: if no tool returned it, say you do not know or that you could not find it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
-- Amounts: fields «in cents» take the amount in the minor unit of the business's currency ({example}). To the
-  person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals) when
-  it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
+- Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its
+  description says: the one a datum marked `"currency": true` beside it names, or the one of the record (a cart, a
+  price list) a datum marked `"currency": {{"read": …}}` names, which that read gives; else the business's ({example}). To
+  the person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals)
+  when it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}
 - If something cannot be done from here (you have no tool for it), say on which screen it is done."""

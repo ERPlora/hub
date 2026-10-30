@@ -136,7 +136,7 @@ EmployeeNumber = _text(50)
 Color = Annotated[
     str, StringConstraints(strip_whitespace=True, pattern=r"^(#[0-9A-Fa-f]{6})?$")
 ]
-Cents = Annotated[int, Field(ge=0, le=99_999_999)]
+Cents = Annotated[int, Field(ge=0, le=99_999_999, json_schema_extra={"money": True})]
 Percent = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)]
 BookingBuffer = Annotated[int, Field(ge=0, le=240)]
 MemberName = _text(200, 1)
@@ -369,7 +369,7 @@ class BulkMemberIn(Schema):
     role: Text100 | None = Field(None, description=D_ROLE)
     # Any text up to 100: a date that does not parse skips its row (invalid_hire_date), not the batch.
     hire_date: _text(100) | None = Field(None, description=D_HIRE_DATE)
-    hourly_rate: int = Field(0, le=99_999_999, description=D_HOURLY_RATE)
+    hourly_rate: int = Field(0, le=99_999_999, description=D_HOURLY_RATE, json_schema_extra={"money": True})
     is_bookable: bool = Field(True, description=D_BOOKABLE)
     bio: str = Field("", description=D_BIO)
     specialties: str = Field("", description=D_SPECIALTIES)

@@ -290,10 +290,10 @@ class InvoiceListIn(PageIn):
         None, description="Issued on this day or earlier (YYYY-MM-DD)."
     )
     total_amount_from: int | None = Field(
-        None, description="Total of at least this many cents."
+        None, description="Total of at least this many cents.", json_schema_extra={"money": True}
     )
     total_amount_to: int | None = Field(
-        None, description="Total of at most this many cents."
+        None, description="Total of at most this many cents.", json_schema_extra={"money": True}
     )
     sort: Literal[
         "issued_at",
@@ -347,7 +347,7 @@ class ManualLineIn(Schema):
         description="Quantity, up to three decimals.",
     )
     unit_price: int = Field(
-        ge=0, le=MAX_AMOUNT, description="Unit price WITHOUT VAT, in cents."
+        ge=0, le=MAX_AMOUNT, description="Unit price WITHOUT VAT, in cents.", json_schema_extra={"money": True}
     )
     tax_category_key: Annotated[_text(255) | None, BeforeValidator(_blank_to_none)] = (
         Field(
@@ -854,9 +854,9 @@ class RectificationPreviewOut(Schema):
     whole: bool = Field(
         description="True: the whole original negated, line by line. False: what is left of it, one line per tax rate."
     )
-    base_amount: int = Field(title=gettext_noop("Tax base"), description="Its base, in cents (negative).")
-    tax_amount: int = Field(title=gettext_noop("Tax"), description="Its tax, in cents (negative).")
-    total_amount: int = Field(description="Its total, in cents (negative).")
+    base_amount: int = Field(title=gettext_noop("Tax base"), description="Its base, in cents (negative).", json_schema_extra={"money": True})
+    tax_amount: int = Field(title=gettext_noop("Tax"), description="Its tax, in cents (negative).", json_schema_extra={"money": True})
+    total_amount: int = Field(description="Its total, in cents (negative).", json_schema_extra={"money": True})
     currency: str
     currency_decimals: int = Field(description="The decimals of its currency (2 in EUR): its amounts' minor unit.")
     lines: list[PreviewLineOut] = Field(description="Its lines.")
