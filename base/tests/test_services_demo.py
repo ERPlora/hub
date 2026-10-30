@@ -133,12 +133,27 @@ class TestCreate:
         assert Hub.objects.filter(is_demo=True).count() == 1
         assert len(events("base.demo.created")) == 1
 
-    @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed", "ready"])
+    @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "ready"])
     def test_a_demo_still_being_made_is_the_browsers_live_one_too(self, status):
         first = create()
         Hub.objects.filter(slug=first.slug).update(status=status)
         again = create()
         assert (again.created, again.slug, again.status) == (False, first.slug, status)
+
+    def test_a_demo_whose_preparation_failed_is_no_live_one_the_browser_gets_another(self):
+        failed = create()
+        Hub.objects.filter(slug=failed.slug).update(status="failed", attempts=1)
+        HubDue.objects.filter(pk=failed.id).delete()
+        again = create()
+        assert again.created and again.slug != failed.slug and again.status == "requested"
+        # The failed one ends: its database (if any) is dropped by the reaper, as a demo that ran out.
+        assert Hub.objects.get(slug=failed.slug).status == "expired"
+        assert HubDue.objects.filter(pk=failed.id).exists()
+
+    def test_a_failed_demo_of_another_browser_never_takes_a_place_under_the_cap(self, settings):
+        settings.MAX_CONCURRENT_DEMOS = 1
+        Hub.objects.filter(slug=create(ANA).slug).update(status="failed")
+        assert create(BEA).created
 
     def test_demos_still_being_made_count_against_the_cap(self, settings):
         settings.MAX_CONCURRENT_DEMOS = 1

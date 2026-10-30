@@ -21,11 +21,14 @@ from base.tenancy.tests import hubs
 pytestmark = pytest.mark.usefixtures("hub_databases")
 
 
-@pytest.fixture(autouse=True)
-def on_the_tests_control_database(settings):
+@pytest.fixture(autouse=True, scope="session")
+def on_the_tests_control_database(django_db_setup):
     """These tests make and drop real databases next to control's: only ever the tests' own. pytest-django sets the
     test databases up only when the session has a ``django_db`` test (this module has one); without it control would
-    still be the developer's database."""
+    still be the developer's database, and ``hub_databases`` would make and drop its templates there. Session-scoped
+    and autouse, it runs before ``hub_databases`` builds anything."""
+    from django.conf import settings
+
     control = tenancy_connections.control_name()
     if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
         pytest.fail(f"The control database is {control!r}, not the tests': run this module whole, not one test of it.")
@@ -177,12 +180,37 @@ def test_a_missing_template_is_a_readable_failure_and_makes_nothing(hub_database
     assert name not in databases()
 
 
-@pytest.mark.parametrize("bad", ["postgres", "hub", "template1", 'x"; DROP DATABASE hub; --'])
+#: A hub of the developer's database (``hub``), of pre's and of prod's: never this session's.
+OTHER_CONTROLS = (
+    f"hub_{uuid.UUID(int=1).hex}",
+    f"hub_demo_{uuid.UUID(int=1).hex}",
+    f"pre_hub_{uuid.UUID(int=1).hex}",
+    "hub_template",
+    "hub_template_test",
+)
+
+
+@pytest.mark.parametrize(
+    "bad", ["postgres", "hub", "template0", "template1", 'x"; DROP DATABASE hub; --', *OTHER_CONTROLS]
+)
 def test_a_name_that_is_no_hubs_never_reaches_the_server(bad, hub_databases):
     with pytest.raises(names.InvalidDatabaseName):
         ops.clone_database(bad, template=hub_databases.template)
     with pytest.raises(names.InvalidDatabaseName):
         ops.drop_database(bad)
+
+
+def test_only_a_name_of_this_sessions_control_database_is_ever_dropped(hub_databases):
+    """What ``drop_database`` takes must pass ``names.validate`` with this session's control database: another
+    session's, the developer's (``hub``), pre's or a template are refused before the server hears anything."""
+    control = tenancy_connections.control_name()
+    assert control.startswith(django_connections.settings["default"]["TEST"]["NAME"])
+    for name in OTHER_CONTROLS:
+        with pytest.raises(names.InvalidDatabaseName):
+            names.validate_hub(name, control=control)
+    another_session = names.hub_db_name(f"{control}x", uuid.uuid7())
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.drop_database(another_session)
 
 
 def test_a_template_is_never_dropped(hub_databases):

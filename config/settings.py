@@ -195,8 +195,8 @@ db_optional_options = {
 db_connect_timeout = config("DB_CONNECT_TIMEOUT", default=5, cast=int)
 # Not test_hub: that one belongs to the packages/live suite, which may run at the same time. Two runs
 # of this suite at once (two sessions, two checkouts) each set their own TEST_DB_NAME, as saas-next.
-# Every database the suite makes derives from it: pytest-xdist appends `_gwN` and the tenancy a hub's
-# `_<hex>` (base.tenancy.names, which refuses a name past PostgreSQL's 63 characters). A name with no
+# Every database the suite makes derives from it: pytest-xdist appends `_gwN` and the tenancy a demo's
+# `_demo_<hex>`, its longest (base.tenancy.names, which refuses a name past PostgreSQL's 63 characters). A name with no
 # room for both (`_gw999`: up to 1000 workers) keeps its first characters and the first 8 of its
 # SHA-256: the same database every run (--reuse-db, the fleet's sweep) and another for another name.
 TEST_DB_NAME = config("TEST_DB_NAME", default="test_hub_next")

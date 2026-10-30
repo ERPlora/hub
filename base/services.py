@@ -1182,8 +1182,11 @@ def _demo_ttl() -> dt.timedelta:
     return dt.timedelta(minutes=settings.DEMO_TTL_MINUTES)
 
 
-#: The statuses of a demo that is not over: being made or ready (one per browser).
-LIVE_DEMO_STATUSES = frozenset({*registry.PREPARING_STATUSES, Hub.Status.READY})
+#: The statuses of a demo that is not over yet: the reaper ends it once its hour is up, an admin may end it by hand.
+OPEN_DEMO_STATUSES = frozenset({*registry.PREPARING_STATUSES, Hub.Status.READY})
+#: The statuses of a browser's live demo (one per browser, under the cap): being made or ready. One whose preparation
+#: failed is not: the browser gets another and that one ends.
+LIVE_DEMO_STATUSES = OPEN_DEMO_STATUSES - {Hub.Status.FAILED}
 
 
 def _demo_out(hub: Hub, *, created: bool) -> dict:
@@ -1233,16 +1236,23 @@ def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
     ``MAX_CONCURRENT_DEMOS`` live demos (being made or ready) it is ``base.demo_full`` (503). The count and the new row
     hold :data:`DEMO_CAP_LOCK`, so two calls at the same instant never pass the cap and one browser never gets two: the
     second looks again once the first has committed. A demo of this browser that ran out and the reaper has not purged
-    yet is marked ``expired`` first: it frees the browser for a new one.
+    yet, or whose preparation failed, is marked ``expired`` and due first (the reaper drops it): it frees the browser for
+    a new one.
     """
     internal_only(ctx)
     now = timezone.now()
     live = _live_demo_of(data.session_key, now)
     if live is not None:
         return _demo_out(live, created=False)
-    Hub.objects.filter(
-        is_demo=True, status__in=LIVE_DEMO_STATUSES, demo_session_key=data.session_key, expires_at__lte=now
-    ).update(status=Hub.Status.EXPIRED, updated_at=now)
+    ended = Hub.objects.filter(
+        Q(expires_at__lte=now) | Q(status=Hub.Status.FAILED),
+        is_demo=True,
+        status__in=OPEN_DEMO_STATUSES,
+        demo_session_key=data.session_key,
+    )
+    for hub in ended:
+        HubDue.mark_due(hub, now)
+    ended.update(status=Hub.Status.EXPIRED, updated_at=now)
     with connection.cursor() as cursor:
         cursor.execute(DEMO_CAP_LOCK)
     # Under the lock: a call of this browser that made its demo meanwhile has committed it.
@@ -1375,7 +1385,7 @@ def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
     """
     _platform_or_its_admin(ctx)
     hub = _locked_demo(data.slug)
-    if hub.status in LIVE_DEMO_STATUSES:
+    if hub.status in OPEN_DEMO_STATUSES:
         now = timezone.now()
         hub.status = Hub.Status.EXPIRED
         hub.expires_at = min(hub.expires_at, now) if hub.expires_at is not None else now
@@ -1438,13 +1448,13 @@ def reap_demos(now: dt.datetime | None = None) -> int:
     now = now or timezone.now()
     ended = list(
         Hub.objects.filter(
-            Q(status__in=LIVE_DEMO_STATUSES, expires_at__lte=now)
+            Q(status__in=OPEN_DEMO_STATUSES, expires_at__lte=now)
             | Q(status__in=(Hub.Status.EXPIRED, Hub.Status.DROPPING)),
             is_demo=True,
         ).only("id", "slug")
     )
     with transaction.atomic():
-        Hub.objects.filter(pk__in=[hub.pk for hub in ended], status__in=LIVE_DEMO_STATUSES).update(
+        Hub.objects.filter(pk__in=[hub.pk for hub in ended], status__in=OPEN_DEMO_STATUSES).update(
             status=Hub.Status.EXPIRED, updated_at=now
         )
         for hub in ended:
