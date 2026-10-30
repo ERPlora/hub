@@ -448,7 +448,8 @@ Entra: los pasos guardados y los permisos que tiene.
 Sale: la lista completa de permisos de la automatización (`flow.flow.granted`). Antes del primer
 guardado no hay nada que autorizar: la pestaña lo dice y pide guardar.
 Si falla: si la lista nombra algo que no existe en el negocio, o algo que necesita a una persona delante
-(anular, devolver, borrar datos, enviar a Hacienda…), se rechaza entera y se dice qué. Nadie concede lo
+(anular, devolver, borrar datos, enviar a Hacienda, sentar a un grupo que llega…), se rechaza entera y se
+dice qué. Nadie concede lo
 que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».» (tampoco una
 integración con su clave). Cada paso actúa solo con el permiso que se le concedió, nunca con todos los
 de quien la montó. Reservar con solo el nombre y el teléfono de quien reserva busca o crea su ficha de
@@ -1210,9 +1211,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Catálogo sin inventar nombres**: los avisos son los `events.ALL` de las apps activas (todas declaran
   el suyo); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
   declara su app (las de «solo la plataforma» quedan fuera) **y que no necesitan a una persona delante**:
-  toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) queda
-  fuera y se rechaza al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión
-  2026-10-15). En la fase 1 «activas» son las instaladas (como `base.session.me`); la fase 2 lo cambia por
+  toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) o que
+  se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`,
+  revisión 2026-10-30; ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
+  al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). En la fase 1 «activas» son las instaladas (como `base.session.me`); la fase 2 lo cambia por
   la foto del SaaS en `queries.active_apps`.
 - **Con qué actúa**: el motor solo llama a las operaciones de la lista `grants`, que fija un propietario
   o administrador, que se valida entera contra el catálogo y que solo contiene lo que quien la concede

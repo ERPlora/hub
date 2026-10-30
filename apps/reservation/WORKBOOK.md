@@ -392,8 +392,9 @@ fuera de servicio: «La mesa 5 (Terraza) no se puede reservar: está bloqueada o
 mesa ocupada por otros (también por el grupo de otra reserva sentado antes, aunque al sentarlo desde el
 plano se gastara la retención de esta): «La mesa 5 (Terraza) está ocupada ahora mismo: libérala, o pasa
 la reserva a otra mesa antes de sentarla.»; si Mesas o Ventas rechazan sentar, su motivo. En todos, la
-reserva no cambia.
-Implicados: TABLE-F10, TABLE-F28
+reserva no cambia. Sentar se hace en la puerta, con quien recibe al grupo: una automatización no puede
+hacerlo (se le pueden autorizar confirmar, cambiar, completar y la lista de espera, nunca sentar).
+Implicados: TABLE-F10, TABLE-F28, FLOW-F12
 
 ### RESERVATION-F12 Completar la reserva
 <!-- origen: fi:modules/reservations#command-reservations-reservations-set_status-handler-wasm-set_status wf:whatsapp-mesa#rec_wa_mesa-f10 old:reservations/workflow/reservas.md#reservations-f12 wf:restaurante-dia#rec_restaurante-f13 -->
@@ -741,7 +742,10 @@ la que solo se le autorizó reservar.
   Citas); la ficha por teléfono (`card_for_phone`, al reservar y en la lista de espera) se busca y se
   crea con `customer.view` y `customer.manage` añadidos solo para esas dos llamadas (`card_keeper`): un
   paso de una automatización, que solo lleva el permiso de su operación y las lecturas de Reservas
-  (FLOW-F12), reserva por teléfono sin recibir permisos de Clientes.
+  (FLOW-F12), reserva por teléfono sin recibir permisos de Clientes. Sentar (`reservation.reservation.seat`)
+  declara `ai.in_person`: Automatizaciones no lo ofrece ni lo concede (`flow.high_risk`), porque abre la
+  cuenta de la mesa con la sesión de quien sienta (`table.add_session` y `sale.add_sale`); el asistente, con
+  una persona delante, sienta sin pedir confirmación (`risk: normal`).
 - **Modelos**: `Settings` (una fila), `TimeSlot` (día de la semana, desde, hasta, máximo de reservas y
   de comensales; borrado lógico; sin solapes en el mismo día), `BlockedDate` (todo el día o
   desde–hasta; único por fecha y hora de inicio entre los vivos), `Reservation` (cliente, nombre,

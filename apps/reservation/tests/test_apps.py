@@ -148,6 +148,21 @@ def test_navigation_is_the_three_sections_of_the_old_module_with_its_icons():
     ]
 
 
+#: Done at the door by whoever receives the party (``ai.in_person``): never granted to an automation (FLOW-F12), and
+#: still of normal risk, so the assistant seats by voice without a confirmation card.
+IN_PERSON = {"reservation.reservation.seat"}
+
+
+def test_seating_is_done_in_person_and_of_normal_risk():
+    from live.operations import get
+
+    from base.assistant import risk
+
+    seat = get("reservation.reservation.seat")
+    assert seat.ai["in_person"] is True
+    assert risk(seat) == "normal"
+
+
 def test_the_operations_are_the_workbook_ones():
     from live.operations import registry
 
@@ -166,7 +181,10 @@ def test_every_operation_is_a_tool_of_the_assistant():
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if op.name in IN_PERSON:
+            expected = expected | {"in_person"}
         assert set(op.ai) == expected, op.name
+        assert op.ai.get("in_person", False) is (op.name in IN_PERSON), op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name
 

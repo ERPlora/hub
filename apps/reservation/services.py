@@ -705,6 +705,8 @@ def confirm_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
         "check opens in Sales. A table that is taken is refused (free it or move the reservation first), unless "
         "this party was already seated at it from the floor plan: then only the reservation is marked.",
         "risk": "normal",
+        # Done at the door by whoever receives the party, never by an automation (FLOW-F12).
+        "in_person": True,
     },
 )
 def seat_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
