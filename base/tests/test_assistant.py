@@ -235,9 +235,15 @@ def test_a_title_its_app_wrote_names_the_datum_in_its_translation_or_in_english(
     assert labels(assistant.card(TITLED, arguments, "en")) == ["Owner", "Family name"]
 
 
+class Place(Schema):
+    city: str = ""
+
+
 class HalfTitledIn(Schema):
     id: str = Field(title="Gizmo slot")
     name: str = ""
+    #: A schema of its own: its title is its class's name («Place»), none its app wrote for the datum.
+    category: Place | None = None
 
 
 HALF_TITLED = Operation(
@@ -266,8 +272,9 @@ def test_a_title_its_app_wrote_is_marked_so_for_the_card_to_name_the_datum_by_it
     assert titled(assistant.card(TITLED, arguments, "en")["fields"]) == {"first_name": True, "last_name": True}
     # «Family name» has no Spanish: its card says the model's «Apellidos», no title of its app's.
     assert titled(assistant.card(TITLED, arguments, "es")["fields"]) == {"first_name": True, "last_name": False}
-    assert titled(assistant.card(HALF_TITLED, {"id": "7", "name": "Ana"}, "es")["fields"]) == {"id": False, "name": False}
-    assert titled(assistant.card(HALF_TITLED, {"id": "7", "name": "Ana"}, "en")["fields"]) == {"id": True, "name": False}
+    half = {"id": "7", "name": "Ana", "category": {"city": "Vigo"}}
+    assert titled(assistant.card(HALF_TITLED, half, "es")["fields"]) == {"id": False, "name": False, "category": False}
+    assert titled(assistant.card(HALF_TITLED, half, "en")["fields"]) == {"id": True, "name": False, "category": False}
     price = assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"]
     assert titled(price) == {"price": False}
     assert "titled" not in price[0]
