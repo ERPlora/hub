@@ -12,6 +12,9 @@ export interface AssistantField {
   label: string;
   kind: 'text' | 'money' | 'bool' | 'list' | 'object' | 'empty';
   value: unknown;
+  /** Its `label` is the title its app wrote («Cuenta» for the check a write of Tables touches): the card calls it so,
+   *  over its own word for a datum it knows by its name (`FIELDS`). */
+  titled?: boolean;
   /** An amount its app declares signed (Cash register's difference): «+» over, «-» short, none at zero. */
   signed?: boolean;
   /** The currency of an amount of a preview, as its read answers it (an invoice keeps the one it was issued in);
@@ -61,8 +64,8 @@ export function screenKey(screen: string | undefined): string | null {
   return screen && Object.hasOwn(SCREENS, screen) ? `base.assistant.screens.${screen}` : null;
 }
 
-/** The data a card names itself in the person's language (`base.assistant.card.fields.<name>`); another, by the
- *  label the server gives it in that language (base/assistant.py `_label`). */
+/** The data a card names itself in the person's language (`base.assistant.card.fields.<name>`) unless their app titles
+ *  them; another, by the label the server gives it in that language (base/assistant.py `_label`). */
 const FIELDS = [
   'name', 'price', 'amount', 'note', 'notes', 'status', 'email', 'phone', 'quantity', 'qty', 'description',
   'duration_minutes', 'date', 'time', 'starts_at', 'ends_at', 'customer_id', 'reason', 'id', 'ids', 'title', 'category',
@@ -112,11 +115,11 @@ export function fieldText(field: AssistantField, format: CardFormat): string {
   }
 }
 
-/** A dangerous write's data, one line each: its name in the person's language (or the server's label) and its value
- *  in words. What it sends and what it will do (its preview) are said alike. */
+/** A dangerous write's data, one line each: the title its app wrote, else its name in the person's language, else the
+ *  server's label, and its value in words. What it sends and what it will do (its preview) are said alike. */
 export function fieldLines(fields: readonly AssistantField[], format: CardFormat): string[] {
   return fields.map((field) => {
-    const key = fieldLabelKey(field.name);
+    const key = field.titled ? null : fieldLabelKey(field.name);
     return `${key ? format.t(key) : field.label}: ${fieldText(field, format)}`;
   });
 }

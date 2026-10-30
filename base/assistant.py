@@ -289,15 +289,24 @@ def _choice_label(app_label: str, entity: str, name: str, value: Any) -> Any:
     return None
 
 
-def _label(op: Operation, name: str, title: str | None) -> str:
-    """How the card names the datum ``name``, in the active language and never by a technical name (gh:hub#1040): by the
-    title its schema gives it when a catalog translates it, or as written when the person reads the code's language;
-    else by the name its app's models give that field, the one its screens show; else by its title, through the
-    catalogs. One way for every app: nothing to list here by hand."""
+def _own_title(name: str, title: str | None) -> str | None:
+    """The title the schema gives the datum ``name`` itself — not the one pydantic makes up from its name —, in the
+    active language: as a catalog translates it, or as written when the person reads the code's language; else
+    ``None`` (one nobody translated never reaches a Spanish card)."""
     if title and title != _generated_title(name):
         translated = gettext(title)
         if translated != title or _in_code_language():
             return translated
+    return None
+
+
+def _label(op: Operation, name: str, title: str | None) -> str:
+    """How the card names the datum ``name``, in the active language and never by a technical name (gh:hub#1040): by the
+    title its schema gives it (``_own_title``); else by the name its app's models give that field, the one its screens
+    show; else by its title, through the catalogs. One way for every app: nothing to list here by hand."""
+    own = _own_title(name, title)
+    if own is not None:
+        return own
     verbose = _verbose_name(op.app_label, op.name.split(".")[1], name)
     if verbose is not None:
         return capfirst(str(verbose))
@@ -519,7 +528,11 @@ def _field(
     """One datum of a card, as its schema ``prop`` declares it: a secret hidden (``_hidden``) and, with the ``words``
     of its card, the rest in words (``_said``); ``None`` when it names a record the card cannot name. An amount
     carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (a preview's,
-    as its read answers it): without it, the card paints it in the business's."""
+    as its read answers it): without it, the card paints it in the business's. ``titled`` when ``label`` is the title
+    its app wrote (``_own_title``): the screen calls it so over its own word for a datum it knows by its name
+    (``assistant-card.ts`` ``FIELDS``: «Record» for an ``id`` Tables titles «Check»)."""
+    # The title of the property itself, as its caller's ``label``: a ``$ref``'s own is its schema class's name.
+    titled = _own_title(name, prop.get("title")) is not None
     value = _hidden(value, prop, defs)
     if words is not None:
         value = _said(value, prop, defs, name, words)
@@ -539,6 +552,8 @@ def _field(
     else:
         kind = "text"
     field = {"name": name, "label": label, "kind": kind, "value": value}
+    if titled:
+        field["titled"] = True
     if kind == "money" and _is_signed(prop):
         field["signed"] = True
     if kind == "money" and money is not None:

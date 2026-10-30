@@ -10,12 +10,14 @@ it is left out, never shown by its id.
 import datetime as dt
 import json
 import re
+from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
 import pytest
+from django.conf import settings
 from django.core import checks
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
@@ -407,6 +409,69 @@ UNNAMED = Operation(
 def test_the_ratchet_counts_a_reference_nobody_marks_and_a_list_nobody_labels():
     assert unnamed(UNNAMED) == (["member_id"], ["mode"])
     assert by_app([UNNAMED, UNNAMED]) == ({"appointment": 2}, {"appointment": 2})
+
+
+# ── A datum the screen knows by its name, titled by its app (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME) ──
+
+#: What the card of a dangerous write calls a datum it knows by its name (``assistant-card.ts`` ``FIELDS``, base's
+#: catalogue) when its app gives it no title of its own, in Spanish.
+KNOWN = json.loads((Path(settings.BASE_DIR) / "base/frontend/locale/es.json").read_text())["base"]["assistant"]["card"][
+    "fields"
+]
+
+#: Every datum the screen knows by its name that a write's schema titles itself, and what its card calls it in
+#: Spanish: the title its app wrote, never the generic word for its name («Registro: 5 (Terraza)»).
+TITLED_IN_SPANISH = {
+    "attendance.record.close_for_terminated:id": "Persona",
+    "base.support.report:description": "¿Qué pasó?",
+    **{f"table.session.{action}:id": "Cuenta" for action in (
+        "close", "delete", "link_order", "merge", "park", "restore", "set_guests", "split", "transfer",
+    )},
+    **{f"table.table.{action}:id": "Mesa" for action in ("delete", "move", "update")},
+    **{f"table.zone.{action}:id": "Zona" for action in ("delete", "update")},
+}
+
+
+def card_title(field: dict) -> str:
+    """What the card calls ``field``, as ``assistant-card.ts`` ``fieldLines`` does: by the title its app wrote, else by
+    the screen's word for a datum it knows, else by the label the server gives it."""
+    return field["label"] if field.get("titled") else KNOWN.get(field["name"], field["label"])
+
+
+def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title(monkeypatch):
+    """Every write the assistant may run: a datum the screen knows by its name («Registro» for ``id``) that its app
+    titles («Cuenta») is called by that title in Spanish; every other one keeps the screen's word — none goes by its
+    name as sent («Id»)."""
+    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "5 (Terraza)")
+    titles: dict[str, str] = {}
+    for op in writes():
+        props = op.input.model_json_schema().get("properties", {})
+        arguments = {name: TABLE for name in props if name in KNOWN}
+        for field in assistant.card(op, arguments, "es")["fields"]:
+            if card_title(field) != KNOWN[field["name"]]:
+                titles[f"{op.name}:{field['name']}"] = card_title(field)
+    assert titles == TITLED_IN_SPANISH
+    assert not {title for title in titles.values() if title.lower() in {"id", "ids"} or "_" in title}
+
+
+def test_no_preview_titles_a_datum_the_screen_knows_by_its_name():
+    """What a dangerous write will do (BASE-F98) is said as what it sends: today no read a preview names titles a datum
+    the screen knows (Employees' PIN removal says the person's «Nombre» and «Correo electrónico», as pydantic titles
+    them); one that does is called by its title, and comes in here."""
+    titled = []
+    for op in writes():
+        declared = assistant.preview_of(op)
+        if declared is None:
+            continue
+        read = registry[declared["operation"]]
+        out = assistant._output_schema(read).get("properties", {})
+        with translation.override("es"):
+            titled += [
+                f"{op.name} › {read.name}:{name}"
+                for name in declared["fields"]
+                if name in KNOWN and assistant._own_title(name, out[name].get("title")) is not None
+            ]
+    assert titled == []
 
 
 # ── The mark, checked at start (base.E009) ────────────────────────────────────────────────────────────────────────────

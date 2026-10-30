@@ -1423,6 +1423,11 @@ class AssistantFieldOut(Schema):
     label: str
     kind: Literal["text", "money", "bool", "list", "object", "empty"]
     value: Any = None
+    titled: bool = Field(
+        default=False,
+        description="Its label is the title its app wrote (a check, a table): the card calls it so over its own word "
+        "for a datum it knows by its name.",
+    )
     signed: bool = Field(
         default=False,
         description="An amount its app declares signed (a difference): written with its sign, «+» over.",

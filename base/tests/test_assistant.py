@@ -235,6 +235,52 @@ def test_a_title_its_app_wrote_names_the_datum_in_its_translation_or_in_english(
     assert labels(assistant.card(TITLED, arguments, "en")) == ["Owner", "Family name"]
 
 
+class HalfTitledIn(Schema):
+    id: str = Field(title="Gizmo slot")
+    name: str = ""
+
+
+HALF_TITLED = Operation(
+    name="base.profile.half_titled",
+    kind="command",
+    permission="base.view_home",
+    input=HalfTitledIn,
+    output=HalfTitledIn,
+    expose_api=False,
+    ai={"description": "A write whose schema titles a datum no catalog translates.", "risk": "high"},
+    fn=lambda ctx, data: data,
+)
+
+
+def titled(fields: list[dict]) -> dict[str, bool]:
+    return {field["name"]: field.get("titled", False) for field in fields}
+
+
+def test_a_title_its_app_wrote_is_marked_so_for_the_card_to_name_the_datum_by_it():
+    """FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: a dangerous write of Tables said «Registro:
+    5 (Terraza)» where its schema titles the check «Cuenta»: the screen names a datum it knows by its own word
+    (``assistant-card.ts`` ``FIELDS``: ``id`` is «Record») and could not tell the title its app wrote from one made up.
+    The card says which: a title its app wrote, said in the person's language, is ``titled``; one no catalog
+    translates, the model's name of the field or the one pydantic makes up, never."""
+    arguments = {"first_name": "Ana", "last_name": "Gil"}
+    assert titled(assistant.card(TITLED, arguments, "en")["fields"]) == {"first_name": True, "last_name": True}
+    # «Family name» has no Spanish: its card says the model's «Apellidos», no title of its app's.
+    assert titled(assistant.card(TITLED, arguments, "es")["fields"]) == {"first_name": True, "last_name": False}
+    assert titled(assistant.card(HALF_TITLED, {"id": "7", "name": "Ana"}, "es")["fields"]) == {"id": False, "name": False}
+    assert titled(assistant.card(HALF_TITLED, {"id": "7", "name": "Ana"}, "en")["fields"]) == {"id": True, "name": False}
+    price = assistant.card(get("service.service.create"), {"price": 1500}, "es")["fields"]
+    assert titled(price) == {"price": False}
+    assert "titled" not in price[0]
+
+
+@pytest.mark.django_db
+def test_a_title_the_read_of_a_preview_wrote_is_marked_so_too(settle):
+    """What a dangerous write will do (BASE-F98) is said as what it sends: the read titles its owner and its person."""
+    failure, fields = assistant.preview(ctx(language="es"), settle, {"id": "7"})
+    assert failure is None
+    assert titled(fields) == {"asked_by": True, "name": True, "total_cents": False}
+
+
 # FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-SECRETSTR-IN-CLEAR: the card painted a secret (a certificate's password, an
 # automation's secret: ``SecretStr``) as typed, on the screen and in what the browser receives. Its schema says so
 # (``format: password``, ``writeOnly``): at any depth, the card shows it hidden; the write still receives it.
