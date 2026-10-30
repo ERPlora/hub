@@ -1045,8 +1045,9 @@ foto. Deshacer la importación (BASE-F34) borra también las fotos que copió, y
 Si falla: una foto que falta en el archivo, o una imagen que la librería ya no tiene, no impide importar
 el artículo: entra sin foto (con sus iniciales) y el informe de la importación lo dice. Una foto que no
 cabe en el espacio del plan del negocio que importa deja su artículo sin foto, con el motivo en el
-informe. Los topes del archivo (hoy 5 MB, 50 MB descomprimido y 200 entradas) se revisan con este flujo
-para que quepan las fotos, y los que se elijan se escriben aquí.
+informe. El archivo pesa 20 MB como mucho, 100 MB descomprimido, con 1 000 entradas como mucho (antes 5 MB,
+50 MB y 200): caben 300 fotos de 60 KB. Una foto de dentro que no es un WebP de hasta 2 MB hace que el archivo no
+se pueda leer («El fichero trae una foto que no es una imagen WebP de hasta 2 MB, así que no se puede leer.»).
 Implicados: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
 ## Qué comparten los verticales
@@ -1314,12 +1315,13 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     ninguna).
   - TPV: `apps/sale/frontend/components/pos/ProductTile.vue` y `ComboTiles.vue` pintan hoy `initials()` sobre
     `tileGradient()` (`till.ts`); pasan a la foto con las iniciales de respaldo, también en el `error` de la
-    imagen. Si un menú lleva foto propia lo decide Menús (`market-decision`); mientras no la tenga, su
-    baldosa sigue con las iniciales.
+    imagen. El menú lleva foto, de la librería o propia, como el artículo: lo decidió Menús con `market-decision`
+    (COMBO-F14, 2026-10-30); sin ella, su baldosa sigue con las iniciales.
   - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip (como hub#1008 del producto
     viejo) y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
-    no duplica (el SKU se salta); `undo` y `reset` borran las copias. Los límites (`MAX_FILE_BYTES` 5 MB,
-    `MAX_INFLATED_BYTES` 50 MB, `MAX_ENTRIES` 200) se revisan para las fotos con su test y se escriben en F33.
+    no duplica (el SKU se salta); `undo` y `reset` borran las copias. Límites desde el 2026-10-30
+    (`base/tests/test_blueprint_images.py`): `MAX_FILE_BYTES` 20 MB, `MAX_INFLATED_BYTES` 100 MB, `MAX_ENTRIES` 1 000
+    y cada `media/` un WebP de `MAX_PHOTO_BYTES` 2 MB (motivo `bad_photo`); antes 5 MB, 50 MB y 200.
   - Supersede la «una copia por paquete o por negocio» del producto viejo (ADR-0121, hub#1006, README de
     `erplora-old/blueprints`): la librería es una sola copia para todos los hubs.
   - Choque en la referencia: el `WORKFLOW.md` viejo de inventario dice «no hay campo de imagen» (F01) mientras
