@@ -4,10 +4,11 @@
 // provider (assistant-provider.ts, an OpenAI-compatible server on 127.0.0.1 that this spec starts): no mock between the
 // Hub and the provider. The SaaS must be seeded with that provider (README «El asistente»).
 // No card books appointments (F14). The owner turns «Book a table» on (its answer and its notice, in Automations'
-// gallery too: FLOW-F33); the guest's message comes in as erplora.com pushes it; the worker's relay hands its event to
-// Automations, whose run reads it, thanks them, makes their card and asks the assistant with only what the answer was
-// granted; the reservation it wants waits in «Waiting for your answer» with whom it is for, and the owner's «Approve»
-// books it in Reservas. «Turn off» pauses both, never deleting them (F17).
+// gallery too: FLOW-F33); the message of a guest who wrote before (their card, come by WhatsApp, already in Customers)
+// comes in as erplora.com pushes it; the worker's relay hands its event to Automations, whose run reads it, thanks them,
+// finds their card and asks the assistant with only what the answer was granted, naming that card; the reservation it
+// wants on it waits in «Waiting for your answer» with whom it is for, and the owner's «Approve» books it in Reservas.
+// «Turn off» pauses both, never deleting them (F17).
 // flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F14 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -158,9 +159,20 @@ for (const viewport of VIEWPORTS) {
       await settled(page);
       await capture(page, `${TASK}-settings-${viewport.label}`);
 
-      // F24: they write; the relay starts the answer, which thanks them, makes their card and asks the assistant.
+      // F24: they write; the relay starts the answer, which thanks them, finds their card and asks the assistant, who
+      // books on that card by its id, as the answer tells it (with the id, Reservas looks no one up).
       const phone = e2ePhone();
-      const booking = { guest_name: 'E2E Lucía', guest_phone: phone, date: DAY.date, time: '21:00', party_size: 4, source: 'whatsapp' };
+      const guest = await api<{ id: string }>(context, A, 'POST', '/customer/customers', { name: 'E2E Lucía', phone, source: 'whatsapp' });
+      expect(guest.status, JSON.stringify(guest.data)).toBe(201);
+      const booking = {
+        customer_id: guest.data.id,
+        guest_name: 'E2E Lucía',
+        guest_phone: phone,
+        date: DAY.date,
+        time: '21:00',
+        party_size: 4,
+        source: 'whatsapp',
+      };
       const message = receive(phone, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`, 'E2E Lucía');
       const received = psql(
         `select id from live_outboxevent where name = 'whatsapp_inbox.message.received' and payload->>'id' = '${message.id}'`,
@@ -171,10 +183,11 @@ for (const viewport of VIEWPORTS) {
       const before = chats();
       await relay(parkedEvent(flowId));
 
-      // The assistant was offered only what the answer grants of the Hub's operations (`<app>__<entity>__<action>`;
-      // the SaaS adds its own clock), and wanted to book: nothing is booked yet.
+      // The assistant was told their card and offered only what the answer grants of the Hub's operations
+      // (`<app>__<entity>__<action>`; the SaaS adds its own clock), and wanted to book: nothing is booked yet.
       const turns = provider.seen.filter((seen) => seen.path === '/v1/chat/completions').slice(before);
       expect(turns).toHaveLength(1);
+      expect(JSON.stringify(turns[0].body)).toContain(`their customer card is ${guest.data.id}:`);
       const tools = ((turns[0].body as { tools?: { function: { name: string } }[] }).tools ?? [])
         .map((tool) => tool.function.name)
         .filter((name) => name.includes('__'));
@@ -205,15 +218,16 @@ for (const viewport of VIEWPORTS) {
       await settled(page);
       await capture(page, `${TASK}-${viewport.label}`);
 
-      // «Approve»: Reservas books it, on their card, and the assistant hears what Reservas answered.
+      // «Approve»: Reservas books it, on their card (no second one), and the assistant hears what Reservas answered.
       await question.locator('[data-testid^=flow-question-yes-]').click();
       await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
       await expect(question).toHaveCount(0);
       expect(
         psql(
-          `select r.party_size || ' ' || r.time::text || ' ' || r.source || ' ' || (r.customer_id = c.id)::text from reservation_reservation r join customer_customer c on c.source = 'whatsapp' and c.phone like '%${phone.slice(-9)}' where r.guest_phone = '${phone}'`,
+          `select r.party_size || ' ' || r.time::text || ' ' || r.source || ' ' || r.customer_id::text from reservation_reservation r where r.guest_phone = '${phone}'`,
         ),
-      ).toBe('4 21:00:00 whatsapp true');
+        `what Reservas answered: ${psql(`select outputs->'_turn'->'messages' from flow_flowrun where flow_id = '${flowId}'`)}`,
+      ).toBe(`4 21:00:00 whatsapp ${guest.data.id}`);
       const asked = chats();
       await relay(parkedEvent(flowId));
       expect(chats()).toBe(asked + 1);
