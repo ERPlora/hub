@@ -19,6 +19,7 @@ from .conftest import make_flow
 pytestmark = pytest.mark.django_db
 
 TASK = "task.task.create"
+DAY = "reservation.availability.day"
 
 
 def declaration(**more) -> dict:
@@ -45,6 +46,14 @@ def declaration(**more) -> dict:
     }
     declared.update(more)
     return declared
+
+
+def asking(*tools: str, before: tuple[dict, ...] = ()) -> dict:
+    """A recipe whose «Ask the assistant» step may use ``tools``, after the steps ``before``; it asks for exactly
+    the permissions they use."""
+    steps = [*before, {"id": "s9", "kind": "assistant", "prompt": "Offer the customer another day.", "tools": list(tools)}]
+    names = [step["operation"] for step in before] + list(tools)
+    return declaration(id="ask", steps=steps, grants={name: "Looks it up." for name in names})
 
 
 @pytest.fixture
@@ -130,6 +139,84 @@ def test_a_recipe_that_needs_an_app_this_business_does_not_have_is_set_aside_nam
     assert offered == []
     assert [(item.ref, item.code, item.apps) for item in set_aside] == [
         ("appointment/gap", "flow.recipe_needs_apps", ("task",))
+    ]
+
+
+def test_a_recipe_whose_assistant_uses_a_tool_of_an_app_this_business_does_not_have_is_set_aside_naming_it(
+    declared, monkeypatch
+):
+    # FLOW-F33: its only reference to Reservations is a tool of «Ask the assistant»; the gallery says which app
+    # to turn on, never «it is wrong».
+    declared(("appointment", asking(DAY)))
+    without(monkeypatch, "reservation")
+    offered, set_aside = recipes.shelf()
+    assert offered == []
+    assert [(item.ref, item.code, item.apps, item.message) for item in set_aside] == [
+        (
+            "appointment/ask",
+            "flow.recipe_needs_apps",
+            ("reservation",),
+            "It needs apps this business does not have: reservation.",
+        )
+    ]
+
+
+def test_with_that_app_on_the_recipe_whose_assistant_uses_its_tool_is_offered(declared):
+    declared(("appointment", asking(DAY)))
+    offered, set_aside = recipes.shelf()
+    assert [recipe.ref for recipe in offered] == ["appointment/ask"]
+    assert set_aside == []
+
+
+def test_an_app_named_by_a_step_and_by_a_tool_is_needed_once(declared, monkeypatch):
+    get = {"id": "s1", "kind": "query", "operation": "reservation.reservation.get", "params": {"id": "input.id"}}
+    declared(("appointment", asking(DAY, before=(get,))))
+    without(monkeypatch, "reservation", "task")
+    _, set_aside = recipes.shelf()
+    assert [(item.code, item.apps) for item in set_aside] == [("flow.recipe_needs_apps", ("reservation",))]
+
+
+@pytest.mark.parametrize(
+    "more",
+    [
+        # Its only reference to Reservations is the event it starts on…
+        {"trigger": {"kind": "event", "event": "reservation.reservation.created"}},
+        # …or a step that looks something up.
+        {
+            "steps": [
+                {"id": "s1", "kind": "query", "operation": "reservation.reservation.get", "params": {"id": "input.id"}}
+            ],
+            "grants": {"reservation.reservation.get": "Looks it up."},
+        },
+    ],
+    ids=["trigger", "query"],
+)
+def test_an_app_named_only_by_the_trigger_or_by_a_step_that_reads_is_needed(declared, monkeypatch, more):
+    declared(("appointment", declaration(**more)))
+    without(monkeypatch, "reservation")
+    _, set_aside = recipes.shelf()
+    assert [(item.code, item.apps) for item in set_aside] == [("flow.recipe_needs_apps", ("reservation",))]
+
+
+@pytest.mark.parametrize(
+    ("kind", "name"),
+    [
+        # The platform's own tools are no app to turn on.
+        ("assistant", "base.profile.update"),
+        # Nor this app's own: Automations is on, it is reading the recipe.
+        ("assistant", "flow.flow.list"),
+        ("query", "flow.flow.list"),
+    ],
+)
+def test_a_name_of_no_app_this_business_can_turn_on_needs_no_app_and_is_set_aside_naming_it(declared, kind, name):
+    if kind == "assistant":
+        step = {"id": "s9", "kind": "assistant", "prompt": "Do it.", "tools": [name]}
+    else:
+        step = {"id": "s1", "kind": "query", "operation": name, "params": {}}
+    declared(("appointment", declaration(steps=[step], grants={name: "Looks it up."})))
+    _, set_aside = recipes.shelf()
+    assert [(item.code, item.apps, item.message) for item in set_aside] == [
+        ("flow.recipe_invalid", (), f"That action does not exist in this business: «{name}».")
     ]
 
 
