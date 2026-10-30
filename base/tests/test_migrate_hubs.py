@@ -208,26 +208,27 @@ def test_erploras_own_hub_goes_first_then_at_most_four_at_once(small, make_hub, 
     platform = make_hub(missing_database(), is_platform=True)
     others = [make_hub(missing_database()) for _ in range(7)]
     guard = threading.Lock()
-    seen: list[str] = []
+    events: list[tuple[str, str]] = []
     inside = [0]
     peak = [0]
 
     def ensure_schema(hub, **kwargs):
         with guard:
-            seen.append(hub.slug)
+            events.append(("start", hub.slug))
             inside[0] += 1
             peak[0] = max(peak[0], inside[0])
         time.sleep(0.5)  # long enough for every worker of the pool to be inside at once
         with guard:
             inside[0] -= 1
+            events.append(("end", hub.slug))
         return []
 
     monkeypatch.setattr(migrator, "ensure_schema", ensure_schema)
 
     out = migrate_hubs()
 
-    assert seen[0] == platform.slug
-    assert sorted(seen[1:]) == sorted(hub.slug for hub in others)
+    assert events[:2] == [("start", platform.slug), ("end", platform.slug)]  # alone, before any other
+    assert sorted(slug for event, slug in events[2:] if event == "start") == sorted(hub.slug for hub in others)
     assert peak[0] == migrator.HUB_WORKERS == 4
     assert "migrate_hubs: hubs: 8 migrated, 0 left behind, 0 up to date." in out
 
