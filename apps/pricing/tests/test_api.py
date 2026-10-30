@@ -24,6 +24,7 @@ ROUTES = {
     ("POST", "/pricing/price_lists/deactivate", "pricing.price_list.deactivate"),
     ("POST", "/pricing/price_lists/activate", "pricing.price_list.activate"),
     ("GET", "/pricing/price_items", "pricing.price_item.list"),
+    ("GET", "/pricing/price_items/detail", "pricing.price_item.get"),
     ("POST", "/pricing/price_items", "pricing.price_item.add"),
     ("POST", "/pricing/price_items/update", "pricing.price_item.update"),
     ("POST", "/pricing/price_items/remove", "pricing.price_item.remove"),
