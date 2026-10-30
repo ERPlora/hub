@@ -1,12 +1,17 @@
-"""The factory automations the WhatsApp inbox brings to Automatizaciones (WHATSAPP_INBOX-F21, F23, F24, F26; FLOW-F33):
-data only, offered whole, asking for exactly what its steps use and nothing that needs a person in front."""
+"""The factory automations the WhatsApp inbox brings to Automatizaciones (WHATSAPP_INBOX-F21, F23, F24, F25, F26; FLOW-F33):
+data only, offered whole, asking for exactly what its steps use and nothing that needs a person in front, but for
+cancelling a reservation in a step that asks first (FLOW-F28)."""
+
+import copy
 
 import pytest
 from django.utils import translation
 
 from apps.flow import document, queries, recipes
 from apps.flow.tests.test_recipes import without
+from apps.whatsapp_inbox import recipes as inbox_recipes
 from apps.whatsapp_inbox.recipes import RECIPES
+from apps.whatsapp_inbox.tests.conftest import ctx_for, run
 
 pytestmark = pytest.mark.django_db
 
@@ -149,17 +154,21 @@ def test_the_gallery_offers_no_answer_that_books_appointments():
 
 TABLE_REF = "whatsapp_inbox/reservation_from_whatsapp"
 ANSWERS = (TABLE_REF,)
-#: What each answer's assistant may use, and nothing more: free tables and the reservation's own changes. A read that
-#: names other people (the reservations book, a customer list) never: what it reads goes out to whoever writes.
+#: What each answer's assistant may use, and nothing more: free tables and the reservation's own changes, its
+#: cancellation included (F25). A read that names other people (the reservations book, a customer list) never: what
+#: it reads goes out to whoever writes.
 TOOLS = {
     TABLE_REF: [
         "reservation.availability.day",
         "reservation.availability.tables",
         "reservation.reservation.create",
         "reservation.reservation.update",
+        "reservation.reservation.cancel",
         "reservation.waitlist.create",
     ],
 }
+#: What needs a person in front that each answer is granted all the same, only because its step asks first (FLOW-F28).
+ASKED_FIRST = {TABLE_REF: {"reservation.reservation.cancel"}}
 #: Reads that tell about other people, which an answer to a stranger may never be granted.
 OTHER_PEOPLE = {
     "appointment.availability.check",
@@ -203,8 +212,50 @@ def test_an_answer_asks_the_assistant_ask_me_first_with_only_what_it_needs(ref):
     assert step["mode"] == "ask"
     assert step["tools"] == TOOLS[ref]
     assert recipes.grants(offered()[ref]) == document.required_grants(recipes.build(offered()[ref], "en")["steps"])
+    assert all(name in queries.ask_first_catalog() for name in recipes.grants(offered()[ref]))
     catalog = queries.catalog_operations()
-    assert all(name in catalog for name in recipes.grants(offered()[ref]))
+    assert {name for name in recipes.grants(offered()[ref]) if name not in catalog} == ASKED_FIRST[ref]
+
+
+def test_the_table_answer_that_did_it_on_its_own_would_not_be_offered(monkeypatch):
+    """A cancellation needs someone's yes (FLOW-F28): with the step on «Do it on its own», the answer is set aside."""
+    declared = copy.deepcopy(RECIPES)
+    [table] = [recipe for recipe in declared if recipe["id"] == "reservation_from_whatsapp"]
+    [step] = [step for step in table["steps"] if step["kind"] == "assistant"]
+    step["mode"] = "auto"
+    monkeypatch.setattr(inbox_recipes, "RECIPES", declared)
+    offered_now, set_aside = recipes.shelf()
+    assert TABLE_REF not in {recipe.ref for recipe in offered_now}
+    assert [(item.code, item.apps) for item in set_aside if item.ref == TABLE_REF] == [("flow.recipe_invalid", ())]
+
+
+def test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_behalf():
+    """F25: the reservation it may cancel is the one read before by their number (``s9``), by its id, and on their card,
+    so Reservas refuses any other (``reservation.customer_mismatch``)."""
+    for language in ("en", "es"):
+        prompt = assistant_step(TABLE_REF, language)["prompt"]
+        [line] = [line for line in prompt.splitlines() if "on_behalf_of {{steps.s6.id}}{{steps.s7.id}}" in line]
+        assert "{{steps.s9.id}}" in line, language
+
+
+def test_who_has_the_table_answer_on_is_offered_the_version_that_cancels(monkeypatch):
+    """WHATSAPP_INBOX-F18: an answer turned on before cancelling was offered is «New version», and updating it gives
+    its assistant the cancellation, granted."""
+    older = copy.deepcopy(RECIPES)
+    [table] = [recipe for recipe in older if recipe["id"] == "reservation_from_whatsapp"]
+    [step] = [step for step in table["steps"] if step["kind"] == "assistant"]
+    step["tools"].remove("reservation.reservation.cancel")
+    del table["grants"]["reservation.reservation.cancel"]
+    with monkeypatch.context() as patch:
+        patch.setattr(inbox_recipes, "RECIPES", older)
+        run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+
+    [row] = [row for row in run("flow.recipe.list", {}, ctx_for("hub_owner")).recipes if row.ref == TABLE_REF]
+    assert row.installed.outdated is True
+    flow = run("flow.recipe.restore", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    [assistant] = [step for step in flow.steps if step["kind"] == "assistant"]
+    assert "reservation.reservation.cancel" in assistant["tools"]
+    assert "reservation.reservation.cancel" in flow.grants
 
 
 #: The assistant's step of each answer, and the reads pinned to the customer who writes that come before it.
