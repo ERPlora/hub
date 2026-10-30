@@ -2413,10 +2413,6 @@ UPLOAD_FILES = "base.upload_files"
 DELETE_FILES = "base.delete_files"
 
 
-def _space_limit(ctx: OperationContext) -> int | None:
-    return files.space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
-
-
 def _file_bytes(content_base64: str) -> bytes:
     try:
         return base64.b64decode(content_base64, validate=True)
@@ -2444,7 +2440,12 @@ def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
     with translation.override(ctx.language):
         content = _file_bytes(data.content_base64)
         saved = files.upload(
-            storages["hub_files"], hub_id(ctx.scope), data.folder, data.name, content, limit_bytes=_space_limit(ctx)
+            storages["hub_files"],
+            hub_id(ctx.scope),
+            data.folder,
+            data.name,
+            content,
+            limit_bytes=queries.space_limit(ctx),
         )
     record_event(ctx, events.FILE_UPLOADED, {"path": saved["path"]})
     return saved

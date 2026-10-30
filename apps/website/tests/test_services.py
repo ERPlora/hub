@@ -6,8 +6,10 @@ import hashlib
 import io
 import threading
 import uuid
+from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.core.cache import cache
 from django.db import connection, transaction
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
@@ -19,6 +21,7 @@ from apps.website.models import Image, Site
 from apps.website.queries import catalog_cache_key, page_cache_key
 from apps.website import reviews
 from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
+from base import files
 from base.models import Hub
 
 pytestmark = pytest.mark.django_db
@@ -496,6 +499,23 @@ def test_without_a_space_in_its_plan_an_image_is_kept_however_full_the_store(hub
     files_upload(KEPT)
 
     assert upload(png_bytes()).size == len(png_bytes())
+
+
+def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_website_s(hub_files, monkeypatch):
+    # FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS: the website copied Files' check and its sentence (hub#406), so
+    # a change of the limit or of what it says was to be made in every copy. Now the website asks base's own check.
+    asked = []
+    monkeypatch.setattr(
+        files, "refuse_past_the_space", lambda store, hub, size, *, limit_bytes: asked.append((hub, size, limit_bytes))
+    )
+    raw = png_bytes()
+    plan_space(len(raw) - 1)
+
+    upload(raw)  # base's check (here, one that lets everything in) decides: the website keeps the image
+
+    assert asked == [(Hub.objects.get(slug="a").id, len(raw), len(raw) - 1)]
+    catalogue = Path(apps.get_app_config("website").path, "locale", "es", "LC_MESSAGES", "django.po").read_text()
+    assert 'msgid "There is no space left for that file: your plan includes %(space)s."' not in catalogue
 
 
 # Two first saves at once (threads, real transactions)

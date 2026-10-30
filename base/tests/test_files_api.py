@@ -26,12 +26,14 @@ from psycopg.conninfo import make_conninfo
 
 from base import events, files
 from base.models import Hub
+from base.queries import refuse_past_the_plans_space
 from base.storage import hub_prefix
 
 A = Scope("host", "a")
 B = Scope("host", "b")
 VIEW, UPLOAD, DELETE = "base.view_files", "base.upload_files", "base.delete_files"
 PDF = b"%PDF-1.7\n" + b"x" * 64
+MB = 1024**2
 OPERATIONS = {
     "base.file.list": ("query", VIEW),
     "base.file.read": ("query", VIEW),
@@ -56,9 +58,9 @@ def store(settings):
     return storages["hub_files"]
 
 
-def ctx(*permissions, scope=A):
+def ctx(*permissions, scope=A, language="en"):
     return OperationContext(
-        scope=scope, actor="ana", permissions=frozenset(permissions or (VIEW, UPLOAD, DELETE)), language="en"
+        scope=scope, actor="ana", permissions=frozenset(permissions or (VIEW, UPLOAD, DELETE)), language=language
     )
 
 
@@ -184,6 +186,35 @@ def test_an_upload_past_the_plan_s_space_is_refused(store):
     with pytest.raises(OperationError) as refused:
         run("base.file.upload", folder="", name="b.pdf", content_base64=b64(b"x" * 11))
     assert (refused.value.status, refused.value.code) == (409, "base.file_no_space")
+
+
+@pytest.mark.django_db
+def test_an_app_refuses_past_the_plan_s_space_of_the_hub_that_asks_in_its_language(store):
+    # FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS: the website's images and WhatsApp's header samples take the
+    # plan's space as Files does; each read the plan and said the sentence on its own, now they ask base.
+    full = hub("a")
+    full.state = {"plan": {"max_storage_bytes": MB}}
+    full.save(update_fields=["state"])
+    put(store, "a", "a.pdf")
+
+    assert refuse_past_the_plans_space(ctx(), store, MB - len(PDF)) is None
+    said = {}
+    for language in ("en", "es"):
+        with pytest.raises(OperationError) as refused:
+            refuse_past_the_plans_space(ctx(scope=A, language=language), store, MB - len(PDF) + 1)
+        assert (refused.value.status, refused.value.code, refused.value.fields) == (409, "base.file_no_space", None)
+        said[language] = refused.value.message
+    assert said == {
+        "en": "There is no space left for that file: your plan includes 1 MB.",
+        "es": "No queda espacio para ese archivo: tu plan incluye 1 MB.",
+    }
+    # B's plan has no limit and A's files are not its own: B's app keeps the file.
+    assert refuse_past_the_plans_space(ctx(scope=B), store, 10 * 1024**3) is None
+    # And Files refuses with exactly that, through the same check.
+    with pytest.raises(OperationError) as by_files:
+        run("base.file.upload", ctx(language="es"), folder="", name="b.pdf", content_base64=b64(b"x" * MB))
+    assert (by_files.value.status, by_files.value.code, by_files.value.fields) == (409, "base.file_no_space", None)
+    assert by_files.value.message == said["es"]
 
 
 @pytest.mark.django_db

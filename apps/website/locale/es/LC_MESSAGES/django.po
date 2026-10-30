@@ -227,9 +227,6 @@ msgstr "Este archivo no es una imagen %(type)s."
 msgid "The image may be %(side)s pixels a side at most."
 msgstr "La imagen puede medir %(side)s píxeles por lado como mucho."
 
-msgid "There is no space left for that file: your plan includes %(space)s."
-msgstr "No queda espacio para ese archivo: tu plan incluye %(space)s."
-
 msgctxt "website"
 msgid "Nothing to show here yet."
 msgstr "Todavía no hay nada que mostrar aquí."
