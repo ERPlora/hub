@@ -434,8 +434,9 @@ export type TestOutcome =
 export interface PinnedOut {
   tool: string;
   field: string;
-  /** What it would be; `null` when empty or unknown. */
-  value: unknown;
+  /** What it would be, as the card of the change says it (a record by its name); `null` when empty, unknown or a
+   *  record the person trying it may not read (the card leaves it out). */
+  said: AssistantField | null;
   /** `empty`: its tool would not be used; `unknown`: it reads a step that does not run here. */
   state: 'filled' | 'empty' | 'unknown';
 }

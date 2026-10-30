@@ -915,7 +915,12 @@ class ClauseOut(Schema):
 class PinnedOut(Schema):
     tool: str = Field(description="The tool the step fixes it for, by name.")
     field: str = Field(description="The datum of that tool it fixes.")
-    value: Any = Field(None, description="What it would be in this trial; null when empty or unknown.")
+    said: AssistantFieldOut | None = Field(
+        None,
+        description="What it would be in this trial, as the card of the change says it (FLOW-F29), read as whoever "
+        "tries it: a record by its name, never by its id. Null when empty, unknown, or a record they may not read "
+        "(the card leaves it out).",
+    )
     state: Literal["filled", "empty", "unknown"] = Field(
         description="`filled`; `empty`: its tool would not be used; `unknown`: it reads a step that does not run here."
     )

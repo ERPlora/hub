@@ -4,12 +4,15 @@
 // document as it is, saved or not, and the saved automation's permissions. It says what would come out
 // empty, what the action would refuse (the server validates the data against the action), where a
 // condition would stop it (that is the automation working), what depends on a step that has not run,
-// and what it is not allowed yet.
+// and what it is not allowed yet. A datum an «Ask the assistant» step fixes is said as the card of the change says it
+// (FLOW-F29, base's `fieldText`): a record by its name, an amount in the business's currency, never an id.
 import { InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
+import { type AssistantField, fieldText } from '../../../../base/frontend/lib/assistant-card';
+import { useBusinessMoney } from '../../../../base/frontend/lib/money';
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import { cleanTrigger, type FlowDocument } from '../lib/document';
@@ -19,6 +22,7 @@ import type { CatalogOut, PinnedOut, TestOut, TestStepOut } from '../operations'
 const props = defineProps<{ document: FlowDocument; flowId: string | null; catalog: CatalogOut | null }>();
 const client = useLiveClient();
 const phrasing = usePhrasing();
+const money = useBusinessMoney();
 
 const result = shallowRef<TestOut | null>(null);
 const error = shallowRef<ApiError | null>(null);
@@ -91,6 +95,9 @@ const names = (fields: readonly string[]): string => fields.map((field) => field
 /** «Cancel a reservation › On behalf of the customer»: a datum an «Ask the assistant» step fixes. */
 const pinnedLabel = (row: PinnedOut): string => `${actionLabel(row.tool, props.catalog, phrasing.value)} › ${fieldLabel(row.field, phrasing.value)}`;
 const pinnedIn = (step: TestStepOut, state: PinnedOut['state']): PinnedOut[] => (step.pinned ?? []).filter((row) => row.state === state);
+/** The fixed data that would be filled in, each in the card's words; one the card leaves out has no row. */
+const pinnedSaid = (step: TestStepOut) => pinnedIn(step, 'filled').filter((row): row is PinnedOut & { said: AssistantField } => row.said !== null);
+const saidText = (said: AssistantField): string => fieldText(said, { locale: phrasing.value.locale, money: money.value, t: phrasing.value.t });
 
 /** Each tool that would not be used, with its fixed data that would be empty in this trial. */
 function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
@@ -160,13 +167,13 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
           <span>{{ shown(value) }}</span>
         </div>
         <div
-          v-for="row in pinnedIn(step, 'filled')"
+          v-for="row in pinnedSaid(step)"
           :key="`${row.tool}|${row.field}`"
           class="flow-test__value"
           :data-testid="`flow-test-pinned-${step.id}-${row.tool}-${row.field}`"
         >
           <span class="flow-test__key">{{ pinnedLabel(row) }}</span>
-          <span>{{ shown(row.value) }}</span>
+          <span>{{ saidText(row.said) }}</span>
         </div>
         <span
           v-for="unused in unusedTools(step)"

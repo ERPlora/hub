@@ -484,7 +484,10 @@ Pasos:
    porque sale de un paso que no ha corrido, una espera y un paso sin permiso («Todavía no le has
    permitido …»).
 4. En un paso **Pedírselo al asistente**, debajo de «Se lo pediría al asistente: …», cada dato fijo (FLOW-F37)
-   con el valor que tendría («Anular una reserva › En nombre del cliente» y su valor); si uno saldría vacío, la
+   con el valor que tendría, dicho como lo dice la tarjeta de «Esperan tu respuesta» (FLOW-F29), leído como
+   quien prueba: una ficha por su nombre («Anular una reserva › En nombre del cliente» · «Lucía Pérez»), un día
+   como lo escribe su idioma, un importe en la moneda del negocio, un sí o un no; nunca un id. Una ficha que no
+   puede ver (sin permiso, o que ya no está) se queda fuera, como en la tarjeta. Si uno saldría vacío, la
    consulta o acción que no se usaría («No se usaría «…»: «…», que fija este paso, estaría vacío en esta
    ejecución.»), y si sale de un paso que no ha corrido, «Sale de un paso anterior que no ha corrido: …».
 Entra: lo que hay en el editor, aunque no esté guardado, y el último aviso real de ese tipo.
@@ -1309,7 +1312,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   argumentos del modelo, antes de `_propose` (la propuesta guardada, y su tarjeta, ya los llevan) o de `run_tool`;
   vacío (`queries.fixed_value`: `None` o texto en blanco, la misma regla en «Probar») → `flow.pinned_empty` al
   modelo y `assistant_pinned_empty` en el log, sin proponer ni ejecutar. «Probar» devuelve `pinned` por paso
-  (`PinnedOut`: `filled`, `empty` o `unknown` si lee un paso que no corre en la prueba). Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
+  (`PinnedOut`: `filled`, `empty` o `unknown` si lee un paso que no corre en la prueba), cada `filled` con `said`,
+  el dato de `base.assistant.card` (la tarjeta de FLOW-F29) leído con el `ctx` de quien prueba: `null` si la tarjeta
+  lo deja fuera (`_LEFT_OUT`), y entonces `TestPanel.vue` no lo pinta; los demás, con `fieldText` de base. Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
   («Set a specific value»: la IA ignora el campo), n8n (parámetros sin `$fromAI()`), Copilot Studio («Set as a
   value»), LangChain (`InjectedToolArg`: fuera del esquema del modelo, puesto antes de la llamada), Intercom Fin
   (conectores sobre un atributo protegido), Salesforce Agentforce (input bindings), Merge (tool input overrides),

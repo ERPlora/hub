@@ -349,10 +349,38 @@ def test_trying_it_says_each_fixed_datum_with_the_value_it_would_have_and_which_
     step = assistant(tools=[CANCEL, UPDATE], pinned=pinned) | {"id": "s1"}
     tried = run("flow.flow.test", {"document": json.dumps({"trigger": {"kind": "manual"}, "steps": [earlier, step]})})
     assert tried.steps[1].outcome == "would_ask_assistant"
-    assert [row.model_dump() for row in tried.steps[1].pinned] == [
-        {"tool": CANCEL, "field": "on_behalf_of", "value": None, "state": "empty"},
-        {"tool": CANCEL, "field": "reason", "value": "Asked by WhatsApp", "state": "filled"},
-        {"tool": UPDATE, "field": "on_behalf_of", "value": None, "state": "unknown"},
+    assert [(row.tool, row.field, row.state, row.said and row.said.value) for row in tried.steps[1].pinned] == [
+        (CANCEL, "on_behalf_of", "empty", None),
+        (CANCEL, "reason", "filled", "Asked by WhatsApp"),
+        (UPDATE, "on_behalf_of", "unknown", None),
     ]
     assert tried.steps[0].pinned == []
+    assert gateway.sent(CHAT) == []
+
+
+def test_trying_it_says_each_fixed_datum_as_the_card_of_the_change_says_it(gateway, guests):
+    # FLOW-F13 as FLOW-F29: a datum is said with the card's own words, read as whoever tries it — a card by its name,
+    # a day as their language writes it, a yes or no —, never by its id; whoever may not read that card gets it left
+    # out, as the card leaves it out, never its id either.
+    lucia = str(guests["lucia"].id)
+    pinned = {CANCEL: {"on_behalf_of": lucia, "reason": "Asked by WhatsApp"}, UPDATE: {"date": "2026-10-16", "no_table": True}}
+    data = {"document": json.dumps({"trigger": {"kind": "manual"}, "steps": [assistant(tools=[CANCEL, UPDATE], pinned=pinned)]})}
+
+    def tried(ctx) -> dict:
+        rows = run("flow.flow.test", data, ctx).model_dump(mode="json")["steps"][0]["pinned"]
+        return {(row["tool"], row["field"]): row for row in rows}
+
+    def said(rows: dict) -> dict:
+        return {key: (row["state"], row["said"] and (row["said"]["kind"], row["said"]["value"])) for key, row in rows.items()}
+
+    assert said(tried(ctx_for())) == {
+        (CANCEL, "on_behalf_of"): ("filled", ("text", "Lucía Pérez")),
+        (CANCEL, "reason"): ("filled", ("text", "Asked by WhatsApp")),
+        (UPDATE, "date"): ("filled", ("text", "Oct 16, 2026")),
+        (UPDATE, "no_table"): ("filled", ("bool", True)),
+    }
+    assert said(tried(ctx_for(language="es")))[(UPDATE, "date")] == ("filled", ("text", "16 oct 2026"))
+    blind = tried(ctx_for(permissions={"flow.view", "flow.manage", "reservation.view_reservation"}))
+    assert said(blind)[(CANCEL, "on_behalf_of")] == ("filled", None)
+    assert lucia not in json.dumps(list(blind.values()))
     assert gateway.sent(CHAT) == []
