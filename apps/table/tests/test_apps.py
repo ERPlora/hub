@@ -122,6 +122,28 @@ def test_navigation_is_the_four_sections_of_the_old_module_with_registered_icons
     ]
 
 
+#: Done at the table by the waiter with the party in front (``ai.in_person``): seating a party, seating a parked
+#: check again, splitting a check and bringing an open check to a table. Never granted to an automation, and still
+#: of normal risk, so the assistant does them by voice without a confirmation card.
+IN_PERSON = {
+    "table.session.open",
+    "table.session.restore",
+    "table.session.split",
+    "table.session.link_order",
+}
+
+
+def test_what_is_done_at_the_table_is_in_person_and_of_normal_risk():
+    from live.operations import get
+
+    from base.assistant import risk
+
+    for name in IN_PERSON:
+        op = get(name)
+        assert op.ai["in_person"] is True, name
+        assert risk(op) == "normal", name
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
@@ -132,7 +154,10 @@ def test_every_operation_is_a_tool_of_the_assistant():
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if op.name in IN_PERSON:
+            expected = expected | {"in_person"}
         assert set(op.ai) == expected, op.name
+        assert op.ai.get("in_person", False) is (op.name in IN_PERSON), op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name
 

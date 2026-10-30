@@ -692,6 +692,8 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
         "with the table. Without guests, the reservation's or the table's seats. Optionally bring an open check of "
         "Sales to the table, and put a customer (by name or phone) on the check.",
         "risk": "normal",
+        # Done by the waiter with the party in front, never by an automation (TABLE-F10).
+        "in_person": True,
     },
 )
 def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
@@ -914,6 +916,8 @@ def merge_session(ctx: OperationContext, data: SessionMergeIn) -> dict:
         "description": "Split a table's check in two so each part pays separately: a second check opens at the same "
         "table and the lines named move to it in Sales (none = a blank check).",
         "risk": "normal",
+        # Done at the table with the party, never by an automation (TABLE-F17).
+        "in_person": True,
     },
 )
 def split_session(ctx: OperationContext, data: SessionSplitIn) -> dict:
@@ -1017,6 +1021,8 @@ def park_session(ctx: OperationContext, data: SessionRefIn) -> dict:
         "description": "Seat a parked check at a free table again, with its guests, waiter and opening time; its "
         "check of Sales takes the table's title.",
         "risk": "normal",
+        # Seating the party again, by the waiter, never by an automation (TABLE-F24).
+        "in_person": True,
     },
 )
 def restore_session(ctx: OperationContext, data: SessionRestoreIn) -> dict:
@@ -1048,6 +1054,8 @@ def restore_session(ctx: OperationContext, data: SessionRestoreIn) -> dict:
         "description": "Make an open check of Sales the check of a table's open check that has none yet (the till "
         "opened it apart); it takes the table's title.",
         "risk": "normal",
+        # Bringing the party's check to its table, by the waiter, never by an automation (TABLE-F12).
+        "in_person": True,
     },
 )
 def link_order(ctx: OperationContext, data: SessionLinkOrderIn) -> dict:
