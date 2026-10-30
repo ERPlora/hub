@@ -29,6 +29,7 @@ ROUTES = {
     ("GET", "/attendance/presence", "attendance.presence.list"),
     ("GET", "/attendance/presence/count", "attendance.presence.count"),
     ("GET", "/attendance/people", "attendance.person.list"),
+    ("GET", "/attendance/people/detail", "attendance.person.detail"),
     ("GET", "/attendance/settings", "attendance.settings.get"),
     ("POST", "/attendance/settings", "attendance.settings.update"),
 }
@@ -163,6 +164,19 @@ def test_an_employee_neither_corrects_nor_sees_the_team_nor_saves_settings(ana, 
         get(client, "/attendance/corrections", record_id=str(day.id)).status_code == 200
     )
     assert get(client, "/attendance/settings").status_code == 200
+
+
+@pytest.mark.django_db
+def test_a_person_by_id_is_the_employees_own_and_anyone_for_the_manager(ana, client, make_user):
+    marta = Member.objects.create(first_name="Marta", last_name="Jefa")
+    own = Member.objects.get(user=ana)
+    mine = get(client, "/attendance/people/detail", id=str(own.id))
+    assert mine.status_code == 200
+    assert mine.json() == {"id": str(own.id), "name": "Ana López", "status": "active"}
+    theirs = get(client, "/attendance/people/detail", id=str(marta.id))
+    assert theirs.status_code == 404 and theirs.json()["error"]["code"] == "not_found"
+    client.force_login(make_user("boss", role="hub_manager"))
+    assert get(client, "/attendance/people/detail", id=str(marta.id)).json()["name"] == "Marta Jefa"
 
 
 @pytest.mark.django_db

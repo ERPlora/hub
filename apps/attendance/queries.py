@@ -14,6 +14,7 @@ import io
 from typing import Any
 from uuid import UUID
 
+from babel.dates import format_date
 from django.db.models import (
     CharField,
     Count,
@@ -29,7 +30,7 @@ from django.db.models import (
     Value,
 )
 from django.db.models.functions import Coalesce, Concat
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -44,7 +45,9 @@ from apps.attendance.schemas import (
     EmptyIn,
     ExportOut,
     PersonListIn,
+    PersonOut,
     PersonPage,
+    PersonRefIn,
     PresenceCountOut,
     PresenceListIn,
     PresencePage,
@@ -56,6 +59,7 @@ from apps.attendance.schemas import (
     SettingsOut,
 )
 from apps.staff.models import Member
+from base.business import babel_locale
 
 MEMBER_NOT_FOUND = _("That person does not exist in Staff.")
 AMBIGUOUS_MEMBER = _("Several people match “%(name)s”: %(matches)s. Say which one.")
@@ -68,6 +72,10 @@ TERMINATED_REASON_SOURCE = "Day closed when the person was terminated in Staff."
 SYSTEM_REASONS = frozenset({TERMINATED_REASON_SOURCE})
 
 VIEW_ALL = "attendance.view_all"
+#: Who reads someone else's working day: whoever sees the team, and whoever may correct it.
+READS_ANY_DAY = (VIEW_ALL, "attendance.correct")
+#: Who reads someone else by id: whoever reads any day, and whoever clocks others in and out.
+READS_ANY_PERSON = (*READS_ANY_DAY, "attendance.clock_others")
 #: How many past days «Recent days» of the clock screen shows (the old module's ten).
 RECENT_DAYS = 10
 #: The CSV of the old module, column for column (WORKBOOK ATTENDANCE-F10).
@@ -289,10 +297,14 @@ def _owns(ctx: OperationContext, record: Record) -> bool:
     return user is not None and record.member.user_id == user.pk
 
 
+def _reads_any(ctx: OperationContext, permissions: tuple[str, ...]) -> bool:
+    return any(ctx.has(permission) for permission in permissions)
+
+
 def visible_record(ctx: OperationContext, record_id: UUID) -> Record:
-    """A day the caller may see (their own, or any with view_all); ``NotFound`` otherwise."""
+    """A day the caller may see (their own, or any for whoever sees the team or corrects); ``NotFound`` otherwise."""
     record = annotated(Record.objects.filter(pk=record_id)).first()
-    if record is None or not (ctx.has(VIEW_ALL) or _owns(ctx, record)):
+    if record is None or not (_reads_any(ctx, READS_ANY_DAY) or _owns(ctx, record)):
         raise NotFound(str(RECORD_NOT_FOUND))
     return record
 
@@ -368,6 +380,12 @@ def correction_out(trail: Correction) -> dict:
         "created_by_name": trail.created_by_name,
         "created_at": trail.created_at,
     }
+
+
+def day_name(record: Record) -> str:
+    """A working day as «Correct working day» names it: the person and its business day, in the active language."""
+    day = format_date(record.work_date, "medium", locale=babel_locale(translation.get_language()))
+    return f"{record.member_name} · {day}"
 
 
 def business_date(instant: dt.datetime) -> dt.date:
@@ -471,7 +489,7 @@ def list_records(ctx: OperationContext, params: RecordListIn) -> dict:
     expose_api=True,
     ai={
         "description": "One working day with its breaks, where it was clocked from and who clocked it; "
-        "someone else's only for whoever sees the team."
+        "someone else's only for whoever sees the team or corrects days."
     },
 )
 def record_detail(ctx: OperationContext, params: RecordRefIn) -> dict:
@@ -493,6 +511,7 @@ def record_detail(ctx: OperationContext, params: RecordRefIn) -> dict:
     ]
     return {
         **record_out(record, as_of, hours),
+        "name": day_name(record),
         "in_lat": record.in_lat,
         "in_lng": record.in_lng,
         "in_accuracy_m": record.in_accuracy_m,
@@ -663,6 +682,19 @@ def count_presence(ctx: OperationContext, params: EmptyIn) -> dict:
     return {"count": present_records().count()}
 
 
+def listed_people() -> QuerySet:
+    """The people whose days can be listed, named: every staff record that is not terminated, and the terminated
+    ones that have days."""
+    with_days = Record.objects.filter(member=OuterRef("pk"))
+    return Member.objects.annotate(name=member_name_expression()).filter(
+        ~Q(status=Member.Status.TERMINATED) | Q(pk__in=with_days.values("member"))
+    )
+
+
+def person_out(member: Member) -> dict:
+    return {"id": member.id, "name": member.name, "status": member.status}
+
+
 @operation(
     "attendance.person.list",
     kind="query",
@@ -676,21 +708,35 @@ def count_presence(ctx: OperationContext, params: EmptyIn) -> dict:
     },
 )
 def list_people(ctx: OperationContext, params: PersonListIn) -> dict:
-    with_days = Record.objects.filter(member=OuterRef("pk"))
-    people = (
-        Member.objects.annotate(name=member_name_expression())
-        .filter(
-            ~Q(status=Member.Status.TERMINATED) | Q(pk__in=with_days.values("member"))
-        )
-        .order_by("first_name", "last_name", "id")
-    )
+    people = listed_people().order_by("first_name", "last_name", "id")
     if params.search:
         people = people.filter(name__icontains=params.search)
-    rows = [
-        {"id": m.id, "name": m.name, "status": m.status}
-        for m in people[params.offset : params.offset + params.limit]
-    ]
+    rows = [person_out(m) for m in people[params.offset : params.offset + params.limit]]
     return _page(rows, people.count(), params)
+
+
+@operation(
+    "attendance.person.detail",
+    kind="query",
+    permission="attendance.clock",
+    input=PersonRefIn,
+    output=PersonOut,
+    expose_api=True,
+    ai={
+        "description": "One person of the time clock by id, as the «Person» filter names them: their name and "
+        "the staff record's status. Your own for whoever clocks; anyone for whoever sees the team, clocks others "
+        "or corrects days."
+    },
+)
+def person_detail(ctx: OperationContext, params: PersonRefIn) -> dict:
+    people = listed_people().filter(pk=params.id)
+    if not _reads_any(ctx, READS_ANY_PERSON):
+        user = actor_user(ctx)
+        people = people.filter(user_id=user.pk) if user is not None else people.none()
+    member = people.first()
+    if member is None:
+        raise NotFound(str(MEMBER_NOT_FOUND))
+    return person_out(member)
 
 
 @operation(

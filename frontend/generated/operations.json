@@ -1475,6 +1475,10 @@
     "method": "get",
     "path": "/api/attendance/people"
   },
+  "attendance.person.detail": {
+    "method": "get",
+    "path": "/api/attendance/people/detail"
+  },
   "attendance.settings.get": {
     "method": "get",
     "path": "/api/attendance/settings"
