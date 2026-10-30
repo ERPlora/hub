@@ -548,6 +548,14 @@ def test_a_person_needs_the_time_clock():
         run("attendance.person.detail", {"id": str(bea.id)}, ctx_for(permissions={"staff.view"}))
 
 
+def test_nobody_behind_the_request_reads_no_person():
+    """«Clock in» alone with no account behind it (the platform, an anonymous caller): there is no own record to read,
+    so nobody is named — never anyone."""
+    bea = make_member("Bea", "Ruiz")
+    with pytest.raises(NotFound):
+        run("attendance.person.detail", {"id": str(bea.id)}, ctx_for(actor=None, permissions={"attendance.clock"}))
+
+
 # attendance.settings.get
 
 
