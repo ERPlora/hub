@@ -1,8 +1,10 @@
 """Read operations of the reservation app (``READ ONLY``): the reservations, one reservation, a day's
-figures and slots, the free tables, the slots, the blocked dates, the waitlist and the rules.
+figures and slots, the free tables, the slots, the blocked dates, the waitlist and the rules. A read by id
+(a reservation, a waitlist entry, a slot, a blocked date) also answers its ``label``: the words the book's
+screens name it by, which the assistant's card says instead of the id (schemas.py, ``names``).
 
 Shared with services.py, inside the command's own transaction: the business's clock, the rules, the
-lookups of a reservation or a waitlist entry as a person says it, and everything the gate (engine.py)
+lookups of a reservation, a waitlist entry, a slot or a blocked date as a person says it, and everything the gate (engine.py)
 reads — the slots of a day with what they hold, its blocks, its opening hours (Schedules) and a table's
 facts (Tables). The business's zone is the Hub's; in phase 1, ``settings.TIME_ZONE`` (Europe/Madrid).
 """
@@ -12,8 +14,10 @@ import re
 from dataclasses import replace
 from uuid import UUID
 
+from babel.dates import format_date, format_time, get_day_names
 from django.db.models import CharField, Count, F, Func, Q, QuerySet, Sum, Value
 from django.utils import timezone
+from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -28,27 +32,34 @@ from apps.reservation.models import (
     WaitlistEntry,
 )
 from apps.reservation.schemas import (
+    BlockedDateDetailOut,
     BlockedDateListIn,
     BlockedDatePage,
+    BlockedDateRefIn,
     DayIn,
     DayOut,
     FreeTablesOut,
     NoIn,
+    ReservationDetailOut,
     ReservationListIn,
-    ReservationOut,
     ReservationPage,
     ReservationRefIn,
     SettingsOut,
     TablesIn,
+    TimeSlotDetailOut,
     TimeSlotListIn,
     TimeSlotPage,
+    TimeSlotRefIn,
+    WaitlistDetailOut,
     WaitlistListIn,
     WaitlistPage,
+    WaitlistRefIn,
 )
 from apps.schedule.queries import day_label, get_week, hours_for_range
 from apps.schedule.schemas import HoursRangeIn, NoParamsIn
 from apps.table.models import Table
 from apps.table.queries import natural_key, table_label
+from base.business import babel_locale
 
 S = Reservation.Status
 #: What a slot counts (the old gate's rule): every reservation not cancelled nor a no-show.
@@ -70,6 +81,9 @@ ENTRY_NOT_FOUND = _("That waitlist entry does not exist in this business.")
 ENTRY_AMBIGUOUS = _(
     "“%(said)s” is on the waitlist several times: %(matches)s. Say which day."
 )
+SLOT_NOT_FOUND = _("That time slot does not exist in this business.")
+BLOCK_NOT_FOUND = _("That blocked date does not exist in this business.")
+BLOCK_AMBIGUOUS = _("That date is blocked at several times: say which one by its id.")
 
 
 # ── The business's clock and rules ───────────────────────────────────────────────────────────────
@@ -236,6 +250,56 @@ def blocked_out(block: BlockedDate) -> dict:
     }
 
 
+# ── How the book names a record (a read by id's ``label``) ──────────────────────────────────────
+# In the words the assistant's card says a day and a time (base/assistant.py: CLDR's medium day and short
+# time, as the screens' formatters), in the caller's language: «Ana García · 15 oct 2026 · 21:00».
+
+
+def _said_day(day: dt.date, language: str) -> str:
+    return format_date(day, "medium", locale=babel_locale(language))
+
+
+def _said_time(at: dt.time, language: str) -> str:
+    return format_time(at.replace(tzinfo=None), "short", locale=babel_locale(language))
+
+
+def _said_hours(start: dt.time, end: dt.time, language: str) -> str:
+    return f"{_said_time(start, language)}–{_said_time(end, language)}"
+
+
+def _named(*parts: str) -> str:
+    return " · ".join(part for part in parts if part)
+
+
+def reservation_label(reservation: Reservation, language: str) -> str:
+    """As the book's dialogs say a reservation before a step: its guest (her phone when she booked herself
+    without a name; nothing once her data were erased), its day and its time."""
+    who = reservation.guest_name or reservation.guest_phone
+    return _named(who, _said_day(reservation.date, language), _said_time(reservation.time, language))
+
+
+def entry_label(entry: WaitlistEntry, language: str) -> str:
+    """As the waitlist's dialogs say an entry: its guest, the day and the time they would like."""
+    who = entry.guest_name or entry.guest_phone
+    return _named(who, _said_day(entry.date, language), _said_time(entry.preferred_time, language))
+
+
+def slot_label(slot: TimeSlot, language: str) -> str:
+    """As the slots' list says a slot: its weekday and its hours («Jueves · 20:00–23:30»)."""
+    weekday = capfirst(get_day_names("wide", locale=babel_locale(language))[slot.day_of_week])
+    return _named(weekday, _said_hours(slot.start_time, slot.end_time, language))
+
+
+def blocked_label(block: BlockedDate, language: str) -> str:
+    """As the blocked dates' list says one: its day and, when it blocks only some hours, those hours."""
+    hours = (
+        ""
+        if block.is_full_day
+        else _said_hours(block.blocked_from, block.blocked_until, language)
+    )
+    return _named(_said_day(block.date, language), hours)
+
+
 def _page(queryset, params, row) -> dict:
     total = queryset.count()
     window = queryset[params.offset : params.offset + params.limit]
@@ -360,6 +424,43 @@ def find_entry(
     if found is None:
         raise NotFound(str(ENTRY_NOT_FOUND), code="reservation.entry_not_found")
     return found
+
+
+def find_slot(
+    slot_id: UUID | None,
+    day_of_week: int | None,
+    start_time: dt.time | None,
+    *,
+    lock: bool = False,
+) -> TimeSlot:
+    """A live slot by id or by its weekday and its start."""
+    rows = TimeSlot.objects.filter(is_deleted=False)
+    if lock:
+        rows = rows.select_for_update()
+    if slot_id is not None:
+        rows = rows.filter(pk=slot_id)
+    else:
+        rows = rows.filter(day_of_week=day_of_week, start_time=start_time)
+    slot = rows.first()
+    if slot is None:
+        raise NotFound(str(SLOT_NOT_FOUND), code="reservation.slot_not_found")
+    return slot
+
+
+def find_block(
+    block_id: UUID | None, day: dt.date | None, *, lock: bool = False
+) -> BlockedDate:
+    """A live blocked date by id or by its day, when that day is blocked once."""
+    rows = BlockedDate.objects.filter(is_deleted=False)
+    if lock:
+        rows = rows.select_for_update()
+    rows = rows.filter(pk=block_id) if block_id is not None else rows.filter(date=day)
+    found = list(rows[:2])
+    if not found:
+        raise NotFound(str(BLOCK_NOT_FOUND), code="reservation.blocked_date_not_found")
+    if len(found) > 1:
+        raise Conflict(str(BLOCK_AMBIGUOUS), code="reservation.blocked_date_ambiguous")
+    return found[0]
 
 
 # ── What the gate reads ──────────────────────────────────────────────────────────────────────────
@@ -547,7 +648,7 @@ def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     kind="query",
     permission="reservation.view_reservation",
     input=ReservationRefIn,
-    output=ReservationOut,
+    output=ReservationDetailOut,
     expose_api=True,
     ai={
         "description": "Reads one reservation with all its detail: by id, or by its guest's name or phone and its day "
@@ -555,7 +656,8 @@ def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     },
 )
 def get_reservation(ctx: OperationContext, params: ReservationRefIn) -> dict:
-    return reservation_out(ctx, find_reservation(params.id, params.guest, params.day))
+    found = find_reservation(params.id, params.guest, params.day)
+    return {**reservation_out(ctx, found), "label": reservation_label(found, ctx.language)}
 
 
 @operation(
@@ -688,6 +790,23 @@ def list_slots(ctx: OperationContext, params: TimeSlotListIn) -> dict:
     return _page(_ordered(rows, params.sort, SLOT_SORTS, ("id",)), params, slot_out)
 
 
+@operation(
+    "reservation.time_slot.get",
+    kind="query",
+    permission="reservation.view_timeslot",
+    input=TimeSlotRefIn,
+    output=TimeSlotDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Reads one slot the book takes reservations in: by id, or by its weekday (0 = Monday … 6 = "
+        "Sunday) and its start."
+    },
+)
+def get_slot(ctx: OperationContext, params: TimeSlotRefIn) -> dict:
+    slot = find_slot(params.id, params.day_of_week, params.start_time)
+    return {**slot_out(slot), "label": slot_label(slot, ctx.language)}
+
+
 BLOCKED_SORTS = {
     "date": ("date", "blocked_from"),
     "reason": ("reason", "date"),
@@ -717,6 +836,23 @@ def list_blocked(ctx: OperationContext, params: BlockedDateListIn) -> dict:
     return _page(
         _ordered(rows, params.sort, BLOCKED_SORTS, ("id",)), params, blocked_out
     )
+
+
+@operation(
+    "reservation.blocked_date.get",
+    kind="query",
+    permission="reservation.view_blockeddate",
+    input=BlockedDateRefIn,
+    output=BlockedDateDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Reads one blocked date (a day, or some hours of it, the book takes no reservations) with its "
+        "reason: by id, or by its date when it is blocked once."
+    },
+)
+def get_blocked(ctx: OperationContext, params: BlockedDateRefIn) -> dict:
+    block = find_block(params.id, params.date)
+    return {**blocked_out(block), "label": blocked_label(block, ctx.language)}
 
 
 WAITLIST_SORTS = {
@@ -761,6 +897,23 @@ def list_waitlist(ctx: OperationContext, params: WaitlistListIn) -> dict:
     return _page(
         _ordered(rows, params.sort, WAITLIST_SORTS, ("id",)), params, entry_out
     )
+
+
+@operation(
+    "reservation.waitlist.get",
+    kind="query",
+    permission="reservation.view_waitlistentry",
+    input=WaitlistRefIn,
+    output=WaitlistDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Reads one waitlist entry: by id, or by its guest's name or phone (and its day, when they wait "
+        "for several); among several, the ones still waiting."
+    },
+)
+def get_entry(ctx: OperationContext, params: WaitlistRefIn) -> dict:
+    entry = find_entry(params.id, params.guest, params.day)
+    return {**entry_out(entry), "label": entry_label(entry, ctx.language)}
 
 
 @operation(
