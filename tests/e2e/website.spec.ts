@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, horizontalOverflow, HUB_DIR, hostPage, SAAS, settled } from './helpers';
-import { atRest } from './website-helpers';
+import { atRest, openSection } from './website-helpers';
 
 const WIDTHS = {
   390: { width: 390, height: 844 },
@@ -138,13 +138,6 @@ async function samplePhoto(page: Page, width: number, height: number, label: str
 }
 
 const field = (page: Page, testid: string) => page.getByTestId(testid).locator('input, textarea').first();
-
-async function openSection(page: Page, name: string): Promise<void> {
-  const accordion = page.getByTestId(`website-section-${name}`);
-  if ((await accordion.getAttribute('class'))?.includes('accordion-expanded')) return;
-  await accordion.locator('ion-item[slot="header"]').click();
-  await expect(accordion).toHaveClass(/accordion-expanded/);
-}
 
 async function setToggle(page: Page, testid: string, on: boolean): Promise<void> {
   const toggle = page.getByTestId(testid);

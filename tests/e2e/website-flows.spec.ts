@@ -16,7 +16,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { A, api, capture, horizontalOverflow, hostPage, HUB_DIR, MAIL_DIR, OWNER, psql, SAAS, settled, topbarApps } from './helpers';
 import { readMailCode } from './mail';
-import { atRest } from './website-helpers';
+import { atRest, openSection, photo } from './website-helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -139,38 +139,8 @@ async function seedServices(context: BrowserContext): Promise<void> {
   }
 }
 
-/** A photo drawn in the page (no binary in the repository): a gradient with `label` in a corner, as a JPEG. */
-async function photo(page: Page, label: string, hue: number): Promise<Buffer> {
-  const url = await page.evaluate(
-    ({ label, hue }) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 600;
-      canvas.height = 600;
-      const draw = canvas.getContext('2d') as CanvasRenderingContext2D;
-      const gradient = draw.createLinearGradient(0, 0, 600, 600);
-      gradient.addColorStop(0, `hsl(${hue}, 70%, 70%)`);
-      gradient.addColorStop(1, `hsl(${hue + 40}, 60%, 35%)`);
-      draw.fillStyle = gradient;
-      draw.fillRect(0, 0, 600, 600);
-      draw.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      draw.font = '600 48px Georgia, serif';
-      draw.fillText(label, 40, 560);
-      return canvas.toDataURL('image/jpeg', 0.86);
-    },
-    { label, hue },
-  );
-  return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
-}
-
 const field = (page: Page, testid: string): Locator => page.getByTestId(testid).locator('input, textarea').first();
 const preview = (page: Page) => page.frameLocator('[data-testid="website-preview-frame"]');
-
-async function openSection(page: Page, name: string): Promise<void> {
-  const accordion = page.getByTestId(`website-section-${name}`);
-  if ((await accordion.getAttribute('class'))?.includes('accordion-expanded')) return;
-  await accordion.locator('ion-item[slot="header"]').click();
-  await expect(accordion).toHaveClass(/accordion-expanded/);
-}
 
 async function setToggle(page: Page, testid: string, on: boolean): Promise<void> {
   const toggle = page.getByTestId(testid);
