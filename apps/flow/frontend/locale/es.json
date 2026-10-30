@@ -861,6 +861,7 @@
       "inventory__product__get": "Leer un producto",
       "appointment__agenda__lanes": "Leer la agenda por profesional",
       "appointment__appointment__bulk_create": "Reservar varias citas",
+      "appointment__appointment__cancel": "Anular una cita",
       "appointment__appointment__complete": "Completar una cita",
       "appointment__appointment__confirm": "Confirmar una cita",
       "appointment__appointment__count_active_for_service": "Contar las citas de un servicio",
@@ -1093,6 +1094,7 @@
       "reservation__availability__tables": "Buscar mesas libres",
       "reservation__blocked_date__create": "Cerrar un día a las reservas",
       "reservation__blocked_date__list": "Buscar días cerrados a las reservas",
+      "reservation__reservation__cancel": "Anular una reserva",
       "reservation__reservation__complete": "Completar una reserva",
       "reservation__reservation__confirm": "Confirmar una reserva",
       "reservation__reservation__create": "Crear una reserva",
@@ -2671,7 +2673,8 @@
         "auto": "Hace los cambios por su cuenta, como esta automatización, con los permisos que le has dado."
       },
       "rounds": "Vueltas como mucho",
-      "answerHint": "Los pasos de después pueden insertar «Texto», lo que ha contestado."
+      "answerHint": "Los pasos de después pueden insertar «Texto», lo que ha contestado.",
+      "askFirst": "Solo tras el sí de alguien que también puede hacerlo: {actions}."
     }
   }
 }

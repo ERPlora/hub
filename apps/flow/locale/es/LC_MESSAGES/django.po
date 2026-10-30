@@ -223,6 +223,9 @@ msgstr "«%(name)s» cambia datos: usa «Hacer algo»."
 msgid "«%(name)s» needs a person in front: an automation cannot do it."
 msgstr "«%(name)s» necesita a una persona delante: una automatización no puede hacerlo."
 
+msgid "«%(name)s» needs a person's yes first: choose «Ask me first»."
+msgstr "«%(name)s» necesita antes el sí de una persona: elige «Que me lo pregunte»."
+
 msgid "Say which automation: its id or its name."
 msgstr "Di qué automatización: su id o su nombre."
 
@@ -282,6 +285,9 @@ msgstr "Ese borrador ya se decidió."
 
 msgid "You cannot allow what you may not do yourself: «%(name)s»."
 msgstr "No puedes permitir lo que tú no puedes hacer: «%(name)s»."
+
+msgid "Only someone who may do it themselves can say yes to «%(name)s»."
+msgstr "Solo puede decir que sí a «%(name)s» quien también puede hacerlo."
 
 msgid "That draft does not exist in this business."
 msgstr "Ese borrador no existe en este negocio."

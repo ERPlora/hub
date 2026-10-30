@@ -861,6 +861,7 @@
       "inventory__product__get": "Read a product",
       "appointment__agenda__lanes": "Read the diary by professional",
       "appointment__appointment__bulk_create": "Book several appointments",
+      "appointment__appointment__cancel": "Cancel an appointment",
       "appointment__appointment__complete": "Complete an appointment",
       "appointment__appointment__confirm": "Confirm an appointment",
       "appointment__appointment__count_active_for_service": "Count the appointments of a service",
@@ -1093,6 +1094,7 @@
       "reservation__availability__tables": "Look for free tables",
       "reservation__blocked_date__create": "Close a day to reservations",
       "reservation__blocked_date__list": "Look for days closed to reservations",
+      "reservation__reservation__cancel": "Cancel a reservation",
       "reservation__reservation__complete": "Complete a reservation",
       "reservation__reservation__confirm": "Confirm a reservation",
       "reservation__reservation__create": "Create a reservation",
@@ -2671,7 +2673,8 @@
         "auto": "It makes the changes on its own, as this automation, with the permissions you gave it."
       },
       "rounds": "Most turns",
-      "answerHint": "The steps after it can insert «Text», what it answered."
+      "answerHint": "The steps after it can insert «Text», what it answered.",
+      "askFirst": "Only after a yes from someone who may do it themselves: {actions}."
     }
   }
 }

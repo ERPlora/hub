@@ -449,12 +449,13 @@ Sale: la lista completa de permisos de la automatización (`flow.flow.granted`).
 guardado no hay nada que autorizar: la pestaña lo dice y pide guardar.
 Si falla: si la lista nombra algo que no existe en el negocio, o algo que necesita a una persona delante
 (anular, devolver, borrar datos, enviar a Hacienda, sentar a un grupo que llega…), se rechaza entera y se
-dice qué. Nadie concede lo
+dice qué. La única excepción es «Anular una reserva»: se autoriza cuando un paso **Pedírselo al asistente** con
+«Que me lo pregunte» la usa (FLOW-F37), y solo así. Nadie concede lo
 que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».» (tampoco una
 integración con su clave). Cada paso actúa solo con el permiso que se le concedió, nunca con todos los
 de quien la montó. Reservar con solo el nombre y el teléfono de quien reserva busca o crea su ficha de
 cliente sin autorizar nada de Clientes.
-Implicados: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16
+Implicados: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16, FLOW-F37
 
 ### FLOW-F13 Probar sin que haga nada
 <!-- origen: old:flows/workflow/editor.md#flows-f20 -->
@@ -805,10 +806,13 @@ Entra: la pregunta, sus detalles, a quién, cuánto esperar y qué hacer con un 
 Sale: el paso. Al ejecutarse, la pregunta espera en «Esperan tu respuesta» (FLOW-F29) con su texto ya rellenado y
 la ejecución se para ahí (`flow.question.asked`); el historial dice «Preguntó a los responsables; espera una
 respuesta hasta el …». Cambiar después la automatización no cambia una pregunta ya hecha. **Probar** dice
-«Preguntaría a … y esperaría hasta … horas» con la pregunta rellenada, sin preguntar.
+«Preguntaría a … y esperaría hasta … horas» con la pregunta rellenada, sin preguntar. Un sí a esta pregunta
+no abre la puerta a lo que necesita a una persona delante: los pasos de después siguen sin poder anular,
+devolver ni borrar. Para anular una reserva cuando alguien dice que sí, pídeselo al asistente con «Que me lo
+pregunte» (FLOW-F37, F38).
 Si falla: una pregunta vacía, o una espera de menos de una hora o de más de 30 días, no se guarda; una
 pregunta que nombra un secreto tampoco.
-Implicados: FLOW-F13, FLOW-F16, FLOW-F25, FLOW-F29, FLOW-F30
+Implicados: FLOW-F13, FLOW-F16, FLOW-F25, FLOW-F29, FLOW-F30, FLOW-F37, FLOW-F38
 
 ### FLOW-F29 Contestar lo que pregunta una automatización
 <!-- origen: old:flows/workflow/bandejas-y-asistente.md#flows-f24 old-hub:HUB-F100 gh:hub#2502 gh:flows#166 -->
@@ -997,7 +1001,8 @@ Pasos:
    momento de pedírselo.
 3. En **Qué puede usar**, elige con **Añadir una consulta o una acción** lo que el asistente podrá consultar o
    hacer (solo salen las que el asistente sabe usar); × quita una. Sin ninguna, solo puede contestar con
-   palabras: «Nada todavía: solo puede contestar con palabras.».
+   palabras: «Nada todavía: solo puede contestar con palabras.». «Anular una reserva» solo sale con «Que me lo
+   pregunte», y la tarjeta avisa: «Solo tras el sí de alguien que también puede hacerlo: «Anular una reserva».».
 4. En **Cambios**, elige «Que me lo pregunte» (de fábrica) o «Que lo haga por su cuenta». La tarjeta lo explica:
    «Lo que quiera cambiar espera un sí en Automatizaciones, en «Esperan tu respuesta». Lo que solo consulta nunca
    espera.» o «Hace los cambios por su cuenta, como esta automatización, con los permisos que le has dado.».
@@ -1009,7 +1014,8 @@ respuesta, «Aprobada», «Nota» y «Contestada por». **Probar** dice «Se lo 
 rellenado, sin pedírselo. Cada consulta o acción que nombra pasa a pedir su permiso.
 Si falla: un encargo vacío, más de 10 vueltas, o un encargo con un secreto no se guardan; tampoco algo que el
 negocio no tiene, que necesita a una persona delante o que el asistente no puede usar («El asistente no puede
-usar «…».»), junto a **Qué puede usar**.
+usar «…».»), junto a **Qué puede usar**. Con «Anular una reserva» puesta y «Que lo haga por su cuenta», tampoco:
+««…» necesita antes el sí de una persona: elige «Que me lo pregunte».».
 Implicados: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 El asistente hace el paso que le toca dentro de una automatización
@@ -1033,9 +1039,12 @@ Pasos:
      cambio hecho, o lo que la acción no aceptó, y que los demás no se han hecho), para que lo cuente o pida el
      siguiente, que vuelve a esperar su sí; la ejecución no sigue hasta que contesta sin pedir nada. Esa vuelta no
      gasta otro mensaje si el sí llega en 15 minutos; más tarde cuenta como una primera vuelta (un mensaje del mes,
-     FLOW-F39). Un no, o nadie contesta en 72 horas, cancela la ejecución sin hacer nada (FLOW-F29, F30);
+     FLOW-F39). Un no, o nadie contesta en 72 horas, cancela la ejecución sin hacer nada (FLOW-F29, F30).
+     «Anular una reserva» solo la aprueba quien también puede anular reservas: a cualquier otro se le dice «Solo
+     puede decir que sí a «Anular una reserva» quien también puede hacerlo.» y la pregunta sigue esperando;
    - con «Que lo haga por su cuenta», se hace en el acto, como la automatización, con las mismas comprobaciones
      que su botón en la pantalla; si pide varios a la vez, se hacen todos y se le devuelve lo que pasó con cada uno.
+     Anular una reserva nunca se le ofrece así.
 5. Cuando contesta sin pedir nada más, el historial dice «El asistente ha contestado: «…»» y la ejecución sigue
    con los pasos de después.
 Entra: el encargo, lo que el paso nombra y la automatización tiene concedido, y los datos de la ejecución.
@@ -1216,6 +1225,22 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   revisión 2026-10-30; ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
   al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). En la fase 1 «activas» son las instaladas (como `base.session.me`); la fase 2 lo cambia por
   la foto del SaaS en `queries.active_apps`.
+- **La excepción «Que me lo pregunte»** (revisión 2026-10-30, FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION):
+  `queries.ASK_FIRST` (hoy solo `reservation.reservation.cancel`; nunca lo que se hace en persona, `asks_first`)
+  entra en `ask_first_catalog`, sale en `flow.catalog.read` con `ask_first: true` (el editor no lo ofrece a
+  «Hacer algo» ni a «Que lo haga por su cuenta»), se guarda solo como herramienta de un paso `assistant` con
+  `mode: ask` (`operation_problem(…, asking=True)`), se concede solo si un paso así lo nombra (`asked_first`) y
+  `_offered` no lo da en `auto`; un paso `command` sigue con `flow.high_risk` al guardar y al ejecutar. El sí lo
+  valida `_may_say_yes`: quien contesta tiene el permiso de la operación o `PermissionDenied`
+  `flow.approval_beyond_you`, y la pregunta sigue pendiente; el cambio corre como `flow_run:<id>`, como cualquier
+  sí. Mercado: Zapier (Human in the Loop antes del paso que no se deshace), n8n (revisión humana de las
+  herramientas del agente: borrar, enviar, comprar), Odoo (reglas de aprobación con grupo permitido), Microsoft
+  Copilot (confirmación antes de una acción con consecuencias), Fresha (su AI Concierge anula según la política
+  del negocio), Square, Vagaro y Booksy (el cliente anula él mismo, con enlace y dentro de la política) y
+  OpenTable/SevenRooms (anula el cliente o el equipo; la respuesta por SMS la atiende una persona). Devoluciones,
+  borrados, VeriFactu y envíos a Hacienda no entran: mueven dinero o dejan un registro que no se deshace.
+  `appointment.appointment.cancel` tampoco, todavía: Citas niega todo cambio de una automatización
+  (`may_change` pide `appointment.change_appointment` o la ficha propia, y el paso no tiene ninguna de las dos).
 - **Con qué actúa**: el motor solo llama a las operaciones de la lista `grants`, que fija un propietario
   o administrador, que se valida entera contra el catálogo y que solo contiene lo que quien la concede
   puede hacer él mismo. Cada paso corre con el contexto `flow_run:<id>` (el actor queda en el outbox de
@@ -1374,7 +1399,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **El asistente no enciende ni concede sin confirmarlo**: deja borradores, y encender, pausar, conceder,
   ejecutar y borrar son acciones `risk: "high"` que el asistente confirma con la persona antes.
 - **No automatiza lo que necesita a una persona delante**: anular o devolver una venta, borrar los datos
-  de un cliente, enviar o anular registros en Hacienda… no salen en la lista de acciones.
+  de un cliente, enviar o anular registros en Hacienda… no salen en la lista de acciones. La única excepción es
+  anular una reserva con «Que me lo pregunte», tras el sí de quien puede anularla (FLOW-F37, F38).
 - **No ejecuta en pausa**: para eso está Probar.
 - **No reintenta sola** una ejecución que falló: se reanuda a mano desde el paso que falló (FLOW-F24).
 
@@ -1388,7 +1414,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   Ahora se rechaza al guardar.
 - **Ejecutar ahora** existe (FLOW-F15; antes «no hecho»), solo con la automatización encendida.
 - **Nada que necesite a una persona delante** (anular, devolver, borrar, enviar a Hacienda) se puede
-  automatizar, y **cada paso actúa solo con el permiso de su acción** (y las lecturas de su app), como el
+  automatizar, salvo anular una reserva tras el sí de quien puede anularla («Que me lo pregunte»), y **cada paso actúa solo con el permiso de su acción** (y las lecturas de su app), como el
   «no elevation» del motor viejo; antes la lista de permisos admitía cualquier acción.
 - **El filtro del disparador se ve y se edita** («Solo cuando…»; antes se conservaba sin verse).
 - **Probar** valida también los datos contra la acción («Se lo rechazarían: …»).
@@ -1480,6 +1506,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
   cuando la tenga.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
+- **Anular una cita con «Que me lo pregunte»**, como ya se anula una reserva: espera a que Citas acepte cambios de
+  una automatización; hoy ninguna confirma, mueve ni anula una cita («Solo puedes cambiar tus propias citas.»).
 - **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
   (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
   conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide que esta app

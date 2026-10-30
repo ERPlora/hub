@@ -354,6 +354,8 @@ export interface CatalogActionOut {
   outputs: string[];
   /** Whether «Ask the assistant» may use it (absent: it may not). */
   assistant?: boolean;
+  /** Whether it needs a person's yes first: only «Ask the assistant» with «Ask me first» may use it (absent: no). */
+  ask_first?: boolean;
 }
 
 export interface CatalogOut {
