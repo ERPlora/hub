@@ -10,6 +10,11 @@ import { actionKey, type AssistantCard, cardLine, fieldLabelKey, fieldLines, fie
 const EUR = { currency: 'EUR', decimals: 2 };
 const t = (key: string, values?: Record<string, unknown>) => (values ? `${key}${JSON.stringify(values)}` : key);
 const opts = { locale: 'es-ES', money: EUR, t };
+/** The card's format with a real catalogue's words, as the screen says them. */
+const said = (catalogue: unknown) => ({
+  ...opts,
+  t: (key: string) => String(key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], catalogue)),
+});
 
 function card(fields: Partial<AssistantCard> = {}): AssistantCard {
   return {
@@ -44,6 +49,30 @@ describe('the action', () => {
   it('only one no catalogue names is «Do this»', () => {
     expect(actionKey('frobnicate')).toBe('base.assistant.card.actions.other');
     expect(actionKey('toString')).toBe('base.assistant.card.actions.other');
+  });
+
+  it('an operation its action’s verb does not say has its own: emptying a cart is «Vaciar», removing one of its lines «Quitar»', () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: the card to empty a cart (`cart_checkout.cart.clear`)
+    // said «Quitar en Carrito y pago», the verb of taking one line out; a cash count (`cash_register.count.add`) said
+    // «Añadir en Caja», as if it put money in. The verb goes by the whole operation first, then by its action.
+    const verb = (operation: string): [string, string] => [said(es).t(actionKey(operation)), said(en).t(actionKey(operation))];
+    expect(verb('cart_checkout.cart.clear')).toEqual(['Vaciar', 'Clear']);
+    expect(verb('cart_checkout.item.remove')).toEqual(['Quitar', 'Remove']);
+    // Kitchen's `clear` takes a product's or a category's route away: its action's verb still says it.
+    expect(verb('kitchen.routing.clear')).toEqual(['Quitar', 'Clear']);
+    // A count of the drawer and a cash in or out, as «Cash register» names them («Registrar arqueo», «Registrar»).
+    expect(verb('cash_register.count.add')).toEqual(['Registrar arqueo', 'Register count']);
+    expect(verb('cash_register.movement.add')).toEqual(['Registrar movimiento', 'Register movement']);
+    // Adding a line to a cart is adding: its action's verb.
+    expect(verb('cart_checkout.item.add')).toEqual(['Añadir', 'Add']);
+  });
+
+  it('an operation the catalogue does not name goes by its action, a word of JavaScript’s included', () => {
+    expect(actionKey('cart_checkout.cart.create')).toBe('base.assistant.card.actions.create');
+    expect(actionKey('cart_checkout.cart.toString')).toBe('base.assistant.card.actions.other');
+    expect(actionKey('toString.name.length')).toBe('base.assistant.card.actions.other');
+    expect(actionKey('cart_checkout.constructor.name')).toBe('base.assistant.card.actions.other');
+    expect(actionKey('cart_checkout.constructor.clear')).toBe('base.assistant.card.actions.clear');
   });
 });
 
@@ -189,10 +218,6 @@ describe('the lines of a dangerous write', () => {
   // FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: transferring a check said «Registro: 5
   // (Terraza)» where Tables titles it «Cuenta»: the screen's word for a datum it knows by its name (`id`) hid the title
   // its app wrote, which the server marks `titled`.
-  const said = (catalogue: unknown) => ({
-    ...opts,
-    t: (key: string) => String(key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], catalogue)),
-  });
 
   it('a datum its app titles is called by that title, over the screen’s word for its name', () => {
     const check = { name: 'id', kind: 'text' as const, value: '5 (Terraza)', titled: true };

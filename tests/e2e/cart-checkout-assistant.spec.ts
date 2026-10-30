@@ -6,19 +6,24 @@
 // «El asistente»). The owner, in Spanish, asks to empty a cart (CART_CHECKOUT-F04), to remove one of its lines
 // (CART_CHECKOUT-F03) and to mark its order paid (CART_CHECKOUT-F09, dangerous): each card names its record; cancelled,
 // nothing changes. What this file creates carries the session prefix of the cart_checkout specs and goes away; the app
-// it turns on is turned off again.
+// it turns on is turned off again. Each card says what its write does (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-
+// EMPTYING-A-CART, BASE-F97): emptying a cart «Vaciar», never «Quitar», the verb of removing one of its lines.
 // flow: cart-checkout-assistant-card
+// flow: base-assistant-card-verbs
 // flow: CART_CHECKOUT-F03 CART_CHECKOUT-F04 CART_CHECKOUT-F09 BASE-F97
 import { execSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
 import { type Cart, cleanUp, code, get, type Line, type Order, post } from './cart-checkout-helpers';
-import { A, api, capture, compactBar, exposeMovingInPage, login, REPO_DIR, shown, turnOn, untilStill } from './helpers';
+import { A, api, capture, compactBar, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOn, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-CART_CHECKOUT-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
+/** The captures of the verb of emptying a cart (base-assistant-card-verbs). */
+const VERB_KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART';
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },
@@ -167,7 +172,7 @@ async function ownerWithACart(browser: import('@playwright/test').Browser): Prom
 const detail = (context: BrowserContext, cart: Cart): Promise<Detail> =>
   get<Detail>(context, `/cart_checkout/carts/detail?cart_id=${cart.id}`);
 
-test('cart-checkout-assistant-card — in Spanish emptying a cart names it by its session code, never by its id', async ({ browser }) => {
+test('cart-checkout-assistant-card, base-assistant-card-verbs — in Spanish emptying a cart says «Vaciar» and names it by its session code, never by its id', async ({ browser }) => {
   const [context, page, cart] = await ownerWithACart(browser);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openPanel(page);
@@ -175,10 +180,11 @@ test('cart-checkout-assistant-card — in Spanish emptying a cart names it by it
   await expect(card(page)).toBeVisible();
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Carrito y pago: ${cart.session_token}`);
+    await expect(card(page)).toContainText(`Vaciar en Carrito y pago: ${cart.session_token}`);
+    await expect(card(page)).not.toContainText('Quitar');
     await expect(card(page)).not.toContainText(cart.id);
     await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    writeFileSync(shot(`${VERB_KEY}-${vp.label}`), await capture(page, `${KEY}-${vp.label}`));
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
@@ -188,13 +194,13 @@ test('cart-checkout-assistant-card — in Spanish emptying a cart names it by it
   await context.close();
 });
 
-test('cart-checkout-assistant-card — in Spanish removing a line names it by its product, never by its id', async ({ browser }) => {
+test('cart-checkout-assistant-card, base-assistant-card-verbs — in Spanish removing a line says «Quitar» and names it by its product, never by its id', async ({ browser }) => {
   const [context, page, cart, [, mask]] = await ownerWithACart(browser);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openPanel(page);
   await ask(page, `E2E-ASK cart_checkout__item__remove ${JSON.stringify({ item_id: mask.id })}`);
   await expect(card(page)).toBeVisible();
-  await expect(card(page)).toContainText(`Carrito y pago: ${MASK}`);
+  await expect(card(page)).toContainText(`Quitar en Carrito y pago: ${MASK}`);
   await expect(card(page)).not.toContainText(mask.id);
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');

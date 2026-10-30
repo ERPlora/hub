@@ -1383,6 +1383,21 @@
           "write_off": "Write off",
           "other": "Do this"
         },
+        "operations": {
+          "cart_checkout": {
+            "cart": {
+              "clear": "Clear"
+            }
+          },
+          "cash_register": {
+            "count": {
+              "add": "Register count"
+            },
+            "movement": {
+              "add": "Register movement"
+            }
+          }
+        },
         "fields": {
           "name": "Name",
           "price": "Price",
