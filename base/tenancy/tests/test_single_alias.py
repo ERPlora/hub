@@ -19,7 +19,9 @@ from live.executor import Executor, Stream, Subscription
 from live.models import OutboxEvent
 from live.operations import get as get_operation
 
-from base.models import Membership
+from apps.demo.models import Item
+from base import api_keys
+from base.models import ApiKey, Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 
@@ -168,8 +170,9 @@ def test_bs_api_key_on_as_host_is_no_caller_and_never_reaches_b(client, hub_a, h
         refused = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost", **key)
 
     assert refused.status_code == 401
-    # A looked for it in its own database, where no key of B exists.
+    # A looked for it in its own database, where no key of B exists, and never in phase 1's shared tables.
     assert touches(sent, hubs.HUB_A_ALIAS, "base_apikey")
+    assert not touches(sent, "default", "base_apikey")
     # The key is good on its own host: only A refuses it.
     assert client.get("/api/demo/items", HTTP_HOST=f"{hub_b.slug}.localhost", **key).status_code == 200
 
@@ -182,3 +185,26 @@ def test_the_watch_fails_a_block_that_reaches_any_other_hub(hub_a, hub_b):
     with pytest.raises(AssertionError, match=hubs.HUB_B_ALIAS):
         with hubs.assert_only_alias(hubs.HUB_A_ALIAS):
             listed(hub_b)
+
+    # Phase 1's shared tables in control's database are no hub's own either: a hub's table read there fails it.
+    with pytest.raises(AssertionError, match="demo_item"):
+        with hubs.assert_only_alias(hubs.HUB_A_ALIAS), context.use_shared_database():
+            list(Item.objects.all())
+
+
+@HUB_DB
+def test_a_key_planted_in_the_shared_tables_never_opens_a_hub_with_its_own_database(client, hub_a):
+    # A key row left in phase 1's shared tables (by hand, or by a business before it moved) is nobody's: A looks for
+    # its keys in its own database only.
+    token = api_keys.new_token()
+    with context.use_shared_database():
+        ApiKey.objects.create(
+            name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full"
+        )
+
+    with hubs.assert_only_alias(hubs.HUB_A_ALIAS) as sent:
+        refused = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    assert refused.status_code == 401
+    assert touches(sent, hubs.HUB_A_ALIAS, "base_apikey")
+    assert not touches(sent, "default", "base_apikey")

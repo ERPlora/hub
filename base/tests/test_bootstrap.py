@@ -358,6 +358,28 @@ def test_hub_app_reads_the_record_of_migrations_and_never_writes_it(cluster, dat
                 conn.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(dbname)))
 
 
+def test_a_record_of_migrations_hub_migrator_does_not_own_is_reported_never_left_writable(cluster):
+    # A table made before this step by another role (the master, by hand): PostgreSQL only warns when who revokes is
+    # not its owner, so the step checks what hub_app still holds and stops, naming the owner.
+    foreign = cluster.prefix + "hub_foreign"
+    with cluster.connect("hub_migrator", "postgres") as conn:
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(foreign)))
+    try:
+        with psycopg.connect(**{**cluster.master, "dbname": foreign}, autocommit=True) as conn:
+            conn.execute(bootstrap.MIGRATIONS_TABLE_DDL)
+            conn.execute(
+                sql.SQL("GRANT SELECT, INSERT, UPDATE, DELETE ON django_migrations TO {}, {}").format(
+                    sql.Identifier(cluster.role("hub_migrator")), sql.Identifier(cluster.role("hub_app"))
+                )
+            )
+
+            with pytest.raises(bootstrap.BootstrapError, match=f"owned by {cluster.prefix}master"):
+                bootstrap._migrations_table(conn, cluster.names)
+    finally:
+        with superuser() as conn:
+            conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(foreign)))
+
+
 def test_the_record_of_migrations_is_made_as_djangos_migrate_makes_it():
     from django.db import connection
     from django.db.migrations.recorder import MigrationRecorder

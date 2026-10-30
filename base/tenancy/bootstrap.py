@@ -381,7 +381,10 @@ def _hub_default_privileges(conn: psycopg.Connection, names: Names) -> tuple[str
 
 def _migrations_table(conn: psycopg.Connection, names: Names) -> tuple[str, str]:
     """``django_migrations``, made by ``hub_migrator`` if missing (``migrate`` then finds it), with ``hub_app`` held to
-    ``SELECT``: a clone of the template copies the table and its grants."""
+    ``SELECT``: a clone of the template copies the table and its grants.
+
+    PostgreSQL only warns when who revokes is not the table's owner (nor who granted): what ``hub_app`` still holds
+    is read back, and a table of another owner stops the bootstrap, naming that owner."""
     existed = _exists(conn, "SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'django_migrations'")
     with _as_role(conn, names.hub_migrator):
         conn.execute(MIGRATIONS_TABLE_DDL)
@@ -389,6 +392,16 @@ def _migrations_table(conn: psycopg.Connection, names: Names) -> tuple[str, str]
             sql.SQL("REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON django_migrations FROM {}").format(
                 sql.Identifier(names.hub_app)
             )
+        )
+    writable, owner, database = conn.execute(
+        "SELECT has_table_privilege(%s, 'public.django_migrations', 'INSERT, UPDATE, DELETE, TRUNCATE'), "
+        "tableowner, current_database() FROM pg_tables WHERE schemaname = 'public' AND tablename = 'django_migrations'",
+        [names.hub_app],
+    ).fetchone()
+    if writable:
+        raise BootstrapError(
+            f"django_migrations on {database}: {names.hub_app} can still write it, owned by {owner}: make "
+            f"{names.hub_migrator} its owner (ALTER TABLE django_migrations OWNER TO {names.hub_migrator}) and run again."
         )
     return ("updated" if existed else "created"), f"SELECT only to {names.hub_app}"
 

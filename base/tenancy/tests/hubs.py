@@ -236,12 +236,31 @@ def watched() -> Iterator[dict[str, list[str]]]:
         yield sent
 
 
+#: Tables of a hub's (or contextual) model that a block watched by :func:`assert_only_alias` may still name in control's
+#: database, each with its reason. None: in control's, a hub's table is phase 1's shared data (``db_name=""``), nobody's
+#: own, and a hub with its own database never reads it.
+CONTROL_HUB_TABLES_ALLOWED: dict[str, str] = {}
+
+
+def _hub_tables_named(statements: list[str]) -> list[str]:
+    """The tables of hub (and contextual) models that ``statements`` name, quoted as Django quotes them."""
+    tables = {
+        model._meta.db_table
+        for model in apps.get_models(include_auto_created=True)
+        if _hub_classes(model) and model._meta.db_table not in CONTROL_HUB_TABLES_ALLOWED
+    }
+    return sorted({table for statement in statements for table in tables if f'"{table}"' in statement})
+
+
 @contextmanager
 def assert_only_alias(alias: str) -> Iterator[dict[str, list[str]]]:
     """The block reaches no hub's database but ``alias``'s (PLAN-DB §14.2): whatever any thread sends to another alias
-    than ``alias`` and control's (``default``: the registry, the sessions) fails it, whichever hub that alias is.
+    than ``alias`` fails it, whichever hub that alias is, and so does a statement to control's (``default``: the
+    registry, the sessions) that names a hub's table, phase 1's shared data (``CONTROL_HUB_TABLES_ALLOWED`` aside).
     Yields the statements by alias (:func:`watched`)."""
     with watched() as sent:
         yield sent
     strays = {other: statements[:3] for other, statements in sent.items() if other not in (alias, DEFAULT_DB_ALIAS)}
     assert not strays, f"Only {alias} and control's database may be reached here, and these were too: {strays}"
+    shared = _hub_tables_named(sent.get(DEFAULT_DB_ALIAS, []))
+    assert not shared, f"Control's database was asked for phase 1's shared data of a hub's tables: {shared}"
