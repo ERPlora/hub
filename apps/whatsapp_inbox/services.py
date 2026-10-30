@@ -28,7 +28,7 @@ from uuid import UUID, uuid7
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Q, Value
 from django.db.models.functions import Concat, Lower
 from django.utils.translation import gettext_lazy as _
@@ -40,7 +40,7 @@ from live.errors import (
     OperationError,
     PermissionDenied,
 )
-from live.operations import get, operation
+from live.operations import atomic, get, operation
 from live.outbox import record_event
 
 from apps.customer.models import Consent, Customer
@@ -266,7 +266,7 @@ def _conversation_for(phone: str, contact_name: str = "") -> Conversation:
     if found is not None:
         return found
     try:
-        with transaction.atomic():
+        with atomic():
             return Conversation.objects.create(phone=phone, contact_name=contact_name)
     except IntegrityError:
         return rows.get(phone=phone)
@@ -448,7 +448,7 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
     kind = data.type or "text"
     reply_to, reply_id, text = _tapped(data)
     try:
-        with transaction.atomic():
+        with atomic():
             message = Message.objects.create(
                 conversation=conversation,
                 direction=data.direction,
@@ -611,7 +611,7 @@ def _locked_channel(ctx: OperationContext) -> Channel:
     row = rows.first()
     if row is None:
         try:
-            with transaction.atomic():
+            with atomic():
                 row = Channel.objects.create(host=ctx.scope.key)
         except IntegrityError:
             row = rows.get()
@@ -1019,7 +1019,7 @@ def _queue_message(
     the one way out of the Hub, for the inbox (F32, F33) and for an automation (``notify``)."""
     body = text if template is None else _rendered(template.body, variables)
     try:
-        with transaction.atomic():
+        with atomic():
             message = Message.objects.create(
                 conversation=conversation,
                 direction=Message.Direction.OUTBOUND,
@@ -1914,7 +1914,7 @@ def create_template(ctx: OperationContext, data: TemplateCreateIn) -> dict:
     row = Template(host=ctx.scope.key, name=data.name, language=data.language, status=Template.Status.DRAFT)
     _apply(row, _content(data))
     try:
-        with transaction.atomic():
+        with atomic():
             _queue(ctx, row, data.submit_key, events.TEMPLATE_CREATED)
     except IntegrityError:
         # The same save at the same time (its key), or the name just taken by another.
@@ -1969,7 +1969,7 @@ def update_template(ctx: OperationContext, data: TemplateUpdateIn) -> dict:
     else:
         row.draft = content  # Meta's stays the one sent until it takes the edit
     try:
-        with transaction.atomic():
+        with atomic():
             _queue(ctx, row, data.submit_key, events.TEMPLATE_UPDATED)
     except IntegrityError:
         raise Conflict(str(TEMPLATE_SUBMITTING), code="whatsapp_inbox.template_submitting") from None

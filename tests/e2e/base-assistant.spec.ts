@@ -545,6 +545,62 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await context.close();
 });
 
+// flow: whatsapp_inbox-assistant-card (WHATSAPP_INBOX-F33 sigue hecho)
+// FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED: sending a template with a document header, the card left the file out
+// (it could only name it by its id) and called the message's key a datum to judge unless it looked like an id: now the
+// file goes by the name it was chosen with and the key never shows, whatever its shape. Cancelled: nothing is sent.
+test('whatsapp_inbox-assistant-card — in Spanish a template names its header file by its name and leaves the message key out', async ({ browser }) => {
+  const KEY = 'FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = (id: string) => before.data.apps.some((app) => app.id === id && app.state === 'on');
+  const turnedOn = ['customer', 'whatsapp_inbox'].filter((id) => !wasOn(id));
+  await turnOn(context, A, ...turnedOn);
+  const stamp = Date.now();
+  const file = `carta-${stamp}.pdf`;
+  const pdf = Buffer.from(`%PDF-1.7\n${'\u0000'.repeat(64)}`, 'latin1').toString('base64');
+  const kept = await api<{ id: string; name: string }>(context, A, 'POST', '/whatsapp_inbox/templates/samples', {
+    header_format: 'DOCUMENT',
+    name: file,
+    content_base64: pdf,
+  });
+  expect(kept.status, `keep the header's file: ${JSON.stringify(kept.data)}`).toBe(201);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  // A key as a model may write it: not an id, so only its mark keeps it off the card.
+  const messageKey = `e2e-attempt-${stamp}`;
+  const send = {
+    to: '+34600111222',
+    template: { name: 'carta_del_dia', language: 'es', header_sample: kept.data.id },
+    client_message_id: messageKey,
+  };
+  await ask(page, `E2E-ASK whatsapp_inbox__message__send ${JSON.stringify(send)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  await expect(card(page)).toContainText('Enviar en Bandeja de WhatsApp. Revisa cada dato antes de seguir.');
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(`Plantilla: carta_del_dia · es · ${file}`);
+    await expect(card(page)).not.toContainText(messageKey);
+    await expect(card(page)).not.toContainText(kept.data.id);
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  for (const app of [...turnedOn].reverse()) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
 // flow: base-assistant-money-mark (BASE-F97)
 // FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS: the card knew an amount only by the words «in cents» of
 // its description, so a payment «in minor units of the currency» said «1500»: now by the mark its app declares, whatever

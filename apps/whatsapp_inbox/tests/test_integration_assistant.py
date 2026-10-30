@@ -7,11 +7,16 @@ templates, the quick replies and the channel's settings) say them."""
 
 import gettext
 import json
+import re
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from live.operations import get, registry
 
+from apps.whatsapp_inbox.tests.conftest import B, ctx_for
+from apps.whatsapp_inbox.tests.test_template_header_file import PDF, upload
+from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
@@ -85,3 +90,74 @@ def test_the_card_names_a_template_as_the_composer():
     for name in ("whatsapp_inbox.message.send", "whatsapp_inbox.message.notify"):
         assert labels(assistant.card(get(name), {"template": template}, "es")) == [SCREENS["composer"]["template"]]
         assert labels(assistant.card(get(name), {"template": template}, "en")) == [SCREENS_EN["composer"]["template"]]
+
+
+# ── A real card: the header's file by its name, the attempt key never (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED) ──
+
+#: What a card never carries: an id.
+AN_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
+
+#: An attempt key as a model may send it: a new UUID, or a text the write refuses but the card must not show either.
+KEYS = ("0192f5a0-0000-7000-8000-0000000000a1", "reintento-1", "")
+
+
+def values(card: dict) -> dict:
+    return {field["name"]: field["value"] for field in card["fields"]}
+
+
+def sending(sample_id, key: str) -> dict:
+    """«Send the menu template to +34 600 111 222 with this PDF», as the model asks for it."""
+    template = {"name": "carta_del_dia", "language": "es", "header_sample": str(sample_id)}
+    return {"to": "+34600111222", "template": template, "client_message_id": key}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("key", KEYS)
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_the_card_of_a_template_names_its_headers_file_and_never_its_message_key(language, key):
+    """WHATSAPP_INBOX-F33: whoever answers reads which file goes in the header, by the name it was chosen with, and
+    never the key that keeps a retry from sending twice — not even empty."""
+    kept = upload(PDF, "DOCUMENT", "carta.pdf")
+    who = ctx_for("hub_employee", language=language)
+
+    card = assistant.card(get("whatsapp_inbox.message.send"), sending(kept.id, key), language, ctx=who)
+
+    template = {"name": "carta_del_dia", "language": "es", "header_sample": "carta.pdf"}
+    assert values(card) == {"to": "+34600111222", "template": template}
+    assert not AN_ID.search(json.dumps(card, ensure_ascii=False))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("key", KEYS)
+@pytest.mark.parametrize("name", ["whatsapp_inbox.template.create", "whatsapp_inbox.template.update"])
+def test_the_card_of_a_template_to_review_names_its_headers_file_and_never_its_save_key(name, key):
+    """WHATSAPP_INBOX-F29, F30: the file Meta reviews the template with, by its name; the key of the save, never."""
+    kept = upload(PDF, "DOCUMENT", "carta.pdf")
+    arguments = {"header_format": "DOCUMENT", "header_sample": str(kept.id), "body": "Hola", "submit_key": key}
+
+    shown = values(assistant.card(get(name), arguments, "es", ctx=ctx_for(language="es")))
+
+    assert shown["header_sample"] == "carta.pdf"
+    assert "submit_key" not in shown
+
+
+@pytest.mark.django_db
+def test_a_file_of_another_business_is_never_named_nor_shown_by_its_id():
+    """Phase 1 shares the tables: ``b``'s file, named in a write of ``a``, is left out of the card."""
+    theirs = upload(PDF, "DOCUMENT", "de-b.pdf", ctx=ctx_for(scope=B))
+
+    card = assistant.card(get("whatsapp_inbox.message.send"), sending(theirs.id, KEYS[0]), "es", ctx=ctx_for("hub_employee"))
+
+    assert values(card)["template"] == {"name": "carta_del_dia", "language": "es"}
+    assert not AN_ID.search(json.dumps(card, ensure_ascii=False))
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_an_automations_card_never_shows_the_message_key(key):
+    """FLOW-F31: an automation's card, with nobody at hand to read the file as, leaves out both."""
+    template = {"name": "carta_del_dia", "header_sample": KEYS[0]}
+    arguments = {"phone": "+34600111222", "template": template, "client_message_id": key}
+
+    shown = values(assistant.card(get("whatsapp_inbox.message.notify"), arguments, "es"))
+
+    assert shown == {"phone": "+34600111222", "template": {"name": "carta_del_dia"}}

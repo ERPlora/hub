@@ -17,13 +17,13 @@ import logging
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError
-from live.operations import UnknownOperation, get, operation
+from live.operations import UnknownOperation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.inventory.models import Category, Product
@@ -1268,7 +1268,7 @@ def _name_free(name: str, but=None) -> None:
 
 def _save_station(station: Station, **save) -> None:
     try:
-        with transaction.atomic():
+        with atomic():
             station.save(**save)
     except IntegrityError:
         raise Conflict(

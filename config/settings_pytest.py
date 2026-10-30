@@ -17,3 +17,8 @@ os.environ["VITE_DEV_PORT"] = "5173"
 from config.settings import *  # noqa: E402, F403
 
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+# The migrator runs only with its own credentials (base.tenancy.migrator.migrator_credentials, never default's in
+# production): in the tests, the one user of the tests' Postgres, as the hub-migrate task's DB_MIGRATOR_* are its.
+os.environ.setdefault("DB_MIGRATOR_USER", DATABASES["default"]["USER"])  # noqa: F405
+os.environ.setdefault("DB_MIGRATOR_PASSWORD", DATABASES["default"]["PASSWORD"])  # noqa: F405

@@ -162,14 +162,18 @@ def needs_a_person(op: Operation) -> bool:
     """An action the assistant confirms before running (``ai.risk == "high"``: voiding, refunding,
     erasing, sending to the tax agency…) or one done in person (``ai.in_person``: seating a party at the
     door): never for an automation, which acts with nobody in front."""
-    ai = op.ai or {}
-    return ai.get("risk") == "high" or ai.get("in_person") is True
+    return hub_assistant.risk(op) == "high" or in_person(op)
+
+
+def in_person(op: Operation) -> bool:
+    """An action done in person (``ai.in_person``, a key of the ``ai=`` dictionary: seating a party at the door)."""
+    return isinstance(op.ai, dict) and op.ai.get("in_person") is True
 
 
 def asks_first(op: Operation) -> bool:
     """An action that needs a person in front that an «Ask me first» step may still propose (``ASK_FIRST``), never
     one done in person."""
-    return op.name in ASK_FIRST and needs_a_person(op) and (op.ai or {}).get("in_person") is not True
+    return op.name in ASK_FIRST and needs_a_person(op) and not in_person(op)
 
 
 def catalog_operations() -> dict[str, Operation]:
@@ -285,7 +289,7 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
                 "kind": op.kind,
                 "app": op.app_label,
                 "app_name": str(apps[op.app_label].verbose_name),
-                "description": str((op.ai or {}).get("description", "")),
+                "description": hub_assistant.description(op),
                 "fields": action_fields(op),
                 "outputs": action_outputs(op),
                 "assistant": hub_assistant.is_tool(op),

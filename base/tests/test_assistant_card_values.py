@@ -320,7 +320,7 @@ UNNAMED_REFERENCES = {
     "tax": 4,
     "verifactu": 6,
     "website": 5,
-    "whatsapp_inbox": 22,
+    "whatsapp_inbox": 14,
 }
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models of their app give no label,
@@ -414,11 +414,11 @@ def test_the_ratchet_counts_a_reference_nobody_marks_and_a_list_nobody_labels():
 
 # ── A datum the screen knows by its name, titled by its app (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME) ──
 
-#: What the card of a dangerous write calls a datum it knows by its name (``assistant-card.ts`` ``FIELDS``, base's
-#: catalogue) when its app gives it no title of its own, in Spanish.
-KNOWN = json.loads((Path(settings.BASE_DIR) / "base/frontend/locale/es.json").read_text())["base"]["assistant"]["card"][
-    "fields"
-]
+#: What the card of a dangerous write calls a datum it knows by its name (``FIELDS`` of the shared assistant's
+#: ``card.ts`` and its catalogue, @erplora/ui) when its app gives it no title of its own, in Spanish.
+KNOWN = json.loads(
+    (Path(settings.BASE_DIR) / "packages/ui/src/components/Assistant/locales/es.json").read_text()
+)["assistant"]["card"]["fields"]
 
 #: Every datum the screen knows by its name that a write's schema titles itself, and what its card calls it in
 #: Spanish: the title its app wrote, never the generic word for its name («Registro: 5 (Terraza)»).
@@ -440,7 +440,7 @@ TITLED_IN_SPANISH = {
 
 
 def card_title(field: dict) -> str:
-    """What the card calls ``field``, as ``assistant-card.ts`` ``fieldLines`` does: by the title its app wrote, else by
+    """What the card calls ``field``, as ``fieldLines`` of the shared assistant's ``card.ts`` does: by the title its app wrote, else by
     the screen's word for a datum it knows, else by the label the server gives it."""
     return field["label"] if field.get("titled") else KNOWN.get(field["name"], field["label"])
 
@@ -684,9 +684,7 @@ ATTEMPT_KEY_NAME = re.compile(r"idempoten|attempt_key|^(?:job|submit)_key$|^clie
 #: The attempt keys of the assistant's writes no ``attempt_key`` mark declares, by app: their card shows them, or
 #: leaves them out only as an id it cannot name. Only ever lower: an app that marks its own lowers its number here,
 #: and none comes in.
-UNMARKED_ATTEMPT_KEYS = {
-    "whatsapp_inbox": 4,
-}
+UNMARKED_ATTEMPT_KEYS: dict[str, int] = {}
 
 
 def is_attempt_key(prop: dict) -> bool:

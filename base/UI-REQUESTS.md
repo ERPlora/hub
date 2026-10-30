@@ -19,9 +19,10 @@ parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 - **Qué**: registrar en `icons.ts` los cuatro iconos del cuadro del asistente (APP-BASE-9), de Lucide como los
   demás que no son de Ionicons: `lucide:paperclip` («Adjuntar un archivo»), `lucide:mic` («Dictar por voz»),
   `lucide:square` («Detener» y «Detener la grabación») y `lucide:volume-2` («Leer en voz alta»).
-- **Hoy**: `base/frontend/lib/assistant-icons.ts` los hornea igual que el shell (`~icons/lucide/*`, sin red) y
-  los pinta con `ion-icon :src` en `AssistantComposer.vue` y `AssistantMessage.vue`.
-- Al llegar: cambiar esos `ion-icon` por `HubIcon name="lucide:…"` y borrar `assistant-icons.ts` y su test.
+- **Hoy**: el chat del asistente ya vive en `@erplora/ui` (`packages/ui/src/components/Assistant/`, 2026-10-30);
+  `icons.ts` de esa carpeta los hornea igual que el shell (`~icons/lucide/*`, sin red) como `ASSISTANT_ICONS`, que
+  pintan `AssistantComposer.vue`, `AssistantMessage.vue` y la tecla «Hablar» de `sale` con `ion-icon :src`.
+- Al llegar: cambiar esos `ion-icon` por `HubIcon name="lucide:…"` y borrar `ASSISTANT_ICONS` y su test.
 
 ## `useI18n` en `@erplora/ui/shell`
 

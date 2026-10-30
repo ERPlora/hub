@@ -11,14 +11,14 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 import pydantic
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Max
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.ninja import FIELD_MESSAGES
-from live.operations import operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
 from apps.customer import events
@@ -192,7 +192,7 @@ def _changes(instance, sent: dict) -> dict:
 def _save_named(instance, message, code: str) -> None:
     """Saves a group, tag or field; a name already taken among the active ones is a 409 under «name»."""
     try:
-        with transaction.atomic():
+        with atomic():
             instance.save()
     except IntegrityError as exc:
         if "_name_unique" not in str(exc):
@@ -1034,12 +1034,14 @@ def _health_fact(
     return fact
 
 
+# Not an assistant tool: health data (GDPR art. 9), for the screen only and never sent to a model.
 @operation(
     "customer.health.grant",
     kind="command",
     permission="customer.manage",
     input=HealthGrantIn,
     output=HealthOut,
+    ai=INTERNAL,
 )
 def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
     customer = find_customer(data.customer_id, data.customer, lock=True)
@@ -1047,12 +1049,14 @@ def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
     return load_health(customer)
 
 
+# Not an assistant tool: health data (GDPR art. 9), for the screen only and never sent to a model.
 @operation(
     "customer.health.withdraw",
     kind="command",
     permission="customer.manage",
     input=HealthWithdrawIn,
     output=HealthOut,
+    ai=INTERNAL,
 )
 def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
     customer = find_customer(data.customer_id, data.customer, lock=True)
@@ -1062,12 +1066,14 @@ def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
     return load_health(customer)
 
 
+# Not an assistant tool: health data (GDPR art. 9), for the screen only and never sent to a model.
 @operation(
     "customer.health.update",
     kind="command",
     permission="customer.manage",
     input=HealthIn,
     output=HealthOut,
+    ai=INTERNAL,
 )
 def update_health(ctx: OperationContext, data: HealthIn) -> dict:
     customer = find_customer(data.customer_id, data.customer, lock=True)
