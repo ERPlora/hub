@@ -183,7 +183,7 @@ def test_the_master_is_no_superuser(cluster):
     assert rolsuper is False
 
 
-def test_owners_and_createdb_follow_plan_db(cluster):
+def test_owners_createdb_and_no_superuser_follow_plan_db(cluster):
     p = cluster.prefix
     with superuser() as conn:
         owners = dict(
@@ -193,13 +193,12 @@ def test_owners_and_createdb_follow_plan_db(cluster):
                 [p],
             ).fetchall()
         )
-        createdb = dict(
-            conn.execute(
-                "SELECT rolname, rolcreatedb FROM pg_roles WHERE starts_with(rolname, %s) "
-                "AND rolname <> %s",
-                [p, p + "master"],
-            ).fetchall()
-        )
+        roles = conn.execute(
+            "SELECT rolname, rolcreatedb, rolsuper FROM pg_roles WHERE starts_with(rolname, %s) "
+            "AND rolname <> %s",
+            [p, p + "master"],
+        ).fetchall()
+        createdb = {name: can_create for name, can_create, _super in roles}
 
     assert owners == {
         f"{p}hub": f"{p}hub_migrator",
@@ -207,6 +206,8 @@ def test_owners_and_createdb_follow_plan_db(cluster):
         f"{p}saas": f"{p}saas_migrator",
     }
     assert createdb == {p + role: role == "hub_migrator" for role in VARIABLES}
+    # PLAN-DB §14.6: no role of the platform is a superuser, hub_app least of all.
+    assert {name: is_super for name, _can_create, is_super in roles} == {p + role: False for role in VARIABLES}
 
 
 def test_hub_migrator_clones_the_template_into_a_hub_database(cluster):
@@ -329,6 +330,64 @@ def test_hub_app_gets_dml_and_hub_admin_reads_what_hub_migrator_creates(
         else:
             with cluster.connect("hub_migrator", "postgres") as conn:
                 conn.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(dbname)))
+
+
+@pytest.mark.parametrize("database", ["control", "a hub cloned from the template"])
+def test_hub_app_reads_the_record_of_migrations_and_never_writes_it(cluster, database):
+    # PLAN-DB §14.6: what says which schema a database has is the migrator's alone. The migrations run as hub_migrator
+    # after the bootstrap (its default privileges give hub_app DML on every table it makes), and every hub is a clone
+    # of the template.
+    n = cluster.names
+    for dbname in (n.control, n.template):
+        with cluster.connect("hub_migrator", dbname) as conn:
+            conn.execute(bootstrap.MIGRATIONS_TABLE_DDL)
+            conn.execute("INSERT INTO django_migrations (app, name, applied) VALUES ('base', '0001_initial', now())")
+    dbname = n.control if database == "control" else hub_from_template(cluster)
+    try:
+        with cluster.connect("hub_app", dbname) as conn:
+            assert allowed(conn, "SELECT app, name FROM django_migrations")
+            assert not allowed(
+                conn, "INSERT INTO django_migrations (app, name, applied) VALUES ('base', '9999_forged', now())"
+            )
+            assert not allowed(conn, "UPDATE django_migrations SET name = '9999_forged'")
+            assert not allowed(conn, "DELETE FROM django_migrations")
+            assert not allowed(conn, "TRUNCATE django_migrations")
+    finally:
+        if database != "control":
+            with cluster.connect("hub_migrator", "postgres") as conn:
+                conn.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(dbname)))
+
+
+def test_a_record_of_migrations_hub_migrator_does_not_own_is_reported_never_left_writable(cluster):
+    # A table made before this step by another role (the master, by hand): PostgreSQL only warns when who revokes is
+    # not its owner, so the step checks what hub_app still holds and stops, naming the owner.
+    foreign = cluster.prefix + "hub_foreign"
+    with cluster.connect("hub_migrator", "postgres") as conn:
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(foreign)))
+    try:
+        with psycopg.connect(**{**cluster.master, "dbname": foreign}, autocommit=True) as conn:
+            conn.execute(bootstrap.MIGRATIONS_TABLE_DDL)
+            conn.execute(
+                sql.SQL("GRANT SELECT, INSERT, UPDATE, DELETE ON django_migrations TO {}, {}").format(
+                    sql.Identifier(cluster.role("hub_migrator")), sql.Identifier(cluster.role("hub_app"))
+                )
+            )
+
+            with pytest.raises(bootstrap.BootstrapError, match=f"owned by {cluster.prefix}master"):
+                bootstrap._migrations_table(conn, cluster.names)
+    finally:
+        with superuser() as conn:
+            conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(foreign)))
+
+
+def test_the_record_of_migrations_is_made_as_djangos_migrate_makes_it():
+    from django.db import connection
+    from django.db.migrations.recorder import MigrationRecorder
+
+    with connection.schema_editor(collect_sql=True, atomic=False) as editor:
+        editor.create_model(MigrationRecorder.Migration)
+
+    assert editor.collected_sql == [bootstrap.MIGRATIONS_TABLE_DDL.replace(" IF NOT EXISTS", "") + ";"]
 
 
 def test_hub_shared_writes_shared_app_and_reaches_nothing_in_public(cluster):
