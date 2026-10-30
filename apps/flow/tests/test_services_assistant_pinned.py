@@ -333,3 +333,26 @@ def test_a_fixed_datum_may_read_an_earlier_step():
     earlier = {"id": "s0", "kind": "query", "operation": "customer.customer.by_phone", "params": {"phone": "input.phone"}}
     created = run("flow.flow.create", document(earlier, assistant(pinned={CANCEL: {"on_behalf_of": "{{steps.s0.id}}"}})))
     assert created.steps[1]["pinned"] == {CANCEL: {"on_behalf_of": "{{steps.s0.id}}"}}
+
+
+# ── Trying it (FLOW-F13) ────────────────────────────────────────────────────────────────────────────────────────────
+
+
+def test_trying_it_says_each_fixed_datum_with_the_value_it_would_have_and_which_would_be_empty(gateway):
+    # Nothing is asked: each datum the step fixes, tool by tool, filled in with the trial's data as the run would fill
+    # it; an empty one means its tool would not be used, and one read from a step that does not run here is unknown.
+    earlier = {"id": "s0", "kind": "query", "operation": "customer.customer.by_phone", "params": {"phone": "input.phone"}}
+    pinned = {
+        CANCEL: {"on_behalf_of": "{{input.customer}}", "reason": "Asked by WhatsApp"},
+        UPDATE: {"on_behalf_of": "{{steps.s0.id}}"},
+    }
+    step = assistant(tools=[CANCEL, UPDATE], pinned=pinned) | {"id": "s1"}
+    tried = run("flow.flow.test", {"document": json.dumps({"trigger": {"kind": "manual"}, "steps": [earlier, step]})})
+    assert tried.steps[1].outcome == "would_ask_assistant"
+    assert [row.model_dump() for row in tried.steps[1].pinned] == [
+        {"tool": CANCEL, "field": "on_behalf_of", "value": None, "state": "empty"},
+        {"tool": CANCEL, "field": "reason", "value": "Asked by WhatsApp", "state": "filled"},
+        {"tool": UPDATE, "field": "on_behalf_of", "value": None, "state": "unknown"},
+    ]
+    assert tried.steps[0].pinned == []
+    assert gateway.sent(CHAT) == []

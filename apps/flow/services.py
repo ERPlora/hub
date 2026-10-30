@@ -53,6 +53,7 @@ from apps.flow.queries import (
     asked_first,
     catalog_operations,
     catalog_problems,
+    fixed_value,
     grantable_operations,
     needs_a_person,
     operation_problem,
@@ -1142,8 +1143,8 @@ def _pinned(run: FlowRun, step: dict, op: Operation) -> tuple[dict, list[str]]:
     values: dict[str, Any] = {}
     empty: list[str] = []
     for name, raw in ((step.get("pinned") or {}).get(op.name) or {}).items():
-        value = document.resolve(raw, data)
-        if value is None or (isinstance(value, str) and not value.strip()):
+        value = fixed_value(raw, data)
+        if value is None:
             empty.append(name)
         else:
             values[name] = value

@@ -4,8 +4,9 @@
 // real reservation. In the editor the step may «Cancel a reservation» and fixes its «On behalf of the customer» to
 // Lucía's card; the assistant asks to cancel Marta's reservation without saying on whose behalf. The card in «Waiting
 // for your answer» says it goes on Lucía's behalf, and after the owner's yes Reservations refuses it: Marta's
-// reservation is still pending (before, the yes cancelled it).
-// flow: FLOW-F37 FLOW-F38 FLOW-F29
+// reservation is still pending (before, the yes cancelled it). «Try it» says each fixed datum with the value it
+// would have, and that «Change a reservation», fixed to a card this trial does not bring, would not be used.
+// flow: FLOW-F37 FLOW-F38 FLOW-F29 FLOW-F13
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -22,6 +23,7 @@ import { pick } from './task-helpers';
 const KEY = 'FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF';
 const TAG = 'E2E FlowPinned';
 const CANCEL = 'reservation.reservation.cancel';
+const UPDATE = 'reservation.reservation.update';
 const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
 const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 /** The maximum of the slot the run opens: how `cleanUp` knows it (slots have no name). */
@@ -148,10 +150,30 @@ for (const viewport of VIEWPORTS) {
       await noHorizontalScroll(page, viewport.label);
       await settled(page);
       await capture(page, `${KEY}-${viewport.label}`);
+
+      // FLOW-F13: «Try it» says each fixed datum with the value it would have, and which tool would not be used
+      // because one would be empty — «Change a reservation» on behalf of a card the run is never given here.
+      await pick(page, 'flow-assistant-addtool-s1', 'Change a reservation', 'Change a reservation');
+      await pick(page, 'flow-assistant-addpin-s1', 'behalf', 'On behalf of the customer');
+      await editor.locator(`[data-testid="flow-assistant-pin-s1-${UPDATE}-on_behalf_of-text-0"]`).fill('{{input.customer}}');
+      await editor.locator('[data-testid=flow-editor-tab-test]').click();
+      const tried = editor.locator('[data-testid=flow-test-step-s1]');
+      await expect(tried).toContainText('Would ask the assistant');
+      await expect(tried.locator(`[data-testid="flow-test-pinned-s1-${CANCEL}-on_behalf_of"]`)).toContainText(writer.card);
+      await expect(tried.locator(`[data-testid="flow-test-pinnedempty-s1-${UPDATE}"]`)).toHaveText(
+        '«Change a reservation» would not be used: «On behalf of the customer», fixed by this step, would be empty in this run.',
+      );
+      await tried.scrollIntoViewIfNeeded();
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await capture(page, `${KEY}-try-${viewport.label}`);
+
       await editor.locator('[data-testid=flow-editor-save]').click();
       await page.waitForURL(/\/flow\/automations\/[0-9a-f-]+$/);
       const flowId = idFromUrl(page);
-      expect(JSON.parse(psql(`select steps::text from flow_flow where id = '${flowId}'`))[0].pinned).toEqual({ [CANCEL]: { on_behalf_of: writer.card } });
+      const saved = JSON.parse(psql(`select steps::text from flow_flow where id = '${flowId}'`))[0].pinned;
+      expect(saved[CANCEL]).toEqual({ on_behalf_of: writer.card });
+      expect(Object.keys(saved[UPDATE])).toEqual(['on_behalf_of']);
 
       await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
       await shown(page).locator('[data-testid=flow-perm-grantall]').click();

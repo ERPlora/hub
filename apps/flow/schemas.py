@@ -912,6 +912,15 @@ class ClauseOut(Schema):
     value: Any
 
 
+class PinnedOut(Schema):
+    tool: str = Field(description="The tool the step fixes it for, by name.")
+    field: str = Field(description="The datum of that tool it fixes.")
+    value: Any = Field(None, description="What it would be in this trial; null when empty or unknown.")
+    state: Literal["filled", "empty", "unknown"] = Field(
+        description="`filled`; `empty`: its tool would not be used; `unknown`: it reads a step that does not run here."
+    )
+
+
 class TestStepOut(Schema):
     id: str
     kind: str
@@ -937,6 +946,8 @@ class TestStepOut(Schema):
     errors: dict[str, str] = {}
     failed: list[ClauseOut] = []
     seconds: int | None = None
+    #: The data an «Ask the assistant» step fixes, tool by tool (FLOW-F37).
+    pinned: list[PinnedOut] = []
 
 
 class TestOut(Schema):

@@ -450,6 +450,7 @@
       },
       "empty": "Would arrive empty: {fields}",
       "unknown": "Comes from an earlier step that has not run: {fields}",
+      "pinnedEmpty": "«{action}» would not be used: {fields}, fixed by this step, would be empty in this run.",
       "loading": "Trying…",
       "again": "Try again"
     },

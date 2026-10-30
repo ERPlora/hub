@@ -318,6 +318,29 @@ def operation_problem(name: str, kind: str | None = None, *, asking: bool = Fals
     return None
 
 
+def fixed_value(raw: Any, data: dict) -> Any:
+    """A datum an «Ask the assistant» step fixes, filled in with ``data`` as its prompt is; ``None`` when it is empty
+    (a path not found, a text with nothing in it): then its tool is not used."""
+    value = document.resolve(raw, data)
+    return None if value is None or (isinstance(value, str) and not value.strip()) else value
+
+
+def _tried_pinned(step: Any, values: dict, unknown_steps: set[str], say: document.Say) -> list[dict]:
+    """What «Try it» says of the data an «Ask the assistant» step fixes: each, tool by tool, with the value it would
+    have (as a person reads it), empty (its tool would not be used) or unknown (it reads a step that does not run)."""
+    rows = []
+    for tool, fixed in (step.pinned or {}).items():
+        for field, raw in fixed.items():
+            reads = document.references(raw)
+            if any(path.startswith("steps.") and path.split(".")[1] in unknown_steps for path in reads):
+                rows.append({"tool": tool, "field": field, "value": None, "state": "unknown"})
+            elif fixed_value(raw, values) is None:
+                rows.append({"tool": tool, "field": field, "value": None, "state": "empty"})
+            else:
+                rows.append({"tool": tool, "field": field, "value": document.resolve(raw, values, say), "state": "filled"})
+    return rows
+
+
 def pinned_problem(tools: list[str], pinned: dict[str, dict[str, Any]]) -> str | None:
     """Why the fixed data of an «Ask the assistant» step cannot be saved (the first reason), or ``None``: each is of a
     tool the step may use, names a datum that tool asks for and has a value."""
@@ -1264,7 +1287,8 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         if step.kind == "assistant":
             # Nothing is asked: what the assistant would answer is not known here.
             asked = {"prompt": document.fill(step.prompt, values), "tools": list(step.tools), "mode": step.mode}
-            steps.append(out | {"outcome": "would_ask_assistant", "params": asked})
+            pinned = _tried_pinned(step, values, unknown_steps, say)
+            steps.append(out | {"outcome": "would_ask_assistant", "params": asked, "pinned": pinned})
             unknown_steps.add(step.id)
             continue
         if step.kind == "condition":

@@ -430,6 +430,16 @@ export type TestOutcome =
   | 'unavailable'
   | 'not_reached';
 
+/** A datum an «Ask the assistant» step fixes, as «Try it» would fill it in. */
+export interface PinnedOut {
+  tool: string;
+  field: string;
+  /** What it would be; `null` when empty or unknown. */
+  value: unknown;
+  /** `empty`: its tool would not be used; `unknown`: it reads a step that does not run here. */
+  state: 'filled' | 'empty' | 'unknown';
+}
+
 export interface TestStepOut {
   id: string;
   kind: StepKind;
@@ -441,6 +451,8 @@ export interface TestStepOut {
   errors: Record<string, string>;
   failed: ClauseOut[];
   seconds: number | null;
+  /** The data an «Ask the assistant» step fixes, tool by tool; absent or empty for any other step. */
+  pinned?: PinnedOut[];
 }
 
 export interface TestOut {

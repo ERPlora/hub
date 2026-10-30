@@ -153,4 +153,46 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
     expect(text).toContain('Refund 12500?');
     expect(text).not.toContain('Hours');
   });
+
+  // FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF (FLOW-F37): the data a step fixes, each
+  // with the value it would have, and the tool that would not be used because one would be empty.
+  it('an assistant step says each fixed datum with its value, and which tool would not be used', async () => {
+    const CANCEL = 'reservation.reservation.cancel';
+    const UPDATE = 'reservation.reservation.update';
+    const assistant = { id: 's1', kind: 'assistant' as const, prompt: 'Help', tools: [CANCEL, UPDATE], mode: 'ask' as const, max_rounds: 6 };
+    const step = {
+      ...ANSWER.steps[0],
+      id: 's1',
+      kind: 'assistant',
+      outcome: 'would_ask_assistant' as const,
+      params: { prompt: 'Help', tools: [CANCEL, UPDATE], mode: 'ask' },
+      pinned: [
+        { tool: CANCEL, field: 'on_behalf_of', value: null, state: 'empty' as const },
+        { tool: CANCEL, field: 'reason', value: 'Asked by WhatsApp', state: 'filled' as const },
+        { tool: UPDATE, field: 'on_behalf_of', value: null, state: 'unknown' as const },
+      ],
+    };
+    const mountIn = async (locale: 'en' | 'es') => {
+      const m = await mountFlow(TestPanel, {
+        locale,
+        props: { document: { ...DOC, steps: [assistant] }, flowId: 'f1', catalog: CATALOG },
+        answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [step] }] },
+      });
+      await settle();
+      return m;
+    };
+    const m = await mountIn('en');
+    const reason = m.find(`flow-test-pinned-s1-${CANCEL}-reason`);
+    expect(reason.findAll('span').map((part) => part.text())).toEqual(['Cancel a reservation › Reason', 'Asked by WhatsApp']);
+    expect(m.find(`flow-test-pinnedempty-s1-${CANCEL}`).text()).toBe(
+      '«Cancel a reservation» would not be used: «On behalf of the customer», fixed by this step, would be empty in this run.',
+    );
+    expect(m.find('flow-test-pinnedunknown-s1').text()).toBe('Comes from an earlier step that has not run: Change a reservation › On behalf of the customer');
+    // An empty datum has no row of its own: its line says it.
+    expect(m.wrapper.find(`[data-testid="flow-test-pinned-s1-${CANCEL}-on_behalf_of"]`).exists()).toBe(false);
+    const es = await mountIn('es');
+    expect(es.find(`flow-test-pinnedempty-s1-${CANCEL}`).text()).toBe(
+      'No se usaría «Anular una reserva»: «En nombre del cliente», que fija este paso, estaría vacío en esta ejecución.',
+    );
+  });
 });

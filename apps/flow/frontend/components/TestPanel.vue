@@ -14,7 +14,7 @@ import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import { cleanTrigger, type FlowDocument } from '../lib/document';
 import { actionLabel, describeClause, describeDuration, describeStep, eventLabel, fieldLabel } from '../lib/phrasing';
-import type { CatalogOut, TestOut, TestStepOut } from '../operations';
+import type { CatalogOut, PinnedOut, TestOut, TestStepOut } from '../operations';
 
 const props = defineProps<{ document: FlowDocument; flowId: string | null; catalog: CatalogOut | null }>();
 const client = useLiveClient();
@@ -87,6 +87,22 @@ function shown(value: unknown): string {
 }
 
 const names = (fields: readonly string[]): string => fields.map((field) => fieldLabel(field, phrasing.value)).join(', ');
+
+/** «Cancel a reservation › On behalf of the customer»: a datum an «Ask the assistant» step fixes. */
+const pinnedLabel = (row: PinnedOut): string => `${actionLabel(row.tool, props.catalog, phrasing.value)} › ${fieldLabel(row.field, phrasing.value)}`;
+const pinnedIn = (step: TestStepOut, state: PinnedOut['state']): PinnedOut[] => (step.pinned ?? []).filter((row) => row.state === state);
+
+/** Each tool that would not be used, with its fixed data that would be empty in this trial. */
+function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
+  const empty = pinnedIn(step, 'empty');
+  return [...new Set(empty.map((row) => row.tool))].map((tool) => ({
+    tool,
+    text: phrasing.value.t('flow.test.pinnedEmpty', {
+      action: actionLabel(tool, props.catalog, phrasing.value),
+      fields: empty.filter((row) => row.tool === tool).map((row) => `«${fieldLabel(row.field, phrasing.value)}»`).join(', '),
+    }),
+  }));
+}
 </script>
 
 <template>
@@ -143,6 +159,26 @@ const names = (fields: readonly string[]): string => fields.map((field) => field
           <span class="flow-test__key">{{ fieldLabel(String(field), phrasing) }}</span>
           <span>{{ shown(value) }}</span>
         </div>
+        <div
+          v-for="row in pinnedIn(step, 'filled')"
+          :key="`${row.tool}|${row.field}`"
+          class="flow-test__value"
+          :data-testid="`flow-test-pinned-${step.id}-${row.tool}-${row.field}`"
+        >
+          <span class="flow-test__key">{{ pinnedLabel(row) }}</span>
+          <span>{{ shown(row.value) }}</span>
+        </div>
+        <span
+          v-for="unused in unusedTools(step)"
+          :key="unused.tool"
+          class="flow-test__bad"
+          :data-testid="`flow-test-pinnedempty-${step.id}-${unused.tool}`"
+        >{{ unused.text }}</span>
+        <span
+          v-if="pinnedIn(step, 'unknown').length"
+          class="flow-test__note"
+          :data-testid="`flow-test-pinnedunknown-${step.id}`"
+        >{{ $t('flow.test.unknown', { fields: pinnedIn(step, 'unknown').map(pinnedLabel).join(', ') }) }}</span>
         <span
           v-if="step.empty.length"
           class="flow-test__bad"

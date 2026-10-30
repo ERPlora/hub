@@ -450,6 +450,7 @@
       },
       "empty": "Saldría vacío: {fields}",
       "unknown": "Sale de un paso anterior que no ha corrido: {fields}",
+      "pinnedEmpty": "No se usaría «{action}»: {fields}, que fija este paso, estaría vacío en esta ejecución.",
       "loading": "Probando…",
       "again": "Volver a probar"
     },
