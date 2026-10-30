@@ -28,7 +28,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatMessageTime } from '../lib/format';
-import { noAllowance } from '../lib/plan';
+import { nearCap, noAllowance } from '../lib/plan';
 import { kindLabel } from '../lib/thread';
 import type { ConversationListIn, ConversationOut, ConversationStatus } from '../operations';
 import { inboxTabs } from '../tabs';
@@ -73,6 +73,8 @@ const blocked = computed(() => blockingError(error.value));
 const { data: channel } = useLive('whatsapp_inbox.channel.get', {});
 /** «Upgrade plan» at the cap: for whoever configures, and only with erplora.com to send them to. */
 const upgradeUrl = computed(() => (canConfigure.value && channel.value?.plans_url) || '');
+// From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
+const left = computed(() => nearCap(channel.value));
 
 // The open conversation lives in the address, so a link (the bell, another app) opens it.
 const openId = computed(() => (typeof route.query.conversation === 'string' ? route.query.conversation : ''));
@@ -213,6 +215,25 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
         data-testid="whatsapp-inbox-cap-reached"
       >
         {{ noAllowance(channel) ? $t('whatsapp_inbox.inbox.notIncluded') : $t('whatsapp_inbox.inbox.capReached') }}
+        <template
+          v-if="upgradeUrl"
+          #actions
+        >
+          <a
+            class="wa-inbox__link"
+            data-testid="whatsapp-inbox-upgrade"
+            :href="upgradeUrl"
+            target="_blank"
+            rel="noopener"
+          >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+        </template>
+      </InlineFeedback>
+      <InlineFeedback
+        v-else-if="left"
+        tone="warning"
+        data-testid="whatsapp-inbox-near-cap"
+      >
+        {{ $t('whatsapp_inbox.inbox.nearCap', { left: left.left, limit: left.limit }) }}
         <template
           v-if="upgradeUrl"
           #actions

@@ -230,6 +230,29 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect((await setup()).find('whatsapp-inbox-cap-reached').exists()).toBe(false);
   });
 
+  it('from 80 % of the month\'s messages the inbox says how many are left, «Upgrade plan» for whoever configures (as the assistant, BASE-F104)', async () => {
+    const near = await setup({}, { ...CONNECTED, monthly_usage: 120 });
+    expect(near.find('whatsapp-inbox-near-cap').text()).toContain('You have 30 of 150 WhatsApp messages of your plan left this month.');
+    expect(near.find('whatsapp-inbox-near-cap').attributes('data-tone')).toBe('warning');
+    expect(near.find('whatsapp-inbox-cap-reached').exists()).toBe(false);
+    expect(near.find('whatsapp-inbox-upgrade').attributes()).toMatchObject({
+      href: 'http://localhost:8001/store/plans',
+      target: '_blank',
+      rel: 'noopener',
+    });
+    const employee = await setup({ session: EMPLOYEE }, { ...CONNECTED, monthly_usage: 120 });
+    expect(employee.find('whatsapp-inbox-near-cap').text()).toContain('You have 30 of 150 WhatsApp messages of your plan left this month.');
+    expect(employee.find('whatsapp-inbox-upgrade').exists()).toBe(false);
+    // Below 80 %, nothing; once spent, the cap says it instead.
+    expect((await setup({}, { ...CONNECTED, monthly_usage: 119 })).find('whatsapp-inbox-near-cap').exists()).toBe(false);
+    const spent = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
+    expect(spent.find('whatsapp-inbox-near-cap').exists()).toBe(false);
+    expect(spent.find('whatsapp-inbox-cap-reached').exists()).toBe(true);
+    // A new month (or a bigger plan) takes it away by itself, without reloading.
+    await near.result(CHANNEL, CONNECTED);
+    expect(near.find('whatsapp-inbox-near-cap').exists()).toBe(false);
+  });
+
   it('a plan without WhatsApp messages says so above the list, «Upgrade plan» for whoever configures (ADR-0474: 0 = none)', async () => {
     const none = { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true };
     const s = await setup({}, none);
@@ -266,6 +289,8 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
       'Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se puede enviar nada hasta que mejores el plan.',
     );
     expect(none.find('whatsapp-inbox-upgrade').text()).toBe('Mejorar el plan');
+    const near = await setup({ locale: 'es' }, { ...CONNECTED, monthly_usage: 120 });
+    expect(near.find('whatsapp-inbox-near-cap').text()).toContain('Te quedan 30 de 150 mensajes de WhatsApp de tu plan este mes.');
     await s.result(LIST, PAGE);
     expect(s.prop('searchPlaceholder')).toBe('Filtrar contacto o teléfono…');
   });

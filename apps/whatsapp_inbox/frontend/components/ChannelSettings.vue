@@ -30,12 +30,14 @@ import TemplateFormModal from './TemplateFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
-import { noAllowance } from '../lib/plan';
+import { nearCap, noAllowance } from '../lib/plan';
 import type { TemplateListIn, TemplateOut } from '../operations';
 
 const t = useT();
 const session = useSession();
 const { data: channel, error: channelError } = useLive('whatsapp_inbox.channel.get', {});
+// From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
+const left = computed(() => nearCap(channel.value));
 const canBook = computed(() =>
   (session.me.value?.apps ?? []).some((app) => app.label === 'reservation' && app.state === 'on'),
 );
@@ -187,9 +189,16 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
         >
           {{ $t('whatsapp_inbox.settings.capReached') }}
         </p>
+        <p
+          v-else-if="left"
+          class="wa-settings__warning"
+          data-testid="whatsapp-inbox-settings-near-cap"
+        >
+          {{ $t('whatsapp_inbox.settings.nearCap', { left: left.left, limit: left.limit }) }}
+        </p>
       </template>
       <a
-        v-if="channel.cap_reached && channel.plans_url"
+        v-if="(channel.cap_reached || left) && channel.plans_url"
         class="wa-settings__upgrade"
         data-testid="whatsapp-inbox-settings-upgrade"
         :href="channel.plans_url"

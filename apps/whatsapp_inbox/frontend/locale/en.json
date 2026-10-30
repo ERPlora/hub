@@ -51,6 +51,7 @@
       "reconnectNeeded": "WhatsApp asks to reconnect the number in Settings: until then nothing can be sent.",
       "goToSettings": "Go to Settings",
       "capReached": "You have used all the WhatsApp messages of your plan this month. Messages keep arriving here, but nothing can be sent until next month or until you upgrade the plan.",
+      "nearCap": "You have {left} of {limit} WhatsApp messages of your plan left this month.",
       "notIncluded": "Your plan does not include WhatsApp messages. Messages keep arriving here, but nothing can be sent until you upgrade the plan.",
       "erased": "The data of this number has been erased.",
       "needsAttention": "Needs attention"
@@ -271,6 +272,7 @@
       "notIncluded": "Your plan does not include WhatsApp messages.",
       "notReported": "erplora.com has not reported this month’s messages yet.",
       "capReached": "You have used all the messages of your plan this month.",
+      "nearCap": "You have {left} of {limit} messages of your plan left this month.",
       "templatesTitle": "Meta templates",
       "loadError": "Could not load the channel.",
       "connection": {
