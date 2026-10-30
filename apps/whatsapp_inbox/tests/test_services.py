@@ -1009,6 +1009,26 @@ def test_a_manager_assigns_by_name_and_unassigns(make_user):
     )
 
 
+def test_a_manager_assigns_by_first_name_or_username_and_two_of_a_name_are_asked_apart(make_user):
+    # The people of the business's database (base.HubUser): their full name, its first word, the username or the email.
+    receive("wamid.1")
+    manager = ctx_for("hub_manager", actor=make_user("boss", role="hub_manager"))
+    make_user("marta", first_name="Marta", last_name="Ruiz")
+
+    def assign(reference):
+        return run("whatsapp_inbox.conversation.assign", {"conversation": "Ana", "assignee": reference}, manager)
+
+    assert assign("MARTA").assigned_to_name == "Marta Ruiz"
+    assert assign("marta").assigned_to_name == "Marta Ruiz"
+    make_user("marta.gil", first_name="Marta", last_name="Gil")
+    with pytest.raises(InvalidPayload) as several:
+        assign("Marta")
+    assert set(several.value.fields) == {"assignee"}
+    with pytest.raises(InvalidPayload) as nobody:
+        assign("Mar")
+    assert set(nobody.value.fields) == {"assignee"}
+
+
 def test_assign_to_me_never_takes_it_from_somebody_else(make_user):
     receive("wamid.1")
     luis = make_user("luis", first_name="Luis")

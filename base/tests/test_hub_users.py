@@ -230,6 +230,14 @@ class TestThePhoto:
 
         assert HubUser.objects.get(account_id=ANA_ID).is_active
 
+    def test_in_the_shared_database_a_business_s_photo_never_touches_the_people_of_another(self, acme):
+        # Olga never was in acme: whatever her state, acme's photo is not hers to change (and the shared database
+        # holds every business's people, so it reads only whoever just left acme).
+        HubUser.objects.create(username=f"saas:{OLGA_ID}", account_id=OLGA_ID, name="Olga")
+        services.hub_state_apply(SYSTEM, photo(1, (ANA_ID, "Ana", "", "hub_employee")))
+
+        assert HubUser.objects.get(account_id=OLGA_ID).is_active
+
     def test_a_photo_without_members_changes_nobody(self, acme):
         services.hub_state_apply(SYSTEM, photo(1, (ANA_ID, "Ana", "", "hub_employee")))
 

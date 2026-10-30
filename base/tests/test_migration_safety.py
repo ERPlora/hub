@@ -136,7 +136,8 @@ ACCEPTED = {
     # the new column hub_user_id, which only the new code writes; the code of before writes the old user_id and leaves
     # hub_user_id NULL, outside the constraint's condition, so no row of it can break it.
     ("staff", "0004_hub_users", "AddConstraint", "member.staff_member_hub_user_unique"),
-    # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): the old columns to
+    # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): each app's
+    # link_hub_users runs once more (a row the code of before linked during W10's deploy), then the old columns to
     # control's users, which W10 took out of the state and nobody writes any more, leave the database through
     # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state:
     #   staff_member.user_id, staff_timeoff.approved_by_id,

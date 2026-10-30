@@ -674,7 +674,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     ``whatsapp_inbox.channel.sync`` with the photo's version when the app is on in that business (off, the photo
     applies and the block waits for the next one); both in this same transaction, so their notices go out after its
     COMMIT (a block out of contract keeps nothing). Its ``members`` apply on the business's memberships
-    (:func:`_apply_members`) and on its people in its own database (``base.hub_user.sync``), in this transaction too. Its modules and plan are read where they are kept: the right
+    (:func:`_apply_members`) and on its people in its own database (``base.hub_user.sync``), in this transaction
+    too. Its modules and plan are read where they are kept: the right
     to a paid app (``base.entitlement``) and «Plan and limits» (``base.plan.usage``) follow this photo.
     """
     internal_only(ctx)
@@ -689,8 +690,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     if data.whatsapp is not None:
         _sync_whatsapp(hub, data)
     if data.members is not None:
-        _apply_members(hub, data.members)
-        _sync_hub_users(hub, data.members)
+        left = _apply_members(hub, data.members)
+        _sync_hub_users(hub, data.members, left)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
     # Applied as the platform (/internal): its own notice goes to the platform's channel. The live queries that
     # follow the photo (base/live.py) listen on the business's, which hears it after the COMMIT too.
@@ -760,14 +761,8 @@ def acting_hub_user(ctx: OperationContext) -> HubUser | None:
     return ensure_hub_user(ctx.actor)
 
 
-def _hosts_of_this_database() -> list[str]:
-    """The businesses whose rows the active database holds: a hub with its own, only it; phase 1's shared database
-    (S1–S4), every business that still has ``db_name=""``."""
-    from base.tenancy.context import current_hub
-
-    hub = current_hub()
-    if hub is not None and hub.db_name:
-        return [hub.slug]
+def _shared_database_hosts() -> list[str]:
+    """Phase 1's shared database (S1–S4): every business whose rows it still holds (``db_name=""``)."""
     return list(Hub.objects.filter(db_name="").values_list("slug", flat=True))
 
 
@@ -778,9 +773,11 @@ def _hosts_of_this_database() -> list[str]:
 def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
     """Make the people of the business's database say what the SaaS's photo lists (its ``members``), before they ever
     enter: who is new is made, with the name and the email the photo says (what it leaves out stays as it was); who is
-    no longer listed keeps their name on what they signed and is no longer active, unless they are still in another
-    business of this same database (phase 1's shared one). The photo's own transaction calls it in the business's
-    database (:func:`hub_state_apply`), after the memberships changed."""
+    no longer in the business keeps their name on what they signed and is no longer active. In a hub with its own
+    database, that is everyone the photo leaves out (its people are only this business's); in phase 1's shared one,
+    which holds every business's, only those the photo just took out (``left``), unless another business there still
+    has them. The photo's own transaction calls it in the business's database (:func:`hub_state_apply`), after the
+    memberships changed."""
     internal_only(ctx)
     made = updated = 0
     listed = set()
@@ -797,29 +794,27 @@ def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
             made += 1
         elif _bring_up_to_date(person, wanted):
             updated += 1
-    gone = set(
-        HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True)
-        .exclude(username__in=listed)
-        .values_list("username", flat=True)
-    )
-    if gone:
-        staying = set(
-            Membership.objects.filter(user__username__in=gone, host__in=_hosts_of_this_database()).values_list(
-                "user__username", flat=True
-            )
+    from base.tenancy.context import current_hub
+
+    hub = current_hub()
+    if hub is not None and hub.db_name:
+        gone = HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True).exclude(
+            username__in=listed
         )
-        gone -= staying
-    left = HubUser.objects.filter(username__in=gone).update(is_active=False) if gone else 0
-    return {"made": made, "updated": updated, "left": left}
+    else:
+        leaving = {username_for(str(saas_user_id)) for saas_user_id in data.left} - listed
+        staying = Membership.objects.filter(user__username__in=leaving, host__in=_shared_database_hosts())
+        gone = HubUser.objects.filter(username__in=leaving - set(staying.values_list("user__username", flat=True)))
+    return {"made": made, "updated": updated, "left": gone.update(is_active=False)}
 
 
-def _sync_hub_users(hub: Hub, members: list) -> None:
-    """The photo's people in the business's own database (``base.hub_user.sync``): the same transaction while it
-    shares control's (phase 1, S1–S4)."""
+def _sync_hub_users(hub: Hub, members: list, left: list[str]) -> None:
+    """The photo's people in the business's own database (``base.hub_user.sync``), and who just left it: the same
+    transaction while it shares control's (phase 1, S1–S4)."""
     from base.tenancy.context import use_hub
 
     with use_hub(hub):
-        hub_user_sync(system_context(Scope("host", hub.slug)), HubUserSyncIn(members=members))
+        hub_user_sync(system_context(Scope("host", hub.slug)), HubUserSyncIn(members=members, left=left))
 
 
 # ── The sessions of a SaaS account (/internal/sessions/revoke) ───────────────────────────────────────────────────
@@ -865,17 +860,18 @@ def _end_sessions(owners) -> int:
     return deleted.get(Session._meta.label, 0)
 
 
-def _apply_members(hub: Hub, members: list) -> None:
+def _apply_members(hub: Hub, members: list) -> list[str]:
     """Make the memberships of ``hub`` say what the photo's ``members`` say (HUBS-F26, F27 and F28 of the SaaS).
 
     A person whose role changed has it now and a person no longer listed loses their membership; either way their
     sessions on this business end (:func:`_end_sessions`), so the next thing they do runs with the permissions of
     the photo, not of their login. Nobody is created: a person the Hub has not seen yet takes their role when they
     first enter (:func:`open_session_from_saas`). Only the copies of SaaS accounts are the photo's (``saas:<id>``):
-    a demo's owner is not.
+    a demo's owner is not. Returns the SaaS accounts that left the business (their memberships gone).
     """
     wanted = {str(member.user_id): member.role for member in members}
     changed = []
+    left = []
     memberships = (
         Membership.objects.select_for_update(of=("self",))
         .select_related("user")
@@ -886,6 +882,7 @@ def _apply_members(hub: Hub, members: list) -> None:
         role = wanted.get(saas_user_id)
         if role is None:
             membership.delete()
+            left.append(saas_user_id)
         elif role != membership.role:
             membership.role = role
             membership.save(update_fields=["role"])
@@ -895,6 +892,7 @@ def _apply_members(hub: Hub, members: list) -> None:
     if changed:
         # A session that noted no host (from before the rule) is valid on every host, this business's too.
         _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host__in=[hub.slug, ""]))
+    return left
 
 
 #: The app whose block (and the business's status) travels in the photo (``verifactu``).

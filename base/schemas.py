@@ -146,9 +146,11 @@ class HubUserOut(Schema):
 
 
 class HubUserSyncIn(Schema):
-    """The people of the SaaS's photo (``members``), for the business's own database (``base.hub_user.sync``)."""
+    """The people of the SaaS's photo (``members``), for the business's own database (``base.hub_user.sync``), and
+    the SaaS accounts the photo just took out of the business (``left``)."""
 
     members: list[MemberIn]
+    left: list[str] = Field(default_factory=list)
 
 
 class HubUserSyncOut(Schema):
