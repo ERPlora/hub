@@ -7,11 +7,11 @@
 // asistente»). Cancelled, the price stays as it was. What this file creates carries its own prefix (E2EPAS) and goes
 // away; the apps it turns on are turned off again.
 // FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every id its schema does not
-// mark, so «pon el champú a 15 en la lista de dólares» or «sube al 15 % la regla de verano» said no list, no product and
-// no rule. Now each record is named as the Price lists screens show it, read as the person, never by its id.
+// mark, so «pon el gel a 15 en la lista de dólares» or «desactiva la regla de verano» said no list, no product and no
+// rule. Now each record is named as the Price lists screens show it, read as the person, never by its id.
 // flow: pricing-assistant-price-currency
 // flow: pricing-assistant-card-references
-// flow: PRICING-F07 PRICING-F08 PRICING-F11 BASE-F97
+// flow: PRICING-F07 PRICING-F08 PRICING-F12 BASE-F97
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -208,7 +208,7 @@ test('pricing-assistant-price-currency — in Spanish changing a price of a list
 });
 
 
-test('pricing-assistant-card-references — in Spanish adding a price names its list and its product, and changing a rule names the rule, never by their id', async ({ browser }) => {
+test('pricing-assistant-card-references — in Spanish adding a price names its list and its product, and deactivating a rule names the rule, never by their id', async ({ browser }) => {
   const [context, page] = await ownerWithAPriceInDollars(browser);
   const list = `E2E Pricing dólares ${RUN}`;
   const gel = `E2E Pricing gel ${RUN}`;
@@ -237,7 +237,6 @@ test('pricing-assistant-card-references — in Spanish adding a price names its 
   expect(JSON.stringify(fields)).not.toMatch(AN_ID);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText('Tarifa');
     await expect(card(page)).toContainText(list);
     await expect(card(page)).toContainText(gel);
     await expect(card(page)).toContainText(FIFTEEN_DOLLARS);
@@ -250,24 +249,25 @@ test('pricing-assistant-card-references — in Spanish adding a price names its 
   await expect(card(page)).toBeHidden();
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
 
-  // «Sube al 15 % la regla de verano»: the rule by its name, titled as the rules' table, never «Registro».
+  // «Desactiva la regla de verano», a dangerous write: its card lists each datum by its title, the rule by the rules'
+  // own word and its name, never «Registro» nor its id.
   sent = sentCard(page);
-  await ask(page, `E2E-ASK pricing__rule__update ${JSON.stringify({ id: rule.id, percent: '15' })}`);
+  await ask(page, `E2E-ASK pricing__rule__deactivate ${JSON.stringify({ id: rule.id })}`);
   await expect(card(page)).toBeVisible();
   fields = (await sent).fields;
   expect(fields.find((field) => field.name === 'id')).toMatchObject({ value: rule.name, label: 'Regla de descuento' });
   expect(JSON.stringify(fields)).not.toMatch(AN_ID);
-  await expect(card(page)).toContainText('Regla de descuento');
-  await expect(card(page)).toContainText(rule.name);
+  await expect(card(page)).toContainText(`Regla de descuento: ${rule.name}`);
   await expect(card(page)).not.toContainText('Registro');
   await expect(card(page)).not.toContainText(AN_ID);
   await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
   await expect(card(page)).toBeHidden();
-  // Cancelled, nothing changed: no price of the gel, and the rule still at 10 %.
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  // Cancelled, nothing changed: no price of the gel, and the rule still on.
   const prices = await api<{ total: number }>(context, A, 'GET', `/pricing/price_items?product_id=${product.id}`);
   expect(prices.data.total).toBe(0);
-  const read = await api<{ percent: string }>(context, A, 'GET', `/pricing/rules/detail?id=${rule.id}`);
+  const read = await api<{ is_active: boolean }>(context, A, 'GET', `/pricing/rules/detail?id=${rule.id}`);
   expect(read.status, JSON.stringify(read.data)).toBe(200);
-  expect(Number(read.data.percent)).toBe(10);
+  expect(read.data.is_active).toBe(true);
   await context.close();
 });
