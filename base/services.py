@@ -1031,6 +1031,18 @@ def registry_row(hub_id: UUID) -> Hub | None:
     return Hub.objects.select_related("cluster").filter(pk=hub_id).first()
 
 
+def hubs_to_serve(now: dt.datetime) -> list[Hub]:
+    """The hubs with their own database that are ready (a demo whose time is up aside), by id: the worker relays their
+    outbox and runs their tasks, each in its database."""
+    return list(
+        Hub.objects.filter(status=Hub.Status.READY)
+        .exclude(db_name="")
+        .exclude(is_demo=True, expires_at__lte=now)
+        .select_related("cluster")
+        .order_by("id")
+    )
+
+
 def registry_row_by_slug(slug: str) -> Hub | None:
     """The registry's row of ``slug``, its cluster with it, as it is now (``seed_local_hubs``)."""
     return Hub.objects.select_related("cluster").filter(slug=slug).first()

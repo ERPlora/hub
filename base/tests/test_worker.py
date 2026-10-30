@@ -99,6 +99,14 @@ class FakeDue:
 
 
 @pytest.fixture(autouse=True)
+def hubs_pass(monkeypatch) -> list[dt.datetime]:
+    """Stands in for the pass over the hubs with their own database (``worker._hubs``; ``test_worker_hubs.py``)."""
+    passes: list[dt.datetime] = []
+    monkeypatch.setattr(worker, "_hubs", passes.append)
+    return passes
+
+
+@pytest.fixture(autouse=True)
 def due(monkeypatch) -> FakeDue:
     fake = FakeDue()
     monkeypatch.setattr(provision, "run_due", fake)
@@ -566,11 +574,17 @@ def test_a_failed_tick_of_the_scheduler_still_relays(calls, tasks, outbox):
 # ── The hubs due: their databases made, the demos that ended dropped (round 2026-10-30, S2a) ───────────────────────
 
 
-def test_makes_the_hubs_due_on_every_tick_on_control_before_the_relay(monkeypatch, calls, tasks, due, outbox):
+def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_every_tick(
+    monkeypatch, calls, tasks, due, outbox
+):
+    """Review of hub#471 (I2, C1): the relay first, so a slow pass making databases never holds kitchen, stock or
+    VeriFactu back; then the hubs with their own database, each relayed in it; the hubs due last, on control. A hub
+    made ready in a tick has its outbox relayed from the next one."""
     order: list[str] = []
     monkeypatch.setattr(scheduler, "run_due", lambda now: order.append("tasks") or [])
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
+    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
     stop = threading.Event()
     wait, _ = stop_after(stop, 3)
 
@@ -578,8 +592,7 @@ def test_makes_the_hubs_due_on_every_tick_on_control_before_the_relay(monkeypatc
 
     assert due.passes == [ten(0), ten(1), ten(2)]
     assert due.contexts == [context.CONTROL] * 3
-    # A hub made ready in a tick has its outbox relayed in the same tick.
-    assert order == ["tasks", "due", "relay"] * 3
+    assert order == ["tasks", "relay", "hubs", "due"] * 3
 
 
 def test_a_due_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog, calls, tasks, due, outbox):
