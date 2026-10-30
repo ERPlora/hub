@@ -20,6 +20,7 @@ from django.conf import settings
 from django.core import checks
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
+from live.errors import NotFound
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
 
@@ -826,17 +827,21 @@ PRICED_ARGUMENTS = {
 }
 
 
+def amount(value: int, money: dict | None = None) -> dict:
+    """An amount inside an object or a list, as the card sends it for its screen to write as one on top."""
+    return {"kind": "money", "value": value, **({"money": money} if money else {})}
+
+
+USD = {"currency": "USD", "decimals": 2}
+
+
 @pytest.mark.django_db
-@pytest.mark.parametrize(
-    ("language", "country", "one", "twelve"),
-    [("es", "ES", "1,50\xa0€", "12,00\xa0€"), ("en", "ES", "€1.50", "€12.00"), ("es", "PL", "1,50\xa0PLN", "12,00\xa0PLN")],
-    ids=["es", "en", "a business in zlotys"],
-)
-def test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth(language, country, one, twelve):
+@pytest.mark.parametrize(("language", "country"), [("es", "ES"), ("en", "ES"), ("es", "PL")], ids=["es", "en", "a business in zlotys"])
+def test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth(language, country):
     """hub#361 and hub#359: a price «in minor units…» and a rate «in whole cents» reached the card as a bare figure
-    («Precio: 1500»): the card knew an amount only by the words «in cents». Now by its schema's mark: on top, money the
-    screen paints in the business's currency; inside an object or a list, said in it as the Hub writes money. A whole
-    number that is no amount stays as sent."""
+    («Precio: 1500»): the card knew an amount only by the words «in cents». Now by its schema's mark, at any depth, as
+    money the screen writes in the business's currency, the same inside an object or a list as on top (the server
+    never words it: «1,50 PLN» beside «15,00 zł»). A whole number that is no amount stays as sent."""
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": country})
     card = assistant.card(priced(), PRICED_ARGUMENTS, language, ctx=ctx(language=language))
     shown = {field["name"]: (field["kind"], field["value"]) for field in card["fields"]}
@@ -844,8 +849,8 @@ def test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth(lan
         "price": ("money", 1500),
         "hourly_rate": ("money", 1250),
         "quantity": ("text", 2),
-        "line": ("object", {"text": "Café", "unit_price": one}),
-        "lines": ("list", [{"text": "Té", "unit_price": twelve}]),
+        "line": ("object", {"text": "Café", "unit_price": amount(150)}),
+        "lines": ("list", [{"text": "Té", "unit_price": amount(1200)}]),
     }
 
 
@@ -884,7 +889,7 @@ def test_an_amount_inside_a_datum_of_a_preview_is_said_in_the_currency_its_read_
     failure, fields = assistant.preview(ctx({*ADMIN, "demo.view", "demo.manage"}, language="en"), write, {"id": "7"})
     assert failure is None
     assert [(field["name"], field["kind"], field["value"]) for field in fields] == [
-        ("totals", "object", {"due": "$12.00", "note": "R1"})
+        ("totals", "object", {"due": amount(1200, USD), "note": "R1"})
     ]
 
 
@@ -928,20 +933,20 @@ def paid(arguments: dict, language: str = "es") -> dict:
 @pytest.mark.parametrize(
     ("sent", "money", "line"),
     [
-        ("USD", {"currency": "USD", "decimals": 2}, "1,50\xa0US$"),
-        ("JPY", {"currency": "JPY", "decimals": 0}, "150\xa0JPY"),
-        (" usd ", {"currency": "USD", "decimals": 2}, "1,50\xa0US$"),
+        ("USD", USD),
+        ("JPY", {"currency": "JPY", "decimals": 0}),
+        (" usd ", USD),
     ],
     ids=["dollars", "yen, without decimals", "as the write takes it"],
 )
-def test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency(sent, money, line):
+def test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency(sent, money):
     """A payment in dollars from a business in euros said «15,00 €»: the card painted every amount of a write in the
     business's currency. As Stripe, Square or Shopify show an amount, in the currency of its operation, with that
     currency's decimals (none in yen): the one the datum its schema marks ``currency`` names, inside an object too."""
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
     shown = paid({"currency": sent})
     assert shown["amount"] == {"name": "amount", "kind": "money", "value": 1500, "money": money}
-    assert shown["line"]["value"] == {"text": "Café", "unit_price": line}
+    assert shown["line"]["value"] == {"text": "Café", "unit_price": amount(150, money)}
 
 
 @pytest.mark.django_db
@@ -951,7 +956,7 @@ def test_an_amount_of_a_write_that_names_no_currency_is_in_the_businesss(argumen
     Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "PL"})
     shown = paid(arguments)
     assert shown["amount"] == {"name": "amount", "kind": "money", "value": 1500}
-    assert shown["line"]["value"] == {"text": "Café", "unit_price": "1,50\xa0PLN"}
+    assert shown["line"]["value"] == {"text": "Café", "unit_price": amount(150)}
 
 
 @pytest.mark.django_db
@@ -983,8 +988,8 @@ def test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts():
     line = {"text": "Café", "unit_price": 150, "currency": "USD"}
     card = assistant.card(priced(PaidLinesIn), {"line": line, "lines": [line, {**line, "currency": ""}]}, "en", ctx=ctx(language="en"))
     assert values(card) == {
-        "line": {"text": "Café", "unit_price": "$1.50", "currency": "USD"},
-        "lines": [{"text": "Café", "unit_price": "$1.50", "currency": "USD"}, {"text": "Café", "unit_price": "€1.50", "currency": ""}],
+        "line": {"text": "Café", "unit_price": amount(150, USD), "currency": "USD"},
+        "lines": [{"text": "Café", "unit_price": amount(150, USD), "currency": "USD"}, {"text": "Café", "unit_price": amount(150), "currency": ""}],
     }
 
 
@@ -993,6 +998,155 @@ def test_the_model_is_told_an_amount_is_in_the_currency_its_write_names():
     assert assistant._resolved(assistant.tool_spec(priced(PaidIn))["parameters"]["properties"]["currency"], {})["currency"] is True
     text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
     assert '`"currency": true`' in text
+
+
+# ── The currency of the record a write is on: a line of a cart in dollars, a price of a list in yen ──────────────────
+
+#: The ledgers of the test, by id: the currency each one answers.
+LEDGERS = {"L-USD": "USD", "L-JPY": "JPY", "L-BAD": "DOLLARS"}
+JPY = {"currency": "JPY", "decimals": 0}
+
+
+class LedgerIn(Schema):
+    id: str | None = None
+    name: str | None = None
+
+
+class LedgerOut(Schema):
+    name: str
+    code: str
+
+
+def ledger_of(read: list):
+    def ledger(ctx, data):
+        read.append(data.model_dump())
+        key = data.id or {"Dólares": "L-USD"}.get(data.name or "", "")
+        if key not in LEDGERS:
+            raise NotFound("There is no such ledger.")
+        return {"name": key, "code": LEDGERS[key]}
+
+    return Operation(
+        name="demo.item.ledger",
+        kind="query",
+        permission="demo.view",
+        input=LedgerIn,
+        output=LedgerOut,
+        expose_api=False,
+        ai={"description": "A ledger by its id or its name."},
+        fn=ledger,
+    )
+
+
+def in_ledger(by: str) -> dict:
+    """The mark of a datum that names the record whose currency is the one of the amounts beside it."""
+    return {"currency": {"read": "demo.item.ledger", "by": by, "code": "code"}}
+
+
+class LedgerEntryIn(Schema):
+    ledger_id: str | None = Field(None, json_schema_extra=in_ledger("id"))
+    ledger: str | None = Field(None, json_schema_extra=in_ledger("name"))
+    price: int | None = Field(None, description="In minor units of the ledger's currency.", json_schema_extra=MONEY)
+    line: PricedLineIn | None = None
+
+
+@pytest.fixture
+def ledger_reads(monkeypatch) -> list:
+    """The ledger's read registered as an app's would be: what it was asked, in order."""
+    read: list = []
+    op = ledger_of(read)
+    monkeypatch.setitem(registry, op.name, op)
+    return read
+
+
+ENTRY = {"price": 1500, "line": {"text": "Café", "unit_price": 150}}
+WRITER = {*ADMIN, "demo.view", "demo.manage"}
+
+
+def entered(arguments: dict, permissions=WRITER, *, person: bool = True) -> dict:
+    card = assistant.card(priced(LedgerEntryIn), arguments, "es", ctx=ctx(permissions) if person else None)
+    return {field["name"]: {key: value for key, value in field.items() if key != "label"} for field in card["fields"]}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("named", "money"),
+    [({"ledger_id": "L-USD"}, USD), ({"ledger": "Dólares"}, USD), ({"ledger_id": "L-JPY"}, JPY)],
+    ids=["by its id", "by its name", "yen, without decimals"],
+)
+def test_an_amount_of_a_write_on_a_record_is_in_that_records_currency(ledger_reads, named, money):
+    """A line of a cart in dollars said «12,50 €»: the write names the record, not the currency. The datum that names
+    it carries the read of its app that answers its currency (``currency``: read, by, code); the card runs it as the
+    person, as it reads a record's name, and says every amount beside it in that currency, inside an object too."""
+    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
+    shown = entered({**ENTRY, **named})
+    assert shown["price"] == {"name": "price", "kind": "money", "value": 1500, "money": money}
+    assert shown["line"]["value"] == {"text": "Café", "unit_price": amount(150, money)}
+    assert len(ledger_reads) == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("named", "permissions"),
+    [({"ledger_id": "L-GONE"}, WRITER), ({"ledger_id": "L-USD"}, {*ADMIN, "demo.manage"}), ({"ledger_id": "L-BAD"}, WRITER)],
+    ids=["not there", "not theirs to read", "answers no currency"],
+)
+def test_an_amount_on_a_record_whose_currency_cannot_be_read_is_shown_as_sent(ledger_reads, named, permissions):
+    """As a currency that is none: the card makes none up, neither the business's nor another; the write decides."""
+    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
+    shown = entered({**ENTRY, **named}, permissions)
+    assert shown["price"] == {"name": "price", "kind": "text", "value": 1500}
+    assert shown["line"]["value"] == {"text": "Café", "unit_price": 150}
+
+
+def test_without_the_person_a_records_currency_is_never_read(ledger_reads):
+    """An automation's card reads nothing for somebody else: its amounts go as sent."""
+    shown = entered({**ENTRY, "ledger_id": "L-USD"}, person=False)
+    assert shown["price"] == {"name": "price", "kind": "text", "value": 1500}
+    assert ledger_reads == []
+
+
+@pytest.mark.django_db
+def test_a_record_is_read_only_for_its_amounts_and_one_not_named_leaves_the_businesss(ledger_reads):
+    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
+    assert entered({"ledger_id": "L-USD"}) == {"ledger_id": {"name": "ledger_id", "kind": "text", "value": "L-USD"}}
+    assert ledger_reads == []
+    assert entered(ENTRY)["price"] == {"name": "price", "kind": "money", "value": 1500}
+    assert ledger_reads == []
+
+
+def currency_errors() -> list:
+    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E011"]
+
+
+def test_the_currency_marks_of_every_app_are_sound():
+    assert currency_errors() == []
+
+
+def entering(mark: object) -> Operation:
+    class MarkedEntryIn(Schema):
+        ledger_id: str | None = Field(None, json_schema_extra={"currency": mark})
+        price: int = Field(json_schema_extra=MONEY)
+
+    return dataclasses.replace(priced(MarkedEntryIn), name="demo.item.enter")
+
+
+@pytest.mark.parametrize(
+    ("write", "why"),
+    [
+        (entering("demo.item.ledger"), "is not true nor a read, by and code"),
+        (entering({"read": "demo.item.nothing", "by": "id", "code": "code"}), "names no operation demo.item.nothing"),
+        (entering({"read": "demo.item.create", "by": "id", "code": "code"}), "not a read"),
+        (entering({"read": "demo.item.ledger", "by": "who", "code": "code"}), "takes no who"),
+        (entering({"read": "demo.item.ledger", "by": "id", "code": "currency"}), "gives no currency"),
+        (entering({"read": "cart_checkout.cart.get", "by": "cart_id", "code": "currency"}), "which demo does not require"),
+    ],
+)
+def test_a_currency_mark_is_checked_at_start(monkeypatch, ledger_reads, write, why):
+    """Like ``refers`` (base.E009): a mark that names no read of its app (or of one it requires), that does not take the
+    datum or answers no currency is said at start, never found out on a card."""
+    monkeypatch.setitem(registry, write.name, write)
+    [error] = currency_errors()
+    assert "demo.item.enter" in error.msg and why in error.msg
 
 
 # ── The ratchet: amounts nobody marks, by app ─────────────────────────────────────────────────────────────────────────
@@ -1241,3 +1395,73 @@ def test_a_currency_is_marked_only_on_a_text():
     """The mark names a code (ISO 4217): on a number or an object it would say a currency that is none."""
     assert misplaced_currency_marks(priced(MisplacedCurrencyIn)) == ["in:amount", "in:line", "out:amount", "out:line"]
     assert [f"{name}:{path}" for name, op in sorted(registry.items()) for path in misplaced_currency_marks(op)] == []
+
+
+# ── The ratchet: amounts on a record in a currency of its own nobody marks, by app ──────────────────────────────────
+
+#: How an amount says it is in the currency of a record and not the business's: «in minor units of the cart's
+#: currency», «in cents of the list's currency».
+RECORD_CURRENCY = re.compile(r"\b(?!business's\b)\w+'s currency\b")
+
+#: The amounts of the assistant's writes in the currency of a record that no ``currency`` mark beside them (or above
+#: them) says how to read, by app: the card paints them in the business's currency. Only ever lower. Pricing's
+#: ``price_item.update`` names its price by the price's id, and no read of Pricing answers the currency of the list of a
+#: price by that id.
+UNPRICED_RECORD_AMOUNTS = {"pricing": 1}
+
+
+def unpriced_record_amounts(op: Operation) -> list[str]:
+    """``op``'s amounts whose description says they are in a record's currency and that no datum marked ``currency``
+    in their object, or in one above it, says how to read, at any depth."""
+    schema = op.input.model_json_schema()
+    defs = schema.get("$defs", {})
+    found: list[str] = []
+
+    def walk(prop: dict, path: str, priced: bool, depth: int) -> None:
+        prop = assistant._resolved(prop, defs)
+        if depth > 8:
+            return
+        props = prop.get("properties", {})
+        priced = priced or any(assistant._resolved(inner, defs).get("currency") for inner in props.values())
+        for name, inner in props.items():
+            inner = assistant._resolved(inner, defs)
+            here = f"{path}.{name}" if path else name
+            if is_marked_amount(inner) and RECORD_CURRENCY.search(str(inner.get("description", ""))) and not priced:
+                found.append(here)
+            walk(inner, here, priced, depth + 1)
+        if isinstance(prop.get("items"), dict):
+            walk(prop["items"], f"{path}[]", priced, depth + 1)
+
+    walk(schema, "", False, 0)
+    return found
+
+
+def test_every_amount_on_a_record_in_a_currency_of_its_own_says_how_to_read_it_but_the_known_ones():
+    counted: dict[str, int] = {}
+    for op in writes():
+        if found := unpriced_record_amounts(op):
+            counted[op.app_label] = counted.get(op.app_label, 0) + len(found)
+    assert dict(sorted(counted.items())) == UNPRICED_RECORD_AMOUNTS
+
+
+class CartLineIn(Schema):
+    unit_price: int = Field(description="The price of one unit in minor units of the cart's currency.", json_schema_extra=MONEY)
+    fee: int = Field(0, description="In minor units of the business's currency.", json_schema_extra=MONEY)
+
+
+class UnpricedEntriesIn(Schema):
+    price: int = Field(description="Price in cents of the list's currency (12.50 = 1250).", json_schema_extra=MONEY)
+    lines: list[CartLineIn] = []
+    entry: LedgerEntryIn | None = None
+
+
+class PricedEntriesIn(Schema):
+    ledger_id: str | None = Field(None, json_schema_extra=in_ledger("id"))
+    lines: list[CartLineIn] = []
+
+
+def test_the_ratchet_counts_an_amount_on_a_record_nobody_says_how_to_read_and_nothing_else():
+    """An amount in the cart's or the list's currency without the mark is counted, inside a list too; one in the
+    business's, or with a ``currency`` mark in its object or above it, is not."""
+    assert unpriced_record_amounts(priced(UnpricedEntriesIn)) == ["price", "lines[].unit_price"]
+    assert unpriced_record_amounts(priced(PricedEntriesIn)) == []

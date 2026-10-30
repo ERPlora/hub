@@ -93,17 +93,35 @@ export function fieldLabelKey(name: string): string | null {
  *  of the code's, in English. */
 const FIGURE = /^\d+(?:[.,]\d+)?$/;
 
+/** An amount inside an object or a list, as the server sends it (base/assistant.py `_Words.amount`): written as one on
+ *  top of the card, in its currency (`money`; none, the card's) and with the screen's own symbol. */
+interface AssistantAmount {
+  kind: 'money';
+  value: number;
+  money?: Money | null;
+}
+
+const AMOUNT_KEYS = new Set(['kind', 'value', 'money']);
+
+function isAmount(value: unknown): value is AssistantAmount {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const shape = value as Record<string, unknown>;
+  return shape.kind === 'money' && typeof shape.value === 'number' && Object.keys(shape).every((key) => AMOUNT_KEYS.has(key));
+}
+
 /** An object datum in words (FIX-HUB-BASE-ASSISTANT-CARD-OBJECT-SHOWS-INNER-KEYS-IN-ENGLISH): by its values, as a
  *  summary says an address or a ticket a variant, never by its keys — but a figure's —; its empty data left out, a
- *  yes or no in words, a list's items one after another. Empty: '' (the caller writes the dash). */
-function compact(value: unknown, t: Translate): string {
+ *  yes or no in words, an amount as one on top (`isAmount`), a list's items one after another. Empty: '' (the caller
+ *  writes the dash). */
+function compact(value: unknown, format: CardFormat): string {
   if (value === null || value === undefined) return '';
-  if (typeof value === 'boolean') return t(value ? 'base.assistant.card.yes' : 'base.assistant.card.no');
+  if (typeof value === 'boolean') return format.t(value ? 'base.assistant.card.yes' : 'base.assistant.card.no');
   if (typeof value !== 'object') return String(value);
+  if (isAmount(value)) return fieldText({ name: '', label: '', kind: 'money', value: value.value, money: value.money }, format);
   const parts = Array.isArray(value)
-    ? value.map((item) => compact(item, t))
+    ? value.map((item) => compact(item, format))
     : Object.entries(value as Record<string, unknown>).map(([key, inner]) => {
-        const text = compact(inner, t);
+        const text = compact(inner, format);
         return text && FIGURE.test(key) ? `${key}: ${text}` : text;
       });
   return parts.filter(Boolean).join(Array.isArray(value) ? ', ' : ' · ');
@@ -122,7 +140,7 @@ export function fieldText(field: AssistantField, format: CardFormat): string {
     case 'list':
       return format.t('base.assistant.card.items', { count: Array.isArray(field.value) ? field.value.length : 0 });
     case 'object':
-      return compact(field.value, format.t) || '—';
+      return compact(field.value, format) || '—';
     default:
       return String(field.value);
   }
