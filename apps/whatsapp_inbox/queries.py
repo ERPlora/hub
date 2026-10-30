@@ -18,7 +18,7 @@ from live.operations import operation
 
 from apps.customer.phones import DEFAULT_COUNTRY, InvalidPhone, candidates, to_e164
 from apps.customer.search import normalize
-from apps.whatsapp_inbox import clock, gateway
+from apps.whatsapp_inbox import clock, gateway, samples
 from apps.whatsapp_inbox.models import (
     FILE_HEADERS,
     Channel,
@@ -745,6 +745,7 @@ def sample_out(sample: TemplateSample | None) -> dict | None:
         "content_type": sample.content_type,
         "size": sample.size,
         "name": sample.name,
+        "url": samples.sample_url(sample.key),
     }
 
 

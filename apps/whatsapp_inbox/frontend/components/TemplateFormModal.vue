@@ -3,7 +3,7 @@
 // «Meta templates» (the old module's panel): Name (lowercase, numbers and underscores; it never changes),
 // Language, Category (Utility or Marketing), Header — a text, or a photo, a video or a document whose file is
 // kept in the business's files at once (`whatsapp_inbox.template_sample.upload`, checked here first by type and
-// size) and goes with the template to Meta's review —, Text with an «Example» box per variable it uses, Footer
+// size), shown with its thumbnail (`HeaderFilePreview`), and goes with the template to Meta's review —, Text with an «Example» box per variable it uses, Footer
 // and up to 10 buttons — quick replies together, at most 2 links (https://) and 1 call (+34…). New sends
 // `whatsapp_inbox.template.create`; Edit sends the whole content with `whatsapp_inbox.template.update` (what
 // Meta has, or the changes still on their way), with its verdict and reason on top; the category only changes
@@ -26,6 +26,7 @@ import type {
   TemplateSampleOut,
   WritableCategory,
 } from '../operations';
+import HeaderFilePreview from './HeaderFilePreview.vue';
 
 const props = defineProps<{
   /** The template being edited; `null` = «New template». */
@@ -448,13 +449,15 @@ async function save(): Promise<void> {
           :data-testid="`${ID}-header-file`"
         >
           <div class="wa-template-form__file-row">
-            <p
+            <HeaderFilePreview
               v-if="form.sample"
-              class="wa-template-form__file-name"
-              :data-testid="`${ID}-header-file-name`"
+              :sample="form.sample"
+              :testid="`${ID}-header-file-preview`"
             >
-              <strong>{{ form.sample.name }}</strong> · {{ formatSize(form.sample.size, locale) }}
-            </p>
+              <p :data-testid="`${ID}-header-file-name`">
+                <strong>{{ form.sample.name }}</strong> · {{ formatSize(form.sample.size, locale) }}
+              </p>
+            </HeaderFilePreview>
             <p
               v-else
               class="wa-template-form__hint"
@@ -705,11 +708,6 @@ async function save(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-.wa-template-form__file-name {
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 .wa-template-form__rule {
   margin: 4px 0 0;

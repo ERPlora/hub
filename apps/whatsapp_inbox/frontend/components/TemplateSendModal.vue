@@ -4,7 +4,7 @@
 // offered (the ones the Hub can fill) with their language, category and text; the chosen one asks for its variables and previews
 // the text as it will go out. A photo, video or document header goes with a file: the template's own (made here), which
 // may be changed, or the one chosen now (made in WhatsApp Manager), kept at once in the business's files
-// (`whatsapp_inbox.template_sample.upload`, checked here first by type and size). «Send» goes through erplora.com (`whatsapp_inbox.message.send`) with a key
+// (`whatsapp_inbox.template_sample.upload`, checked here first by type and size), shown with its thumbnail (`HeaderFilePreview`). «Send» goes through erplora.com (`whatsapp_inbox.message.send`) with a key
 // of its own, so pressing it again never sends twice; the dialog closes only when it was sent, and a
 // refusal (marketing without consent, erplora.com down) stays on top of it.
 import { FormModal } from '@erplora/ui/components';
@@ -16,6 +16,7 @@ import { useLocale, useT } from '../composables/useT';
 import { acceptsSample, fileToBase64, formatSize, SAMPLE_RULES } from '../lib/files';
 import { renderTemplate } from '../lib/thread';
 import type { FileHeaderFormat, TemplateOut, TemplateSampleOut } from '../operations';
+import HeaderFilePreview from './HeaderFilePreview.vue';
 
 const props = defineProps<{ conversationId: string }>();
 const open = defineModel<boolean>('open', { default: false });
@@ -174,14 +175,16 @@ watch(open, (isOpen) => {
           data-testid="whatsapp-inbox-template-file"
         >
           <div class="wa-template__file-row">
-            <p
+            <HeaderFilePreview
               v-if="sample"
-              class="wa-template__file-name"
-              data-testid="whatsapp-inbox-template-file-name"
+              :sample="sample"
+              testid="whatsapp-inbox-template-file-preview"
             >
-              {{ t(`whatsapp_inbox.templates.editor.headerFormats.${fileKind}`) }}:
-              <strong>{{ sample.name }}</strong> · {{ formatSize(sample.size, locale) }}
-            </p>
+              <p data-testid="whatsapp-inbox-template-file-name">
+                {{ t(`whatsapp_inbox.templates.editor.headerFormats.${fileKind}`) }}:
+                <strong>{{ sample.name }}</strong> · {{ formatSize(sample.size, locale) }}
+              </p>
+            </HeaderFilePreview>
             <p
               v-else
               class="wa-template__meta"
@@ -275,11 +278,6 @@ watch(open, (isOpen) => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-.wa-template__file-name {
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 .wa-template__error {
   margin: 0;

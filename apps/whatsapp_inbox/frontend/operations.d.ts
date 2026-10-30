@@ -253,6 +253,8 @@ export interface TemplateSampleOut {
   content_type: string;
   size: number;
   name: string;
+  /** Where the Hub shows it to the hub's people (`/p/media/…`, only with a session of this hub); empty when it cannot. */
+  url: string;
 }
 
 export interface TemplateSampleUploadIn {

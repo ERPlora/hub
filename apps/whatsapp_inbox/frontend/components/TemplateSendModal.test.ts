@@ -130,15 +130,18 @@ describe('TemplateSendModal (WHATSAPP_INBOX-F33)', () => {
 
 // ── A header with a photo, a video or a document (WHATSAPP_INBOX-F33) ───────────────────────────────────────────────
 
-const SAMPLE = { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 2048, name: 'carta.jpg' } as const;
-const OTHER = { id: 's2', header_format: 'IMAGE', content_type: 'image/png', size: 4096, name: 'otono.png' } as const;
+const MEDIA = '/p/media/0193a5b2c3d47e8f9a0b1c2d3e4f5a6b/whatsapp_inbox/samples';
+const SAMPLE = { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 2048, name: 'carta.jpg', url: `${MEDIA}/0123456789abcdef.jpg` } as const;
+const OTHER = { id: 's2', header_format: 'IMAGE', content_type: 'image/png', size: 4096, name: 'otono.png', url: `${MEDIA}/fedcba9876543210.png` } as const;
+const PDF = { id: 's5', header_format: 'DOCUMENT', content_type: 'application/pdf', size: 8192, name: 'carta.pdf', url: `${MEDIA}/aaaabbbbccccdddd.pdf` } as const;
 const photo = (name = 'otono.png', type = 'image/png') => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], name, { type });
 const PHOTO_TEMPLATES = {
   rows: [
     template({ id: 't3', name: 'oferta_foto', header_format: 'IMAGE', header_sample: SAMPLE, body: '¡Hola {{1}}!', variables: 1 }),
     template({ id: 't4', name: 'promo_foto', header_format: 'IMAGE', header_sample: null, body: 'Oferta', variables: 0, editable: false, sendable: false }),
+    template({ id: 't5', name: 'carta_pdf', header_format: 'DOCUMENT', header_sample: PDF, body: 'La carta', variables: 0 }),
   ],
-  total: 2,
+  total: 3,
   limit: 100,
   offset: 0,
 };
@@ -188,6 +191,34 @@ describe('TemplateSendModal: a header with a file (WHATSAPP_INBOX-F33)', () => {
     await click(s.send());
     await flush();
     expect(s.sent().at(-1)?.body).toMatchObject({ template: { name: 'promo_foto', header_sample: 's2' } });
+  });
+
+  it('shows the thumbnail of the template’s own photo next to its name (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL)', async () => {
+    const s = await setup();
+    await s.result(OP, PHOTO_TEMPLATES);
+    await s.pick('t3');
+    const thumbnail = s.inDoc('whatsapp-inbox-template-file-preview-image');
+    expect([thumbnail?.tagName, thumbnail?.getAttribute('src'), thumbnail?.getAttribute('alt')]).toEqual(['IMG', SAMPLE.url, 'carta.jpg']);
+    expect(s.inDoc('whatsapp-inbox-template-file-preview')?.contains(s.inDoc('whatsapp-inbox-template-file-name'))).toBe(true);
+    expect(s.inDoc('whatsapp-inbox-template-file-preview-loading')).not.toBeNull();
+    thumbnail!.dispatchEvent(new Event('error'));
+    await settle();
+    expect(s.inDoc('whatsapp-inbox-template-file-preview-error')?.textContent).toContain('The photo could not be shown.');
+    expect(s.inDoc('whatsapp-inbox-template-file-name')?.textContent).toContain('carta.jpg');
+  });
+
+  it('the photo chosen now shows its thumbnail; a document shows its icon and no thumbnail', async () => {
+    const s = await setup();
+    await s.result(OP, PHOTO_TEMPLATES);
+    await s.pick('t4');
+    expect(s.inDoc('whatsapp-inbox-template-file-preview')).toBeNull();
+    s.answer(201, OTHER);
+    await choose(s, photo());
+    expect(s.inDoc('whatsapp-inbox-template-file-preview-image')?.getAttribute('src')).toBe(OTHER.url);
+    await s.pick('t5');
+    expect(s.inDoc('whatsapp-inbox-template-file-preview-document')).not.toBeNull();
+    expect(s.inDoc('whatsapp-inbox-template-file-preview')?.querySelector('img, video')).toBeNull();
+    expect(s.inDoc('whatsapp-inbox-template-file-name')?.textContent).toContain('carta.pdf');
   });
 
   it('a file of another type is said under the field and never uploaded', async () => {

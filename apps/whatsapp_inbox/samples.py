@@ -7,20 +7,23 @@ MP4 video up to Meta's limits (5 and 16 MB), and a PDF document up to the Hub's 
 (``base.files.MAX_FILE_BYTES``, 25 MB; Meta takes up to 100 MB). Its key is
 ``hub-<hex>/whatsapp_inbox/samples/<first 16 hex of its sha256>.<ext>``: under its hub's prefix and named by its
 content, as the website keeps its images, so the same file chosen twice is one object. Nothing here is public:
-``/p/media/`` serves this folder only to a session of the hub (``members_media`` in ``apps.py``, ``base.media``). Key
-builders and rules only; ``services.upload_sample`` writes the bytes.
+``/p/media/`` serves this folder only to a session of the hub (``members_media`` in ``apps.py``, ``base.media``), at
+:func:`sample_url`, where the template's sheet shows it. Key builders and rules only; ``services.upload_sample`` writes
+the bytes.
 """
 
 import uuid
 
 from base.files import MAX_FILE_BYTES
-from base.storage import hub_prefix
+from base.storage import hub_prefix, media_url
 
 MB = 1024 * 1024
 #: The headers that carry a file.
 FILE_HEADERS = ("IMAGE", "VIDEO", "DOCUMENT")
 #: The heaviest file each takes.
 MAX_BYTES = {"IMAGE": 5 * MB, "VIDEO": 16 * MB, "DOCUMENT": MAX_FILE_BYTES}
+#: The folder of the samples under a hub's prefix, the one ``members_media`` declares.
+FOLDER = "whatsapp_inbox/samples/"
 #: The file extension of each type a sample is.
 EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "video/mp4": "mp4", "application/pdf": "pdf"}
 #: How many hex characters of the sha256 name the file (64 bits: no collision in one hub's samples).
@@ -44,4 +47,17 @@ def sniff(head: bytes) -> tuple[str, str] | None:
 
 def sample_key(hub_id: uuid.UUID, sha256: str, content_type: str) -> str:
     """The key of a sample of ``hub_id`` whose content hashes to ``sha256``; ``KeyError`` for another type."""
-    return f"{hub_prefix(hub_id)}/whatsapp_inbox/samples/{sha256[:HASH_CHARS]}.{EXTENSIONS[content_type]}"
+    return f"{hub_prefix(hub_id)}/{FOLDER}{sha256[:HASH_CHARS]}.{EXTENSIONS[content_type]}"
+
+
+def sample_url(key: str) -> str:
+    """Where ``/p/media/`` serves the sample kept at ``key`` to a session of its hub (the hub of its prefix, never
+    another's: ``base.media`` answers it only on that hub's host); empty for a key that is no hub's sample."""
+    prefix, _, name = key.partition("/")
+    try:
+        hub = uuid.UUID(prefix.removeprefix("hub-"))
+    except ValueError:
+        return ""
+    if prefix != hub_prefix(hub) or not name.startswith(FOLDER):
+        return ""
+    return media_url(hub, name)

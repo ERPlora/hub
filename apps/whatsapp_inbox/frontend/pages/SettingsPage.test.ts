@@ -190,7 +190,7 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
       id: 't5',
       name: 'promo_otono',
       header_format: 'IMAGE',
-      header_sample: { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 120_000, name: 'carta.jpg' },
+      header_sample: { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 120_000, name: 'carta.jpg', url: '/p/media/0193a5b2c3d47e8f9a0b1c2d3e4f5a6b/whatsapp_inbox/samples/0123456789abcdef.jpg' },
       body: '¡Oferta de otoño!',
       editable: true,
       sendable: true,

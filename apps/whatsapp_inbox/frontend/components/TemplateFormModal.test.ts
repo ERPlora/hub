@@ -267,7 +267,9 @@ describe('TemplateFormModal: editing a template (WHATSAPP_INBOX-F30)', () => {
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 const photo = (name = 'carta.jpg', bytes: BlobPart = JPEG, type = 'image/jpeg') => new File([bytes], name, { type });
-const SAMPLE = { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 6, name: 'carta.jpg' } as const;
+const MEDIA = '/p/media/0193a5b2c3d47e8f9a0b1c2d3e4f5a6b/whatsapp_inbox/samples';
+const SAMPLE = { id: 's1', header_format: 'IMAGE', content_type: 'image/jpeg', size: 6, name: 'carta.jpg', url: `${MEDIA}/0123456789abcdef.jpg` } as const;
+const VIDEO = { id: 's2', header_format: 'VIDEO', content_type: 'video/mp4', size: 6, name: 'otono.mp4', url: `${MEDIA}/fedcba9876543210.mp4` } as const;
 
 type Setup = Awaited<ReturnType<typeof setup>>;
 
@@ -364,10 +366,40 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     expect(s.field('header-file-error').textContent).toContain(message);
   });
 
+  it('the photo just kept shows its thumbnail next to its name (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL)', async () => {
+    const s = await setup();
+    await s.choose('header-format', 'IMAGE');
+    expect(s.field('header-file-preview')).toBeNull();
+    s.answer(201, SAMPLE);
+    await pick(s, photo());
+    const thumbnail = s.field('header-file-preview-image');
+    expect([thumbnail?.tagName, thumbnail?.getAttribute('src'), thumbnail?.getAttribute('alt')]).toEqual(['IMG', SAMPLE.url, 'carta.jpg']);
+    expect(s.field('header-file-preview').contains(s.field('header-file-name'))).toBe(true);
+    expect(s.field('header-file-preview-loading')).not.toBeNull();
+    thumbnail.dispatchEvent(new Event('load'));
+    await settle();
+    expect(s.field('header-file-preview-loading')).toBeNull();
+    expect(s.field('header-file-preview-error')).toBeNull();
+  });
+
+  it('a video shows its first frame; one that cannot be shown says so and keeps its name', async () => {
+    const s = await setup();
+    await s.choose('header-format', 'VIDEO');
+    s.answer(201, VIDEO);
+    await pick(s, new File([new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70])], 'otono.mp4', { type: 'video/mp4' }));
+    const video = s.field('header-file-preview-video') as HTMLVideoElement;
+    expect([video.tagName, video.getAttribute('src'), video.getAttribute('preload')]).toEqual(['VIDEO', `${VIDEO.url}#t=0.1`, 'metadata']);
+    video.dispatchEvent(new Event('error'));
+    await settle();
+    expect(s.field('header-file-preview-error').textContent).toContain('The video could not be shown.');
+    expect(s.field('header-file-name').textContent).toContain('otono.mp4');
+  });
+
   it('editing a template with a photo shows its file and keeps it without uploading it again', async () => {
     const s = await setup(approved({ header_format: 'IMAGE', header: '', header_sample: SAMPLE, supported: false, sendable: false }));
     expect(s.field('header-format').value).toBe('IMAGE');
     expect(s.field('header-file-name').textContent).toContain('carta.jpg');
+    expect(s.field('header-file-preview-image').getAttribute('src')).toBe(SAMPLE.url);
     expect(s.field('header-file-choose').textContent).toContain('Change file');
     s.answer(200, approved());
     await click(s.submit());
@@ -390,6 +422,12 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup(null, 'es');
+    await s.choose('header-format', 'IMAGE');
+    s.answer(201, SAMPLE);
+    await pick(s, photo());
+    s.field('header-file-preview-image').dispatchEvent(new Event('error'));
+    await settle();
+    expect(s.field('header-file-preview-error').textContent).toContain('No se ha podido mostrar la foto.');
     await s.choose('header-format', 'DOCUMENT');
     expect(s.field('header-format').label).toBe('Tipo de cabecera');
     expect(s.field('header-file-rules').textContent).toContain('PDF, hasta 25 MB');
