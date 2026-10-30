@@ -115,11 +115,11 @@ describe('AssistantMessage', () => {
       'Hecho: Registrar arqueo en Caja',
     ]);
     es.wrapper.unmount();
-    const names = { cart_checkout: 'Cart & checkout', cash_register: 'Cash register' };
+    const names = { cart_checkout: 'Cart & Checkout', cash_register: 'Cash register' };
     const en = await mountBubble(answer({ text: 'Done.', executed }), { appNameOf: (app: string) => names[app as keyof typeof names] }, 'en');
     expect(en.wrapper.findAll('[data-testid="assistant-receipt"]').map((row) => row.text())).toEqual([
-      'Done: Clear in Cart & checkout',
-      'Not done, cancelled: Remove in Cart & checkout',
+      'Done: Clear in Cart & Checkout',
+      'Not done, cancelled: Remove in Cart & Checkout',
       'Done: Register count in Cash register',
     ]);
     en.wrapper.unmount();

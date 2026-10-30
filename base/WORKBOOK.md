@@ -2385,7 +2385,10 @@ Pasos:
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
      técnico. Una acción de la propia plataforma se nombra por la pantalla donde se hace, por ejemplo «Cambiar en
      Ajustes» o «Borrar en Archivos». Cada acción sale con su propio verbo, nunca con uno genérico: rectificar una
-     factura dice «Rectificar en Facturación».
+     factura dice «Rectificar en Facturación». Dos acciones que se llaman igual en dos apps dicen cada una lo que
+     hace: vaciar un carrito dice «Vaciar en Carrito y pago», quitar una de sus líneas «Quitar en Carrito y pago» y
+     quitar la ruta de un producto en la cocina «Quitar en Cocina»; un arqueo dice «Registrar arqueo en Caja» y una
+     entrada o salida de efectivo «Registrar movimiento en Caja», como sus pantallas, nunca «Añadir».
   3. «Ejecutar» lo hace con la sesión de quien preguntó, con los mismos permisos y las mismas comprobaciones que el
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que no se confirmó y lo dice.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
@@ -3033,9 +3036,16 @@ Implicados: ACCOUNTS-F38
   pantalla de su entidad, `BASE_SCREENS`, nunca «Base»; el recibo usa el `app_name` que manda el turno en
   `executed`; lo comprueba `test_every_action_of_base_names_its_screen`; la acción de la tarjeta y del recibo, el
   último trozo del nombre de la operación (`action`), por su verbo en `base.assistant.card.actions` de los catálogos
-  `en` y `es` de `base` (`actionKey` de `lib/assistant-card.ts`, por clave exacta; sin clave, «Do this»): una app con
-  una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
-  `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`; un dato secreto, el que su
+  `en` y `es` de `base` (`actionKey` de `lib/assistant-card.ts`, que recibe el nombre entero de la operación, por clave
+  exacta; sin clave, «Do this»): una app con una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
+  `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`; antes que el de su acción va el
+  verbo de la operación entera, `base.assistant.card.operations.<app>.<entidad>.<acción>`, para la que el de su acción
+  no dice lo que hace (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: `cart_checkout.cart.clear` vacía
+  el carrito, «Vaciar», mientras `kitchen.routing.clear` quita una ruta, «Quitar»; `cash_register.count.add` y
+  `cash_register.movement.add` registran un arqueo y un movimiento, no añaden nada): lo comprueban
+  `test_a_write_whose_actions_verb_does_not_say_what_it_does_is_named_by_its_own` y
+  `test_each_verb_of_its_own_names_a_write_the_assistant_may_call_in_english_and_spanish` (una clave que no nombra una
+  escritura del asistente, o sin palabras en un idioma, caería en silencio al verbo de su acción); un dato secreto, el que su
   esquema marca `format: password` o `writeOnly` (`SecretStr`), a cualquier profundidad, sale tapado con `HIDDEN`,
   «••••••••», igual en todos los idiomas (`_hidden`, desde `_field`, el mismo en la tarjeta y en la vista previa): ni
   la pantalla ni lo que recibe el navegador lo llevan tal como se escribió, y la escritura lo recibe entero al

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:868922c7d6f33e438c61edf6b9d7c52cfff48245d75c18701870f29c8cfad120 -->
+<!-- generated from WORKBOOK.md sha256:1800fe9648b9f02ac5d549f025b4f26dc8f662834d79438719799d69e3a9cc6b -->
 
 ## What it is for and who it is for
 
@@ -2270,7 +2270,11 @@ Steps:
      name of each datum when the card puts it on its own line (BASE-F98): the
      same one its app calls it by, never a technical name. An action of the platform itself is named by the screen where
      it is done, for example "Change in Settings" or "Delete in Files". Each action shows with its own verb, never a
-     generic one: rectifying an invoice says "Rectify in Invoicing".
+     generic one: rectifying an invoice says "Rectify in Invoicing". Two actions with the same name in two apps each
+     say what they do: emptying a cart says "Clear in Cart & Checkout", removing one of its lines "Remove in Cart &
+     Checkout" and taking a product's route away in the kitchen "Clear in Kitchen"; a cash count says "Register count
+     in Cash register" and cash brought in or taken out "Register movement in Cash register", as their screens do,
+     never "Add".
   3. "Run it" does it with the session of whoever asked, with the same permissions and the same checks as the button
      on its screen. "Cancel" or Esc do nothing: the assistant knows it was not confirmed and says so.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something

@@ -106,8 +106,8 @@ describe('AssistantConfirm', () => {
     await card(clear);
     expect(body()).toContain('Vaciar en Carrito y pago: S-1');
     document.body.innerHTML = '';
-    await card({ ...clear, app_name: 'Cart & checkout' }, false, 'en');
-    expect(body()).toContain('Clear in Cart & checkout: S-1');
+    await card({ ...clear, app_name: 'Cart & Checkout' }, false, 'en');
+    expect(body()).toContain('Clear in Cart & Checkout: S-1');
     document.body.innerHTML = '';
     const count: AssistantCard = {
       ...HIGH,
