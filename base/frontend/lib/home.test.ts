@@ -182,6 +182,23 @@ describe('formatValue: the business currency (BASE-G98)', () => {
     expect(formatValue(1250, 'currency', 'en')).toBe('12.50');
   });
 
+  it('an amount of four figures groups its thousands, as Sales writes it (base-money-thousands-grouping)', () => {
+    // The Spanish CLDR only groups from five figures: the Home said «1234,56 €» where Sales says «1.234,56 €».
+    expect(formatValue(123456, 'currency', 'es', EUR)).toBe('1.234,56 €');
+    expect(formatValue('123456', 'currency', 'es', EUR)).toBe('1.234,56 €');
+    expect(formatValue(123456, 'currency', 'es')).toBe('1.234,56');
+    expect(formatValue(123400, 'currency', 'es', { currency: 'JPY', decimals: 0 })).toBe('123.400 ¥');
+    const list = widget('s.top', { kind: 'bar-list', map: { label: 'name', value: 'total' }, options: { valueFormat: 'currency' } });
+    const view = widgetView(list, { rows: [{ name: 'Café', total: 123456 }] }, 'es', { money: EUR });
+    expect(view).toMatchObject({ kind: 'bar-list', bars: [{ label: 'Café', text: '1.234,56 €' }] });
+    const kpi = widget('s.total', { kind: 'kpi', map: { value: 'total' }, options: { format: 'currency' } });
+    expect(widgetView(kpi, { total: 987654 }, 'es', { money: EUR })).toMatchObject({ kind: 'kpi', value: '9.876,54 €' });
+  });
+
+  it('a value that is no amount stays as it came', () => {
+    expect(formatValue('n/a', 'currency', 'es', EUR)).toBe('n/a');
+  });
+
   it("a panel's every amount — a sparkline's last value, each bar of a list — is in the business's currency", () => {
     const spark = widget('s.days', { kind: 'sparkline', map: { series: 'n' }, options: { format: 'currency' } });
     expect(widgetView(spark, [{ n: 100 }, { n: 250 }], 'es', { money: PLN })).toMatchObject({ value: '2,50\u00a0zł' });

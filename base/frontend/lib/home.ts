@@ -5,6 +5,10 @@
 import { formatDateTime } from '@erplora/ui/components';
 
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
+import { formatMoney, type Money } from './money';
+
+// The apps read the money's shape from here since BASE-G98; it lives with how an amount is written.
+export type { Money };
 
 // ── Heading (BASE-G127) ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -115,42 +119,31 @@ export function rowsOf(result: unknown): Row[] {
   return [result as Row];
 }
 
-/** A business's currency (ISO 4217) and its decimals, as `base.business.get` says them (BASE-G98). */
-export interface Money {
-  currency: string;
-  decimals: number;
-}
-
 const numberFormats = new Map<string, Intl.NumberFormat>();
 
-function formatOptions(format: string, money: Money | undefined): Intl.NumberFormatOptions {
-  if (format === 'currency') {
-    // The symbol a till of that country prints («zł», «€»); until the business is known, the amount alone.
-    const digits = { minimumFractionDigits: money?.decimals ?? 2, maximumFractionDigits: money?.decimals ?? 2 };
-    return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
-  }
+function formatOptions(format: string): Intl.NumberFormatOptions {
   if (format === 'percent') return { style: 'percent', maximumFractionDigits: 1 };
   if (format === 'compact') return { notation: 'compact' };
   return {};
 }
 
-function numberFormat(locale: string, format: string, money?: Money): Intl.NumberFormat {
-  const id = format === 'currency' ? `${locale}|${format}|${money?.currency ?? ''}|${money?.decimals ?? ''}` : `${locale}|${format}`;
+function numberFormat(locale: string, format: string): Intl.NumberFormat {
+  const id = `${locale}|${format}`;
   let found = numberFormats.get(id);
   if (!found) {
-    found = new Intl.NumberFormat(locale, formatOptions(format, money));
+    found = new Intl.NumberFormat(locale, formatOptions(format));
     numberFormats.set(id, found);
   }
   return found;
 }
 
 /** A value of a panel as text: money in the minor unit of its currency (the server's: 1250 is 12.50 €, ¥1,250 has no
- *  cents) in the business's currency (`money`; without it, the amount alone, in cents), a percentage as 0–100, else
- *  the number. */
+ *  cents) in the business's currency (`money`; without it, the amount alone), written as the whole Hub writes an
+ *  amount (`formatMoney`: «1.234,56 €»), a percentage as 0–100, else the number. */
 export function formatValue(value: unknown, format: unknown, locale: string, money?: Money): string {
   const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
   if (Number.isNaN(number)) return String(value);
-  if (format === 'currency') return numberFormat(locale, 'currency', money).format(number / 10 ** (money?.decimals ?? 2));
+  if (format === 'currency') return formatMoney(number, locale, money);
   if (format === 'percent') return numberFormat(locale, 'percent').format(number / 100);
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);
 }

@@ -81,6 +81,18 @@ describe('each datum', () => {
     expect(fieldText(card().fields[1], opts)).toBe('15,00\u00a0€');
   });
 
+  it('an amount of four figures groups its thousands, as Sales and Payments write it (base-money-thousands-grouping)', () => {
+    // The Spanish CLDR only groups from five figures: the card said «1234,56 €» where Sales says «1.234,56 €».
+    const price = { name: 'price', label: 'Precio', kind: 'money' as const, value: 123456 };
+    expect(fieldText(price, opts)).toBe('1.234,56\u00a0€');
+    expect(fieldText({ ...price, signed: true }, opts)).toBe('+1.234,56\u00a0€');
+    expect(fieldText({ ...price, value: -123456 }, opts)).toBe('-1.234,56\u00a0€');
+    expect(fieldText(price, { ...opts, locale: 'en' })).toBe('€1,234.56');
+    expect(fieldLines([{ ...price, name: 'expected_balance', label: 'Efectivo esperado' }], opts)).toEqual([
+      'Efectivo esperado: 1.234,56\u00a0€',
+    ]);
+  });
+
   it('an amount marked signed says over or short as Cash register does: + over, - short, none at zero', () => {
     // FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN: a difference over came as «137,90 €», like an
     // amount, while only the one short had its sign.
@@ -202,7 +214,8 @@ describe('a datum that is an object', () => {
     // In the one its write names, with its decimals.
     expect(fieldText(line({ kind: 'money', value: 150, money: USD }), opts)).toBe('Café · 1,50 $');
     expect(fieldText(top(USD), opts)).toBe('1,50 $');
-    expect(fieldText(line({ kind: 'money', value: 1500, money: JPY }), opts)).toBe('Café · 1500 ¥');
+    // base-money-thousands-grouping: «1500 ¥» until the platform grouped every amount from four digits on.
+    expect(fieldText(line({ kind: 'money', value: 1500, money: JPY }), opts)).toBe('Café · 1.500\u00a0¥');
     // Inside a list inside an object, the same.
     const order = { lines: [{ text: 'Té', unit_price: { kind: 'money', value: 1200 } }] };
     expect(fieldText({ name: 'order', label: 'Pedido', kind: 'object', value: order }, opts)).toBe('Té · 12,00 €');
