@@ -1,7 +1,7 @@
 # Workbook — Inventario (app)
 Prefijo: INVENTORY
 Alcance MVP: transversal
-Estado de la app: en uso; parcial F12 (espera al núcleo)
+Estado de la app: en uso; parcial F12 (espera al núcleo); F30 a F33 sin hacer (la foto del artículo, 2026-10-30)
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -70,6 +70,10 @@ pero no la cantidad restante en el TPV, que aquí no existe. Además:
   Lightspeed, Odoo y Holded.
 - **La unidad de un producto con stock no se cambia**: Odoo lo impide en cuanto el producto tiene
   movimientos; aquí basta con que su stock sea cero.
+- **La foto del artículo en la baldosa del TPV y, sin foto, sus iniciales sobre un color**: Square (la
+  imagen del artículo o, sin ella, su color y su abreviatura), Loyverse (imagen, o color y forma) y
+  Shopify POS (la imagen del producto en la rejilla). La foto se elige de la librería de ERPlora o se
+  sube desde la ficha, y viaja en la copia del negocio, como en el producto actual.
 
 ## Antes de empezar
 
@@ -133,6 +137,10 @@ crear), «Umbral stock bajo», «EAN-13», «Descripción», «Tipo» («Físico
 crear), la casilla «Controlar stock de este artículo» con su nota, «Unidad de medida», «Categoría
 fiscal» («Elige una categoría fiscal») y «Categorías» (si hay alguna), y «Guardar» / «Guardar
 cambios» («Guardando…»).
+
+La foto del artículo (INVENTORY-F30 a F32, sin hacer todavía) añadirá la miniatura a la tabla y a las
+tarjetas, el campo «Foto» al formulario, con «Elegir de la librería», «Subir foto» y «Quitar foto», para
+quien puede cambiar productos, y la foto arriba en la ficha.
 
 Vacía: «Sin productos». Cargando: «Cargando…». Error: el aviso de la tabla con «Reintentar». Un
 rechazo del formulario sale dentro del panel; el de una acción de fila, encima de la tabla.
@@ -247,6 +255,11 @@ fueran los del negocio.
 | INVENTORY-F26 | Vender al peso o por medida: unidades y escalón | hecho |
 | INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | hecho |
 | INVENTORY-F28 | Completar el primer paso «Tu catálogo» | hecho |
+| | **Foto del artículo** | |
+| INVENTORY-F30 | Elegir la imagen de un artículo desde la librería | no hecho |
+| INVENTORY-F31 | Subir una foto propia del artículo | no hecho |
+| INVENTORY-F32 | La foto en la ficha del TPV | no hecho |
+| INVENTORY-F33 | Las fotos viajan en el blueprint | no hecho |
 
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
 
@@ -924,6 +937,118 @@ está agotado» o el que dé la app). Quien no puede cambiar productos ve la ins
 acciones. Un artículo que ya no existe da «Este producto no existe en este hub».
 Implicados: SALE-F01, INVENTORY-F27, COMBO-F12
 
+### INVENTORY-F30 Elegir la imagen de un artículo desde la librería
+<!-- origen: nuevo (decisión de Ioan del 2026-10-30: una librería de imágenes compartida por todos los negocios, con título y sinónimos en español y en inglés; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) old:inventory/WORKFLOW.md (Foto del artículo en la ficha, duda 6) -->
+Estado: no hecho
+Actor: administrador, responsable, asistente
+Pantalla: Productos
+Pasos:
+1. En el formulario del producto (el **+** o «Editar»), en «Foto», pulsa «Elegir de la librería»: se
+   abre la ventana «Librería de imágenes» con el buscador «Buscar imagen…» ya escrito con el nombre del
+   producto.
+2. Busca en español o en inglés («café con leche», «latte», «champú»): el buscador mira el título y los
+   sinónimos de cada imagen, nunca el nombre de su archivo. Cada imagen sale con su título en el idioma
+   del negocio (en inglés si no es el español). Las pestañas «Todas», «Hostelería», «Peluquería»,
+   «Estética», «Comercio», «Deporte» y «Spa y bienestar» acotan por sector; salen de 60 en 60 con
+   «Cargar más».
+3. Toca una imagen: la ventana se cierra y el formulario la enseña en «Foto», con «Cambiar» y «Quitar
+   foto».
+4. Pulsa «Guardar» o «Guardar cambios»: la foto queda en el artículo. «Cancelar edición» o cerrar el
+   panel la descarta.
+5. Por el asistente: «ponle foto al café con leche». El asistente busca por el nombre del artículo,
+   enseña hasta cinco imágenes candidatas por su título y pregunta cuál; nunca pone una por su cuenta.
+   Al elegir una, pide la tarjeta de confirmación de un clic y la pone.
+Entra: el artículo y la librería de imágenes de ERPlora, la misma para todos los negocios, con el título
+y los sinónimos de cada imagen en español y en inglés.
+Sale: el artículo con su imagen de la librería. El negocio no guarda una copia de la imagen, solo cuál
+es, así que no gasta espacio de su plan. Inventario avisa del cambio (`inventory.product.updated`) y el
+TPV la enseña sin recargar (INVENTORY-F32). Elegir otra la sustituye; si la anterior era una foto
+propia (INVENTORY-F31), se borra de la carpeta del negocio. «Quitar foto» deja el artículo con sus
+iniciales. Las candidatas las da `inventory.product.suggest_image`, el buscador es
+`base.catalog_image.search` y la foto la pone o la quita `inventory.product.set_image`.
+Si falla: si la librería no contesta, «No se pudo cargar la librería de imágenes.» con «Reintentar», y
+el producto se sigue pudiendo guardar sin foto. Sin resultados: «Ninguna imagen coincide con tu
+búsqueda. Prueba con otra palabra o sube una foto.». El asistente que no encuentra candidatas lo dice y
+propone subir una foto desde la ficha. Una imagen que la librería ya no tiene se rechaza al guardar
+(«Esa imagen ya no está en la librería. Elige otra.») y no se guarda nada. Quien no puede cambiar
+productos no ve «Foto», y la app lo rechaza también por el asistente o la API.
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, BASE-F93
+
+### INVENTORY-F31 Subir una foto propia del artículo
+<!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda las fotos de sus artículos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
+Estado: no hecho
+Actor: administrador, responsable
+Pantalla: Productos
+Pasos:
+1. En el formulario del producto (el **+** o «Editar»), en «Foto», pulsa «Subir foto» y elige una
+   imagen del dispositivo (en el móvil o la tableta, también con la cámara): JPG, PNG o WebP de hasta
+   2 MB.
+2. El formulario la enseña en «Foto», recortada en cuadrado, con «Cambiar» y «Quitar foto».
+3. Pulsa «Guardar» o «Guardar cambios»: se guarda el artículo y después su foto («Subiendo foto…»).
+   «Cancelar edición» o cerrar el panel la descarta.
+Entra: la imagen elegida y el artículo.
+Sale: la foto, convertida a WebP de 512 × 512 (recortada al centro), en la carpeta del negocio, que solo
+ven las personas del negocio y que cuenta en el espacio de su plan, como sus archivos. El artículo
+apunta a ella y Inventario avisa del cambio (`inventory.product.updated`); el TPV la enseña sin recargar
+(INVENTORY-F32). Subir otra, elegir una de la librería o «Quitar foto» borra la anterior de la carpeta;
+eliminar el artículo (INVENTORY-F04), también. La subida es `inventory.product.upload_image`, también
+por la API.
+Si falla: junto a «Foto», y no se sube nada: una imagen de más de 2 MB, «La foto pesa más de 2 MB.
+Elige una más ligera.»; un archivo que no es una imagen, «Ese archivo no es una foto. Sube una imagen
+JPG, PNG o WebP.»; sin espacio en el plan, «No queda espacio para ese archivo: tu plan incluye
+<espacio>.»; si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.». Si el
+artículo se guardó y la foto no, el panel lo dice («El producto se ha guardado, pero la foto no:
+<motivo>») con «Reintentar», y el artículo se queda con la foto que tenía.
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F28
+
+### INVENTORY-F32 La foto en la ficha del TPV
+<!-- origen: nuevo (decisión de Ioan del 2026-10-30; hoy la baldosa del TPV pinta las iniciales sobre un degradado, SALE-F01) -->
+Estado: no hecho
+Actor: empleado, cajero
+Pantalla: Ventas: Vender; Productos; Ficha del producto
+Pasos:
+1. En el TPV (Ventas), la baldosa de cada artículo enseña su foto encima del nombre, la unidad y el
+   precio; lo agotado sale en gris con «Agotado», también con foto. El buscador del TPV enseña las
+   mismas baldosas.
+2. Un artículo sin foto, o cuya foto no se puede cargar, enseña sus iniciales sobre su color, como hasta
+   ahora: nunca un hueco ni una imagen rota.
+3. Las baldosas de los menús (Menús) siguen la misma regla: su foto si la tienen y, si no, sus
+   iniciales.
+4. En **Inventario → Productos**, cada fila lleva delante del nombre la miniatura de la foto (o las
+   iniciales), en la tabla y en las tarjetas; la ficha del producto la enseña arriba, más grande.
+Entra: la foto de cada artículo, de la librería o propia.
+Sale: nada: solo se enseña. Las imágenes de la librería se guardan en el dispositivo y no se vuelven a
+pedir; las propias solo las ve quien ha entrado en el negocio.
+Si falla: una foto que no carga (sin conexión, borrada o que la librería ya no tiene) deja las iniciales,
+sin aviso; el TPV vende igual.
+Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
+
+### INVENTORY-F33 Las fotos viajan en el blueprint
+<!-- origen: nuevo (decisión de Ioan del 2026-10-30: las fotos propias viajan dentro del archivo exportado y las de la librería como referencia) gh:hub#1008 gh:hub#1006 -->
+Estado: no hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias
+Pasos:
+1. Exporta una copia de seguridad o una plantilla con Inventario y sus datos (BASE-F35): el archivo
+   lleva dentro las fotos propias de los artículos; las de la librería no van dentro, solo cuál es cada
+   una, porque la librería es la misma en todos los negocios.
+2. Impórtalo en otro negocio (BASE-F31): cada foto propia se copia a la carpeta del negocio que importa,
+   con un nombre nuevo, y su artículo apunta a la copia; los artículos con imagen de la librería la
+   enseñan igual.
+3. Las plantillas del Hub (restaurante y peluquería, INVENTORY-F12) traen cada artículo con su imagen de
+   la librería.
+Entra: el archivo exportado (.blueprint.zip) con sus fotos.
+Sale: los artículos con su foto en el negocio que importa. Importar dos veces el mismo archivo no
+duplica ni los artículos ni sus fotos: el artículo que ya está (el mismo SKU) se salta, y con él su
+foto. Deshacer la importación (BASE-F34) borra también las fotos que copió, y restablecer Inventario
+(BASE-F37) borra sus artículos y sus fotos propias.
+Si falla: una foto que falta en el archivo, o una imagen que la librería ya no tiene, no impide importar
+el artículo: entra sin foto (con sus iniciales) y el informe de la importación lo dice. Una foto que no
+cabe en el espacio del plan del negocio que importa deja su artículo sin foto, con el motivo en el
+informe. Los topes del archivo (hoy 5 MB, 50 MB descomprimido y 200 entradas) se revisan con este flujo
+para que quepan las fotos, y los que se elijan se escriben aquí.
+Implicados: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
+
 ## Qué comparten los verticales
 
 El restaurante usa Inventario para la carta y la peluquería para los productos de venta, con las
@@ -941,6 +1066,7 @@ vertical: tocar una pieza de esta tabla afecta a los dos negocios.
 | La unidad de medida y su escalón | F01, F02, F09, F13, F14, F15, F26 |
 | El catálogo de venta que leen Ventas, Cocina y Menús (solo productos activos y no eliminados) | F03, F04, F08, F27 |
 | Los textos fiscales aprendidos en Impuestos al importar | F09, F10 |
+| La foto del artículo: de la librería común o propia, con las iniciales si no hay | F30, F31, F32, F33 |
 
 ## Servicios: lo que entra y lo que sale
 
@@ -1153,11 +1279,48 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 - **Roles**: el `cashier` viejo no existe; lo que tenía (ver productos, categorías y stock) es del
   empleado (`hub_employee`).
 - **Del módulo viejo se queda fuera, a propósito**: almacenes (`inventory_location`) y variantes
-  (`inventory_product_variant`), que este WORKBOOK excluye; la foto del producto y la imagen de la
-  categoría (duda 6); el SKU autogenerado `PROD-NNN` de su alta en lote (aquí el SKU es obligatorio,
+  (`inventory_product_variant`), que este WORKBOOK excluye; la imagen de la categoría (duda 6; la
+  foto del producto vuelve con F30 a F33); el SKU autogenerado `PROD-NNN` de su alta en lote (aquí el SKU es obligatorio,
   INVENTORY-F09); desactivar una categoría (cambio 5); `inventory.products.unit_of` y
   `inventory.products.stock_levels`, que eran lecturas internas de los handlers (aquí la unidad sale en
   la ficha y en `inventory.unit.list`, y el saldo se lee dentro de la transacción).
+- **La foto del artículo (INVENTORY-F30 a F33, sin hacer; decisión de Ioan del 2026-10-30, encargo
+  `docs/plans/2026-10-30-blueprints-imagenes-prompt.md` de erplora-next)**:
+  - `Product.image`: texto validado con una referencia lógica, nunca una URL (un `.blueprint.zip` es inmutable
+    y una URL horneada se pudre si cambia el dominio, el bucket o la CDN): `catalog:<carpeta>/<nombre>` (la
+    librería compartida, repo `ERPlora/blueprints`, `img/<carpeta>/<nombre>.webp`, con el manifiesto bilingüe
+    `img/catalog.json`: `title` y `tags` en `en` y `es`) o `file:inventory/products/<uuid>.webp` (la foto
+    propia, en `hub_files` bajo `hub-<id>/inventory/products/<uuid>.webp`, `base/storage.py::hub_prefix`).
+    Vacío = sin foto. Migración que solo añade la columna con `db_default` (expand, reversible).
+  - Operaciones, todas con `ai=` (los nombres son de tres partes: `NAME_RE` de `live/operations.py` rechaza
+    `inventory.product.image.set`): `inventory.product.suggest_image` (consulta, ver productos: candidatas por
+    el nombre del artículo, nunca la fija), `inventory.product.set_image` (acción, cambiar productos, un clic:
+    pone un `catalog:` que exista en el manifiesto o vacía; un `file:` solo lo escribe la subida, así nadie
+    apunta un artículo a otro archivo del negocio), `inventory.product.upload_image` (acción, cambiar
+    productos: ≤ 2 MB, Pillow a WebP 512×512 recortada al centro, el espacio del plan con
+    `base.files.refuse_past_the_space` → 409 `base.file_no_space` con su frase; borra el `file:` anterior) y,
+    en `base`, `base.catalog_image.search` (consulta: título y `tags` del manifiesto en `es` y `en`; título en
+    el idioma del negocio). Reutilizan `inventory.product.updated`. Al hacerlas entran en «Lo que ofrece» y,
+    la de `base`, en «Lo que necesita de otras apps» (`tests/test_workbook.py` exige que esa tabla nombre
+    solo lo que el código llama, por eso no está ya).
+  - Servir: `/p/catalog/<carpeta>/<nombre>.webp` lee del prefijo compartido del bucket de hubs
+    (`shared/catalog/…`, de solo lectura para los hubs) con caché inmutable, la misma vista genérica que
+    `base/media.py`; en local sin bucket, desde `blueprints/img/` (ruta configurable). Las propias, por
+    `/p/media/<hub>/inventory/products/…`: inventory declara `members_media` con esa carpeta (hoy no declara
+    ninguna).
+  - TPV: `apps/sale/frontend/components/pos/ProductTile.vue` y `ComboTiles.vue` pintan hoy `initials()` sobre
+    `tileGradient()` (`till.ts`); pasan a la foto con las iniciales de respaldo, también en el `error` de la
+    imagen. Si un menú lleva foto propia lo decide Menús (`market-decision`); mientras no la tenga, su
+    baldosa sigue con las iniciales.
+  - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip (como hub#1008 del producto
+    viejo) y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
+    no duplica (el SKU se salta); `undo` y `reset` borran las copias. Los límites (`MAX_FILE_BYTES` 5 MB,
+    `MAX_INFLATED_BYTES` 50 MB, `MAX_ENTRIES` 200) se revisan para las fotos con su test y se escriben en F33.
+  - Supersede la «una copia por paquete o por negocio» del producto viejo (ADR-0121, hub#1006, README de
+    `erplora-old/blueprints`): la librería es una sola copia para todos los hubs.
+  - Choque en la referencia: el `WORKFLOW.md` viejo de inventario dice «no hay campo de imagen» (F01) mientras
+    su esquema (`migrations/postgres/001_init.sql`) tiene `image TEXT` en producto y en categoría: la columna
+    existía y solo se llenaba por el asistente, la API o una plantilla.
 
 ## Cambios frente al producto actual
 
@@ -1203,13 +1366,18 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
     etiquetas bajo demanda).
 17. **Los avisos solo llevan los datos del flujo** (sección «Lo que avisa»). Antes copiaban también
     la identidad fiscal del negocio y quién lanzó la acción.
+18. **La foto del artículo se pone desde la ficha** (F30, F31): antes la columna existía, pero la ficha no
+    tenía campo y cada paquete llevaba su propia copia de la imagen; ahora se elige de una librería común
+    (una sola copia para todos los negocios) o se sube a la carpeta del negocio, y viaja en la copia
+    exportada (F33).
 
 ## Cobertura contra la referencia
 
 | Elemento de la referencia | Qué hará la app | Flujo |
 |---|---|---|
 | Ficha con nombre, SKU, precio, coste, categoría fiscal, código de barras y unidad | sí | F01, F02 |
-| Foto del artículo en la ficha | no: duda 6 | F01 |
+| Foto del artículo en la ficha, la lista y el TPV | no todavía: flujos escritos y sin hacer (duda 6 resuelta el 2026-10-30) | F30, F31, F32 |
+| Fotos de los artículos en la copia o la plantilla exportada | no todavía: flujo escrito y sin hacer | F33 |
 | Precio por una cantidad distinta de la unidad (por 100 g, por kg con stock en g) | parcial: solo por el asistente o la API (duda 12) | F01, F26 |
 | Categoría fiscal obligatoria y existente al guardar | sí | F01, F02 |
 | Activar y desactivar sin borrar | sí | F03 |
@@ -1245,7 +1413,9 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
 - **Propios**: los productos (con su unidad, su umbral, su control de stock y su categoría fiscal,
   guardada como referencia a Impuestos), las categorías de producto y sus enlaces con los
   productos, el libro de movimientos, las unidades de medida, los ajustes (uno por negocio) y la
-  marca de «venta ya repuesta» o «venta sin movimientos», y la de «devolución ya repuesta».
+  marca de «venta ya repuesta» o «venta sin movimientos», y la de «devolución ya repuesta». Con F30 a
+  F33, también la foto de cada producto: cuál es de la librería común o su foto propia, guardada en la
+  carpeta del negocio.
 - **Lee de otros**: las categorías fiscales, sus tipos y los textos aprendidos, de Impuestos; al
   importar también crea en Impuestos categorías y textos aprendidos, siempre por sus servicios. En
   Movimientos, el número de la venta (Ventas) y el de su tique o factura (Facturación), solo para
@@ -1288,6 +1458,8 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - **Permisos**: los de «Quién puede qué», en todas las puertas.
 - **Borrado lógico**: un producto o una categoría eliminados no desaparecen de la base de datos y
   sus movimientos se conservan.
+- **Fotos** (F30 a F33): la foto propia de un negocio solo la ven las personas de ese negocio y nunca la
+  usa otro; la librería es la misma para todos y ningún negocio la cambia.
 
 ## Lo que NO hace, a propósito
 
@@ -1302,6 +1474,7 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 - No crea unidades de medida: usa las ocho de fábrica.
 - No cambia el tipo de un producto (físico o servicio) después de crearlo.
 - No imprime por sí misma: entrega la etiqueta a Impresión.
+- No busca fotos en internet ni las genera: se eligen de la librería de ERPlora o se suben (F30, F31).
 - No enseña en el TPV cuántas unidades quedan, ni marca un artículo agotado sola cuando su stock llega
   a cero, ni lo vuelve a poner a la venta al recibir mercancía: la marca «Agotado» la pone y la quita
   una persona (F29).
@@ -1325,8 +1498,10 @@ código del flujo; mientras tanto, el flujo hace lo que dice arriba.
 5. El «Umbral de stock bajo» de Ajustes solo lo hereda un producto creado por el asistente o la API
    sin umbral (F19): ¿debe el formulario dejar el campo vacío para heredarlo, y debe un cambio del
    ajuste alcanzar a los productos que lo heredaron?
-6. ¿Entran en el MVP la foto del artículo en la ficha y el orden, el color y el icono de las
-   categorías en el TPV (F01, F06, F08)?
+6. ~~¿Entra en el MVP la foto del artículo en la ficha (F01)?~~ Resuelta (2026-10-30, decisión de
+   Ioan): sí, elegida de la librería común o subida, en el TPV y en la copia exportada (F30 a F33).
+   Sigue abierta la otra mitad: ¿entran el orden, el color, el icono y la imagen de las categorías en
+   el TPV (F06, F08)?
 7. ¿Debe la etiqueta llevar el EAN-13 cuando lo hay, y el TPV buscar por código de barras (F25,
    F27)?
 8. ¿Debe un artículo poder volver a «Sigue el ajuste del hub» después de haber decidido (F20)?
