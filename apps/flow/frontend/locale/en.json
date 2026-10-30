@@ -506,7 +506,8 @@
         "assistantUsed": "The assistant used «{action}».",
         "assistantRefused": "The assistant tried «{action}», which did not take it.",
         "assistantAnswered": "The assistant answered: «{text}»",
-        "assistantProposed": "The assistant wants to «{action}»: it waits for a yes until {date}."
+        "assistantProposed": "The assistant wants to «{action}»: it waits for a yes until {date}.",
+        "assistantPinnedEmpty": "The assistant tried «{action}», but {fields}, fixed by this step, was empty: it was not done."
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",
@@ -2674,7 +2675,13 @@
       },
       "rounds": "Most turns",
       "answerHint": "The steps after it can insert «Text», what it answered.",
-      "askFirst": "Only after a yes from someone who may do it themselves: {actions}."
+      "askFirst": "Only after a yes from someone who may do it themselves: {actions}.",
+      "pinned": "Fixed data",
+      "noPins": "None: the assistant fills in every datum itself.",
+      "addPin": "Fix a datum",
+      "choosePin": "Choose a datum",
+      "removePin": "Unfix «{datum}»",
+      "pinnedHint": "The assistant never sees them nor can change them: they are filled in when it is asked, and a tool whose fixed datum is empty is not used."
     }
   }
 }

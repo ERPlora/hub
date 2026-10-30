@@ -506,7 +506,8 @@
         "assistantUsed": "El asistente ha usado «{action}».",
         "assistantRefused": "El asistente ha intentado «{action}», que no lo ha aceptado.",
         "assistantAnswered": "El asistente ha contestado: «{text}»",
-        "assistantProposed": "El asistente quiere «{action}»: espera un sí hasta el {date}."
+        "assistantProposed": "El asistente quiere «{action}»: espera un sí hasta el {date}.",
+        "assistantPinnedEmpty": "El asistente ha intentado «{action}», pero {fields}, que fija este paso, estaba vacío: no se ha hecho."
       },
       "advice": {
         "flow__not_allowed": "Abre Permisos y concédele lo que necesita.",
@@ -2674,7 +2675,13 @@
       },
       "rounds": "Vueltas como mucho",
       "answerHint": "Los pasos de después pueden insertar «Texto», lo que ha contestado.",
-      "askFirst": "Solo tras el sí de alguien que también puede hacerlo: {actions}."
+      "askFirst": "Solo tras el sí de alguien que también puede hacerlo: {actions}.",
+      "pinned": "Datos fijos",
+      "noPins": "Ninguno: el asistente rellena todos los datos.",
+      "addPin": "Fijar un dato",
+      "choosePin": "Elige un dato",
+      "removePin": "Quitar «{datum}»",
+      "pinnedHint": "El asistente no los ve ni puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa."
     }
   }
 }

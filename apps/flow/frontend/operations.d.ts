@@ -96,6 +96,9 @@ export interface AssistantStep extends StepOptions {
   prompt: string;
   /** The reads and actions it may use, by name: each one a permission of the automation. */
   tools: string[];
+  /** Data a tool always gets, `{tool: {input: value}}`, filled in when it runs: the assistant never sees them nor
+   *  changes them. Absent: none. */
+  pinned?: Record<string, Record<string, unknown>>;
   /** `ask`: a change waits for a yes in «Waiting for your answer»; `auto`: it makes it on its own. */
   mode: 'ask' | 'auto';
   /** Most turns: 1 to 10. */
@@ -194,9 +197,12 @@ export interface LogEntry {
     | 'thinking'
     | 'assistant_used'
     | 'assistant_answered'
-    | 'assistant_proposed';
+    | 'assistant_proposed'
+    | 'assistant_pinned_empty';
   /** Whether a read or an action the assistant used went well (`assistant_used`). */
   ok?: boolean;
+  /** The data the step fixes that were empty, so the tool was not used (`assistant_pinned_empty`). */
+  fields?: string[];
   /** What the assistant answered (`assistant_answered`). */
   text?: string;
   /** Who a question was asked of (`asking`). */
