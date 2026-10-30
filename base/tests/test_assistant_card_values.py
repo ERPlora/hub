@@ -422,6 +422,12 @@ KNOWN = json.loads((Path(settings.BASE_DIR) / "base/frontend/locale/es.json").re
 #: Spanish: the title its app wrote, never the generic word for its name («Registro: 5 (Terraza)»).
 TITLED_IN_SPANISH = {
     "attendance.record.close_for_terminated:id": "Persona",
+    "base.api_key.revoke:id": "Clave de API",
+    "base.device.remove:id": "Dispositivo",
+    "base.device.rename:id": "Dispositivo",
+    "base.failed_event.discard:id": "Evento caído",
+    "base.failed_event.retry:id": "Evento caído",
+    "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
     **{f"table.session.{action}:id": "Cuenta" for action in (
         "close", "delete", "link_order", "merge", "park", "restore", "set_guests", "split", "transfer",
@@ -451,6 +457,24 @@ def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title
                 titles[f"{op.name}:{field['name']}"] = card_title(field)
     assert titles == TITLED_IN_SPANISH
     assert not {title for title in titles.values() if title.lower() in {"id", "ids"} or "_" in title}
+
+
+def test_every_dangerous_write_of_the_platform_titles_the_record_it_names():
+    """The record a dangerous write of the platform acts on is called as its screen calls it, in the person's language
+    («Dispositivo: Barra», «Evento caído: …»), never «Registro»: its schema titles it, and a catalog says that title in
+    Spanish. One that does not comes in here (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME)."""
+    untitled = []
+    for op in writes():
+        if op.app_label != "base" or assistant.risk(op) != "high":
+            continue
+        props = op.input.model_json_schema().get("properties", {})
+        with translation.override("es"):
+            untitled += [
+                f"{op.name}:{name}"
+                for name in ("id", "ids")
+                if name in props and assistant._own_title(name, props[name].get("title")) is None
+            ]
+    assert untitled == []
 
 
 def test_no_preview_titles_a_datum_the_screen_knows_by_its_name():

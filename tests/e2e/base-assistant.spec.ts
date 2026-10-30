@@ -559,7 +559,8 @@ test('assistant-card — in Spanish removing a device names it as Settings › D
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Quitar en Ajustes. Revisa cada dato antes de seguir.');
-    await expect(card(page)).toContainText('Registro: Barra');
+    // FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: by the title its schema gives it, never «Registro».
+    await expect(card(page)).toContainText('Dispositivo: Barra');
     await expect(card(page)).not.toContainText(device!.id);
     await confirmationReady(page);
     await untilStill(page);

@@ -628,7 +628,7 @@ class DatasetListOut(Schema):
 class ImportIdIn(Schema):
     """A load of this business, by its id."""
 
-    id: UUID = Field(json_schema_extra=names("base.import.detail"))
+    id: UUID = Field(title=gettext_noop("Import"), json_schema_extra=names("base.import.detail"))
 
 
 class ImportUndoIn(ImportIdIn):
@@ -778,11 +778,11 @@ class FailedEventListOut(Schema):
 class FailedEventIn(Schema):
     """A failed event of the hub of the request, by its id."""
 
-    id: UUID = Field(json_schema_extra=names("base.failed_event.detail"))
+    id: UUID = Field(title=gettext_noop("Failed event"), json_schema_extra=names("base.failed_event.detail"))
 
 
 class FailedEventDiscardIn(Schema):
-    id: UUID = Field(json_schema_extra=names("base.failed_event.detail"))
+    id: UUID = Field(title=gettext_noop("Failed event"), json_schema_extra=names("base.failed_event.detail"))
     #: Why it is discarded (optional): kept with who and when.
     reason: str = Field(default="", max_length=500)
 
@@ -869,12 +869,12 @@ class DeviceListOut(Schema):
 
 
 class DeviceRenameIn(Schema):
-    id: UUID = Field(json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))
+    id: UUID = Field(title=gettext_noop("Device"), json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))
     name: str = Field(max_length=80, description="«Bar», «Kitchen»: 60 characters at most once trimmed.")
 
 
 class DeviceByIdIn(Schema):
-    id: UUID = Field(json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))
+    id: UUID = Field(title=gettext_noop("Device"), json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))
 
 
 class DeviceRemoveOut(Schema):
@@ -1085,7 +1085,7 @@ class ApiKeyCreateIn(Schema):
 
 
 class ApiKeyIdIn(Schema):
-    id: UUID = Field(json_schema_extra=names("base.api_key.detail"))
+    id: UUID = Field(title=gettext_noop("API key"), json_schema_extra=names("base.api_key.detail"))
 
 
 class ApiKeyTokenOut(Schema):

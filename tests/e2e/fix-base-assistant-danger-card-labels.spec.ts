@@ -4,9 +4,10 @@
 // Tables titles it «Cuenta». End to end with the stack's SaaS gateway and the e2e's provider (assistant-provider.ts,
 // `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El asistente»). The owner asks,
 // in Spanish, to transfer the check of table 5 of the terrace to table 2 of the dining room: the card says «Cuenta» and
-// «Mesa de destino», never «Registro»; cancelled, nothing changes. A datum its app does not title keeps the card's word
-// («Registro: Barra» when removing a device: base-assistant.spec.ts). What this file creates carries `E2EDcl` and goes
-// away; the apps it turns on are turned off again.
+// «Mesa de destino», never «Registro»; and to remove a device of the platform (BASE-F98), named «Barra» in Settings ›
+// Devices: the card says «Dispositivo: Barra», as every dangerous write of the platform now titles the record it acts on.
+// Cancelled, nothing changes. What this file creates carries `E2EDcl` and goes away; the apps it turns on are turned off
+// again, and the device gets its name back.
 // flow: base-assistant-danger-card-labels
 // flow: BASE-F97 BASE-F98 TABLE-F15
 import { execSync } from 'node:child_process';
@@ -178,8 +179,8 @@ test('base-assistant-danger-card-labels — in Spanish transferring a check call
     await expect(card(page)).toContainText(`Mesa de destino: 2 (${ROOM})`);
     await expect(card(page)).not.toContainText('Registro:');
     for (const id of [seated.data.id, two.id]) await expect(card(page)).not.toContainText(id);
-    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-${vp.label}`);
+    expect(await confirmationSettled(page), `${KEY}-check-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${KEY}-check-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
@@ -189,5 +190,44 @@ test('base-assistant-danger-card-labels — in Spanish transferring a check call
   expect([after.data.table_id, after.data.status]).toEqual([five.id, 'open']);
   // The session, for ui-clip-sweep.sh over the screen behind the card (its pages are behind the login).
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  await context.close();
+});
+
+test('base-assistant-danger-card-labels — in Spanish removing a device calls it «Dispositivo», the title the platform gives it, never «Registro»', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  type Device = { id: string; name: string; current: boolean };
+  const listed = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
+  expect(listed.status, JSON.stringify(listed.data)).toBe(200);
+  const device = listed.data.devices.find((row) => row.current) ?? listed.data.devices[0];
+  expect(device, JSON.stringify(listed.data.devices)).toBeDefined();
+  // Named as the business names it in Settings › Devices, and given its name back at the end.
+  const rename = async (name: string) => {
+    const renamed = await api(context, A, 'POST', '/devices/rename', { id: device!.id, name });
+    expect(renamed.status, JSON.stringify(renamed.data)).toBe(200);
+  };
+  await rename('Barra');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openPanel(page);
+  await ask(page, `E2E-ASK base__device__remove ${JSON.stringify({ id: device!.id })}`);
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Quitar en Ajustes. Revisa cada dato antes de seguir.');
+    await expect(card(page)).toContainText('Dispositivo: Barra');
+    await expect(card(page)).not.toContainText('Registro:');
+    await expect(card(page)).not.toContainText(device!.id);
+    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
+  await expect(card(page)).toBeHidden();
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  const after = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
+  expect(after.data.devices.map((row) => row.id)).toContain(device!.id);
+  await rename(device!.name);
   await context.close();
 });
