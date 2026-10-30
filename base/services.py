@@ -65,7 +65,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.live_registry import ALL_EVENTS
 from live.models import OutboxEvent
 from live.operations import get as get_operation
-from live.operations import INTERNAL, operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from PIL import Image as PILImage
@@ -264,7 +264,8 @@ def _note_the_owner(
     )
 
 
-@transaction.atomic
+@transaction.atomic  # control's: the account's copy, its Membership and the session
+@atomic  # the hub's: the trusted device and the ones it ends
 def open_session_from_saas(request: HttpRequest, redeemed: RedeemedUser, slug: str):
     """Get or create the customer copy, set its role on ``slug`` and log it in (a new session key).
 
@@ -321,7 +322,7 @@ def sync_task_schedules(declared: Iterable[tuple[str, str, str, str, dt.datetime
     its ``next_run`` and ``last_run`` (a boot never resets the clock) and takes the declared operation and
     cron; a new one is due at ``first_run``.
     """
-    with transaction.atomic():
+    with atomic():
         keep = set()
         for app_label, name, operation, cron, first_run in declared:
             TaskSchedule.objects.update_or_create(
@@ -351,7 +352,7 @@ def run_next_due_task(
     this one run. Returns ``("<app>.<name>", ran)``,
     or ``None`` when nothing is due.
     """
-    with transaction.atomic():
+    with atomic():
         row = (
             TaskSchedule.objects.select_for_update(skip_locked=True)
             .filter(next_run__lte=now)
@@ -362,7 +363,7 @@ def run_next_due_task(
             return None
         ran = True
         try:
-            with transaction.atomic():
+            with atomic():
                 execute(row.operation)
         except Exception:
             ran = False
@@ -406,7 +407,7 @@ def relay_take_events(
     ``SELECT … FOR UPDATE SKIP LOCKED``: a second worker (a deploy overlaps the old one and the new one) skips the
     events this one holds, and once it commits they are taken.
     """
-    with transaction.atomic():
+    with atomic():
         taken = list(
             OutboxEvent.objects.select_for_update(skip_locked=True)
             .filter(delivered_at__isnull=True)
@@ -434,7 +435,7 @@ def relay_deliver_next(
     logged with the event, and the other deliveries go on: a refusal of the business (an ``OperationError``) as a
     warning with its code; anything else, and the delivery given up, as an error with its traceback.
     """
-    with transaction.atomic():
+    with atomic():
         delivery = (
             EventDelivery.objects.select_for_update(skip_locked=True, of=("self",))
             .select_related("event")
@@ -446,7 +447,7 @@ def relay_deliver_next(
             return None
         delivery.attempts += 1
         try:
-            with transaction.atomic():
+            with atomic():
                 recorded: list[OutboxEvent] = []
                 token = _recorded_by_the_delivery.set(recorded)
                 try:
@@ -1138,7 +1139,7 @@ def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
     for _draw in range(DEMO_SLUG_DRAWS):
         slug = f"{DEMO_SLUG_PREFIX}{secrets.token_hex(4)}"
         try:
-            with transaction.atomic():
+            with atomic():
                 hub = Hub.objects.create(
                     slug=slug,
                     is_demo=True,
@@ -1475,21 +1476,13 @@ def has_own_database(hub: Hub | None) -> bool:
     },
 )
 def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
-    """The plan of what each app would lose, or empty the apps chosen with the business's name typed (BASE-G109)."""
+    """The plan of what each app would lose, or empty the apps chosen with the business's name typed (BASE-G109).
+
+    Without the business's own database the reset is refused before anything of it is read (PLAN-DB §14.14)."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        confirm_with = hub.name.strip() if hub and hub.name.strip() else ctx.scope.key
-        sections = blueprint.reset_plan(ctx)
-        answer = {
-            "dry_run": data.dry_run,
-            "confirm_with": confirm_with,
-            "available": has_own_database(hub),
-            "sections": sections,
-            "apps": [],
-        }
-        if data.dry_run:
-            return answer
-        if not answer["available"]:
+        available = has_own_database(hub)
+        if not data.dry_run and not available:
             raise Conflict(
                 gettext(
                     "Resetting the business is not available yet. Undo a load instead, or remove what you want "
@@ -1497,6 +1490,17 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
                 ),
                 code="base.reset_shared_database",
             )
+        confirm_with = hub.name.strip() if hub and hub.name.strip() else ctx.scope.key
+        sections = blueprint.reset_plan(ctx)
+        answer = {
+            "dry_run": data.dry_run,
+            "confirm_with": confirm_with,
+            "available": available,
+            "sections": sections,
+            "apps": [],
+        }
+        if data.dry_run:
+            return answer
         chosen = list(dict.fromkeys(data.apps))
         offered = {section["id"] for section in sections}
         if not chosen or not set(chosen) <= offered:
@@ -1694,7 +1698,8 @@ def _end_other_devices(slug: str, device: TrustedDevice) -> None:
     )
 
 
-@transaction.atomic
+@transaction.atomic  # control's: the new session and the other devices' ones it ends
+@atomic  # the hub's: the device, locked, and the ones it ends
 def open_session_on_device(request: HttpRequest, user, device: TrustedDevice, credential: str) -> None:
     """Log ``user`` in on the hub's ``device`` with its PIN or its badge (BASE-G55, G56, G60), for a shift (or what the
     device and the business allow). Over someone else's session («Switch user») ``login`` ends that one only now, once
@@ -1781,11 +1786,11 @@ def badge_key() -> bytes:
     """The hub's key of the badges' digests (``access.badge_digest``): made once, with the system's randomness, and
     kept in the business's row of ``AccessSettings``, never readable by any route. Two first uses at once end with
     the same key: the row is locked while it is made."""
-    with transaction.atomic():
+    with atomic():
         row = AccessSettings.objects.select_for_update().first()
         if row is None:
             try:
-                with transaction.atomic():
+                with atomic():
                     row = AccessSettings.objects.create(badge_key=secrets.token_hex(32))
             except IntegrityError:
                 row = AccessSettings.objects.select_for_update().get()
@@ -1948,7 +1953,7 @@ def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) 
     row = AccessSettings.objects.select_for_update().first()
     if row is None:
         try:
-            with transaction.atomic():
+            with atomic():
                 row = AccessSettings.objects.create()
         except IntegrityError:
             row = AccessSettings.objects.select_for_update().get()
@@ -2180,7 +2185,7 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
     credential, _ = Credential.objects.select_for_update().get_or_create(username=data.person)
     credential.badge_digest, credential.badge_set_at = digest, timezone.now()
     try:
-        with transaction.atomic():
+        with atomic():
             credential.save(update_fields=["badge_digest", "badge_set_at"])
     except IntegrityError:
         # Given to somebody else at this same moment: the unique digest keeps one.
@@ -2348,12 +2353,17 @@ API_KEY_LAST_USE_EVERY = dt.timedelta(minutes=1)
 def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyCaller | None":
     """The caller of ``token`` on the published operation ``op``, in the request's hub (``base.api_keys.KeyDoor``).
 
-    ``None`` (the session's door goes on) on a business that shares phase 1's database, or for a token nobody issued
-    here (counted against the address); 429 once the address tried too many, or the key passed its pace; 403 when the
-    key may not do this on this app."""
+    401 ``base.api_keys_unavailable`` on a business that shares phase 1's database, where no key exists: a request
+    that brings one is refused for that reason, never let through by a session (PLAN-DB §14.14). ``None`` (the
+    session's door goes on) without a hub, or for a token nobody issued here (counted against the address); 429 once
+    the address tried too many, or the key passed its pace; 403 when the key may not do this on this app."""
     hub = getattr(request, "hub", None)
-    if not has_own_database(hub):
+    if hub is None:
         return None
+    if not has_own_database(hub):
+        raise Unauthorized(
+            gettext("API keys are not available yet for this business."), code="base.api_keys_unavailable"
+        )
     address = client_key(request)
     wait = api_keys.KEY_ADDRESS_LIMIT.wait(hub.slug, address)
     if wait:
@@ -2542,7 +2552,7 @@ def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn)
     row = ApiSettings.objects.select_for_update().first()
     if row is None:
         try:
-            with transaction.atomic():
+            with atomic():
                 row = ApiSettings.objects.create()
         except IntegrityError:
             row = ApiSettings.objects.select_for_update().get()

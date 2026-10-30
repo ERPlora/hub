@@ -11,13 +11,13 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.staff import events
@@ -371,7 +371,7 @@ def _already_linked(name: str) -> Conflict:
 def _save(member: Member, **options: Any) -> None:
     """Save, turning the race of two links of one user (the database's unique index) into the 409."""
     try:
-        with transaction.atomic():
+        with atomic():
             member.save(**options)
     except IntegrityError as error:
         if USER_UNIQUE not in str(error):
@@ -451,7 +451,7 @@ def update_role(ctx: OperationContext, data: RolePatchIn) -> Role | None:
 
 def _save_role(role: Role, **options: Any) -> None:
     try:
-        with transaction.atomic():
+        with atomic():
             role.save(**options)
     except IntegrityError as error:
         if ROLE_UNIQUE not in str(error):

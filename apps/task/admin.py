@@ -8,7 +8,7 @@ that names them do: it waits for the one under way and then takes what that writ
 """
 
 from django.contrib import admin
-from django.db import transaction
+from live.operations import atomic
 
 from apps.task.models import Comment, Project, Task, TaskCounter
 from apps.task.services import lock_projects, lock_tasks
@@ -22,12 +22,12 @@ class ProjectAdmin(admin.ModelAdmin):
     readonly_fields = ("id", "created_at", "updated_at")
 
     def delete_model(self, request, obj):
-        with transaction.atomic():
+        with atomic():
             lock_projects([obj.pk])
             super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
-        with transaction.atomic():
+        with atomic():
             lock_projects(queryset.values_list("pk", flat=True))
             super().delete_queryset(request, queryset)
 
@@ -60,12 +60,12 @@ class TaskAdmin(admin.ModelAdmin):
     )
 
     def delete_model(self, request, obj):
-        with transaction.atomic():
+        with atomic():
             lock_tasks([obj.pk])
             super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
-        with transaction.atomic():
+        with atomic():
             lock_tasks(queryset.values_list("pk", flat=True))
             super().delete_queryset(request, queryset)
 

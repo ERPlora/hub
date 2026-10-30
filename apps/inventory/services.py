@@ -19,13 +19,13 @@ from babel.core import get_global
 from babel.languages import get_official_languages
 from babel.numbers import get_currency_precision
 from django.conf import settings as django_settings
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.operations import UnknownOperation, get, operation
+from live.operations import UnknownOperation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.inventory import events
@@ -729,7 +729,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
     if settings is not None:
         return settings
     try:
-        with transaction.atomic():
+        with atomic():
             return Settings.objects.create(updated_by=_actor(ctx))
     except IntegrityError:
         return Settings.objects.select_for_update().get()
@@ -935,7 +935,7 @@ def _service_has_no_stock(field: str) -> Conflict:
 def _save(product: Product, **options) -> None:
     """Save in a savepoint, so that a SKU or an EAN-13 taken by another live product says so."""
     try:
-        with transaction.atomic():
+        with atomic():
             product.save(**options)
     except IntegrityError as exc:
         for constraint, (field, message, code) in _PRODUCT_CONSTRAINTS.items():
@@ -1045,7 +1045,7 @@ def _sale_stock(sale_id: UUID, state: str) -> tuple[SaleStock, bool]:
     Two deliveries of the same sale at once: the second waits on the unique key until the first commits.
     """
     try:
-        with transaction.atomic():
+        with atomic():
             return SaleStock.objects.create(sale_id=sale_id, state=state), True
     except IntegrityError:
         return SaleStock.objects.select_for_update().get(sale_id=sale_id), False
@@ -1079,7 +1079,7 @@ def _still_out(sale_id: UUID) -> dict[UUID, Decimal]:
 def _refund_stock(refund_id: UUID, sale_id: UUID) -> tuple[RefundStock, bool]:
     """The refund's note, created if it is new; two deliveries at once: the second waits on the unique key."""
     try:
-        with transaction.atomic():
+        with atomic():
             return RefundStock.objects.create(refund_id=refund_id, sale_id=sale_id), True
     except IntegrityError:
         return RefundStock.objects.select_for_update().get(refund_id=refund_id), False

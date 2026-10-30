@@ -10,12 +10,12 @@ field they are about, so the screen puts them next to it.
 from collections.abc import Callable
 from decimal import Decimal
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.tax import events
@@ -90,7 +90,7 @@ RULE_ALREADY_INACTIVE = _("That rule is already deactivated.")
 )
 def create_category(ctx: OperationContext, data: CategoryIn) -> dict:
     try:
-        with transaction.atomic():
+        with atomic():
             category = TaxCategory.objects.create(**data.model_dump())
     except IntegrityError:  # the key is the only unique field
         raise Conflict(
@@ -133,7 +133,7 @@ def _category(reference: str, field: str = "tax_category_key") -> TaxCategory:
 def create_alias(ctx: OperationContext, data: AliasIn) -> dict:
     category = _category(data.tax_category_key)
     try:
-        with transaction.atomic():
+        with atomic():
             alias = TaxAlias.objects.create(
                 alias=data.alias, category=category, source=data.source
             )
@@ -484,7 +484,7 @@ def _locked_settings(ctx: OperationContext) -> TaxSettings:
     if settings is not None:
         return settings
     try:
-        with transaction.atomic():
+        with atomic():
             return TaxSettings.objects.create(updated_by=_actor(ctx))
     except IntegrityError:
         return TaxSettings.objects.select_for_update().get()

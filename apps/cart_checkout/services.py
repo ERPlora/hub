@@ -15,13 +15,13 @@ way; no sale, invoice, VeriFactu record, cash or stock movement is created.
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import F, Q, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.cart_checkout import events
@@ -182,7 +182,7 @@ def create_cart(ctx: OperationContext, data: CartIn) -> dict:
         updated_by=actor,
     )
     try:
-        with transaction.atomic():
+        with atomic():
             cart.save()
     except IntegrityError:
         raise _session_taken() from None

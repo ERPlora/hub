@@ -475,6 +475,9 @@ LIVE = {
     # Every operation's transaction opens on the alias of its use_hub; the registry's, on control (phase 2, S1). An
     # operation of an app the business has no right to answers 402 before (base.entitlement, BASE-G12).
     "operation_database": "base.entitlement.operation_database",
+    # Where live.operations.atomic() opens (a services.py's savepoint): the active use_hub's alias, inside an operation
+    # its transaction's; without a context HubContextMissing, never control's by omission (phase 2, W9).
+    "current_database": "base.tenancy.context.current_alias",
     # Hub slugs (live.slugs): 3–63 characters in production; local development also opens the
     # one-letter demo hubs a and b (a.localhost:8000, b.localhost:8000).
     "hub_slug_min_length": 1 if DEBUG else 3,

@@ -13,14 +13,14 @@ and spends no number.
 import datetime as dt
 from uuid import UUID
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.staff.models import Member
@@ -463,7 +463,7 @@ def create_project(ctx: OperationContext, data: ProjectIn) -> dict:
     if Project.objects.filter(code__iexact=data.code).exists():
         raise _project_exists()
     try:
-        with transaction.atomic():
+        with atomic():
             project = Project.objects.create(code=data.code, name=data.name, color=data.color, owner=owner)
     except IntegrityError:  # two saves of the same code at once: the code is the only unique field
         raise _project_exists() from None

@@ -11,14 +11,14 @@ attempt sent again (a retry, a double tap, both at once) answers the payment alr
 a second number or notice.
 """
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import F
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.payment import events
@@ -105,7 +105,7 @@ def _check_name(name: str, *, other_than=None) -> None:
 def _save_method(method: PaymentMethod, **kwargs) -> None:
     """Saves ``method``; two saves of one name at once end in the unique constraint → the same 409."""
     try:
-        with transaction.atomic():
+        with atomic():
             method.save(**kwargs)
     except IntegrityError:
         raise _name_taken() from None
@@ -333,7 +333,7 @@ def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
     try:
         # The number and the row in one savepoint: an attempt that lost the race to its twin gives its
         # number back and answers the twin's payment.
-        with transaction.atomic():
+        with atomic():
             payment = Payment.objects.create(
                 reference=f"PAY-{day:%Y%m%d}-{_number(day):04d}",
                 method=method,
