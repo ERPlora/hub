@@ -138,6 +138,19 @@ describe('HeaderFilePreview: a video Safari loads no frame of', () => {
     expect(s.part('video')).not.toBeNull();
     expect(s.part('error')).toBeNull();
   });
+
+  it('a photo chosen in its place keeps its own spinner: the video’s wait is dropped with it, and a photo never waits', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const s = await setup(VIDEO);
+    expect(s.part('loading')).not.toBeNull();
+    await s.wrapper.setProps({ sample: PHOTO });
+    await settle();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await settle();
+    expect(s.part('image')?.getAttribute('src')).toBe(PHOTO.url);
+    expect(s.part('loading')).not.toBeNull();
+    expect(s.part('play')).toBeNull();
+  });
 });
 
 describe('HeaderFilePreview: a document (WHATSAPP_INBOX-F29, F33)', () => {
