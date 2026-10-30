@@ -3,12 +3,14 @@
 // «Send a template» (F33) show it, as WhatsApp Manager, WATI or respond.io do: the photo's thumbnail, the video's first
 // frame with a play sign, a document's icon (the one Files gives a PDF); what the sheet puts in the slot (its name and
 // size) next to it. The Hub serves the file at `sample.url` (`/p/media/…`, to the hub's people only: `'self'` in the
-// CSP). While the photo or the video loads, a spinner; if it cannot be shown, a notice, and the name stays.
+// CSP). While the photo or the video loads, a spinner; if it cannot be shown, a notice, and the name stays. Safari (the
+// iPad the Hub runs on) loads no frame of a `preload="metadata"` video until the person taps it: the video counts as
+// shown with its metadata, and after `VIDEO_WAIT_MS` without a word it shows its play sign anyway, never an endless spinner.
 //   <HeaderFilePreview :sample="sample" testid="…-preview"><p>{{ name }} · {{ size }}</p></HeaderFilePreview>
 // `data-testid` hooks: `<testid>` on the root, `-image`, `-video`, `-play`, `-document`, `-broken`, `-loading`, `-error`.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSpinner } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import type { TemplateSampleOut } from '../operations';
 
@@ -17,16 +19,28 @@ const props = defineProps<{
   testid: string;
 }>();
 
+/** How long a video may say nothing before its play sign shows without its frame. */
+const VIDEO_WAIT_MS = 4000;
+
 /** The photo or the video could not be loaded from its address. */
 const failed = ref(false);
 const loaded = ref(false);
+let waiting: ReturnType<typeof setTimeout> | undefined;
 watch(
-  () => props.sample.url,
-  () => {
+  () => [props.sample.url, props.sample.header_format] as const,
+  ([url, format]) => {
     failed.value = false;
     loaded.value = false;
+    clearTimeout(waiting);
+    if (format === 'VIDEO' && url) {
+      waiting = setTimeout(() => {
+        loaded.value = true;
+      }, VIDEO_WAIT_MS);
+    }
   },
+  { immediate: true },
 );
+onBeforeUnmount(() => clearTimeout(waiting));
 
 const kind = computed(() => props.sample.header_format);
 const media = computed(() => kind.value === 'IMAGE' || kind.value === 'VIDEO');
@@ -65,6 +79,7 @@ const loading = computed(() => media.value && !broken.value && !loaded.value);
           playsinline
           disablepictureinpicture
           :data-testid="`${testid}-video`"
+          @loadedmetadata="loaded = true"
           @loadeddata="loaded = true"
           @error="failed = true"
         />

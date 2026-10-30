@@ -2,7 +2,7 @@
 // «Send a template» show it (FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL) — as WhatsApp Manager, WATI
 // or respond.io do: the photo's thumbnail, the video's first frame with a play sign, a document's icon; its name and
 // size next to it. While the photo or the video loads, a spinner; if it cannot be shown, a notice, and the name stays.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mountInbox, settle } from '../__tests__/mount-inbox';
 import type { TemplateSampleOut } from '../operations';
@@ -107,6 +107,36 @@ describe('HeaderFilePreview: a video (WHATSAPP_INBOX-F29, F33)', () => {
     expect(s.part('video')).toBeNull();
     expect(s.part('broken')).not.toBeNull();
     expect(s.part('error')?.textContent?.trim()).toBe('The video could not be shown.');
+  });
+});
+
+// Safari (WebKit, the iPad the Hub runs on) loads no frame of a `preload="metadata"` video until the person taps it, so
+// `loadeddata` may never come: the spinner must never turn for ever.
+describe('HeaderFilePreview: a video Safari loads no frame of', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('with its metadata alone, the spinner gives way to the play sign', async () => {
+    const s = await setup(VIDEO);
+    s.part('video')!.dispatchEvent(new Event('loadedmetadata'));
+    await settle();
+    expect(s.part('loading')).toBeNull();
+    expect(s.part('play')).not.toBeNull();
+    expect(s.part('video')).not.toBeNull();
+    expect(s.part('error')).toBeNull();
+  });
+
+  it('saying nothing at all, after a few seconds it is the video with its play sign, never an endless spinner', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const s = await setup(VIDEO);
+    expect(s.part('loading')).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await settle();
+    expect(s.part('loading')).toBeNull();
+    expect(s.part('play')).not.toBeNull();
+    expect(s.part('video')).not.toBeNull();
+    expect(s.part('error')).toBeNull();
   });
 });
 
