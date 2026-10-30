@@ -13,6 +13,7 @@ import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInbox } fro
 import ConversationPanel from '../components/ConversationPanel.vue';
 import type { ChannelOut, ConversationOut } from '../operations';
 import InboxPage from './InboxPage.vue';
+import source from './InboxPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -39,6 +40,7 @@ const row = (over: Partial<ConversationOut> = {}): ConversationOut => ({
   last_message_direction: 'inbound',
   last_message_kind: 'text',
   last_inbound_at: '2026-03-10T08:00:00Z',
+  flagged: false,
   created_at: '2026-03-10T08:00:00Z',
   ...over,
 });
@@ -109,6 +111,22 @@ describe('InboxPage: the live list', () => {
     const s = await setup();
     await s.result(LIST, PAGE);
     expect(s.wrapper.findAll('[data-testid="whatsapp-inbox-unread"]').map((cell) => cell.text())).toEqual(['2', '—']);
+  });
+
+  it('a conversation an automatic answer could not answer says «Needs attention» next to its name (WHATSAPP_INBOX-F20)', async () => {
+    const s = await setup();
+    await s.result(LIST, { ...PAGE, rows: [row({ flagged: true }), row({ id: 'c2' })], total: 2 });
+    expect(s.wrapper.findAll('[data-testid="whatsapp-inbox-flagged"]').map((chip) => chip.text())).toEqual(['Needs attention']);
+  });
+
+  it('a long name ends in «…» in a box of its own, with «Needs attention» beside it, never cut short', async () => {
+    const s = await setup();
+    await s.result(LIST, { ...PAGE, rows: [row({ flagged: true, display_name: 'Lucía Fernández de la Peña' })], total: 1 });
+    const name = s.find('whatsapp-inbox-name');
+    expect(name.text()).toBe('Lucía Fernández de la Peña');
+    expect(name.element.nextElementSibling?.getAttribute('data-testid')).toBe('whatsapp-inbox-flagged');
+    // The table's cell only gives «…» to its own span; inside the row with the mark, the name needs its own.
+    expect(source).toMatch(/\.wa-inbox__display \{[^}]*min-width: 0;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/);
   });
 
   it('a last message without text is named by its type, in the reader’s language', async () => {

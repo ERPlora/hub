@@ -134,12 +134,22 @@ async def conversation_erase(request, data: ConversationRefIn):
     return await run_operation(request, services.erase, data)
 
 
+@bind(router, "whatsapp_inbox.conversation.flag", "/whatsapp_inbox/conversations/flag")
+async def conversation_flag(request, data: ConversationRefIn):
+    return await run_operation(request, services.flag, data)
+
+
 # Messages
 
 
 @bind(router, "whatsapp_inbox.message.list", "/whatsapp_inbox/messages")
 async def message_list(request, params: Query[MessageListIn]):
     return await run_operation(request, queries.list_messages, params)
+
+
+@bind(router, "whatsapp_inbox.message.get", "/whatsapp_inbox/messages/detail")
+async def message_get(request, params: Query[MessageRefIn]):
+    return await run_operation(request, queries.get_message, params)
 
 
 @bind(
