@@ -247,7 +247,8 @@ Pasos:
 2. Para varias: marca sus casillas y pulsa **Encenderlas** o **Ponerlas en pausa**.
 3. Encender una a la que le faltan permisos avisa: «Encendida, pero aún no tiene los permisos que pide:
    no hará nada hasta que se los concedas en la pestaña Permisos.»
-Entra: la automatización (por voz, por su nombre: «activa la automatización de bienvenida»).
+Entra: la automatización (por voz, por su nombre: «activa la automatización de bienvenida»). Antes de
+encenderla o pausarla, la tarjeta del asistente la nombra por su nombre («Bienvenida»), nunca por su código.
 Sale: encendida o en pausa (`flow.flow.enabled`, `flow.flow.paused`). Al pausarla deja de arrancar;
 una ejecución que espera se cancela al despertar si sigue en pausa (si se vuelve a encender antes,
 sigue). Un horario que se enciende cuenta desde ese momento: no recupera lo que pasó mientras estaba
@@ -320,7 +321,8 @@ Pasos:
 2. Sale «Copia de …» (o «Copia de … (2)») en la lista, en pausa, y el aviso «Copiada, y la copia está en
    pausa. No lleva ninguno de los permisos de la original: concédele lo que necesite antes de
    encenderla.».
-Entra: la automatización que se copia (por voz, por su nombre).
+Entra: la automatización que se copia (por voz, por su nombre; la tarjeta del asistente la nombra por su
+nombre, nunca por su código).
 Sale: una automatización nueva con los mismos pasos, en pausa, sin permisos y sin historial
 (`flow.flow.created`).
 Si falla: el mensaje en rojo arriba; no se crea nada.
@@ -334,7 +336,8 @@ Pantalla: Automatizaciones
 Pasos:
 1. En la fila, pulsa **Borrar**.
 2. Confirma: «¿Borrar «…»? Esto no se puede deshacer.» con **Sí, bórrala** o **Déjala**.
-Entra: la automatización que se borra (por voz, por su nombre, y siempre con la confirmación).
+Entra: la automatización que se borra (por voz, por su nombre, y siempre con la confirmación: la tarjeta del
+asistente la nombra por su nombre, nunca por su código).
 Sale: la automatización deja de arrancar al momento y sale de la lista; lo que esperaba se cancela al
 momento; su historial se conserva (`flow.flow.deleted`).
 Si falla: el mensaje en rojo arriba; la fila sigue.
@@ -451,7 +454,8 @@ Pasos:
    que falta sale como «Falta tu permiso»; lo concedido, «Autorizado» con **Retirar**. Con cambios
    sin guardar avisa: «Guárdala primero: lo que autorices es lo guardado.».
 3. Pulsa **Autorizar todo lo que necesita**: sale «Permisos actualizados.».
-Entra: los pasos guardados y los permisos que tiene.
+Entra: los pasos guardados y los permisos que tiene (por voz, la tarjeta del asistente nombra la
+automatización por su nombre, nunca por su código).
 Sale: la lista completa de permisos de la automatización (`flow.flow.granted`). Antes del primer
 guardado no hay nada que autorizar: la pestaña lo dice y pide guardar.
 Si falla: si la lista nombra algo que no existe en el negocio, o algo que necesita a una persona delante
@@ -515,7 +519,8 @@ Pasos:
    **Cancelar**.
 3. Sale «Ejecutada. Mírala en Historial.»; si se paró por un error, «Se ejecutó y se paró por un error:
    …» en rojo; si quedó esperando, «Se ejecutó y está esperando…».
-Entra: la automatización (por voz: «ejecuta ahora la revisión semanal»).
+Entra: la automatización (por voz: «ejecuta ahora la revisión semanal»; la tarjeta del asistente la nombra
+por su nombre, nunca por su código).
 Sale: una ejecución real, con todos sus efectos (`flow.run.started`, `flow.run.finished`). Sin datos de
 un aviso, lo que lee del aviso sale vacío.
 Si falla: en pausa, «Esta automatización está en pausa: enciéndela para ejecutarla.»; sin guardar,
@@ -584,7 +589,8 @@ Pasos:
 2. Corrige y completa los pasos (FLOW-F10, FLOW-F11).
 3. Pulsa **Guardar**: se crea la automatización (en pausa si no se ha tocado el interruptor) y el
    borrador sale de la bandeja como usado, **en la misma operación**: no se puede crear dos veces.
-Entra: el borrador pendiente, tal como lo dejó el asistente, con sus notas.
+Entra: el borrador pendiente, tal como lo dejó el asistente, con sus notas. Si se lo pides al asistente, su
+tarjeta nombra el borrador por su nombre, nunca por su código.
 Sale: una automatización nueva sin permisos y el borrador usado, con el enlace a ella
 (`flow.flow.created`, `flow.draft.used`). Salir sin guardar deja el borrador en la bandeja.
 Si falla: si no encaja (una acción que no existe aquí), el mensaje junto al paso y no se crea nada; un
@@ -599,7 +605,8 @@ Pantalla: Automatizaciones
 Pasos:
 1. En **Propuestas por el asistente**, pulsa × («Descartar») en el borrador que no quiere.
 2. Sale «Descartado.» y el borrador desaparece de la bandeja; los demás siguen.
-Entra: el borrador pendiente.
+Entra: el borrador pendiente (también pidiéndoselo al asistente: su tarjeta lo nombra por su nombre, nunca por
+su código).
 Sale: el borrador descartado (`flow.draft.dismissed`), que se conserva como registro.
 Si falla: uno ya decidido no se puede volver a decidir: «Ese borrador ya se decidió.».
 Implicados: FLOW-F17, FLOW-F18
@@ -690,7 +697,9 @@ Pasos:
 3. Sale «Reanudada: terminó bien.» (o «…está esperando»); si vuelve a fallar, «Se reanudó y volvió a
    pararse por un error: …» junto a la ejecución, que se puede reanudar otra vez. En sus pasos queda
    «Reanudada aquí, desde el paso que había fallado».
-Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»).
+Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»). La
+tarjeta del asistente la nombra como el Historial, con su automatización delante: «Bienvenida · 15 oct 2026,
+21:00», nunca por su código.
 Sale: la misma ejecución sigue en el paso que falló, sin repetir los que ya hicieron efecto y con los
 pasos con los que empezó, aunque la automatización haya cambiado después (`flow.run.resumed`,
 `flow.run.finished`). Una ejecución parada por un error guarda lo que dejaron sus pasos **7 días** para
@@ -841,7 +850,8 @@ Pasos:
 2. Si quieres, escribe en **Añadir una nota (opcional)**.
 3. Pulsa **Aprobar** o **No**. Sale «Aprobada: la automatización sigue.» o «Contestada que no.» y la tarjeta
    sale de la bandeja.
-Entra: la decisión y la nota (por voz: «aprueba la devolución de Ana»), con quién contesta de su sesión.
+Entra: la decisión y la nota (por voz: «aprueba la devolución de Ana»), con quién contesta de su sesión. La
+tarjeta del asistente nombra la pregunta por lo que pregunta, nunca por su código.
 Sale: la respuesta con quién, cuándo y la nota (`flow.question.answered`). Un sí sigue con los pasos
 siguientes, que pueden leer «Aprobada», «Nota» y «Contestada por»; un no hace lo que dice el paso: para la
 ejecución («Cancelada: Marta contestó que no a «…».») o sigue. El historial dice «Marta contestó que sí:
@@ -1111,6 +1121,12 @@ hace (su valor se teclea en la pantalla), y lo que hace solo la plataforma, que 
 se nombra por su id o por su nombre (o parte de él); si un nombre vale para varias, se dice cuáles
 (`flow.ambiguous_flow`).
 
+Antes de cambiar nada, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo
+nombran las pantallas de Automatizaciones, nunca por su código: una automatización y un borrador, por su nombre;
+una ejecución, por su automatización y cuándo empezó, como el Historial («Bienvenida · 15 oct 2026, 21:00»); una
+pregunta, por lo que pregunta. Un registro que quien confirma no puede ver (una ejecución, para quien solo contesta
+preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
+
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
 | Qué da | Quién puede | Flujos | Servicio |
@@ -1118,13 +1134,16 @@ se nombra por su id o por su nombre (o parte de él); si un nombre vale para var
 | Las automatizaciones, con búsqueda, filtros, orden y su última ejecución, en páginas de hasta 100 (en vivo) | ver | F02 | `flow.flow.list` |
 | Una automatización, con los permisos que necesita y los que le faltan (en vivo) | ver | F09–F16 | `flow.flow.detail` |
 | Las ejecuciones de una automatización, de 20 en 20, y cuántas fallaron (en vivo) | ver | F16 | `flow.run.list` |
+| Una ejecución, con las palabras con que se nombra (su automatización y cuándo empezó) | ver | F24 | `flow.run.get` |
 | Los borradores pendientes del asistente (en vivo) | ver | F18, F19 | `flow.draft.list` |
+| Un borrador del asistente, esté pendiente, usado o descartado | ver | F18, F19 | `flow.draft.get` |
 | Los avisos y las acciones de las apps activas, con los datos que pide cada acción | ver | F10, F11 | `flow.catalog.read` |
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |
 | Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26 | `flow.secret.list` |
 | Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente sus datos en palabras, leídos como esa persona (en vivo) | contestar | F29, F38 | `flow.question.list` |
+| Una pregunta que espera respuesta, como sale en «Esperan tu respuesta», solo para quien puede contestarla | contestar (su rol) | F29 | `flow.question.get` |
 | Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F33–F36 | `flow.recipe.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
@@ -1281,6 +1300,17 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   moneda de `base.business.get`. Una pregunta de «Preguntar antes a alguien» no trae `fields`.
   `appointment.appointment.cancel` tampoco, todavía: Citas niega todo cambio de una automatización
   (`may_change` pide `appointment.change_appointment` o la ficha propia, y el paso no tiene ninguna de las dos).
+- **Cada registro de la tarjeta del asistente, por su nombre** (revisión 2026-10-30,
+  FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS): cada id que nombra un registro en una escritura lleva su
+  marca `refers` (`names` de `base/schemas.py`; `base.E009` la comprueba al arrancar), a una lectura por id de
+  flow ejecutada como quien confirma: la automatización (`FlowRefIn.id`, seis escrituras), `flow.flow.detail` por
+  su `name`; el borrador (`DraftRefIn.id`, `CreateIn.draft_id`), `flow.draft.get` por su `name`; la ejecución
+  (`RunRefIn.id`), `flow.run.get` por su `label` (`queries.run_label`: el nombre de su automatización y su
+  `started_at` con `_moment_words`, CLDR a la hora del negocio, como el Historial); la pregunta
+  (`QuestionRefIn.id`, `AnswerIn`), `flow.question.get` por su `title`, que pide `flow.answer` y además
+  `can_answer` de su rol (`flow.question_not_yours`) y solo da una que espera (`flow.question_closed`), como la
+  bandeja. Un registro que la persona no puede leer, o de otro negocio, no sale. El trinquete de
+  `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca.
 - **Con qué actúa**: el motor solo llama a las operaciones de la lista `grants`, que fija un propietario
   o administrador, que se valida entera contra el catálogo y que solo contiene lo que quien la concede
   puede hacer él mismo. Cada paso corre con el contexto `flow_run:<id>` (el actor queda en el outbox de
