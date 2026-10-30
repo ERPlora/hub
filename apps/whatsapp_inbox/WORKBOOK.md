@@ -740,8 +740,9 @@ Pasos:
    nadie contesta en 72 horas, no se cambia ni se anula nada y se queda con el acuse.
 Entra: el mensaje y la última reserva de ese cliente.
 Sale: la reserva cambiada (`reservation.reservation.updated`) o anulada (`reservation.reservation.status_changed`)
-en Reservas, y la respuesta por WhatsApp; nunca la de otra persona: la anulación va a nombre de su ficha y Reservas
-rechaza la de una reserva que no es suya.
+en Reservas, y la respuesta por WhatsApp; nunca la de otra persona: el asistente la anula a nombre de su ficha,
+Reservas rechaza la de una reserva que no es suya y la tarjeta de **Esperan tu respuesta** dice de quién es la
+reserva antes de tu **Aprobar**.
 Si falla: F20; si Reservas lo rechaza, se le explica. Con los mensajes del plan del mes gastados no se cambia ni se
 anula nada, no recibe respuesta y la conversación queda con «Necesita atención» (F13).
 Implicados: RESERVATION-F09, RESERVATION-F18, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F20, WHATSAPP_INBOX-F24
@@ -1606,7 +1607,10 @@ Automatizaciones solo lo concede porque el paso pregunta antes (`ASK_FIRST`, FLO
 `mode: "auto"` la receta se aparta (`flow.recipe_invalid`), y el **Aprobar** solo vale de quien tiene
 `reservation.change_reservation`. El encargo le da el id de la última reserva del número (`steps.s9.id`) y le pide
 anular solo esa con `on_behalf_of` = su ficha, así que Reservas rechaza cualquier otra
-(`reservation.customer_mismatch`, RESERVATION-F18, reservations#50). La tarjeta de Ajustes enciende la respuesta y su
+(`reservation.customer_mismatch`, RESERVATION-F18, reservations#50). Ese argumento lo pone el asistente: si no lo pone
+(un mensaje que le pide anular la de otro por su nombre), lo único que queda es la tarjeta de **Esperan tu
+respuesta**, que nombra la reserva de esa otra persona y no dice en nombre de qué cliente; fijar el argumento a la ficha de la
+ejecución es de Automatizaciones (el mismo hueco tiene `reservation.reservation.update`). La tarjeta de Ajustes enciende la respuesta y su
 aviso (F26). La receta cambió de huella al añadir la anulación: quien ya la tenía encendida la ve como versión nueva
 en Automatizaciones y la actualiza con F18.
 
