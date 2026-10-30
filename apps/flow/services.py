@@ -72,6 +72,8 @@ from apps.flow.queries import (
     validation_fields,
     can_answer,
     TURN,
+    ASSISTANT_WANTS,
+    proposal_held,
     PERSON_PARAMS,
     words_for,
 )
@@ -126,7 +128,6 @@ SECRETS_KEY_MISSING = _(
 SECRET_NOT_FOUND = _("There is no secret called «%(name)s».")
 QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.")
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
-ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
 APPROVAL_BEYOND_YOU = _("Only someone who may do it themselves can say yes to «%(name)s».")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
@@ -788,6 +789,13 @@ def _own(code: str, key: str = "", *, fields: dict | None = None, technical: str
     return StepFailed(code, say(reason), fields=fields, technical=technical, reason=reason)
 
 
+def _asked_for(run: FlowRun) -> dict[str, str]:
+    """For the reason of a question nobody said yes to: the operation of the assistant's change it asked about, kept so
+    the History names it by its action when it is read (``queries.say``); nothing for an «Ask someone first» one."""
+    proposal = proposal_held(run)
+    return {"operation": str(proposal["operation"])} if proposal and proposal.get("operation") else {}
+
+
 def _log(run: FlowRun, step: dict, outcome: str, now: dt.datetime, **more: Any) -> None:
     entry = {"step": step["id"], "kind": step["kind"]}
     if step.get("operation"):
@@ -1283,11 +1291,11 @@ def _propose(
     now: dt.datetime,
 ) -> None:
     """«Ask me first»: the change waits in «Waiting for your answer» with what the assistant said, and the run on it;
-    what it would send is said there for whoever reads it, as they read it (``queries.proposal_fields``). A yes makes
-    it (``answer_question``), a no or silence cancels the run, as a question that stops on a no. One change waits at a
-    time: ``later``, the calls of the same answer behind it, are not made, and the assistant hears so with the
-    change's result. Each change it asks for is a question of its own (``<step>:<n>``), so a late yes to one never
-    approves the next."""
+    its title, its action and what it would send are said there for whoever reads it, as they read it
+    (``queries.question_row``). A yes makes it (``answer_question``), a no or silence cancels the run, as a question
+    that stops on a no. One change waits at a time: ``later``, the calls of the same answer behind it, are not made,
+    and the assistant hears so with the change's result. Each change it asks for is a question of its own
+    (``<step>:<n>``), so a late yes to one never approves the next."""
     question = Question.objects.create(
         run=run,
         flow=flow,
@@ -1567,7 +1575,7 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
             left = {"approved": data.approve, "expired": False, "note": data.note, "answered_by": who}
             _carry_on(ctx, run, flow, step, left, now)
         else:
-            no = _own("flow.question_rejected", who=who, title=question.title)
+            no = _own("flow.question_rejected", who=who, title=question.title, **_asked_for(run))
             _finish(ctx, run, FlowRun.Status.CANCELLED, now, no)
     return {"id": question.id, "run_id": run.id, "status": run.status}
 
@@ -1609,7 +1617,7 @@ def expire_questions(ctx: OperationContext, data: DueIn) -> dict:
         with translation.override(flow.language):
             _log(run, step, "expired", now)
             if policy != "continue":
-                silence = _own("flow.question_expired", title=question.title)
+                silence = _own("flow.question_expired", title=question.title, **_asked_for(run))
                 _finish(ctx, run, FlowRun.Status.CANCELLED, now, silence)
             elif flow.deleted_at is not None:
                 _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.deleted"))

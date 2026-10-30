@@ -92,6 +92,9 @@ RUN_NOT_FOUND = _("That run does not exist in this business.")
 QUESTION_NOT_FOUND = _("That question does not exist in this business.")
 QUESTION_NOT_YOURS = _("This question was asked of someone else: you cannot answer it.")
 QUESTION_CLOSED = _("This question is closed: its automation no longer waits for it.")
+#: The title of a change the assistant wants (FLOW-F38): kept when it is asked and said again, with its action, in the
+#: language of whoever reads it (``question_row``).
+ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
 UNKNOWN_EVENT = _("That does not happen in this business: «%(name)s».")
 UNKNOWN_ACTION = _("That action does not exist in this business: «%(name)s».")
@@ -740,6 +743,8 @@ ASSISTANT_GONE_UNNAMED = _("That action is no longer allowed or available, so th
 
 #: A change of the assistant no longer granted (code ``flow.not_allowed``), named for a person when it is read.
 ASSISTANT_GONE_KEY = "flow.assistant_gone"
+#: The reasons of a question nobody said yes to that, for the assistant's change, name its action (``say``).
+NAMED_BY_ITS_ACTION = frozenset({"flow.question_rejected", "flow.question_expired"})
 #: The engine's own reasons, by name (the code, but where one code says different things): a run and the entry of
 #: the step that failed keep the name and its values, and the reason is said when it is read, in the reader's
 #: language (FLOW-F16). A name never equals a code it does not say whole: a run kept with its words alone
@@ -811,6 +816,12 @@ def say(reason: dict, said: str = "") -> str:
         if op is None:
             return str(ASSISTANT_GONE_UNNAMED)
         values["name"] = action_label(op, (translation.get_language() or "en").split("-")[0])
+    elif key in NAMED_BY_ITS_ACTION and values.get("operation"):
+        # The assistant's change nobody said yes to, by its action as the History names it now («Cancel a
+        # reservation»), not by the title kept in the automation's language; one that no longer exists, by that title.
+        op = registry.get(str(values["operation"]))
+        if op is not None:
+            values["title"] = action_label(op, (translation.get_language() or "en").split("-")[0])
     try:
         return str(words) % values
     except (KeyError, TypeError, ValueError):
@@ -1367,28 +1378,35 @@ def can_answer(ctx: OperationContext, role: str) -> bool:
     return ctx.has(ROLE_PERMISSION.get(role, MANAGE)) or ctx.has(MANAGE)
 
 
-def proposal_fields(ctx: OperationContext, question: Question) -> list[dict]:
-    """The data of the change the assistant wants that ``question`` waits on (FLOW-F38, «Ask me first»), each as its
-    confirmation card in the chat says it (BASE-F97 step 2): read now, as ``ctx``'s person and in their language, so
-    a record is named only for whoever may read it, never for the automation nor by its id. A run waits on one change
-    at a time, the one its assistant step holds; an «Ask someone first» question, or a change whose action is gone,
-    has none."""
-    run = question.run
+def proposal_held(run: FlowRun) -> dict | None:
+    """The change the assistant wants that ``run`` waits on (FLOW-F38, «Ask me first»), as its step keeps it, or
+    ``None``: a run waits on one change at a time, the one its assistant step holds; an «Ask someone first» step has
+    none."""
     steps = run.definition.get("steps") or []
     step = steps[run.step_index] if run.step_index < len(steps) else {}
-    proposal = (run.outputs.get(TURN) or {}).get("proposal") if step.get("kind") == "assistant" else None
+    return (run.outputs.get(TURN) or {}).get("proposal") if step.get("kind") == "assistant" else None
+
+
+def proposal_of(question: Question) -> tuple[Operation, dict] | None:
+    """The change the assistant wants that ``question`` waits on — its action and what it would send —, or ``None``:
+    an «Ask someone first» question, or a change whose action is gone, has none (``proposal_held``)."""
+    proposal = proposal_held(question.run)
     op = registry.get(str(proposal.get("operation") or "")) if proposal else None
     if op is None:
-        return []
+        return None
     try:
         arguments = json.loads(proposal.get("arguments") or "{}")
     except ValueError:
         arguments = {}
-    return hub_assistant.card(op, arguments if isinstance(arguments, dict) else {}, ctx.language, ctx)["fields"]
+    return op, arguments if isinstance(arguments, dict) else {}
 
 
-def question_row(question: Question, fields: list[dict] | None = None) -> dict[str, Any]:
-    return {
+def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:
+    """``question`` as «Waiting for your answer» shows it to ``ctx``'s person. A change the assistant wants is read
+    now, as that person and in their language, never as the automation nor as it was kept: its title and its action
+    as the History names it («Cancel a reservation»), and each datum as its confirmation card in the chat says it
+    (BASE-F97 step 2), a record named only for whoever may read it, never by its id."""
+    row = {
         "id": question.id,
         "flow_id": question.flow_id,
         "flow_name": question.flow.name,
@@ -1400,8 +1418,18 @@ def question_row(question: Question, fields: list[dict] | None = None) -> dict[s
         "on_timeout": question.on_timeout,
         "expires_at": question.expires_at,
         "created_at": question.created_at,
-        "fields": fields or [],
+        "action": "",
+        "fields": [],
     }
+    proposal = proposal_of(question)
+    if proposal is None:
+        return row
+    op, arguments = proposal
+    with translation.override(ctx.language):
+        title = str(ASSISTANT_WANTS) % {"app": hub_assistant.app_name(op)}
+        action = action_label(op, ctx.language)
+    fields = hub_assistant.card(op, arguments, ctx.language, ctx)["fields"]
+    return row | {"title": title[:300], "action": action, "fields": fields}
 
 
 @operation(
@@ -1423,7 +1451,7 @@ def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
         .filter(status=Question.Status.PENDING, role__in=roles, run__status=FlowRun.Status.ASKING)
         .order_by("expires_at", "id")[:100]
     )
-    return {"rows": [question_row(question, proposal_fields(ctx, question)) for question in pending]}
+    return {"rows": [question_row(ctx, question) for question in pending]}
 
 
 @operation(
@@ -1447,7 +1475,7 @@ def get_question(ctx: OperationContext, data: QuestionRefIn) -> dict:
             raise PermissionDenied(str(QUESTION_NOT_YOURS), code="flow.question_not_yours")
         if found.status != Question.Status.PENDING or found.run.status != FlowRun.Status.ASKING:
             raise NotFound(str(QUESTION_CLOSED), code="flow.question_closed")
-    return question_row(found, proposal_fields(ctx, found))
+    return question_row(ctx, found)
 
 
 # --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
