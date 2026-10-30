@@ -52,4 +52,19 @@ describe('ServiceTile', () => {
     await click(m.find('pos-service-sv1').element);
     expect(m.wrapper.emitted('pick')).toEqual([[service()]]);
   });
+
+  // SERVICE-F34: the service's photo on its tile, as a product's (INVENTORY-F32).
+  it('shows the service’s photo where the initials go, and the initials when it does not load', async () => {
+    const url = '/p/catalog/beauty_hair/corte_mujer.webp';
+    const m = await mountSale(ServiceTile, { props: { service: service({ image: 'catalog:beauty_hair/corte_mujer', image_url: url }) } });
+    const thumb = m.find('pos-service-sv1').find('.pos-tile__thumb');
+    expect([thumb.get('img').attributes('src'), thumb.get('img').attributes('alt'), thumb.get('img').attributes('loading')]).toEqual([
+      url,
+      service().name,
+      'lazy',
+    ]);
+    await thumb.get('img').trigger('error');
+    expect(thumb.find('img').exists()).toBe(false);
+    expect(thumb.text()).toBe('CD');
+  });
 });

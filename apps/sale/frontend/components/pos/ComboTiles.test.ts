@@ -62,4 +62,20 @@ describe('ComboTiles', () => {
     expect(s.find('pos-menus-error').exists()).toBe(false);
     expect(s.wrapper.findAll('[data-testid^="pos-menu-"]').length).toBe(0);
   });
+
+  // COMBO-F14: a menu's tile shows its photo, and its initials when it has none or it does not load.
+  it('shows each menu’s photo, or its initials', async () => {
+    const s = await setup();
+    const url = '/p/catalog/hospitality/menu_dia.webp';
+    await s.result(OP, page([menu({ image: 'catalog:hospitality/menu_dia', image_url: url }), menu({ id: 'm2', name: 'Menú infantil' })], 2));
+    const thumb = s.find('pos-menu-m1').find('.pos-menu__thumb');
+    expect([thumb.get('img').attributes('src'), thumb.get('img').attributes('alt'), thumb.get('img').attributes('loading')]).toEqual([
+      url,
+      'Menú del día',
+      'lazy',
+    ]);
+    expect(s.find('pos-menu-m2').find('.pos-menu__thumb').text()).toBe('MI');
+    await thumb.get('img').trigger('error');
+    expect(s.find('pos-menu-m1').find('.pos-menu__thumb').text()).toBe('MD');
+  });
 });
