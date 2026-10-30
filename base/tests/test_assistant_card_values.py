@@ -1085,6 +1085,15 @@ def test_an_amount_of_a_write_on_a_record_is_in_that_records_currency(ledger_rea
 
 
 @pytest.mark.django_db
+def test_an_amount_only_inside_an_object_is_also_in_the_records_currency(ledger_reads):
+    """A write whose only amount is a line's price: the record is read for it all the same."""
+    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
+    shown = entered({"ledger_id": "L-USD", "line": {"text": "Café", "unit_price": 150}})
+    assert shown["line"]["value"] == {"text": "Café", "unit_price": amount(150, USD)}
+    assert len(ledger_reads) == 1
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     ("named", "permissions"),
     [({"ledger_id": "L-GONE"}, WRITER), ({"ledger_id": "L-USD"}, {*ADMIN, "demo.manage"}), ({"ledger_id": "L-BAD"}, WRITER)],
@@ -1147,6 +1156,8 @@ def entering(mark: object) -> Operation:
     ("write", "why"),
     [
         (entering("demo.item.ledger"), "is not true nor a read, by and code"),
+        (entering({"read": "demo.item.ledger", "by": "id"}), "is not true nor a read, by and code"),
+        (entering(False), "is not true nor a read, by and code"),
         (entering({"read": "demo.item.nothing", "by": "id", "code": "code"}), "names no operation demo.item.nothing"),
         (entering({"read": "demo.item.create", "by": "id", "code": "code"}), "not a read"),
         (entering({"read": "demo.item.ledger", "by": "who", "code": "code"}), "takes no who"),

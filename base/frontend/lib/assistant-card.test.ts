@@ -207,7 +207,9 @@ describe('a datum that is an object', () => {
     const order = { lines: [{ text: 'Té', unit_price: { kind: 'money', value: 1200 } }] };
     expect(fieldText({ name: 'order', label: 'Pedido', kind: 'object', value: order }, opts)).toBe('Té · 12,00 €');
     // What only looks like one is said by its values, as any other.
-    expect(fieldText(line({ kind: 'money', value: '150', note: 'x' }), opts)).toBe('Café · money · 150 · x');
+    expect(fieldText(line({ kind: 'money', value: 150, note: 'x' }), opts)).toBe('Café · money · 150 · x');
+    expect(fieldText(line({ kind: 'money', value: '150' }), opts)).toBe('Café · money · 150');
+    expect(fieldText(line({ kind: 'cash', value: 150 }), opts)).toBe('Café · cash · 150');
   });
 
   it('a secret stays hidden as the server sends it', () => {
