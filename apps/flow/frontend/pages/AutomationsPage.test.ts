@@ -42,10 +42,23 @@ describe('AutomationsPage', () => {
 
   it('«Your automations» shows only when there is one', async () => {
     const empty = await setup();
-    expect(empty.wrapper.findComponent(FlowList).exists()).toBe(false);
+    // Hidden, not left out (one live stream, below): `display: none` until there is one.
+    const shown = (m: Awaited<ReturnType<typeof setup>>) => (m.wrapper.findComponent(FlowList).element as HTMLElement).style.display !== 'none';
+    expect(shown(empty)).toBe(false);
     const some = await setup('/flow/automations', [flow('f1')]);
+    expect(shown(some)).toBe(true);
     expect(some.wrapper.findComponent(FlowList).props('allTotal')).toBe(1);
     expect(some.wrapper.findComponent(FlowGallery).props('flows')).toEqual([flow('f1')]);
+  });
+
+  // FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF: the list of the automations used to
+  // subscribe only once the count arrived, so the stream was closed (net::ERR_ABORTED) and opened again on every visit.
+  it('opens one live stream for the whole page: the automations arriving reopen nothing', async () => {
+    const m = await setup('/flow/automations', [flow('f1')]);
+    await m.reopen();
+    await settle();
+    expect(m.net.streams.map((stream) => stream.aborted())).toEqual([false]);
+    expect(m.params('flow.flow.list')).toHaveLength(2);
   });
 
   it('a card used opens the new automation on its Permissions; a row, on its steps', async () => {

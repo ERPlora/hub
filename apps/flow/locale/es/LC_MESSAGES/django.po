@@ -551,6 +551,15 @@ msgstr "Respuesta"
 msgid "The assistant cannot use «%(name)s»."
 msgstr "El asistente no puede usar «%(name)s»."
 
+msgid "«%(name)s» has fixed data but the assistant may not use it: add it to what it may use or remove its fixed data."
+msgstr "«%(name)s» tiene datos fijos, pero el asistente no puede usarla: añádela a lo que puede usar o quita sus datos fijos."
+
+msgid "«%(field)s» is no datum of «%(name)s»."
+msgstr "«%(field)s» no es un dato de «%(name)s»."
+
+msgid "Give «%(field)s» of «%(name)s» a value, or remove it."
+msgstr "Dale un valor a «%(field)s» de «%(name)s», o quítalo."
+
 msgid "The assistant wants to change something in «%(app)s»"
 msgstr "El asistente quiere cambiar algo en «%(app)s»"
 

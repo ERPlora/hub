@@ -96,6 +96,9 @@ export interface AssistantStep extends StepOptions {
   prompt: string;
   /** The reads and actions it may use, by name: each one a permission of the automation. */
   tools: string[];
+  /** Data a tool always gets, `{tool: {input: value}}`, filled in when it runs: the assistant never sees them nor
+   *  changes them. Absent: none. */
+  pinned?: Record<string, Record<string, unknown>>;
   /** `ask`: a change waits for a yes in «Waiting for your answer»; `auto`: it makes it on its own. */
   mode: 'ask' | 'auto';
   /** Most turns: 1 to 10. */
@@ -194,9 +197,12 @@ export interface LogEntry {
     | 'thinking'
     | 'assistant_used'
     | 'assistant_answered'
-    | 'assistant_proposed';
+    | 'assistant_proposed'
+    | 'assistant_pinned_empty';
   /** Whether a read or an action the assistant used went well (`assistant_used`). */
   ok?: boolean;
+  /** The data the step fixes that were empty, so the tool was not used (`assistant_pinned_empty`). */
+  fields?: string[];
   /** What the assistant answered (`assistant_answered`). */
   text?: string;
   /** Who a question was asked of (`asking`). */
@@ -424,6 +430,17 @@ export type TestOutcome =
   | 'unavailable'
   | 'not_reached';
 
+/** A datum an «Ask the assistant» step fixes, as «Try it» would fill it in. */
+export interface PinnedOut {
+  tool: string;
+  field: string;
+  /** What it would be, as the card of the change says it (a record by its name); `null` when empty, unknown or a
+   *  record the person trying it may not read (the card leaves it out). */
+  said: AssistantField | null;
+  /** `empty`: its tool would not be used; `unknown`: it reads a step that does not run here. */
+  state: 'filled' | 'empty' | 'unknown';
+}
+
 export interface TestStepOut {
   id: string;
   kind: StepKind;
@@ -435,6 +452,8 @@ export interface TestStepOut {
   errors: Record<string, string>;
   failed: ClauseOut[];
   seconds: number | null;
+  /** The data an «Ask the assistant» step fixes, tool by tool; absent or empty for any other step. */
+  pinned?: PinnedOut[];
 }
 
 export interface TestOut {

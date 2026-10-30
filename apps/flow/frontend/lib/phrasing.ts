@@ -238,6 +238,8 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
       return p.t('flow.history.log.assistantAnswered', { text: entry.text ?? '' });
     case 'assistant_proposed':
       return p.t('flow.history.log.assistantProposed', { action, date: formatDate(entry.until ?? entry.at, p.locale) });
+    case 'assistant_pinned_empty':
+      return p.t('flow.history.log.assistantPinnedEmpty', { action, fields: (entry.fields ?? []).map((name) => `«${fieldLabel(name, p)}»`).join(', ') });
     case 'skipped':
       return p.t('flow.history.log.skipped', {
         clauses: (entry.failed ?? []).map((clause) => describeClause(clause, steps, catalog, p)).join('; '),

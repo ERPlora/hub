@@ -39,7 +39,7 @@ from live.operations import Operation, operation, registry
 
 from apps.flow import document, recipes, vault
 from base import assistant as hub_assistant
-from base.business import babel_locale, money_text
+from base.business import babel_locale, currency_decimals, money_text
 from base.home import ISO_HOUR, moment
 from base.operations import business_currency
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
@@ -110,6 +110,11 @@ ASK_FIRST = frozenset({"reservation.reservation.cancel"})
 NO_SECRET = _("There is no secret called «%(name)s».")
 BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
 NOT_FOR_THE_ASSISTANT = _("The assistant cannot use «%(name)s».")
+PINNED_NOT_A_TOOL = _(
+    "«%(name)s» has fixed data but the assistant may not use it: add it to what it may use or remove its fixed data."
+)
+PINNED_NO_INPUT = _("«%(field)s» is no datum of «%(name)s».")
+PINNED_EMPTY = _("Give «%(field)s» of «%(name)s» a value, or remove it.")
 
 #: How many names an ambiguous reference lists.
 AMBIGUOUS_SHOWN = 5
@@ -313,6 +318,60 @@ def operation_problem(name: str, kind: str | None = None, *, asking: bool = Fals
     return None
 
 
+def fixed_value(raw: Any, data: dict) -> Any:
+    """A datum an «Ask the assistant» step fixes, filled in with ``data`` as its prompt is; ``None`` when it is empty
+    (a path not found, a text with nothing in it): then its tool is not used."""
+    value = document.resolve(raw, data)
+    return None if value is None or (isinstance(value, str) and not value.strip()) else value
+
+
+def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps: set[str]) -> list[dict]:
+    """What «Try it» says of the data an «Ask the assistant» step fixes: each, tool by tool, with the value it would
+    have as the card of the change says it (FLOW-F29: a record by its name for whoever may read it, else left out;
+    never its id; an amount with the business's currency, so the screen needs no live read of its own), empty (its
+    tool would not be used) or unknown (it reads a step that does not run)."""
+    rows = []
+    currency = _currency(ctx.scope) if step.pinned else None
+    for tool, fixed in (step.pinned or {}).items():
+        filled = {}
+        for field, raw in fixed.items():
+            reads = document.references(raw)
+            if any(path.startswith("steps.") and path.split(".")[1] in unknown_steps for path in reads):
+                rows.append({"tool": tool, "field": field, "said": None, "state": "unknown"})
+            elif (value := fixed_value(raw, values)) is None:
+                rows.append({"tool": tool, "field": field, "said": None, "state": "empty"})
+            else:
+                filled[field] = value
+                rows.append({"tool": tool, "field": field, "said": None, "state": "filled"})
+        op = registry.get(tool)
+        if op is None or not filled:
+            continue
+        said = {field["name"]: field for field in hub_assistant.card(op, filled, ctx.language, ctx)["fields"]}
+        for field in said.values():
+            if field["kind"] == "money" and currency and "money" not in field:
+                field["money"] = {"currency": currency, "decimals": currency_decimals(currency)}
+        for row in rows:
+            if row["tool"] == tool and row["state"] == "filled":
+                row["said"] = said.get(row["field"])
+    return rows
+
+
+def pinned_problem(tools: list[str], pinned: dict[str, dict[str, Any]]) -> str | None:
+    """Why the fixed data of an «Ask the assistant» step cannot be saved (the first reason), or ``None``: each is of a
+    tool the step may use, names a datum that tool asks for and has a value."""
+    for name, fixed in pinned.items():
+        op = grantable_operations().get(name)
+        if name not in tools or op is None:
+            return str(PINNED_NOT_A_TOOL) % {"name": name}
+        inputs = {field["name"] for field in action_fields(op)}
+        for field, value in fixed.items():
+            if field not in inputs:
+                return str(PINNED_NO_INPUT) % {"field": field, "name": name}
+            if value is None or (isinstance(value, str) and not value.strip()):
+                return str(PINNED_EMPTY) % {"field": field, "name": name}
+    return None
+
+
 def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
     """What a document names that this business does not have, by field (``trigger.event``,
     ``steps.<n>.operation``), and the code of the refusal: ``flow.high_risk`` when a step needs a
@@ -344,6 +403,9 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
                     problem_code, problems[f"steps.{index}.tools"] = problem
                     code = HIGH_RISK_CODE if problem_code == HIGH_RISK_CODE else code
                     break
+            problem = pinned_problem(step.tools, step.pinned or {})
+            if problem is not None:
+                problems[f"steps.{index}.pinned"] = problem
             continue
         if step.kind not in ("command", "query"):
             continue
@@ -1240,7 +1302,8 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
         if step.kind == "assistant":
             # Nothing is asked: what the assistant would answer is not known here.
             asked = {"prompt": document.fill(step.prompt, values), "tools": list(step.tools), "mode": step.mode}
-            steps.append(out | {"outcome": "would_ask_assistant", "params": asked})
+            pinned = _tried_pinned(ctx, step, values, unknown_steps)
+            steps.append(out | {"outcome": "would_ask_assistant", "params": asked, "pinned": pinned})
             unknown_steps.add(step.id)
             continue
         if step.kind == "condition":
