@@ -31,6 +31,7 @@ QUERIES = {
     "attendance.presence.list",
     "attendance.presence.count",
     "attendance.person.list",
+    "attendance.person.detail",
     "attendance.settings.get",
 }
 COMMANDS = {

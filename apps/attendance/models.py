@@ -14,6 +14,10 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
+#: The context of the model names other apps' catalogues also have («working day» is Staff's weekday of a schedule,
+#: «slot» a schedule's slot): without it the Hub said them the other app's way («día de trabajo», «ranura»).
+NAMES = "attendance"
+
 #: The radii a personal device may be asked to be within (metres), as the old module.
 RADII = (50, 100, 250, 500, 1000)
 
@@ -90,8 +94,8 @@ class Record(UUIDModel):
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
     class Meta:
-        verbose_name = _("working day")
-        verbose_name_plural = _("working days")
+        verbose_name = pgettext_lazy(NAMES, "working day")
+        verbose_name_plural = pgettext_lazy(NAMES, "working days")
         # The order of attendance.record.list by default: the newest first, id as the tie-break.
         ordering = ["-clock_in_at", "id"]
         indexes = [
@@ -145,10 +149,10 @@ class Break(UUIDModel):
         Record,
         on_delete=models.PROTECT,
         related_name="breaks",
-        verbose_name=_("working day"),
+        verbose_name=pgettext_lazy(NAMES, "working day"),
     )
     started_at = models.DateTimeField(_("started at"))
-    ended_at = models.DateTimeField(_("ended at"), null=True, blank=True)
+    ended_at = models.DateTimeField(pgettext_lazy(NAMES, "ended at"), null=True, blank=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
@@ -179,7 +183,7 @@ class Correction(UUIDModel):
         Record,
         on_delete=models.PROTECT,
         related_name="corrections",
-        verbose_name=_("working day"),
+        verbose_name=pgettext_lazy(NAMES, "working day"),
     )
     old_clock_in_at = models.DateTimeField(_("clock-in before"))
     old_clock_out_at = models.DateTimeField(
@@ -229,7 +233,7 @@ class Correction(UUIDModel):
 class AttendanceSettings(UUIDModel):
     """The settings of the time clock: one row, created by the first save (until then, the defaults)."""
 
-    slot = models.PositiveSmallIntegerField(_("slot"), default=1, editable=False)
+    slot = models.PositiveSmallIntegerField(pgettext_lazy(NAMES, "slot"), default=1, editable=False)
     require_location = models.BooleanField(
         _("require the location when clocking in from a personal device"), default=False
     )

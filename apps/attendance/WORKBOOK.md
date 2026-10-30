@@ -363,7 +363,9 @@ Pantalla: ninguna (asistente y API)
 Pasos:
 1. El responsable le dice al asistente «ficha la entrada de Ana» o «ficha la salida de Ana» (o llama a
    la API con la persona por su id o su nombre).
-2. El Hub ficha a Ana con la hora del servidor, como si lo hiciera ella, y guarda quién lo hizo.
+2. Antes de fichar, el asistente pide confirmación y dice a quién, en «Persona», por su nombre (Ana López),
+   nunca por un código; el responsable confirma.
+3. El Hub ficha a Ana con la hora del servidor, como si lo hiciera ella, y guarda quién lo hizo.
 Entra: la ficha de Personal de esa persona.
 Sale: lo mismo que ATTENDANCE-F01 y ATTENDANCE-F02.
 Si falla: un empleado no puede fichar a otra persona («Solo puedes fichar tu propia entrada y
@@ -401,12 +403,13 @@ y la API, con las mismas reglas y los mismos permisos. Una persona se nombra por
 |---|---|---|---|
 | Mi jornada de hoy: mi ficha, si estoy dentro o en pausa y desde cuándo, lo trabajado y las pausas de hoy y mis diez últimas jornadas | fichar | F01, F02 | `attendance.record.current` |
 | Las jornadas, con búsqueda por persona, filtros (persona, mías, estado, fechas) y orden, en páginas (hasta 100); el empleado, solo las suyas | fichar | F06, F07 | `attendance.record.list` |
-| Una jornada con sus pausas y la posición al fichar (la de otro, solo con ver el equipo) | fichar | F07 | `attendance.record.detail` |
+| Una jornada con sus pausas y la posición al fichar (la de otro, solo con ver el equipo o corregir); su nombre, la persona y el día (Ana López · 6 oct 2026) | fichar | F07, F08 | `attendance.record.detail` |
 | El CSV de las jornadas del filtro (el empleado, solo las suyas) | fichar | F10 | `attendance.record.export` |
 | El historial de correcciones de una jornada (o de todas), del más reciente al más antiguo; el empleado, de las suyas | fichar | F09 | `attendance.correction.list` |
 | Quién está fichado ahora (cuántos y quiénes), con búsqueda | ver el equipo | F11 | `attendance.presence.list` |
 | Cuántos están fichados ahora (el panel «Fichados ahora» del Inicio) | ver el equipo | F11 | `attendance.presence.count` |
 | Las personas que se pueden filtrar (fichas de Personal, también las dadas de baja con jornadas), con búsqueda | ver el equipo | F07 | `attendance.person.list` |
+| Una de esas personas por su id, con su nombre y el estado de su ficha: la propia para quien ficha; cualquiera para quien ve el equipo, ficha a otros o corrige | fichar | F01, F02, F12, F13 | `attendance.person.detail` |
 | Los ajustes | fichar | F03, F04 | `attendance.settings.get` |
 
 ### Lo que ofrece: acciones (cambian datos)
