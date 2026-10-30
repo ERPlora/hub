@@ -14,7 +14,7 @@ from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.customer.models import (
     Activity,
@@ -738,12 +738,14 @@ def load_health(customer: Customer) -> dict:
 
 
 # No ``ai`` and no ``expose_api``: health data never reaches the assistant nor an API key (GDPR art. 9).
+# Not an assistant tool: health data (GDPR art. 9), for the screen only and never sent to a model.
 @operation(
     "customer.health.detail",
     kind="query",
     permission="customer.view",
     input=HealthDetailIn,
     output=HealthOut,
+    ai=INTERNAL,
 )
 def health_detail(ctx: OperationContext, data: HealthDetailIn) -> dict:
     return load_health(find_customer(data.customer_id, data.customer))

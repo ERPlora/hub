@@ -319,7 +319,7 @@ UNNAMED_REFERENCES = {
     "tax": 4,
     "verifactu": 6,
     "website": 5,
-    "whatsapp_inbox": 22,
+    "whatsapp_inbox": 14,
 }
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models of their app give no label,
@@ -686,9 +686,7 @@ ATTEMPT_KEY_NAME = re.compile(r"idempoten|attempt_key|^(?:job|submit)_key$|^clie
 #: The attempt keys of the assistant's writes no ``attempt_key`` mark declares, by app: their card shows them, or
 #: leaves them out only as an id it cannot name. Only ever lower: an app that marks its own lowers its number here,
 #: and none comes in.
-UNMARKED_ATTEMPT_KEYS = {
-    "whatsapp_inbox": 4,
-}
+UNMARKED_ATTEMPT_KEYS: dict[str, int] = {}
 
 
 def is_attempt_key(prop: dict) -> bool:
