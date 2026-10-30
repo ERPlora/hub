@@ -13,19 +13,24 @@ dict with the alias is swapped in, under a lock, after looking again. A hub of t
 phase 1 until S5) stays on ``default``.
 
 The migrator's alias, ``<db_name>__ddl`` (PLAN-DB §4 and §7), is the same database reached directly, without
-PgBouncer and without the control database's pool, as the migrator's role (``settings.DB_MIGRATOR_USER``; the default
-connection's where it is not set): only the migrator, the provisioning (``base.tenancy.provision``) and the tests'
-template builder use it. :func:`migrator_conninfo` is the same connection in libpq's terms, for ``psycopg`` itself
-(``base.tenancy.ops``: ``CREATE``/``DROP DATABASE`` on the maintenance database ``postgres``).
+PgBouncer and without the control database's pool, as the migrator's role: only the migrator, the provisioning
+(``base.tenancy.provision``) and the tests' template builder use it. :func:`migrator_conninfo` is the same connection
+in libpq's terms, for ``psycopg`` itself (``base.tenancy.ops``: ``CREATE``/``DROP DATABASE`` on the maintenance
+database ``postgres``).
+
+A hub on a :class:`control.models.Cluster` (round 2026-10-30, S2a) is reached on that cluster: its alias through the
+cluster's PgBouncer (its writer, directly, when the row names none) with the cluster's app role, its migrator's alias and connection on the cluster's writer with the
+cluster's migrator role (``base.tenancy.credentials.credentials_for``). A hub's alias never carries a migrator's role, nor
+asks for its secret: the web opens no other. Without a cluster, the settings' own server and the environment's roles.
 """
 
 import copy
 import threading
 
-from django.conf import settings as django_settings
 from django.db import DEFAULT_DB_ALIAS, connections
 
 from base.tenancy import names
+from base.tenancy.credentials import APP, MIGRATOR, credentials_for
 
 #: The static alias every hub's alias is copied from; nobody connects to it.
 TEMPLATE_ALIAS = "hub_template"
@@ -77,39 +82,58 @@ def register_hub_alias(hub) -> str:
     overrides = {"NAME": name}
     cluster = getattr(hub, "cluster", None)
     if cluster is not None:
-        overrides |= {"HOST": cluster.pooler_host, "PORT": cluster.pooler_port}
+        found = credentials_for(cluster, APP)
+        # Its own PgBouncer if it has one; else its writer: the task's sidecar only knows the settings' own server.
+        host, port = (cluster.pooler_host, cluster.pooler_port) if cluster.pooler_host else _writer(cluster)
+        overrides |= {
+            "HOST": host,
+            "PORT": port,
+            "USER": found.user,
+            "PASSWORD": found.password,
+        }
     return _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides))
 
 
-def _migrator_role() -> tuple[str, str]:
-    """The migrator's user and password: ``DB_MIGRATOR_USER``/``_PASSWORD``, or the default connection's."""
-    if django_settings.DB_MIGRATOR_USER:
-        return django_settings.DB_MIGRATOR_USER, django_settings.DB_MIGRATOR_PASSWORD
+def _writer(cluster) -> tuple[str, int]:
+    """Where the migrator reaches a database directly: the cluster's writer, or the default connection's server."""
+    if cluster is not None:
+        return cluster.host, cluster.port
     default = connections.settings[DEFAULT_DB_ALIAS]
-    return default["USER"], default["PASSWORD"]
+    return default["HOST"], default["PORT"]
 
 
-def migrator_conninfo(dbname: str) -> dict:
-    """The migrator's direct connection to ``dbname`` in libpq's terms (``psycopg.connect(**…)``): the default
-    connection's server, TLS and timeout, the migrator's role, no pool."""
+def migrator_conninfo(dbname: str, *, cluster=None) -> dict:
+    """The migrator's direct connection to ``dbname`` (on ``cluster``, or the settings' own server) in libpq's terms
+    (``psycopg.connect(**…)``): the default connection's TLS and timeout, the migrator's role, no pool."""
     default = connections.settings[DEFAULT_DB_ALIAS]
-    user, password = _migrator_role()
+    found = credentials_for(cluster, MIGRATOR)
+    host, port = _writer(cluster)
     options = {key: value for key, value in default["OPTIONS"].items() if key not in NON_LIBPQ_OPTIONS}
-    return {**options, "dbname": dbname, "host": default["HOST"], "port": default["PORT"], "user": user, "password": password}
+    return {
+        **options,
+        "dbname": dbname,
+        "host": host,
+        "port": port,
+        "user": found.user,
+        "password": found.password,
+    }
 
 
-def register_ddl_alias(db_name: str) -> str:
-    """The migrator's alias of the database ``db_name`` (``<db_name>__ddl``): direct, as the migrator's role, no pool,
-    closed after use."""
+def register_ddl_alias(db_name: str, *, cluster=None) -> str:
+    """The migrator's alias of the database ``db_name`` (``<db_name>__ddl``) on ``cluster`` (or the settings' own
+    server): direct, as the migrator's role, no pool, closed after use."""
     names.validate(db_name, control=control_name())
 
     def build() -> dict:
-        user, password = _migrator_role()
+        found = credentials_for(cluster, MIGRATOR)
+        host, port = _writer(cluster)
         settings = _copied(
             DEFAULT_DB_ALIAS,
             NAME=db_name,
-            USER=user,
-            PASSWORD=password,
+            HOST=host,
+            PORT=port,
+            USER=found.user,
+            PASSWORD=found.password,
             CONN_MAX_AGE=0,
             DISABLE_SERVER_SIDE_CURSORS=True,
         )

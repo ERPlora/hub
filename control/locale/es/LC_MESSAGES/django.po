@@ -135,5 +135,8 @@ msgstr "0 = sin límite."
 msgid "credentials secret"
 msgstr "secreto de credenciales"
 
-msgid "The Secrets Manager secret with this cluster's roles; empty, the environment's own."
-msgstr "El secreto de Secrets Manager con los roles de este clúster; vacío, los del entorno."
+msgid "The prefix of this cluster's two Secrets Manager secrets (…/app and …/migrator); empty, the environment's roles."
+msgstr "El prefijo de los dos secretos de Secrets Manager de este clúster (…/app y …/migrator); vacío, los roles del entorno."
+
+msgid "Empty: its hubs are reached on its writer, directly."
+msgstr "Vacío: a sus hubs se llega por su escritor, directamente."
