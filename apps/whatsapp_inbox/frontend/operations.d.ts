@@ -60,6 +60,8 @@ export interface ConversationOut {
   /** Meta's type of the last message: the inbox names it when there is no text. */
   last_message_kind: string;
   last_inbound_at: string | null;
+  /** «Needs attention»: an automatic answer could not answer her (WHATSAPP_INBOX-F20). */
+  flagged: boolean;
   created_at: string;
 }
 

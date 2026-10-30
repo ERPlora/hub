@@ -52,6 +52,7 @@ from apps.whatsapp_inbox import clock, events, gateway, samples
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template, TemplateSample, hub_writes
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.queries import (
+    MESSAGE_NOT_FOUND,
     CAP_REACHED,
     HEADER_SAMPLE_MISSING_CODE,
     META_RATE_LIMITED,
@@ -97,6 +98,7 @@ from apps.whatsapp_inbox.schemas import (
     ConversationRefIn,
     CustomerEventIn,
     ErasedOut,
+    FlaggedOut,
     LinkCustomerIn,
     MergedEventIn,
     MessageOut,
@@ -153,7 +155,6 @@ SAAS_UNCONFIGURED = _(
 #: A plan that includes no WhatsApp messages (0, ADR-0474): no month brings any, so not «until next month».
 NO_PLAN_MESSAGES = _("Your plan does not include WhatsApp messages: nothing can be sent until you upgrade the plan.")
 NOT_RETRYABLE = _("This message cannot be sent again: write a new one.")
-MESSAGE_NOT_FOUND = _("That message no longer exists.")
 TEMPLATE_NOT_FOUND = _("There is no template called “%(name)s”.")
 TEMPLATE_LANGUAGE = _("That template exists in several languages: say which one.")
 TEMPLATE_NOT_APPROVED = _(
@@ -372,6 +373,8 @@ def _received(ctx: OperationContext, message: Message) -> None:
             "id": str(message.id),
             "conversation_id": str(message.conversation_id),
             "direction": message.direction,
+            # An automatic answer starts on a live message only, never on the old chats connecting brought (F21).
+            "source": message.source,
             "reply_to_message_id": str(asked) if asked else None,
             "reply_id": message.reply_id,
         },
@@ -493,6 +496,8 @@ def receive_message(ctx: OperationContext, data: ReceiveIn) -> dict:
             )
             conversation.last_message_kind = kind
             conversation.last_message_direction = message.direction
+        if not inbound and data.source == Message.Source.LIVE:
+            conversation.needs_attention = False  # the business answered from its phone (F20)
         conversation.save()
     _link_by_phone(ctx, conversation, card_id)
     _received(ctx, message)
@@ -977,6 +982,8 @@ def send_message(ctx: OperationContext, data: SendIn) -> dict:
         _link_by_phone(ctx, conversation, card_id)
     variables = list(data.template.variables) if template else []
     sample = _file_to_send(ctx, template, data.template.header_sample) if template else None
+    # Somebody of the business answers from the inbox: she waits no more (F20); an automation's notice leaves the mark.
+    conversation.needs_attention = False
     return _queue_message(ctx, conversation, data.text, template, variables, data.client_message_id, now, sample)
 
 
@@ -1489,13 +1496,39 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
     conversation = find_conversation(data.id, data.conversation, lock=True)
     if conversation.status != data.status:
         conversation.status = data.status
-        _save(conversation, "status")
+        conversation.needs_attention = False
+        _save(conversation, "status", "needs_attention")
         record_event(
             ctx,
             events.STATUS_CHANGED,
             {"id": str(conversation.id), "status": data.status},
         )
     return conversation_out(conversation)
+
+
+@operation(
+    "whatsapp_inbox.conversation.flag",
+    kind="command",
+    permission="whatsapp_inbox.reply",
+    input=ConversationRefIn,
+    output=FlaggedOut,
+    expose_api=True,
+    ai={
+        "description": "Marks an open WhatsApp conversation «Needs attention»: an automatic answer could not answer "
+        "the customer, so she waits for a person even after its apology; somebody of the business answering, or "
+        "changing its status, takes it away. A pending or closed conversation is left as it is.",
+        "risk": "normal",
+    },
+)
+def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
+    conversation = find_conversation(data.id, data.conversation, lock=True)
+    if conversation.status != Conversation.Status.OPEN:
+        return {"id": conversation.id, "flagged": False}
+    if not conversation.needs_attention:
+        conversation.needs_attention = True
+        _save(conversation, "needs_attention")
+        record_event(ctx, events.FLAGGED, {"id": str(conversation.id)})
+    return {"id": conversation.id, "flagged": True}
 
 
 @operation(

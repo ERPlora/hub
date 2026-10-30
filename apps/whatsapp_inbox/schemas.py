@@ -197,6 +197,11 @@ class ConversationOut(Schema):
     last_inbound_at: datetime | None = Field(
         description="The customer's last message: the 24-hour window runs from it."
     )
+    flagged: bool = Field(
+        False,
+        description="«Needs attention»: an automatic answer could not answer the customer, so she waits for a person "
+        "until somebody answers or its status changes.",
+    )
     created_at: datetime = Field(description="When the customer first wrote.")
 
 
@@ -399,6 +404,25 @@ class MessageOut(Schema):
 
 class MessagePage(Page[MessageOut]):
     pass
+
+
+class MessageGetOut(MessageOut):
+    """A message with what an automation needs to answer it: its conversation's exact number and her name."""
+
+    phone: str = Field(description="Its conversation's number, exactly in international format (+34600111222).")
+    display_name: str = Field(
+        description="What to call the customer: her card's name, her WhatsApp profile's or, with neither, her number."
+    )
+    can_send: bool = Field(
+        description="Whether anything can be sent now (the number connected and the month's messages not spent)."
+    )
+
+
+class FlaggedOut(Schema):
+    id: UUID = Field(description="The conversation's id.")
+    flagged: bool = Field(
+        description="true: it is marked «Needs attention»; false: it was not, being closed or pending."
+    )
 
 
 class TemplateSendIn(Schema):

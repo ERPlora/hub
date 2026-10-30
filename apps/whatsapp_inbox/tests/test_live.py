@@ -26,6 +26,7 @@ INBOX = [
     E.CONVERSATION_READ,
     E.ASSIGNED,
     E.STATUS_CHANGED,
+    E.FLAGGED,
     E.CUSTOMER_LINKED,
     E.ERASED,
 ]
@@ -33,8 +34,9 @@ INBOX = [
 
 #: The number's state: erplora.com's photo, and its answer when the business connects or disconnects it here.
 CHANNEL = [E.CHANNEL_SYNCED, E.CHANNEL_CONNECTED, E.CHANNEL_DISCONNECTED]
-#: What changes whether a conversation waits for an answer: a message in or out, its status, its erasure.
-AWAITING = [E.MESSAGE_RECEIVED, E.MESSAGE_SENT, E.STATUS_CHANGED, E.ERASED]
+#: What changes whether a conversation waits for an answer: a message in or out, its status, the «Needs attention» an
+#: automatic answer leaves (F20), its erasure.
+AWAITING = [E.MESSAGE_RECEIVED, E.MESSAGE_SENT, E.STATUS_CHANGED, E.FLAGGED, E.ERASED]
 
 
 def inbox_queries():
@@ -58,6 +60,7 @@ def test_each_screen_and_its_events():
             E.MESSAGE_SENT,
             E.CONVERSATION_READ,
             E.STATUS_CHANGED,
+            E.FLAGGED,
             E.ERASED,
             *CHANNEL,
         ],

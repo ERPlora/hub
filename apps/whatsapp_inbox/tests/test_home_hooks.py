@@ -103,12 +103,20 @@ def another_customer_writes():
     receive("wamid.2", "34600999999", contact_name="Bea")
 
 
+def an_automatic_answer_could_not_answer():
+    """F20: a conversation the automatic answer already thanked (its last message, the Hub's) is marked «Needs
+    attention»: it waits for an answer again. Made on the model, so that only the mark records an event."""
+    thanked = Conversation.objects.create(phone="+34600888888", contact_name="Eva", last_message_direction="outbound")
+    run("whatsapp_inbox.conversation.flag", {"id": str(thanked.id)})
+
+
 #: Each event of the counter's ``refresh_on`` → a change of the number that records it, seen by an employee.
 CHANGES = {
     "whatsapp_inbox.message.received": another_customer_writes,
     "whatsapp_inbox.message.sent": answer_from_the_hub,
     "whatsapp_inbox.conversation.status_changed": close,
     "whatsapp_inbox.conversation.erased": erase,
+    "whatsapp_inbox.conversation.flagged": an_automatic_answer_could_not_answer,
 }
 
 
