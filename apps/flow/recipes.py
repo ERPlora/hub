@@ -17,7 +17,9 @@ Its **fingerprint** (``digest``) is what it does: its document built in every la
 permissions; never the sentences that explain it. An automation keeps the one it was built from: a
 different one today is «New version». Its **repair** (``missing_clauses``): an automation built from an
 older version whose «Only when…» lacks a clause today's recipe has started in more cases than its app
-meant; the repair adds just those clauses.
+meant; the repair adds just those clauses. Its **fixed data** (``fixed_data``): the data today's recipe
+fixes on its «Ask the assistant» steps are fixed on those steps of every automation built from it,
+whenever it was built, without waiting for anybody; what the owner fixed there stays.
 """
 
 import hashlib
@@ -236,3 +238,41 @@ def missing_clauses(recipe: Recipe, flow: Flow) -> dict[str, dict[str, Any]]:
     wanted = _words(trigger.get("filter") or {})
     have = flow.trigger_filter or {}
     return {path: clause for path, clause in wanted.items() if path not in have}
+
+
+def _declared(ref: str) -> dict | None:
+    """What the active app that brings ``ref`` declares for it today, as it is (set aside or not: a fix it makes
+    must reach the automations built from it all the same); ``None`` when no active app does."""
+    for config, declared in declarations():
+        if isinstance(declared, dict) and f"{config.label}/{declared.get('id', '')}" == ref:
+            return declared
+    return None
+
+
+def fixed_data(flow: Flow, steps: list[dict]) -> list[dict]:
+    """``steps`` of ``flow`` with the data its recipe fixes today on its «Ask the assistant» steps (``pinned``,
+    FLOW-F37) that they leave to the assistant, whenever it was built: an app's safety fix never waits for the owner
+    (FLOW-F36). By step id, only for the tools the step still offers and only the data nobody fixed there: what the
+    owner fixed stays, and the rest of each step and every other step are as they are."""
+    declared = _declared(flow.recipe) if flow.recipe else None
+    wanted = {
+        step.get("id"): step["pinned"]
+        for step in (declared or {}).get("steps") or []
+        if isinstance(step, dict) and step.get("kind") == "assistant" and step.get("pinned")
+    }
+    if not wanted:
+        return steps
+    fixed = []
+    for step in steps:
+        apps = wanted.get(step.get("id")) if step.get("kind") == "assistant" else None
+        have = step.get("pinned") or {}
+        pinned = {
+            **have,
+            **{
+                tool: {**data, **(have.get(tool) or {})}
+                for tool, data in _words(apps or {}).items()
+                if tool in (step.get("tools") or [])
+            },
+        }
+        fixed.append({**step, "pinned": pinned} if pinned != have else step)
+    return fixed

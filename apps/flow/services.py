@@ -399,7 +399,7 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
         trigger_filter=original.trigger_filter,
         schedule=original.schedule,
         run_at=original.run_at,
-        steps=original.steps,
+        steps=recipes.fixed_data(original, original.steps),
         language=ctx.language,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
@@ -635,11 +635,13 @@ def repair_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     recipe = recipes.find(data.recipe)
     flow = _recipe_flow(recipe.ref)
     missing = recipes.missing_clauses(recipe, flow)
-    if missing:
+    steps = recipes.fixed_data(flow, flow.steps)
+    if missing or steps != flow.steps:
         flow.trigger_filter = {**flow.trigger_filter, **missing}
+        flow.steps = steps
         flow.version += 1
         flow.updated_by = _actor(ctx)
-        flow.save(update_fields=["trigger_filter", "version", "updated_by", "updated_at"])
+        flow.save(update_fields=["trigger_filter", "steps", "version", "updated_by", "updated_at"])
         record_event(ctx, events.FLOW_UPDATED, {"id": str(flow.id), "version": flow.version})
     return flow_row(flow)
 
@@ -1190,12 +1192,18 @@ def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
     return f"{text}\n\n{UNATTENDED % {'name': flow.name}} {mode}"
 
 
+def _step_of(run: FlowRun, flow: Flow) -> dict:
+    """The step ``run`` is on, as its automation was when it started, with the data its app fixes today (FLOW-F36):
+    also a run started before its app fixed them."""
+    return recipes.fixed_data(flow, run.definition["steps"])[run.step_index]
+
+
 def _assistant_run(run_id: uuid.UUID) -> tuple[FlowRun | None, dict]:
     """The run whose «Ask the assistant» step is thinking, locked, and that step; ``None`` for any other."""
     run = FlowRun.objects.select_for_update(of=("self",)).select_related("flow").filter(pk=run_id).first()
     if run is None or run.status != FlowRun.Status.CALLING:
         return None, {}
-    step = run.definition["steps"][run.step_index]
+    step = _step_of(run, run.flow)
     return (run, step) if step["kind"] == "assistant" else (None, {})
 
 
@@ -1252,7 +1260,7 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
     if run is None:
         return {"claimed": False}
     flow = run.flow
-    step = run.definition["steps"][run.step_index]
+    step = _step_of(run, flow)
     if step["kind"] != "assistant":
         return {"claimed": False}
     with translation.override(flow.language):
@@ -1443,9 +1451,19 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
         if _fail(ctx, run, step, _own("flow.not_allowed", ASSISTANT_GONE_KEY, operation=name), now):
             _go_on(ctx, run, flow, now)
         return
-    outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, str(proposal.get("arguments") or "{}"))
-    _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
-    told = [{"role": "tool", "tool_call_id": proposal["call_id"], "content": outcome.content}]
+    # What the step fixes goes in again: a change proposed before its app fixed that datum is never made as the
+    # assistant chose it (FLOW-F36), and one whose fixed datum is empty now is not made.
+    fixed, empty = _pinned(run, step, op)
+    if empty:
+        told_empty = PINNED_EMPTY_TOLD % {"fields": ", ".join(f"«{name}»" for name in empty)}
+        content = hub_assistant.error_content(PINNED_EMPTY_CODE, told_empty)
+        _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
+    else:
+        arguments = _with_pinned(str(proposal.get("arguments") or "{}"), fixed)
+        outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, arguments)
+        _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
+        content = outcome.content
+    told = [{"role": "tool", "tool_call_id": proposal["call_id"], "content": content}]
     told += [{"role": "tool", "tool_call_id": call_id, "content": NOT_MADE} for call_id in proposal.get("later") or []]
     rounds = turn["rounds"] + 1
     run.outputs = {
@@ -1566,7 +1584,7 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
     question.decided_by, question.decided_at, question.note = who, now, data.note
     question.save(update_fields=["status", "decided_by", "decided_at", "note"])
     record_event(ctx, events.QUESTION_ANSWERED, {"id": str(question.id), "run_id": str(run.id)})
-    step = run.definition["steps"][run.step_index]
+    step = _step_of(run, flow)
     with translation.override(flow.language):
         _log(run, step, "answered", now, approved=data.approve, by=who, note=data.note)
         if goes_on and step["kind"] == "assistant":

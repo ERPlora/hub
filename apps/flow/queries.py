@@ -504,7 +504,7 @@ def flow_row(flow: Flow) -> dict[str, Any]:
         "name": flow.name,
         "enabled": flow.enabled,
         "trigger": trigger_of(flow),
-        "steps": flow.steps,
+        "steps": recipes.fixed_data(flow, flow.steps),
         "grants": flow.grants,
         "required_grants": required,
         "missing_grants": [name for name in required if name not in flow.grants],
