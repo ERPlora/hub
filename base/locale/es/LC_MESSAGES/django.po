@@ -1969,3 +1969,19 @@ msgstr "Océano"
 msgctxt "palette"
 msgid "Violet"
 msgstr "Violeta"
+
+#: schemas.py
+msgid "Import"
+msgstr "Importación"
+
+#: schemas.py
+msgid "Failed event"
+msgstr "Evento caído"
+
+#: schemas.py
+msgid "Device"
+msgstr "Dispositivo"
+
+#: schemas.py
+msgid "API key"
+msgstr "Clave de API"

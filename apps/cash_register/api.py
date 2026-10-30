@@ -14,6 +14,7 @@ from apps.cash_register.schemas import (
     CountListIn,
     MovementAddIn,
     MovementListIn,
+    RegisterGetIn,
     RegisterIn,
     RegisterListIn,
     RegisterUpdateIn,
@@ -46,6 +47,11 @@ async def settings_update(request, data: SettingsPatchIn):
 @bind(router, "cash_register.register.list", "/cash_register/registers")
 async def register_list(request, params: Query[RegisterListIn]):
     return await run_operation(request, queries.list_registers, params)
+
+
+@bind(router, "cash_register.register.get", "/cash_register/registers/detail")
+async def register_get(request, params: Query[RegisterGetIn]):
+    return await run_operation(request, queries.get_register, params)
 
 
 @bind(router, "cash_register.register.create", "/cash_register/registers", status=201)

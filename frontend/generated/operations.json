@@ -1095,6 +1095,10 @@
     "method": "get",
     "path": "/api/cash_register/registers"
   },
+  "cash_register.register.get": {
+    "method": "get",
+    "path": "/api/cash_register/registers/detail"
+  },
   "cash_register.register.create": {
     "method": "post",
     "path": "/api/cash_register/registers"

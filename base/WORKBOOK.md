@@ -2870,6 +2870,15 @@ Implicados: ACCOUNTS-F38
   lo que su app recupera sola (reclamo con plazo y barrido, como `flow.run.claim_call`). En los tests corre en línea
   (`conftest.py`); la marca `outbound_threads` da los hilos de verdad. Tests: `base/tests/test_outbound.py` y
   `apps/flow/tests/test_relay.py`.
+- Un trabajo para otro negocio que el de la operación (una fila de otro negocio en las tablas compartidas de la fase 1:
+  «Reintentar» desde la bandeja de WhatsApp) lo dice su app con `after_commit(fn, *args, scope=<Scope del negocio de la
+  fila>)` (FIX-HUB-BASE-OUTBOUND-JOB-OF-ANOTHER-BUSINESS-HUB-CONTEXT-MISMATCH): `base.tenancy.context.current_for(scope)`
+  le da la BD compartida de la fase 1 si quien lo pide es un hub de la fase 1 (`db_name=""`) y el negocio es otro, donde
+  corren las operaciones de ese negocio, como en el barrido del worker, y sin ver nada que quien lo pide no viera ya; en
+  cualquier otro caso (su propio negocio, la plataforma, un hub con BD propia) el contexto de quien lo pide, donde la
+  operación de otro hub se rechaza (`HubContextMismatch`): ningún trabajo entra jamás en la BD de otro hub. El contexto
+  se fija al pedirlo (`Job` inmutable). En la fase 2 cada BD solo guarda sus filas y nada cambia; S5 quita la rama de la
+  fase 1 con `db_name=""`. Sin `scope`, el contexto de quien lo pide, como antes.
 - Informe de errores de la pantalla: `base/frontend/lib/error-report.ts` (`error`, `unhandledrejection` y
   `app.config.errorHandler`; `navigator.sendBeacon`, el mismo error una vez cada 30 s, 50 recordados), instalado en
   `frontend/main.ts`. No envía los avisos del navegador de `BROWSER_NOTICES` («ResizeObserver loop completed with

@@ -36,7 +36,9 @@ from apps.cash_register.schemas import (
     EmptyIn,
     MovementListIn,
     MovementPage,
+    RegisterGetIn,
     RegisterListIn,
+    RegisterOut,
     RegisterPage,
     SessionGetIn,
     SessionListIn,
@@ -311,6 +313,19 @@ def list_registers(ctx: OperationContext, params: RegisterListIn) -> dict:
         "limit": params.limit,
         "offset": params.offset,
     }
+
+
+@operation(
+    "cash_register.register.get",
+    kind="query",
+    permission="cash_register.view_session",
+    input=RegisterGetIn,
+    output=RegisterOut,
+    expose_api=True,
+    ai={"description": "One drawer by its id: its name and whether it is active."},
+)
+def get_register(ctx: OperationContext, params: RegisterGetIn) -> dict:
+    return register_row(find_register(params.register_id, None))
 
 
 # ── The lines of a shift ─────────────────────────────────────────────────────────────────────────

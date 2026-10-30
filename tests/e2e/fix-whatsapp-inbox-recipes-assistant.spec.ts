@@ -140,7 +140,8 @@ for (const viewport of VIEWPORTS) {
       await expect(card.locator('[data-testid=whatsapp-inbox-autoreply-tables-confirm] ion-radio')).toHaveCount(2);
       expect(built(ANSWER)).toBe('true true');
       expect(built(NOTICE)).toBe('true true');
-      // «Ask me first», and only Reservas' free tables, booking, changing and waiting list among the assistant's tools.
+      // «Ask me first», and only Reservas' free tables, booking, changing, cancelling and waiting list among the
+      // assistant's tools (F25: cancelling only because its step asks first, FLOW-F28).
       const steps = JSON.parse(psql(`select steps from flow_flow where recipe = '${ANSWER}'`)) as {
         kind: string;
         mode?: string;
@@ -153,6 +154,7 @@ for (const viewport of VIEWPORTS) {
         'reservation.availability.tables',
         'reservation.reservation.create',
         'reservation.reservation.update',
+        'reservation.reservation.cancel',
         'reservation.waitlist.create',
       ]);
       await card.locator('[data-testid=whatsapp-inbox-autoreply-tables-off]').scrollIntoViewIfNeeded();
@@ -197,6 +199,7 @@ for (const viewport of VIEWPORTS) {
         'reservation__availability__tables',
         'reservation__reservation__create',
         'reservation__reservation__update',
+        'reservation__reservation__cancel',
         'reservation__waitlist__create',
       ]);
       expect(psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('asking');
