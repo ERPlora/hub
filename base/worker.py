@@ -22,14 +22,17 @@ system) runs off this loop, in ``base.outbound``'s threads, so it never holds th
 its way out the worker gives what still runs ``OUTBOUND_GRACE_SECONDS`` and drops what waits (their lease sends them
 again). On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
 demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
-pass that fails is logged and the next one tries again, and the worker never stops for it. Every pass
-releases its connection. Phase 1 runs the tasks on one fixed scope (``WORKER_SCOPE_SLUG``) and relays the
-one database every hub shares; phase 2 adds, in this loop, the hubs whose ``hub_due`` has come (each under
-``use_hub``, for its tasks and its outbox) and the hubs' provisioning and purge.
+pass that fails is logged and the next one tries again, and the worker never stops for it. Every tick, after the
+reaper and before the relay, it makes the databases of the hubs whose ``hub_due`` has come and drops the demos that
+ended (``base.tenancy.provision.run_due``, round 2026-10-30 of PLAN-DB, S2a): a hub that is made ready has its outbox
+relayed in the same tick; a pass that fails is logged and the next tick tries again. Every pass releases its
+connection. Phase 1 runs the tasks on one fixed scope (``WORKER_SCOPE_SLUG``) and relays the one database every hub
+shares; S3 adds, in the ``hub_due`` pass, each hub's own tasks and outbox (under ``use_hub``).
 
 Each pass opens its database context (phase 2, S1; plan 2026-10-22): the tasks and the relay run on phase 1's shared
-database (``use_shared_database``: every hub with ``db_name=""``; a hub with its own database waits for S2's
-``hub_due`` loop), and the reaper on control (``use_control``), where the registry and the demos live.
+database (``use_shared_database``: every hub with ``db_name=""``; a hub with its own database waits for S3's), and the
+reaper and the ``hub_due`` pass on control (``use_control``), where the registry and the demos live (the provisioning
+enters each hub's own database itself).
 """
 
 import datetime as dt
@@ -42,6 +45,7 @@ from django.utils import timezone
 
 from base import catalog, outbound, relay, scheduler
 from base.services import reap_demos
+from base.tenancy import provision
 from base.tenancy.context import use_control, use_shared_database
 
 logger = logging.getLogger(__name__)
@@ -112,10 +116,11 @@ def run(
     while not stop.is_set():
         now = clock()
         _tick(now)
-        _relay(now)
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
+        _due(now)
+        _relay(now)
         wait(tick_seconds)
     outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
@@ -134,6 +139,22 @@ def _reap(now: dt.datetime) -> None:
             logger.info("worker: purged %d demo(s).", purged)
     finally:
         # The reaper's connection is not kept open while the worker idles, nor a broken one taken further.
+        close_old_connections()
+
+
+def _due(now: dt.datetime) -> None:
+    """Make the databases of the hubs due by ``now`` and drop the demos that ended; a failure is logged and the next
+    tick tries again (each hub's own failure is noted on it by the provisioning)."""
+    try:
+        with use_control():
+            worked = provision.run_due(now)
+    except Exception:
+        logger.exception("worker: the hub_due pass failed; the next tick tries again.")
+    else:
+        if worked:
+            logger.info("worker: worked on %d hub(s) due.", worked)
+    finally:
+        # The pass's connections (control's, and each hub's direct one) are not kept open while the worker idles.
         close_old_connections()
 
 

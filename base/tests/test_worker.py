@@ -9,9 +9,11 @@ then 60 s; any other failure stops the worker with 1. Then it schedules the apps
 tick that fails is logged and the next one tries again. On the first tick and then every
 ``REAPER_INTERVAL_SECONDS`` it purges the demos that ended (``reap_demos``, plan 2026-10-17 §1.7); a reaper that
 fails is logged and never stops the worker. Every tick, after the tasks, it relays the outbox (``relay.run``, round
-2026-10-20); a relay pass that fails is logged and the next tick tries again. No database here: ``register_apps``,
-the scheduler, the relay and the reaper are replaced; their own tests are ``test_register_apps.py``,
-``test_scheduler.py``, ``test_relay.py`` and ``test_services_demo.py``.
+2026-10-20); a relay pass that fails is logged and the next tick tries again. Before the relay, every tick, it makes
+the databases of the hubs due in ``hub_due`` and drops the demos that ended (``provision.run_due``, round 2026-10-30,
+S2a), on control; a pass that fails is logged and the next tick tries again. No database here: ``register_apps``, the
+scheduler, the relay, the reaper and the due pass are replaced; their own tests are ``test_register_apps.py``,
+``test_scheduler.py``, ``test_relay.py``, ``test_services_demo.py`` and ``base/tenancy/tests/test_provision.py``.
 """
 
 import datetime as dt
@@ -24,6 +26,7 @@ from django.db import DatabaseError
 
 from base import catalog, outbound, relay, scheduler, worker
 from base.catalog import CatalogError, RegisterResult, SharedSchemaNotReady
+from base.tenancy import context, provision
 
 WRITTEN = RegisterResult(written=1, retired=0, docs_changed=1, skipped=False, apps=("demo",))
 SKIPPED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
@@ -76,6 +79,30 @@ class FakeRelay:
         if self.failures:
             raise self.failures.pop(0)
         return relay.RelayPass(taken=1, delivered=2, failed=0)
+
+
+class FakeDue:
+    """Stands in for ``provision.run_due``: records the clock and the database context of each pass, and raises the
+    failures it is given."""
+
+    def __init__(self) -> None:
+        self.passes: list[dt.datetime] = []
+        self.contexts: list[str] = []
+        self.failures: list[Exception] = []
+
+    def __call__(self, now: dt.datetime) -> int:
+        self.passes.append(now)
+        self.contexts.append(context.current().kind)
+        if self.failures:
+            raise self.failures.pop(0)
+        return 1
+
+
+@pytest.fixture(autouse=True)
+def due(monkeypatch) -> FakeDue:
+    fake = FakeDue()
+    monkeypatch.setattr(provision, "run_due", fake)
+    return fake
 
 
 @pytest.fixture(autouse=True)
@@ -239,8 +266,9 @@ def test_releases_the_connection_between_attempts(monkeypatch):
 
     worker.run(stop, tick_seconds=TICK, wait=wait)
 
-    # The SaaS's database is not held open while it waits, nor while it idles, nor after the reaper's first pass.
-    assert released == [1, 2, 2]
+    # The SaaS's database is not held open while it waits, nor while it idles, nor after the reaper's first pass and
+    # the hub_due pass.
+    assert released == [1, 2, 2, 2]
 
 
 def test_a_stop_while_it_waits_for_the_schema_exits_0_without_working(monkeypatch, caplog):
@@ -408,8 +436,8 @@ def test_a_tick_that_fails_is_logged_and_the_next_one_tries_again(monkeypatch, c
     assert "next tick" in record.getMessage()
     assert record.exc_info[1] is failure
     # The broken connection is released before the next tick: after registering, after the failed tick, and after
-    # each of the reaper's two passes (10:00 and 10:01).
-    assert calls.count("close_old_connections") == 4
+    # each of the reaper's and the hub_due pass's two passes (10:00 and 10:01).
+    assert calls.count("close_old_connections") == 6
 
 
 # ── The demo reaper (plan 2026-10-17, §1.7) ─────────────────────────────────────────────────────
@@ -440,12 +468,20 @@ def test_a_stop_before_the_first_tick_reaps_nothing(calls, reaper):
 
 def test_releases_the_connection_after_each_pass_of_the_reaper(calls, monkeypatch):
     monkeypatch.setattr(worker, "reap_demos", lambda now: calls.append("reap_demos") or 0)
+    monkeypatch.setattr(provision, "run_due", lambda now: calls.append("run_due") or 0)
     stop = threading.Event()
     wait, _ = stop_after(stop, 1)
 
     worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0))
 
-    assert calls == ["register_apps", "close_old_connections", "reap_demos", "close_old_connections"]
+    assert calls == [
+        "register_apps",
+        "close_old_connections",
+        "reap_demos",
+        "close_old_connections",
+        "run_due",
+        "close_old_connections",
+    ]
 
 
 def test_a_reaper_that_fails_is_logged_and_never_stops_the_worker(monkeypatch, caplog, calls, tasks, reaper):
@@ -513,8 +549,8 @@ def test_a_relay_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog,
     [record] = [r for r in caplog.records if r.name == "base.worker"]
     assert "outbox relay" in record.getMessage() and record.exc_info[1] is failure
     # Its broken connection is released before the next tick: after registering, after the failed pass, and after
-    # each of the reaper's two passes.
-    assert calls.count("close_old_connections") == 4
+    # each of the reaper's and the hub_due pass's two passes.
+    assert calls.count("close_old_connections") == 6
 
 
 def test_a_failed_tick_of_the_scheduler_still_relays(calls, tasks, outbox):
@@ -525,3 +561,44 @@ def test_a_failed_tick_of_the_scheduler_still_relays(calls, tasks, outbox):
     worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0))
 
     assert outbox.passes == [ten(0)]
+
+
+# ── The hubs due: their databases made, the demos that ended dropped (round 2026-10-30, S2a) ───────────────────────
+
+
+def test_makes_the_hubs_due_on_every_tick_on_control_before_the_relay(monkeypatch, calls, tasks, due, outbox):
+    order: list[str] = []
+    monkeypatch.setattr(scheduler, "run_due", lambda now: order.append("tasks") or [])
+    monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
+    monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 3)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1, 2))
+
+    assert due.passes == [ten(0), ten(1), ten(2)]
+    assert due.contexts == [context.CONTROL] * 3
+    # A hub made ready in a tick has its outbox relayed in the same tick.
+    assert order == ["tasks", "due", "relay"] * 3
+
+
+def test_a_due_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog, calls, tasks, due, outbox):
+    failure = DatabaseError("server closed the connection unexpectedly")
+    due.failures.append(failure)
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 2)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1)) == 0
+
+    assert due.passes == [ten(0), ten(1)]
+    # The tasks and the relay did not wait for it.
+    assert tasks.ticks == [ten(0), ten(1)] and outbox.passes == [ten(0), ten(1)]
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "hub_due" in record.getMessage() and record.exc_info[1] is failure
+
+
+def test_a_stop_before_the_first_tick_makes_no_hub(calls, due):
+    worker.run(stopped())
+
+    assert due.passes == []

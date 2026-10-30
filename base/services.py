@@ -41,7 +41,7 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from contextvars import ContextVar
 from functools import partial
-from uuid import UUID
+from uuid import UUID, uuid7
 
 import pydantic
 from django.conf import settings
@@ -54,7 +54,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.core.validators import validate_email
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import HttpRequest
@@ -107,6 +107,9 @@ from base.schemas import (
 from base import api_keys
 from base.models import ApiKey
 from base.throttle import client_key
+from base.tenancy import names as database_names
+from base.tenancy.connections import control_name
+from control.models import Cluster, HubDue
 from base.schemas import (
     BlueprintImportIn,
     BlueprintSourceIn,
@@ -573,12 +576,14 @@ def _slug_taken() -> Conflict:
     ai=INTERNAL,
 )
 def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
-    """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``ready`` at once in phase 1.
+    """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``requested``, with a database of
+    its own to make (round 2026-10-30 of PLAN-DB, decision 1: never control's), due in the worker's ``hub_due``.
 
     A customer's slug never takes a demo's ``demo-…`` nor a reserved name (``base.slug_invalid``); one that is
     another hub's is ``base.slug_taken``. A cancelled hub is restored first (``base.hub_cancelled``); a purged one
-    never comes back (``hub_purged``). The SaaS hears ``ready`` after the COMMIT when the row is new or was not
-    ready yet; a rename, idempotent, says nothing.
+    never comes back (``hub_purged``). The worker clones its database (``base.tenancy.provision``) and the SaaS hears
+    ``ready`` from it; an update of a hub still being prepared keeps it due (a failed one is tried again now), and
+    one of a ready hub, idempotent, says nothing.
     """
     internal_only(ctx)
     try:
@@ -604,41 +609,48 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
     if created:
         try:
             with transaction.atomic():
-                hub = Hub.objects.create(id=data.id, status=Hub.Status.READY, ready_at=now, **fields)
+                hub = Hub.objects.create(
+                    id=data.id,
+                    status=Hub.Status.REQUESTED,
+                    db_name=database_names.hub_db_name(control_name(), data.id),
+                    **fields,
+                )
         except IntegrityError:
             # A concurrent call took the slug, or registered this same id first (then it is an update).
             hub = Hub.objects.select_for_update().filter(pk=data.id).first()
             if hub is None:
                 raise _slug_taken() from None
             created = False
-    was_ready = created
     if not created:
         _refuse_purged(hub)
         if hub.status == Hub.Status.CANCELLED:
             raise Conflict(gettext("This hub was cancelled: restore it first."), code="base.hub_cancelled")
-        was_ready = hub.status == Hub.Status.READY
         for field, value in fields.items():
             setattr(hub, field, value)
-        if not was_ready:
-            hub.status, hub.ready_at = Hub.Status.READY, now
+        if hub.status in registry.PREPARING_STATUSES and not hub.db_name:
+            # Never prepared before round 2026-10-30: it has no data in control's database, and gets its own.
+            hub.db_name = database_names.hub_db_name(control_name(), hub.id)
+        if hub.status == Hub.Status.FAILED:
+            # The SaaS asks again: the next attempt is now, not at the end of its wait.
+            hub.next_attempt_at = now
         try:
             with transaction.atomic():
                 hub.save()
         except IntegrityError:
             raise _slug_taken() from None
+    if hub.status in registry.PREPARING_STATUSES:
+        HubDue.mark_due(hub, now)
     record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": hub.slug, "created": created})
     # Registered as the platform (/internal): Settings › Business (APP-BASE-6) listens on the business's channel, so a
     # name, zone or language changed on erplora.com shows without reloading, after the COMMIT as the photo's.
     transaction.on_commit(partial(notify, Scope("host", hub.slug), [events.HUB_REGISTERED]), robust=True)
-    if created or not was_ready:
-        transaction.on_commit(partial(report_ready, hub.id), robust=True)
     return {**hub_answer(hub), "created": created}
 
 
 def report_ready(hub_id: UUID) -> None:
     """Tell the SaaS that ``hub_id`` is ready: ``POST {SAAS_INTERNAL_URL}/internal/hubs/{id}/ready``, signed v1 + v2.
 
-    Called after the COMMIT that made it ready, never inside it. It never raises: a failure is logged and not
+    Called after the COMMIT that made it ready (:func:`provision_ready`, the worker's), never inside it. It never raises: a failure is logged and not
     retried, because the SaaS asks ``GET /internal/hubs/{id}`` about a sign-up without its ``ready`` two minutes
     later (``reconcile_hub_states``) and marks it itself.
     """
@@ -679,9 +691,12 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     was_open = not registry.is_suspended(hub)
     hub.state, hub.state_version = data.photo, data.version
     hub.save(update_fields=["state", "state_version", "updated_at"])
-    if data.verifactu is not None or data.status is not None:
+    # A hub whose database is still being made keeps the photo on its row: its seeding applies the blocks of the apps
+    # it has on (:func:`apply_kept_photo`), as turning an app on does.
+    reachable = not (hub.db_name and registry.is_preparing(hub))
+    if reachable and (data.verifactu is not None or data.status is not None):
         _sync_verifactu(hub, data)
-    if data.whatsapp is not None:
+    if reachable and data.whatsapp is not None:
         _sync_whatsapp(hub, data)
     if data.members is not None:
         _apply_members(hub, data.members)
@@ -880,13 +895,19 @@ def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
 @operation("base.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubOut, ai=INTERNAL)
 def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
-    """Bring a cancelled hub back (``ready``); a hub that never ended stays as it is; a purged one is ``hub_purged``."""
+    """Bring a cancelled hub back (``ready``, or ``requested`` again if its database was never finished); a hub that
+    never ended stays as it is; a purged one is ``hub_purged``."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
     _refuse_purged(hub)
     if hub.status == Hub.Status.CANCELLED:
-        hub.status, hub.cancelled_at = Hub.Status.READY, None
+        # Its own database never finished (cancelled while it was being made): it is made again, not opened.
+        unfinished = hub.db_name and hub.ready_at is None
+        hub.status = Hub.Status.REQUESTED if unfinished else Hub.Status.READY
+        hub.cancelled_at = None
         hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        if hub.status == Hub.Status.REQUESTED:
+            HubDue.mark_due(hub)
         record_event(ctx, events.HUB_RESTORED, {"id": str(hub.id)})
     return hub_answer(hub)
 
@@ -930,6 +951,210 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
     return {"hubs": hubs}
 
 
+# ── The provisioning's writes in control (round 2026-10-30 of PLAN-DB, S2a; PLAN-DB §6 and §8) ─────────────────────
+#
+# ``base.tenancy.provision`` makes a hub's database in steps; each step writes control here, in a short transaction of
+# its own, never holding a row while the database is cloned or migrated. Who works on a hub holds its ``hub_due`` lease
+# (``SELECT … FOR UPDATE SKIP LOCKED``, ``lease_until``), renewed at each step: two workers, or the worker and a
+# command, never prepare the same hub at once.
+
+#: The waits before a failed preparation is tried again: 1 min, 5 min, 15 min, then every hour (PLAN-DB §6).
+PROVISION_RETRY_SECONDS = (60, 300, 900, 3600)
+#: The longest error a failed preparation keeps (``Hub.last_error``).
+LAST_ERROR_MAX = 2000
+
+
+class ProvisioningStopped(Exception):
+    """The hub left its preparation meanwhile (cancelled, its demo ended): nothing more is done for it."""
+
+
+class ProvisioningFailed(Exception):
+    """A step of a preparation that failed for a reason with a name (``no_cluster_available``, ``template_missing``…)."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
+def retry_delay(attempts: int) -> dt.timedelta:
+    """How long a preparation that failed ``attempts`` times waits before the next."""
+    return dt.timedelta(seconds=PROVISION_RETRY_SECONDS[min(attempts, len(PROVISION_RETRY_SECONDS)) - 1])
+
+
+def registry_row(hub_id: UUID) -> Hub | None:
+    """The registry's row of ``hub_id``, its cluster with it, as it is now."""
+    return Hub.objects.select_related("cluster").filter(pk=hub_id).first()
+
+
+def _leased(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> None:
+    HubDue.objects.filter(pk=hub_id).update(lease_until=now + lease)
+
+
+def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> Hub | None:
+    """Make ``hub_id`` due now and take its lease; ``None`` when someone else holds it (or no such hub)."""
+    with transaction.atomic():
+        hub = Hub.objects.filter(pk=hub_id).first()
+        if hub is None:
+            return None
+        HubDue.mark_due(hub, now)
+        free = (
+            HubDue.objects.select_for_update(skip_locked=True)
+            .filter(pk=hub_id)
+            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now))
+            .exists()
+        )
+        if not free:
+            return None
+        _leased(hub_id, now, lease)
+    return registry_row(hub_id)
+
+
+def claim_due_hubs(now: dt.datetime, limit: int, lease: dt.timedelta) -> list[UUID]:
+    """Take the lease of up to ``limit`` hubs due by ``now`` that nobody holds, the longest due first."""
+    with transaction.atomic():
+        due = list(
+            HubDue.objects.select_for_update(skip_locked=True)
+            .filter(due_at__lte=now)
+            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now))
+            .order_by("due_at")
+            .values_list("hub_id", flat=True)[:limit]
+        )
+        HubDue.objects.filter(pk__in=due).update(lease_until=now + lease)
+    return due
+
+
+def release_hub(hub_id: UUID, now: dt.datetime) -> None:
+    """Give the lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop), else gone."""
+    with transaction.atomic():
+        hub = Hub.objects.filter(pk=hub_id).first()
+        due = HubDue.objects.select_for_update().filter(pk=hub_id)
+        if hub is not None and hub.status == Hub.Status.FAILED:
+            due.update(due_at=hub.next_attempt_at or now, lease_until=None)
+        elif hub is not None and (
+            hub.status in registry.PREPARING_STATUSES
+            or (hub.is_demo and hub.status in (Hub.Status.EXPIRED, Hub.Status.DROPPING))
+        ):
+            due.update(due_at=now, lease_until=None)
+        else:
+            due.delete()
+
+
+def place_hub(hub_id: UUID) -> Hub:
+    """Put ``hub_id`` on a cluster unless it is on one: the open one with the fewest hubs, under its ``max_hubs``.
+
+    Without any ``Cluster`` row, the settings' own server (``cluster`` stays empty). With rows and none open with room,
+    ``no_cluster_available``: never the settings' server then. The clusters are locked while it counts, so two
+    placements at once never pass a limit.
+    """
+    with transaction.atomic():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        if hub.cluster_id is not None:
+            return registry_row(hub_id)
+        clusters = list(Cluster.objects.select_for_update().order_by("name"))
+        if not clusters:
+            return registry_row(hub_id)
+        placed = dict(
+            Hub.objects.filter(cluster__in=clusters)
+            .exclude(status=Hub.Status.PURGED)
+            .values_list("cluster")
+            .annotate(count=Count("pk"))
+        )
+        room = [
+            cluster
+            for cluster in clusters
+            if cluster.is_open and (cluster.max_hubs == 0 or placed.get(cluster.pk, 0) < cluster.max_hubs)
+        ]
+        if not room:
+            raise ProvisioningFailed("no_cluster_available", "No open database cluster has room for a new hub.")
+        hub.cluster = min(room, key=lambda cluster: (placed.get(cluster.pk, 0), cluster.name))
+        hub.save(update_fields=["cluster", "updated_at"])
+    return registry_row(hub_id)
+
+
+def _preparing(hub_id: UUID, now: dt.datetime) -> Hub:
+    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").get(pk=hub_id)
+    if hub.status not in registry.PREPARING_STATUSES or (hub.is_demo and registry.is_gone(hub, now)):
+        raise ProvisioningStopped(f"{hub.slug} is {hub.status}: its preparation stops.")
+    return hub
+
+
+def provision_step(hub_id: UUID, status: str, now: dt.datetime, lease: dt.timedelta) -> Hub:
+    """Note that ``hub_id`` is at the step ``status`` of its preparation and renew its lease;
+    ``ProvisioningStopped`` when it left its preparation meanwhile."""
+    with transaction.atomic():
+        hub = _preparing(hub_id, now)
+        if hub.status != status:
+            hub.status = status
+            hub.save(update_fields=["status", "updated_at"])
+        _leased(hub_id, now, lease)
+    return hub
+
+
+def provision_ready(hub_id: UUID, now: dt.datetime, schema_apps: dict[str, str]) -> Hub:
+    """``hub_id`` is ready: its schema as the migrator left it; a business's SaaS hears it after the COMMIT."""
+    with transaction.atomic():
+        hub = _preparing(hub_id, now)
+        hub.status, hub.ready_at = Hub.Status.READY, now
+        hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
+        hub.schema_apps, hub.schema_state = schema_apps, Hub.SchemaState.CURRENT
+        hub.save(
+            update_fields=[
+                "status",
+                "ready_at",
+                "attempts",
+                "last_error",
+                "next_attempt_at",
+                "schema_apps",
+                "schema_state",
+                "updated_at",
+            ]
+        )
+        if not hub.is_demo:
+            # A demo's SaaS asks for it (``GET /internal/hubs/{id}``) and keeps no row to tell.
+            transaction.on_commit(partial(report_ready, hub.id), robust=True)
+    return hub
+
+
+def provision_failed(hub_id: UUID, now: dt.datetime, error: str) -> Hub | None:
+    """The preparation of ``hub_id`` failed with ``error``: ``failed``, tried again after :func:`retry_delay`.
+
+    ``None`` when the hub left its preparation meanwhile: nothing to try again."""
+    with transaction.atomic():
+        try:
+            hub = _preparing(hub_id, now)
+        except ProvisioningStopped:
+            return None
+        hub.attempts += 1
+        hub.status, hub.last_error = Hub.Status.FAILED, error[:LAST_ERROR_MAX]
+        hub.next_attempt_at = now + retry_delay(hub.attempts)
+        hub.save(update_fields=["status", "attempts", "last_error", "next_attempt_at", "updated_at"])
+        HubDue.objects.filter(pk=hub_id).update(due_at=hub.next_attempt_at)
+    return hub
+
+
+def demo_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> Hub | None:
+    """The demo ``hub_id``, which ended, is being dropped (``dropping``, its lease renewed); ``None`` if it is no demo
+    that ended or was purged already."""
+    with transaction.atomic():
+        hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=hub_id).first()
+        if hub is None or not hub.is_demo or hub.status == Hub.Status.PURGED or not registry.is_gone(hub, now):
+            return None
+        if hub.status != Hub.Status.DROPPING:
+            hub.status = Hub.Status.DROPPING
+            hub.save(update_fields=["status", "updated_at"])
+        _leased(hub_id, now, lease)
+    return hub
+
+
+def apply_kept_photo(hub: Hub) -> None:
+    """Inside ``use_hub(hub)``: apply the blocks of the SaaS's photo kept on its row that belong to the apps it has on
+    (its seeding: the photo came while its database was being made)."""
+    from base import relay
+
+    _sync_photo_blocks(hub, relay.active_apps(Scope("host", hub.slug)))
+
+
 # ── The demos (plan 2026-10-17, §1.6 and §1.7) ───────────────────────────────────────────────────────────────────
 
 #: How long a client waits before asking for a demo again when they are all taken (``Retry-After`` of the 503).
@@ -956,8 +1181,12 @@ def _demo_ttl() -> dt.timedelta:
     return dt.timedelta(minutes=settings.DEMO_TTL_MINUTES)
 
 
+#: The statuses of a demo that is not over: being made or ready (one per browser).
+LIVE_DEMO_STATUSES = frozenset({*registry.PREPARING_STATUSES, Hub.Status.READY})
+
+
 def _demo_out(hub: Hub, *, created: bool) -> dict:
-    return {"id": hub.id, "slug": hub.slug, "expires_at": hub.expires_at, "created": created}
+    return {"id": hub.id, "slug": hub.slug, "status": hub.status, "expires_at": hub.expires_at, "created": created}
 
 
 def _demo_status(hub: Hub) -> dict:
@@ -965,9 +1194,9 @@ def _demo_status(hub: Hub) -> dict:
 
 
 def _live_demo_of(session_key: str, now: dt.datetime) -> Hub | None:
-    """The demo of this browser that is still on, or ``None``."""
+    """The demo of this browser that is still on (being made or ready), or ``None``."""
     return Hub.objects.filter(
-        is_demo=True, status=Hub.Status.READY, demo_session_key=session_key, expires_at__gt=now
+        is_demo=True, status__in=LIVE_DEMO_STATUSES, demo_session_key=session_key, expires_at__gt=now
     ).first()
 
 
@@ -997,12 +1226,13 @@ def _locked_demo(slug: str) -> Hub:
 def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
     """This browser's demo: its live one (``created`` false, nothing spent), or a new, empty ``demo-<8 hex>``.
 
-    A new one is ready at once (phase 1 has no database to clone, plan §1.5) and ends ``DEMO_TTL_MINUTES`` from now;
-    ``vertical`` is only noted (the verticals' seed comes with the blueprints). Beyond ``MAX_CONCURRENT_DEMOS`` live
-    demos it is ``base.demo_full`` (503). The count and the new row hold :data:`DEMO_CAP_LOCK`, so two calls at the
-    same instant never pass the cap: the second counts once the first has committed. A demo of this browser that ran
-    out and the reaper has not purged yet is marked ``expired`` first: it frees the browser for a new one (one live
-    demo per browser, a unique constraint).
+    A new one is ``requested`` with a database of its own to make (``<control>_demo_<hex>``, cloned from its
+    vertical's template by the worker; round 2026-10-30 of PLAN-DB): the SaaS waits for ``ready`` on
+    ``GET /internal/hubs/{id}`` before it asks for a code. It ends ``DEMO_TTL_MINUTES`` from now. Beyond
+    ``MAX_CONCURRENT_DEMOS`` live demos (being made or ready) it is ``base.demo_full`` (503). The count and the new row
+    hold :data:`DEMO_CAP_LOCK`, so two calls at the same instant never pass the cap and one browser never gets two: the
+    second looks again once the first has committed. A demo of this browser that ran out and the reaper has not purged
+    yet is marked ``expired`` first: it frees the browser for a new one.
     """
     internal_only(ctx)
     now = timezone.now()
@@ -1010,27 +1240,34 @@ def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
     if live is not None:
         return _demo_out(live, created=False)
     Hub.objects.filter(
-        is_demo=True, status=Hub.Status.READY, demo_session_key=data.session_key, expires_at__lte=now
+        is_demo=True, status__in=LIVE_DEMO_STATUSES, demo_session_key=data.session_key, expires_at__lte=now
     ).update(status=Hub.Status.EXPIRED, updated_at=now)
     with connection.cursor() as cursor:
         cursor.execute(DEMO_CAP_LOCK)
-    live_demos = Hub.objects.filter(is_demo=True, status=Hub.Status.READY, expires_at__gt=now).count()
+    # Under the lock: a call of this browser that made its demo meanwhile has committed it.
+    live = _live_demo_of(data.session_key, now)
+    if live is not None:
+        return _demo_out(live, created=False)
+    live_demos = Hub.objects.filter(is_demo=True, status__in=LIVE_DEMO_STATUSES, expires_at__gt=now).count()
     if live_demos >= settings.MAX_CONCURRENT_DEMOS:
         raise _demo_full()
     for _draw in range(DEMO_SLUG_DRAWS):
         slug = f"{DEMO_SLUG_PREFIX}{secrets.token_hex(4)}"
         try:
             with transaction.atomic():
+                demo_id = uuid7()
                 hub = Hub.objects.create(
+                    id=demo_id,
                     slug=slug,
                     is_demo=True,
-                    status=Hub.Status.READY,
-                    ready_at=now,
+                    status=Hub.Status.REQUESTED,
+                    db_name=database_names.demo_db_name(control_name(), demo_id),
                     expires_at=now + _demo_ttl(),
                     demo_session_key=data.session_key,
                     vertical=data.vertical or "",
                     language=data.language,
                 )
+                HubDue.mark_due(hub, now)
         except IntegrityError:
             # Either another call of this browser made its demo first (then it is that one), or the address is taken.
             live = _live_demo_of(data.session_key, now)
@@ -1055,7 +1292,8 @@ def demo_code_create(ctx: OperationContext, data: DemoCodeIn) -> dict:
     """A one-time code into the demo ``data.slug`` for the browser that owns it, valid ``DEMO_CODE_TTL_SECONDS``.
 
     Only its sha256 is kept. 404 when no demo has the slug, 410 ``base.hub_gone`` once it ended, 403
-    ``base.demo_not_owner`` for another browser (the SaaS sends that browser back to its door).
+    ``base.demo_not_owner`` for another browser (the SaaS sends that browser back to its door), 503
+    ``base.hub_preparing`` while its database is being made (the SaaS waits for ``ready`` first).
     """
     internal_only(ctx)
     now = timezone.now()
@@ -1066,6 +1304,12 @@ def demo_code_create(ctx: OperationContext, data: DemoCodeIn) -> dict:
         raise OperationError(gettext("This demo has ended."), code="base.hub_gone", status=410)
     if not secrets.compare_digest(hub.demo_session_key.encode(), data.session_key.encode()):
         raise PermissionDenied(gettext("This demo is another browser's."), code="base.demo_not_owner")
+    if registry.is_preparing(hub):
+        raise OperationError(
+            gettext("This demo is still being prepared; try again in a few seconds."),
+            code=registry.HUB_PREPARING,
+            status=503,
+        )
     code = secrets.token_urlsafe(32)
     expires_at = now + dt.timedelta(seconds=auth.DEMO_CODE_TTL_SECONDS)
     DemoCode.objects.create(hub=hub, code_hash=_code_hash(code), language=data.language, expires_at=expires_at)
@@ -1125,16 +1369,17 @@ def open_demo_session(request: HttpRequest, hub: Hub):
 def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
     """End the demo ``data.slug`` now: its host answers 410 at once and the reaper purges it on its next pass.
 
-    For the platform (``manage.py demo_expire``) and its admins (the Hub admin's «Expire now»). A demo that already
-    ended stays as it is.
+    For the platform (``manage.py demo_expire``) and its admins (the Hub admin's «Expire now»), being made or ready. A
+    demo that already ended stays as it is.
     """
     _platform_or_its_admin(ctx)
     hub = _locked_demo(data.slug)
-    if hub.status == Hub.Status.READY:
+    if hub.status in LIVE_DEMO_STATUSES:
         now = timezone.now()
         hub.status = Hub.Status.EXPIRED
         hub.expires_at = min(hub.expires_at, now) if hub.expires_at is not None else now
         hub.save(update_fields=["status", "expires_at", "updated_at"])
+        HubDue.mark_due(hub, now)
         record_event(ctx, events.DEMO_EXPIRED, {"id": str(hub.id), "slug": hub.slug})
     return _demo_status(hub)
 
@@ -1164,37 +1409,53 @@ def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
 
 
 def purge_demo_data(hub: Hub) -> None:
-    """Delete what the demo ``hub`` wrote in the apps: in phase 1, nothing, on purpose.
+    """Delete what the demo ``hub`` wrote in the apps: its whole database, ``DROP DATABASE … WITH (FORCE)`` on its
+    cluster (``base.tenancy.ops``), never another one; it is never emptied nor reused.
 
-    Phase 1 has one database: the apps' tables are shared by every demo, by ``a``/``b`` and by the businesses, and
-    their rows carry no ``hub_id`` (CLAUDE.md «Tenencia del Hub»), so nothing tells a demo's rows from anyone else's
-    and deleting any would delete someone else's (the limitation Ioan accepted, plan 2026-10-17 §1.7). Phase 2 gives
-    each demo its own database, cloned from ``hub_template_<vertical>``, and this is where it goes:
-    ``DROP DATABASE demo_<hex> WITH (FORCE)``.
+    A demo made before round 2026-10-30 (``db_name`` empty) kept its rows in the database every hub of phase 1 shares,
+    where nothing tells them from anyone else's (plan 2026-10-17 §1.7): nothing is deleted for it. A database already
+    gone is no failure; one the server refuses to drop fails the purge, which the reaper tries again.
     """
-    return None
+    if not hub.db_name:
+        return
+    from base.tenancy import ops
+
+    ops.drop_database(hub.db_name, cluster=hub.cluster)
 
 
 def reap_demos(now: dt.datetime | None = None) -> int:
     """Purge every demo that ended by ``now`` (its time ran out, or it was expired by hand); return how many.
 
-    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``) and ``manage.py demo_expire``'s. Each demo is
-    purged in its own transaction (``base.demo.purge``): one that fails is logged and the others are purged; it is
-    tried again on the next pass. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
+    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``) and ``manage.py demo_expire``'s. Every demo
+    that ended is marked ``expired`` and due (``hub_due``) first, then dropped and purged under its lease
+    (``base.tenancy.provision.drop``: its database, then ``base.demo.purge`` in its own transaction). One that fails,
+    or whose lease the worker holds (it was still being made), is logged or left, and the others are purged; the worker
+    takes it again as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
     """
+    from base.tenancy import provision
+
     now = now or timezone.now()
-    ended = Hub.objects.filter(
-        Q(status=Hub.Status.READY, expires_at__lte=now) | Q(status=Hub.Status.EXPIRED), is_demo=True
-    ).values_list("slug", flat=True)
-    ctx = system_context(REGISTRY_SCOPE)
+    ended = list(
+        Hub.objects.filter(
+            Q(status__in=LIVE_DEMO_STATUSES, expires_at__lte=now)
+            | Q(status__in=(Hub.Status.EXPIRED, Hub.Status.DROPPING)),
+            is_demo=True,
+        ).only("id", "slug")
+    )
+    with transaction.atomic():
+        Hub.objects.filter(pk__in=[hub.pk for hub in ended], status__in=LIVE_DEMO_STATUSES).update(
+            status=Hub.Status.EXPIRED, updated_at=now
+        )
+        for hub in ended:
+            HubDue.mark_due(hub, now)
     purged = 0
-    for slug in list(ended):
+    for hub in ended:
         try:
-            demo_purge(ctx, DemoSlugIn(slug=slug))
+            dropped = provision.drop(hub, now=now)
         except Exception:
-            logger.exception("base.demo.purge_failed demo=%s: it is tried again on the next pass.", slug)
+            logger.exception("base.demo.purge_failed demo=%s: it is tried again on the next pass.", hub.slug)
             continue
-        purged += 1
+        purged += dropped
     reap_demo_tombstones(now)
     return purged
 

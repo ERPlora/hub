@@ -202,10 +202,12 @@ class DemoCreateIn(Schema):
 
 
 class DemoOut(Schema):
-    """The browser's demo; ``created`` says whether this call made it (201) or it was the live one (200)."""
+    """The browser's demo; ``created`` says whether this call made it (202, ``requested``) or it was the live one
+    (200); ``status`` is the registry's (``ready`` once its database is made)."""
 
     id: UUID
     slug: str
+    status: str
     expires_at: dt.datetime
     created: bool
 

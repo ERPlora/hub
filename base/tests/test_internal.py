@@ -5,16 +5,19 @@ A call is heard by its v2 signature when it carries one (method, path and body; 
 signature is the authentication: the ALB never publishes ``/internal``, so the door answers on any host (the
 SaaS reaches it by the private name).
 
-The demos (§1.5, §1.6): ``POST /internal/demos`` gives a browser of the SaaS its demo (201 new, 200 its live one, 503
-``base.demo_full`` with ``Retry-After`` at the cap) and ``POST /internal/demos/{slug}/codes`` a one-time code into it
-for that browser only (201; 403 another browser's, 410 once it ended, 404 none), as the SaaS's ``hub_client`` reads them.
+The demos (§1.5, §1.6; round 2026-10-30, S2a): ``POST /internal/demos`` gives a browser of the SaaS its demo (202 new,
+``requested`` until the worker makes its database; 200 its live one; 503 ``base.demo_full`` with ``Retry-After`` at the
+cap) and ``POST /internal/demos/{slug}/codes`` a one-time code into it for that browser only (201; 403 another
+browser's, 410 once it ended, 503 while it is being prepared, 404 none), as the SaaS's ``hub_client`` reads them.
 
-The registry (plan 2026-10-17, §1.5): ``PUT /internal/hubs/{id}`` registers a business (202, ready at once in phase 1,
-and the SaaS hears ``ready`` after the COMMIT; 200 when it updates it), ``GET`` reads it, ``DELETE`` cancels it and
+The registry (plan 2026-10-17, §1.5; round 2026-10-30, S2a): ``PUT /internal/hubs/{id}`` registers a business (202
+``requested`` with its own database to make, which the worker makes and then tells the SaaS ``ready``; 200 when it
+updates one that is ready), ``GET`` reads it (its status, never where its database is), ``DELETE`` cancels it and
 ``POST …/restore`` brings it back. ``PUT …/state`` (the photo) keeps it on the registry's row, by the path's id, and
 applies its VeriFactu block and the business's status through ``verifactu.config.sync`` on the hub's slug.
 """
 
+import datetime as dt
 import hashlib
 import hmac
 import json
@@ -27,6 +30,9 @@ from django.test import Client
 from django.utils.dateparse import parse_datetime
 
 from apps.verifactu.models import Config
+from base import services
+from base.tenancy import names
+from control.models import HubDue
 from base.models import DemoCode, Hub
 from base.signing import verify_signed
 
@@ -452,7 +458,7 @@ def test_the_registry_answers_on_the_private_name_and_locally(client, db, settin
     assert answer.status_code == 202
 
 
-def test_a_new_business_is_ready_at_once_and_the_saas_hears_it_after_the_commit(
+def test_a_new_business_is_requested_with_a_database_of_its_own_to_make_and_the_saas_waits(
     client, db, saas_hears, django_capture_on_commit_callbacks
 ):
     with django_capture_on_commit_callbacks(execute=True):
@@ -462,14 +468,29 @@ def test_a_new_business_is_ready_at_once_and_the_saas_hears_it_after_the_commit(
     assert {key: body[key] for key in ("id", "slug", "status", "is_demo", "expires_at", "state_version")} == {
         "id": NEW_ID,
         "slug": "bar-pepe",
-        "status": "ready",
+        "status": "requested",
         "is_demo": False,
         "expires_at": None,
         "state_version": 0,
     }
-    assert body["ready_at"] is not None and "created" not in body
+    assert body["ready_at"] is None and "created" not in body and "db_name" not in body
     hub = Hub.objects.get(pk=NEW_ID)
-    assert (hub.status, hub.name, hub.country) == ("ready", "Bar Pepe", "ES")
+    assert (hub.status, hub.name, hub.country) == ("requested", "Bar Pepe", "ES")
+    # Never born sharing control's database (round 2026-10-30, decision 1): its own, made by the worker.
+    assert hub.db_name == names.hub_db_name(connection_name(), hub.id)
+    assert HubDue.objects.filter(pk=hub.pk).exists()
+    assert saas_hears.calls == []
+
+
+def connection_name() -> str:
+    from base.tenancy.connections import control_name
+
+    return control_name()
+
+
+def test_the_saas_hears_ready_signed_once_the_worker_made_it(client, db, saas_hears):
+    services.report_ready(NEW_ID)
+
     [call] = saas_hears.calls
     ready_path = f"/internal/hubs/{NEW_ID}/ready"
     assert call["url"] == f"http://localhost:8001{ready_path}"
@@ -479,26 +500,57 @@ def test_a_new_business_is_ready_at_once_and_the_saas_hears_it_after_the_commit(
     assert "X-Erplora-Signature-V2" in call["headers"]
 
 
-def test_registering_it_again_is_200_and_the_saas_hears_nothing_more(
+def test_registering_it_again_while_it_is_prepared_is_202_and_once_ready_200(
     client, db, saas_hears, django_capture_on_commit_callbacks
 ):
     with django_capture_on_commit_callbacks(execute=True):
         signed(client, "put", HUB_PATH, REGISTRY)
     with django_capture_on_commit_callbacks(execute=True):
         again = signed(client, "put", HUB_PATH, {**REGISTRY, "name": "Bar Pepe 2"})
-    assert again.status_code == 200 and again.json()["status"] == "ready"
+    assert again.status_code == 202 and again.json()["status"] == "requested"
     assert Hub.objects.get(pk=NEW_ID).name == "Bar Pepe 2"
-    assert len(saas_hears.calls) == 1
-
-
-def test_a_saas_that_is_away_never_breaks_the_registration(
-    client, db, saas_at, django_capture_on_commit_callbacks, caplog
-):
-    saas_at(raises=OSError("connection refused"))
+    Hub.objects.filter(pk=NEW_ID).update(status="ready")
     with django_capture_on_commit_callbacks(execute=True):
-        answer = signed(client, "put", HUB_PATH, REGISTRY)
-    assert answer.status_code == 202
-    assert Hub.objects.get(pk=NEW_ID).status == "ready"
+        ready = signed(client, "put", HUB_PATH, {**REGISTRY, "name": "Bar Pepe 3"})
+    assert ready.status_code == 200 and ready.json()["status"] == "ready"
+    assert Hub.objects.get(pk=NEW_ID).name == "Bar Pepe 3"
+    assert saas_hears.calls == []
+
+
+def test_registering_a_business_whose_preparation_failed_tries_again_now(client, db):
+    signed(client, "put", HUB_PATH, REGISTRY)
+    later = Hub.objects.get(pk=NEW_ID).created_at + dt.timedelta(hours=1)
+    Hub.objects.filter(pk=NEW_ID).update(status="failed", attempts=4, next_attempt_at=later)
+    HubDue.objects.filter(pk=NEW_ID).update(due_at=later)
+
+    again = signed(client, "put", HUB_PATH, REGISTRY)
+
+    hub = Hub.objects.get(pk=NEW_ID)
+    assert again.status_code == 202 and again.json()["status"] == "failed"
+    assert hub.next_attempt_at < later and HubDue.objects.get(pk=NEW_ID).due_at < later
+
+
+def test_a_photo_of_a_business_being_prepared_waits_on_its_row_for_its_seeding(client, db, monkeypatch):
+    signed(client, "put", HUB_PATH, REGISTRY)
+    entered = []
+    monkeypatch.setattr(services, "_sync_verifactu", lambda hub, data: entered.append("verifactu"))
+    monkeypatch.setattr(services, "_sync_whatsapp", lambda hub, data: entered.append("whatsapp"))
+    photo = {"id": NEW_ID, "version": 3, "status": "active", "verifactu": {}, "whatsapp": {"status": "connected"}}
+
+    answer = signed(client, "put", f"{HUB_PATH}/state", photo, with_v2=True)
+
+    hub = Hub.objects.get(pk=NEW_ID)
+    assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 3}
+    assert (hub.state_version, hub.state["status"]) == (3, "active")
+    # Its database is not made yet: nothing enters it; the seeding applies the photo (services.apply_kept_photo).
+    assert entered == []
+
+
+def test_a_saas_that_is_away_never_breaks_the_ready_notice(client, db, saas_at, caplog):
+    saas_at(raises=OSError("connection refused"))
+
+    services.report_ready(NEW_ID)
+
     assert "base.hub.ready_unreported" in caplog.text
 
 
@@ -533,6 +585,18 @@ def test_get_answers_the_status_the_saas_waits_for(client, db):
     answer = signed(client, "get", f"/internal/hubs/{HUB_ID}", b"", with_v2=True)
     assert answer.status_code == 200
     assert (answer.json()["id"], answer.json()["slug"], answer.json()["status"]) == (HUB_ID, "acme", "ready")
+
+
+@pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed"])
+def test_get_answers_every_step_of_the_preparation_and_never_where_the_database_is(client, db, status):
+    signed(client, "put", HUB_PATH, REGISTRY)
+    Hub.objects.filter(pk=NEW_ID).update(status=status, last_error="clone_failed: the server said no")
+
+    body = signed(client, "get", HUB_PATH, b"", with_v2=True).json()
+
+    assert body["status"] == status
+    assert not {"db_name", "cluster", "last_error", "schema_apps"} & set(body)
+    assert Hub.objects.get(pk=NEW_ID).db_name not in json.dumps(body)
 
 
 def test_get_of_an_unknown_hub_is_the_404_envelope(client, db):
@@ -604,14 +668,22 @@ def demo_code(client, slug, session_key=OWNER, language="es"):
     return signed(client, "post", path, {"session_key": session_key, "language": language}, with_v2=True)
 
 
-def test_a_new_demo_is_201_with_what_the_saas_reads(client, db):
+def test_a_new_demo_is_202_requested_with_what_the_saas_reads(client, db):
     answer = new_demo(client)
-    assert answer.status_code == 201
+    assert answer.status_code == 202
     body = answer.json()
-    assert set(body) == {"id", "slug", "expires_at", "created"} and body["created"] is True
+    assert set(body) == {"id", "slug", "status", "expires_at", "created"} and body["created"] is True
     assert re.fullmatch(r"demo-[0-9a-f]{8}", body["slug"])
     hub = Hub.objects.get(slug=body["slug"])
-    assert (body["id"], hub.is_demo, hub.status, hub.demo_session_key) == (str(hub.id), True, "ready", OWNER)
+    assert (body["id"], body["status"], hub.is_demo, hub.status, hub.demo_session_key) == (
+        str(hub.id),
+        "requested",
+        True,
+        "requested",
+        OWNER,
+    )
+    assert hub.db_name == names.demo_db_name(connection_name(), hub.id)
+    assert HubDue.objects.filter(pk=hub.pk).exists()
     # An aware ISO 8601, as the SaaS's door parses it (``parse_datetime`` and ``is_aware``).
     expires_at = parse_datetime(body["expires_at"])
     assert expires_at.tzinfo is not None and expires_at == hub.expires_at
@@ -653,8 +725,21 @@ def test_unsigned_demo_calls_are_401_and_make_nothing(client, db):
     assert Hub.objects.filter(is_demo=True).count() == 1 and not DemoCode.objects.exists()
 
 
-def test_the_owner_gets_a_one_time_code_201(client, db):
+def ready(slug: str) -> str:
+    """The worker made the demo's database: it is ready."""
+    Hub.objects.filter(slug=slug).update(status="ready")
+    return slug
+
+
+def test_a_code_of_a_demo_being_prepared_is_503_hub_preparing(client, db):
     slug = new_demo(client).json()["slug"]
+    answer = demo_code(client, slug)
+    assert (answer.status_code, code(answer)) == (503, "base.hub_preparing")
+    assert not DemoCode.objects.exists()
+
+
+def test_the_owner_gets_a_one_time_code_201(client, db):
+    slug = ready(new_demo(client).json()["slug"])
     answer = demo_code(client, slug)
     assert answer.status_code == 201
     body = answer.json()
