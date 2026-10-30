@@ -8,7 +8,8 @@
 // 1440×900 on «Clear filters»: Ionic's 12px on both sides, the label and the button that far from the edge, the margin
 // still 0 (each row sets its gap), and the chip no taller than Ionic's 32px or its 40px remove button, as on main (with
 // Ionic's 6px on top and below too, a chip with a remove button grew from 40 to 52px, nearly the 56px of its field).
-// What the run creates is deleted.
+// «Clear filters» ends in its own icon, which keeps Ionic's margin too (FIX-UI-SHELL-ION-CHIP-ICON-MARGIN-WIPED-BY-PREFLIGHT):
+// pulled 4px toward the edge, it sits 8px from it. What the run creates is deleted.
 // flow: UI shell relleno de ion-chip
 import { type Browser, expect, type Locator, test } from '@playwright/test';
 
@@ -27,6 +28,8 @@ const VIEWPORTS = [
 
 /** Ionic's own `:host` padding of `ion-chip` on each side, in ios and in md (`chip.ios.css`, `chip.md.css`). */
 const IONIC_INLINE = 12;
+/** How far Ionic pulls a chip's own icon (its `ion-icon` child, first or last) toward the chip's edge (`ion-chip.js`). */
+const IONIC_ICON_PULL = 4;
 /** Ionic's `min-height` of `ion-chip`: a chip of one line of text is that tall with or without its 6px on top and below. */
 const IONIC_MIN_HEIGHT = 32;
 
@@ -90,14 +93,15 @@ function chipBox(chip: Locator): Promise<ChipBox> {
   });
 }
 
-/** Ionic's 12px on both sides, the label and the last child that far from the edge; margin and height as on main. */
-function expectIonicPadding(measured: ChipBox, what: string): void {
+/** Ionic's 12px on both sides, the label and the last child that far from the edge (`endInset`: a remove button; a chip's
+ *  own icon sits closer); margin and height as on main. */
+function expectIonicPadding(measured: ChipBox, what: string, endInset = IONIC_INLINE): void {
   const detail = `${what}: ${JSON.stringify(measured)}`;
   expect(measured.paddingStart, detail).toBe(`${IONIC_INLINE}px`);
   expect(measured.paddingEnd, detail).toBe(`${IONIC_INLINE}px`);
   expect(measured.marginStart, detail).toBe('0px');
   expect(Math.abs(measured.labelInset - IONIC_INLINE), detail).toBeLessThanOrEqual(0.5);
-  expect(Math.abs(measured.endInset - IONIC_INLINE), detail).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(measured.endInset - endInset), detail).toBeLessThanOrEqual(0.5);
   expect(measured.labelFits, detail).toBe(true);
   expect(measured.height, detail).toBeLessThanOrEqual(Math.max(IONIC_MIN_HEIGHT, measured.tailHeight) + 0.5);
 }
@@ -179,7 +183,7 @@ test('UI shell relleno de ion-chip — «Clear filters» of a table keeps Ionic�
     await view.locator('[data-testid=combo-menus-filter-name] input').fill(`${TAG} ${RUN}`);
     const clear = view.locator('[data-testid=combo-menus-filters-clear]');
     await expect(clear).toBeVisible();
-    expectIonicPadding(await chipBox(clear), '«Clear filters» 1440');
+    expectIonicPadding(await chipBox(clear), '«Clear filters» 1440', IONIC_INLINE - IONIC_ICON_PULL);
     await clear.click();
     await expect(clear).toBeHidden();
   } finally {
