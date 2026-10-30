@@ -428,6 +428,7 @@ test('«Retry» on another business’s reply in the shared inbox hands it to er
   const reason = reply.locator('[data-testid=whatsapp-inbox-message-error]');
   await expect(reason).toHaveAttribute('data-code', 'whatsapp_inbox.channel_not_connected');
   await expect(reason).toHaveText('WhatsApp is not connected: connect the number in Settings to send.');
+  if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await reply.scrollIntoViewIfNeeded();
