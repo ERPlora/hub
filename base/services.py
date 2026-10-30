@@ -650,9 +650,9 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
 def report_ready(hub_id: UUID) -> None:
     """Tell the SaaS that ``hub_id`` is ready: ``POST {SAAS_INTERNAL_URL}/internal/hubs/{id}/ready``, signed v1 + v2.
 
-    Called after the COMMIT that made it ready (:func:`provision_ready`, the worker's), never inside it. It never raises: a failure is logged and not
-    retried, because the SaaS asks ``GET /internal/hubs/{id}`` about a sign-up without its ``ready`` two minutes
-    later (``reconcile_hub_states``) and marks it itself.
+    Called after the COMMIT that made it ready (:func:`provision_ready`, the worker's), never inside it. It never
+    raises: a failure is logged and not retried, because the SaaS asks ``GET /internal/hubs/{id}`` about a sign-up
+    without its ``ready`` two minutes later (``reconcile_hub_states``) and marks it itself.
     """
     path = READY_PATH.format(id=hub_id)
     body = json.dumps({"id": str(hub_id)}).encode()
@@ -969,7 +969,8 @@ class ProvisioningStopped(Exception):
 
 
 class ProvisioningFailed(Exception):
-    """A step of a preparation that failed for a reason with a name (``no_cluster_available``, ``template_missing``…)."""
+    """A step of a preparation that failed for a reason with a name (``no_cluster_available``,
+    ``template_missing``…)."""
 
     def __init__(self, code: str, message: str):
         super().__init__(f"{code}: {message}")

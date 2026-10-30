@@ -234,8 +234,8 @@ DATABASES = {
 
 # The migrator's role (hub_migrator: DDL and CREATEDB; PLAN-DB §10) for the direct connections that make and change a
 # hub's database: its `<db_name>__ddl` alias and the maintenance connection to `postgres` (base.tenancy.connections,
-# base.tenancy.ops). Only the worker and the hub-migrate task have it (aws stacks/prod/apps.tf, hub_migrator_credentials;
-# never the web). Empty, the default connection's own role: local development and the tests.
+# base.tenancy.ops). Only the worker and the hub-migrate task have it (aws stacks/prod/apps.tf,
+# hub_migrator_credentials; never the web). Empty, the default connection's own role: local development and the tests.
 DB_MIGRATOR_USER = config("DB_MIGRATOR_USER", default="")
 DB_MIGRATOR_PASSWORD = config("DB_MIGRATOR_PASSWORD", default="")
 

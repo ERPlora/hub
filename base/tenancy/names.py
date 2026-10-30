@@ -54,7 +54,7 @@ def validate(name: str, *, control: str) -> str:
 
 
 def validate_hub(name: str, *, control: str) -> str:
-    """``name`` if it is a hub's or a demo's database of ``control`` (never a template's); ``InvalidDatabaseName`` if not.
+    """``name`` if it is a hub's or a demo's database of ``control`` (never a template's); else ``InvalidDatabaseName``.
 
     What may be dropped (``base.tenancy.ops.drop_database``): a template is every hub's source, never one hub's.
     """

@@ -58,7 +58,8 @@ def hub_app_labels() -> frozenset[str]:
     return frozenset(
         config.label
         for config in apps.get_app_configs()
-        if config.name.startswith(inventory.HUB_MODULES_PACKAGE) or inventory.APP_CLASSES.get(config.label) == inventory.HUB
+        if config.name.startswith(inventory.HUB_MODULES_PACKAGE)
+        or inventory.APP_CLASSES.get(config.label) == inventory.HUB
     )
 
 

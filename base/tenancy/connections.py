@@ -19,9 +19,10 @@ in libpq's terms, for ``psycopg`` itself (``base.tenancy.ops``: ``CREATE``/``DRO
 database ``postgres``).
 
 A hub on a :class:`control.models.Cluster` (round 2026-10-30, S2a) is reached on that cluster: its alias through the
-cluster's PgBouncer (its writer, directly, when the row names none) with the cluster's app role, its migrator's alias and connection on the cluster's writer with the
-cluster's migrator role (``base.tenancy.credentials.credentials_for``). A hub's alias never carries a migrator's role, nor
-asks for its secret: the web opens no other. Without a cluster, the settings' own server and the environment's roles.
+cluster's PgBouncer (its writer, directly, when the row names none) with the cluster's app role, its migrator's alias
+and connection on the cluster's writer with the cluster's migrator role (``base.tenancy.credentials.credentials_for``).
+A hub's alias never carries a migrator's role, nor asks for its secret: the web opens no other. Without a cluster, the
+settings' own server and the environment's roles.
 """
 
 import copy

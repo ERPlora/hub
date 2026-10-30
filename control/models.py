@@ -71,7 +71,9 @@ class Cluster(UUIDModel):
         blank=True,
         default="",
         db_default="",
-        help_text=_("The prefix of this cluster's two Secrets Manager secrets (…/app and …/migrator); empty, the environment's roles."),
+        help_text=_(
+            "The prefix of this cluster's two Secrets Manager secrets (…/app and …/migrator); empty, the environment's roles."
+        ),
     )
     created_at = models.DateTimeField(pgettext_lazy("hub registry", "created at"), auto_now_add=True)
 

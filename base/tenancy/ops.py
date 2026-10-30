@@ -7,13 +7,13 @@ and ``hub-migrate`` have and the web does not; the default connection's role whe
 and closes it on the way out.
 
 - :func:`clone_database` makes a hub's or a demo's database as a copy of its template (``CREATE DATABASE … TEMPLATE``;
-  its owner is the migrator that connects), on the hub's cluster: a template only clones within its cluster, so it
-  is that cluster's ``<control>_template[_<vertical>]`` (:class:`TemplateMissing` when it has none). A database that is already there (``42P04``) is no failure: the second
-  call of a provisioning that was cut short goes on from there. A template someone is connected to (``55006``) is
-  waited for a bounded while (:data:`TEMPLATE_BUSY_WAITS`), then a readable failure. Every call then makes the
-  database private: nothing to ``PUBLIC``, ``CONNECT`` and ``TEMPORARY`` to the environment's ``hub_app`` and
-  ``hub_admin`` (``bootstrap.Names``, with pre's ``pre_`` prefix); a role the server does not have (local
-  development, the tests) is skipped and logged.
+  its owner is the migrator that connects), on the hub's cluster: a template only clones within its cluster, so it is
+  that cluster's ``<control>_template[_<vertical>]`` (:class:`TemplateMissing` when it has none). A database that is
+  already there (``42P04``) is no failure: the second call of a provisioning that was cut short goes on from there. A
+  template someone is connected to (``55006``) is waited for a bounded while (:data:`TEMPLATE_BUSY_WAITS`), then a
+  readable failure. Every call then makes the database private: nothing to ``PUBLIC``, ``CONNECT`` and ``TEMPORARY`` to
+  the environment's ``hub_app`` and ``hub_admin`` (``bootstrap.Names``, with pre's ``pre_`` prefix); a role the server
+  does not have (local development, the tests) is skipped and logged.
 - :func:`drop_database` drops one hub's or demo's database, the sessions on it included (``WITH (FORCE)``); a
   template or any other name is refused before the server hears it.
 
@@ -98,7 +98,8 @@ def clone_database(
     source = names.identifier(template, control=control)
     roles = environment_roles(control) if roles is None else roles
     with connect_ops(cluster=cluster) as conn:
-        made = _create(conn, sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(target, source), name, template, waits, sleep)
+        statement = sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(target, source)
+        made = _create(conn, statement, name, template, waits, sleep)
         _make_private(conn, target, name, roles)
     return made
 
@@ -143,7 +144,7 @@ def _make_private(conn, target: sql.Identifier, name: str, roles: bootstrap.Name
     for role in wanted:
         if role not in present:
             logger.warning(
-                "base.tenancy.ops.role_missing role=%s database=%s: the server has no such role; nothing granted to it.",
+                "base.tenancy.ops.role_missing role=%s database=%s: no such role on the server; nothing granted.",
                 role,
                 name,
             )
