@@ -112,6 +112,27 @@ describe('ThreadView', () => {
     }
   });
 
+  it('a send erplora.com refused because the business has no number there says it in the Hub’s words, never as Meta’s reason (WHATSAPP_INBOX-F34)', async () => {
+    const unconnected = message({
+      id: 'n',
+      direction: 'outbound',
+      origin: 'hub',
+      status: 'failed',
+      error_code: 'whatsapp_inbox.channel_not_connected',
+      error_message: "WhatsApp is not connected. Connect the business's number in Settings to receive and send messages.",
+    });
+    for (const [locale, said] of [
+      ['en', 'WhatsApp is not connected: connect the number in Settings to send.'],
+      ['es', 'WhatsApp no está conectado: conecta el número en Ajustes para enviar.'],
+    ] as const) {
+      const s = await setup({ messages: [unconnected] }, locale);
+      const error = s.bubbles()[0].find('[data-testid="whatsapp-inbox-message-error"]');
+      expect(error.attributes('data-code'), locale).toBe('whatsapp_inbox.channel_not_connected');
+      expect(error.text(), locale).toBe(said);
+      expect(s.bubbles()[0].text(), locale).not.toMatch(/Meta's reason|Motivo de Meta/);
+    }
+  });
+
   describe('a send refused because WhatsApp’s permission expired (WHATSAPP_INBOX-F34, F02)', () => {
     const expired = message({
       id: 'x',

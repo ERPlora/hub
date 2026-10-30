@@ -921,7 +921,9 @@ Sale: el mensaje guardado en cola y, tras el guardado, entregado a erplora.com; 
 Si falla: si no se puede ni guardar, el cuadro conserva el texto con el motivo: han pasado más de 24
 horas desde el último mensaje del cliente («Han pasado más de 24 horas…»), o el número no está
 conectado, el mes está gastado o el Hub no llega a erplora.com (el cuadro lo dice antes de escribir).
-Si erplora.com lo rechaza (número bloqueado, tope del mes…), la burbuja dice «No entregado» y su motivo.
+Si erplora.com lo rechaza (número bloqueado, tope del mes…), la burbuja dice «No entregado» y su motivo; si
+erplora.com no tiene conectado el número del negocio, lo dice el Hub con sus palabras («WhatsApp no está
+conectado: conecta el número en Ajustes para enviar.»), nunca como motivo de Meta.
 Si erplora.com no contesta, no confirma o pide ir más despacio, la burbuja dice «No enviado» con
 **Reintentar**, que lo entrega otra vez con la misma clave: nunca sale dos veces. Sale siempre por el número
 del negocio que lo envió, aunque lo reintente otro desde la bandeja compartida de la fase 1.
@@ -1246,14 +1248,22 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   entonces. En la fase 2 corre en la BD de cada hub. «Reintentar» (`message.retry`) y volver a borrar un
   número ya borrado (`conversation.erase` por su id) entregan igual, con el negocio de la fila y no con el de
   quien lo pide desde la bandeja compartida; sin negocio guardado (anterior a `0007`), con el de quien lo pide.
-  Desde una petición de otro hub (la bandeja compartida de la fase 1), esa entrega aún no sale en el acto: su
-  hilo trabaja en el contexto de BD de la petición, que no es el del negocio de la fila (`HubContextMismatch`
-  en el log, igual que antes con `on_commit`), y la entrega el barrido a los 2–5 minutos.
+  Desde una petición de otro hub (la bandeja compartida de la fase 1), esa entrega también sale en el acto: la
+  bandeja le dice a `base.outbound` de qué negocio es el trabajo (`scope=`, en `_after_commit_as`) y su hilo
+  trabaja donde corren las operaciones de ese negocio (la BD compartida de la fase 1), nunca en el contexto de
+  BD de la petición ni en la BD de otro hub (`base.tenancy.context.current_for`); antes caía con
+  `HubContextMismatch` en el log y la entregaba el barrido a los 2–5 minutos
+  (FIX-HUB-WHATSAPP-INBOX-RETRY-OF-ANOTHER-BUSINESS-WAITS-FOR-THE-SWEEP, `tests/test_resume_per_business.py`).
+  El barrido pasa por el mismo camino: corrido en el contexto de un hub de la fase 1 (como lo hará el
+  planificador de la fase 2, un `use_hub` por hub), entrega lo de su negocio en ese contexto y lo de los demás
+  en la BD compartida, en el acto; hoy el worker lo corre en la BD compartida y no cambia nada.
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`; `whatsapp.reconnect_needed`, el 190 de Meta, como
   `whatsapp_inbox.reconnect_needed` con el texto del Hub (`RECONNECT_NEEDED`), nunca el de Meta, y la burbuja
-  lo dice como **Tu número** mientras el canal siga `reconnect_needed`; cualquier otro como
+  lo dice como **Tu número** mientras el canal siga `reconnect_needed`; `whatsapp.not_connected`, erplora.com sin
+  número del negocio, como `whatsapp_inbox.channel_not_connected` con el texto del Hub (`NOT_CONNECTED`; la burbuja,
+  el de la caja de respuesta), nunca como motivo de Meta; cualquier otro como
   `whatsapp_inbox.send_refused`, con el motivo de Meta); conexión fallida o un
   4xx que no es 409 (también un 429: ir más despacio no es el tope) → no ha salido (`sending`,
   `whatsapp_inbox.saas_unreachable`); 5xx, tiempo de lectura agotado o 200 sin id → no se sabe

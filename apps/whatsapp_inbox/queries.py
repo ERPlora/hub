@@ -110,6 +110,7 @@ _MESSAGE_REASONS = {
     "whatsapp_inbox.meta_unreachable": META_UNREACHABLE,
     HEADER_SAMPLE_MISSING_CODE: MESSAGE_HEADER_SAMPLE_MISSING,
     "whatsapp_inbox.cap_reached": CAP_REACHED,
+    "whatsapp_inbox.channel_not_connected": NOT_CONNECTED,
     "whatsapp_inbox.reconnect_needed": RECONNECT_NEEDED,
     SAAS_UNREACHABLE_CODE: SAAS_UNREACHABLE,
     SEND_UNKNOWN_CODE: SEND_UNKNOWN,

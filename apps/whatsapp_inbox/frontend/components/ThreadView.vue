@@ -81,11 +81,13 @@ function notSent(message: MessageOut): boolean {
 
 const EXPIRED = 'whatsapp_inbox.reconnect_needed';
 
-/** Why a message was not delivered: erplora.com's refusal for the plan's cap in the Hub's words (it is not Meta's,
- *  and erplora.com says it in English); WhatsApp's expired permission as «Your number» says it while the number
- *  still needs reconnecting, and as what happened once it is back; any other with Meta's reason. */
+/** Why a message was not delivered: erplora.com's refusal for the plan's cap, or for having no number of the
+ *  business, in the Hub's words (neither is Meta's, and erplora.com says them in English); WhatsApp's expired
+ *  permission as «Your number» says it while the number still needs reconnecting, and as what happened once it is
+ *  back; any other with Meta's reason. */
 function failedText(message: MessageOut): string {
   if (message.error_code === 'whatsapp_inbox.cap_reached') return t('whatsapp_inbox.composer.blocked.cap_reached');
+  if (message.error_code === 'whatsapp_inbox.channel_not_connected') return t('whatsapp_inbox.composer.blocked.not_connected');
   if (message.error_code === EXPIRED) {
     return t(props.reconnectNeeded ? 'whatsapp_inbox.settings.reconnectNeeded' : 'whatsapp_inbox.thread.permissionExpired');
   }

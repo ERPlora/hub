@@ -1,4 +1,4 @@
-// flow: WHATSAPP_INBOX-F01 WHATSAPP_INBOX-F02 WHATSAPP_INBOX-F03 WHATSAPP_INBOX-F05 WHATSAPP_INBOX-F06 WHATSAPP_INBOX-F07 WHATSAPP_INBOX-F08 WHATSAPP_INBOX-F09 WHATSAPP_INBOX-F10 WHATSAPP_INBOX-F13 WHATSAPP_INBOX-F32 WHATSAPP_INBOX-F33 WHATSAPP_INBOX-F35 WHATSAPP_INBOX-F36 WHATSAPP_INBOX-F37 WHATSAPP_INBOX-F38
+// flow: WHATSAPP_INBOX-F01 WHATSAPP_INBOX-F02 WHATSAPP_INBOX-F03 WHATSAPP_INBOX-F05 WHATSAPP_INBOX-F06 WHATSAPP_INBOX-F07 WHATSAPP_INBOX-F08 WHATSAPP_INBOX-F09 WHATSAPP_INBOX-F10 WHATSAPP_INBOX-F13 WHATSAPP_INBOX-F32 WHATSAPP_INBOX-F33 WHATSAPP_INBOX-F34 WHATSAPP_INBOX-F35 WHATSAPP_INBOX-F36 WHATSAPP_INBOX-F37 WHATSAPP_INBOX-F38
 // The WhatsApp inbox in a hidden Chrome (apps/whatsapp_inbox/WORKBOOK.md): the owner of hub `a` opens
 // the inbox with the number not connected and reads why; a customer writes (erplora.com's push, run as
 // the system) and her conversation arrives live with its unread; opening it reads it and shows the thread;
@@ -11,13 +11,16 @@
 // «Create card» joining a Customers card; «Erase this number's data» asked first. An attachment, the
 // echo of the owner's phone and an option tapped show in the thread; the filters keep who waits; the
 // month spent and a number to reconnect are said and go by themselves. An employee notes and takes a
-// conversation but neither erases nor opens Settings. Each flow's screen in three sizes
+// conversation but neither erases nor opens Settings. «Retry» on another business's reply, from the shared inbox of
+// phase 1, hands it to erplora.com at once, for that business (WHATSAPP_INBOX-F34). Each flow's screen in three sizes
 // (APP-WHATSAPP_INBOX-1-<flow>-390|834|1440). What it creates is deleted after the file.
+import { execFileSync } from 'node:child_process';
+
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanUpCards } from './customer-helpers';
-import { A, EMPLOYEE, hostPage, login, SAAS, shot, shown } from './helpers';
-import { filterBy } from './service-helpers';
+import { A, capture, EMPLOYEE, HUB_DIR, hostPage, login, psql, SAAS, shot, shown } from './helpers';
+import { filterBy, FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import {
   cleanUp,
   e2ePhone,
@@ -330,5 +333,107 @@ test('an employee notes and takes a conversation, but neither erases nor opens t
     await page.screenshot({ path: shot('whatsapp-inbox-employee-settings') });
   } finally {
     await context?.close();
+  }
+});
+
+/** `b`'s reply that erplora.com never answered («Not sent», with «Retry»), in phase 1's shared tables: `b`'s own
+ *  operations, run as the platform in a one-shot `manage.py shell` (phase 1's shared database, as the helpers of
+ *  whatsapp-helpers.ts do for `a`), with what their COMMIT hands to erplora.com dropped, as when the worker stops on a
+ *  deploy. Its channel's version and its conversation's number carry the run's marks: `cleanUp` deletes them. */
+const B_NOT_SENT = `
+import json, os, uuid
+from base import outbound
+from live.context import Scope, system_context
+from live.operations import get
+from apps.whatsapp_inbox import gateway
+class _Stopping:
+    def submit(self, job):
+        return False
+    def stop(self, grace):
+        return True
+outbound._pool = _Stopping()
+b = system_context(Scope("host", "b"))
+def run(name, payload):
+    op = get(name)
+    return op(b, op.input.model_validate(payload))
+setup = json.loads(os.environ["WA_SETUP"])
+run("whatsapp_inbox.channel.sync", setup["channel"])
+received = run("whatsapp_inbox.message.receive", setup["inbound"])
+sent = run("whatsapp_inbox.message.send", {"id": str(received.conversation_id), "text": setup["text"], "client_message_id": str(uuid.uuid7())})
+run("whatsapp_inbox.message.claim_delivery", {"id": str(sent.id)})
+run("whatsapp_inbox.message.record_delivery", {"id": str(sent.id), "kind": gateway.UNREACHABLE, "message": "erplora.com did not answer."})
+print(json.dumps({"id": str(sent.id)}))
+`;
+
+/** `b`'s reply to `phone` (E.164) that never left (B_NOT_SENT): its id. */
+function notSentOfB(phone: string, contactName: string, text: string): string {
+  const month = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' }).slice(0, 7);
+  const setup = {
+    channel: {
+      version: 900_000_000 + (Math.floor(Date.now() / 1000) % 1_000_000),
+      status: 'connected',
+      phone_number: '+34910000002',
+      display_name: 'e2e. Barbería',
+      monthly_limit: 150,
+      monthly_usage: 0,
+      usage_month: month,
+      templates: null,
+    },
+    inbound: {
+      wa_message_id: waId(),
+      from: phone.replace('+', ''),
+      contact_name: contactName,
+      direction: 'inbound',
+      source: 'live',
+      type: 'text',
+      text: 'Hola, ¿me dais cita el viernes?',
+      sent_at: new Date().toISOString(),
+    },
+    text,
+  };
+  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', B_NOT_SENT], {
+    cwd: HUB_DIR,
+    encoding: 'utf8',
+    env: { ...process.env, WA_SETUP: JSON.stringify(setup) },
+  });
+  return (JSON.parse(out.trim().split('\n').at(-1) ?? '{}') as { id: string }).id;
+}
+
+test('«Retry» on another business’s reply in the shared inbox hands it to erplora.com at once, for that business', async ({ page }) => {
+  // WHATSAPP_INBOX-F34 (FIX-HUB-WHATSAPP-INBOX-RETRY-OF-ANOTHER-BUSINESS-WAITS-FOR-THE-SWEEP): phase 1's inbox of `a` also
+  // lists `b`'s conversations. `a`'s owner retries `b`'s reply that did not leave: `a`'s request hands it to erplora.com
+  // at once, for `b` (never as `a`'s, never refused for running in `a`'s context), and erplora.com answers `b`'s way:
+  // `b` has no number there (its test seed gives one only to `a`, whose answer would be Meta's 190, «reconnect»), so
+  // «Not delivered», said in the Hub's words and never as Meta's reason. This stack runs no worker: no sweep could have
+  // handed it over. Before, it stayed «Sending…» until the worker's sweep, 2 to 5 minutes later.
+  const phone = e2ePhone();
+  const text = 'Te esperamos el viernes a las 11:00.';
+  const id = notSentOfB(phone, `${PREFIX}Bea ${Date.now().toString(36)}`, text);
+  const state = () => psql(`select status || ' ' || error_code from whatsapp_inbox_message where id = '${id}'`);
+  expect(state()).toBe('sending whatsapp_inbox.saas_unreachable');
+
+  await login(page, A, '/whatsapp_inbox/inbox');
+  await searchInbox(page, phone.slice(3));
+  await rowOf(page, phone).click();
+  const reply = bubbles(page, 'outbound').filter({ hasText: text });
+  await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toHaveText('Not sent');
+  await reply.locator('[data-testid=whatsapp-inbox-message-retry]').click();
+
+  await expect.poll(state, { timeout: 15_000 }).toBe('failed whatsapp_inbox.channel_not_connected');
+  // erplora.com's answer is `b`'s live notice, not `a`'s (phase 1 sends them per hub): `a`'s page reads it again.
+  await page.reload();
+  await searchInbox(page, phone.slice(3));
+  await rowOf(page, phone).click();
+  await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toHaveText('Not delivered');
+  const reason = reply.locator('[data-testid=whatsapp-inbox-message-error]');
+  await expect(reason).toHaveAttribute('data-code', 'whatsapp_inbox.channel_not_connected');
+  await expect(reason).toHaveText('WhatsApp is not connected: connect the number in Settings to send.');
+  for (const viewport of FLOW_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await reply.scrollIntoViewIfNeeded();
+    await expect(reply.locator('[data-testid=whatsapp-inbox-message-status]')).toBeInViewport();
+    await settled(page);
+    await noHorizontalScroll(page, `WHATSAPP_INBOX-F34 retry of another business ${viewport.label}`);
+    await capture(page, `FIX-HUB-WHATSAPP-INBOX-RETRY-OF-ANOTHER-BUSINESS-WAITS-FOR-THE-SWEEP-${viewport.label}`);
   }
 });

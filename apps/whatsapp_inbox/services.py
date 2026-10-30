@@ -216,6 +216,7 @@ _INTERNATIONAL = re.compile(r"\+[1-9]\d{6,14}")
 #: is «erplora.com did not send it», with Meta's reason as it came.
 _REFUSALS = {
     "whatsapp.cap_reached": "whatsapp_inbox.cap_reached",
+    "whatsapp.not_connected": "whatsapp_inbox.channel_not_connected",
     "whatsapp.reconnect_needed": "whatsapp_inbox.reconnect_needed",
     HEADER_SAMPLE_MISSING_CODE: HEADER_SAMPLE_MISSING_CODE,
 }
@@ -249,10 +250,12 @@ def _after_commit(ctx: OperationContext, job, *args) -> None:
 
 
 def _after_commit_as(host: str, ctx: OperationContext, job, *args) -> None:
-    """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as. A row made
-    before its business was recorded (empty ``host``) goes as ``ctx``'s, as it did."""
+    """``_after_commit`` for the business in ``host`` (the row's own), whatever business ``ctx`` runs as, and where that
+    business's operations run: phase 1's shared database when it is another business of phase 1 (the shared inbox's
+    «Retry», erasing again, the sweep), at once; never another hub's database (``base.outbound``, ``scope=``). A row
+    made before its business was recorded (empty ``host``) goes as ``ctx``'s, as it did."""
     scope = Scope(ctx.scope.kind, host) if host else ctx.scope
-    outbound.after_commit(job, scope, *args)
+    outbound.after_commit(job, scope, *args, scope=scope)
 
 
 def _conversation_for(phone: str, contact_name: str = "") -> Conversation:
