@@ -2377,7 +2377,11 @@ Pasos:
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
      una lista, por cuántos elementos lleva, y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
-     quedan los billetes y monedas contados: «50: 2»). Todo sale en el idioma de la persona, también el nombre de cada dato
+     quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
+     de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,
+     «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno); y
+     un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
+     no lo pone, nunca por su código. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
      técnico. Una acción de la propia plataforma se nombra por la pantalla donde se hace, por ejemplo «Cambiar en
      Ajustes» o «Borrar en Archivos». Cada acción sale con su propio verbo, nunca con uno genérico: rectificar una
@@ -2389,7 +2393,7 @@ Pasos:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
      persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio y, en «Lo que va a pasar»,
-la que dé su app.
+la que dé su app; la zona horaria del negocio.
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Si se recarga la página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se

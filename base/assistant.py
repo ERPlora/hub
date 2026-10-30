@@ -19,22 +19,26 @@ gateway (``saas`` ``assistant/internal.py``), without the ORM.
   ``assistant.unavailable``…), and what never reached it is ``assistant.unreachable``.
 """
 
+import datetime as dt
 import json
 import re
 import time
 import unicodedata
+import uuid
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
 from functools import cache
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 import pydantic
+from babel.dates import format_date, format_time, get_datetime_format
 from django.conf import settings
 from django.core import checks
 from django.core.exceptions import FieldDoesNotExist
 from django.http import StreamingHttpResponse
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.text import capfirst
 from django.utils.translation import get_language_info, gettext, pgettext_lazy
 from live.context import OperationContext, Scope
@@ -44,7 +48,7 @@ from live.operations import Operation, registry
 
 from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
-from base.business import currency_decimals
+from base.business import babel_locale, currency_decimals
 from base.operations import HostScopeResolver
 
 #: The tools a turn offers at most: the gateway takes 256, the model chooses better among a few.
@@ -250,22 +254,36 @@ def _in_code_language() -> bool:
 
 
 @cache
-def _verbose_name(app_label: str, entity: str, name: str) -> Any:
-    """The name the models of the app ``app_label`` give their field ``name`` (lazy: said in the active language), the
-    model of the operation's ``entity`` first — another may mean something else by it —, or ``None``. Their metadata
-    only: no query."""
+def _model_fields(app_label: str, entity: str, name: str) -> tuple:
+    """The fields ``name`` of the models of the app ``app_label``, the model of the operation's ``entity`` first —
+    another may mean something else by it. Their metadata only: no query."""
     config = active_apps_label(app_label)
     if config is None:
-        return None
+        return ()
     own = entity.replace("_", "")
-    models = sorted(config.get_models(), key=lambda model: not model._meta.model_name.endswith(own))
-    for model in models:
+    found = []
+    for model in sorted(config.get_models(), key=lambda model: not model._meta.model_name.endswith(own)):
         try:
-            verbose = getattr(model._meta.get_field(name), "verbose_name", None)
+            found.append(model._meta.get_field(name))
         except FieldDoesNotExist:
             continue
-        if verbose:
-            return verbose
+    return tuple(found)
+
+
+def _verbose_name(app_label: str, entity: str, name: str) -> Any:
+    """The name the models of the app ``app_label`` give their field ``name`` (lazy: said in the active language), or
+    ``None``."""
+    named = (getattr(field, "verbose_name", None) for field in _model_fields(app_label, entity, name))
+    return next((verbose for verbose in named if verbose), None)
+
+
+def _choice_label(app_label: str, entity: str, name: str, value: Any) -> Any:
+    """The label the models of the app ``app_label`` give the value ``value`` of their field ``name`` — its
+    ``choices``, the ones its screens show (lazy: said in the active language) —, or ``None``."""
+    for field in _model_fields(app_label, entity, name):
+        labels = dict(getattr(field, "flatchoices", None) or ())
+        if value in labels:
+            return labels[value]
     return None
 
 
@@ -319,11 +337,185 @@ def _hidden(value: Any, prop: dict, defs: dict) -> Any:
     return value
 
 
-def _field(name: str, label: str, prop: dict, defs: dict, value: Any, money: dict | None = None) -> dict:
-    """One datum of a card, a secret hidden (``_hidden``); an amount carries ``signed`` when its schema declares it so
-    and ``money`` when it is in a currency of its own (a preview's, as its read answers it): without it, the card
-    paints it in the business's."""
+# ── Each datum in words: a moment, a value of a list, a record (FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES) ──
+
+#: The mark of a datum that names a record (``json_schema_extra={"refers": {"read": "<a query>", "by": "<its input>",
+#: "name": "<the datum of its answer that names it>"}}``): the card names it by that read, run as the person. A datum
+#: the schema says is an id (``format: uuid``) without it is left out of the card. ``base.E009`` checks it at start.
+REFERS = "refers"
+
+#: The moments a schema declares (``format``), said as the person's language writes them.
+MOMENTS = ("date-time", "date", "time")
+
+
+def refers_of(prop: dict) -> dict | None:
+    """The read the schema ``prop`` marks to name its record (``REFERS``), or ``None``."""
+    declared = prop.get(REFERS)
+    return declared if isinstance(declared, dict) else None
+
+
+def _is_uuid(value: Any) -> bool:
+    """Whether ``value`` is an id as a schema's ``format: uuid`` takes it."""
+    try:
+        uuid.UUID(value)
+    except (TypeError, ValueError, AttributeError):
+        return False
+    return True
+
+
+#: What a card leaves out: a record it cannot name.
+_LEFT_OUT = object()
+
+
+@dataclass
+class _Words:
+    """What a card needs to say ``op``'s data in words: the person's language and the person (``ctx``: to read a
+    record's name as them and the business's zone; ``None`` for an automation's card, which names no record)."""
+
+    op: Operation
+    language: str
+    ctx: OperationContext | None
+    _zone: Any = None
+
+    def zone(self) -> Any:
+        """The business's zone (Settings › Business, read as the person) or else the deployment's, the one every app
+        reads a wall-clock time in; read once per card, only when a moment needs it."""
+        if self._zone is None:
+            failure, answer = (True, None) if self.ctx is None else _run(self.ctx, registry["base.business.get"], {})
+            business = _zone_named(answer.timezone) if failure is None else None
+            self._zone = business or timezone.get_current_timezone()
+        return self._zone
+
+
+def _zone_named(name: str) -> ZoneInfo | None:
+    """The zone ``name`` (IANA), or ``None`` when Python does not know it."""
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+
+
+def _moment(value: str, kind: str, words: _Words) -> str | None:
+    """``value`` (ISO 8601: a day, a day and a time, or a time) as the person's language writes it — CLDR's medium day
+    and short time, as the screens' ``formatDateTime`` (@erplora/ui) says them —; an instant of another zone at the
+    business's hour, a wall-clock time as it is (the app books it at the business's hour). ``None``: it is none."""
+    locale = babel_locale(words.language)
+    try:
+        if kind == "date":
+            return format_date(dt.date.fromisoformat(value), "medium", locale=locale)
+        if kind == "time":
+            return format_time(dt.time.fromisoformat(value).replace(tzinfo=None), "short", locale=locale)
+        moment = dt.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(words.zone()).replace(tzinfo=None)
+    day, hour = format_date(moment.date(), "medium", locale=locale), format_time(moment.time(), "short", locale=locale)
+    return get_datetime_format("medium", locale=locale).replace("{1}", day).replace("{0}", hour)
+
+
+def _reference(value: Any, prop: dict, words: _Words) -> Any:
+    """The name of the record ``value`` names, as the read its schema marks (``REFERS``) answers it to the person; or
+    ``_LEFT_OUT`` — no mark, no person at hand, or a read that fails (not there, not theirs to read, its app off):
+    the card names nobody by an id, nor reads anything for somebody else."""
+    declared = refers_of(prop)
+    read = registry.get(declared.get("read")) if declared else None
+    if read is None or words.ctx is None or not isinstance(value, str):
+        return _LEFT_OUT
+    failure, answer = _run(words.ctx, read, {declared.get("by"): value})
+    if failure is not None:
+        return _LEFT_OUT
+    name = answer.model_dump(mode="json").get(declared.get("name"))
+    return name if isinstance(name, str) and name.strip() else _LEFT_OUT
+
+
+#: The type of a value each JSON Schema type names.
+_TYPES = {"object": dict, "array": list, "string": str, "integer": int, "number": int | float, "boolean": bool}
+
+
+def _fits(value: Any, branch: dict) -> bool:
+    """Whether ``value`` has the shape of ``branch``: its type and, an object, no key it does not take and its
+    constants (a discriminator, as an automation's trigger ``kind``)."""
+    expected = _TYPES.get(branch.get("type", ""))
+    if expected is not None and not isinstance(value, expected):
+        return False
+    if not isinstance(value, dict):
+        return True
+    props = branch.get("properties", {})
+    if branch.get("additionalProperties") is False and not set(value) <= set(props):
+        return False
+    return all(value[key] == inner["const"] for key, inner in props.items() if key in value and "const" in inner)
+
+
+def _referred(prop: dict, defs: dict) -> dict:
+    """``prop`` with the schema its ``$ref`` names, what it says itself on top."""
+    ref = prop.get("$ref")
+    if not ref:
+        return prop
+    return {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
+
+
+def _fitting(value: Any, prop: dict, defs: dict, depth: int = 0) -> dict:
+    """The schema of ``value`` among the branches of the union ``prop`` declares (``anyOf``, ``oneOf``, one inside
+    another as an optional automation's trigger): the first one it fits (``_fits``), with what ``prop`` itself says
+    (its title, its marks); ``prop`` resolved when it is no union."""
+    prop = _referred(prop, defs)
+    branches = [*prop.get("anyOf", []), *prop.get("oneOf", [])]
+    if not branches or depth > 8:
+        return _resolved(prop, defs)
+    outer = {key: inner for key, inner in prop.items() if key not in ("anyOf", "oneOf", "discriminator")}
+    for branch in branches:
+        branch = _referred(branch, defs)
+        if branch.get("type") != "null" and _fits(value, branch):
+            return _fitting(value, {**branch, **outer}, defs, depth + 1)
+    return _resolved(prop, defs)
+
+
+def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words) -> Any:
+    """``value`` in words as its schema ``prop`` declares it, at any depth: a moment as the person's language writes it
+    (``_moment``), a value of a closed list by the label its app's models give it (``_choice_label``), a record by
+    its name (``_reference``) or else ``_LEFT_OUT`` — left out of an object, none in a list (which still says how many
+    it carries); what is none of them, or not what its schema declares (the write refuses it), as sent."""
+    if value is None or value == "":
+        return value
+    prop = _fitting(value, prop, defs)
+    if REFERS in prop or (prop.get("format") == "uuid" and _is_uuid(value)):
+        return _reference(value, prop, words)
+    if prop.get("format") in MOMENTS and isinstance(value, str):
+        said = _moment(value, prop["format"], words)
+        return value if said is None else said
+    if "enum" in prop and isinstance(value, str | int) and not isinstance(value, bool):
+        label = _choice_label(words.op.app_label, words.op.name.split(".")[1], name, value)
+        return value if label is None else str(label)
+    if isinstance(value, dict):
+        props = prop.get("properties", {})
+        extra = prop.get("additionalProperties")
+        extra = extra if isinstance(extra, dict) else {}
+        said = {
+            key: _said(inner, props.get(key, extra), defs, key if key in props else name, words) for key, inner in value.items()
+        }
+        return {key: inner for key, inner in said.items() if inner is not _LEFT_OUT}
+    if isinstance(value, list):
+        items, prefix = prop.get("items"), prop.get("prefixItems", [])
+        items = items if isinstance(items, dict) else {}
+        said = [_said(item, prefix[i] if i < len(prefix) else items, defs, name, words) for i, item in enumerate(value)]
+        return [None if item is _LEFT_OUT else item for item in said]
+    return value
+
+
+def _field(
+    name: str, label: str, prop: dict, defs: dict, value: Any, money: dict | None = None, words: _Words | None = None
+) -> dict | None:
+    """One datum of a card, as its schema ``prop`` declares it: a secret hidden (``_hidden``) and, with the ``words``
+    of its card, the rest in words (``_said``); ``None`` when it names a record the card cannot name. An amount
+    carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (a preview's,
+    as its read answers it): without it, the card paints it in the business's."""
     value = _hidden(value, prop, defs)
+    if words is not None:
+        value = _said(value, prop, defs, name, words)
+    if value is _LEFT_OUT:
+        return None
+    prop = _resolved(prop, defs)
     if value is None or value == "" or value == []:
         kind = "empty"
     elif isinstance(value, bool):
@@ -344,11 +536,12 @@ def _field(name: str, label: str, prop: dict, defs: dict, value: Any, money: dic
     return field
 
 
-def card(op: Operation, arguments: dict, language: str) -> dict:
+def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
     """What the person sees before ``op`` runs with ``arguments``: its app, its action, each datum it sends by its name
-    in ``language`` (``_label``; an amount in cents marked ``money``, and ``signed`` when its schema declares it so),
-    its risk and, for a dangerous one, what to type (``confirm_word``) — how many records when it names them by
-    ``ids``, and ``blocked`` when it names none (not from the chat)."""
+    in ``language`` (``_label``) and in words (``_said``: a moment, a value of a list, a record by its name, read as
+    ``ctx``'s person; an amount in cents marked ``money``, and ``signed`` when its schema declares it so), its risk
+    and, for a dangerous one, what to type (``confirm_word``) — how many records when it names them by ``ids``, and
+    ``blocked`` when it names none (not from the chat)."""
     schema = _schema(op)
     defs = schema.get("$defs", {})
     props = schema.get("properties", {})
@@ -361,13 +554,15 @@ def card(op: Operation, arguments: dict, language: str) -> dict:
             count = len(ids)
         else:
             blocked = True
+    words = _Words(op, language, ctx)
     with translation.override(language):
-        fields = [
+        said = [
             # The title of the property itself: a ``$ref``'s own is its schema class's name.
-            _field(name, _label(op, name, prop.get("title")), _resolved(prop, defs), defs, arguments[name])
+            _field(name, _label(op, name, prop.get("title")), prop, defs, arguments[name], words=words)
             for name, prop in props.items()
             if name in arguments
         ]
+        fields = [field for field in said if field is not None]
         word = str(count) if count else str(CONFIRM_WORD)
         app = app_name(op)
     return {
@@ -561,14 +756,21 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     defs = schema.get("$defs", {})
     props = schema.get("properties", {})
     money = _answer_money(answer)
+    words = _Words(read, ctx.language, ctx)
     with translation.override(ctx.language):
         fields = [
             _field(
-                name, _label(read, name, props[name].get("title")), _resolved(props[name], defs), defs, answer.get(name), money
+                name,
+                _label(read, name, props[name].get("title")),
+                props[name],
+                defs,
+                answer.get(name),
+                money,
+                words,
             )
             for name in declared["fields"]
         ]
-    return None, [field for field in fields if field["kind"] != "empty"]
+    return None, [field for field in fields if field is not None and field["kind"] != "empty"]
 
 
 @checks.register("base")
@@ -621,6 +823,67 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     problems += [
         f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields
     ]
+    return problems
+
+
+@checks.register("base")
+def check_references(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E009``: a datum marked ``REFERS`` names a read of the operation's own app, of ``base`` or of one it
+    requires, that takes the datum (``by``) and answers the record's name (``name``)."""
+    errors: list[checks.CheckMessage] = []
+    for op in registry.values():
+        schema = _schema(op)
+        problems = [
+            f"{path} {problem}"
+            for path, declared in _marks(schema, schema.get("$defs", {}))
+            for problem in _reference_problems(op, declared)
+        ]
+        if problems:
+            errors.append(
+                checks.Error(
+                    f"{op.name} marks a reference that {'; '.join(problems)}.",
+                    hint='Mark it json_schema_extra={"refers": {"read": "<app>.<entity>.<a query>", "by": "<its input>", '
+                    '"name": "<the datum of its answer that names the record>"}}.',
+                    obj=op.name,
+                    id="base.E009",
+                )
+            )
+    return errors
+
+
+def _marks(prop: dict, defs: dict, path: str = "", depth: int = 0) -> list[tuple[str, Any]]:
+    """Each ``REFERS`` mark of the schema ``prop`` at any depth, with the path of its datum."""
+    if depth > 8:  # a schema that names itself
+        return []
+    ref = prop.get("$ref")
+    if ref:
+        prop = {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
+    found = [(path, prop[REFERS])] if REFERS in prop else []
+    for branch in [*prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]:
+        found += _marks(branch, defs, path, depth + 1)
+    for name, inner in prop.get("properties", {}).items():
+        found += _marks(inner, defs, f"{path}.{name}" if path else name, depth + 1)
+    if isinstance(prop.get("items"), dict):
+        found += _marks(prop["items"], defs, f"{path}[]", depth + 1)
+    return found
+
+
+def _reference_problems(op: Operation, declared: Any) -> list[str]:
+    if not isinstance(declared, dict) or not all(isinstance(declared.get(key), str) for key in ("read", "by", "name")):
+        return ["is not a read, by and name"]
+    read = registry.get(declared["read"])
+    if read is None:
+        return [f"names no operation {declared['read']}"]
+    problems = []
+    if read.kind != "query":
+        problems.append(f"names {read.name}, not a read")
+    own = active_apps_label(op.app_label)
+    if read.app_label not in {op.app_label, "base", *(own.requires if own else ())}:
+        problems.append(f"names {read.name}, of {read.app_label}, which {op.app_label} does not require")
+    if declared["by"] not in read.input.model_fields:
+        problems.append(f"names {read.name}, which takes no {declared['by']}")
+    if declared["name"] not in _output_schema(read).get("properties", {}):
+        problems.append(f"names {read.name}, which gives no {declared['name']}")
     return problems
 
 

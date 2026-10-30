@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
-import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOn, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = [
@@ -390,7 +390,8 @@ test('BASE-G116 — a dangerous write lists its data and runs only after typing 
   await ask(page, `E2E-DELETE ${item.data.id}`, { settle: false });
   await expect(card(page)).toBeVisible();
   await expect(card(page)).toContainText('Delete in Demo. Check each datum before going on.');
-  await expect(card(page)).toContainText(`Record: ${item.data.id}`);
+  // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a record is never shown by its id; Demo marks no read that names it.
+  await expect(card(page)).not.toContainText(item.data.id);
   // The native button inside `ion-button` (its host carries no role for `aria-disabled` to count).
   const submit = card(page).locator('[data-testid="assistant-confirm-submit"] button');
   await expect(submit).toBeDisabled();
@@ -488,6 +489,45 @@ test('assistant-card — in Spanish an object datum (a WhatsApp template) is sai
   await context.close();
 });
 
+// flow: assistant-card (BASE-F97)
+// FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a booking's card said each datum as the model sent it («2026-11-02T10:00:00+01:00»,
+// «counter», the customer's and the professional's ids): now its day and time as the person's language writes them, at the
+// business's hour, its channel by the label Appointments gives it, and nobody by an id. Cancelled: nothing is booked.
+test('assistant-card — in Spanish a booking says its day and time and its channel in words, and nobody by an id', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  // A business is born with every app off: Appointments and the apps it needs, off again at the end if they were.
+  const needed = ['customer', 'service', 'staff', 'schedule', 'appointment'];
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  await turnOn(context, A, ...needed);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const ids = ['0192f0b2-1111-7000-8000-000000000001', '0192f0b2-2222-7000-8000-000000000002', '0192f0b2-3333-7000-8000-000000000003'];
+  const booking = { customer_id: ids[0], services: [{ service_id: ids[1] }], staff_id: ids[2], start: '2026-11-02T10:00:00+01:00', source: 'counter' };
+  await ask(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Crear en Citas: 1 elemento · 2 nov 2026, 10:00 · Mostrador');
+    for (const raw of ['2026-11-02', '+01:00', 'counter', ...ids]) await expect(card(page)).not.toContainText(raw);
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  for (const app of [...needed].reverse().filter((id) => !wasOn.has(id))) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
 // flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
 // FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what a dangerous write sends («Persona:
 // saas:3»), never what it will do. Base's own preview: «Remove the PIN» names whose PIN goes, as its read
@@ -516,7 +556,9 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
     await expect(card(page)).toContainText('Quitar en Empleados. Revisa cada dato antes de seguir.');
     await expect(preview).toContainText('Lo que va a pasar');
     await expect(preview.locator('li')).toHaveText([`Nombre: ${employee!.name}`, `Correo: ${EMPLOYEE.email}`]);
-    await expect(card(page)).toContainText(`Persona: ${employee!.id}`);
+    // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: the person by their name, as Employees reads it, never by the id sent.
+    await expect(card(page)).toContainText(`Persona: ${employee!.name}`);
+    await expect(card(page)).not.toContainText(employee!.id);
     await confirmationReady(page);
     await untilStill(page);
     expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);

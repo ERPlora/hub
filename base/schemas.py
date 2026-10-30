@@ -986,6 +986,8 @@ class PersonIn(Schema):
         max_length=150,
         title=gettext_noop("Person"),
         description="The ``id`` of a person of ``base.person.list``.",
+        # The assistant's card names the person, never by this id (base/assistant.py ``REFERS``).
+        json_schema_extra={"refers": {"read": "base.person.detail", "by": "person", "name": "name"}},
     )
 
 
