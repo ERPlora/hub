@@ -451,7 +451,8 @@ Si falla: si la lista nombra algo que no existe en el negocio, o algo que necesi
 (anular, devolver, borrar datos, enviar a Hacienda…), se rechaza entera y se dice qué. Nadie concede lo
 que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».» (tampoco una
 integración con su clave). Cada paso actúa solo con el permiso que se le concedió, nunca con todos los
-de quien la montó.
+de quien la montó. Reservar con solo el nombre y el teléfono de quien reserva busca o crea su ficha de
+cliente sin autorizar nada de Clientes.
 Implicados: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16
 
 ### FLOW-F13 Probar sin que haga nada
@@ -1220,6 +1221,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`<app>.view…`, para contestar con lo que hizo), nunca con todos: los controles internos de la
   operación siguen valiendo (el «no elevation» del motor viejo); en el idioma de quien la guardó, que es el de
   lo que escriben sus pasos y el del motivo que leen los pasos siguientes (`steps.<id>.error_message`).
+  Lo que una operación pide a otra app para hacer su propio trabajo lo añade esa operación solo para esa
+  llamada, nunca el paso (`reservation.reservation.create` busca o crea la ficha por teléfono con
+  `card_keeper`, como lee Horarios con `reader`): `_step_context` no gana permisos de otras apps
+  (`test_services_safety.py`).
 - **El motivo de una parada, en el idioma de quien lo lee** (FLOW-F16; mismo patrón que `message_reason` de
   whatsapp_inbox, hub#384): la ejecución (`error_reason`) y la entrada del paso que falló (`error.reason`)
   guardan el **nombre** del motivo propio del motor y sus datos (`queries.REASONS`: el código, salvo donde un

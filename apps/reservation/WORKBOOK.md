@@ -685,7 +685,8 @@ retención la recibe por la llamada de Reservas en la misma transacción (TABLE-
   `table.hold.move_reservation` (quitar la mesa de una confirmada) y `table.hold.release` (sentar
   pronto); sentar llama a `table.session.open` con la sesión de quien sienta.
 - **Clientes** (requisito): la ficha del cliente (`find_customer`), buscarla por teléfono
-  (`customer.customer.by_phone`) y crearla (`customer.customer.create`), con la sesión de quien reserva.
+  (`customer.customer.by_phone`) y crearla (`customer.customer.create`), en nombre de quien reserva
+  aunque no tenga permiso en Clientes (también una automatización a la que solo se le autorizó reservar).
 - **Horarios** (requisito): el horario del negocio de cada día (`schedule.hours.for_range`), leído en
   nombre de quien reserva aunque no tenga permiso en Horarios, y la forma de decir un día
   (`day_label`), la misma que usa Citas.
@@ -715,8 +716,9 @@ retención la recibe por la llamada de Reservas en la misma transacción (TABLE-
 
 Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`, `hub_employee`).
 Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuenta» de Ventas
-(`sale.add_sale`); apuntar con un cliente nuevo, «Gestionar clientes» de Clientes
-(`customer.manage`): los cuatro papeles los tienen.
+(`sale.add_sale`). Apuntar una reserva o a alguien en la lista de espera por su teléfono no pide nada
+de Clientes: su ficha se busca o se crea en nombre de quien apunta, también si es una automatización a
+la que solo se le autorizó reservar.
 
 ## Para quien lo mantiene
 
@@ -736,7 +738,10 @@ Sentar pide además «Sentar» de Mesas (`table.add_session`) y «Montar la cuen
 - **`requires = ["table", "customer", "schedule"]`**: la mesa es una clave ajena a `table.Table`; el
   cliente, a `customer.Customer` (`PROTECT`, como Citas); el horario se lee con la operación
   `schedule.hours.for_range`, con `schedule.view` añadido al contexto solo para esa lectura (como
-  Citas).
+  Citas); la ficha por teléfono (`card_for_phone`, al reservar y en la lista de espera) se busca y se
+  crea con `customer.view` y `customer.manage` añadidos solo para esas dos llamadas (`card_keeper`): un
+  paso de una automatización, que solo lleva el permiso de su operación y las lecturas de Reservas
+  (FLOW-F12), reserva por teléfono sin recibir permisos de Clientes.
 - **Modelos**: `Settings` (una fila), `TimeSlot` (día de la semana, desde, hasta, máximo de reservas y
   de comensales; borrado lógico; sin solapes en el mismo día), `BlockedDate` (todo el día o
   desde–hasta; único por fecha y hora de inicio entre los vivos), `Reservation` (cliente, nombre,

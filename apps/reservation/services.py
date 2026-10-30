@@ -101,6 +101,8 @@ S = Reservation.Status
 SYSTEM = "reservation.system"
 #: Tables' platform operations (the holds of reservations).
 TABLE_SYSTEM = "table.system"
+#: What finding the guest's card by her phone, or making it, asks of Customers (``card_keeper``).
+CARD_RIGHTS = frozenset({"customer.view", "customer.manage"})
 #: The reason a reservation released unconfirmed keeps (the screen translates it).
 UNCONFIRMED = "unconfirmed"
 
@@ -240,6 +242,13 @@ def call_app(ctx: OperationContext, name: str, data: dict) -> Any:
 def table_system(ctx: OperationContext) -> OperationContext:
     """``ctx`` with Tables' platform permission added, for the holds of reservations only."""
     return replace(ctx, permissions=ctx.permissions | {TABLE_SYSTEM})
+
+
+def card_keeper(ctx: OperationContext) -> OperationContext:
+    """``ctx`` able to find the guest's card by her phone or make it, for that only: booking needs no right in
+    Customers, as it needs none in Schedules (``queries.reader``), so an automation granted only to book books by
+    phone (FLOW-F12) and keeps none of Customers' rights after it."""
+    return replace(ctx, permissions=ctx.permissions | CARD_RIGHTS)
 
 
 def contract(reservation: Reservation, status: str) -> dict:
@@ -386,8 +395,9 @@ def card_for_phone(
     ctx: OperationContext, name: str, phone: str, email: str, source: str
 ) -> Customer:
     """The live card with ``phone`` (among several, the one with ``name``, case and accents ignored; else
-    the first) or a new one with the guest's name, phone and email, made by Customers."""
-    matches = call_app(ctx, "customer.customer.by_phone", {"phone": phone}).rows
+    the first) or a new one with the guest's name, phone and email, made by Customers (``card_keeper``)."""
+    keeper = card_keeper(ctx)
+    matches = call_app(keeper, "customer.customer.by_phone", {"phone": phone}).rows
     if matches:
         wanted = _folded(name)
         match = next(
@@ -396,7 +406,7 @@ def card_for_phone(
         return find_customer(match.id, None, lock=True)  # locked, as ``chosen_card``
     try:
         created = call_app(
-            ctx,
+            keeper,
             "customer.customer.create",
             {"name": name, "phone": phone, "email": email, "source": source},
         )

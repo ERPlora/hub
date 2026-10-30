@@ -40,6 +40,41 @@ def test_a_guest_with_a_new_phone_gets_a_card_of_customers():
     assert out.guest_phone == "+34600111222"
 
 
+#: Who may only take reservations and read them, with no right in Customers: an automation's step (FLOW-F12:
+#: its operation's permission and its app's reads) or an integration's key that only books.
+ONLY_BOOKING = {"reservation.add_reservation", "reservation.view_reservation"}
+
+
+def test_who_may_only_book_finds_the_guests_card_by_her_phone():
+    # FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED: booking by phone looked the card up with the caller's own
+    # rights in Customers, so an automation that may book was refused («customer.view») and booked nothing.
+    card = make_customer("Ana García", phone="600111222")
+    out = book(guest_phone="600 111 222", ctx=ctx_for(permissions=ONLY_BOOKING))
+    assert out.customer_id == card.id
+    assert Customer.objects.count() == 1
+
+
+def test_who_may_only_book_gives_a_new_phone_its_card():
+    out = book(
+        guest_name="Luis Pérez",
+        guest_phone="600 333 444",
+        ctx=ctx_for(permissions=ONLY_BOOKING),
+    )
+    card = Customer.objects.get(pk=out.customer_id)
+    assert (card.name, card.phone, card.source) == ("Luis Pérez", "+34600333444", "phone")
+    assert Reservation.objects.get().customer_id == card.id
+
+
+def test_who_may_only_keep_the_waitlist_writes_a_new_phone_down_with_its_card():
+    entry = run(
+        "reservation.waitlist.create",
+        {"guest_name": "Luis", "guest_phone": "600333444", "date": "2026-10-15", "preferred_time": "21:00", "party_size": 2},
+        ctx_for(permissions={"reservation.change_waitlistentry"}),
+    )
+    card = Customer.objects.get(pk=entry.customer_id)
+    assert (card.name, card.phone, card.source) == ("Luis", "+34600333444", "walk_in")
+
+
 def test_a_guest_at_the_door_gets_a_walk_in_card():
     out = book(source="in_person")
     assert Customer.objects.get(pk=out.customer_id).source == "walk_in"

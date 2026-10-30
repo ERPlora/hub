@@ -17,9 +17,10 @@ import pytest
 from live.context import system_context
 from live.models import OutboxEvent
 
-from apps.customer.models import Activity
+from apps.customer.models import Activity, Customer
 from apps.flow import events
 from apps.flow.models import FlowRun
+from apps.reservation.models import Reservation
 from apps.task.models import Task
 
 from .conftest import A, ctx_for, run
@@ -274,3 +275,56 @@ def test_a_chain_of_real_events_is_stopped_when_it_would_start_itself_again():
     ).get()
     assert stopped.error_code == "flow.loop_stopped"
     assert Task.objects.count() == 2
+
+
+# ── Booking a table by the guest's phone (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED) ─────────────
+
+
+#: «Book a table» with what a call or a message gives: the guest's name and phone, never her card.
+BOOK_BY_PHONE = {
+    "id": "s1",
+    "kind": "command",
+    "operation": "reservation.reservation.create",
+    "params": {
+        "guest_name": "input.name",
+        "guest_phone": "input.phone",
+        "date": "2026-10-16",
+        "time": "21:00",
+        "party_size": 2,
+    },
+}
+
+
+@pytest.fixture
+def open_book(clock):
+    """Reservations open every day for lunch and dinner, on the 15th at noon."""
+    from apps.reservation.tests.conftest import open_week
+
+    clock(NOON)
+    open_week()
+
+
+def book_by_phone(phone: str, name: str = "Ana García"):
+    """Runs an automation granted only «reservation.reservation.create» that books for ``name`` by ``phone``."""
+    flow = create_automation(
+        {"name": "Book by phone", "trigger": {"kind": "manual"}, "steps": [BOOK_BY_PHONE]},
+        ["reservation.reservation.create"],
+    )
+    return run("flow.flow.run", {"id": flow, "input": {"name": name, "phone": phone}})
+
+
+def test_an_automation_books_by_phone_with_the_guests_card_found_by_her_phone(open_book):
+    # FLOW-F12: what was granted («reservation.reservation.create») is enough for what booking does itself in
+    # Customers; before, the step was refused «customer.view» and nothing was booked.
+    card = run("customer.customer.create", {"name": "Ana García", "phone": "600111222"}, system_context(A))
+    result = book_by_phone("600 111 222")
+    assert (result.status, result.error_code) == ("succeeded", "")
+    booked = Reservation.objects.get()
+    assert (booked.customer_id, booked.guest_phone) == (card.id, "+34600111222")
+
+
+def test_an_automation_books_a_new_phone_under_a_new_card(open_book):
+    result = book_by_phone("600 333 444", name="Luis Pérez")
+    assert (result.status, result.error_code) == ("succeeded", "")
+    card = Customer.objects.get(pk=Reservation.objects.get().customer_id)
+    assert (card.name, card.phone) == ("Luis Pérez", "+34600333444")

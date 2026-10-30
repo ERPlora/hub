@@ -104,3 +104,16 @@ def test_only_what_the_caller_may_do_is_granted():
 def test_a_normal_step_still_runs_with_its_narrow_permission():
     flow = make_flow(trigger_kind="manual", steps=[TASK_STEP])
     assert run("flow.flow.run", {"id": str(flow.id)}).status == "succeeded"
+
+
+def test_a_step_that_books_by_phone_still_holds_nothing_of_customers():
+    # FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED: booking finds or makes the guest's card by itself, the step
+    # never gets Customers' rights: it can neither look a card up nor make one on its own.
+    flow = make_flow(grants=["reservation.reservation.create"])
+    started = FlowRun.objects.create(flow=flow, flow_version=1, trigger_kind="manual", trigger_key="k")
+    ctx = services._step_context(ctx_for(scope=A), started, flow, get("reservation.reservation.create"))
+    assert not ctx.has("customer.view") and not ctx.has("customer.manage")
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.by_phone", {"phone": "600111222"}, ctx)
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.create", {"name": "Ana García", "phone": "600111222"}, ctx)

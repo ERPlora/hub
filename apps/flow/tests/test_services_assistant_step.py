@@ -563,3 +563,54 @@ def test_a_turn_another_process_holds_is_left_alone(gateway, clock, worker):
     assert run("flow.run.claim_assistant", {"id": str(ran.id)}, system).claimed is True
     assert run("flow.run.claim_assistant", {"id": str(ran.id)}, system).claimed is False  # someone else holds it
     assert gateway.sent(CHAT) == []
+
+
+# ── Booking by the guest's phone (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED) ───────────────────────────
+
+
+BOOKING = {"guest_name": "Ana García", "guest_phone": "600 111 222", "date": "2026-10-16", "time": "21:00", "party_size": 2}
+
+
+def book_step(**more) -> dict:
+    return step(prompt="Book a table for {{input.name}}", tools=["reservation.reservation.create"]) | more
+
+
+@pytest.fixture
+def open_book():
+    """Reservations open every day for lunch and dinner."""
+    from apps.reservation.tests.conftest import open_week
+
+    open_week()
+
+
+def booked_cards() -> list:
+    from apps.reservation.models import Reservation
+
+    return [(row.customer.name, row.customer.phone) for row in Reservation.objects.select_related("customer")]
+
+
+def test_on_its_own_the_assistant_books_by_the_guests_phone_alone(gateway, clock, worker, open_book):
+    # FLOW-F37: what the automation was granted («reservation.reservation.create») books with only a name and a phone;
+    # before, the guest's card was looked up with the step's rights in Customers, none, and it was refused.
+    clock(NOON)
+    flow = manual([book_step(mode="auto")], grants=["reservation.reservation.create"])
+    gateway.reply(CHAT, json=wants("reservation__reservation__create", BOOKING))
+    gateway.reply(CHAT, json=said("Booked"))
+    ran = start(worker, flow)
+    worker()
+    assert booked_cards() == [("Ana García", "+34600111222")]
+    assert json.loads(gateway.sent(CHAT)[1].body["messages"][-1]["content"]).get("error") is None
+    assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
+
+
+def test_a_yes_to_the_assistant_books_by_the_guests_phone_alone(gateway, clock, worker, open_book):
+    # FLOW-F38: «Ask me first» runs the change, after the yes, with the same rights as on its own.
+    clock(NOON)
+    flow = manual([book_step()], grants=["reservation.reservation.create"])
+    gateway.reply(CHAT, json=wants("reservation__reservation__create", BOOKING))
+    gateway.reply(CHAT, json=said("Booked"))
+    ran = start(worker, flow)
+    worker()
+    question = Question.objects.get(run_id=ran.id)
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": True, "note": ""})
+    assert booked_cards() == [("Ana García", "+34600111222")]
