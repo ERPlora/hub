@@ -34,7 +34,7 @@ from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, NotFound
-from live.operations import get, operation, registry
+from live.operations import INTERNAL, get, operation, registry
 
 from apps.website import reviews
 from apps.website.models import Site
@@ -165,6 +165,7 @@ def get_site(ctx: OperationContext, data: NoIn) -> dict:
 
 
 # Not an assistant tool (no ``ai=``): an HTML page for the editor's frame; the assistant reads website.site.get.
+# Not an assistant tool: the page as HTML, for the screen's preview.
 @operation(
     "website.site.preview",
     kind="query",
@@ -172,6 +173,7 @@ def get_site(ctx: OperationContext, data: NoIn) -> dict:
     input=NoIn,
     output=PreviewOut,
     expose_api=True,
+    ai=INTERNAL,
 )
 def preview_site(ctx: OperationContext, data: NoIn) -> dict:
     site = current_site(hub_id(ctx.scope))
@@ -199,6 +201,7 @@ def business_day(scope: Scope) -> str:
 
 
 # Not an assistant tool (no ``ai=``): its answer is an image in base64; the editor downloads it.
+# Not an assistant tool: an image the screen shows and prints.
 @operation(
     "website.qr.get",
     kind="query",
@@ -206,6 +209,7 @@ def business_day(scope: Scope) -> str:
     input=QrIn,
     output=QrOut,
     expose_api=True,
+    ai=INTERNAL,
 )
 def get_qr(ctx: OperationContext, data: QrIn) -> dict:
     url = public_url(ctx.scope.key, ctx.request)
@@ -300,6 +304,7 @@ def _without_hidden(content: dict) -> dict:
 
 
 # The visitors' anonymous reads are no assistant tools (no ``ai=``): the team's assistant reads website.site.get.
+# Not an assistant tool: the public website's read, for its visitors.
 @operation(
     "website.public.site",
     kind="query",
@@ -307,6 +312,7 @@ def _without_hidden(content: dict) -> dict:
     input=NoIn,
     output=PublicSiteOut,
     expose_api=True,
+    ai=INTERNAL,
 )
 def public_site(ctx: OperationContext, data: NoIn) -> dict:
     _count_visitor(ctx)
@@ -321,6 +327,7 @@ def public_site(ctx: OperationContext, data: NoIn) -> dict:
     }
 
 
+# Not an assistant tool: the public website's read, for its visitors.
 @operation(
     "website.public.catalog",
     kind="query",
@@ -328,6 +335,7 @@ def public_site(ctx: OperationContext, data: NoIn) -> dict:
     input=NoIn,
     output=CatalogOut,
     expose_api=True,
+    ai=INTERNAL,
 )
 def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
     _count_visitor(ctx)
@@ -346,6 +354,7 @@ def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
     return view
 
 
+# Not an assistant tool: the public website's read, for its visitors.
 @operation(
     "website.public.reviews",
     kind="query",
@@ -353,6 +362,7 @@ def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
     input=NoIn,
     output=ReviewsOut,
     expose_api=True,
+    ai=INTERNAL,
 )
 def public_reviews(ctx: OperationContext, data: NoIn) -> dict:
     _count_visitor(ctx)
