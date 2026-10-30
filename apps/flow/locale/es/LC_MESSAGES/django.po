@@ -205,6 +205,14 @@ msgstr "borradores"
 msgid "That automation does not exist in this business."
 msgstr "Esa automatización no existe en este negocio."
 
+msgctxt "datum"
+msgid "Yes"
+msgstr "Sí"
+
+msgctxt "datum"
+msgid "No"
+msgstr "No"
+
 msgid "Several automations fit «%(text)s»: %(names)s. Say which one."
 msgstr "Varias automatizaciones encajan con «%(text)s»: %(names)s. Di cuál."
 

@@ -6,7 +6,8 @@
   are left out). ``active_apps`` is the phase-1 seam: every installed module but this one, as
   ``base.session.me``; phase 2 reads the SaaS's picture there.
 - **Values** (``map_params``): a step's params for what the run knows (``document.resolve``), leaving out
-  what came out empty, so an optional field keeps its default.
+  what came out empty, so an optional field keeps its default. What a person reads (``PERSON_PARAMS``, a question's
+  texts) says each datum in words (``words_for``); what goes to a machine, as the code keeps it.
 - **«Try it»** (``flow.flow.test``) walks the steps against the last real event of this business and
   executes nothing: it validates each action's data against the action's own schema.
 """
@@ -15,6 +16,8 @@ import datetime as dt
 import functools
 import importlib
 import json
+import re
+from collections.abc import Collection
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
@@ -23,15 +26,20 @@ import pydantic
 from django.db.models import Count, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Lower
 from django.utils import timezone, translation
+from babel.dates import format_date, format_time, get_datetime_format
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound
+from django.utils.translation import pgettext_lazy
+from live.context import OperationContext, Scope
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 from live.meta import LiveAppConfig, module_configs
 from live.models import OutboxEvent
 from live.operations import Operation, operation, registry
 
 from apps.flow import document, recipes, vault
 from base import assistant as hub_assistant
+from base.business import babel_locale, money_text
+from base.home import ISO_HOUR, moment
+from base.operations import business_currency
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.schemas import (
     CatalogIn,
@@ -933,19 +941,111 @@ def event_sample(ctx: OperationContext, data: SampleIn) -> dict:
     return sample_of(ctx, data.event)
 
 
+#: The data of an action a person reads, by action: a message to a customer (FLOW-F31), its text and its template's
+#: values. Each datum inserted in them is said in words (``words_for``); every other action's data go to a machine.
+PERSON_PARAMS: dict[str, frozenset[str]] = {"whatsapp_inbox.message.notify": frozenset({"text", "template"})}
+#: A yes or no inserted in a text a person reads.
+YES = pgettext_lazy("datum", "Yes")
+NO = pgettext_lazy("datum", "No")
+
+
+def _is_money(name: str, prop: dict) -> bool:
+    """An amount in cents, as its schema declares it: the rule of the assistant's card (base/assistant.py)."""
+    return name.endswith("_cents") or "in cents" in str(prop.get("description", "")).lower()
+
+
+def _money_paths(steps: list[dict]) -> frozenset[str]:
+    """The paths (``steps.<id>.<field>``) of the amounts in cents the steps' actions and reads declare they leave: their
+    output's schema (a read's first row). An event declares none."""
+    found: set[str] = set()
+    for step in steps:
+        op = registry.get(str(step.get("operation") or "")) if step.get("kind") in ("command", "query") else None
+        if op is None:
+            continue
+        schema = op.output.model_json_schema()
+        defs = schema.get("$defs", {})
+        props = schema.get("properties", {})
+        if op.kind == "query" and "rows" in props:
+            props = _resolve_ref(props["rows"].get("items", {}), defs).get("properties", {})
+        found |= {f"steps.{step.get('id')}.{name}" for name, prop in props.items() if _is_money(name, prop)}
+    return frozenset(found)
+
+
+#: The hour JSON gives (``21:30:00``); one without its seconds (``21:00``) is how an app writes it for a person.
+_JSON_HOUR = re.compile(r"\d{2}:\d{2}:\d{2}(\.\d+)?")
+
+
+def _moment_words(text: str, language: str) -> str | None:
+    """``text``, an ISO day, hour or instant as JSON gives it, as CLDR writes it in ``language`` — a medium day and a
+    short hour, as the screens and the assistant's card say them —, an instant at the business's hour; ``None`` for
+    any other text, an hour already written for a person (``21:00``) among them."""
+    if ISO_HOUR.fullmatch(text) and not _JSON_HOUR.fullmatch(text):
+        return None
+    try:
+        when = moment(text)
+    except ValueError:
+        return None
+    locale = babel_locale(language)
+    if isinstance(when, dt.datetime):
+        when = when.replace(tzinfo=None)
+        day, hour = format_date(when.date(), "medium", locale=locale), format_time(when.time(), "short", locale=locale)
+        return get_datetime_format("medium", locale=locale).replace("{1}", day).replace("{0}", hour)
+    if isinstance(when, dt.date):
+        return format_date(when, "medium", locale=locale)
+    return format_time(when.replace(tzinfo=None), "short", locale=locale)
+
+
+def words_for(steps: list[dict], language: str, scope: Scope) -> document.Say:
+    """How a text a person reads — a question (FLOW-F28), a message to a customer (FLOW-F31) — says each datum it
+    inserts, as the assistant's card says it (BASE-F97): a yes or no as «Yes»/«No», an ISO day, hour or instant as
+    ``language`` writes it at the business's hour, and an amount the step that left it declares in cents in the
+    business's currency; anything else as it is. An event declares no schema: a number it brings is never guessed as
+    money."""
+    money = _money_paths(steps)
+    currency = functools.cache(lambda: _currency(scope))
+
+    def say(path: str, value: Any) -> str:
+        if isinstance(value, bool):
+            with translation.override(language):
+                return str(YES if value else NO)
+        if isinstance(value, str):
+            return _moment_words(value, language) or value
+        if isinstance(value, int) and path in money and currency():
+            return money_text(value, currency(), language=language)
+        return str(value)
+
+    return say
+
+
+def _currency(scope: Scope) -> str | None:
+    """The business's currency, or ``None`` when it has none (a scope that is no hub's): its amounts then say their
+    figure, never a made-up currency."""
+    try:
+        return business_currency(scope)
+    except OperationError:
+        return None
+
+
 def map_params(
-    params: dict[str, Any], data: dict, unknown_steps: set[str] = frozenset()
+    params: dict[str, Any],
+    data: dict,
+    unknown_steps: set[str] = frozenset(),
+    *,
+    say: document.Say | None = None,
+    person: Collection[str] = (),
 ) -> tuple[dict, list, list]:
     """``(values, empty, unknown)`` of a step's ``params`` for ``data``.
 
     A value read from a path that is missing (or null) is left out and named in ``empty``; a template
     with a missing field keeps its text and is named in ``empty`` too. A value that reads the output of
-    a step in ``unknown_steps`` (one that has not run) is left out and named in ``unknown``.
+    a step in ``unknown_steps`` (one that has not run) is left out and named in ``unknown``. The params in
+    ``person`` are read by a person: each datum in them is the text ``say`` writes for it.
     """
     values: dict[str, Any] = {}
     empty: list[str] = []
     unknown: list[str] = []
     for key, raw in params.items():
+        said = say if key in person else None
         reads = document.references(raw)
         if any(
             path.startswith("steps.") and path.split(".")[1] in unknown_steps
@@ -958,9 +1058,9 @@ def map_params(
             if not found or value is None:
                 empty.append(key)
                 continue
-            values[key] = value
+            values[key] = value if said is None else said(raw, value)
             continue
-        values[key] = document.resolve(raw, data)
+        values[key] = document.resolve(raw, data, said)
         if any(
             document.lookup(path, data)[1] is None
             for path in reads
@@ -1046,6 +1146,8 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
     )
     stopped = bool(trigger_failed)
     operations = catalog_operations()
+    # What a person would read is said as the person trying it reads it (who saves it, in their language).
+    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope)
     unknown_steps: set[str] = set()
     steps = []
     for step in tried.steps:
@@ -1075,7 +1177,7 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
             continue
         if step.kind == "ask":
             # Nothing is asked; what the person would answer is not known here.
-            texts = {"title": document.fill(step.title, values), "details": document.fill(step.details, values)}
+            texts = {"title": document.fill(step.title, values, say), "details": document.fill(step.details, values, say)}
             steps.append(out | {"outcome": "would_ask", "params": texts | {"role": step.role, "hours": step.hours}})
             unknown_steps.add(step.id)
             continue
@@ -1105,7 +1207,9 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
             continue
         unknown_steps.add(step.id)
         op = operations.get(step.operation)
-        mapped, empty, unknown = map_params(step.params, values, unknown_steps)
+        mapped, empty, unknown = map_params(
+            step.params, values, unknown_steps, say=say, person=PERSON_PARAMS.get(step.operation, ())
+        )
         out |= {"params": mapped, "empty": empty, "unknown": unknown}
         grantable = grantable_operations().get(step.operation)
         if grantable is not None and needs_a_person(grantable):

@@ -66,6 +66,8 @@ from apps.flow.queries import (
     validation_fields,
     can_answer,
     TURN,
+    PERSON_PARAMS,
+    words_for,
 )
 from apps.flow.schemas import (
     AnsweredOut,
@@ -888,7 +890,8 @@ def _operation_step(
     if op is None or op.kind != step["kind"]:
         raise _own("flow.action_unavailable", name=name)
     step_ctx = _step_context(ctx, run, flow, op)
-    values, _, _ = map_params(step.get("params", {}), data)
+    say = words_for(run.definition["steps"], flow.language, ctx.scope)
+    values, _, _ = map_params(step.get("params", {}), data, say=say, person=PERSON_PARAMS.get(name, ()))
     try:
         payload = op.input.model_validate(
             prepared(op, step["kind"], step.get("result", "first"), values)
@@ -1412,13 +1415,15 @@ def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict
     """Leaves the step's question, its texts filled in now, in «Waiting for your answer» and parks the run on it. A
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
+    # Its texts are read by a person: each datum in words, in the language of whoever saved the automation.
+    say = words_for(run.definition["steps"], flow.language, ctx.scope)
     question, _created = Question.objects.get_or_create(
         run=run,
         step_id=step["id"],
         defaults={
             "flow": flow,
-            "title": document.fill(step["title"], data)[:300],
-            "details": document.fill(step.get("details", ""), data),
+            "title": document.fill(step["title"], data, say)[:300],
+            "details": document.fill(step.get("details", ""), data, say),
             "role": step.get("role", ""),
             "on_no": step.get("on_no", "stop"),
             "on_timeout": step.get("on_timeout", "no"),

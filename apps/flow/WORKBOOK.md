@@ -425,7 +425,13 @@ Pasos:
      minuto a 30 días.
 3. En cada valor, **Insertar un dato** abre «¿Qué dato?», con los datos del aviso y un ejemplo real del
    negocio al lado (el último aviso de ese tipo), y los datos que dejan los pasos anteriores; se elige,
-   no se escribe. Un dato elegido se ve como una pastilla; el resto del valor es texto.
+   no se escribe. Un dato elegido se ve como una pastilla; el resto del valor es texto. En lo que lee una
+   persona —la pregunta de «Preguntar antes a alguien» (FLOW-F28) y el mensaje a un cliente (FLOW-F31)— cada
+   dato sale en palabras, en el idioma de quien guardó la automatización: un sí o un no como «Sí» o «No», una
+   fecha y una hora como se escriben en ese idioma y a la hora del negocio («2 nov 2026, 10:00»), y un importe
+   que deja un paso anterior en la moneda del negocio («120,50 €»); un número que trae el aviso sale tal cual,
+   porque el aviso no dice si es dinero. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…»
+   lleva cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
 cliente»), nunca con su nombre interno.
@@ -804,10 +810,10 @@ Pasos:
    siguientes». Con «Seguir», el aviso explica cómo poner después un «Solo sigue si…» sobre «Aprobada».
 6. Pulsa **Guardar**. Este paso no pide permiso.
 Entra: la pregunta, sus detalles, a quién, cuánto esperar y qué hacer con un no y con el silencio.
-Sale: el paso. Al ejecutarse, la pregunta espera en «Esperan tu respuesta» (FLOW-F29) con su texto ya rellenado y
-la ejecución se para ahí (`flow.question.asked`); el historial dice «Preguntó a los responsables; espera una
+Sale: el paso. Al ejecutarse, la pregunta espera en «Esperan tu respuesta» (FLOW-F29) con su texto ya rellenado,
+cada dato insertado en palabras (FLOW-F11: «Sí», «2 nov 2026, 10:00»), y la ejecución se para ahí (`flow.question.asked`); el historial dice «Preguntó a los responsables; espera una
 respuesta hasta el …». Cambiar después la automatización no cambia una pregunta ya hecha. **Probar** dice
-«Preguntaría a … y esperaría hasta … horas» con la pregunta rellenada, sin preguntar. Un sí a esta pregunta
+«Preguntaría a … y esperaría hasta … horas» con la pregunta rellenada como saldrá, sin preguntar. Un sí a esta pregunta
 no abre la puerta a lo que necesita a una persona delante: los pasos de después siguen sin poder anular,
 devolver ni borrar. Para anular una reserva cuando alguien dice que sí, pídeselo al asistente con «Que me lo
 pregunte» (FLOW-F37, F38).
@@ -822,7 +828,8 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Automatizaciones
 Pasos:
 1. En **Automatizaciones**, **Esperan tu respuesta** enseña cada pregunta que puedes contestar, la que caduca
-   antes primero: de qué automatización viene, la pregunta y sus detalles, «Preguntado a los responsables.
+   antes primero: de qué automatización viene, la pregunta y sus detalles (con sus datos en palabras, FLOW-F28),
+   «Preguntado a los responsables.
    Quien lleva el negocio también puede contestar.», qué pasa si nadie contesta («Si nadie contesta antes
    del …, cuenta como un no.») y qué hace un no. Si es un cambio que quiere hacer el asistente (FLOW-F38), sus
    detalles son lo que dijo y, debajo, cada dato que mandaría, uno por línea, como lo dice su tarjeta en el
@@ -877,7 +884,9 @@ Pasos:
 2. En «A quién (su teléfono)» inserta el teléfono del cliente con **Insertar un dato** (el de su ficha, que ya
    está en formato internacional): solo lo recibe la conversación de WhatsApp de justo ese número
    internacional, nunca una nueva. Un número escrito a mano incompleto no le llega a nadie.
-3. Escribe el «Mensaje», con datos insertados: sale tal cual si el cliente te escribió en las últimas 24 horas.
+3. Escribe el «Mensaje», con datos insertados: sale tal cual si el cliente te escribió en las últimas 24 horas,
+   con cada dato en palabras (FLOW-F11: un sí o un no, una fecha y una hora, un importe de un paso anterior),
+   también en los huecos de la plantilla.
 4. Elige la «Plantilla» entre tus plantillas aprobadas por Meta (debajo se ve su texto) y rellena un dato por
    cada hueco: pasadas las 24 horas, WhatsApp solo deja pasar una plantilla aprobada. Sin plantillas
    aprobadas lo dice: «Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.».
@@ -1248,6 +1257,20 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   del negocio), Square, Vagaro y Booksy (el cliente anula él mismo, con enlace y dentro de la política) y
   OpenTable/SevenRooms (anula el cliente o el equipo; la respuesta por SMS la atiende una persona). Devoluciones,
   borrados, VeriFactu y envíos a Hacienda no entran: mueven dinero o dejan un registro que no se deshace.
+- **Los datos insertados en lo que lee una persona** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES):
+  `document.fill`/`resolve` meten cada dato tal cual (`true`, ISO, céntimos) salvo con un `say`; `queries.words_for`
+  es el de lo que lee una persona — el título y los detalles de un paso `ask` (`_ask` y «Probar») y los datos de
+  `PERSON_PARAMS` (`whatsapp_inbox.message.notify`: `text` y `template`, en `map_params`) —: un `bool` como «Sí»/«No»
+  (`pgettext "datum"`), un día, una hora con segundos o un instante ISO (`base.home.moment`, a la hora del negocio)
+  como CLDR en `flow.language` (en «Probar», el de quien prueba), y un `int` de una ruta `steps.<id>.<campo>` cuyo
+  esquema de salida lo declara en céntimos (`…_cents` o «in cents», la regla de la tarjeta de base) con
+  `base.business.money_text` en la moneda del negocio. Una hora sin segundos («21:00») ya la escribió su app para una
+  persona y se deja. Un aviso no declara esquema: su número sale tal cual (`test_person_texts.py`). Lo que va a una
+  máquina — otra acción, «Llamar a otro sistema», condiciones, el encargo al asistente — no cambia. Mercado: HubSpot
+  (los tokens salen con el formato de su tipo: fecha y moneda de la cuenta) y Mailchimp (formato de fecha de la
+  audiencia en las etiquetas) dan el dato ya en palabras; Shopify Flow y Klaviyo (filtros `money`/`date` de Liquid),
+  Zapier (paso Formatter), Make (`formatDate`, `formatNumber`) y n8n (expresiones) lo dejan crudo y piden un
+  formateador. Gana lo más sencillo para quien escribe: en lo que lee una persona sale ya en palabras, sin sintaxis.
 - **Los datos del cambio que espera un sí** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES):
   `_propose` guarda en `Question.details` solo lo que dijo el asistente; `flow.question.list` añade `fields` con
   `queries.proposal_fields`, que lee la propuesta que el paso `assistant` guarda en `run.outputs["_turn"]` (una a
