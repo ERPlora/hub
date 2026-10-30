@@ -55,6 +55,22 @@ describe('answerTo', () => {
     expect(textOf(answerTo(cancelled).frames)).toBe('No lo he hecho.');
   });
 
+  it('the outcome by the shape of the result: the Hub’s error envelope is a refusal, a word inside a result that ran is not', () => {
+    const outcome = (content: string) => textOf(answerTo([user('x'), { role: 'tool', content }]).frames);
+    // What the Hub sends when a tool did not run (`error_content`): cancelled, refused, failed with its fields.
+    for (const code of ['base.assistant_not_confirmed', 'permission_denied', 'app_inactive', 'requires_elevation'])
+      expect(outcome(JSON.stringify({ error: { code, message: 'No.' } })), code).toBe('No lo he hecho.');
+    expect(outcome(JSON.stringify({ error: { code: 'invalid_payload', message: 'Some data does not fit.', fields: { name: 'Required' } } }))).toBe(
+      'No lo he hecho.',
+    );
+    // A print job that ran: its row says it can be cancelled, and was not; it carries no error.
+    const job = { id: '1', status: 'pending', cancellable: true, cancelled_at: null, cancel_reason: '', last_error: '', retryable: true };
+    expect(outcome(JSON.stringify({ job, duplicate: false, skipped: null }))).toBe('Hecho.');
+    expect(outcome(JSON.stringify({ status: 'refused_by_customer', denied: 0, error_count: 0 }))).toBe('Hecho.');
+    // A result too long for the model, cut by the Hub (` …(cut)`): it ran.
+    expect(outcome(`${JSON.stringify({ rows: [{ status: 'cancelled' }] })} …(cut)`)).toBe('Hecho.');
+  });
+
   it('a chain: first a read, then a write, then the outcome (BASE-G119)', () => {
     const question = user('E2E-CHAIN Mesa 7');
     const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
