@@ -331,6 +331,7 @@ class PaymentIn(In):
     )
     idempotency_key: UUID | None = Field(
         None,
+        json_schema_extra={"attempt_key": True},
         description="A key the caller makes once per payment it means to record. Sent again with the same "
         "payment (a retry, a double tap), it answers the payment already recorded instead of recording "
         "another one; with another payment, it is refused.",

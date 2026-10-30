@@ -2381,7 +2381,9 @@ Pasos:
      de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Todo sale en el idioma de la persona, también el nombre de cada dato
+     no lo pone, nunca por su código. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
+     reintenta (cobrar, enviar un WhatsApp, imprimir): nadie puede juzgarla, y la acción la recibe igual al
+     ejecutarse. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
      técnico. Una acción de la propia plataforma se nombra por la pantalla donde se hace, por ejemplo «Cambiar en
      Ajustes» o «Borrar en Archivos». Cada acción sale con su propio verbo, nunca con uno genérico: rectificar una
@@ -3003,9 +3005,13 @@ Implicados: ACCOUNTS-F38
   listados de después recorren los archivos una sola vez; lo que guardan las apps se cuenta en cada llamada. El espacio
   es el de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
-  enseña. Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
+  enseña; antes de guardar uno nuevo pasa por la misma comprobación del espacio que Archivos,
+  `base.queries.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
+  409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app
+  (FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS). Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
-  `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A).
+  `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A) y
+  `tests/e2e/fix-base-plan-space-check.spec.ts` (el tope en español: Archivos y la web dicen la misma frase).
 - **`/p/media/<hex>/<nombre>`** (`base/media.py`, FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES): sirve, desde el
   host de su hub y nunca el de otro, solo las carpetas del almacén que declara cada app en su `LiveAppConfig`:
   `public_media` (cualquiera; caché pública de un año: `website/img/`, las imágenes de la web) y `members_media` (solo una
@@ -3051,7 +3057,17 @@ Implicados: ACCOUNTS-F38
   la pantalla ni lo que recibe el navegador lo llevan tal como se escribió, y la escritura lo recibe entero al
   aceptarla; uno vacío sale vacío; lo comprueban `test_no_operation_lets_a_secret_reach_its_card_in_clear`, que
   recorre el registro entero, y
-  `test_a_secret_reaches_the_browser_hidden_on_its_card_and_its_write_as_typed`), la vista previa de una
+  `test_a_secret_reaches_the_browser_hidden_on_its_card_and_its_write_as_typed`); una clave de intento
+  (idempotencia: la que el llamador crea una vez y repite en cada reintento), la que su esquema marca
+  `json_schema_extra={"attempt_key": True}` (`ATTEMPT_KEY`, siempre sobre un texto; en un tipo anotado, como
+  `AttemptKey` de Ventas, vale en cada uso), no sale ni en la tarjeta ni en la vista previa, a cualquier profundidad y
+  aunque vaya vacía (`_said` la deja fuera como `_LEFT_OUT`), y la escritura la recibe entera; lo comprueban
+  `test_an_attempt_key_its_schema_marks_never_reaches_the_card_at_any_depth`,
+  `test_the_yes_runs_the_write_with_its_attempt_keys_as_sent` y el trinquete
+  `test_every_attempt_key_of_a_write_is_marked_but_the_known_ones` (`UNMARKED_ATTEMPT_KEYS`, que solo baja: detecta
+  por el nombre, `idempotency_key`, `job_key`, `submit_key`, `client_<x>_id` o con «idempoten»/«attempt_key», un
+  texto sin la marca; hoy queda Bandeja de WhatsApp), con `test_an_attempt_key_is_marked_only_on_a_text`
+  (`base/tests/test_assistant_card_values.py`), la vista previa de una
   escritura peligrosa (BASE-F98, `preview`: su `ai=` lleva `"preview": {"operation": "<una query de su app>",
   "fields": [<datos de su respuesta>]}`; el turno la corre como la persona, `_run` con su `ctx`, con los datos de la
   escritura que su entrada toma, antes de la tarjeta; quita los vacíos y los `None`, lo que la lectura oculta; si no

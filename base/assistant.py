@@ -359,6 +359,16 @@ REFERS = "refers"
 #: The moments a schema declares (``format``), said as the person's language writes them.
 MOMENTS = ("date-time", "date", "time")
 
+#: The mark of a key of the caller's attempt (``json_schema_extra={"attempt_key": True}``, on a text): an idempotency
+#: key, born once and the same on every retry so a retry never charges, sends or prints twice. Nobody can judge it:
+#: the card and its preview leave it out, at any depth; the write gets it as sent
+#: (FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS).
+ATTEMPT_KEY = "attempt_key"
+
+
+def _is_attempt_key(prop: dict) -> bool:
+    return prop.get(ATTEMPT_KEY) is True
+
 
 def refers_of(prop: dict) -> dict | None:
     """The read the schema ``prop`` marks to name its record (``REFERS``), or ``None``."""
@@ -494,10 +504,13 @@ def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words) -> Any:
     """``value`` in words as its schema ``prop`` declares it, at any depth: a moment as the person's language writes it
     (``_moment``), a value of a closed list by the label its app's models give it (``_choice_label``), a record by
     its name (``_reference``) or else ``_LEFT_OUT`` — left out of an object, none in a list (which still says how many
-    it carries); what is none of them, or not what its schema declares (the write refuses it), as sent."""
+    it carries), as an attempt key (``ATTEMPT_KEY``) is, even empty; what is none of them, or not what its schema
+    declares (the write refuses it), as sent."""
+    prop = _fitting(value, prop, defs)
+    if _is_attempt_key(prop):
+        return _LEFT_OUT
     if value is None or value == "":
         return value
-    prop = _fitting(value, prop, defs)
     if REFERS in prop or (prop.get("format") == "uuid" and _is_uuid(value)):
         return _reference(value, prop, words)
     if prop.get("format") in MOMENTS and isinstance(value, str):
@@ -526,7 +539,8 @@ def _field(
     name: str, label: str, prop: dict, defs: dict, value: Any, money: dict | None = None, words: _Words | None = None
 ) -> dict | None:
     """One datum of a card, as its schema ``prop`` declares it: a secret hidden (``_hidden``) and, with the ``words``
-    of its card, the rest in words (``_said``); ``None`` when it names a record the card cannot name. An amount
+    of its card, the rest in words (``_said``); ``None`` when it names a record the card cannot name or is an attempt
+    key. An amount
     carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (a preview's,
     as its read answers it): without it, the card paints it in the business's. ``titled`` when ``label`` is the title
     its app wrote (``_own_title``): the screen calls it so over its own word for a datum it knows by its name

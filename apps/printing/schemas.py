@@ -235,6 +235,7 @@ class PrinterStatusOut(Schema):
 class JobCreateIn(Closed):
     job_key: JobKey | None = Field(
         None,
+        json_schema_extra={"attempt_key": True},
         description="Idempotency key of the caller (sale-<id>-receipt): two requests with the same key are one job. "
         "Without it, a new one.",
     )

@@ -67,7 +67,7 @@ class LineIn(Schema):
     id: UUID
     text: LineText
     qty: Decimal = Field(gt=0, max_digits=10, decimal_places=3)
-    client_line_id: UUID | None = None
+    client_line_id: UUID | None = Field(None, json_schema_extra={"attempt_key": True})
 
 
 # Outputs
