@@ -5,7 +5,8 @@ explicit list: ``control`` (the registry, Django's admin, auth, contenttypes and
 ``Membership`` and ``SessionOwner``), ``hub`` (``base``, ``live`` and every module of ``apps/``), ``contextual`` (the outbox and its
 deliveries: in the database of the context, control's for the registry's events) or ``shared`` (the SaaS's schema).
 A model nobody classified fails here and in the router, never lands anywhere by default. Own models have a UUIDv7
-key.
+key. Once migrated, each database holds exactly its classes' tables and ``django_migrations``: control's, its own and
+the outbox (plus phase 1's hubs' until S5, ``SHARED_MODE_EXTRA``); a hub's, those of its apps.
 """
 
 import uuid
@@ -143,3 +144,59 @@ def test_own_models_have_a_uuid7_key(model):
 
     assert key.get_internal_type() == "UUIDField"
     assert key.default is uuid.uuid7
+
+
+# ── After migrating: each database holds exactly its tables (PLAN-DB §14.1) ──────────────────────────────────────────
+
+#: Database classes whose tables control's database also holds while phase 1's hubs share it (``db_name=""``), each
+#: with its reason. S5 retires the shared database with the ``db_name=""`` branch and empties this: from then on a hub's
+#: table left in control's fails the equality below.
+SHARED_MODE_EXTRA: dict[str, str] = {
+    inventory.HUB: (
+        "phase 1's hubs (db_name='') keep base, live and every module in control's database until S5 (plan "
+        "2026-10-22-fase-2-tenencia, decision 1); retired with S5."
+    ),
+}
+#: Django's own bookkeeping, in every database it migrates.
+MIGRATIONS_TABLE = "django_migrations"
+
+
+def tables_of(*classes: str) -> set[str]:
+    """The tables of every installed model (the auto-created ones too) whose database class is in ``classes``."""
+    return {
+        model._meta.db_table
+        for model in _installed()
+        if model._meta.managed and inventory.classify(model) in classes
+    }
+
+
+def test_shared_mode_extra_names_known_classes_with_their_reason():
+    for database_class, reason in SHARED_MODE_EXTRA.items():
+        assert database_class in inventory.CLASSES - {inventory.CONTROL}, database_class
+        assert "S5" in reason, database_class
+
+
+@pytest.mark.django_db
+def test_controls_database_holds_exactly_controls_tables_and_phase_1s_hubs():
+    from django.db import connection
+
+    from base.tenancy.tests import hubs
+
+    found = hubs.table_names(connection.settings_dict["NAME"])
+
+    # The outbox is contextual: the registry's own events (base.hub.*, the demos) stay in control's after S5 too.
+    expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, *SHARED_MODE_EXTRA) | {MIGRATIONS_TABLE}
+    assert found == expected, {"not a model's": sorted(found - expected), "missing": sorted(expected - found)}
+
+
+@pytest.mark.django_db(databases=("default",))
+def test_a_hubs_database_holds_exactly_its_apps_tables(hub_databases):
+    from base.tenancy.tests import hubs
+
+    expected = hubs.hub_tables(hub_databases.apps) | {MIGRATIONS_TABLE}
+
+    for name in (hub_databases.a, hub_databases.b):
+        found = hubs.table_names(name)
+        assert found == expected, {name: {"not a model's": sorted(found - expected), "missing": sorted(expected - found)}}
+    # Nothing of control's ever lands in a hub's.
+    assert not expected & tables_of(inventory.CONTROL)

@@ -1,9 +1,11 @@
 // Test helper of the sale app's pages and components, as `mount-tax.ts` is the tax app's: the SDK's live
 // harness (fake clock, fake network serving the stream and the API) on the hub's generated op → route
 // map, the shell's i18n with the sale catalogues merged in (and Taxes', whose `useTaxName` names the
-// territory's tax on every sale screen), a session and a memory router.
+// territory's tax on every sale screen), a session and a memory router; the shared assistant configured as the Hub
+// boots it (main.ts), for the till's «Speak», which dictates to it.
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
 // from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
+import { configureAssistant } from '@erplora/ui/components';
 import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
@@ -17,6 +19,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
 import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import taxEn from '../../../tax/frontend/locale/en.json';
@@ -25,6 +28,8 @@ import type { TaxSettingsOut, TerritoryTaxKind } from '../../../tax/frontend/ope
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
+
+configureAssistant(HUB_ASSISTANT);
 
 // happy-dom made to behave as a browser where Ionic's runtime reaches it, by each helper: the hub setup
 // (vitest.setup.ts) only unmounts what a test left mounted and fails one that leaves a real timer armed.
