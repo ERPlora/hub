@@ -282,7 +282,9 @@ Pasos:
 2. Pon la fecha, la hora, los comensales y, si quieres, la mesa (RESERVATION-F23), la duración, el
    origen y las notas. «Reservar».
 3. La reserva nace Pendiente (o Confirmada, si se confirman solas: entonces retiene su mesa).
-4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5».
+4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5». Antes de apuntarla, la
+   tarjeta del asistente dice para quién, por el nombre de su ficha, el día y la hora («Crear en Reservas:
+   Ana García · 15 oct 2026 · 21:00»), y lleva la mesa por su número, nunca por un código.
 Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas. El
 teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
 espacios), también el que se teclea con la ficha ya elegida; uno escrito con el prefijo de otro país
@@ -615,20 +617,32 @@ cuáles (409 `*_ambiguous`). Cambiar y cancelar se pueden pedir además en nombr
 (`on_behalf_of`, su ficha; hoy, desde WhatsApp): solo su reserva, con sus reglas de cliente y sin tocar la
 mesa, las notas internas ni reservar igualmente (F18).
 
+Antes de cambiar nada, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro
+como lo nombran las pantallas de Reservas, nunca por su código: una reserva, por su cliente, su día y su
+hora («Ana García · 15 oct 2026 · 21:00»; sin nombre, por su teléfono; con los datos del cliente borrados,
+por el día y la hora); una entrada de la lista de espera, igual; una franja, por su día de la semana y sus
+horas («Jueves · 20:00–23:30»); una fecha bloqueada, por su día y, si no es entera, sus horas; el cliente,
+por el nombre de su ficha, y la mesa, por su número. Un registro que quien confirma no puede ver (por
+ejemplo, la ficha de un cliente sin permiso para ver clientes) no sale en la tarjeta.
+
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las reservas de unos días (o de todo el libro buscando), con filtros, orden y páginas (hasta 100) | ver reservas | F05–F12 | `reservation.reservation.list` |
-| Una reserva | ver reservas | F08, F19 | `reservation.reservation.get` |
+| Una reserva, con las palabras con que se nombra | ver reservas | F08, F19 | `reservation.reservation.get` |
 | Un día: cubiertos, reservas, bloqueos, horario del negocio y ocupación de cada franja | ver reservas | F05 | `reservation.availability.day` |
 | Las mesas libres para una fecha, hora, duración y grupo | ver reservas | F23 | `reservation.availability.tables` |
 | Las franjas horarias, con filtros y páginas | ver franjas | F01 | `reservation.time_slot.list` |
+| Una franja, por su id o por su día de la semana y su inicio, con las palabras con que se nombra | ver franjas | F01 | `reservation.time_slot.get` |
 | Las fechas bloqueadas, con filtros y páginas | ver bloqueos | F02 | `reservation.blocked_date.list` |
+| Una fecha bloqueada, por su id o por su fecha, con las palabras con que se nombra | ver bloqueos | F02 | `reservation.blocked_date.get` |
 | La lista de espera, en orden de llegada, con búsqueda, filtros y páginas | ver lista de espera | F14–F16 | `reservation.waitlist.list` |
+| Una entrada de la lista de espera, por su id o por su cliente, con las palabras con que se nombra | ver lista de espera | F14–F16 | `reservation.waitlist.get` |
 | Las reglas (con la zona horaria del negocio) | ver ajustes | F03, F04 | `reservation.settings.get` |
 
-Todas se pueden seguir en vivo.
+Se siguen en vivo todas menos una franja, una fecha bloqueada y una entrada de espera sueltas, que solo
+leen la tarjeta del asistente y la API.
 
 Cada reserva que dan (la lista, una reserva y la que devuelve cada acción) trae, además de su fecha y su
 hora, el día y la hora listos para decir en el idioma de quien la pide («martes, 5 de marzo de 2030» o
@@ -806,7 +820,13 @@ la que solo se le autorizó reservar.
   primera (aún en horario de verano) y una que no existe pasa a la de después del salto (02:30 → 03:30),
   como la retención de Mesas (TABLE-F25).
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cancelar, no presentado y
-  todo borrado) y cada campo de `schemas.py` su `description`.
+  todo borrado) y cada campo de `schemas.py` su `description`. Cada id que nombra un registro en una
+  escritura lleva su marca `refers` (`names` de `base/schemas.py`; `base.E009` la comprueba al arrancar):
+  los de Reservas, la lectura por id de su registro (`reservation.reservation.get`, `.waitlist.get`,
+  `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries.py`,
+  `*_label`: día mediano y hora corta de CLDR, como dice la tarjeta una fecha); el cliente
+  (`customer_id`, `on_behalf_of`), `customer.customer.detail` por su `name`; la mesa, `table.table.get`
+  por su `number`. El trinquete de `base/tests/test_assistant_card_values.py` no deja entrar uno sin marca.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17): ajustes, franjas, bloqueos,
   reservas y lista de espera; ids y fechas en solo lectura. Lo que guarda no pasa por las operaciones
   ni deja aviso.
