@@ -112,6 +112,10 @@ export interface PriceItemPatchIn {
   min_quantity?: string;
 }
 
+export interface PriceItemIdIn {
+  id: string;
+}
+
 export interface PriceItemRefIn {
   id?: string;
   price_list_id?: string;
@@ -138,6 +142,11 @@ export interface PriceItemOut {
   min_quantity: string;
   price: number;
   updated_at: string;
+}
+
+/** One price with the currency of its list, the one its price is in (ISO 4217). */
+export interface PriceItemDetailOut extends PriceItemOut {
+  currency: string;
 }
 
 export interface DeletedOut {
@@ -276,6 +285,7 @@ declare module '@erplora/ui/sdk' {
     'pricing.price_list.deactivate': { input: PriceListRefIn; output: PriceListOut };
     'pricing.price_list.activate': { input: PriceListRefIn; output: PriceListOut };
     'pricing.price_item.list': { input: PriceItemListIn; output: Page<PriceItemOut> };
+    'pricing.price_item.get': { input: PriceItemIdIn; output: PriceItemDetailOut };
     'pricing.price_item.add': { input: PriceItemIn; output: PriceItemOut };
     'pricing.price_item.update': { input: PriceItemPatchIn; output: PriceItemOut };
     'pricing.price_item.remove': { input: PriceItemRefIn; output: DeletedOut };

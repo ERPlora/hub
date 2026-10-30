@@ -12,6 +12,7 @@ QUERIES = {
     "pricing.price_list.list",
     "pricing.price_list.get",
     "pricing.price_item.list",
+    "pricing.price_item.get",
     "pricing.rule.list",
     "pricing.price.resolve",
 }

@@ -11,7 +11,8 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.core.cache import cache
-from django.db import connection, transaction
+from django.db import connection, connections, transaction
+from live.context import Scope
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
@@ -19,10 +20,12 @@ from PIL import Image as PILImage
 
 from apps.website.models import Image, Site
 from apps.website.queries import catalog_cache_key, page_cache_key
-from apps.website import reviews
+from apps.website import reviews, services
 from apps.website.tests.conftest import PLACE_ID, A, B, ctx_for, full_content, google_reviews, with_language
 from base import files
 from base.models import Hub
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
 
@@ -563,6 +566,82 @@ def test_two_first_saves_at_once_leave_one_site_and_neither_fails(transactional_
     assert waited, "the second save did not wait for the first one's row"
     assert Site.objects.count() == 1
     assert hub_site("a").template == "bold"
+
+
+# A hub with its own database (plan 2026-10-22-fase-2-tenencia, S2's first step)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_in_a_hub_with_its_own_database_what_follows_a_write_waits_for_that_hubs_commit(
+    hub_a, google, django_capture_on_commit_callbacks
+):
+    # The operation's transaction is on the hub's alias: what runs after its COMMIT (Google's reviews, dropping the
+    # cached page) waits for that COMMIT, never for one of control's (``default``), which would run it at once.
+    ctx = ctx_for(scope=Scope("host", hub_a.slug))
+    content = full_content(reviews={"place_ref": PLACE_ID}, catalog={"source": None})
+    with use_hub(hub_a):
+        with (
+            django_capture_on_commit_callbacks(using=hubs.HUB_A_ALIAS) as on_the_hub,
+            django_capture_on_commit_callbacks() as on_control,
+        ):
+            save(content, ctx=ctx)
+            run("website.site.publish", ctx=ctx)
+            run("website.site.unpublish", ctx=ctx)
+
+    assert on_control == []
+    # The save's new place (Google), the publication's page and reviews, and taking it offline's page; the rest is
+    # live's notice of each event.
+    website_callbacks = [
+        callback.func.__name__
+        for callback in on_the_hub
+        if getattr(callback, "func", None) in (services.refresh_reviews, services.forget_cached)
+    ]
+    assert website_callbacks == ["refresh_reviews", "forget_cached", "refresh_reviews", "forget_cached"]
+    assert google == []
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
+def test_two_uploads_of_one_image_at_once_in_a_hub_with_its_own_database_keep_one_row_and_neither_fails(
+    hub_a, hub_files
+):
+    # The second one's row waits for the first one's COMMIT and then finds it: its duplicate is recovered from on the
+    # hub's own connection, never on control's (``default``), which would leave the hub's transaction aborted (a 500).
+    ctx = ctx_for(scope=Scope("host", hub_a.slug))
+    raw = png_bytes()
+    first_kept, release = threading.Event(), threading.Event()
+
+    def in_the_hub(body):
+        def run_in_the_hub():
+            try:
+                with use_hub(hub_a):
+                    return body()
+            finally:
+                connections[hubs.HUB_A_ALIAS].close()
+
+        return run_in_the_hub
+
+    def first():
+        with transaction.atomic(using=hubs.HUB_A_ALIAS):
+            out = upload(raw, ctx=ctx)
+            first_kept.set()
+            release.wait(5)
+        return out
+
+    holder, held = _in_thread(in_the_hub(first))
+    assert first_kept.wait(5)
+    waiter, second = _in_thread(in_the_hub(lambda: upload(raw, ctx=ctx)))
+    waiter.join(0.3)
+    waited = waiter.is_alive()
+    release.set()
+    holder.join(5)
+    waiter.join(5)
+
+    assert "result" in held, held
+    assert "result" in second, second
+    assert waited, "the second upload did not wait for the first one's row"
+    assert second["result"].id == held["result"].id
+    with use_hub(hub_a):
+        assert Image.objects.count() == 1
 
 
 # Google's reviews

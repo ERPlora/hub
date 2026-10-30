@@ -6,12 +6,11 @@
 // condition would stop it (that is the automation working), what depends on a step that has not run,
 // and what it is not allowed yet. A datum an «Ask the assistant» step fixes is said as the card of the change says it
 // (FLOW-F29, base's `fieldText`): a record by its name, an amount in the currency the server gives it, never an id.
-import { InlineFeedback } from '@erplora/ui/components';
+import { type AssistantField, fieldText, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
-import { type AssistantField, fieldText } from '../../../../base/frontend/lib/assistant-card';
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import { cleanTrigger, type FlowDocument } from '../lib/document';

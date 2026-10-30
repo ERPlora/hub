@@ -10,18 +10,22 @@ Per test session (and xdist worker), next to its control database ``<control>``:
 
 The names are the production rule's (``base.tenancy.names``), so two sessions or two workers never share one. They are
 dropped when the session ends. The rows in control (``hub_a``, ``hub_b``) are the root ``conftest.py``'s fixtures.
+:func:`watched` and :func:`assert_only_alias` see every statement of every thread by alias: «A never reaches B».
 """
 
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import SimpleNamespace
+from unittest import mock
 
 import psycopg
 import pytest
 from django.apps import apps
-from django.db import connections
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.backends.signals import connection_created
+from django.db.backends.utils import CursorWrapper
 from psycopg import sql
 
 from base.tenancy import connections as tenancy_connections
@@ -210,6 +214,23 @@ def _build() -> HubDatabases:
     return hubs
 
 
+@contextmanager
+def clone_of_the_template(hubs: HubDatabases, name: str) -> Iterator[str]:
+    """The database ``name``, cloned from the session's template as an alta does, before its identity is written;
+    dropped after the block (``WITH (FORCE)``: an alias the block left open does not keep it)."""
+    with _maintenance() as conn:
+        conn.execute(
+            sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                names.identifier(name, control=hubs.control), names.identifier(hubs.template, control=hubs.control)
+            )
+        )
+    try:
+        yield name
+    finally:
+        with _maintenance() as conn:
+            _drop(conn, name, hubs.control)
+
+
 def drop(hubs: HubDatabases) -> None:
     for alias in (HUB_A_ALIAS, HUB_B_ALIAS):
         connections[alias].close()
@@ -236,6 +257,54 @@ def table_names(name: str) -> set[str]:
     """The tables of the database ``name``'s ``public`` schema."""
     with _maintenance(name) as conn:
         return {row[0] for row in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")}
+
+
+@contextmanager
+def watched() -> Iterator[dict[str, list[str]]]:
+    """Every statement any thread sends, by alias: a wrapper at the cursor, under every connection of every thread
+    (a ``connection.execute_wrapper`` on every alias at once, those registered while the block runs included).
+
+    Scoped to the block (``mock.patch.object``): ``monkeypatch.undo()`` would also undo the test's other patches, the
+    ``no_test_fallback`` one included."""
+    sent: dict[str, list[str]] = {}
+    real = CursorWrapper._execute
+
+    def execute(self, sql, params, *ignored):
+        sent.setdefault(self.db.alias, []).append(sql)
+        return real(self, sql, params, *ignored)
+
+    with mock.patch.object(CursorWrapper, "_execute", execute):
+        yield sent
+
+
+#: Tables of a hub's (or contextual) model that a block watched by :func:`assert_only_alias` may still name in control's
+#: database, each with its reason. None: in control's, a hub's table is phase 1's shared data (``db_name=""``), nobody's
+#: own, and a hub with its own database never reads it.
+CONTROL_HUB_TABLES_ALLOWED: dict[str, str] = {}
+
+
+def _hub_tables_named(statements: list[str]) -> list[str]:
+    """The tables of hub (and contextual) models that ``statements`` name, quoted as Django quotes them."""
+    tables = {
+        model._meta.db_table
+        for model in apps.get_models(include_auto_created=True)
+        if _hub_classes(model) and model._meta.db_table not in CONTROL_HUB_TABLES_ALLOWED
+    }
+    return sorted({table for statement in statements for table in tables if f'"{table}"' in statement})
+
+
+@contextmanager
+def assert_only_alias(alias: str) -> Iterator[dict[str, list[str]]]:
+    """The block reaches no hub's database but ``alias``'s (PLAN-DB §14.2): whatever any thread sends to another alias
+    than ``alias`` fails it, whichever hub that alias is, and so does a statement to control's (``default``: the
+    registry, the sessions) that names a hub's table, phase 1's shared data (``CONTROL_HUB_TABLES_ALLOWED`` aside).
+    Yields the statements by alias (:func:`watched`)."""
+    with watched() as sent:
+        yield sent
+    strays = {other: statements[:3] for other, statements in sent.items() if other not in (alias, DEFAULT_DB_ALIAS)}
+    assert not strays, f"Only {alias} and control's database may be reached here, and these were too: {strays}"
+    shared = _hub_tables_named(sent.get(DEFAULT_DB_ALIAS, []))
+    assert not shared, f"Control's database was asked for phase 1's shared data of a hub's tables: {shared}"
 
 
 # ── For the migrator's tests (base/tenancy/tests/test_migrator.py, base/tests/test_migrate_hubs.py) ───────────────

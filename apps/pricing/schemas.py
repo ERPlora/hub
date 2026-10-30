@@ -316,11 +316,15 @@ class PriceItemIn(_ArticleFields):
 class PriceItemPatchIn(In):
     """Changes only the fields sent."""
 
-    id: UUID = Field(description="The price's id.")
+    id: UUID = Field(description="The price's id.", json_schema_extra=in_currency_of("pricing.price_item.get"))
     price: Cents | None = Field(None, description=D_PRICE)
     min_quantity: Quantity | None = Field(None, description=D_MIN_QUANTITY)
 
     _required = field_validator("price", "min_quantity")(classmethod(lambda cls, value: _not_empty(value)))
+
+
+class PriceItemIdIn(In):
+    id: UUID = Field(description="The price's id.")
 
 
 class PriceItemRefIn(In):
@@ -365,6 +369,12 @@ class PriceItemOut(Schema):
     min_quantity: Decimal = Field(description=D_MIN_QUANTITY)
     price: int = Field(description=D_PRICE)
     updated_at: dt.datetime = Field(description="Its last change.")
+
+
+class PriceItemDetailOut(PriceItemOut):
+    """One price as the list shows it, with the currency of its list: the one its price is in."""
+
+    currency: str = Field(description="The currency of its list, the one its price is in (ISO 4217).")
 
 
 # Rules

@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings, Usage
 from apps.printing.schemas import (
@@ -558,7 +558,15 @@ def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
     return {"rows": [device_row(device, key) for device in page], "total": total, "limit": params.limit, "offset": params.offset}
 
 
-@operation("printing.device.get", kind="query", permission="printing.print", input=DeviceGetIn, output=DeviceGetOut)
+# Not an assistant tool: /ws/print's hello, the device's own.
+@operation(
+    "printing.device.get",
+    kind="query",
+    permission="printing.print",
+    input=DeviceGetIn,
+    output=DeviceGetOut,
+    ai=INTERNAL,
+)
 def get_device(ctx: OperationContext, params: DeviceGetIn) -> dict:
     """For base's /ws/print, at the hello: the device set up with the id it says, with its printers, or whether it
     was retired (the session that pairs a device new here does not pair a retired one). No route (the id never

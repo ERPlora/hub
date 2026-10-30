@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SetupItem, SetupStatus } from '../operations';
 import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
-import { createAssistant, installAssistant } from '../lib/assistant';
+import { createAssistant, installAssistant } from '@erplora/ui/components';
 import SetupChecklist from './SetupChecklist.vue';
 
 function item(key: string, fields: Partial<SetupItem> = {}): SetupItem {
