@@ -12,6 +12,9 @@
 // as `cap_reached` — by the Hub when it knows it, by erplora.com when the Hub's figure is behind — before Meta: the
 // run's Graph never receives it and erplora.com's count stays at the allowance
 // (FIX-HUB-WHATSAPP-INBOX-E2E-SEED-TEMPLATES-AND-CAP-UNUSED-F13-…). The month goes back to 0 after the file.
+// Before that, the month nearly spent: erplora.com's seed sets `a`'s usage to 80 % of its plan's allowance and pushes
+// it; the inbox says how many are left with «Upgrade plan», and so does Settings → This month, as the assistant says
+// its own from 80 % (BASE-F104). Captured in three sizes (FIX-HUB-WHATSAPP-INBOX-WORKBOOK-KEEPS-SETTLED-DECISIONS-OPEN-…).
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
@@ -38,6 +41,7 @@ import {
 test.describe.configure({ mode: 'serial' });
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-ZERO-LIMIT-SHOWN-UNLIMITED';
+const NEAR = 'FIX-HUB-WHATSAPP-INBOX-WORKBOOK-KEEPS-SETTLED-DECISIONS-OPEN';
 const SPENT = 'FIX-HUB-WHATSAPP-INBOX-E2E-SEED-TEMPLATES-AND-CAP-UNUSED';
 // The run's erplora.com checkout and database, as whatsapp-helpers.ts finds them.
 const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
@@ -152,6 +156,65 @@ test.describe('a plan without WhatsApp messages', () => {
       await settled(page);
       await noHorizontalScroll(page, `settings ${viewport.label}`);
       await page.screenshot({ path: shot(`${TASK}-settings-${viewport.label}`) });
+    }
+  });
+});
+
+test.describe('the month nearly spent', () => {
+  let allowance = 0;
+  let used = 0;
+
+  test.beforeAll(async () => {
+    cleanUp();
+    expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+    await metaGraph();
+    allowance = Number(psql("select monthly_limit from whatsapp_inbox_channel where host = 'a'"));
+    expect(allowance, 'a plan with WhatsApp messages').toBeGreaterThan(0);
+    // 80 % of the month spent, by erplora.com's count: the first figure that warns.
+    used = Math.ceil(allowance * 0.8);
+    expect(seedErplora({ used })).toEqual({ delivered: true, hub_error: '' });
+  });
+
+  test.afterAll(() => {
+    cleanUp();
+    // The month back to 0, the photo pushed again: the next spec sends as always.
+    expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
+    restorePhoto();
+  });
+
+  test('WHATSAPP_INBOX-F13: from 80 % of the month the inbox and Settings say how many messages are left, with «Upgrade plan»', async ({ page }) => {
+    const left = allowance - used;
+    await login(page, A, '/whatsapp_inbox/inbox');
+    const near = shown(page).locator('[data-testid=whatsapp-inbox-near-cap]');
+    await expect(near).toContainText(`You have ${left} of ${allowance} WhatsApp messages of your plan left this month.`);
+    await expect(notIncluded(page)).toBeHidden();
+    const upgrade = shown(page).locator('[data-testid=whatsapp-inbox-upgrade]');
+    await expect(upgrade).toHaveText('Upgrade plan');
+    await expect(upgrade).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
+    for (const viewport of FLOW_VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await near.scrollIntoViewIfNeeded();
+      await expect(near).toBeInViewport();
+      await settled(page);
+      await noHorizontalScroll(page, `inbox ${viewport.label}`);
+      await page.screenshot({ path: shot(`${NEAR}-${viewport.label}`) });
+    }
+    await page.setViewportSize({ width: 1280, height: 860 });
+
+    await login(page, A, '/whatsapp_inbox/settings');
+    const month = shown(page).locator('[data-testid=whatsapp-inbox-settings-month]');
+    await expect(month).toContainText(`${used} of ${allowance} messages sent`);
+    await expect(month.locator('[data-testid=whatsapp-inbox-settings-near-cap]')).toHaveText(
+      `You have ${left} of ${allowance} messages of your plan left this month.`,
+    );
+    await expect(shown(page).locator('[data-testid=whatsapp-inbox-settings-upgrade]')).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
+    for (const viewport of FLOW_VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await month.scrollIntoViewIfNeeded();
+      await expect(month).toBeInViewport();
+      await settled(page);
+      await noHorizontalScroll(page, `settings ${viewport.label}`);
+      await page.screenshot({ path: shot(`${NEAR}-settings-${viewport.label}`) });
     }
   });
 });
