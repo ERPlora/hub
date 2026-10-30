@@ -57,6 +57,8 @@ describe('nearCap', () => {
 
   it('is nothing with a plan without messages, before erplora.com speaks, nor without the channel', () => {
     expect(nearCap(CHANNEL)).toBeNull();
+    // Even if a photo said 0 without the cap: never «0 of 0 left».
+    expect(nearCap({ ...WITH, monthly_limit: 0, monthly_usage: 0, cap_reached: false })).toBeNull();
     expect(nearCap({ ...WITH, monthly_usage: 140, synced_at: null })).toBeNull();
     expect(nearCap(null)).toBeNull();
     expect(nearCap(undefined)).toBeNull();
