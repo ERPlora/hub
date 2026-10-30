@@ -481,9 +481,11 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Las tarifas, con búsqueda, filtros y orden, en páginas de hasta 100 | ver | F01 | `pricing.price_list.list` | sí |
 | Una tarifa | ver | F03, F06 | `pricing.price_list.get` | sí |
 | Los precios de una tarifa, o los de un producto o un servicio en todas | ver | F06 | `pricing.price_item.list` | sí |
-| Un precio, con lo que muestra de él su tarifa y la moneda de esa tarifa, la de su precio | ver | F06, F08 | `pricing.price_item.get` | no |
+| Un precio, con lo que muestra de él su tarifa, cómo se nombra fuera de ella (su artículo, su tarifa y, desde una cantidad, esa cantidad) y la moneda de esa tarifa, la de su precio | ver | F06, F08 | `pricing.price_item.get` | no |
 | Las reglas de descuento | ver | F09 | `pricing.rule.list` | sí |
+| Una regla, activa o no, por su id, su código o su nombre | ver | F11, F12 | `pricing.rule.get` | no |
 | El precio de una línea (tarifa, regla, descuento y total) | ver | F13 | `pricing.price.resolve` | no |
+| El nombre del servicio, la categoría o el grupo de clientes al que apunta una tarifa, un precio o una regla, por su id (el de un servicio, con el permiso en Servicios de quien pregunta) | ver | F02, F03, F07, F08, F10, F11 | `pricing.catalog.get` | no |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -628,6 +630,14 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones: `high` en
   elegir o quitar la general, desactivar o activar una tarifa, quitar un precio y desactivar una regla) y
   todo campo de entrada lleva `description`.
+- La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id
+  con las marcas `refers` de `schemas.py` (`A_LIST`, `A_PRICE`, `A_RULE`, `A_PRODUCT`, `A_SERVICE`, `A_CATEGORY`,
+  `A_GROUP`), leídas como quien pregunta: la tarifa y la regla por su nombre, el precio por su `label` («Champú ·
+  Mayoristas · desde 10»), el producto con `inventory.product.get` y el servicio, la categoría o el grupo con
+  `pricing.catalog.get` (Servicios no es requisito: su nombre, por `call_service`; apagada o ausente, la tarjeta lo
+  deja fuera). El id de una tarifa, un precio o una regla lleva su título («Tarifa», «Precio», «Regla de
+  descuento»), nunca «Registro». Sin persona detrás, sin permiso o con un id de otro negocio, el registro queda
+  fuera, nunca su id (FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS).
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una
   escritura cruda del admin no deja aviso ni comprueba reglas, salvo los tramos de una regla, que lee
   como la API (`schemas.Tier`, hasta 10, cantidad creciente) porque el precio de una línea los lee así.

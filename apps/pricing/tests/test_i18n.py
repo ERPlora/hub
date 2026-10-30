@@ -24,24 +24,27 @@ def _unescape(text: str) -> str:
 
 
 def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals nor contexts (the header is skipped)."""
+    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped); an entry with a context
+    (``pgettext``) is keyed as gettext compiles it, ``<context>\x04<msgid>``."""
     entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgid": [], "msgstr": []}
+    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
     fuzzy, current = False, None
 
     def flush():
         msgid = _unescape("".join(parts["msgid"]))
         if msgid:
-            entries[msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
+            context = _unescape("".join(parts["msgctxt"]))
+            entries[f"{context}\x04{msgid}" if context else msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
 
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line.startswith("msgid ") or (line.startswith("#") and current == "msgstr"):
+        starts = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
+        if starts or (line.startswith("#") and current == "msgstr"):
             flush()
-            parts, fuzzy, current = {"msgid": [], "msgstr": []}, False, None
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
-        elif line.startswith(("msgid ", "msgstr ")):
+        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
             current, _, rest = line.partition(" ")
             parts[current].append(_STRING.match(rest).group(1))
         elif current and _STRING.match(line):
@@ -102,7 +105,8 @@ def test_every_entry_has_a_spanish_translation():
 
 def test_every_visible_text_is_in_the_catalog():
     assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    # A text with a context (``pgettext_lazy``) is said by its source alone, as the catalog keeps it after its context.
+    assert visible_texts() - {msgid.rpartition("\x04")[2] for msgid in po_entries(LOCALE / "django.po")} == set()
 
 
 def test_the_compiled_catalog_is_current():

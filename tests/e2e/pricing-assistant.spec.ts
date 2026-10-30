@@ -6,8 +6,12 @@
 // (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El
 // asistente»). Cancelled, the price stays as it was. What this file creates carries its own prefix (E2EPAS) and goes
 // away; the apps it turns on are turned off again.
+// FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every id its schema does not
+// mark, so «pon el champú a 15 en la lista de dólares» or «sube al 15 % la regla de verano» said no list, no product and
+// no rule. Now each record is named as the Price lists screens show it, read as the person, never by its id.
 // flow: pricing-assistant-price-currency
-// flow: PRICING-F08 BASE-F97
+// flow: pricing-assistant-card-references
+// flow: PRICING-F07 PRICING-F08 PRICING-F11 BASE-F97
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -18,6 +22,9 @@ import { createProduct, post, stamp } from './pricing-helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-PRICING-PRICE-UPDATE-CARD-IN-THE-BUSINESS-CURRENCY';
+const REFERENCES_KEY = 'FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
+/** An id as a schema's `format: uuid` takes it: never on a card. */
+const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
   { label: '834', width: 834, height: 1112 },
@@ -56,6 +63,7 @@ function cleanUp(): void {
       `delete from inventory_stockmovement where product_id in (${products})`,
       `delete from inventory_productcategory where product_id in (${products})`,
       `delete from inventory_product where sku like '${PREFIX}-%'`,
+      `delete from pricing_discountrule where code like '${PREFIX}%'`,
     ].join('; '),
   );
 }
@@ -196,5 +204,70 @@ test('pricing-assistant-price-currency — in Spanish changing a price of a list
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   expect((await priceNow(context, item)).price).toBe(1200);
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+  await context.close();
+});
+
+
+test('pricing-assistant-card-references — in Spanish adding a price names its list and its product, and changing a rule names the rule, never by their id', async ({ browser }) => {
+  const [context, page] = await ownerWithAPriceInDollars(browser);
+  const list = `E2E Pricing dólares ${RUN}`;
+  const gel = `E2E Pricing gel ${RUN}`;
+  const product = await createProduct(context, gel, `${PREFIX}-${RUN}-G`, 900);
+  const rule = await post<{ id: string; name: string }>(context, '/pricing/rules', {
+    code: `${PREFIX}${RUN}R`,
+    name: `E2E Pricing verano ${RUN}`,
+    rule_type: 'percent',
+    percent: '10',
+  });
+  const [listId] = (await api<{ rows: { id: string }[] }>(context, A, 'GET', `/pricing/price_lists?code=${PREFIX}${RUN}`)).data.rows.map(
+    (row) => row.id,
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openPanel(page);
+
+  // «Pon el gel a 15 en la lista de dólares»: the list and the product by their names.
+  let sent = sentCard(page);
+  await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify({ price_list_id: listId, product_id: product.id, price: 1500 })}`);
+  await expect(card(page)).toBeVisible();
+  let fields = (await sent).fields;
+  expect(Object.fromEntries(fields.map((field) => [field.name, field.value]))).toMatchObject({
+    price_list_id: list,
+    product_id: gel,
+  });
+  expect(JSON.stringify(fields)).not.toMatch(AN_ID);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Tarifa');
+    await expect(card(page)).toContainText(list);
+    await expect(card(page)).toContainText(gel);
+    await expect(card(page)).toContainText(FIFTEEN_DOLLARS);
+    await expect(card(page)).not.toContainText(AN_ID);
+    await untilStill(page);
+    await capture(page, `${REFERENCES_KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
+  await expect(card(page)).toBeHidden();
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+
+  // «Sube al 15 % la regla de verano»: the rule by its name, titled as the rules' table, never «Registro».
+  sent = sentCard(page);
+  await ask(page, `E2E-ASK pricing__rule__update ${JSON.stringify({ id: rule.id, percent: '15' })}`);
+  await expect(card(page)).toBeVisible();
+  fields = (await sent).fields;
+  expect(fields.find((field) => field.name === 'id')).toMatchObject({ value: rule.name, label: 'Regla de descuento' });
+  expect(JSON.stringify(fields)).not.toMatch(AN_ID);
+  await expect(card(page)).toContainText('Regla de descuento');
+  await expect(card(page)).toContainText(rule.name);
+  await expect(card(page)).not.toContainText('Registro');
+  await expect(card(page)).not.toContainText(AN_ID);
+  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
+  await expect(card(page)).toBeHidden();
+  // Cancelled, nothing changed: no price of the gel, and the rule still at 10 %.
+  const prices = await api<{ total: number }>(context, A, 'GET', `/pricing/price_items?product_id=${product.id}`);
+  expect(prices.data.total).toBe(0);
+  const read = await api<{ percent: string }>(context, A, 'GET', `/pricing/rules/detail?id=${rule.id}`);
+  expect(read.status, JSON.stringify(read.data)).toBe(200);
+  expect(Number(read.data.percent)).toBe(10);
   await context.close();
 });

@@ -1543,6 +1543,10 @@
     "method": "get",
     "path": "/api/pricing/rules"
   },
+  "pricing.rule.get": {
+    "method": "get",
+    "path": "/api/pricing/rules/detail"
+  },
   "pricing.rule.create": {
     "method": "post",
     "path": "/api/pricing/rules"
@@ -1562,6 +1566,10 @@
   "pricing.price.resolve": {
     "method": "get",
     "path": "/api/pricing/prices/resolve"
+  },
+  "pricing.catalog.get": {
+    "method": "get",
+    "path": "/api/pricing/catalog/detail"
   },
   "combo.combo.list": {
     "method": "get",

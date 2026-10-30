@@ -27,10 +27,11 @@ from pydantic import (
     StringConstraints,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 
 from apps.pricing.models import CODE_MAX_LENGTH, DEFAULT_PRIORITY, NAME_MAX_LENGTH, DiscountRule
-from base.schemas import in_currency_of
+from base.schemas import in_currency_of, names
 
 T = TypeVar("T")
 
@@ -56,10 +57,25 @@ TARGET_REQUIRED = _("Say which one the rule applies to.")
 TARGET_OF_ANOTHER_SCOPE = _("This only goes with a rule that applies to it.")
 TIERS_RISING = _("Each tier starts at a higher quantity than the one before.")
 TOO_MANY_TIERS = _("At most %(count)s tiers.")
+ONE_RECORD = _("Say one service, one category or one customer group, by its id.")
 
 # How the Price lists screens name the data the models do not (the assistant's card names each datum by its title).
 CUSTOMER_GROUP = gettext_noop("Customer group")
 DISCOUNT_RULE = gettext_noop("Discount rule")
+PRICE_LIST = gettext_noop("Price list")
+PRICE = gettext_noop("Price")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a list and a rule by their name, as the Price lists screen; a price by its article and its
+# list, as its dialogs; a product by Inventory's read; a category, a customer group or a service (Services is no
+# requirement) by the read of what a price or a rule points at in another app. Whoever changes prices reads them all.
+A_LIST = names("pricing.price_list.get")
+A_PRICE = names("pricing.price_item.get", name=("label",))
+A_RULE = names("pricing.rule.get")
+A_PRODUCT = names("inventory.product.get")
+A_SERVICE = names("pricing.catalog.get", by="service_id")
+A_CATEGORY = names("pricing.catalog.get", by="category_id")
+A_GROUP = names("pricing.catalog.get", by="customer_group_id")
 
 RuleType = Literal[*DiscountRule.Type.values]
 RuleScope = Literal[*DiscountRule.Scope.values]
@@ -195,7 +211,7 @@ class PriceListListIn(PageIn):
 
 
 class PriceListRefIn(In):
-    id: UUID | None = Field(None, description=D_LIST_ID)
+    id: UUID | None = Field(None, title=PRICE_LIST, description=D_LIST_ID, json_schema_extra=A_LIST)
     price_list: Said | None = Field(None, validate_default=True, description=D_LIST)
 
     @field_validator("price_list")
@@ -219,7 +235,7 @@ class PriceListIn(_ListFields):
     name: Name = Field(description=D_NAME)
     currency: Currency | None = Field(None, description=D_CURRENCY)
     tax_included: bool | None = Field(None, description=D_TAX_INCLUDED)
-    customer_group_id: UUID | None = Field(None, description=D_GROUP_ID)
+    customer_group_id: UUID | None = Field(None, description=D_GROUP_ID, json_schema_extra=A_GROUP)
     customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description=D_GROUP)
     valid_from: dt.date | None = Field(None, description=D_FROM)
     valid_until: dt.date | None = Field(None, description=D_UNTIL)
@@ -241,7 +257,7 @@ class PriceListPatchIn(PriceListRefIn, _ListFields):
     name: Name | None = Field(None, description=D_NAME)
     currency: Currency | None = Field(None, description=D_CURRENCY)
     tax_included: bool | None = Field(None, description=D_TAX_INCLUDED)
-    customer_group_id: UUID | None = Field(None, description=D_GROUP_ID)
+    customer_group_id: UUID | None = Field(None, description=D_GROUP_ID, json_schema_extra=A_GROUP)
     customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description=D_GROUP)
     valid_from: dt.date | None = Field(None, description=D_FROM)
     valid_until: dt.date | None = Field(None, description=D_UNTIL)
@@ -288,9 +304,9 @@ class PriceItemListIn(PageIn):
 class _ArticleFields(In):
     """A product (by id, SKU or name) or a service (by id or name): exactly one."""
 
-    service_id: UUID | None = Field(None, description=D_SERVICE_ID)
+    service_id: UUID | None = Field(None, description=D_SERVICE_ID, json_schema_extra=A_SERVICE)
     service: Said | None = Field(None, description=D_SERVICE)
-    product_id: UUID | None = Field(None, description=D_PRODUCT_ID)
+    product_id: UUID | None = Field(None, description=D_PRODUCT_ID, json_schema_extra=A_PRODUCT)
     product: Said | None = Field(None, validate_default=True, description=D_PRODUCT)
 
     @field_validator("product")
@@ -300,7 +316,9 @@ class _ArticleFields(In):
 
 
 class PriceItemIn(_ArticleFields):
-    price_list_id: UUID | None = Field(None, description=D_LIST_ID, json_schema_extra=in_currency_of("pricing.price_list.get"))
+    price_list_id: UUID | None = Field(
+        None, description=D_LIST_ID, json_schema_extra={**in_currency_of("pricing.price_list.get"), **A_LIST}
+    )
     price_list: Said | None = Field(
         None, validate_default=True, description=D_LIST, json_schema_extra=in_currency_of("pricing.price_list.get", by="price_list")
     )
@@ -316,7 +334,9 @@ class PriceItemIn(_ArticleFields):
 class PriceItemPatchIn(In):
     """Changes only the fields sent."""
 
-    id: UUID = Field(description="The price's id.", json_schema_extra=in_currency_of("pricing.price_item.get"))
+    id: UUID = Field(
+        title=PRICE, description="The price's id.", json_schema_extra={**in_currency_of("pricing.price_item.get"), **A_PRICE}
+    )
     price: Cents | None = Field(None, description=D_PRICE)
     min_quantity: Quantity | None = Field(None, description=D_MIN_QUANTITY)
 
@@ -330,12 +350,12 @@ class PriceItemIdIn(In):
 class PriceItemRefIn(In):
     """A price by its id, or by its list, its article and its from quantity (1 if not said)."""
 
-    id: UUID | None = Field(None, description="The price's id.")
-    price_list_id: UUID | None = Field(None, description=D_LIST_ID)
+    id: UUID | None = Field(None, title=PRICE, description="The price's id.", json_schema_extra=A_PRICE)
+    price_list_id: UUID | None = Field(None, description=D_LIST_ID, json_schema_extra=A_LIST)
     price_list: Said | None = Field(None, validate_default=True, description=D_LIST)
-    service_id: UUID | None = Field(None, description=D_SERVICE_ID)
+    service_id: UUID | None = Field(None, description=D_SERVICE_ID, json_schema_extra=A_SERVICE)
     service: Said | None = Field(None, description=D_SERVICE)
-    product_id: UUID | None = Field(None, description=D_PRODUCT_ID)
+    product_id: UUID | None = Field(None, description=D_PRODUCT_ID, json_schema_extra=A_PRODUCT)
     product: Said | None = Field(None, validate_default=True, description=D_PRODUCT)
     min_quantity: Quantity = Field(Decimal("1"), description=D_MIN_QUANTITY)
 
@@ -375,6 +395,10 @@ class PriceItemDetailOut(PriceItemOut):
     """One price as the list shows it, with the currency of its list: the one its price is in."""
 
     currency: str = Field(description="The currency of its list, the one its price is in (ISO 4217).")
+    label: str = Field(
+        description="How it is named outside its list, in the reader's language: its article, its list and, from a "
+        "quantity on, that quantity (e.g. «Shampoo · VIP prices · from 10»)."
+    )
 
 
 # Rules
@@ -400,7 +424,7 @@ class RuleListIn(PageIn):
 
 
 class RuleRefIn(In):
-    id: UUID | None = Field(None, description=D_RULE_ID)
+    id: UUID | None = Field(None, title=DISCOUNT_RULE, description=D_RULE_ID, json_schema_extra=A_RULE)
     rule: Said | None = Field(None, validate_default=True, title=DISCOUNT_RULE, description=D_RULE)
 
     @field_validator("rule")
@@ -433,13 +457,17 @@ class RuleIn(In):
         description="tiered: up to 10 tiers by rising quantity (in the unit of the price), each with the percent from it on.",
     )
     applies_to: RuleScope = Field("all", description=D_SCOPE)
-    category_id: UUID | None = Field(None, description="category: the category's id (Inventory).")
+    category_id: UUID | None = Field(
+        None, description="category: the category's id (Inventory).", json_schema_extra=A_CATEGORY
+    )
     category: Said | None = Field(None, description="category: the category's name, when its id is not known.")
-    product_id: UUID | None = Field(None, description="product: " + D_PRODUCT_ID)
+    product_id: UUID | None = Field(None, description="product: " + D_PRODUCT_ID, json_schema_extra=A_PRODUCT)
     product: Said | None = Field(None, description="product: " + D_PRODUCT)
-    service_id: UUID | None = Field(None, description="service: " + D_SERVICE_ID)
+    service_id: UUID | None = Field(None, description="service: " + D_SERVICE_ID, json_schema_extra=A_SERVICE)
     service: Said | None = Field(None, description="service: " + D_SERVICE)
-    customer_group_id: UUID | None = Field(None, description="Only for the members of this group. " + D_GROUP_ID)
+    customer_group_id: UUID | None = Field(
+        None, description="Only for the members of this group. " + D_GROUP_ID, json_schema_extra=A_GROUP
+    )
     customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description="Only for the members of this group. " + D_GROUP)
     min_quantity: Quantity | None = Field(None, description="Only from this quantity of the line on, in the unit of its price (kg of an article priced per kg).")
     valid_from: dt.date | None = Field(None, description=D_FROM)
@@ -459,13 +487,17 @@ class RulePatchIn(RuleRefIn):
     get_quantity: Units | None = Field(None, description="buy_x_get_y: the units of the price that are free (the Y), rounded down.")
     tiers: list[Tier] | None = Field(None, max_length=MAX_TIERS, description="tiered: up to 10 tiers by rising quantity.")
     applies_to: RuleScope | None = Field(None, description=D_SCOPE)
-    category_id: UUID | None = Field(None, description="category: the category's id (Inventory).")
+    category_id: UUID | None = Field(
+        None, description="category: the category's id (Inventory).", json_schema_extra=A_CATEGORY
+    )
     category: Said | None = Field(None, description="category: the category's name, when its id is not known.")
-    product_id: UUID | None = Field(None, description="product: " + D_PRODUCT_ID)
+    product_id: UUID | None = Field(None, description="product: " + D_PRODUCT_ID, json_schema_extra=A_PRODUCT)
     product: Said | None = Field(None, description="product: " + D_PRODUCT)
-    service_id: UUID | None = Field(None, description="service: " + D_SERVICE_ID)
+    service_id: UUID | None = Field(None, description="service: " + D_SERVICE_ID, json_schema_extra=A_SERVICE)
     service: Said | None = Field(None, description="service: " + D_SERVICE)
-    customer_group_id: UUID | None = Field(None, description="Only for the members of this group. " + D_GROUP_ID)
+    customer_group_id: UUID | None = Field(
+        None, description="Only for the members of this group. " + D_GROUP_ID, json_schema_extra=A_GROUP
+    )
     customer_group: Said | None = Field(None, title=CUSTOMER_GROUP, description="Only for the members of this group. " + D_GROUP)
     min_quantity: Quantity | None = Field(None, description="Only from this quantity of the line on, in the unit of its price (kg of an article priced per kg).")
     valid_from: dt.date | None = Field(None, description=D_FROM)
@@ -607,6 +639,28 @@ class ResolveOut(Schema):
     rule_name: str | None = Field(description="That rule's name.")
     rule_type: RuleType | None = Field(description="That rule's type.")
     total: int = Field(description="The line after the discount, in cents.")
+
+
+# What a price or a rule points at in another app (the assistant's card names it by this read)
+
+
+class CatalogRefIn(In):
+    """One record of another app a price list, a price or a rule points at, by its id: exactly one."""
+
+    service_id: UUID | None = Field(None, description=D_SERVICE_ID)
+    category_id: UUID | None = Field(None, description="The category's id (Inventory).")
+    customer_group_id: UUID | None = Field(None, description="The customer group's id (Customers).")
+
+    @model_validator(mode="after")
+    def _one(self) -> "CatalogRefIn":
+        if sum(value is not None for value in (self.service_id, self.category_id, self.customer_group_id)) != 1:
+            raise ValueError(str(ONE_RECORD))
+        return self
+
+
+class CatalogRecordOut(Schema):
+    id: UUID = Field(description="Its id.")
+    name: str = Field(description="Its name, as its own app says it.")
 
 
 # Reactions to other apps' events

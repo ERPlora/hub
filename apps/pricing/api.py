@@ -1,8 +1,8 @@
 """Ninja routes of the pricing app: each route calls exactly one operation and holds no logic.
 
 No path parameters (as ``apps.demo``): an id travels in the input, because a route takes one parameter,
-the operation's input. The reactions to other apps' events (``pricing.catalog.*``) have no route: only
-the platform runs them.
+the operation's input. The reactions to other apps' events (``pricing.catalog.forget_*`` and
+``pricing.catalog.refresh_service``) have no route: only the platform runs them.
 """
 
 from live.ninja import bind, run_operation
@@ -10,6 +10,7 @@ from ninja import Query, Router
 
 from apps.pricing import queries, services
 from apps.pricing.schemas import (
+    CatalogRefIn,
     PriceItemIdIn,
     PriceItemIn,
     PriceItemListIn,
@@ -104,6 +105,11 @@ async def rule_list(request, params: Query[RuleListIn]):
     return await run_operation(request, queries.list_rules, params)
 
 
+@bind(router, "pricing.rule.get", "/pricing/rules/detail")
+async def rule_get(request, params: Query[RuleRefIn]):
+    return await run_operation(request, queries.get_rule, params)
+
+
 @bind(router, "pricing.rule.create", "/pricing/rules", status=201)
 async def rule_create(request, data: RuleIn):
     return await run_operation(request, services.create_rule, data)
@@ -130,3 +136,11 @@ async def rule_activate(request, data: RuleRefIn):
 @bind(router, "pricing.price.resolve", "/pricing/prices/resolve")
 async def price_resolve(request, params: Query[ResolveIn]):
     return await run_operation(request, queries.resolve_price, params)
+
+
+# What a price or a rule points at in another app
+
+
+@bind(router, "pricing.catalog.get", "/pricing/catalog/detail")
+async def catalog_get(request, params: Query[CatalogRefIn]):
+    return await run_operation(request, queries.get_catalog_record, params)

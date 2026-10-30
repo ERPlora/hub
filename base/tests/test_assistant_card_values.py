@@ -310,7 +310,6 @@ UNNAMED_REFERENCES = {
     "modifier": 14,
     "online_booking": 7,
     "payment": 8,
-    "pricing": 25,
     "printing": 11,
     "sale": 101,
     "schedule": 4,
@@ -431,6 +430,9 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
+    **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
+    **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
+    **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
     **{f"table.session.{action}:id": "Cuenta" for action in (
         "close", "delete", "link_order", "merge", "park", "restore", "set_guests", "split", "transfer",
     )},
