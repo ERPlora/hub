@@ -29,7 +29,9 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 
 import { createShell, logout } from '@erplora/ui/shell';
 import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
+import { assistantConfig, assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { approvalPass } from '../base/frontend/lib/approval';
+import { HUB_ASSISTANT } from '../base/frontend/lib/assistant-hub';
 
 import { sessionChanged } from '../base/frontend/lib/access';
 import { APP_BLOCKED_ROUTE } from '../base/frontend/lib/app-gate';
@@ -156,9 +158,27 @@ describe('main.ts', () => {
       },
     );
     expect(shellOptions().messages).toEqual({
-      en: { demo: { items: { title: 'Demo items' } }, zeta: { title: 'Zeta' } },
-      es: { demo: { items: { title: 'Elementos' } }, zeta: { title: 'Zeta ES' } },
+      en: { ...assistantMessages.en, demo: { items: { title: 'Demo items' } }, zeta: { title: 'Zeta' } },
+      es: { ...assistantMessages.es, demo: { items: { title: 'Elementos' } }, zeta: { title: 'Zeta ES' } },
     });
+  });
+
+  it("on import, the shell speaks the shared assistant's words next to base's (its panel would show raw keys otherwise)", () => {
+    const messages = importBoot.messages as Record<string, { assistant: { send: string }; base: { assistant: { more: string } } }>;
+    expect([messages.en.assistant.send, messages.es.assistant.send]).toEqual(['Send', 'Enviar']);
+    expect(messages.es.base.assistant.more).toBe('Más opciones');
+  });
+
+  it("configures the shared assistant as the Hub's before the shell mounts (HUB_ASSISTANT)", async () => {
+    const shell = fakeShell();
+    configureAssistant(undefined);
+    let configured: unknown;
+    vi.mocked(createShell).mockImplementationOnce(async () => {
+      configured = assistantConfig();
+      return shell as never;
+    });
+    await main.boot({});
+    expect(configured).toBe(HUB_ASSISTANT);
   });
 
   it('on import, globs the real app catalogues (the demo pages would show raw keys otherwise)', () => {

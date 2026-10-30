@@ -1694,11 +1694,6 @@ msgstr "Elige quién lo aprueba y escribe su PIN."
 msgid "That person cannot approve this: ask somebody who may do it themselves."
 msgstr "Esa persona no puede aprobarlo: pídeselo a alguien que pueda hacerlo."
 
-#: base/assistant.py
-msgctxt "base"
-msgid "CONFIRM"
-msgstr "CONFIRMAR"
-
 #: base/services.py
 msgctxt "base"
 msgid "Home"

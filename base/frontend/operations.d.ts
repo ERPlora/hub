@@ -811,7 +811,7 @@ declare module '@erplora/ui/sdk' {
     'base.api_doc.get': { input: NoInput; output: { document: Record<string, unknown>; apps: ApiApp[]; keys_available: boolean } };
     'base.api_doc.settings': { input: NoInput; output: { docs_enabled: boolean; can_change: boolean } };
     'base.api_doc.settings_update': { input: { docs_enabled: boolean }; output: { docs_enabled: boolean; can_change: boolean } };
-    // Assistant (APP-BASE-9); its turn is a stream the panel reads itself (lib/assistant-stream.ts).
+    // Assistant (APP-BASE-9); its turn is a stream the shared panel reads itself (@erplora/ui, Assistant/stream.ts).
     'base.assistant.usage': { input: NoInput; output: AssistantUsage };
     'base.assistant.report': { input: AssistantReportInput; output: { sent: boolean; duplicate: boolean } };
     'base.assistant.transcribe': {

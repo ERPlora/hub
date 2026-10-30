@@ -4,7 +4,7 @@ its operations, every one usable by the assistant (``ai``)."""
 from django.apps import apps
 from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 PERMISSIONS = [
     "customer.view",
@@ -209,7 +209,7 @@ def test_the_system_only_permission_is_declared_by_no_app():
 def test_every_operation_tells_the_assistant_what_it_does():
     for name, op in customer_operations().items():
         if name in SCREEN_ONLY:
-            assert op.ai is None, name
+            assert op.ai is INTERNAL, name
             continue
         assert isinstance(op.ai, dict), name
         assert (

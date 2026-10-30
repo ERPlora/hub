@@ -10,6 +10,7 @@ import copy
 import json
 from functools import cache
 
+from live.assistant import description
 from live.operations import registry as operation_registry
 
 SECURITY_SCHEME = "ApiKey"
@@ -45,7 +46,7 @@ def public_document(apps: set[str]) -> dict:
                 continue
             route = copy.deepcopy(route)
             route.pop("security", None)
-            described = op.ai.get("description") if isinstance(op.ai, dict) else None
+            described = description(op)
             if described and "description" not in route:
                 route["description"] = described
             kept[method] = route

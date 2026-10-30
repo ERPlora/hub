@@ -20,7 +20,7 @@ from live.context import OperationContext
 from live.errors import InvalidPayload, NotFound, Unauthorized
 from live.meta import Category, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from base import access, activation, blueprint, business, entitlement, files, home, system
 from base.auth import SAAS_PANEL_PATH, saas_url
@@ -107,7 +107,8 @@ from live.meta import module_configs
 from live.operations import registry as operation_registry
 
 
-@operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut)
+# Not an assistant tool: the SPA's own session, read at start.
+@operation("base.session.me", kind="query", permission=None, input=SessionMeIn, output=SessionMeOut, ai=INTERNAL)
 def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     """The user, its permissions, and the menu and apps it may see on this scope, already translated.
 
@@ -166,7 +167,8 @@ def _user(actor: Any) -> dict[str, str] | None:
     return {"id": str(actor.pk), "label": person_label(actor)}
 
 
-@operation("base.hub.get", kind="query", permission=None, input=HubGetIn, output=HubOut)
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation("base.hub.get", kind="query", permission=None, input=HubGetIn, output=HubOut, ai=INTERNAL)
 def hub_get(ctx: OperationContext, data: HubGetIn) -> dict[str, Any]:
     """The registry's row of ``data.id`` (``GET /internal/hubs/{id}``), for the platform only: the SaaS asks it about
     a sign-up whose ``ready`` it never heard, and marks it ready when ``status`` is ``ready``."""
@@ -177,7 +179,8 @@ def hub_get(ctx: OperationContext, data: HubGetIn) -> dict[str, Any]:
     return hub_answer(hub)
 
 
-@operation("base.hub.by_slugs", kind="query", permission=None, input=HubsBySlugIn, output=HubsBySlugOut)
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation("base.hub.by_slugs", kind="query", permission=None, input=HubsBySlugIn, output=HubsBySlugOut, ai=INTERNAL)
 def hubs_by_slugs(ctx: OperationContext, data: HubsBySlugIn) -> dict[str, Any]:
     """The registry's status of each of ``data.slugs`` (``None`` without a row), in their order, for the platform
     only: ``seed_local_hubs --check`` asks it about ``a`` and ``b``."""
@@ -186,7 +189,8 @@ def hubs_by_slugs(ctx: OperationContext, data: HubsBySlugIn) -> dict[str, Any]:
     return {"hubs": [{"slug": slug, "status": found.get(slug)} for slug in data.slugs]}
 
 
-@operation("base.demo.get", kind="query", permission=None, input=DemoSlugIn, output=DemoStatusOut)
+# Not an assistant tool: the SaaS's door to the demo (/internal), no person.
+@operation("base.demo.get", kind="query", permission=None, input=DemoSlugIn, output=DemoStatusOut, ai=INTERNAL)
 def demo_get(ctx: OperationContext, data: DemoSlugIn) -> dict[str, Any]:
     """The status of the demo ``data.slug``, for the platform only: ``manage.py demo_expire`` says it once done."""
     internal_only(ctx)
@@ -262,7 +266,15 @@ def _platform_steps(ctx: OperationContext, on: frozenset[str]) -> list[dict]:
     ]
 
 
-@operation("base.widget.list", kind="query", permission=VIEW_HOME, input=WidgetListIn, output=WidgetListOut)
+# Not an assistant tool: the Home's panels, the screen's own layout.
+@operation(
+    "base.widget.list",
+    kind="query",
+    permission=VIEW_HOME,
+    input=WidgetListIn,
+    output=WidgetListOut,
+    ai=INTERNAL,
+)
 def widget_list(ctx: OperationContext, data: WidgetListIn) -> dict:
     """The panels of the apps on that this person may see, of the hub's vertical; the SPA follows each one's data."""
     with translation.override(ctx.language):
@@ -271,7 +283,15 @@ def widget_list(ctx: OperationContext, data: WidgetListIn) -> dict:
         return {"widgets": home.widgets(ctx, configs, hub.vertical if hub else "")}
 
 
-@operation("base.bell.counters", kind="query", permission=VIEW_HOME, input=BellCountersIn, output=BellCountersOut)
+# Not an assistant tool: the bell's counters, the screen's own chrome.
+@operation(
+    "base.bell.counters",
+    kind="query",
+    permission=VIEW_HOME,
+    input=BellCountersIn,
+    output=BellCountersOut,
+    ai=INTERNAL,
+)
 def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
     """The bell: the counters above zero of the apps on, and for who runs the hub the events the relay gave up on."""
     with translation.override(ctx.language):
@@ -299,7 +319,15 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
         return {"counters": counters, "refresh_every": home.bell_refresh_every(ctx, modules)}
 
 
-@operation("base.notice.list", kind="query", permission=VIEW_HOME, input=NoticeListIn, output=NoticeListOut)
+# Not an assistant tool: the device's notices, which the device itself shows.
+@operation(
+    "base.notice.list",
+    kind="query",
+    permission=VIEW_HOME,
+    input=NoticeListIn,
+    output=NoticeListOut,
+    ai=INTERNAL,
+)
 def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
     """The device's notices (PLAN-HUB round 2026-10-23): the rows the modules on tell, with their texts filled in."""
     with translation.override(ctx.language):
@@ -311,7 +339,8 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
 # ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-@operation("base.app.list", kind="query", permission=VIEW_HOME, input=AppListIn, output=AppListOut)
+# Not an assistant tool: the Apps screen's own read; the assistant knows the apps by its catalogue.
+@operation("base.app.list", kind="query", permission=VIEW_HOME, input=AppListIn, output=AppListOut, ai=INTERNAL)
 def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     """The Apps screen: every module the scope shows, from its own config in this process (PLAN §20.4.1; never the
     SaaS's catalog), with where its right comes from and its state (``base.entitlement``: ``blocked`` without it;
@@ -394,7 +423,15 @@ def _first_screen(ctx: OperationContext, config: Any) -> str | None:
     return config.navigation[0].path
 
 
-@operation("base.plan.usage", kind="query", permission=ADMINISTER_HUB, input=PlanUsageIn, output=PlanUsageOut)
+# Not an assistant tool: System › Plan and limits, the SaaS's photo on its screen.
+@operation(
+    "base.plan.usage",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=PlanUsageIn,
+    output=PlanUsageOut,
+    ai=INTERNAL,
+)
 def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     """«Plan and limits» of System (BASE-G81): the limits of the plan the SaaS's last photo carries (``plan``:
     ``max_users``, ``max_devices``; 0 = no limit) against the people of the business (its active members, the ones

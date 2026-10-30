@@ -1105,87 +1105,14 @@
       }
     },
     "assistant": {
-      "title": "Assistant",
-      "open": "Assistant",
-      "close": "Close",
       "more": "More options",
-      "newConversation": "New conversation",
       "empty": "Ask me about your sales, your stock or anything about your business.",
       "setupIntro": "Review your business's setup. Choose an option or write your question.",
-      "placeholder": "Write a message…",
-      "send": "Send",
-      "stop": "Stop",
-      "attach": "Attach a file",
-      "removeFile": "Remove attachment",
-      "dictate": "Dictate by voice",
-      "stopRecording": "Stop recording",
-      "transcribing": "Transcribing…",
-      "listen": "Read aloud",
-      "stopListening": "Stop reading",
-      "noAnswer": "(no answer)",
-      "stopped": "Stopped.",
-      "writing": "The assistant is writing",
-      "goTo": "Go to {name}",
-      "retry": "Try again",
-      "signIn": "Sign in again",
-      "upgrade": "Upgrade plan",
-      "askOwner": "Ask whoever runs the business to upgrade the plan.",
-      "usage": "You have {left} of {limit} messages left this month.",
-      "usageSpent": "You have used all {limit} messages of this month.",
-      "renews": "They renew on {date}.",
-      "offline": "No connection: you can write, and send when it is back.",
-      "files": {
-        "tooLarge": "{name} is too large: 8 MB at most per file.",
-        "tooMuch": "The files of one question add up to 20 MB at most.",
-        "unsupported": "{name} cannot be attached: images, PDF, Word, Excel, text or CSV.",
-        "unreadable": "{name} could not be read."
-      },
-      "voice": {
-        "denied": "Microphone access is blocked. Allow it in your browser to dictate.",
-        "deniedInApp": "Microphone access is blocked. Allow it in your device settings to dictate.",
-        "failed": "The audio could not be transcribed. Try again.",
-        "tooLong": "The recording is too long: dictate a shorter message.",
-        "empty": "Nothing was heard. Try again closer to the microphone."
-      },
       "shortcuts": {
         "missing": "What is left to set up?",
         "step": "How do I set up “{title}”?"
       },
-      "errors": {
-        "unreachable": "The assistant could not be reached. Check the connection and try again.",
-        "unavailable": "The assistant is not available right now. Try again in a few minutes.",
-        "cut": "The answer was cut off.",
-        "quotaSpent": "You have used all the assistant's messages of this month ({used} of {limit}).",
-        "noPlan": "Your plan does not include the assistant.",
-        "rateLimited": "Too many questions in a row: wait {seconds} seconds and try again.",
-        "tooLarge": "This conversation is too long: start a new one.",
-        "tooManySteps": "I stopped: this needed too many steps. Ask for it in parts.",
-        "signedOut": "Your session has ended. Sign in again to keep talking."
-      },
-      "notices": {
-        "claimed_change": "The assistant said it made a change, but no action was run. Nothing was changed.",
-        "unread_id": "This answer shows an identifier the assistant did not really read. Do not trust it.",
-        "unknown_screen": "This answer points to a screen that does not exist here."
-      },
-      "receipts": {
-        "ok": "Done: {action} in {app}",
-        "cancelled": "Not done, cancelled: {action} in {app}",
-        "error": "Not done, it failed: {action} in {app}",
-        "refused": "Not done, not allowed: {action} in {app}"
-      },
       "card": {
-        "title": "Run this action?",
-        "message": "{action} in {app}: {line}",
-        "highMessage": "{action} in {app}. Check each datum before going on.",
-        "run": "Run it",
-        "cancel": "Cancel",
-        "cancelAll": "Cancel all",
-        "count": "It acts on {count} records.",
-        "preview": "What will happen",
-        "notFromChat": "I cannot tell how many records this would change, so I do not do it from here. Open its screen, where you can see them.",
-        "yes": "Yes",
-        "no": "No",
-        "items": "no items | 1 item | {count} items",
         "actions": {
           "activate": "Activate",
           "add": "Add",
@@ -1398,48 +1325,7 @@
               "add": "Register movement"
             }
           }
-        },
-        "fields": {
-          "name": "Name",
-          "price": "Price",
-          "amount": "Amount",
-          "note": "Note",
-          "notes": "Notes",
-          "status": "Status",
-          "email": "Email",
-          "phone": "Phone",
-          "quantity": "Quantity",
-          "qty": "Quantity",
-          "description": "Description",
-          "duration_minutes": "Duration (minutes)",
-          "date": "Date",
-          "time": "Time",
-          "starts_at": "Starts",
-          "ends_at": "Ends",
-          "customer_id": "Customer",
-          "reason": "Reason",
-          "id": "Record",
-          "ids": "Records",
-          "title": "Title",
-          "category": "Category",
-          "app": "App"
         }
-      },
-      "report": {
-        "action": "Report a problem",
-        "title": "Report this answer",
-        "intro": "If this answer of the assistant looks wrong or harmful, send it to us and we will review it.",
-        "reason": "What is wrong with it?",
-        "reasons": {
-          "incorrect": "It is wrong",
-          "harmful": "It is harmful or offensive",
-          "instructions": "It did not do what I asked",
-          "other": "Something else"
-        },
-        "comment": "Comment (optional)",
-        "send": "Report",
-        "sent": "Thank you, we have received your report.",
-        "failed": "The report could not be sent. Try again."
       },
       "screens": {
         "home": "Home",

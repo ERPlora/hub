@@ -4,9 +4,10 @@
 // assistant's panel and the business's apps followed live (AppsFollower).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
+
 import type { BellCounter } from '../operations';
 import { accessibleName, flush, memoryStorage, mountBase } from '../__tests__/mount-base';
-import { createAssistant, installAssistant, useAssistant } from '../lib/assistant';
 import { forgetAppDistribution } from '../lib/management';
 import BackgroundChrome from './BackgroundChrome.vue';
 import TopbarChrome from './TopbarChrome.vue';
@@ -102,6 +103,15 @@ describe('the chrome of base', () => {
     const { wrapper } = await mountBase(BackgroundChrome);
     expect(wrapper.find('[data-testid="device-notices"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="assistant-panel"]').exists()).toBe(true);
+  });
+
+  it('the assistant’s empty conversation is base’s: its sentence and the setup’s shortcuts (BASE-G121)', async () => {
+    const { wrapper } = await mountBase(BackgroundChrome, { locale: 'es' });
+    useAssistant().setOpen(true);
+    for (let i = 0; i < 3; i += 1) await flush();
+    const empty = wrapper.get('[data-testid="assistant-empty"]');
+    expect(empty.text()).toContain('Pregúntame por tus ventas, tu inventario o cualquier cosa de tu negocio.');
+    expect(empty.findAll('[data-testid="assistant-shortcut"]').map((button) => button.text())).toEqual(['¿Qué falta por configurar?']);
   });
 
   it('beside the pane, the business’s apps followed live: the menu follows an app turned on or off (PLAN-HUB §9)', async () => {

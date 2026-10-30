@@ -34,7 +34,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload
-from live.operations import operation
+from live.operations import INTERNAL, operation
 from live.outbox import record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
@@ -279,6 +279,7 @@ def _measured(raw: bytes, content_type: str) -> tuple[int, int]:
 
 
 # Not an assistant tool (no ``ai=``): it takes the file in base64, up to 5 MB; the editor uploads it.
+# Not an assistant tool: a file the screen uploads.
 @operation(
     "website.image.upload",
     kind="command",
@@ -286,6 +287,7 @@ def _measured(raw: bytes, content_type: str) -> tuple[int, int]:
     input=ImageUploadIn,
     output=ImageOut,
     expose_api=True,
+    ai=INTERNAL,
 )
 def upload_image(ctx: OperationContext, data: ImageUploadIn) -> dict:
     hub = hub_id(ctx.scope)

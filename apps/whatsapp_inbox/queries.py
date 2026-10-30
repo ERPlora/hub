@@ -56,6 +56,8 @@ from apps.whatsapp_inbox.schemas import (
     SummaryOut,
     TemplateListIn,
     TemplatePage,
+    TemplateSampleOut,
+    TemplateSampleRefIn,
 )
 from base.auth import SAAS_PANEL_PATH
 from base.models import Membership
@@ -97,6 +99,7 @@ DELETE_UNKNOWN = _("erplora.com did not confirm that Meta deleted the template. 
 #: The Hub's own code of a hand-over that could not take the header's file: it is no longer in the business's store.
 HEADER_SAMPLE_MISSING_CODE = "whatsapp_inbox.header_sample_missing"
 HEADER_SAMPLE_MISSING = _("The header's file is no longer in the business's files: choose it again with Edit.")
+SAMPLE_NOT_FOUND = _("That file is not among the business's files.")
 MESSAGE_HEADER_SAMPLE_MISSING = _(
     "The header's file is no longer in the business's files: send the template again choosing its file."
 )
@@ -824,6 +827,28 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
     if params.fillable is not None:
         rows = rows.filter(_FILLABLE if params.fillable else ~_FILLABLE)
     return page(rows.order_by("name", "language", "id"), params, template_out)
+
+
+@operation(
+    "whatsapp_inbox.template_sample.detail",
+    kind="query",
+    # Whoever sends chooses the file (F33), so whoever sends reads it: the assistant's card names it by this read.
+    permission="whatsapp_inbox.reply",
+    input=TemplateSampleRefIn,
+    output=TemplateSampleOut,
+    expose_api=True,
+    ai={
+        "description": "One file of a WhatsApp template's header by its id (the one whatsapp_inbox.template_sample."
+        "upload answered): its name, whether it is a photo, a video or a document, and its size."
+    },
+)
+def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> dict:
+    """F29, F33: a header's file as its upload answered it, only of the business that asks (phase 1 shares the
+    tables, as ``Template``)."""
+    sample = TemplateSample.objects.filter(pk=data.id, host=ctx.scope.key).first()
+    if sample is None:
+        raise NotFound(str(SAMPLE_NOT_FOUND), code="whatsapp_inbox.sample_not_found")
+    return sample_out(sample)
 
 
 @operation(
