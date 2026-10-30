@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6cbf2d2dadf9684893a465e3aa38ab622b61bf83f0d76cb2f325d5dcd20a2405 -->
+<!-- generated from WORKBOOK.md sha256:fd2275b0c82a2db283bce411c8a1b7f05b60de1c771239cf1acba3240968a419 -->
 
 ## What it is for and who it is for
 
@@ -93,6 +93,9 @@ service" — "<name> — it will no longer be offered or bookable. Its history a
 booked are kept." and, if Appointments has upcoming appointments with it, "{count} upcoming
 appointment(s) still use this service. They keep their booking, price and length; only new bookings
 stop.".
+
+The service photo (SERVICE-F34 and F35, not done yet) will add the "Photo" field to the form, with
+"Choose from the library", "Upload photo" and "Remove photo", for whoever may edit services.
 
 ### Categories
 Table with the search box "Search category…" and columns **Name, Parent category, Order** and
@@ -190,6 +193,8 @@ Amounts, durations and dates show in the format of the language of whoever is lo
 | SERVICE-F31 | Assign a professional to a service | done |
 | SERVICE-F32 | Change or remove a professional from a service | done |
 | SERVICE-F33 | Know who can perform a service | done |
+| SERVICE-F34 | Choose a service's image from the library | not done |
+| SERVICE-F35 | Upload the service's own photo | not done |
 
 ### SERVICE-F01 Add a service
 Status: done
@@ -789,6 +794,63 @@ Out: the list, read only. Empty means "nobody declared" or "whoever has it is no
 the rule "then the whole bookable team does it" belongs to Appointments.
 If it fails: a service that does not exist, "That service does not exist in this business.".
 Involved: SERVICE-F31, APPOINTMENT-F01
+
+### SERVICE-F34 Choose a service's image from the library
+Status: not done
+Actor: manager, assistant
+Screen: Services
+Steps:
+1. In the service's form (**New service** or "Editing service — <name>"), under "Photo", tap "Choose from
+   the library": the "Image library" window opens with the search box "Search image…" already filled in
+   with the service's name; among the sector tabs (those of INVENTORY-F30), "Hair" and "Beauty" come
+   first.
+2. Search in Spanish or in English ("highlights", "balayage", "manicure"): the search looks at each
+   image's title and synonyms, never at its file name. Tap one: the window closes and the form shows it
+   under "Photo", with "Change" and "Remove photo".
+3. Tap **Create service** or **Save changes**: the photo stays on the service. Closing the form without
+   saving discards it.
+4. Through the assistant: "put a photo on the women's haircut". The assistant shows up to five
+   candidate images by their title and asks which one; it never sets one on its own. When one is
+   chosen, it asks for the confirmation card and sets it.
+In: the service and the ERPlora image library, the same one Inventory uses (INVENTORY-F30).
+Out: the service with its image from the library; the business keeps no copy, only which one it is, and
+it uses none of its plan's space. Services announces the change (`service.service.updated`). The service's
+tile at the till shows the photo, with the initials when there is none or it does not load, like an
+item's (INVENTORY-F32). "Remove photo" leaves it with its initials. The hair salon templates bring each
+service with its image. The candidates come from `service.service.suggest_image`, the search is
+`base.catalog_image.search` and `service.service.set_image` sets or removes the photo.
+If it fails: if the library does not answer, "The image library could not be loaded." with "Retry", and
+the service can still be saved without a photo. No results: "No image matches your search. Try another
+word or upload a photo.". An image the library no longer has is refused on saving ("That image is no
+longer in the library. Choose another one.") and nothing is saved. Whoever may not edit services does
+not see "Photo", and the app refuses it through the assistant or the API too.
+Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
+
+### SERVICE-F35 Upload the service's own photo
+Status: not done
+Actor: manager
+Screen: Services
+Steps:
+1. In the service's form, under "Photo", tap "Upload photo" and choose an image from the device (on a
+   phone or a tablet, also with the camera): JPG, PNG or WebP up to 2 MB.
+2. The form shows it under "Photo", cropped to a square, with "Change" and "Remove photo".
+3. Tap **Create service** or **Save changes**: the service is saved and then its photo ("Uploading
+   photo…"). Closing the form without saving discards it.
+In: the chosen image and the service.
+Out: the photo, converted to a 512 × 512 WebP (cropped at the centre), in the business's folder, which only
+the business's people see and which counts towards its plan's space. Services announces the change
+(`service.service.updated`) and the till shows it on the service's tile (INVENTORY-F32). Uploading
+another one, choosing one from the library or "Remove photo" deletes the previous one from the folder;
+archiving the service keeps it, in case it is restored (SERVICE-F05). When the business is exported
+(BASE-F35) the photo travels inside the file and is copied to the business that imports it, like the
+items' photos (INVENTORY-F33). The upload is `service.service.upload_image`, also through the API.
+If it fails: next to "Photo", and nothing is uploaded: an image over 2 MB, "The photo is over 2 MB.
+Choose a lighter one."; a file that is not an image, "That file is not a photo. Upload a JPG, PNG or WebP
+image."; with no space left in the plan, "There is no space left for that file: your plan includes
+<space>."; if the store does not answer, "The photo could not be saved. Try again.". If the service was
+saved and the photo was not, the form says so ("The service has been saved, but the photo has not:
+<reason>") with "Retry", and the service keeps the photo it had.
+Involved: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
 
 ## Services: what goes in and what comes out
 
