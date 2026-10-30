@@ -2043,6 +2043,10 @@
     "method": "post",
     "path": "/api/whatsapp_inbox/templates/samples"
   },
+  "whatsapp_inbox.template_sample.detail": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/templates/samples/detail"
+  },
   "whatsapp_inbox.channel.get": {
     "method": "get",
     "path": "/api/whatsapp_inbox/channel"

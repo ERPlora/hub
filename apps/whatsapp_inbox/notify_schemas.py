@@ -33,6 +33,7 @@ class NotifyIn(Schema):
         None,
         description="A key of the caller's own for this message (the same on a retry): sending again with it never "
         "sends twice. Empty: a new message.",
+        json_schema_extra={"attempt_key": True},
     )
 
     @field_validator("text")

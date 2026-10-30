@@ -20,7 +20,8 @@ import pytest
 import respx
 from django.apps import apps
 from django.core.files.storage import storages
-from live.errors import Conflict, InvalidPayload, OperationError
+from live.context import OperationContext
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Template, TemplateSample
@@ -611,3 +612,39 @@ def test_a_file_of_another_business_named_by_a_template_is_never_shown_nor_sent(
     assert route.call_count == calls, "b's file never leaves for erplora.com"
     row.refresh_from_db()
     assert (row.submit_state, row.submit_error_code) == ("failed", "whatsapp_inbox.header_sample_missing")
+
+
+# ── The file, read by its id (the assistant's card names it so: FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED) ──────
+
+
+def detail(sample_id, ctx=None):
+    return run("whatsapp_inbox.template_sample.detail", {"id": str(sample_id)}, ctx)
+
+
+def test_a_header_file_is_read_by_its_id_as_it_was_kept():
+    """Whoever sends reads the file they chose, as its upload answered it: its name first."""
+    kept = upload(PDF, "DOCUMENT", "carta.pdf")
+
+    read = detail(kept.id, ctx_for("hub_employee"))
+
+    assert read == kept
+    assert (read.name, read.header_format) == ("carta.pdf", "DOCUMENT")
+
+
+def test_a_header_file_of_another_business_is_not_there():
+    """Phase 1 shares the tables: ``b``'s file, asked for by its id from ``a``, does not exist."""
+    theirs = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
+
+    with pytest.raises(NotFound) as gone:
+        detail(theirs.id)
+
+    assert gone.value.code == "whatsapp_inbox.sample_not_found"
+    assert detail(theirs.id, ctx_for(scope=B)).name == "de-b.jpg"
+
+
+def test_only_who_may_answer_reads_a_header_file():
+    kept = upload()
+    looker = OperationContext(scope=ctx_for().scope, actor="mirón", permissions=frozenset({"whatsapp_inbox.view"}))
+
+    with pytest.raises(PermissionDenied):
+        detail(kept.id, looker)
