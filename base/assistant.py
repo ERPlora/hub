@@ -1,53 +1,68 @@
 """The Hub's assistant (APP-BASE-9; PLAN §30, ronda 2026-10-22b): chat and voice in the Hub against erplora.com's AI
 gateway (``saas`` ``assistant/internal.py``), without the ORM.
 
-- **Its tools** (``catalog``) are the operations of the apps on in this business that this person may run (the
-  operation's own permission), told to the assistant by their ``ai=`` description: never one that says «Not an
-  assistant tool» or «System only», one without a permission (the system's), one only the platform runs (a permission
-  no app declares, whatever its ``ai=`` says), the assistant's own, nor what is never done from the chat
-  (``NOT_FROM_CHAT``: emptying the business, a file to download). A turn offers only the few of
-  what was asked (``relevant``, at most ``MAX_TOOLS``), never the whole catalogue. A tool runs as the person, by its
-  own operation (``run_tool``): the same permission, transaction and refusals as the button on the screen.
-- **A write never runs without the person's yes**: its card (``card``) says what it will send, each datum by its name
-  in the person's language (the name its app's models give it: their metadata, no query) and in words — a moment as
-  their language writes it, at the business's hour; a value of a closed list by its label; a record by its name, as
-  the read its schema marks answers it to them, or not at all: never by its id; an amount by its schema's mark
-  (``MONEY``), in the business's currency —; ``risk="high"`` asks
-  to type a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many; such a write
-  that names no record is not done from the chat (``blocked``). Such a write may show what it will do (``preview``):
-  a read of its own app its ``ai=`` names, run as the person before the card; one that cannot be read shows no card.
+The mechanics that do not depend on the gateway are ``live.assistant``'s, shared with the SaaS's panel
+(docs/plans/2026-10-30-asistente-saas.md §2) and re-exported here; this module gives them the Hub's own:
+
+- **Its tools** (``catalog``) are the operations of the apps on in this business (``active_apps``: its right and its
+  switch) that this person may run, by their ``ai=`` (``live.assistant.is_tool``: an ``AI``; ``INTERNAL``, a «Not an
+  assistant tool»/«System only» dictionary or one on what only the platform runs never), never the assistant's own
+  nor what is never done from the chat (``NOT_FROM_CHAT``: emptying the business, a file to download). A write a
+  manager may approve is theirs too (``approvals``). A turn offers only the few of what was asked (``relevant``, with
+  ``ALWAYS`` first).
+- **A write never runs without the person's yes**: its card (``card``) says each datum in the Hub's words
+  (``_Words``) — a moment as their language writes it (CLDR, as the screens' ``formatDateTime``), at the business's
+  hour; a record by its name, as the read its schema marks answers it to them (``REFERS``), or not at all: never by
+  its id; an amount in the currency the write names (``CURRENCY``) or the business's —; ``risk="high"`` asks to type
+  a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many. Its preview
+  (``preview``) says the amounts of its read in the currency it answers. A platform action is named by the screen
+  where the person would do it (``screen``, ``app_name``).
 - **The gateway**: every door is a signed POST (``base.signing``, the secret of every ``/internal`` call) naming this
   business by its host (``scope.key``); the browser never talks to it. ``stream_turn`` relays a turn as the Hub's own
   frames (``text``, ``usage``, ``error``, ``done``); its refusals become one of ours (``assistant.quota_exceeded``,
   ``assistant.unavailable``…), and what never reached it is ``assistant.unreachable``.
 """
 
+import dataclasses
 import datetime as dt
 import json
-import re
 import time
-import unicodedata
-import uuid
 from collections.abc import AsyncIterator, Iterable
-import dataclasses
 from dataclasses import dataclass
-from functools import cache
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 import pycountry
-import pydantic
 from babel.dates import format_date, format_time, get_datetime_format
 from django.conf import settings
 from django.core import checks
-from django.core.exceptions import FieldDoesNotExist
 from django.http import StreamingHttpResponse
-from django.utils import timezone, translation
-from django.utils.text import capfirst
-from django.utils.translation import get_language_info, gettext, pgettext_lazy
+from django.utils import timezone
+from django.utils.translation import get_language_info, pgettext_lazy
+from live import assistant as shared
+
+# Re-exported: the Hub's services, routes, apps and tests read the shared mechanics here, as always.
+from live.assistant import (
+    LEFT_OUT,
+    MAX_ROUNDS,
+    MAX_TOOLS,
+    REFERS,
+    ToolOutcome,
+    confirmed,
+    description,
+    error_content,
+    named,
+    operation_of,
+    preview_of,
+    refers_of,
+    risk,
+    rounds,
+    run_tool,
+    tool_name,
+    tool_spec,
+)
 from live.context import OperationContext, Scope
-from live.errors import AppInactive, OperationError, PermissionDenied, Unauthorized
 from live.meta import LiveAppConfig, all_live_app_configs
 from live.operations import Operation, registry
 
@@ -56,20 +71,26 @@ from base.auth import saas_internal_url
 from base.business import babel_locale, currency_decimals
 from base.operations import HostScopeResolver
 
-#: The tools a turn offers at most: the gateway takes 256, the model chooses better among a few.
-MAX_TOOLS = 40
-#: Rounds of tools of one request of the person (the old hub's guard against a loop, not an allowance).
-MAX_ROUNDS = 6
+# The card's helpers by the names this module and the apps' tests have always read them by (``live.assistant``'s).
+_LEFT_OUT = LEFT_OUT
+_choice_label = shared.choice_label
+_field = shared.field
+_generated_title = shared.generated_title
+_is_money = shared.is_money
+_is_signed = shared.is_signed
+_label = shared.label
+_output_schema = shared.output_schema
+_own_title = shared.own_title
+_resolved = shared.resolved
+_run = shared.run
+_schema = shared.input_schema
+_sends_amount = shared.sends_amount
+_verbose_name = shared.verbose_name
+
 #: Always offered when the person may read them: the checklist and the business's own data.
 ALWAYS = ("base.setup.status", "base.business.get")
 #: Never from the chat (the old hub's «destructive actions of the hub itself»): emptying the business; a file.
 NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
-NOT_A_TOOL = ("Not an assistant tool", "System only")
-SEPARATOR = "__"
-#: What a dangerous write asks to type, in the person's language.
-CONFIRM_WORD = pgettext_lazy("base", "CONFIRM")
-#: A tool's result told back to the model: no more (a list of a hundred rows fits).
-MAX_RESULT_CHARS = 60_000
 
 TURN_PATH = "/internal/assistant/chat/stream"
 USAGE_PATH = "/internal/assistant/usage"
@@ -83,54 +104,10 @@ TURN_TIMEOUT = httpx.Timeout(15.0, read=120.0)
 # ── Tools ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def tool_name(operation_name: str) -> str:
-    """The operation's name as a tool's (the gateway's function names take no dots)."""
-    return operation_name.replace(".", SEPARATOR)
-
-
-def operation_of(name: str, tools: dict[str, Operation]) -> Operation | None:
-    """The operation of the tool ``name`` among ``tools``; ``None`` for one it was not offered."""
-    for op in tools.values():
-        if tool_name(op.name) == name:
-            return op
-    return None
-
-
-def named(name: str) -> Operation | None:
-    """The registered operation the tool ``name`` stands for, offered or not: only to name it in a receipt (BASE-G118:
-    «Not done, not allowed: Create in Demo»); it never runs from here."""
-    return operation_of(name, registry)
-
-
-def description(op: Operation) -> str:
-    ai = op.ai if isinstance(op.ai, dict) else None
-    return str(ai.get("description", "")).strip() if ai else ""
-
-
-def risk(op: Operation) -> str:
-    ai = op.ai if isinstance(op.ai, dict) else {}
-    return "high" if ai.get("risk") == "high" else "normal"
-
-
-@cache
-def declared_permissions() -> frozenset[str]:
-    """Every permission an app declares: all the owner and the admin of a business hold, and the most a role is
-    given. One no app declares (``<app>.system``, ``system.<app>``: the platform's reactions and scheduled tasks) only
-    «*» reaches: a superuser and the system."""
-    return frozenset(permission for config in all_live_app_configs() for permission in config.permissions)
-
-
 def is_tool(op: Operation) -> bool:
-    text = description(op)
-    return (
-        bool(text)
-        and op.permission is not None
-        # Only the platform runs it, whatever its ``ai=`` says («Platform reaction…»): no tool, even of a superuser.
-        and op.permission in declared_permissions()
-        and not text.startswith(NOT_A_TOOL)
-        and op.name not in NOT_FROM_CHAT
-        and not op.name.startswith("base.assistant.")
-    )
+    """Whether ``op`` is a tool of the Hub's assistant: its ``ai=`` says so (``live.assistant.is_tool``) and it is
+    neither done never from the chat (``NOT_FROM_CHAT``) nor the assistant's own."""
+    return shared.is_tool(op, not_from_chat=NOT_FROM_CHAT) and not op.name.startswith("base.assistant.")
 
 
 def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
@@ -143,114 +120,22 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
 def catalog(ctx: OperationContext) -> dict[str, Operation]:
     """The tools of ``ctx``'s person: by name, in name order. A write a manager may approve is theirs too, as its
     button on the screen is (APP-BASE-5): running it asks for the approval (BASE-G118)."""
-    on = active_apps(ctx.scope)
-    return {
-        name: op
-        for name, op in sorted(registry.items())
-        if op.app_label in on and is_tool(op) and (ctx.has(op.permission) or approvals.label_of(op) is not None)
-    }
-
-
-#: What a person says (Spanish or English) → the verbs of the operations' names that do it.
-VERBS = {
-    "create": ("crea", "crear", "creame", "alta", "añade", "añadir", "anade", "nuevo", "nueva", "add", "create", "new"),
-    "update": ("cambia", "cambiar", "modifica", "actualiza", "edita", "pon", "update", "change", "edit", "set"),
-    "delete": ("borra", "borrar", "elimina", "quita", "delete", "remove"),
-    "list": ("lista", "listar", "muestra", "ver", "dime", "cuantos", "cuantas", "cuales", "busca", "list", "show", "find",
-             "search", "how", "which"),
-    "get": ("dame", "datos", "detalle", "get", "detail"),
-    "complete": ("cobra", "cobrar", "charge", "pay"),
-    "void": ("anula", "anular", "void", "cancel"),
-    "close": ("cierra", "cerrar", "close"),
-    "open": ("abre", "abrir", "open"),
-}
-_WORD = re.compile(r"[a-z0-9]+")
-
-
-def _stems(text: str) -> set[str]:
-    """The words of ``text`` without accents, lowercase, cut to five letters (a cheap stem that joins «servicio» and
-    «service», «clientes» and «client»); shorter than three letters, none."""
-    plain = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
-    return {word[:5] for word in _WORD.findall(plain) if len(word) >= 3}
-
-
-def _asked(texts: Iterable[str]) -> tuple[set[str], set[str]]:
-    """The stems of what was asked and the verbs (``VERBS``) it names."""
-    words = set()
-    for text in texts:
-        plain = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
-        words |= set(_WORD.findall(plain))
-    verbs = {verb for verb, said in VERBS.items() if words & {word for word in said}}
-    return {word[:5] for word in words if len(word) >= 3}, verbs
-
-
-@cache
-def _app_words(label: str, language: str) -> frozenset[str]:
-    """How a person names the app ``label``: its id, its name and its menu, in English and in ``language``."""
-    config = next((c for c in all_live_app_configs() if c.label == label), None)
-    words = _stems(label.replace("_", " "))
-    if config is None:
-        return frozenset(words)
-    for lang in ("en", language):
-        with translation.override(lang):
-            words |= _stems(str(config.verbose_name))
-            for nav in getattr(config, "navigation", []) or []:
-                words |= _stems(str(nav.label))
-    return frozenset(words)
+    tools = shared.catalog(
+        ctx,
+        active_labels=active_apps(ctx.scope),
+        not_from_chat=NOT_FROM_CHAT,
+        approvable=lambda op: approvals.label_of(op) is not None,
+    )
+    return {name: op for name, op in tools.items() if is_tool(op)}
 
 
 def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -> list[Operation]:
-    """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS``: the app named (in either language) weighs
-    most, then the verb asked of the operation's own action, then the words of its description; ``ALWAYS`` first."""
-    asked, verbs = _asked(texts)
-
-    def score(op: Operation) -> int:
-        app, entity, action = op.name.split(".")
-        points = 4 * len(asked & _app_words(app, language))
-        points += 3 * (action in verbs or any(action.startswith(verb) for verb in verbs))
-        points += 2 * len(asked & _stems(entity.replace("_", " ")))
-        points += len(asked & _stems(description(op)))
-        return points
-
-    always = [tools[name] for name in ALWAYS if name in tools]
-    ranked = sorted((op for op in tools.values() if op.name not in ALWAYS), key=lambda op: (-score(op), op.name))
-    return [*always, *ranked][:MAX_TOOLS]
+    """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``): ``ALWAYS``
+    first."""
+    return shared.relevant(tools, texts, language, always=ALWAYS)
 
 
-@cache
-def _schema(op: Operation) -> dict:
-    return op.input.model_json_schema()
-
-
-def tool_spec(op: Operation) -> dict:
-    """``op`` as the gateway takes a tool (OpenAI's ``function``)."""
-    return {"type": "function", "name": tool_name(op.name), "description": description(op), "parameters": _schema(op)}
-
-
-# ── The card of a write (BASE-G115, G116) ────────────────────────────────────────────────────────────────────────
-
-
-def _resolved(prop: dict, defs: dict) -> dict:
-    for branch in prop.get("anyOf", []):
-        if branch.get("type") != "null":
-            return _resolved({**branch, **{k: v for k, v in prop.items() if k != "anyOf"}}, defs)
-    ref = prop.get("$ref")
-    return {**defs.get(ref.rsplit("/", 1)[-1], {}), **prop} if ref else prop
-
-
-#: The mark of an amount (``json_schema_extra={"money": True}``, on a whole number): in the minor unit of the currency
-#: it is in — 1250 is 12.50 €, ¥1,250 has no cents. The card paints it as money and the model is told so by its tool,
-#: whatever its description says: the words are for the model, the mark is the platform's
-#: (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS).
-MONEY = "money"
-
-
-def _is_money(name: str, prop: dict) -> bool:
-    """Whether the datum ``name`` is an amount: its schema's mark (``MONEY``). A name in ``_cents`` still counts while
-    the schemas of Automations' tests give one without its mark; no tool of the assistant does (the ratchet
-    ``UNMARKED_AMOUNTS`` of ``base/tests/test_assistant_card_values.py``). A description's words never do."""
-    return prop.get(MONEY) is True or name.endswith("_cents")
-
+# ── The card of a write in the Hub's words (BASE-G115, G116) ─────────────────────────────────────────────────────
 
 #: The mark of the datum that names the currency of the amounts beside it, at any depth below it: a payment in dollars.
 #: ``True`` on a text, an ISO 4217 code; on a datum that names a record in a currency of its own (a cart, a price list),
@@ -308,198 +193,42 @@ def _record_currency(sent: Any, declared: dict, words: "_Words") -> Any:
     return None if failure is not None else answer.model_dump(mode="json").get(declared.get("code"))
 
 
-def _sends_amount(value: Any, prop: dict, defs: dict, name: str, depth: int = 0) -> bool:
-    """Whether ``value`` carries an amount (``MONEY``) as its schema ``prop`` declares it, at any depth."""
-    prop = _fitting(value, prop, defs)
-    if depth > 8:  # a schema that names itself
-        return False
-    if isinstance(value, int) and not isinstance(value, bool):
-        return _is_money(name, prop)
-    if isinstance(value, dict):
-        props = prop.get("properties", {})
-        return any(_sends_amount(inner, props.get(key, {}), defs, key, depth + 1) for key, inner in value.items())
-    if isinstance(value, list):
-        items = prop.get("items")
-        items = items if isinstance(items, dict) else {}
-        return any(_sends_amount(item, items, defs, name, depth + 1) for item in value)
-    return False
-
-
-def _is_signed(prop: dict) -> bool:
-    """Whether the schema declares the datum signed (``json_schema_extra={"signed": True}``): an amount (``MONEY``) that
-    says over or short, as Cash register's difference, which the card writes with its sign («+» over)."""
-    return prop.get("signed") is True
-
-
-def _generated_title(name: str) -> str:
-    """The title pydantic makes up for a field without one (``closing_balance`` → «Closing Balance»)."""
-    return name.title().replace("_", " ").strip()
-
-
-def _in_code_language() -> bool:
-    """Whether the active language is the one the code's texts are written in (and fall back to): English."""
-    return (translation.get_language() or settings.LANGUAGE_CODE).split("-")[0] == settings.LANGUAGE_CODE.split("-")[0]
-
-
-@cache
-def _model_fields(app_label: str, entity: str, name: str) -> tuple:
-    """The fields ``name`` of the models of the app ``app_label``, the model of the operation's ``entity`` first —
-    another may mean something else by it. Their metadata only: no query."""
-    config = active_apps_label(app_label)
-    if config is None:
-        return ()
-    own = entity.replace("_", "")
-    found = []
-    for model in sorted(config.get_models(), key=lambda model: not model._meta.model_name.endswith(own)):
-        try:
-            found.append(model._meta.get_field(name))
-        except FieldDoesNotExist:
-            continue
-    return tuple(found)
-
-
-def _verbose_name(app_label: str, entity: str, name: str) -> Any:
-    """The name the models of the app ``app_label`` give their field ``name`` (lazy: said in the active language), or
-    ``None``."""
-    named = (getattr(field, "verbose_name", None) for field in _model_fields(app_label, entity, name))
-    return next((verbose for verbose in named if verbose), None)
-
-
-def _choice_label(app_label: str, entity: str, name: str, value: Any) -> Any:
-    """The label the models of the app ``app_label`` give the value ``value`` of their field ``name`` — its
-    ``choices``, the ones its screens show (lazy: said in the active language) —, or ``None``."""
-    for field in _model_fields(app_label, entity, name):
-        labels = dict(getattr(field, "flatchoices", None) or ())
-        if value in labels:
-            return labels[value]
-    return None
-
-
-def _own_title(name: str, title: str | None) -> str | None:
-    """The title the schema gives the datum ``name`` itself — not the one pydantic makes up from its name —, in the
-    active language: as a catalog translates it, or as written when the person reads the code's language; else
-    ``None`` (one nobody translated never reaches a Spanish card)."""
-    if title and title != _generated_title(name):
-        translated = gettext(title)
-        if translated != title or _in_code_language():
-            return translated
-    return None
-
-
-def _label(op: Operation, name: str, title: str | None) -> str:
-    """How the card names the datum ``name``, in the active language and never by a technical name (gh:hub#1040): by the
-    title its schema gives it (``_own_title``); else by the name its app's models give that field, the one its screens
-    show; else by its title, through the catalogs. One way for every app: nothing to list here by hand."""
-    own = _own_title(name, title)
-    if own is not None:
-        return own
-    verbose = _verbose_name(op.app_label, op.name.split(".")[1], name)
-    if verbose is not None:
-        return capfirst(str(verbose))
-    return gettext(title or _generated_title(name))
-
-
-#: What a card shows of a secret instead of its value: the same in every language.
-HIDDEN = "••••••••"
-
-
-def _is_secret(prop: dict) -> bool:
-    """Whether the schema declares the datum secret: a password, a certificate, a key (pydantic's ``SecretStr``:
-    ``format: password``, ``writeOnly``)."""
-    return prop.get("format") == "password" or prop.get("writeOnly") is True
-
-
-def _hidden(value: Any, prop: dict, defs: dict) -> Any:
-    """``value`` with each secret its schema ``prop`` declares, at any depth, as ``HIDDEN``; an empty one hides
-    nothing. A card never carries a secret as typed: neither on the screen nor in what the browser receives."""
-    if value is None or value == "":
-        return value
-    ref = prop.get("$ref")
-    if ref:
-        prop = {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
-    if _is_secret(prop):
-        return HIDDEN
-    # Each branch of a union hides its own: what any of them declares secret is hidden.
-    for branch in [*prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]:
-        value = _hidden(value, branch, defs)
-    if isinstance(value, dict):
-        props = prop.get("properties", {})
-        extra = prop.get("additionalProperties")
-        extra = extra if isinstance(extra, dict) else {}
-        return {key: _hidden(inner, props.get(key, extra), defs) for key, inner in value.items()}
-    if isinstance(value, list):
-        items, prefix = prop.get("items"), prop.get("prefixItems", [])
-        items = items if isinstance(items, dict) else {}
-        return [_hidden(item, prefix[i] if i < len(prefix) else items, defs) for i, item in enumerate(value)]
-    return value
-
-
-# ── Each datum in words: a moment, a value of a list, a record (FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES) ──
-
-#: The mark of a datum that names a record (``json_schema_extra={"refers": {"read": "<a query>", "by": "<its input>",
-#: "name": "<the datum of its answer that names it>"}}``, or a list of them: the first one not empty, as a device with
-#: no name is said by what it is): the card names it by that read, run as the person. A datum the schema says is an id
-#: (``format: uuid``) without it is left out of the card. ``base.E009`` checks it at start.
-REFERS = "refers"
-
-#: The moments a schema declares (``format``), said as the person's language writes them.
-MOMENTS = ("date-time", "date", "time")
-
-#: The mark of a key of the caller's attempt (``json_schema_extra={"attempt_key": True}``, on a text): an idempotency
-#: key, born once and the same on every retry so a retry never charges, sends or prints twice. Nobody can judge it:
-#: the card and its preview leave it out, at any depth; the write gets it as sent
-#: (FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS).
-ATTEMPT_KEY = "attempt_key"
-
-
-def _is_attempt_key(prop: dict) -> bool:
-    return prop.get(ATTEMPT_KEY) is True
-
-
-def refers_of(prop: dict) -> dict | None:
-    """The read the schema ``prop`` marks to name its record (``REFERS``), or ``None``."""
-    declared = prop.get(REFERS)
-    return declared if isinstance(declared, dict) else None
-
-
-def _is_uuid(value: Any) -> bool:
-    """Whether ``value`` is an id as a schema's ``format: uuid`` takes it."""
-    try:
-        uuid.UUID(value)
-    except (TypeError, ValueError, AttributeError):
-        return False
-    return True
-
-
-#: What a card leaves out: a record it cannot name.
-_LEFT_OUT = object()
-
-
 @dataclass
 class _Words:
-    """What a card needs to say ``op``'s data in words: the person's language and the person (``ctx``: to read a
+    """The Hub's words of a card (``live.assistant.Words``): the person's language and the person (``ctx``: to read a
     record's name and its currency as them, and the business's zone; ``None`` for an automation's card, which reads no
     record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
-    the record it names, or a preview's read answers); ``priced`` false when the write names one that is none, or a
-    record whose currency cannot be read: its amounts go as sent."""
+    the record it names, or a preview's read answers, with the decimals it answers: ``answered``); ``priced`` false
+    when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent."""
 
     op: Operation
     language: str
     ctx: OperationContext | None
     currency: str | None = None
     priced: bool = True
+    answered: dict | None = None
     _business: Any = None
+
+    @classmethod
+    def of_answer(cls, read: Operation, ctx: OperationContext, answer: dict) -> "_Words":
+        """The words of a preview's read: in the currency it answers (``_answer_money``), else the business's."""
+        money = _answer_money(answer)
+        return cls(read, ctx.language, ctx, currency=money["currency"] if money else None, answered=money)
 
     def within(self, value: Any, props: dict, defs: dict) -> "_Words":
         """The words of the data of the object ``value``: in the currency it names (``CURRENCY``), else in this one."""
         priced, currency = _named_currency(value, props, defs, self)
         if priced and currency is None:
             return self
-        return dataclasses.replace(self, currency=currency, priced=priced)
+        return dataclasses.replace(self, currency=currency, priced=priced, answered=None)
+
+    def _currency_money(self) -> dict | None:
+        return {"currency": self.currency, "decimals": currency_decimals(self.currency)} if self.currency else None
 
     def money(self) -> dict | None:
-        """The currency of its amounts as the card's screen takes it, when it is not the business's."""
-        return {"currency": self.currency, "decimals": currency_decimals(self.currency)} if self.currency else None
+        """The currency of its amounts as the card's screen takes it, when it is not the business's: as a preview's
+        read answers it, else as the currency says it."""
+        return self.answered if self.answered is not None else self._currency_money()
 
     def business(self) -> Any:
         """Settings › Business, read as the person once per card and only when a datum needs it; ``False`` when it
@@ -520,8 +249,17 @@ class _Words:
         card in one format, the screen's, nested or not; as sent when its write names a currency that is none."""
         if not self.priced:
             return value
-        money = self.money()
+        money = self._currency_money()
         return {"kind": "money", "value": value, **({"money": money} if money else {})}
+
+    def moment(self, value: str, kind: str) -> str | None:
+        return _moment(value, kind, self)
+
+    def reference(self, value: Any, prop: dict) -> Any:
+        return _reference(value, prop, self)
+
+    def app_name(self) -> str:
+        return app_name(self.op)
 
 
 def _zone_named(name: str) -> ZoneInfo | None:
@@ -573,176 +311,15 @@ def _names(declared: dict) -> list:
     return [name] if isinstance(name, str) else name if isinstance(name, list) else []
 
 
-#: The type of a value each JSON Schema type names.
-_TYPES = {"object": dict, "array": list, "string": str, "integer": int, "number": int | float, "boolean": bool}
-
-
-def _fits(value: Any, branch: dict) -> bool:
-    """Whether ``value`` has the shape of ``branch``: its type and, an object, no key it does not take and its
-    constants (a discriminator, as an automation's trigger ``kind``)."""
-    expected = _TYPES.get(branch.get("type", ""))
-    if expected is not None and not isinstance(value, expected):
-        return False
-    if not isinstance(value, dict):
-        return True
-    props = branch.get("properties", {})
-    if branch.get("additionalProperties") is False and not set(value) <= set(props):
-        return False
-    return all(value[key] == inner["const"] for key, inner in props.items() if key in value and "const" in inner)
-
-
-def _referred(prop: dict, defs: dict) -> dict:
-    """``prop`` with the schema its ``$ref`` names, what it says itself on top."""
-    ref = prop.get("$ref")
-    if not ref:
-        return prop
-    return {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
-
-
-def _fitting(value: Any, prop: dict, defs: dict, depth: int = 0) -> dict:
-    """The schema of ``value`` among the branches of the union ``prop`` declares (``anyOf``, ``oneOf``, one inside
-    another as an optional automation's trigger): the first one it fits (``_fits``), with what ``prop`` itself says
-    (its title, its marks); ``prop`` resolved when it is no union."""
-    prop = _referred(prop, defs)
-    branches = [*prop.get("anyOf", []), *prop.get("oneOf", [])]
-    if not branches or depth > 8:
-        return _resolved(prop, defs)
-    outer = {key: inner for key, inner in prop.items() if key not in ("anyOf", "oneOf", "discriminator")}
-    for branch in branches:
-        branch = _referred(branch, defs)
-        if branch.get("type") != "null" and _fits(value, branch):
-            return _fitting(value, {**branch, **outer}, defs, depth + 1)
-    return _resolved(prop, defs)
-
-
-def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words, inner: bool = False) -> Any:
-    """``value`` in words as its schema ``prop`` declares it, at any depth: a moment as the person's language writes it
-    (``_moment``), a value of a closed list by the label its app's models give it (``_choice_label``), a record by
-    its name (``_reference``) or else ``_LEFT_OUT`` — left out of an object, none in a list (which still says how many
-    it carries), as an attempt key (``ATTEMPT_KEY``) is, even empty; an amount (``MONEY``) inside an object or a list
-    as the screen writes one on top (``_Words.amount``), in the currency the object names, or the one of the record it
-    names (``CURRENCY``); what is none of them, or not what its schema declares (the write refuses it), as sent."""
-    prop = _fitting(value, prop, defs)
-    if _is_attempt_key(prop):
-        return _LEFT_OUT
-    if value is None or value == "":
-        return value
-    if inner and _is_money(name, prop) and isinstance(value, int) and not isinstance(value, bool):
-        return words.amount(value)
-    if REFERS in prop or (prop.get("format") == "uuid" and _is_uuid(value)):
-        return _reference(value, prop, words)
-    if prop.get("format") in MOMENTS and isinstance(value, str):
-        said = _moment(value, prop["format"], words)
-        return value if said is None else said
-    if "enum" in prop and isinstance(value, str | int) and not isinstance(value, bool):
-        label = _choice_label(words.op.app_label, words.op.name.split(".")[1], name, value)
-        return value if label is None else str(label)
-    if isinstance(value, dict):
-        props = prop.get("properties", {})
-        extra = prop.get("additionalProperties")
-        extra = extra if isinstance(extra, dict) else {}
-        own = words.within(value, props, defs)
-        said = {
-            key: _said(inner, props.get(key, extra), defs, key if key in props else name, own, inner=True)
-            for key, inner in value.items()
-        }
-        return {key: inner for key, inner in said.items() if inner is not _LEFT_OUT}
-    if isinstance(value, list):
-        items, prefix = prop.get("items"), prop.get("prefixItems", [])
-        items = items if isinstance(items, dict) else {}
-        said = [
-            _said(item, prefix[i] if i < len(prefix) else items, defs, name, words, inner=True) for i, item in enumerate(value)
-        ]
-        return [None if item is _LEFT_OUT else item for item in said]
-    return value
-
-
-def _field(
-    name: str, label: str, prop: dict, defs: dict, value: Any, money: dict | None = None, words: _Words | None = None
-) -> dict | None:
-    """One datum of a card, as its schema ``prop`` declares it: a secret hidden (``_hidden``) and, with the ``words``
-    of its card, the rest in words (``_said``); ``None`` when it names a record the card cannot name or is an attempt
-    key. An amount
-    carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (the one its
-    write names, or a preview's, as its read answers it): without it, the card paints it in the business's; in a
-    currency its write names that is none, it is no amount but as sent. ``titled`` when ``label`` is the title
-    its app wrote (``_own_title``): the screen calls it so over its own word for a datum it knows by its name
-    (``assistant-card.ts`` ``FIELDS``: «Record» for an ``id`` Tables titles «Check»)."""
-    # The title of the property itself, as its caller's ``label``: a ``$ref``'s own is its schema class's name.
-    titled = _own_title(name, prop.get("title")) is not None
-    value = _hidden(value, prop, defs)
-    if words is not None:
-        value = _said(value, prop, defs, name, words)
-    if value is _LEFT_OUT:
-        return None
-    prop = _resolved(prop, defs)
-    if value is None or value == "" or value == []:
-        kind = "empty"
-    elif isinstance(value, bool):
-        kind = "bool"
-    elif isinstance(value, int) and _is_money(name, prop) and (words is None or words.priced):
-        kind = "money"
-    elif isinstance(value, list):
-        kind = "list"
-    elif isinstance(value, dict):
-        kind = "object"
-    else:
-        kind = "text"
-    field = {"name": name, "label": label, "kind": kind, "value": value}
-    if titled:
-        field["titled"] = True
-    if kind == "money" and _is_signed(prop):
-        field["signed"] = True
-    if kind == "money" and money is not None:
-        field["money"] = money
-    return field
-
-
 def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
-    """What the person sees before ``op`` runs with ``arguments``: its app, its action, each datum it sends by its name
-    in ``language`` (``_label``) and in words (``_said``: a moment, a value of a list, a record by its name, read as
-    ``ctx``'s person; an amount its schema marks (``MONEY``) as ``money``, ``signed`` when it declares it so, in the
-    currency the write names, ``CURRENCY``), its risk
-    and, for a dangerous one, what to type (``confirm_word``) — how many records when it names them by ``ids``, and
-    ``blocked`` when it names none (not from the chat)."""
-    schema = _schema(op)
-    defs = schema.get("$defs", {})
-    props = schema.get("properties", {})
-    level = risk(op)
-    count: int | None = None
-    blocked = False
-    if level == "high" and _resolved(props.get("ids", {}), defs).get("type") == "array":
-        ids = arguments.get("ids")
-        if isinstance(ids, list) and ids:
-            count = len(ids)
-        else:
-            blocked = True
-    words = _Words(op, language, ctx).within(arguments, props, defs)
-    with translation.override(language):
-        said = [
-            # The title of the property itself: a ``$ref``'s own is its schema class's name.
-            _field(name, _label(op, name, prop.get("title")), prop, defs, arguments[name], words.money(), words)
-            for name, prop in props.items()
-            if name in arguments
-        ]
-        fields = [field for field in said if field is not None]
-        word = str(count) if count else str(CONFIRM_WORD)
-        app = app_name(op)
-    return {
-        "operation": op.name,
-        "app": op.app_label,
-        "app_name": app,
-        "action": op.name.rsplit(".", 1)[-1],
-        "risk": level,
-        "fields": fields,
-        "count": count,
-        "confirm_word": word if level == "high" else "",
-        "blocked": blocked,
-    }
+    """What the person sees before ``op`` runs with ``arguments`` (``live.assistant.card``), in the Hub's words: a
+    moment at the business's hour, a record by its name read as ``ctx``'s person, an amount in the currency the write
+    names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``)."""
+    return shared.card(op, arguments, language, _Words(op, language, ctx))
 
 
 def active_apps_label(label: str) -> LiveAppConfig | None:
-    return next((config for config in all_live_app_configs() if config.label == label), None)
+    return shared.config_of(label)
 
 
 # The screens of the platform, as its menu and the assistant's instructions name them.
@@ -812,79 +389,7 @@ def app_name(op: Operation) -> str:
     config = active_apps_label(op.app_label)
     return str(config.verbose_name) if config is not None else op.app_label
 
-
-def confirmed(card_: dict, typed: str) -> bool:
-    """Whether ``typed`` is what the card asks, as the platform's ``ConfirmDialog`` compares it (``@erplora/ui``: spaces
-    around and case ignored, accents not); a normal write asks nothing; a blocked one, never."""
-    word = card_["confirm_word"]
-    return not card_["blocked"] and (word == "" or typed.strip().casefold() == word.casefold())
-
-
-# ── A tool, run as the person (BASE-G115, G118) ──────────────────────────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class ToolOutcome:
-    """``outcome``: ``ok``, ``error`` (the operation refused the data or the state: the model tells it), ``refused``
-    (the person may not: no permission, the app off, a manager's approval) or ``cancelled`` (the person said no)."""
-
-    outcome: str
-    code: str
-    content: str
-
-
-def error_content(code: str, message: str, fields: dict | None = None) -> str:
-    error: dict[str, Any] = {"code": code, "message": message}
-    if fields:
-        error["fields"] = fields
-    return json.dumps({"error": error}, ensure_ascii=False)
-
-
-def _run(ctx: OperationContext, op: Operation, data: dict) -> tuple[ToolOutcome | None, Any]:
-    """``op`` run with ``data`` for ``ctx``'s person, by its own operation: ``(None, its result)``, or why it did not
-    run (``(outcome, None)``)."""
-    try:
-        validated = op.input.model_validate(data)
-    except pydantic.ValidationError as exc:
-        fields = {".".join(str(part) for part in error["loc"]) or "__all__": error["msg"] for error in exc.errors()}
-        return ToolOutcome("error", "invalid_payload", error_content("invalid_payload", "Some data does not fit.", fields)), None
-    try:
-        return None, op(ctx, validated)
-    except (PermissionDenied, AppInactive, Unauthorized) as exc:
-        return ToolOutcome("refused", exc.code, error_content(exc.code, str(exc))), None
-    except OperationError as exc:
-        return ToolOutcome("error", exc.code, error_content(exc.code, str(exc), getattr(exc, "fields", None))), None
-
-
-def run_tool(ctx: OperationContext, op: Operation, arguments: str) -> ToolOutcome:
-    """Run ``op`` with the model's ``arguments`` (JSON text) for ``ctx``'s person, by its own operation."""
-    try:
-        data = json.loads(arguments or "{}")
-    except ValueError:
-        data = None
-    if not isinstance(data, dict):
-        return ToolOutcome("error", "invalid_payload", error_content("invalid_payload", "The arguments are not a JSON object."))
-    failure, result = _run(ctx, op, data)
-    if failure is not None:
-        return failure
-    content = result.model_dump_json()
-    if len(content) > MAX_RESULT_CHARS:
-        content = content[:MAX_RESULT_CHARS] + " …(cut)"
-    return ToolOutcome("ok", "", content)
-
-
 # ── What a dangerous write will do, on its card (BASE-F98) ───────────────────────────────────────────────────────
-
-
-def preview_of(op: Operation) -> Any:
-    """What ``op``'s ``ai=`` declares as its preview (``base.E005`` checks its shape at start), or ``None``."""
-    ai = op.ai if isinstance(op.ai, dict) else {}
-    return ai.get("preview")
-
-
-@cache
-def _output_schema(op: Operation) -> dict:
-    return op.output.model_json_schema()
 
 
 def _answer_money(answer: dict) -> dict | None:
@@ -900,40 +405,11 @@ def _answer_money(answer: dict) -> dict | None:
 
 
 def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
-    """What the dangerous write ``op`` will do with ``arguments``, as its app says it: the read its ``ai=`` names
-    (``"preview": {"operation": <a query of its app>, "fields": [<data of its answer>]}``), run as ``ctx``'s person
-    — their permissions, their business — with the data of the write its input takes. The card's data, by their names
-    in the person's language and an amount (``MONEY``) as money (``signed`` when its schema declares it so, as a
-    difference; in the currency the read answers, ``_answer_money``, when it answers one), in the order the app names
-    them; what the read leaves empty or hides from this person (none: a blind count's expected cash) is not there.
-    ``(None, None)`` without a preview; ``(outcome, None)`` when it cannot be read: the write is not confirmed blind."""
-    declared = preview_of(op)
-    if declared is None:
-        return None, None
-    read = registry[declared["operation"]]
-    failure, result = _run(ctx, read, {name: value for name, value in arguments.items() if name in read.input.model_fields})
-    if failure is not None:
-        return failure, None
-    answer = result.model_dump(mode="json")
-    schema = _output_schema(read)
-    defs = schema.get("$defs", {})
-    props = schema.get("properties", {})
-    money = _answer_money(answer)
-    words = _Words(read, ctx.language, ctx, currency=money["currency"] if money else None)
-    with translation.override(ctx.language):
-        fields = [
-            _field(
-                name,
-                _label(read, name, props[name].get("title")),
-                props[name],
-                defs,
-                answer.get(name),
-                money,
-                words,
-            )
-            for name in declared["fields"]
-        ]
-    return None, [field for field in fields if field is not None and field["kind"] != "empty"]
+    """What the dangerous write ``op`` will do with ``arguments`` (``live.assistant.preview``: the read its ``ai=``
+    names, run as ``ctx``'s person), in the Hub's words: its amounts in the currency the read answers
+    (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` checks the
+    declaration at start."""
+    return shared.preview(ctx, op, arguments, words_of_answer=_Words.of_answer)
 
 
 @checks.register("base")
@@ -1087,17 +563,6 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
     given = _output_schema(read).get("properties", {})
     problems += [f"names {read.name}, which gives no {name}" for name in _names(declared) if name not in given]
     return problems
-
-
-def rounds(messages: list[dict]) -> int:
-    """The rounds of tools since the person's last message: the model's messages that asked for tools."""
-    count = 0
-    for message in reversed(messages):
-        if message.get("role") == "user":
-            break
-        if message.get("role") == "assistant" and message.get("tool_calls"):
-            count += 1
-    return count
 
 
 # ── The instructions of a turn ───────────────────────────────────────────────────────────────────────────────────

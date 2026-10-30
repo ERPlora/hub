@@ -20,7 +20,7 @@ from django.utils import timezone
 from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import INTERNAL, get
 from live.outbox import channel_for
 
 from apps.customer import events
@@ -2092,7 +2092,7 @@ def test_health_declarations_keep_the_data_away_from_the_assistant_and_the_api_k
         input,
         HealthOut,
     )
-    assert (op.ai, op.expose_api) == (None, False)
+    assert (op.ai, op.expose_api) == (INTERNAL, False)
 
 
 def grant_health(customer, actor="clara"):
