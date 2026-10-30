@@ -17,6 +17,8 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import AfterValidator, StringConstraints, ValidationInfo, field_validator
 
+from base.schemas import names
+
 T = TypeVar("T")
 
 # Validation messages (English source, Spanish in locale/).
@@ -81,6 +83,14 @@ D_LNG = (
 D_ACCURACY = "Accuracy of that position, in metres, as the device reports it."
 D_SEARCH_PEOPLE = "Text to look for in the person's name."
 
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id; and each datum by the name the screens give it: «Person», as the Records column, and «Working
+# day», as «Correct working day» says it.
+A_PERSON = names("attendance.person.detail")
+A_WORKING_DAY = names("attendance.record.detail")
+PERSON = gettext_noop("Person")
+WORKING_DAY = gettext_noop("Working day")
+
 
 class PageIn(Schema):
     limit: int = Field(
@@ -109,15 +119,21 @@ class RecordRefIn(Schema):
 class TerminatedIn(Schema):
     """The payload of ``staff.member.terminated``."""
 
-    id: UUID = Field(description="Id of the staff member who was terminated.")
+    id: UUID = Field(
+        title=PERSON, description="Id of the staff member who was terminated.", json_schema_extra=A_PERSON
+    )
+
+
+class PersonRefIn(Schema):
+    id: UUID = Field(description="Id of the staff member.")
 
 
 # A person (none = the caller), and where the device is
 
 
 class MemberRefIn(Schema):
-    member_id: UUID | None = Field(None, description=D_MEMBER_ID)
-    member: MemberName | None = Field(None, description=D_MEMBER)
+    member_id: UUID | None = Field(None, title=PERSON, description=D_MEMBER_ID, json_schema_extra=A_PERSON)
+    member: MemberName | None = Field(None, title=PERSON, description=D_MEMBER)
 
 
 class PositionIn(MemberRefIn):
@@ -152,7 +168,9 @@ class BreakIn(MemberRefIn):
 
 
 class CorrectIn(Schema):
-    record_id: UUID = Field(description="Id of the working day to correct.")
+    record_id: UUID = Field(
+        title=WORKING_DAY, description="Id of the working day to correct.", json_schema_extra=A_WORKING_DAY
+    )
     clock_in_at: Instant = Field(
         description="The right clock-in, ISO 8601. Without an offset it is the business's local time."
     )
@@ -302,6 +320,10 @@ class BreakOut(Schema):
 
 
 class RecordDetailOut(RecordOut):
+    name: str = Field(
+        description="The day as the screens name it, in the reader's language: the person and the business day "
+        "(«Ana López · Oct 6, 2026»)."
+    )
     in_lat: float | None
     in_lng: float | None
     in_accuracy_m: float | None

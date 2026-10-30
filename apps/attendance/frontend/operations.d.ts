@@ -68,6 +68,10 @@ export interface RecordRefIn {
   id: string;
 }
 
+export interface PersonRefIn {
+  id: string;
+}
+
 export interface CorrectionListIn extends PageIn {
   record_id?: string;
 }
@@ -113,6 +117,8 @@ export interface BreakOut {
 }
 
 export interface RecordDetailOut extends RecordOut {
+  /** The day as the screens name it, in the reader's language: «Ana López · 6 oct 2026». */
+  name: string;
   in_lat: number | null;
   in_lng: number | null;
   in_accuracy_m: number | null;
@@ -208,6 +214,7 @@ declare module '@erplora/ui/sdk' {
     'attendance.presence.list': { input: SearchListIn; output: Page<PresenceOut> };
     'attendance.presence.count': { input: NoInput; output: PresenceCountOut };
     'attendance.person.list': { input: SearchListIn; output: Page<PersonOut> };
+    'attendance.person.detail': { input: PersonRefIn; output: PersonOut };
     'attendance.settings.get': { input: NoInput; output: SettingsOut };
     'attendance.settings.update': { input: SettingsIn; output: SettingsOut };
   }

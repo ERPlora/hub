@@ -20,6 +20,7 @@ from apps.attendance.schemas import (
     CorrectionPage,
     CurrentOut,
     ExportOut,
+    PersonOut,
     PersonPage,
     PresenceCountOut,
     PresencePage,
@@ -346,6 +347,30 @@ def test_someone_elses_day_does_not_exist_for_an_employee(person):
     )
 
 
+@pytest.mark.parametrize(
+    ("language", "named"), [("es", "Bea Ruiz · 6 oct 2026"), ("en", "Bea Ruiz · Oct 6, 2026")]
+)
+def test_the_detail_names_the_day_by_its_person_and_its_day(person, language, named):
+    """As «Correct working day» names it (the person and the day, in the reader's language): the assistant's card
+    of a correction says which day by it."""
+    bea, ctx = person("Bea", "Ruiz")
+    record = day(bea, "2026-10-06T07:00", "2026-10-06T15:00")
+    with translation.override(language):
+        assert run("attendance.record.detail", {"id": str(record.id)}, ctx).name == named
+
+
+def test_whoever_corrects_days_reads_the_one_they_correct(person):
+    """«Correct» rewrites any day, so its holder reads it (and its history) even without seeing the team."""
+    bea, _ = person("Bea", "Ruiz")
+    record = day(bea, "2026-10-06T07:00", "2026-10-06T15:00")
+    corrects = ctx_for(permissions={"attendance.clock", "attendance.correct"})
+    assert run("attendance.record.detail", {"id": str(record.id)}, corrects).id == record.id
+    assert run("attendance.correction.list", {"record_id": str(record.id)}, corrects).total == 0
+    # Positive control: without it, someone else's day still does not exist.
+    with pytest.raises(NotFound):
+        run("attendance.record.detail", {"id": str(record.id)}, ctx_for(permissions={"attendance.clock"}))
+
+
 # attendance.correction.list: the history (ATTENDANCE-F09; the employee's own, attendance#8)
 
 
@@ -478,6 +503,49 @@ def test_the_people_of_the_filter_include_who_left_with_days(person):
             "attendance.person.list", {"search": "gil"}, ctx_for("hub_manager")
         ).rows
     ] == ["Carlos Gil"]
+
+
+# attendance.person.detail: one person by id, as the «Person» filter shows them (the assistant's card names by it)
+
+
+def test_an_employee_reads_their_own_person_by_its_id(person):
+    ana, ctx = person()
+    found = run("attendance.person.detail", {"id": str(ana.id)}, ctx)
+    assert isinstance(found, PersonOut)
+    assert (found.id, found.name, found.status) == (ana.id, "Ana López", "active")
+
+
+def test_someone_else_does_not_exist_for_an_employee(person):
+    _, ctx = person()
+    bea = make_member("Bea", "Ruiz")
+    with pytest.raises(NotFound):
+        run("attendance.person.detail", {"id": str(bea.id)}, ctx)
+
+
+@pytest.mark.parametrize(
+    "extra", ["attendance.view_all", "attendance.clock_others", "attendance.correct"]
+)
+def test_who_sees_the_team_clocks_others_or_corrects_reads_anyone(extra):
+    bea = make_member("Bea", "Ruiz")
+    ctx = ctx_for(permissions={"attendance.clock", extra})
+    assert run("attendance.person.detail", {"id": str(bea.id)}, ctx).name == "Bea Ruiz"
+
+
+def test_who_left_is_read_while_they_have_days_as_the_filter_lists_them():
+    gone = make_member("Carlos", "Gil", status=Member.Status.TERMINATED)
+    nobody = make_member("Dora", "Sin", status=Member.Status.TERMINATED)
+    day(gone, "2026-09-01T07:00", "2026-09-01T15:00")
+    found = run("attendance.person.detail", {"id": str(gone.id)}, ctx_for("hub_manager"))
+    assert (found.name, found.status) == ("Carlos Gil", "terminated")
+    for missing in (nobody.id, "0192f0b2-3333-7000-8000-000000000003"):
+        with pytest.raises(NotFound):
+            run("attendance.person.detail", {"id": str(missing)}, ctx_for("hub_manager"))
+
+
+def test_a_person_needs_the_time_clock():
+    bea = make_member("Bea", "Ruiz")
+    with pytest.raises(PermissionDenied):
+        run("attendance.person.detail", {"id": str(bea.id)}, ctx_for(permissions={"staff.view"}))
 
 
 # attendance.settings.get
