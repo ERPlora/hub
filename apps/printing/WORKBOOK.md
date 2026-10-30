@@ -2,8 +2,8 @@
 Prefijo: PRINTING
 Alcance MVP: núcleo
 Estado de la app: servidor y páginas hechos; Ventas, Facturación, Cocina, Caja e Inventario ya piden su papel
-a la cola; solo recoge la cola el dispositivo dado de alta, y el papel sale cuando la app del dispositivo la
-recoja (PRINTING-F18)
+a la cola; solo recoge la cola el dispositivo dado de alta, y la app de ERPlora de ese dispositivo saca el papel
+en cuanto llega (PRINTING-F18)
 
 > Manual de usuario y especificación de la app `printing`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -188,7 +188,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F02 | Encontrar una impresora de la red sin escribir su dirección | común | parcial: la app solo busca para el negocio al que está vinculada |
 | PRINTING-F03 | Añadir una impresora por su dirección | común | hecho |
 | PRINTING-F04 | Asignar qué sale por cada impresora | común | hecho |
-| PRINTING-F05 | Hacer una prueba de impresión | común | parcial: el papel sale cuando el dispositivo pueda recoger |
+| PRINTING-F05 | Hacer una prueba de impresión | común | hecho |
 | PRINTING-F06 | Elegir cómo imprime el negocio | común | hecho |
 | PRINTING-F07 | Imprimir el tique al cobrar | común | hecho |
 | PRINTING-F08 | Reimprimir un tique o una factura | común | hecho |
@@ -196,12 +196,12 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F10 | Imprimir la comanda en cocina y barra | restaurante | hecho |
 | PRINTING-F11 | Reimprimir una comanda | restaurante | hecho |
 | PRINTING-F12 | Imprimir la etiqueta de un código de barras | común | hecho |
-| PRINTING-F13 | Abrir el cajón al cobrar | común | parcial: el aviso del cajón que no abre es de la app del dispositivo |
+| PRINTING-F13 | Abrir el cajón al cobrar | común | hecho |
 | PRINTING-F14 | Sacar del atasco un trabajo de impresión | común | hecho |
 | PRINTING-F15 | Llevar el texto antiguo del tique a Ventas | común | hecho |
 | PRINTING-F16 | Mandar imprimir desde el asistente | común | hecho |
 | PRINTING-F17 | Imprimir el cierre de caja | común | hecho |
-| PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | parcial: falta quien recoge en la app del dispositivo |
+| PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | hecho |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
 
@@ -321,21 +321,22 @@ Implicados: PRINTING-F01, PRINTING-F06, INVENTORY-F25
 
 ### PRINTING-F05 Hacer una prueba de impresión
 <!-- origen: old-hub:HUB_APP-F20 old-hub:HUB_PERIPHERALS-F14 old:printing/workflow/impresoras.md#printing-f05 -->
-Estado: parcial — la prueba entra en la cola y es la del dispositivo de esa impresora (PRINTING-F18); el
-papel no sale hasta que la plataforma sirva el canal por el que el dispositivo recoge los trabajos
+Estado: hecho
 Vertical: común
 Actor: administrador, responsable, empleado
 Pantalla: Impresoras
 Pasos:
 1. Pulsa «Probar» en la fila de la impresora.
-2. Sale «Prueba enviada a la cola de Caja.» y en la cola aparece «Hoja de prueba».
-3. El dispositivo junto a la impresora la saca: el nombre del negocio (el que tiene Facturación; sin
-   Facturación o sin permiso para leerlo, «ERPlora»), «Impresora OK», la fecha y la dirección de la
-   impresora. Una impresora del sistema saca la hoja en A4 con lo mismo.
+2. Sale «Hoja de prueba enviada a la cola de Caja.» y en la cola aparece «Hoja de prueba».
+3. El dispositivo que imprime para esa impresora, con la app de ERPlora abierta, la saca enseguida
+   (PRINTING-F18): el nombre del negocio (el que tiene Facturación; sin Facturación o sin permiso para leerlo,
+   «ERPlora»), «Impresora OK», la fecha y la dirección de la impresora. Una impresora del sistema saca la hoja en
+   A4 con lo mismo. En la cola, la hoja queda «Impreso».
 Entra: la impresora.
 Sale: un trabajo «Hoja de prueba» para esa impresora (avisa: `printing.job.queued`).
 Si falla: una impresora inactiva no se prueba: «Esa impresora está inactiva: actívala para probarla.».
-Si el papel no sale, el trabajo queda «Fallido» con el error del dispositivo (PRINTING-F14).
+Si el papel no sale, la hoja vuelve a la cola con el error del dispositivo y, tras 5 intentos, queda «Fallido»
+(PRINTING-F14).
 Implicados: PRINTING-F18
 
 ### PRINTING-F06 Elegir cómo imprime el negocio
@@ -475,9 +476,7 @@ Implicados: INVENTORY-F25, PRINTING-F01, PRINTING-F04, PRINTING-F18
 
 ### PRINTING-F13 Abrir el cajón al cobrar
 <!-- origen: old-hub:HUB_APP-F21 old-hub:HUB_SHELL-F71 wf:restaurante-dia#rec_restaurante-f17 qa:verticals/beauty/06-fiscal-and-printing qa:verticals/restaurant/10-hardware-offline-and-recovery qa:verticals/restaurant/07-payment-and-fiscal old-hub:HUB-F207 old-hub:HUB_PERIPHERALS-F15 old:printing/workflow/documentos.md#printing-f13 qa:modules/printing/open-cash-drawer -->
-Estado: parcial — la parte del Hub está hecha (el cobro con efectivo pide el cajón en su transacción);
-falta la del dispositivo: que la app avise si el pulso no llega al cajón, como avisa del tique (hub#2724), y
-el canal por el que recoge el trabajo (PRINTING-F18)
+Estado: hecho
 Vertical: común
 Actor: empleado
 Pantalla: Vender (de Ventas)
@@ -487,10 +486,15 @@ Pasos:
 2. El cobro (F07) pide el tique con la orden de abrir el cajón conectado a la impresora de tiques; con
    el tique apagado, un trabajo solo de cajón. Un cobro sin efectivo (tarjeta, Bizum…) no abre el cajón,
    como en Square, Toast, Odoo, Shopify y Lightspeed: no hay nada que guardar en él.
+3. El dispositivo que imprime los tiques saca el tique y, después, abre el cajón (PRINTING-F18).
 Entra: el ajuste y si el cobro llevó efectivo (`open_drawer`).
 Sale: la orden de abrir el cajón, en el mismo trabajo que el tique; el dispositivo la manda al cajón
 cuando saca el trabajo (PRINTING-F18).
-Si falla: si el tique no sale, el cajón tampoco; el trabajo queda en la cola (PRINTING-F14).
+Si falla: si el tique no sale, el cajón tampoco; el trabajo vuelve a la cola (PRINTING-F14). Si el tique sale y el
+cajón no responde (la impresora se apagó, o el cajón no está conectado a ella), la pantalla del dispositivo lo dice:
+«El cajón no se ha abierto: comprueba que «Caja» está encendida y conectada.», y el tique, que ya salió, no se
+imprime otra vez; el cajón se abre a mano. Un trabajo solo de cajón que no se abre avisa igual y vuelve a la cola con
+el error del dispositivo.
 Implicados: PRINTING-F06, PRINTING-F07
 
 ### PRINTING-F14 Sacar del atasco un trabajo de impresión
@@ -565,9 +569,7 @@ Implicados: CASH_REGISTER-F16
 
 ### PRINTING-F18 Sacar el papel: el dispositivo recoge y confirma los trabajos
 <!-- origen: fi:hub/tauri-packages#camino-de-hardware-handlers-invoke-de-perifericos-erplora-peripherals old-hub:HUB_APP-F19 old-hub:HUB_APP-F18 old-hub:HUB_SHELL-F73 old-hub:HUB_SHELL-F74 qa:verticals/restaurant/10-hardware-offline-and-recovery fi:modules/printing#integracion-bridge-hardware-client-side-no-es-command-query-del-manifest old-hub:HUB-F196 old-hub:HUB-F197 old-hub:HUB-F198 old-hub:HUB-F199 old-hub:HUB-F200 old-hub:HUB_PERIPHERALS-F06 old-hub:HUB_PERIPHERALS-F07 old-hub:HUB_PERIPHERALS-F08 -->
-Estado: parcial — solo el dispositivo dado de alta recoge, confirma y avisa del fallo de los trabajos de sus
-impresoras, y su pantalla está hecha; falta quien recoge en la app del dispositivo (hasta entonces el papel no
-sale solo) y que el canal del dispositivo pregunte por sus impresoras al conectarse.
+Estado: hecho
 Vertical: común
 Actor: el propietario, el administrador o el responsable (dan de alta el dispositivo) y la app del dispositivo
 (recoge)
@@ -579,21 +581,32 @@ Pasos:
    marca «Este dispositivo» y la nota dice «Este dispositivo imprime para: …». Si quien gestiona las impresoras
    imprime desde un dispositivo nuevo en alguna impresora activa, también queda dado de alta, como «Dispositivo 1»,
    con las impresoras activas que usa.
-2. El dispositivo pide el siguiente trabajo de sus impresoras. Impresión le da el más antiguo en cola (de esa
+2. Con la app de ERPlora abierta en ese dispositivo —en cualquier pantalla y con la sesión de cualquiera—, la app
+   se conecta a Impresión para imprimir: dice qué dispositivo es y cuáles son las impresoras de su alta, y desde ahí
+   saca sola el papel de sus impresoras activas en cuanto llega a la cola, sin que nadie toque nada. En un navegador
+   no se conecta: desde él no se llega a ninguna impresora.
+3. El dispositivo pide el siguiente trabajo de sus impresoras. Impresión le da el más antiguo en cola (de esa
    impresora, o sin impresora y de su función), lo marca «Enviado» con un plazo de 90 s, suma un intento y apunta
-   qué dispositivo lo tiene, por su nombre.
-3. El dispositivo lo imprime —la primera copia como original y las demás de un tique o una factura
+   qué dispositivo lo tiene, por su nombre. Mientras imprime uno, no pide otro de la misma función: al terminarlo
+   pide el siguiente, hasta vaciar la cola.
+4. El dispositivo lo imprime —la primera copia como original y las demás de un tique o una factura
    como «DUPLICADO»— y confirma: «Impreso». Si no pudo, avisa con el error: vuelve a la cola hasta 5 intentos y
-   después queda «Fallido».
-4. Si el dispositivo se cae sin contestar, pasado el plazo el trabajo vuelve a la cola y se avisa a los
-   dispositivos.
-5. Mientras la app de ERPlora del dispositivo está conectada para imprimir, dice que está ahí al conectarse y en
+   después queda «Fallido». Tras un fallo, el dispositivo no vuelve a pedir esa función hasta que llega otro
+   trabajo, alguien pulsa «Reintentar» en la cola o la app vuelve a conectarse: una impresora sin papel no gasta
+   los 5 intentos en un momento.
+5. Si el dispositivo se cae sin contestar, pasado el plazo el trabajo vuelve a la cola y se avisa a los
+   dispositivos. Si se corta la conexión, la app vuelve a conectarse sola, esperando cada vez un poco más (hasta
+   30 s), y lo primero que hace es confirmar lo que imprimió y no llegó a confirmar, para que no salga dos veces.
+   Si la sesión se acaba, el negocio se da de baja o se suspende, Impresión se apaga o el dispositivo deja de
+   imprimir para ninguna impresora, deja de intentarlo.
+6. Mientras la app de ERPlora del dispositivo está conectada para imprimir, dice que está ahí al conectarse y en
    cada latido (cada 30 s), con la sesión de quien la usa, también la de un empleado; darlo de alta desde él y
    pedir un trabajo también cuentan. La lista lo enseña en «Visto por última vez». Si pasa 90 s sin dar señales,
    cuenta como apagado: sus trabajos hacen sonar la campana pasado el minuto (PRINTING-F01).
-6. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
-   un dispositivo («Editar») o lo retira («Retirar», tras confirmarlo): ya no imprime nada, y los trabajos que
-   tenía vuelven a la cola cuando vence su plazo. Un dispositivo retirado no vuelve a recibir trabajos, tampoco con
+7. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
+   un dispositivo («Editar») o lo retira («Retirar», tras confirmarlo): la app de ese dispositivo lo nota al
+   momento, imprime para sus impresoras nuevas o deja de imprimir, y los trabajos que tenía vuelven a la cola cuando
+   vence su plazo. Un dispositivo retirado no vuelve a recibir trabajos, tampoco con
    la sesión de quien gestiona las impresoras: hay que darlo de alta otra vez desde él («Imprimir desde este
    dispositivo»).
 Entra: el nombre del dispositivo y las impresoras a las que llega; al pedir, sus impresoras; al confirmar, el
@@ -835,6 +848,20 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries.py`,
    `tests/test_services.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
    `tests/test_integration_home.py`.
+7. **El cliente del canal en el dispositivo** (FIX-HUB-PRINTING-WS-PRINT-CLIENT-IN-PACKAGES-UI; el `print-drain.ts` y el
+   `print-host.ts` del Hub viejo). `frontend/components/PrintHost.vue` es la pieza de fondo de Impresión: una ruta de
+   `frontend/routes.ts` con `meta.background`, que el shell de `@erplora/ui` deja fuera del router y monta junto al
+   panel en todas las pantallas mientras hay sesión. Solo dentro de la app (con `window.__TAURI__.core.invoke`) sigue
+   en vivo `printing.device.list` (`limit: 100`, como Dispositivos) y pasa los ids de las impresoras **activas** de la
+   fila `this_device` a `usePrintHost` de `@erplora/ui/shell`; sin fila, o sin ninguna activa, no se conecta. El
+   bucle (`hello` con `deviceId` = `LiveClient.deviceId`, el mismo `X-Device-Id` del alta, y `printers`; un `claim`
+   por función; `done`/`failed` con el error del dispositivo cortado a 500; `beat` cada `heartbeatSeconds`; `wake`;
+   reconexión de 1 s a 30 s; cierre 44xx o `refreshed: 0` = para) es `print-channel.ts` del SDK, y los comandos del
+   punto 2 los llama `device-printer.ts` del shell (con el reintento mientras la app dice `not_the_linked_hub`). Un
+   cajón que no se abre tras el papel no falla el trabajo (se imprimiría otra vez): `onDrawerFailed` saca el aviso
+   `printing.host.drawerFailed` (con el nombre de la impresora de la fila) y deja la línea `[print-host]` en la
+   consola. Tests: `frontend/components/PrintHost.test.ts`, los de `packages/ui` (`print-channel`, `device-printer`,
+   `print-host`) y la e2e `tests/e2e/printing-ws-client.spec.ts` contra el `/ws/print` real.
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 
