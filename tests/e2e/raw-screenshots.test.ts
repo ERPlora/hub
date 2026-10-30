@@ -23,12 +23,18 @@ function rawScreenshots(source: string): number {
   return source.match(/\.screenshot\(/g)?.length ?? 0;
 }
 
-/** Each file of the e2e with raw calls and how many: the specs and their helpers, not Vitest's own tests. */
+/** The files of the e2e (the specs and their helpers, not Vitest's own tests) and their text, read once while Vitest
+ *  collects this file: reading the ~290 files inside a test took seconds with the machine loaded, past Vitest's 5 s
+ *  (the same cause as horizontal-overflow.test.ts, `WIDTH`). */
+const E2E_SOURCES: ReadonlyArray<[string, string]> = readdirSync(E2E_DIR)
+  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+  .map((name) => [name, readFileSync(join(E2E_DIR, name), 'utf8')]);
+
+/** Each file of the e2e with raw calls and how many. */
 function rawCallsByFile(): Record<string, number> {
   const found: Record<string, number> = {};
-  for (const name of readdirSync(E2E_DIR)) {
-    if (!name.endsWith('.ts') || name.endsWith('.test.ts')) continue;
-    const calls = rawScreenshots(readFileSync(join(E2E_DIR, name), 'utf8'));
+  for (const [name, source] of E2E_SOURCES) {
+    const calls = rawScreenshots(source);
     if (calls > 0) found[name] = calls;
   }
   return found;
