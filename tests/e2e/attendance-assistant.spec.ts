@@ -186,6 +186,7 @@ test('attendance-assistant-card — in Spanish clocking someone else in names th
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   expect(await daysOf(context, bea)).toEqual([]);
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await context.close();
 });
 
