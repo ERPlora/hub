@@ -245,6 +245,16 @@ def test_a_tool_whose_fixed_datum_is_empty_is_not_used_and_the_history_says_why(
     assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.SUCCEEDED
 
 
+def test_a_tool_whose_fixed_text_fills_in_to_nothing_in_this_run_is_not_used_either(gateway, worker, guests):
+    # The same rule as «Try it» (``queries.fixed_value``): a text whose data are all missing fills in to nothing, so
+    # the tool is not used; never called with «on_behalf_of» blank.
+    pinned = {CANCEL: {"on_behalf_of": "{{input.found}}{{input.customer}}"}}
+    ran = asked(worker, gateway, guests, assistant(pinned=pinned), {"id": str(guests["other"].id)}, customer=None)
+    assert not Question.objects.filter(run_id=ran.id).exists()
+    assert status_of(guests["other"]) == "pending"
+    assert json.loads(told(gateway)[0]["content"])["error"]["code"] == "flow.pinned_empty"
+
+
 def test_the_card_of_the_change_says_the_fixed_datum_by_name(gateway, worker, guests):
     # FLOW-F29: the yes is given knowing on whose behalf (her name, never her card's id).
     ran = asked(worker, gateway, guests, assistant(pinned=THEIRS), {"id": str(guests["other"].id)})
