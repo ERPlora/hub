@@ -169,6 +169,13 @@ def titles() -> list[str]:
     return sorted(Task.objects.values_list("title", flat=True))
 
 
+def sends(question: Question) -> dict:
+    """What the change ``question`` waits on would send, as «Waiting for your answer» shows it to whoever runs the
+    business: ``{datum: value}`` (FLOW-F29; the card's data, ``test_question_card.py``)."""
+    [row] = [row for row in run("flow.question.list", {}).rows if row.id == question.id]
+    return {field.name: field.value for field in row.fields}
+
+
 def test_ask_me_first_leaves_a_change_waiting_for_an_answer_and_a_yes_does_it(gateway, clock, worker):
     # FLOW-F38: a yes makes the change and takes the step back to the assistant with what happened; the run goes on
     # with what it answers then (OpenAI Agents SDK approvals, LangGraph's interrupt), never with the text before it.
@@ -185,7 +192,7 @@ def test_ask_me_first_leaves_a_change_waiting_for_an_answer_and_a_yes_does_it(ga
     waiting = FlowRun.objects.get(pk=ran.id)
     assert waiting.status == FlowRun.Status.ASKING
     question = Question.objects.get(run_id=ran.id)
-    assert "Call Ana" in question.details
+    assert sends(question) == {"title": "Call Ana"}
     answered = worker.request("flow.question.answer", {"id": str(question.id), "approve": True, "note": "fine"})
     assert answered.status == FlowRun.Status.CALLING
     assert titles() == ["Call Ana"]
@@ -213,7 +220,7 @@ def test_ask_me_first_two_changes_at_once_the_second_is_not_made_and_the_assista
     ran = start(worker, flow)
     worker()
     question = Question.objects.get(run_id=ran.id)
-    assert "Call Ana" in question.details and "Email Ana" not in question.details
+    assert sends(question) == {"title": "Call Ana"}
     answered = worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
     assert answered.status == FlowRun.Status.CALLING
     assert titles() == ["Call Ana"]
@@ -259,7 +266,7 @@ def test_ask_me_first_the_next_change_it_asks_for_waits_for_its_own_yes(gateway,
     assert titles() == ["Call Ana"]
     assert FlowRun.objects.get(pk=ran.id).status == FlowRun.Status.ASKING
     second = Question.objects.filter(run_id=ran.id, status=Question.Status.PENDING).get()
-    assert second.id != first.id and "Email Ana" in second.details
+    assert second.id != first.id and sends(second) == {"title": "Email Ana"}
     worker.request("flow.question.answer", {"id": str(second.id), "approve": True})
     worker()
     assert titles() == ["Call Ana", "Email Ana"]

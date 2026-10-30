@@ -30,6 +30,7 @@ from pydantic import (
 )
 
 from apps.flow import document
+from base.schemas import AssistantFieldOut
 from apps.flow.models import EVENT_MAX_LENGTH, NAME_MAX_LENGTH, QUESTION_ROLES, SECRET_NAME_RE, Draft, FlowRun
 
 T = TypeVar("T")
@@ -971,6 +972,12 @@ class QuestionOut(Schema):
     on_timeout: str
     expires_at: dt.datetime
     created_at: dt.datetime
+    fields: list[AssistantFieldOut] = Field(
+        default_factory=list,
+        description="The data of the change the assistant wants (FLOW-F38), as its confirmation card in the chat says "
+        "them, read for whoever asks: a moment in their language at the business's hour, a record by its name only "
+        "if they may read it, an amount in cents as `money`; none for a question an «Ask someone first» step asks.",
+    )
 
 
 class QuestionPageOut(Schema):

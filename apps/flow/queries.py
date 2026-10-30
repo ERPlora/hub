@@ -68,6 +68,8 @@ ANSWER = "flow.answer"
 ANSWER_MANAGER = "flow.answer_manager"
 #: The permission each role of «Ask someone first» asks for ('' = whoever runs the business).
 ROLE_PERMISSION = {"": MANAGE, "manager": ANSWER_MANAGER, "employee": ANSWER}
+#: Where a step's conversation lives while the assistant thinks: no step id starts with «_» (``StepId``).
+TURN = "_turn"
 
 FLOW_NOT_FOUND = _("That automation does not exist in this business.")
 AMBIGUOUS_FLOW = _("Several automations fit «%(text)s»: %(names)s. Say which one.")
@@ -1142,7 +1144,27 @@ def can_answer(ctx: OperationContext, role: str) -> bool:
     return ctx.has(ROLE_PERMISSION.get(role, MANAGE)) or ctx.has(MANAGE)
 
 
-def question_row(question: Question) -> dict[str, Any]:
+def proposal_fields(ctx: OperationContext, question: Question) -> list[dict]:
+    """The data of the change the assistant wants that ``question`` waits on (FLOW-F38, «Ask me first»), each as its
+    confirmation card in the chat says it (BASE-F97 step 2): read now, as ``ctx``'s person and in their language, so
+    a record is named only for whoever may read it, never for the automation nor by its id. A run waits on one change
+    at a time, the one its assistant step holds; an «Ask someone first» question, or a change whose action is gone,
+    has none."""
+    run = question.run
+    steps = run.definition.get("steps") or []
+    step = steps[run.step_index] if run.step_index < len(steps) else {}
+    proposal = (run.outputs.get(TURN) or {}).get("proposal") if step.get("kind") == "assistant" else None
+    op = registry.get(str(proposal.get("operation") or "")) if proposal else None
+    if op is None:
+        return []
+    try:
+        arguments = json.loads(proposal.get("arguments") or "{}")
+    except ValueError:
+        arguments = {}
+    return hub_assistant.card(op, arguments if isinstance(arguments, dict) else {}, ctx.language, ctx)["fields"]
+
+
+def question_row(question: Question, fields: list[dict] | None = None) -> dict[str, Any]:
     return {
         "id": question.id,
         "flow_id": question.flow_id,
@@ -1155,6 +1177,7 @@ def question_row(question: Question) -> dict[str, Any]:
         "on_timeout": question.on_timeout,
         "expires_at": question.expires_at,
         "created_at": question.created_at,
+        "fields": fields or [],
     }
 
 
@@ -1173,11 +1196,11 @@ def question_row(question: Question) -> dict[str, Any]:
 def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
     roles = [role for role in ROLE_PERMISSION if can_answer(ctx, role)]
     pending = (
-        Question.objects.select_related("flow")
+        Question.objects.select_related("flow", "run")
         .filter(status=Question.Status.PENDING, role__in=roles, run__status=FlowRun.Status.ASKING)
         .order_by("expires_at", "id")[:100]
     )
-    return {"rows": [question_row(question) for question in pending]}
+    return {"rows": [question_row(question, proposal_fields(ctx, question)) for question in pending]}
 
 
 # --- Secrets (FLOW-F26) ------------------------------------------------------------------------------
