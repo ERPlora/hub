@@ -4,13 +4,17 @@
 // whoever runs the business —, the soonest to expire first. Each card says the question as it was asked,
 // who it was asked of, what silence and a no do, and takes an optional note and «Approve» or «No»; it leaves
 // when answered. A refusal (too late, already answered, the automation paused) stays on its card. With no
-// question the section hides, unless it is all the page shows (`alone`).
+// question the section hides, unless it is all the page shows (`alone`). The change the assistant wants
+// (FLOW-F38) lists each datum it would send as its card in the chat says it (BASE-F97 step 2, base's
+// `fieldLines`): in words, an amount in the business's currency, the empty ones left out.
 import { InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { fieldLines } from '../../../../base/frontend/lib/assistant-card';
+import { useBusinessMoney } from '../../../../base/frontend/lib/money';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/phrasing';
 import { wording } from '../lib/refusal';
@@ -25,6 +29,14 @@ const answer = useCommand('flow.question.answer');
 const rows = computed(() => questions.data.value?.rows ?? []);
 const loadError = computed(() => (questions.error.value ? wording(questions.error.value, t('flow.errors.read')) : ''));
 const shown = computed(() => props.alone || rows.value.length > 0 || !!loadError.value);
+const money = useBusinessMoney();
+/** Each question's data, one line each, by its id: none for a question with no change of the assistant. */
+const data = computed(() => {
+  const format = { locale: locale.value, money: money.value, t };
+  return Object.fromEntries(
+    rows.value.map((question) => [question.id, fieldLines((question.fields ?? []).filter((field) => field.kind !== 'empty'), format)]),
+  );
+});
 const notes = ref<Record<string, string>>({});
 const problems = ref<Record<string, string>>({});
 const busy = ref<string | null>(null);
@@ -100,6 +112,18 @@ async function decide(question: QuestionOut, approve: boolean): Promise<void> {
       >
         {{ question.details }}
       </p>
+      <ul
+        v-if="data[question.id]?.length"
+        class="flow-inbox__data"
+        :data-testid="`flow-question-data-${question.id}`"
+      >
+        <li
+          v-for="(line, index) in data[question.id]"
+          :key="index"
+        >
+          {{ line }}
+        </li>
+      </ul>
       <span
         class="flow-inbox__muted"
         :data-testid="`flow-question-who-${question.id}`"
@@ -184,6 +208,11 @@ async function decide(question: QuestionOut, approve: boolean): Promise<void> {
 .flow-inbox__details {
   margin: 0;
   white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.flow-inbox__data {
+  margin: 0;
+  padding-left: 1.1rem;
   overflow-wrap: anywhere;
 }
 .flow-inbox__muted {

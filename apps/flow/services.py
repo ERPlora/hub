@@ -65,6 +65,9 @@ from apps.flow.queries import (
     say,
     validation_fields,
     can_answer,
+    TURN,
+    PERSON_PARAMS,
+    words_for,
 )
 from apps.flow.schemas import (
     AnsweredOut,
@@ -887,7 +890,8 @@ def _operation_step(
     if op is None or op.kind != step["kind"]:
         raise _own("flow.action_unavailable", name=name)
     step_ctx = _step_context(ctx, run, flow, op)
-    values, _, _ = map_params(step.get("params", {}), data)
+    say = words_for(run.definition["steps"], flow.language, ctx.scope)
+    values, _, _ = map_params(step.get("params", {}), data, say=say, person=PERSON_PARAMS.get(name, ()))
     try:
         payload = op.input.model_validate(
             prepared(op, step["kind"], step.get("result", "first"), values)
@@ -1073,8 +1077,6 @@ def _call_failed(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, fa
 
 # --- Asking the assistant (FLOW-F37 to F39) ---------------------------------------------------------
 
-#: Where a step's conversation lives while the assistant thinks: no step id starts with «_» (``StepId``).
-TURN = "_turn"
 #: What the step's instructions add to the assistant's own: nobody is in front, and what a change does.
 UNATTENDED = (
     "This is a step of the automation «%(name)s» and nobody is watching: never ask a question, decide with your "
@@ -1233,23 +1235,18 @@ def _propose(
     said: str,
     now: dt.datetime,
 ) -> None:
-    """«Ask me first»: the change waits in «Waiting for your answer» with what it would send, and the run on it; a
-    yes makes it (``answer_question``), a no or silence cancels the run, as a question that stops on a no. One change
-    waits at a time: ``later``, the calls of the same answer behind it, are not made, and the assistant hears so with
-    the change's result. Each change it asks for is a question of its own (``<step>:<n>``), so a late yes to one
-    never approves the next."""
-    try:
-        arguments = json.loads(call.arguments or "{}")
-    except ValueError:
-        arguments = {}
-    card = hub_assistant.card(op, arguments if isinstance(arguments, dict) else {}, flow.language)
-    lines = [f"{field['label']}: {field['value']}" for field in card["fields"] if field["kind"] != "empty"]
+    """«Ask me first»: the change waits in «Waiting for your answer» with what the assistant said, and the run on it;
+    what it would send is said there for whoever reads it, as they read it (``queries.proposal_fields``). A yes makes
+    it (``answer_question``), a no or silence cancels the run, as a question that stops on a no. One change waits at a
+    time: ``later``, the calls of the same answer behind it, are not made, and the assistant hears so with the
+    change's result. Each change it asks for is a question of its own (``<step>:<n>``), so a late yes to one never
+    approves the next."""
     question = Question.objects.create(
         run=run,
         flow=flow,
         step_id=f"{step['id']}:{Question.objects.filter(run=run).count() + 1}",
-        title=(str(ASSISTANT_WANTS) % {"app": card["app_name"]})[:300],
-        details="\n".join([*([said] if said else []), *lines])[:2000],
+        title=(str(ASSISTANT_WANTS) % {"app": hub_assistant.app_name(op)})[:300],
+        details=said[:2000],
         role="",
         on_no="stop",
         on_timeout="no",
@@ -1418,13 +1415,15 @@ def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict
     """Leaves the step's question, its texts filled in now, in «Waiting for your answer» and parks the run on it. A
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
+    # Its texts are read by a person: each datum in words, in the language of whoever saved the automation.
+    say = words_for(run.definition["steps"], flow.language, ctx.scope)
     question, _created = Question.objects.get_or_create(
         run=run,
         step_id=step["id"],
         defaults={
             "flow": flow,
-            "title": document.fill(step["title"], data)[:300],
-            "details": document.fill(step.get("details", ""), data),
+            "title": document.fill(step["title"], data, say)[:300],
+            "details": document.fill(step.get("details", ""), data, say),
             "role": step.get("role", ""),
             "on_no": step.get("on_no", "stop"),
             "on_timeout": step.get("on_timeout", "no"),

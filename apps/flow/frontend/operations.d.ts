@@ -4,6 +4,7 @@
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path parameters,
 // an automation's `id` (or its name, `flow`) travels in the input. Dates are ISO strings.
 import type { Page } from '../../../frontend/sdk-types';
+import type { AssistantField } from '../../../base/frontend/lib/assistant-card';
 
 export type TriggerKind = 'event' | 'schedule' | 'at' | 'manual';
 export type Operator = 'eq' | 'neq' | 'in' | 'exists' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte';
@@ -257,6 +258,9 @@ export interface QuestionOut {
   on_timeout: 'no' | 'stop' | 'continue';
   expires_at: string;
   created_at: string;
+  /** The data of the change the assistant wants (FLOW-F38), as its card in the chat says them, read for whoever
+   *  asks (BASE-F97 step 2); none for a question an «Ask someone first» step asks. */
+  fields: AssistantField[];
 }
 export interface QuestionPageOut {
   rows: QuestionOut[];

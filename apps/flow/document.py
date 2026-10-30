@@ -4,7 +4,9 @@ permissions its steps ask for (WORKBOOK «Para quien lo mantiene»). Pure: no da
 - A **path** is ``<root>.<field>[.<field>…]`` with the roots ``input`` (what the event or the manual run
   brought) and ``steps`` (``steps.<id>.<field>``: what an earlier step left). It keeps the type of what
   it points at. There is no index into a list: the old engine could not walk one either.
-- A **template** is text with ``{{path}}`` inside; it is always text, and a missing field is empty.
+- A **template** is text with ``{{path}}`` inside; it is always text, and a missing field is empty. Each datum goes
+  in as the code keeps it («true», an ISO day, an amount in cents), for a machine; a text a person reads passes a
+  ``say`` that writes each one in words (``queries.words_for``, FLOW-F28 and F31).
 - A **condition** is ``{path: {operator: value}}``, every comparison at once. A field that is not there
   never matches, except with ``exists: false``.
 - A **schedule** is every day, week (``weekday``, Monday 0) or month (``day``) at ``time``, read in the
@@ -17,7 +19,7 @@ permissions its steps ask for (WORKBOOK «Para quien lo mantiene»). Pure: no da
 import datetime as dt
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import quote, urlsplit
@@ -49,6 +51,8 @@ _SEGMENT = r"[A-Za-z_][A-Za-z0-9_]*"
 PATH_RE = re.compile(rf"^(?:{'|'.join(ROOTS)})(?:\.{_SEGMENT})+$")
 TEMPLATE_RE = re.compile(r"\{\{\s*([^{}]*?)\s*\}\}")
 _MISSING = object()
+#: How a text says the datum ``value`` its path names: ``say(path, value) -> text``.
+Say = Callable[[str, Any], str]
 
 
 def is_path(text: Any) -> bool:
@@ -66,21 +70,28 @@ def lookup(path: str, data: dict) -> tuple[bool, Any]:
     return True, current
 
 
-def resolve(value: Any, data: dict) -> Any:
-    """The value of ``value`` for ``data``: a path its value, a template its text, a literal itself."""
+def resolve(value: Any, data: dict, say: Say | None = None) -> Any:
+    """The value of ``value`` for ``data``: a path its value, a template its text, a literal itself. With ``say`` (a
+    text a person reads), each datum a template inserts — and a path alone — is the text ``say`` writes for it."""
     if isinstance(value, dict):
-        return {key: resolve(item, data) for key, item in value.items()}
+        return {key: resolve(item, data, say) for key, item in value.items()}
     if isinstance(value, list):
-        return [resolve(item, data) for item in value]
+        return [resolve(item, data, say) for item in value]
     if not isinstance(value, str):
         return value
     if is_path(value):
-        return lookup(value, data)[1]
+        found = lookup(value, data)[1]
+        return found if say is None or found is None else say(value, found)
     if TEMPLATE_RE.search(value):
-        return TEMPLATE_RE.sub(
-            lambda match: _text(lookup(match.group(1), data)[1]), value
-        )
+        written = say or (lambda _path, datum: _text(datum))
+        return TEMPLATE_RE.sub(lambda match: _said(written, match.group(1), data), value)
     return value
+
+
+def _said(say: Say, path: str, data: dict) -> str:
+    """The datum ``path`` names, as ``say`` writes it; a missing one, empty."""
+    found = lookup(path, data)[1]
+    return "" if found is None else say(path, found)
 
 
 def references(value: Any) -> list[str]:
@@ -108,9 +119,10 @@ def _text(value: Any) -> str:
     return str(value)
 
 
-def fill(text: str, data: dict) -> str:
-    """``text`` with its ``{{…}}`` data filled in, always text (a path alone is its value as text)."""
-    return _text(resolve(text, data))
+def fill(text: str, data: dict, say: Say | None = None) -> str:
+    """``text`` with its ``{{…}}`` data filled in, always text (a path alone is its value as text); with ``say``,
+    each datum as it writes it."""
+    return _text(resolve(text, data, say))
 
 
 # --- Conditions -------------------------------------------------------------------------------------

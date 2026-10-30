@@ -23,13 +23,37 @@ const Q: QuestionOut = {
   on_timeout: 'no',
   expires_at: '2026-10-16T12:00:00+02:00',
   created_at: '2026-10-15T12:00:00+02:00',
+  fields: [],
 };
 
-async function setup(rows: QuestionOut[] = [Q], props: Record<string, unknown> = {}) {
-  const m = await mountFlow(QuestionInbox, { props });
+/** The change the assistant wants (FLOW-F38), its data as the server says them for whoever reads it (BASE-F97 step 2):
+ *  a moment and a record already in words; an amount in cents, a yes or no and a list as such. */
+const CHANGE: QuestionOut = {
+  ...Q,
+  id: 'q2',
+  role: '',
+  title: 'The assistant wants to change something in «Appointments»',
+  details: 'I will book Ana.',
+  fields: [
+    { name: 'start', label: 'Starts at', kind: 'text', value: 'Nov 2, 2026, 10:00 AM' },
+    { name: 'services', label: 'Services', kind: 'list', value: [{}] },
+    { name: 'price_cents', label: 'Price', kind: 'money', value: 1500 },
+    { name: 'urgent', label: 'Urgent', kind: 'bool', value: true },
+    { name: 'customer_id', label: 'Customer', kind: 'text', value: 'Ana López' },
+    { name: 'notes', label: 'Notes', kind: 'empty', value: '' },
+  ],
+};
+
+async function setup(rows: QuestionOut[] = [Q], props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+  const m = await mountFlow(QuestionInbox, { props, locale });
   await m.live();
   await m.result(OP, { rows });
   return m;
+}
+
+/** The lines of a question's data, as the card shows them. */
+function data(m: Awaited<ReturnType<typeof setup>>, id: string): string[] {
+  return m.find(`flow-question-data-${id}`).findAll('li').map((line) => line.text());
 }
 
 describe('QuestionInbox', () => {
@@ -45,6 +69,46 @@ describe('QuestionInbox', () => {
     expect(own.find('flow-question-who-q1').text()).toBe('Asked of whoever runs the business.');
     expect(own.find('flow-question-silence-q1').text()).toContain('the automation carries on anyway');
     expect(own.find('flow-question-no-q1').text()).toBe('After a no, the automation carries on.');
+  });
+
+  it("says each datum of the assistant's change in words, as its card in the chat does (FLOW-F38)", async () => {
+    const m = await setup([CHANGE]);
+    await m.result('base.business.get', { currency: 'EUR', currency_decimals: 2 });
+    expect(m.find('flow-question-q2').text()).toContain('I will book Ana.');
+    expect(data(m, 'q2')).toEqual([
+      'Starts at: Nov 2, 2026, 10:00 AM',
+      'Services: 1 item',
+      'Price: €15.00',
+      'Urgent: Yes',
+      'Customer: Ana López',
+    ]);
+    const shown = m.find('flow-question-q2').text();
+    for (const raw of ['[{}]', '1500', 'true']) expect(shown).not.toContain(raw);
+  });
+
+  it("says them in the reader's language, the business's currency included", async () => {
+    // The server says each datum, and names it, in the reader's language; the card's own words are base's.
+    const fields = [
+      { name: 'start', label: 'Inicio', kind: 'text', value: '2 nov 2026, 10:00' },
+      { name: 'services', label: 'Servicios', kind: 'list', value: [{}] },
+      { name: 'price_cents', label: 'Precio', kind: 'money', value: 1500 },
+      { name: 'urgent', label: 'Urgente', kind: 'bool', value: true },
+      { name: 'customer_id', label: 'Cliente', kind: 'text', value: 'Ana López' },
+    ] satisfies QuestionOut['fields'];
+    const m = await setup([{ ...CHANGE, fields }], {}, 'es');
+    await m.result('base.business.get', { currency: 'EUR', currency_decimals: 2 });
+    expect(data(m, 'q2')).toEqual([
+      'Inicio: 2 nov 2026, 10:00',
+      'Servicios: 1 elemento',
+      'Precio: 15,00\u00a0€',
+      'Urgente: Sí',
+      'Cliente: Ana López',
+    ]);
+  });
+
+  it('a question with no change of the assistant lists no data', async () => {
+    const m = await setup();
+    expect(m.find('flow-question-data-q1').exists()).toBe(false);
   });
 
   it('approves with a note', async () => {
