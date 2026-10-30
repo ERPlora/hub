@@ -230,7 +230,11 @@ def _drop(hub_id, now: dt.datetime) -> bool:
     if hub is None:
         return False
     # Its database first, outside any transaction of control; its rows after, in base.demo.purge's own.
-    services.purge_demo_data(hub)
-    services.demo_purge(system_context(registry.REGISTRY_SCOPE), DemoSlugIn(slug=hub.slug))
+    try:
+        services.purge_demo_data(hub)
+        services.demo_purge(system_context(registry.REGISTRY_SCOPE), DemoSlugIn(slug=hub.slug))
+    except Exception as error:
+        services.demo_drop_failed(hub_id, now, f"{type(error).__name__}: {error}")
+        raise
     logger.info("base.tenancy.provision.dropped demo=%s database=%s", hub.slug, hub.db_name or "-")
     return True

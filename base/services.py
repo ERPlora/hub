@@ -1060,11 +1060,14 @@ def claim_due_hubs(now: dt.datetime, limit: int, lease: dt.timedelta) -> list[UU
 
 
 def release_hub(hub_id: UUID, now: dt.datetime) -> None:
-    """Give the lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop), else gone."""
+    """Give the lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop: at its
+    ``next_attempt_at`` when the last try failed), else gone."""
     with transaction.atomic():
         hub = Hub.objects.filter(pk=hub_id).first()
         due = HubDue.objects.select_for_update().filter(pk=hub_id)
-        if hub is not None and hub.status == Hub.Status.FAILED:
+        if hub is not None and (
+            hub.status == Hub.Status.FAILED or (hub.status == Hub.Status.DROPPING and hub.next_attempt_at)
+        ):
             due.update(due_at=hub.next_attempt_at or now, lease_until=None)
         elif hub is not None and (
             hub.status in registry.PREPARING_STATUSES
@@ -1171,16 +1174,35 @@ def provision_failed(hub_id: UUID, now: dt.datetime, error: str) -> Hub | None:
 
 def demo_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> Hub | None:
     """The demo ``hub_id``, which ended, is being dropped (``dropping``, its lease renewed); ``None`` if it is no demo
-    that ended or was purged already."""
+    that ended, was purged already, or whose last drop failed and waits for its ``next_attempt_at``.
+
+    Its first drop starts its counters again: a preparation that had failed is no drop that failed."""
     with transaction.atomic():
         hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=hub_id).first()
         if hub is None or not hub.is_demo or hub.status == Hub.Status.PURGED or not registry.is_gone(hub, now):
             return None
+        if hub.status == Hub.Status.DROPPING and hub.next_attempt_at is not None and hub.next_attempt_at > now:
+            return None
         if hub.status != Hub.Status.DROPPING:
             hub.status = Hub.Status.DROPPING
-            hub.save(update_fields=["status", "updated_at"])
+            hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
+            hub.save(update_fields=["status", "attempts", "last_error", "next_attempt_at", "updated_at"])
         _leased(hub_id, now, lease)
     return hub
+
+
+def demo_drop_failed(hub_id: UUID, now: dt.datetime, error: str) -> None:
+    """The drop of the demo ``hub_id`` failed with ``error``: noted, and tried again after :func:`retry_delay` (its
+    ``hub_due`` waits for it: never every tick)."""
+    with transaction.atomic():
+        hub = Hub.objects.select_for_update().filter(pk=hub_id, status=Hub.Status.DROPPING).first()
+        if hub is None:
+            return
+        hub.attempts += 1
+        hub.last_error = f"drop_failed: {error}"[:LAST_ERROR_MAX]
+        hub.next_attempt_at = now + retry_delay(hub.attempts)
+        hub.save(update_fields=["attempts", "last_error", "next_attempt_at", "updated_at"])
+        HubDue.objects.filter(pk=hub_id).update(due_at=hub.next_attempt_at)
 
 
 def apply_kept_photo(hub: Hub) -> None:

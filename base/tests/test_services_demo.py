@@ -29,7 +29,7 @@ from live.models import OutboxEvent
 
 from base import registry, services
 from base.models import DemoCode, Hub, Membership
-from base.tenancy import names, ops
+from base.tenancy import names, ops, provision
 from base.tenancy.connections import control_name
 from control.models import HubDue
 from base.queries import demo_get
@@ -538,6 +538,48 @@ class TestReaper:
         assert HubDue.objects.get(pk=first_hub.pk).lease_until is None
         assert Hub.objects.get(slug=second.slug).status == "purged"
         assert first.slug in caplog.text
+
+    def test_a_demo_whose_drop_fails_waits_longer_each_time_and_is_not_tried_before(self, monkeypatch):
+        """Review of hub#471 (I3): a drop the server refuses is noted on the demo (``attempts``, ``last_error``,
+        ``next_attempt_at``: 1 min, 5 min…) and its ``hub_due`` waits for it, never every tick of the worker."""
+        tried = []
+
+        def refused(hub):
+            tried.append(hub.slug)
+            raise RuntimeError("permission denied to terminate process")
+
+        monkeypatch.setattr(services, "purge_demo_data", refused)
+        demo = create()
+        lapse(demo.slug)
+        before = timezone.now()
+
+        assert reap_demos() == 0
+
+        hub = Hub.objects.get(slug=demo.slug)
+        assert (hub.status, hub.attempts) == ("dropping", 1)
+        assert hub.last_error.startswith("drop_failed: RuntimeError: permission denied")
+        assert before + MINUTE <= hub.next_attempt_at <= timezone.now() + MINUTE
+        assert HubDue.objects.get(pk=hub.pk).due_at == hub.next_attempt_at
+        assert reap_demos() == 0 and provision.run_due() == 0
+        assert tried == [demo.slug]
+
+        later = hub.next_attempt_at + dt.timedelta(seconds=1)
+        assert reap_demos(later) == 0
+        hub.refresh_from_db()
+        assert (tried, hub.attempts) == ([demo.slug, demo.slug], 2)
+        assert hub.next_attempt_at >= later + 5 * MINUTE - dt.timedelta(seconds=1)
+
+    def test_a_demo_whose_preparation_had_failed_is_dropped_at_once_when_it_ends(self, monkeypatch):
+        dropped = []
+        monkeypatch.setattr(services, "purge_demo_data", lambda hub: dropped.append(hub.slug))
+        demo = create()
+        Hub.objects.filter(slug=demo.slug).update(
+            status="failed", attempts=3, next_attempt_at=timezone.now() + 15 * MINUTE
+        )
+        lapse(demo.slug)
+
+        assert reap_demos() == 1
+        assert dropped == [demo.slug] and Hub.objects.get(slug=demo.slug).status == "purged"
 
     def test_purging_a_demo_that_has_not_ended_is_refused(self):
         demo = create()
