@@ -1555,6 +1555,10 @@
     "method": "get",
     "path": "/api/pricing/price_items"
   },
+  "pricing.price_item.get": {
+    "method": "get",
+    "path": "/api/pricing/price_items/detail"
+  },
   "pricing.price_item.add": {
     "method": "post",
     "path": "/api/pricing/price_items"

@@ -27,7 +27,7 @@ from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run
-from base import catalog, worker
+from base import catalog, scheduler, worker
 from base.catalog import RegisterResult
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 
@@ -48,11 +48,18 @@ SORRY = (
 @pytest.fixture
 def tick(monkeypatch, django_capture_on_commit_callbacks):
     """One turn of the worker's real loop (``test_relay_notify.py``'s): the relay, then what each COMMIT left for
-    after it (the deliveries to erplora.com, the assistant's turns)."""
+    after it (the deliveries to erplora.com, the assistant's turns). ``tick(later)`` runs it with its clock ``later``
+    than now (a second by default).
+
+    The apps' scheduled tasks are not these tests': they are scheduled a day ahead (the worker's own ``sync`` keeps a
+    known task's clock), so whichever minute a tick lands on, only the relay runs. A tick that crossed the minute ran
+    ``flow.run.resume_due`` before the relay, and in phase 1 it takes the run waiting on the assistant on the worker's
+    fixed scope (``WORKER_SCOPE_SLUG``), not the business's: the guest got the thanks last (CI run 41094697959)."""
     monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
+    scheduler.sync(timezone.now() + dt.timedelta(days=1))
 
-    def run_once() -> None:
+    def run_once(later: dt.timedelta = dt.timedelta(seconds=1)) -> None:
         stop = threading.Event()
         now = timezone.now()
 
@@ -61,7 +68,7 @@ def tick(monkeypatch, django_capture_on_commit_callbacks):
             return True
 
         with django_capture_on_commit_callbacks(execute=True):
-            assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now + dt.timedelta(seconds=1)) == 0
+            assert worker.run(stop, tick_seconds=0, wait=wait, clock=lambda: now + later) == 0
 
     return run_once
 
@@ -382,11 +389,17 @@ def test_a_guest_cancels_their_table_and_after_the_owner_s_yes_it_is_cancelled(
     assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
 
 
+@pytest.mark.parametrize(
+    "later", [dt.timedelta(seconds=1), dt.timedelta(minutes=2)], ids=["at_once", "past_the_minute"]
+)
 def test_the_answer_never_cancels_the_reservation_of_another_number(
-    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+    gateway, tick, django_capture_on_commit_callbacks, later  # noqa: F811 - the fixture
 ):
     """reservations#50: on their behalf, another guest's reservation is refused even after the yes, saying nothing of it;
-    the assistant hears the refusal and what it says then goes to them."""
+    the assistant hears the refusal and what it says then goes to them.
+
+    ``past_the_minute``: the tick after the yes lands on another minute than the first one, as in the CI run that got
+    the thanks last (18:06:59.147 + 1 s); what the guest gets never depends on the minute it lands on."""
     connect()
     open_week()
     run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
@@ -403,13 +416,14 @@ def test_the_answer_never_cancels_the_reservation_of_another_number(
 
     tick()
     answer_yes(django_capture_on_commit_callbacks)
-    tick()
+    tick(later)
 
     theirs.refresh_from_db()
     assert theirs.status != Reservation.Status.CANCELLED
     told = [message for message in gateway.sent(CHAT)[-1].body["messages"] if message.get("role") == "tool"]
     assert "reservation.customer_mismatch" in json.dumps(told)
     assert outbound()[-1] == "No encuentro ninguna reserva a tu nombre."
+    assert [seen.body["hub"] for seen in gateway.sent(CHAT)] == ["a", "a"]  # both turns, the business's own
 
 
 def tool_inputs(seen, name: str) -> set[str]:

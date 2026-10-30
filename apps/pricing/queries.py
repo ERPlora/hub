@@ -33,6 +33,8 @@ from apps.inventory.queries import find_product
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.schemas import (
     Page,
+    PriceItemDetailOut,
+    PriceItemIdIn,
     PriceItemListIn,
     PriceItemOut,
     PriceListListIn,
@@ -369,6 +371,25 @@ def list_price_items(ctx: OperationContext, params: PriceItemListIn) -> dict:
     column = {"name": "shown_name"}.get(params.sort, params.sort)
     rows = rows.order_by(*_ordering(column, params.dir, "min_quantity", "id"))
     return _page(rows, params, item_row)
+
+
+@operation(
+    "pricing.price_item.get",
+    kind="query",
+    permission="pricing.view",
+    input=PriceItemIdIn,
+    output=PriceItemDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one price of a price list by its id (see pricing.price_item.list): the article, its list "
+        "and the list's currency, the from quantity and the price in cents of that currency."
+    },
+)
+def get_price_item(ctx: OperationContext, data: PriceItemIdIn) -> dict:
+    item = live_items().select_related("price_list", "product").filter(pk=data.id).first()
+    if item is None:
+        raise NotFound(str(ITEM_NOT_FOUND), code="pricing.price_item_not_found")
+    return {**item_row(item), "currency": item.price_list.currency}
 
 
 # ── Rules ────────────────────────────────────────────────────────────────────────────────────────

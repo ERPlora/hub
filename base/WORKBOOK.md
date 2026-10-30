@@ -3099,8 +3099,8 @@ Implicados: ACCOUNTS-F38
   el dato que nombra un registro con moneda propia, la lectura de su app que la da
   (`base.schemas.in_currency_of("<query>", by="<su entrada>", code="<el dato de su respuesta>")`, que es
   `{"currency": {"read", "by", "code"}}`; hoy `cart_id`, `session_token` y `customer` de las escrituras de Carrito y
-  pago, con `cart_checkout.cart.get`, y `price_list_id` y `price_list` de `pricing.price_item.add`, con
-  `pricing.price_list.get`), corrida como la persona (`_run`, como el nombre de un registro) solo si el objeto lleva
+  pago, con `cart_checkout.cart.get`; `price_list_id` y `price_list` de `pricing.price_item.add`, con
+  `pricing.price_list.get`, e `id` de `pricing.price_item.update`, con `pricing.price_item.get`), corrida como la persona (`_run`, como el nombre de un registro) solo si el objeto lleva
   algún importe (`_sends_amount`) y del primer dato marcado que venga relleno; tomada como la toman las escrituras
   (sin espacios, en mayúsculas, un código ISO 4217 que `pycountry` conoce) y con los decimales de esa moneda
   (`currency_decimals`: ninguno en yenes): arriba y dentro de un objeto va en el `money` del importe; vacía o sin ese
@@ -3119,8 +3119,7 @@ Implicados: ACCOUNTS-F38
   yenes, de verdad), el trinquete
   `test_every_amount_on_a_record_in_a_currency_of_its_own_says_how_to_read_it_but_the_known_ones`
   (`UNPRICED_RECORD_AMOUNTS`, que solo baja: un importe de una escritura cuya descripción dice «<x>'s currency», salvo
-  la del negocio, sin marca `currency` en su objeto ni encima; hoy Tarifas 1, `pricing.price_item.update`, que nombra
-  el precio por su id y ninguna lectura de Tarifas da por ese id la moneda de su tarifa),
+  la del negocio, sin marca `currency` en su objeto ni encima; hoy ninguno),
   `test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency` (dólares, yenes y « usd »),
   `test_an_amount_in_a_currency_that_is_none_is_shown_as_sent_never_in_another`,
   `test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts`, el trinquete
