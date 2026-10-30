@@ -2374,7 +2374,7 @@ Pasos:
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
-     «15,00 US$», y en yenes, sin decimales; una moneda que no existe no se inventa: el importe sale tal como se
+     «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: el importe sale tal como se
      escribió y la acción la rechaza al ejecutarse. Uno de «Lo que va a pasar» que su app da en otra moneda sale en la
      suya: rectificar una factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un

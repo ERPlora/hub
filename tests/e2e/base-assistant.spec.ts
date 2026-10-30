@@ -580,6 +580,46 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
   await context.close();
 });
 
+// flow: base-assistant-money-mark (BASE-F97)
+// The same PR: a payment in dollars of a business in euros said «15,00 €», every amount in the business's currency. Now in
+// the currency its write names, with that currency's decimals (none in yen), as Stripe or Square show it. Cancelled.
+test('base-assistant-money-mark — in Spanish a payment in another currency says its amount in it, with its decimals', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-USD';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = before.data.apps.some((app) => app.id === 'payment' && app.state === 'on');
+  await turnOn(context, A, 'payment');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur', currency: 'USD' };
+  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s\$/);
+    await expect(card(page)).not.toContainText('€');
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  // In yen, without decimals: 1500 is ¥1,500, never «15,00».
+  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
+  await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1500\s¥/);
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  if (!wasOn) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
+    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
 // flow: assistant-card (BASE-F97)
 // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a booking's card said each datum as the model sent it («2026-11-02T10:00:00+01:00»,
 // «counter», the customer's and the professional's ids): now its day and time as the person's language writes them, at the
