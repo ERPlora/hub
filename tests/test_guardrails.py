@@ -22,7 +22,7 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     swapped in); ``apps/`` never imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside
     ``live.broker``; phase 1's shared database (``use_shared_database``) only where the list says, until S5; the
     tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
-    ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``) but the 8 S2 moves first.
+    ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``): S2's first step moved the last ones.
 (f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
     import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
     it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo, and the helpers of its
@@ -376,12 +376,10 @@ SHARED_DATABASE_USERS: dict[str, str] = {
     "base/management/commands/create_platform_hub.py": "the platform hub has no registry row before S2.",
     "base/management/commands/shell.py": "manage.py shell (the e2e's relay helpers) on phase 1's database.",
 }
-#: ``transaction.on_commit`` in the modules, pending S2, by file and count: with the hub's own database the operation's
-#: transaction is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a
-#: rollback). The first step of S2 moves them to ``live.operations.on_commit`` and empties this list.
-PENDING_S2_ON_COMMIT: dict[str, int] = {
-    "apps/website/services.py": 4,
-}
+#: ``transaction.on_commit`` in the modules, by file and count: with the hub's own database the operation's transaction
+#: is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a rollback). S2's
+#: first step moved the last ones (website's) to ``live.operations.on_commit``: it stays empty.
+PENDING_S2_ON_COMMIT: dict[str, int] = {}
 #: Hub models that still have a ``hub_id`` column, each with its reason (PLAN-DB §11: the border is the database).
 HUB_ID_COLUMNS: dict[str, str] = {
     "base.hubidentity": "the identity of the hub's database itself (PLAN-DB §3).",
@@ -999,15 +997,13 @@ def on_commit_problems(counts: dict[str, int]) -> dict[str, tuple[int, int]]:
 
 
 def test_a_new_bare_on_commit_in_the_modules_is_caught_listed_file_or_not():
-    listed = dict(PENDING_S2_ON_COMMIT)
-
-    assert on_commit_problems(listed) == {}
-    assert on_commit_problems({**listed, "apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
-    # Moved off (flow's and the inbox's calls go through base.outbound): a file no longer listed may not come back.
-    assert on_commit_problems({**listed, "apps/flow/services.py": 1}) == {"apps/flow/services.py": (1, 0)}
-    assert on_commit_problems({**listed, "apps/whatsapp_inbox/services.py": 1}) == {"apps/whatsapp_inbox/services.py": (1, 0)}
-    # One moved to live.operations.on_commit: its entry shrinks, so the list never hides a new one.
-    assert on_commit_problems({**listed, "apps/website/services.py": 3}) == {"apps/website/services.py": (3, 4)}
+    assert PENDING_S2_ON_COMMIT == {}, "S2's first step emptied it: a module never goes back to a bare on_commit"
+    assert on_commit_problems({}) == {}
+    assert on_commit_problems({"apps/demo/services.py": 1}) == {"apps/demo/services.py": (1, 0)}
+    # Moved off (flow's and the inbox's through base.outbound, website's to live.operations.on_commit): none comes back.
+    assert on_commit_problems({"apps/flow/services.py": 1}) == {"apps/flow/services.py": (1, 0)}
+    assert on_commit_problems({"apps/whatsapp_inbox/services.py": 1}) == {"apps/whatsapp_inbox/services.py": (1, 0)}
+    assert on_commit_problems({"apps/website/services.py": 4}) == {"apps/website/services.py": (4, 0)}
 
 
 def test_the_modules_run_after_the_commit_only_through_live():
@@ -1017,8 +1013,7 @@ def test_the_modules_run_after_the_commit_only_through_live():
 
     assert problems == {}, (
         "A module runs after the COMMIT with live.operations.on_commit, on its operation's alias; a bare "
-        "transaction.on_commit registers on default, outside the hub's transaction. PENDING_S2_ON_COMMIT lists the "
-        f"4 calls S2 moves first (shrink an entry once moved, never add one): {{file: (found, listed)}} {problems}"
+        f"transaction.on_commit registers on default, outside the hub's transaction: {{file: (found, listed)}} {problems}"
     )
 
 
