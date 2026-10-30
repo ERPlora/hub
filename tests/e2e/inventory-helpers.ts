@@ -138,3 +138,155 @@ export async function rowAction(page: Page, id: string, action: string): Promise
   await menu.click();
   await page.locator(`ion-popover [data-testid=${hook}]`).click();
 }
+
+/** How a «Not configured» chip sits in its box (`within`: the table cell, the card's value or the form's field):
+ *  what is wrong with it (none = its icon in sight and its text on one line, whole or ending in «…»; `whole`: it
+ *  has to be whole; `titled`: its `title` is its whole text) and its measurements for the report. A part is in
+ *  sight when it lies inside the box and inside every box between them that clips (`overflow` not `visible`, the
+ *  chip itself included). */
+export async function chipFit(
+  chip: Locator,
+  options: { within: string; whole?: boolean; titled?: boolean },
+): Promise<{ problems: string[]; metrics: Record<string, unknown> }> {
+  return chip.evaluate((el, { within: selector, whole: mustFit, titled }) => {
+    const px = (n: number) => Math.round(n * 10) / 10;
+    const box = el.closest(selector);
+    if (!box) return { problems: [`no ${selector} around the chip`], metrics: {} };
+    const sight = (node: Element) => {
+      const r = box.getBoundingClientRect();
+      const span = { left: r.left, right: r.right };
+      for (let up = node.parentElement; up && up !== box; up = up.parentElement) {
+        if (getComputedStyle(up).overflowX === 'visible') continue;
+        const c = up.getBoundingClientRect();
+        span.left = Math.max(span.left, c.left);
+        span.right = Math.min(span.right, c.right);
+      }
+      return span;
+    };
+    const inSight = (node: Element) => {
+      const r = node.getBoundingClientRect();
+      const s = sight(node);
+      return { ok: r.width >= 1 && r.left >= s.left - 0.5 && r.right <= s.right + 0.5, at: `${px(r.left)}–${px(r.right)}`, sight: `${px(s.left)}–${px(s.right)}` };
+    };
+    const problems: string[] = [];
+    const chipAt = inSight(el);
+    if (!chipAt.ok) problems.push(`the chip (${chipAt.at}) sticks out of its box (${chipAt.sight})`);
+    const icon = el.querySelector('ion-icon');
+    const iconAt = icon ? inSight(icon) : null;
+    if (!icon || !iconAt || getComputedStyle(icon).visibility === 'hidden') problems.push('the chip has no icon');
+    else if (!iconAt.ok) problems.push(`its icon (${iconAt.at}) is out of sight (${iconAt.sight})`);
+    // The box that paints the text: the nearest ancestor of its text that is not inline.
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let text: Node | null = walker.nextNode();
+    while (text && !text.textContent?.trim()) text = walker.nextNode();
+    let painter: Element | null = text?.parentElement ?? null;
+    while (painter && painter !== el && getComputedStyle(painter).display === 'inline') painter = painter.parentElement;
+    const whole = (el.querySelector('ion-label')?.textContent ?? '').trim();
+    if (!text || !painter || !whole) return { problems: [...problems, 'the chip has no text'], metrics: {} };
+    const style = getComputedStyle(painter);
+    const fits = painter.scrollWidth <= painter.clientWidth;
+    const ellipsis = style.textOverflow === 'ellipsis' && style.overflowX === 'hidden' && style.whiteSpace === 'nowrap';
+    if (mustFit && !fits) problems.push(`its text is not whole though the row has room (${painter.scrollWidth} > ${painter.clientWidth})`);
+    else if (!fits && !ellipsis) {
+      problems.push(
+        `its text is cut with no «…» (${painter.scrollWidth} > ${painter.clientWidth}; text-overflow ${style.textOverflow}, overflow ${style.overflowX}, white-space ${style.whiteSpace})`,
+      );
+    }
+    // One line: a chip that wraps its text is not whole on its row.
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+    if (lines > 1) problems.push(`its text wraps to ${lines} lines`);
+    const textAt = inSight(painter);
+    if (!textAt.ok) problems.push(`its text (${textAt.at}) is cut by a box around it (${textAt.sight})`);
+    const title = el.getAttribute('title');
+    if (titled && title !== whole) problems.push(`its title «${title}» is not its whole text «${whole}»`);
+    return {
+      problems,
+      metrics: {
+        box: sight(el),
+        chip: chipAt.at,
+        icon: iconAt?.at,
+        text: { at: textAt.at, scrollWidth: painter.scrollWidth, clientWidth: painter.clientWidth, fits, ellipsis, lines },
+        title,
+        whole,
+      },
+    };
+  }, options);
+}
+
+/** A measurement's problems once the layout settles (`[]` = all is well): the table refits to its box after a resize
+ *  (columns, cards) and a step on its way may look right, so a measurement counts only when the next one finds it
+ *  unchanged. Soft: one run says what is wrong at every width. */
+export async function settled<T extends { problems: string[] }>(measure: () => Promise<T>, message: string, empty: T): Promise<T> {
+  let last = '';
+  let fit = empty;
+  await expect
+    .configure({ soft: true })
+    .poll(
+      async () => {
+        fit = await measure();
+        const now = JSON.stringify(fit);
+        const same = now === last;
+        last = now;
+        return same ? fit.problems : ['settling'];
+      },
+      { message },
+    )
+    .toEqual([]);
+  return fit;
+}
+
+/** The chip's problems once the layout settles (`[]` = it fits; see `settled`). */
+export const settledChipFit = (
+  chip: Locator,
+  options: Parameters<typeof chipFit>[1],
+  message: string,
+): Promise<Awaited<ReturnType<typeof chipFit>>> => settled(() => chipFit(chip, options), message, { problems: [], metrics: {} });
+
+/** FIX-UI-DATATABLE-CELL-NO-WRAP-SQUEEZES-CHIP-BESIDE-BADGE - How a «Not configured» chip and the badge painted after
+ *  it (`badge`, a selector inside the same box) share their box (`within`, as `chipFit`): what is wrong with them (none
+ *  = the chip is whole or as wide as its box, never squeezed by the badge beside it; the badge whole and inside the box;
+ *  neither over the other) and their measurements for the report. */
+export async function chipBesideBadge(
+  chip: Locator,
+  options: { within: string; badge: string },
+): Promise<{ problems: string[]; metrics: Record<string, unknown> }> {
+  return chip.evaluate((el, { within: selector, badge: badgeSelector }) => {
+    const px = (n: number) => Math.round(n * 10) / 10;
+    const box = el.closest(selector);
+    if (!box) return { problems: [`no ${selector} around the chip`], metrics: {} };
+    const badge = box.querySelector(badgeSelector);
+    if (!badge) return { problems: [`no ${badgeSelector} beside the chip`], metrics: {} };
+    const problems: string[] = [];
+    const boxStyle = getComputedStyle(box);
+    const room = box.clientWidth - (parseFloat(boxStyle.paddingLeft) || 0) - (parseFloat(boxStyle.paddingRight) || 0);
+    // The chip clips its text: its `scrollWidth` is its whole width while it is cut.
+    const chipStyle = getComputedStyle(el);
+    const borders = (parseFloat(chipStyle.borderLeftWidth) || 0) + (parseFloat(chipStyle.borderRightWidth) || 0);
+    const natural = Math.max(el.scrollWidth, el.clientWidth) + borders;
+    const chip = el.getBoundingClientRect();
+    if (chip.width < Math.min(natural, room) - 1) {
+      problems.push(`the chip is squeezed to ${px(chip.width)}px though it needs ${px(natural)}px and its box gives ${px(room)}px`);
+    }
+    const tag = badge.getBoundingClientRect();
+    const frame = box.getBoundingClientRect();
+    if (tag.width < 1) problems.push('the badge is not painted');
+    else if (tag.left < frame.left - 0.5 || tag.right > frame.right + 0.5) {
+      problems.push(`the badge (${px(tag.left)}–${px(tag.right)}) sticks out of its box (${px(frame.left)}–${px(frame.right)})`);
+    }
+    if (badge.scrollWidth > badge.clientWidth + 0.5) problems.push(`the badge's text is cut (${badge.scrollWidth} > ${badge.clientWidth})`);
+    const across = Math.min(chip.right, tag.right) - Math.max(chip.left, tag.left);
+    const down = Math.min(chip.bottom, tag.bottom) - Math.max(chip.top, tag.top);
+    if (across > 0.5 && down > 0.5) problems.push(`the badge lies over the chip (${px(across)}×${px(down)}px)`);
+    return {
+      problems,
+      metrics: {
+        room: px(room),
+        chip: { width: px(chip.width), natural: px(natural), top: px(chip.top) },
+        badge: { left: px(tag.left), right: px(tag.right), top: px(tag.top) },
+        under: tag.top >= chip.bottom - 0.5,
+      },
+    };
+  }, options);
+}
