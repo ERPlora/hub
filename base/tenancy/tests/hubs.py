@@ -2,8 +2,9 @@
 
 Per test session (and xdist worker), next to its control database ``<control>``:
 
-- ``<control>_template_test``: built as ``migrate_hubs`` builds a template (``base.tenancy.migrator.ensure_template``),
-  with every hub app whose tables only reference the hub's own (``migrator.portable_apps``);
+- ``<control>_template_test``: created here and migrated as ``migrate_hubs`` migrates a template
+  (``base.tenancy.migrator.ensure_template``), with every hub app whose tables only reference the hub's own
+  (``migrator.portable_apps``);
 - ``<control>_<hex of HUB_A_ID>`` and ``<control>_<hex of HUB_B_ID>``: cloned from it with
   ``CREATE DATABASE … TEMPLATE``, each with its identity row (``base_hub_identity``).
 
@@ -116,6 +117,38 @@ def create_database(name: str) -> None:
         )
 
 
+#: The role a platform's template of the tests grants, as ``bootstrap_databases`` grants ``hub_admin``: one every
+#: PostgreSQL 14+ has, so the tests create no role.
+TEMPLATE_GRANTEE = "pg_monitor"
+
+
+def bootstrap_template(name: str, *, control: str | None = None) -> None:
+    """Make ``name`` as ``bootstrap_databases`` leaves a platform's template (``base.tenancy.bootstrap``): empty, no
+    access for PUBLIC, ``CONNECT, TEMPORARY`` for one role and default privileges in ``public`` for it. The migrator
+    never makes one (``migrator.TemplateMissing``)."""
+    identifier = names.identifier(name, control=tenancy_connections.control_name() if control is None else control)
+    grantee = sql.Identifier(TEMPLATE_GRANTEE)
+    with _maintenance() as conn:
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(identifier))
+        conn.execute(sql.SQL("REVOKE ALL ON DATABASE {} FROM PUBLIC").format(identifier))
+        conn.execute(sql.SQL("GRANT CONNECT, TEMPORARY ON DATABASE {} TO {}").format(identifier, grantee))
+    with _maintenance(name) as conn:
+        conn.execute(sql.SQL("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {}").format(grantee))
+
+
+def database_access(name: str) -> list[tuple[str, str, str, bool]]:
+    """``(grantor, grantee, privilege, grantable)`` of the database ``name``, its default included (``acldefault``)."""
+    with _maintenance() as conn:
+        return sorted(
+            conn.execute(
+                "SELECT pg_get_userbyid(a.grantor), CASE WHEN a.grantee = 0 THEN 'PUBLIC' "
+                "ELSE pg_get_userbyid(a.grantee) END, a.privilege_type, a.is_grantable "
+                "FROM pg_database d, aclexplode(coalesce(d.datacl, acldefault('d', d.datdba))) a WHERE d.datname = %s",
+                [name],
+            ).fetchall()
+        )
+
+
 def drop_database(name: str, *, control: str | None = None) -> None:
     """Drop the database ``name`` (one of ``control``'s names, default this session's) if it exists, whoever is still
     connected to it."""
@@ -158,7 +191,8 @@ def _build() -> HubDatabases:
     with _maintenance() as conn:
         for name in (hubs.a, hubs.b, hubs.template):
             _drop(conn, name, control)
-    # As migrate_hubs makes a template: nobody stays connected to it, so it can be cloned.
+        conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(hubs.template, control=control)))
+    # Migrated as migrate_hubs migrates a template: nobody stays connected to it afterwards, so it can be cloned.
     migrator.ensure_template(migrator.Template(db_name=hubs.template, apps=hubs.apps))
     with _maintenance() as conn:
         for name in (hubs.a, hubs.b):

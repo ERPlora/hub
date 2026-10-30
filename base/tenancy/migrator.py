@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 import decouple
 import psycopg
 from django.apps import apps as django_apps
+from django.conf import settings as django_settings
 from django.core.management import call_command
 from django.db import DEFAULT_DB_ALIAS, Error, connections
 from django.db.migrations.executor import MigrationExecutor
@@ -85,6 +86,12 @@ LOCK_TIMEOUT_ATTEMPTS = 3
 MIGRATED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.EXPIRED)
 #: Where ``CREATE DATABASE`` runs: every database's own catalog is reached from any, and this one always exists.
 OPS_DATABASE = "postgres"
+#: Cloning a template fails while anyone is connected to its source (55006, after PostgreSQL's own 5 s wait): it is
+#: tried this many times, this many seconds apart (PLAN-DB §6).
+CLONE_ATTEMPTS = 5
+CLONE_RETRY_DELAY = 2.0
+#: The privileges of a database (``aclexplode``'s ``privilege_type``): the only words that reach a GRANT.
+DATABASE_PRIVILEGES = frozenset({"CONNECT", "CREATE", "TEMPORARY"})
 
 
 class HubWithoutDatabase(RuntimeError):
@@ -109,6 +116,26 @@ class AppNotPortable(ValueError):
     """An app whose tables still reference control's users: no hub's database can hold them yet."""
 
     code = "app_not_portable"
+
+
+class TemplateMissing(RuntimeError):
+    """A platform's template that is not on its server: only db-bootstrap makes one, with its roles and grants."""
+
+    code = "template_missing"
+
+
+class MigratorCredentialsMissing(RuntimeError):
+    """``DB_MIGRATOR_USER``/``DB_MIGRATOR_PASSWORD`` are not set: the migrator never runs as ``default``'s role."""
+
+    code = "migrator_credentials_missing"
+
+
+@dataclass(frozen=True)
+class CodeMigrations:
+    """This code's migrations: every app's leaf and every node of the graph."""
+
+    leaves: dict[str, str]
+    nodes: frozenset[tuple[str, str]]
 
 
 @dataclass(frozen=True)
@@ -222,9 +249,10 @@ def _forwards_plan(executor: MigrationExecutor, app_labels, where: str) -> tuple
 # ── What a hub's database holds ────────────────────────────────────────────────────────────────────────────────
 
 
-def code_leaves() -> dict[str, str]:
-    """``{app label: its leaf migration}`` in this code."""
-    return dict(MigrationLoader(None, ignore_no_migrations=True).graph.leaf_nodes())
+def code_migrations() -> CodeMigrations:
+    """This code's migration graph: ``{app label: its leaf}`` and every ``(app label, migration)``."""
+    graph = MigrationLoader(None, ignore_no_migrations=True).graph
+    return CodeMigrations(leaves=dict(graph.leaf_nodes()), nodes=frozenset(graph.nodes))
 
 
 def hub_apps() -> frozenset[str]:
@@ -319,18 +347,24 @@ def templates(control: str | None = None) -> list[Template]:
     return [platform, *verticals]
 
 
-def is_behind(hub, leaves: dict[str, str] | None = None) -> bool:
+def is_behind(hub, code: CodeMigrations | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 
-    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). A label the
-    code does not know (a rollback's) is ignored. Opens no database.
+    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). A label or a
+    migration the code does not have (a later code's, after a rollback: the database is ahead) is not behind. Opens no
+    database.
     """
     if hub.schema_state == Hub.SchemaState.BEHIND:
         return True
-    leaves = code_leaves() if leaves is None else leaves
+    code = code_migrations() if code is None else code
     recorded = hub.schema_apps or {}
-    labels = set(platform_apps()) | {label for label in recorded if label in leaves}
-    return any(recorded.get(label) != leaves.get(label) for label in labels)
+    for label in set(platform_apps()) | {label for label in recorded if label in code.leaves}:
+        name = recorded.get(label)
+        if name is None:
+            return True
+        if (label, name) in code.nodes and name != code.leaves[label]:
+            return True
+    return False
 
 
 # ── The servers: the settings' own and control's clusters ─────────────────────────────────────────────────────
@@ -340,13 +374,21 @@ def migrator_credentials(cluster) -> tuple[str, str]:
     """The migrator's user and password on ``cluster`` (``None``: the settings' own server).
 
     The environment's ``DB_MIGRATOR_USER``/``DB_MIGRATOR_PASSWORD`` (the worker's and the ``hub-migrate`` task's,
-    aws ``apps.tf``), else ``default``'s (local development and the tests, where one role does everything). A
+    aws ``apps.tf``; the tests', ``config/settings_pytest.py``). Without them it refuses
+    (``MigratorCredentialsMissing``): ``default`` is ``hub_app`` in the web and the worker. Only local development
+    (``DEBUG``, compose's Postgres, one role for everything, as db-bootstrap's local mode) takes ``default``'s. A
     cluster's own secret (``Cluster.secret_name``) plugs in here.
     """
-    settings = connections.settings[DEFAULT_DB_ALIAS]
-    return (
-        decouple.config("DB_MIGRATOR_USER", default=settings["USER"]),
-        decouple.config("DB_MIGRATOR_PASSWORD", default=settings["PASSWORD"]),
+    user = decouple.config("DB_MIGRATOR_USER", default="")
+    password = decouple.config("DB_MIGRATOR_PASSWORD", default="")
+    if user and password:
+        return user, password
+    if django_settings.DEBUG:
+        settings = connections.settings[DEFAULT_DB_ALIAS]
+        return settings["USER"], settings["PASSWORD"]
+    raise MigratorCredentialsMissing(
+        "DB_MIGRATOR_USER and DB_MIGRATOR_PASSWORD are not set: the migrator runs only as hub_migrator, never as "
+        "the database user of the web (the hub-migrate task and the worker have them)."
     )
 
 
@@ -388,34 +430,50 @@ def clusters_to_migrate(*, credentials: Callable | None = None) -> list[ClusterT
 
 
 def _ddl_alias(db_name: str, target: ClusterTarget) -> str:
-    """The migrator's alias of ``db_name`` on ``target``: direct, no pool, closed after use.
+    """The migrator's alias of ``db_name`` on ``target``: direct, no pool; forgotten after use (``_forget_alias``).
 
     ``<db_name>__ddl`` on the settings' own server (``base.tenancy.connections.register_ddl_alias``'s);
-    ``<db_name>__<cluster>__ddl`` on a cluster, where a template has the same name as on any other.
+    ``<db_name>__<cluster>__ddl`` on a cluster, where a template has the same name as on any other. It is registered
+    and this thread's connection made under ``base.tenancy.connections``' lock, so another thread forgetting it in
+    between never leaves this one without it.
     """
     names.validate(db_name, control=target.control)
     cluster = "" if target.cluster_id is None else f"__{target.cluster_id.hex}"
     alias = f"{db_name}{cluster}{names.DDL_SUFFIX}"
     reach = {"HOST": target.host, "PORT": target.port, "USER": target.migrator_user}
-
-    def build() -> dict:
-        settings = copy.deepcopy(connections.settings[DEFAULT_DB_ALIAS]) | reach | {
-            "NAME": db_name,
-            "PASSWORD": target.migrator_password,
-            "CONN_MAX_AGE": 0,
-            "DISABLE_SERVER_SIDE_CURSORS": True,
-        }
-        settings["OPTIONS"].pop("pool", None)
-        return settings
-
-    tenancy_connections._register(alias, build)
-    registered = connections.settings[alias]
-    if {key: str(registered[key]) for key in reach} != {key: str(value) for key, value in reach.items()}:
-        raise tenancy_connections.HubAliasConflict(
-            f"{alias} already reaches {registered['USER']}@{registered['HOST']}:{registered['PORT']} in this "
-            f"process, not the migrator's {target.migrator_user}@{target.host}:{target.port}."
-        )
+    with tenancy_connections._lock:
+        registered = connections.settings.get(alias)
+        if registered is None:
+            settings = copy.deepcopy(connections.settings[DEFAULT_DB_ALIAS]) | reach | {
+                "NAME": db_name,
+                "PASSWORD": target.migrator_password,
+                "CONN_MAX_AGE": 0,
+                "DISABLE_SERVER_SIDE_CURSORS": True,
+            }
+            settings["OPTIONS"].pop("pool", None)
+            connections.settings = {**connections.settings, alias: settings}
+        elif {key: str(registered[key]) for key in reach} != {key: str(value) for key, value in reach.items()}:
+            raise tenancy_connections.HubAliasConflict(
+                f"{alias} already reaches {registered['USER']}@{registered['HOST']}:{registered['PORT']} in this "
+                f"process, not the migrator's {target.migrator_user}@{target.host}:{target.port}."
+            )
+        connections[alias]  # this thread's connection, made while the alias is surely there
     return alias
+
+
+def _forget_alias(alias: str) -> None:
+    """Close this thread's connection of ``alias`` and take the alias out of the settings (under the same lock): a
+    long process would otherwise keep one per hub it ever migrated. Another thread's connection stays its own."""
+    try:
+        connections[alias].close()
+    finally:
+        with tenancy_connections._lock:
+            try:
+                del connections[alias]
+            except AttributeError:
+                pass  # this thread never made one
+            if alias in connections.settings:
+                connections.settings = {key: value for key, value in connections.settings.items() if key != alias}
 
 
 # ── Changing a database's schema ───────────────────────────────────────────────────────────────────────────────
@@ -451,15 +509,29 @@ def ensure_schema(hub, *, add: Iterable[str] = (), lock_wait: float = SCHEMA_LOC
 def ensure_template(
     template: Template, *, target: ClusterTarget | None = None, lock_wait: float = SCHEMA_LOCK_WAIT
 ) -> list[str]:
-    """Create ``template`` on ``target`` (default: the settings' own server) if it is missing (a clone of its
-    ``source``, if any) and bring its apps, and the ones it already has, to the code's leaf; return what it applied.
+    """Bring ``template`` on ``target`` (default: the settings' own server) to the code's leaf: its apps and the ones
+    it already has; return what it applied. A vertical's missing one is cloned from its ``source``, and its access is
+    made its source's (a clone copies no grant of the database); a platform's missing one is ``TemplateMissing``.
     It is never rebuilt: an app that left its list keeps its tables, at the leaf. Nobody stays connected to it
     afterwards, so it can be cloned."""
     target = cluster_target(None) if target is None else target
     if not database_exists(template.db_name, target=target):
-        _create_database(template.db_name, source=template.source, target=target)
+        if template.source is None:
+            raise TemplateMissing(
+                f"{template.db_name} does not exist on {server_of(target)}: run db-bootstrap there "
+                "(manage.py bootstrap_databases), the only one that makes a platform's template, with its roles, "
+                "grants and default privileges."
+            )
+        _clone(template.db_name, template.source, target)
+    if template.source is not None:
+        _copy_access(template.db_name, template.source, target)
     applied, _has = _migrate_database(template.db_name, target, lambda found: set(template.apps) | found, lock_wait)
     return applied
+
+
+def server_of(target: ClusterTarget) -> str:
+    """How the messages name ``target``: its cluster, or the settings' server."""
+    return f"cluster {target.name}" if target.name else "the settings' server"
 
 
 def pending_template(template: Template, *, target: ClusterTarget | None = None) -> list[str]:
@@ -480,7 +552,7 @@ def pending_template(template: Template, *, target: ClusterTarget | None = None)
         _targets, plan = _forwards_plan(executor, set(template.apps) | found, alias)
         return [f"{migration.app_label}.{migration.name}" for migration, _backwards in plan]
     finally:
-        connections[alias].close()
+        _forget_alias(alias)
 
 
 def _migrate_database(
@@ -508,7 +580,7 @@ def _migrate_database(
                 logger.warning("migrate_hubs: the schema lock of %s could not be released; closing.", db_name)
     finally:
         # Closing ends the session, and with it any lock it still held.
-        connection.close()
+        _forget_alias(alias)
 
 
 def _take_schema_lock(connection, db_name: str, wait: float) -> None:
@@ -561,19 +633,69 @@ def database_exists(db_name: str, *, target: ClusterTarget | None = None) -> boo
         return conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", [db_name]).fetchone() is not None
 
 
-def _create_database(db_name: str, *, source: str | None, target: ClusterTarget) -> None:
-    control = target.control
-    if source is None:
-        statement = sql.SQL("CREATE DATABASE {}").format(names.identifier(db_name, control=control))
-    else:
-        statement = sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
-            names.identifier(db_name, control=control), names.identifier(source, control=control)
-        )
+def _clone(db_name: str, source: str, target: ClusterTarget) -> None:
+    """``CREATE DATABASE db_name TEMPLATE source`` on ``target``, tried again while someone holds ``source`` (55006,
+    ``CLONE_ATTEMPTS`` times); one another run made meanwhile (42P04) is no failure."""
+    for attempt in range(1, CLONE_ATTEMPTS + 1):
+        try:
+            _clone_once(db_name, source, target)
+            return
+        except pg_errors.ObjectInUse:
+            if attempt == CLONE_ATTEMPTS:
+                raise
+            logger.warning("migrate_hubs: %s is in use; cloning %s again (attempt %d).", source, db_name, attempt)
+        time.sleep(CLONE_RETRY_DELAY)
+
+
+def _clone_once(db_name: str, source: str, target: ClusterTarget) -> None:
+    statement = sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+        names.identifier(db_name, control=target.control), names.identifier(source, control=target.control)
+    )
     with _ops(target) as conn:
         try:
             conn.execute(statement)
         except pg_errors.DuplicateDatabase:
             logger.info("migrate_hubs: %s was created meanwhile by another run.", db_name)
+
+
+_ACCESS = (
+    "SELECT CASE WHEN a.grantee = 0 THEN '' ELSE pg_get_userbyid(a.grantee) END, a.privilege_type, a.is_grantable "
+    "FROM pg_database d, aclexplode(coalesce(d.datacl, acldefault('d', d.datdba))) a "
+    "WHERE d.datname = %s AND a.grantee <> d.datdba"
+)
+
+
+def _copy_access(db_name: str, source: str, target: ClusterTarget) -> None:
+    """Make who may reach ``db_name`` exactly who may reach ``source`` (its owner aside): a clone gets PUBLIC's
+    default access, never its source's grants, and a template open to PUBLIC lets every role of the cluster in."""
+    control = target.control
+    with _ops(target) as conn:
+        want = set(conn.execute(_ACCESS, [source]).fetchall())
+        have = set(conn.execute(_ACCESS, [db_name]).fetchall())
+        database = names.identifier(db_name, control=control)
+        for grantee, privilege, _grantable in sorted(have - want):
+            conn.execute(
+                sql.SQL("REVOKE {} ON DATABASE {} FROM {}").format(_privilege(privilege), database, _grantee(grantee))
+            )
+        for grantee, privilege, grantable in sorted(want - have):
+            conn.execute(
+                sql.SQL("GRANT {} ON DATABASE {} TO {}{}").format(
+                    _privilege(privilege),
+                    database,
+                    _grantee(grantee),
+                    sql.SQL(" WITH GRANT OPTION") if grantable else sql.SQL(""),
+                )
+            )
+
+
+def _privilege(privilege: str) -> sql.SQL:
+    if privilege not in DATABASE_PRIVILEGES:
+        raise ValueError(f"{privilege!r} is no privilege of a database.")
+    return sql.SQL(privilege)
+
+
+def _grantee(role: str) -> sql.Composable:
+    return sql.SQL("PUBLIC") if role == "" else sql.Identifier(role)
 
 
 # ── The hubs' pass of migrate_hubs ─────────────────────────────────────────────────────────────────────────────
@@ -593,8 +715,8 @@ def migrate_hubs_behind(*, workers: int = HUB_WORKERS) -> HubsPass:
     """``ensure_schema`` of every hub behind: ERPlora's own first, then the rest ``workers`` at a time. A hub that
     fails is marked ``behind`` (its traceback logged) and the others go on."""
     every = hubs_with_a_database()
-    leaves = code_leaves()
-    behind = [hub for hub in every if is_behind(hub, leaves)]
+    code = code_migrations()
+    behind = [hub for hub in every if is_behind(hub, code)]
     result = HubsPass(up_to_date=len(every) - len(behind))
     first = [hub for hub in behind if hub.is_platform]
     rest = [hub for hub in behind if not hub.is_platform]

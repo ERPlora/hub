@@ -67,6 +67,7 @@ def templates_built(django_db_setup, django_db_blocker):
         patch.setattr(migrator, "templates", small_templates)
         before = connections.settings
         try:
+            hubs.bootstrap_template(small_templates()[0].db_name)  # db-bootstrap's, never the migrator's
             for template in small_templates():
                 migrator.ensure_template(template)
         finally:
@@ -151,6 +152,7 @@ def test_a_run_goes_control_then_templates_then_the_hubs_behind(small, new_datab
     out = migrate_hubs()
 
     assert order == ["migrate_control", "ensure_template", "ensure_template", "ensure_schema"]
+    assert [alias for alias in connections.settings if alias.endswith(names.DDL_SUFFIX)] == []
     assert "migrate_hubs: hubs: 1 migrated, 0 left behind, 0 up to date." in out
     hub.refresh_from_db()
     assert hub.schema_apps == at_the_leaf()
@@ -269,6 +271,20 @@ def test_a_lock_timeout_is_tried_again_up_to_three_times(small, make_hub, monkey
     assert stuck.schema_state == Hub.SchemaState.BEHIND
 
 
+def test_a_missing_platform_template_stops_the_run_before_any_hub(small, template_name, make_hub, monkeypatch):
+    missing = migrator.Template(db_name=template_name(), apps=PLATFORM)
+    monkeypatch.setattr(migrator, "templates", lambda control=None: [missing, *small_templates(control)[1:]])
+    make_hub(missing_database())
+    touched = []
+    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: touched.append(hub))
+
+    with pytest.raises(CommandError, match=f"{missing.db_name} does not exist on the settings' server: run db-boot"):
+        migrate_hubs()
+
+    assert touched == []
+    assert not migrator.database_exists(missing.db_name)
+
+
 def test_a_template_that_fails_stops_the_run_before_any_hub(small, make_hub, monkeypatch):
     make_hub(missing_database())
     touched = []
@@ -307,12 +323,14 @@ def test_every_server_gets_its_templates_and_each_hub_migrates_on_its_own(
 
     monkeypatch.setattr(migrator, "clusters_to_migrate", apart)
     made = [template.db_name for template in small_templates(second_control)]
+    hubs.bootstrap_template(made[0], control=second_control)  # db-bootstrap ran on the second cluster
     try:
         out = migrate_hubs()
 
         for name in made:
             assert hubs.table_names(name) >= hubs.hub_tables(PLATFORM)
             assert f"migrate_hubs: template {name} on cluster {second.name}: " in out
+        assert hubs.database_access(made[1]) == hubs.database_access(made[0])
         assert "closed-empty.invalid" not in {host for host, _name in opened_at}
         assert {host for host, name in opened_at if name == new_database} == {other_host}
         hub.refresh_from_db()
@@ -387,17 +405,32 @@ def test_check_sees_a_new_migration_of_a_templates_app(small, db):
     assert out.splitlines() == [f"migrate_hubs: unapplied migrations in {vertical}:", f"tax.{leaf}"]
 
 
-def test_check_lists_a_missing_template_and_creates_nothing(small, template_name, monkeypatch):
-    extra = migrator.Template(db_name=template_name(), apps=PLATFORM)
+def test_check_lists_a_missing_verticals_template_and_creates_nothing(small, template_name, monkeypatch):
+    extra = migrator.Template(db_name=template_name(), apps=(*PLATFORM, "customer"), source=small[0].db_name)
     monkeypatch.setattr(migrator, "templates", lambda control=None: [*small_templates(control), extra])
 
     status, out = migrate_hubs_check()
 
     lines = out.splitlines()
     assert status == 1
-    assert lines[0] == f"migrate_hubs: {extra.db_name} does not exist; a run creates it and applies:"
-    assert "base.0001_initial" in lines[1:]
+    assert lines[0] == (
+        f"migrate_hubs: {extra.db_name} does not exist; a run clones it from {small[0].db_name} and applies:"
+    )
+    assert "customer.0001_initial" in lines[1:]
     assert not migrator.database_exists(extra.db_name)
+
+
+def test_check_says_a_missing_platform_template_is_db_bootstraps(small, template_name, monkeypatch):
+    missing = migrator.Template(db_name=template_name(), apps=PLATFORM)
+    monkeypatch.setattr(migrator, "templates", lambda control=None: [missing, *small_templates(control)[1:]])
+
+    status, out = migrate_hubs_check()
+
+    assert status == 1
+    assert out.splitlines() == [
+        f"migrate_hubs: {missing.db_name} does not exist on the settings' server: run db-bootstrap there.",
+    ]
+    assert not migrator.database_exists(missing.db_name)
 
 
 def test_check_lists_the_hubs_behind_without_opening_them(small, make_hub):

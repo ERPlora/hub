@@ -99,17 +99,26 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
 - **Las plantillas**, en cada servidor donde viven hubs (`CREATE DATABASE … TEMPLATE` solo clona dentro de uno):
   `<control>_template`, solo la plataforma, y una `<control>_template_<vertical>` por vertical de `base/catalog.py`,
   clonada de la anterior, con las tablas de las apps de su vertical (`template_apps`) y todo apagado (ninguna
-  `AppActivation`). Una que falta se crea; una cuya lista cambió se pone al día, nunca se rehace ni pierde tablas.
+  `AppActivation`). La de la plataforma la crea **solo** `bootstrap_databases` (roles, `vector`, privilegios por
+  defecto, sin acceso para PUBLIC); si falta en un servidor, `migrate_hubs` para con `TemplateMissing` («run
+  db-bootstrap there»). La de una vertical que falta se clona (reintenta mientras otro tenga abierta la de la
+  plataforma, 55006) y recibe los mismos permisos de BD que su origen, porque el clon no copia los `GRANT`; en cada
+  pasada se igualan otra vez. Una cuya lista cambió se pone al día, nunca se rehace ni pierde tablas. En local,
+  `node tests/e2e/database.ts` crea la `<BD>_template` de cada BD de e2e (y `--drop` borra sus plantillas); para la
+  `hub` de desarrollo, `createdb hub_template` en el Postgres de compose (o `bootstrap_databases`).
 - **`manage.py migrate_hubs`** (la tarea `hub-migrate` de cada despliegue): 1) control, bajo su lock; 2) las
   plantillas de cada servidor (`clusters_to_migrate`: sin filas de `Cluster`, el del settings; con ellas, los abiertos
   y los cerrados que aún tienen hubs, y el del settings mientras viva en él un hub sin cluster), como canarios: si una
   falla, no se toca ningún hub; 3) los hubs atrasados según `schema_apps` (un despliegue sin migraciones no abre
   ninguna BD de hub) con BD propia y estado `ready`, `cancelled` o `expired`: primero el de ERPlora y después 4 a la
   vez, cada uno en su servidor; un fallo de `lock_timeout` se reintenta hasta 3 veces, y el hub que falla queda
-  `behind`, no para a los demás y hace salir al comando con código ≠ 0. `--check` no aplica nada: lista lo pendiente
-  de control, de las plantillas (abre cada una) y los hubs atrasados (sin abrirlos), y sale 1 si hay algo. Las
-  credenciales del migrador son `DB_MIGRATOR_USER`/`DB_MIGRATOR_PASSWORD` (en local y en los tests, las de `default`);
-  las de cada cluster se enchufan en `migrator.migrator_credentials`.
+  `behind`, no para a los demás y hace salir al comando con código ≠ 0. Una BD por delante del código (tras un
+  rollback) no cuenta como atrasada. `--check` no aplica nada: lista lo pendiente de control, de las plantillas (abre
+  cada una) y los hubs atrasados (sin abrirlos), y sale 1 si hay algo. Cada alias `__ddl` se olvida tras usarlo. Las
+  credenciales del migrador son `DB_MIGRATOR_USER`/`DB_MIGRATOR_PASSWORD`; sin ellas falla
+  (`MigratorCredentialsMissing`), nunca usa las de `default` (`hub_app` en el web y el worker), salvo en local con
+  `DEBUG` (un solo rol); los tests las fijan en `config/settings_pytest.py`. Las de cada cluster se enchufan en
+  `migrator.migrator_credentials`.
 - **Quién abre el contexto**: `HubDatabaseMiddleware` (cada petición: el hub del host; en `hubs.localhost`, el hub
   elegido en el admin o la BD compartida), `HubContextBuilder.enter` (cada re-ejecución viva, en el hilo del ejecutor),
   `/ws/print`, las puertas de `/internal`, el worker y los comandos. Una sesión vale solo en el host donde se abrió

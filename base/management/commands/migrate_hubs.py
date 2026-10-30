@@ -109,8 +109,8 @@ class Command(BaseCommand):
                 for template, target, exists in templates
             ]
             every = migrator.hubs_with_a_database()
-            leaves = migrator.code_leaves()
-            behind = [hub for hub in every if migrator.is_behind(hub, leaves)]
+            code = migrator.code_migrations()
+            behind = [hub for hub in every if migrator.is_behind(hub, code)]
         except Exception as error:
             logger.exception("migrate_hubs --check: the databases could not be read.")
             raise CommandError(f"migrate_hubs --check: the databases could not be read: {error}") from error
@@ -121,12 +121,13 @@ class Command(BaseCommand):
             if not missing:
                 continue
             if exists:
-                lines.append(f"migrate_hubs: unapplied migrations in {template.db_name}{_on(target)}:")
+                lines += [f"migrate_hubs: unapplied migrations in {template.db_name}{_on(target)}:", *missing]
+            elif template.source is None:
+                where = migrator.server_of(target)
+                lines.append(f"migrate_hubs: {template.db_name} does not exist on {where}: run db-bootstrap there.")
             else:
-                lines.append(
-                    f"migrate_hubs: {template.db_name}{_on(target)} does not exist; a run creates it and applies:"
-                )
-            lines += missing
+                clones = f"a run clones it from {template.source} and applies:"
+                lines += [f"migrate_hubs: {template.db_name}{_on(target)} does not exist; {clones}", *missing]
         if behind:
             lines += ["migrate_hubs: hubs behind the code:", *(f"{hub.slug} ({hub.db_name})" for hub in behind)]
         if not lines:

@@ -26,6 +26,7 @@ from base import catalog
 from base.models import AppActivation
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import migrator, names
+from base.tenancy.bootstrap import admin_conninfo as bootstrap_conninfo
 from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import (  # noqa: F401 (fixtures)
     committed_database,
@@ -172,6 +173,37 @@ def test_the_open_clusters_and_the_closed_ones_with_hubs_are_migrated_through_th
     assert "its-secret" not in repr(target)  # never in a log or a test's report
 
 
+def test_without_the_migrators_credentials_it_refuses_never_falling_back_to_defaults(settings, monkeypatch):
+    """The web's and the worker's ``default`` is ``hub_app``: the migrator never runs as it (review of hub#469)."""
+    settings.DEBUG = False
+    monkeypatch.setenv("DB_MIGRATOR_USER", "")
+    monkeypatch.setenv("DB_MIGRATOR_PASSWORD", "")
+
+    with pytest.raises(migrator.MigratorCredentialsMissing, match="DB_MIGRATOR_USER") as raised:
+        migrator.migrator_credentials(None)
+
+    assert raised.value.code == "migrator_credentials_missing"
+
+
+def test_the_migrators_credentials_come_from_the_environment(settings, monkeypatch):
+    settings.DEBUG = False
+    monkeypatch.setenv("DB_MIGRATOR_USER", "hub_migrator")
+    monkeypatch.setenv("DB_MIGRATOR_PASSWORD", "its-password")
+
+    assert migrator.migrator_credentials(None) == ("hub_migrator", "its-password")
+
+
+def test_local_development_migrates_as_its_one_role(settings, monkeypatch):
+    """``DEBUG`` (a developer's machine, compose's Postgres): one role does everything, as in db-bootstrap's local
+    mode."""
+    settings.DEBUG = True
+    monkeypatch.setenv("DB_MIGRATOR_USER", "")
+    monkeypatch.setenv("DB_MIGRATOR_PASSWORD", "")
+    default = connections.settings["default"]
+
+    assert migrator.migrator_credentials(None) == (default["USER"], default["PASSWORD"])
+
+
 def test_the_settings_own_server_stays_while_a_hub_without_a_cluster_lives_on_it(make_cluster, make_hub):
     cluster = make_cluster("open")
     make_hub(names.hub_db_name(control(), uuid.uuid7()))  # on the settings' own server
@@ -182,7 +214,9 @@ def test_the_settings_own_server_stays_while_a_hub_without_a_cluster_lives_on_it
 
 def test_a_template_is_made_on_the_server_it_is_asked_for(template_name, opened_at, monkeypatch):
     target = replace(migrator.clusters_to_migrate()[0], host=same_server_by_another_name())
-    template = migrator.Template(db_name=template_name(), apps=PLATFORM)
+    platform = migrator.Template(db_name=template_name(), apps=PLATFORM)
+    hubs.bootstrap_template(platform.db_name)
+    template = migrator.Template(db_name=template_name(), apps=PLATFORM, source=platform.db_name)
     ops_hosts = []
     connect = psycopg.connect
 
@@ -436,39 +470,125 @@ def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
     assert not migrator.is_behind(Hub(schema_apps=current))
     assert migrator.is_behind(Hub(schema_apps={}))  # never confirmed
     assert migrator.is_behind(Hub(schema_apps={**current, "base": "0001_initial"}))
-    assert migrator.is_behind(Hub(schema_apps={**current, "tax": "0000_older"}))
+    assert migrator.is_behind(Hub(schema_apps={**current, "tax": "0001_initial"}))  # an older one of the code
     assert migrator.is_behind(Hub(schema_apps=current, schema_state=Hub.SchemaState.BEHIND))
     assert not migrator.is_behind(Hub(schema_apps={**current, "gone": "0009_later"}))  # a rollback's unknown label
+    # A later code's migration (after a rollback): the database is ahead, not behind.
+    assert not migrator.is_behind(Hub(schema_apps={**current, "base": "0099_from_a_later_code"}))
 
 
 # ── Templates ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_a_new_template_is_created_and_migrated_with_every_app_off(template_name):
-    template = migrator.Template(db_name=template_name(), apps=(*PLATFORM, "tax"))
-
-    applied = migrator.ensure_template(template)
-
-    assert "base.0001_initial" in applied
-    assert hubs.table_names(template.db_name) == tables_of(template.apps)
-    assert rows(template.db_name, AppActivation._meta.db_table) == 0  # proposal (h): everything off
-    assert sessions_on(template.db_name) == 0  # nobody connected: it can be cloned
-
-
-def test_a_verticals_template_is_cloned_from_the_platforms_then_gets_its_apps(template_name):
+def platform_and_vertical(template_name, apps=("tax",)) -> tuple[migrator.Template, migrator.Template]:
+    """A platform's template as db-bootstrap leaves it, migrated, and a vertical's (not made yet) cloned from it."""
     platform = migrator.Template(db_name=template_name(), apps=PLATFORM)
+    hubs.bootstrap_template(platform.db_name)
     migrator.ensure_template(platform)
-    vertical = migrator.Template(db_name=template_name(), apps=(*PLATFORM, "tax"), source=platform.db_name)
+    return platform, migrator.Template(db_name=template_name(), apps=(*PLATFORM, *apps), source=platform.db_name)
+
+
+def test_a_missing_platform_template_is_refused_naming_its_server(template_name, make_cluster):
+    """Only db-bootstrap makes a platform's template, with its roles, grants and default privileges (ruling of the
+    review of hub#469): a plain one would let every role of the cluster in, and stay so."""
+    template = migrator.Template(db_name=template_name(), apps=PLATFORM)
+    cluster = make_cluster("second")
+    on_cluster = migrator.cluster_target(cluster)
+
+    with pytest.raises(migrator.TemplateMissing, match="db-bootstrap") as settings_own:
+        migrator.ensure_template(template)
+    with pytest.raises(migrator.TemplateMissing, match=f"cluster {cluster.name}"):
+        migrator.ensure_template(template, target=on_cluster)
+
+    assert "the settings' server" in str(settings_own.value)
+    assert settings_own.value.code == "template_missing"
+    assert database_oid(template.db_name) is None
+
+
+def test_a_verticals_template_is_cloned_from_the_platforms_with_every_app_off(template_name):
+    platform, vertical = platform_and_vertical(template_name)
 
     applied = migrator.ensure_template(vertical)
 
     assert applied and all(name.split(".")[0] not in PLATFORM for name in applied)  # the platform came cloned
     assert hubs.table_names(vertical.db_name) == tables_of(vertical.apps)
-    assert sessions_on(platform.db_name) == sessions_on(vertical.db_name) == 0
+    assert rows(vertical.db_name, AppActivation._meta.db_table) == 0  # proposal (h): everything off
+    assert sessions_on(platform.db_name) == sessions_on(vertical.db_name) == 0  # nobody connected: both clonable
+
+
+def test_a_verticals_template_gets_its_platforms_access_never_publics(template_name):
+    """``CREATE DATABASE … TEMPLATE`` copies no grant of the database: PUBLIC would connect to the new one."""
+    platform, vertical = platform_and_vertical(template_name)
+
+    migrator.ensure_template(vertical)
+
+    assert hubs.database_access(vertical.db_name) == hubs.database_access(platform.db_name)
+    with hubs._maintenance() as conn:
+        allowed = conn.execute(
+            "SELECT has_database_privilege(%s, %s, 'CONNECT'), has_database_privilege(%s, %s, 'CONNECT')",
+            ["pg_read_all_settings", vertical.db_name, hubs.TEMPLATE_GRANTEE, vertical.db_name],
+        ).fetchone()
+    assert allowed == (False, True)
+
+
+def test_a_verticals_template_made_open_before_is_closed_on_the_next_run(template_name):
+    platform, vertical = platform_and_vertical(template_name)
+    with hubs._maintenance() as conn:  # as a template made before this fix: PUBLIC's default access, nobody else's
+        conn.execute(
+            psycopg.sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                psycopg.sql.Identifier(vertical.db_name), psycopg.sql.Identifier(platform.db_name)
+            )
+        )
+        conn.execute(
+            psycopg.sql.SQL("GRANT CREATE ON DATABASE {} TO pg_read_all_settings").format(
+                psycopg.sql.Identifier(vertical.db_name)
+            )
+        )
+
+    migrator.ensure_template(vertical)
+
+    assert hubs.database_access(vertical.db_name) == hubs.database_access(platform.db_name)
+
+
+def test_a_clone_waits_for_whoever_holds_its_source_a_bounded_number_of_times(template_name, monkeypatch):
+    """55006 («source database … is being accessed by other users», PLAN-DB §6): PostgreSQL itself waits 5 s."""
+    platform, vertical = platform_and_vertical(template_name)
+    monkeypatch.setattr(migrator, "CLONE_RETRY_DELAY", 0.2)
+    holder = psycopg.connect(**(bootstrap_conninfo() | {"dbname": platform.db_name}), autocommit=True)
+    releaser = threading.Timer(6.5, holder.close)  # past the 5 s of PostgreSQL's own wait: one failed attempt
+    releaser.start()
+    try:
+        migrator.ensure_template(vertical)
+    finally:
+        releaser.cancel()
+        holder.close()
+
+    assert hubs.table_names(vertical.db_name) == tables_of(vertical.apps)
+
+
+def test_a_clone_gives_up_after_its_attempts(template_name, monkeypatch):
+    platform, vertical = platform_and_vertical(template_name)
+    monkeypatch.setattr(migrator, "CLONE_ATTEMPTS", 2)
+    monkeypatch.setattr(migrator, "CLONE_RETRY_DELAY", 0)
+    attempts = []
+    real = migrator._clone_once
+
+    def counted(*args, **kwargs):
+        attempts.append(1)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(migrator, "_clone_once", counted)
+    with psycopg.connect(**(bootstrap_conninfo() | {"dbname": platform.db_name}), autocommit=True):
+        with pytest.raises(psycopg.errors.ObjectInUse):
+            migrator.ensure_template(vertical)
+
+    assert len(attempts) == 2
+    assert database_oid(vertical.db_name) is None
 
 
 def test_a_template_whose_list_changed_is_brought_up_to_date_never_rebuilt(template_name):
     name = template_name()
+    hubs.create_database(name)
     migrator.ensure_template(migrator.Template(db_name=name, apps=(*PLATFORM, "tax")))
     oid = database_oid(name)
 
@@ -482,6 +602,7 @@ def test_a_template_whose_list_changed_is_brought_up_to_date_never_rebuilt(templ
 
 def test_an_app_that_left_a_templates_list_is_still_brought_to_the_leaf(template_name):
     name = template_name()
+    hubs.create_database(name)
     migrator.ensure_template(migrator.Template(db_name=name, apps=PLATFORM))
     migrate_to(name, ("tax", "0001_initial"))  # on an older list, at an older code
 
@@ -491,17 +612,21 @@ def test_an_app_that_left_a_templates_list_is_still_brought_to_the_leaf(template
 
 
 def test_a_template_another_run_created_meanwhile_is_migrated_not_refused(template_name, monkeypatch):
-    """Two overlapping deploys may both find it missing: the second ``CREATE DATABASE`` (42P04) is not a failure."""
-    template = migrator.Template(db_name=template_name(), apps=PLATFORM)
-    hubs.create_database(template.db_name)
-    monkeypatch.setattr(migrator, "database_exists", lambda name, **kwargs: False)
+    """Two overlapping deploys may both find it missing: the second clone (42P04) is not a failure."""
+    platform, vertical = platform_and_vertical(template_name)
+    hubs.create_database(vertical.db_name)
+    exists = migrator.database_exists
+    monkeypatch.setattr(
+        migrator, "database_exists", lambda name, **kwargs: False if name == vertical.db_name else exists(name, **kwargs)
+    )
 
-    assert "base.0001_initial" in migrator.ensure_template(template)
-    assert hubs.table_names(template.db_name) == tables_of(PLATFORM)
+    assert "base.0001_initial" in migrator.ensure_template(vertical)
+    assert hubs.table_names(vertical.db_name) == tables_of(vertical.apps)
 
 
 def test_pending_lists_what_a_template_lacks_and_applies_nothing(template_name):
     template = migrator.Template(db_name=template_name(), apps=(*PLATFORM, "tax"))
+    hubs.create_database(template.db_name)
     migrator.ensure_template(template)
     leaf = leaves()["tax"]
     with hubs._maintenance(template.db_name) as conn:  # as if the code had just gained tax's leaf
@@ -512,7 +637,7 @@ def test_pending_lists_what_a_template_lacks_and_applies_nothing(template_name):
     assert sessions_on(template.db_name) == 0
 
 
-def test_pending_of_a_missing_template_is_what_creating_it_applies_and_creates_nothing(template_name):
+def test_pending_of_a_missing_template_is_what_making_it_applies_and_creates_nothing(template_name):
     template = migrator.Template(db_name=template_name(), apps=PLATFORM)
     leaf = leaves()
 
@@ -520,6 +645,17 @@ def test_pending_of_a_missing_template_is_what_creating_it_applies_and_creates_n
 
     assert {"base.0001_initial", f"base.{leaf['base']}", f"live.{leaf['live']}"} <= set(pending)
     assert database_oid(template.db_name) is None
+
+
+def test_the_migrator_leaves_no_alias_of_its_own_registered(template_name, new_database, make_hub):
+    """Each ``__ddl`` alias is forgotten once used: one left in the settings breaks every later test case, and in a
+    long process every hub would leave one."""
+    platform, vertical = platform_and_vertical(template_name)
+    migrator.ensure_template(vertical)
+    migrator.pending_template(vertical)
+    migrator.ensure_schema(make_hub(new_database))
+
+    assert [alias for alias in connections.settings if alias.endswith(names.DDL_SUFFIX)] == []
 
 
 def test_the_migrator_never_drops_anything():

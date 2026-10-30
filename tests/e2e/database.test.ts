@@ -33,6 +33,11 @@ function fakePostgres(existing: string[], fail: Record<string, string> = {}): { 
       if (created) databases.add(created[1]);
       const dropped = /^drop database if exists "([a-z0-9_]+)"$/.exec(statement);
       if (dropped) databases.delete(dropped[1]);
+      const listed = /^select datname from pg_database where datname like '([a-z0-9_\\]+)%' order by datname$/.exec(statement);
+      if (listed) {
+        const prefix = listed[1].replaceAll('\\', '');
+        return OK([...databases].filter((name) => name.startsWith(prefix)).sort().map((name) => `${name}\n`).join(''));
+      }
       return OK();
     },
   };
@@ -53,17 +58,42 @@ describe('prepareDatabase', () => {
     expect(postgres.statements).toEqual([
       "select 1 from pg_database where datname = 'hub_e2e_8030'",
       'create database "hub_e2e_8030"',
+      "select 1 from pg_database where datname = 'hub_e2e_8030_template'",
+      'create database "hub_e2e_8030_template"',
+      'revoke all on database "hub_e2e_8030_template" from public',
     ]);
     expect(calls).toEqual([['migrate', '--no-input'], ['migrate_hubs'], ['seed_local_hubs']]);
   });
 
   it('only migrates and seeds one that exists: it is idempotent and keeps its rows', () => {
-    const postgres = fakePostgres(['hub_e2e_8030']);
+    const postgres = fakePostgres(['hub_e2e_8030', 'hub_e2e_8030_template']);
     const { manage, calls } = fakeManage();
 
     expect(prepareDatabase('hub_e2e_8030', { sql: postgres.sql, manage })).toEqual({ created: false });
-    expect(postgres.statements).toEqual(["select 1 from pg_database where datname = 'hub_e2e_8030'"]);
+    expect(postgres.statements).toEqual([
+      "select 1 from pg_database where datname = 'hub_e2e_8030'",
+      "select 1 from pg_database where datname = 'hub_e2e_8030_template'",
+    ]);
     expect(calls).toEqual([['migrate', '--no-input'], ['migrate_hubs'], ['seed_local_hubs']]);
+  });
+
+  it("makes the platform's template that db-bootstrap makes in production, which migrate_hubs never creates", () => {
+    // An e2e database of before: migrate_hubs clones each vertical's template from it (base/tenancy/migrator.py).
+    const postgres = fakePostgres(['hub_e2e_8030']);
+
+    expect(prepareDatabase('hub_e2e_8030', { sql: postgres.sql, ...fakeManage() })).toEqual({ created: false });
+    expect(postgres.statements.slice(1)).toEqual([
+      "select 1 from pg_database where datname = 'hub_e2e_8030_template'",
+      'create database "hub_e2e_8030_template"',
+      'revoke all on database "hub_e2e_8030_template" from public',
+    ]);
+
+    const refused = fakePostgres(['hub_e2e_8030'], { 'create database "hub_e2e_8030_template"': 'ERROR:  disk full' });
+    const notMigrated = fakeManage();
+    expect(() => prepareDatabase('hub_e2e_8030', { sql: refused.sql, manage: notMigrated.manage })).toThrow(
+      /^Could not create the template hub_e2e_8030_template of the e2e database hub_e2e_8030[^\n]*\nERROR: {2}disk full/,
+    );
+    expect(notMigrated.calls).toEqual([]);
   });
 
   it('refuses the shared `hub` and every database that is no e2e one, touching nothing', () => {
@@ -116,7 +146,29 @@ describe('dropDatabase', () => {
     dropDatabase('hub_e2e_8030', { sql: postgres.sql });
     dropDatabase('hub_e2e_8030', { sql: postgres.sql });
 
-    expect(postgres.statements).toEqual(['drop database if exists "hub_e2e_8030"', 'drop database if exists "hub_e2e_8030"']);
+    expect(postgres.statements.filter((statement) => statement.startsWith('drop'))).toEqual([
+      'drop database if exists "hub_e2e_8030"',
+      'drop database if exists "hub_e2e_8030"',
+    ]);
+  });
+
+  it("drops its templates after it (migrate_hubs's), never another database's", () => {
+    const postgres = fakePostgres([
+      'hub_e2e_8030',
+      'hub_e2e_8030_template',
+      'hub_e2e_8030_template_restaurant',
+      'hub_e2e_80301_template',
+      'hub_template',
+    ]);
+
+    dropDatabase('hub_e2e_8030', { sql: postgres.sql });
+
+    expect(postgres.statements).toEqual([
+      'drop database if exists "hub_e2e_8030"',
+      "select datname from pg_database where datname like 'hub\\_e2e\\_8030\\_template%' order by datname",
+      'drop database if exists "hub_e2e_8030_template"',
+      'drop database if exists "hub_e2e_8030_template_restaurant"',
+    ]);
   });
 
   it('refuses `hub` and every database that is no e2e one', () => {
@@ -184,7 +236,10 @@ describe('runCli', () => {
     const dropped = io();
     expect(runCli(['--drop'], { database: 'hub_e2e_8030', sql: postgres.sql, manage: fakeManage().manage, ...keyed(), ...dropped })).toBe(0);
     expect(dropped.out).toEqual(['database.ts: hub_e2e_8030 dropped.']);
-    expect(postgres.statements.at(-1)).toBe('drop database if exists "hub_e2e_8030"');
+    expect(postgres.statements.filter((statement) => statement.startsWith('drop'))).toEqual([
+      'drop database if exists "hub_e2e_8030"',
+      'drop database if exists "hub_e2e_8030_template"',
+    ]);
   });
 
   it("leaves the checkout's .env the certificates' key and the secrets' key once the database is ready, and never prints them", () => {
