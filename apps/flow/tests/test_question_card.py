@@ -22,6 +22,7 @@ from ninja import Field, Schema
 
 from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, Question
+from apps.flow.queries import TURN
 from base import relay
 from base.models import Hub, Membership
 from base.schemas import names
@@ -395,5 +396,23 @@ def test_a_no_to_an_ask_someone_first_question_keeps_what_was_asked(clock):
     flow = make_flow(language="es", trigger_kind=Flow.Trigger.MANUAL, steps=[{"id": "s1", "kind": "ask", "title": "Refund?"}])
     ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
     question = Question.objects.get(run_id=ran.id)
+    run("flow.question.answer", {"id": str(question.id), "approve": False})
+    assert history_of(flow, "en") == ("Cancelled: tester answered no to «Refund?».",) * 2
+
+
+def test_an_ask_someone_first_question_after_the_assistant_s_turn_says_no_action(clock, plan):
+    # The step that asks decides, never what the run keeps: a run whose turn still holds a change of the assistant
+    # and asks a person at an «Ask someone first» step (FLOW-F28) says no action, on the card and in the History.
+    from .conftest import make_run
+
+    clock(NOON)
+    steps = [{"id": "s1", "kind": "assistant", "prompt": "Help", "tools": [PLAN.name]}, {"id": "s2", "kind": "ask", "title": "Refund?"}]
+    flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=steps, grants=[PLAN.name])
+    held = {TURN: {"proposal": {"operation": PLAN.name, "arguments": json.dumps(CHORE)}}}
+    ran = make_run(flow, status="asking", step_index=1, outputs=held)
+    question = Question.objects.create(
+        run=ran, flow=flow, step_id="s2", title="Refund?", details="", expires_at=NOON + dt.timedelta(hours=72)
+    )
+    assert (row_of(question, OWNER, "en")["action"], row_of(question, OWNER, "en")["title"]) == ("", "Refund?")
     run("flow.question.answer", {"id": str(question.id), "approve": False})
     assert history_of(flow, "en") == ("Cancelled: tester answered no to «Refund?».",) * 2
