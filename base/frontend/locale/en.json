@@ -299,7 +299,7 @@
         "version": "Version",
         "brings": "It brings",
         "readError": "The file could not be read: {reason}",
-        "tooBig": "the file is larger than 5 MB."
+        "tooBig": "the file is larger than 20 MB."
       },
       "review": {
         "title": "Review what it brings",

@@ -101,8 +101,8 @@ async def plan_usage(request):
 
 
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
-#: The upload's body: 5 MB of zip in base64 (6 990 508 characters) and its JSON around it.
-MAX_BLUEPRINT_BODY = 7_100_000
+#: The upload's body: 20 MB of zip in base64 (27 962 028 characters) and its JSON around it.
+MAX_BLUEPRINT_BODY = 28_100_000
 
 
 @bind(router, "base.blueprint.list", "/settings/data/blueprints")

@@ -299,7 +299,7 @@
         "version": "Versión",
         "brings": "Trae",
         "readError": "No se pudo leer el fichero: {reason}",
-        "tooBig": "el fichero pasa de 5 MB."
+        "tooBig": "el fichero pasa de 20 MB."
       },
       "review": {
         "title": "Revisa lo que trae",

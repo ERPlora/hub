@@ -419,8 +419,8 @@ class PlanUsageOut(Schema):
 
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
 
-#: A file uploaded in base64: 5 MB of zip is 6 990 508 characters.
-FILE_BASE64_MAX = 7_000_000
+#: A file uploaded in base64: 20 MB of zip (``base.blueprint.MAX_FILE_BYTES``) is 27 962 028 characters.
+FILE_BASE64_MAX = 28_000_000
 BlueprintPurpose = Literal["backup", "template"]
 #: How a dataset of a load went: «applied», «partial», «already» (it was there), «failed», «empty» (nothing to copy)
 #: or «discarded» (personal data in a template).
@@ -477,7 +477,7 @@ class BlueprintSourceIn(Schema):
         "",
         max_length=FILE_BASE64_MAX,
         title=gettext_noop("File"),
-        description="A .blueprint.zip in base64 (5 MB at most).",
+        description="A .blueprint.zip in base64 (20 MB at most).",
     )
 
 

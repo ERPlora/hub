@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7887bf12470ca0a799edbd71b509a3dd6a434ab7e94665e29826b73542d356f9 -->
+<!-- generated from WORKBOOK.md sha256:fe72413a33409a090cd49b90e6338ec5295687883ba7d52dc2bc26af2aef5bba -->
 
 ## What it is for and who it is for
 
@@ -968,10 +968,10 @@ Steps:
      template another one exported.
   2. While it is read, the button spins. Then "Review what it brings" opens (BASE-F31).
   3. After an error the same file can be chosen again.
-In: the file, of 5 MB at most.
+In: the file, of 20 MB at most (with the own photos of its products and services, INVENTORY-F33).
 Out: nothing saved until it is loaded.
 If it fails: "The file could not be read: {reason}" with the reason (it is not a .blueprint.zip, it is
-damaged, a newer version of ERPlora made it or it is larger than 5 MB) and it stays on the choice.
+damaged, a newer version of ERPlora made it or it is larger than 20 MB) and it stays on the choice.
 Involved: none
 
 ### BASE-F31 Review and load what the file brings

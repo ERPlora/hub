@@ -599,9 +599,9 @@ msgstr "Tu sesión ha terminado: vuelve a entrar."
 
 # Django 6.1.2 ships these with an empty Spanish translation, so the admin of hubs.erplora.com showed them in English
 # (APP-ACCOUNTS-6). They are Django's messages, not base's: a makemessages of base marks them obsolete, keep them.
-msgid "The file is larger than 5 MB, or holds more than a blueprint can."
+msgid "The file is larger than 20 MB, or holds more than a blueprint can."
 msgstr ""
-"El fichero pesa más de 5 MB, o trae más de lo que cabe en una plantilla."
+"El fichero pesa más de 20 MB, o trae más de lo que cabe en una plantilla."
 
 msgid "This is not a .blueprint.zip file."
 msgstr "No es un fichero .blueprint.zip."
@@ -2009,3 +2009,11 @@ msgstr "La foto pesa más de 2 MB. Elige una más ligera."
 #: images.py
 msgid "The photo could not be saved. Try again."
 msgstr "No se pudo guardar la foto. Inténtalo de nuevo."
+
+#: blueprint.py
+msgid "The file holds a photo that is not a WebP image of up to 2 MB, so it cannot be read."
+msgstr "El fichero trae una foto que no es una imagen WebP de hasta 2 MB, así que no se puede leer."
+
+#: blueprint.py
+msgid "«%(row)s»: its photo is not in the file, so it loads without it."
+msgstr "«%(row)s»: su foto no viene en el archivo, así que entra sin ella."

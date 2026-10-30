@@ -9,8 +9,13 @@ key — a product's categories by name, a table's zone by name — never by an i
 (hub#2626). People, PINs and fiscal data have no dataset: they never travel, and a file that brings them has them
 dropped on reading (``Bundle.dropped``).
 
-- The file: ``manifest.json`` and ``data/<dataset>.json`` in a zip (:func:`read_zip`, :func:`write_zip`), read with
-  limits (5 MB, 50 MB inflated, 200 entries) and refused with a reason the person can read (:class:`BlueprintInvalid`).
+- The file: ``manifest.json``, ``data/<dataset>.json`` and the rows' own photos at ``media/<name>`` in a zip
+  (:func:`read_zip`, :func:`write_zip`), read with limits (20 MB, 100 MB inflated, 1 000 entries) and refused with a
+  reason the person can read (:class:`BlueprintInvalid`).
+- Images (INVENTORY-F33; round 2026-10-30, ``base.images``): an image of the shared library travels as its reference
+  (``catalog:<folder>/<name>``), a photo of a row's own inside the file (:func:`export_media`); loading it copies the
+  photo under a new name through the app's own upload, and a row whose image cannot be set loads without it and is
+  told (:func:`_load_image`).
 - The catalogue: the seeds of ``base/seeds/<vertical>.<language>.json``, one per vertical and language; what a seed
   turns on is its vertical's apps (``base.catalog.template_apps``, PLAN §15.2), what it brings is its own data.
 - :func:`apply` loads a blueprint app by app, each part on its own: a row an app refuses fails alone and is told, the
@@ -52,6 +57,7 @@ from live.errors import InvalidPayload, NotFound, OperationError
 from live.meta import module_configs
 from live.operations import get
 
+from base import images
 from base.catalog import template_apps
 from base.entitlement import blocked_apps
 from base.relay import active_apps
@@ -64,11 +70,17 @@ MANIFEST = "manifest.json"
 PURPOSE_BACKUP = "backup"
 PURPOSE_TEMPLATE = "template"
 PURPOSES = (PURPOSE_BACKUP, PURPOSE_TEMPLATE)
-#: The largest file read (what the person uploads), before anything is inflated.
-MAX_FILE_BYTES = 5 * 1024 * 1024
-#: The most its members may weigh once inflated: a zip bomb stops here, never in memory.
-MAX_INFLATED_BYTES = 50 * 1024 * 1024
-MAX_ENTRIES = 200
+#: The largest file read (what the person uploads), before anything is inflated. A photo travels as the 512 × 512 WebP
+#: it was kept as (``base.images``), 20–60 KB and already compressed, so the zip weighs what its photos weigh: 300
+#: photos of 60 KB are 18 MB, and the rows' JSON a few hundred KB more (round 2026-10-30; it was 5 MB without photos).
+MAX_FILE_BYTES = 20 * 1024 * 1024
+#: The most its members may weigh once inflated: a zip bomb stops here, never in memory. The photos inflate to what
+#: they weigh (≤ 20 MB) and the rows' JSON about ten to one: 100 MB holds both with room.
+MAX_INFLATED_BYTES = 100 * 1024 * 1024
+#: The manifest, a file per dataset and the photos: a thousand photos of 20 KB still fit in :data:`MAX_FILE_BYTES`.
+MAX_ENTRIES = 1000
+#: The heaviest photo one ``media/`` entry may be: what an upload takes (``base.images``).
+MAX_PHOTO_BYTES = images.MAX_UPLOAD_BYTES
 MAX_ROWS = 10_000
 #: The problems told per dataset: the first ones say what to fix; the count says how many.
 MAX_PROBLEMS = 20
@@ -77,6 +89,8 @@ PAGE = 100
 SEEDS_DIR = Path(__file__).resolve().parent / "seeds"
 LABEL_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 DATA_FILE_RE = re.compile(r"^data/([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)\.json$")
+#: A photo of a row's own: ``media/`` and its name under the hub's prefix (``inventory/products/<uuid7 hex>.webp``).
+MEDIA_FILE_RE = re.compile(r"^media/((?:[a-z][a-z0-9_]*/){2}[0-9a-f]{32}\.webp)$")
 #: What a spreadsheet runs as a formula; the customers' export quotes a cell that starts with one (CUSTOMER-F09).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
@@ -90,7 +104,8 @@ ON, TURNS_ON = "on", "turns_on"
 COMPLETE = "complete"
 
 REASONS = {
-    "too_big": _("The file is larger than 5 MB, or holds more than a blueprint can."),
+    "too_big": _("The file is larger than 20 MB, or holds more than a blueprint can."),
+    "bad_photo": _("The file holds a photo that is not a WebP image of up to 2 MB, so it cannot be read."),
     "not_a_blueprint": _("This is not a .blueprint.zip file."),
     "no_manifest": _("The file has no manifest: it was not made by ERPlora."),
     "unreadable": _("The file is damaged or was changed by hand, so it cannot be read."),
@@ -100,6 +115,7 @@ SOMETHING_WENT_WRONG = _("Something went wrong loading this part; nothing else w
 NO_NAME = _("A row has no name.")
 CATEGORY_MISSING = _("«%(row)s»: the category «%(category)s» is not there, so it was left without it.")
 ROW_REFUSED = _("«%(row)s»: %(reason)s")
+PHOTO_MISSING = _("«%(row)s»: its photo is not in the file, so it loads without it.")
 
 
 class BlueprintInvalid(Exception):
@@ -120,6 +136,8 @@ class Bundle:
     manifest: dict
     data: dict[str, list[dict]]
     dropped: list[str] = field(default_factory=list)
+    #: The rows' own photos it carries, by their name under the hub's prefix (``media/<name>`` in the zip).
+    media: dict[str, bytes] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -144,6 +162,8 @@ class Loaded:
     already: int = 0
     failed: int = 0
     problems: list[str] = field(default_factory=list)
+    #: The photos the blueprint carries, for the rows that name one (``Bundle.media``).
+    media: dict[str, bytes] = field(default_factory=dict)
 
     def refuse(self, row: str, reason: str, *, counted: bool = True) -> None:
         if counted:
@@ -212,12 +232,19 @@ def read_zip(content: bytes) -> Bundle:
         if sum(info.file_size for info in members) > MAX_INFLATED_BYTES:
             raise BlueprintInvalid("too_big")
         names = [info.filename for info in members]
-        if any(name != MANIFEST and not DATA_FILE_RE.match(name) for name in names):
+        if any(name != MANIFEST and not DATA_FILE_RE.match(name) and not MEDIA_FILE_RE.match(name) for name in names):
             raise BlueprintInvalid("unreadable")
         if MANIFEST not in names:
             raise BlueprintInvalid("no_manifest")
+        if any(MEDIA_FILE_RE.match(info.filename) and info.file_size > MAX_PHOTO_BYTES for info in members):
+            raise BlueprintInvalid("bad_photo")
         budget = [MAX_INFLATED_BYTES]
         manifest = _manifest(_member_json(archive, MANIFEST, budget))
+        media = {
+            match.group(1): _member_photo(archive, name, budget)
+            for name in names
+            if (match := MEDIA_FILE_RE.match(name)) is not None
+        }
         data: dict[str, list[dict]] = {}
         dropped = []
         for name in names:
@@ -230,16 +257,19 @@ def read_zip(content: bytes) -> Bundle:
                 data[key] = rows
             else:
                 dropped.append(key)
-    return Bundle(manifest=manifest, data=_in_order(data), dropped=sorted(dropped))
+    return Bundle(manifest=manifest, data=_in_order(data), dropped=sorted(dropped), media=media)
 
 
 def write_zip(bundle: Bundle) -> bytes:
-    """The ``.blueprint.zip`` of ``bundle``: its manifest and a file per dataset."""
+    """The ``.blueprint.zip`` of ``bundle``: its manifest, a file per dataset and its photos, stored as they are (a
+    WebP is already compressed)."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(MANIFEST, json.dumps(bundle.manifest, ensure_ascii=False, indent=2))
         for key, rows in _in_order(bundle.data).items():
             archive.writestr(f"data/{key}.json", json.dumps(rows, ensure_ascii=False, indent=1))
+        for name, content in sorted(bundle.media.items()):
+            archive.writestr(f"media/{name}", content, compress_type=zipfile.ZIP_STORED)
     return buffer.getvalue()
 
 
@@ -265,8 +295,8 @@ def manifest(*, name: str, language: str, country: str, purpose: str, created_at
     }
 
 
-def _member_json(archive: zipfile.ZipFile, name: str, budget: list[int]) -> Any:
-    """A member parsed as JSON, read in chunks against what is left of the inflated budget."""
+def _member_bytes(archive: zipfile.ZipFile, name: str, budget: list[int]) -> bytes:
+    """A member's bytes, read in chunks against what is left of the inflated budget."""
     chunks = []
     with archive.open(name) as member:
         while chunk := member.read(65536):
@@ -274,10 +304,24 @@ def _member_json(archive: zipfile.ZipFile, name: str, budget: list[int]) -> Any:
             if budget[0] < 0:
                 raise BlueprintInvalid("too_big")
             chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _member_json(archive: zipfile.ZipFile, name: str, budget: list[int]) -> Any:
+    """A member parsed as JSON, read against what is left of the inflated budget."""
     try:
-        return json.loads(b"".join(chunks).decode("utf-8"))
+        return json.loads(_member_bytes(archive, name, budget).decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
         raise BlueprintInvalid("unreadable") from None
+
+
+def _member_photo(archive: zipfile.ZipFile, name: str, budget: list[int]) -> bytes:
+    """A ``media/`` member: a WebP (a RIFF container of the WEBP kind) of :data:`MAX_PHOTO_BYTES` at most; the app's
+    upload reads it whole when the row loads (``base.images.to_webp``)."""
+    content = _member_bytes(archive, name, budget)
+    if len(content) > MAX_PHOTO_BYTES or content[:4] != b"RIFF" or content[8:12] != b"WEBP":
+        raise BlueprintInvalid("bad_photo")
+    return content
 
 
 def _manifest(raw: Any) -> dict:
@@ -521,7 +565,7 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None,
             if dataset.personal and bundle.manifest["purpose"] != PURPOSE_BACKUP:
                 loads[dataset.key] = _dataset_report(dataset, Loaded(), rows, discarded=True)
                 continue
-            loaded = Loaded()
+            loaded = Loaded(media=bundle.media)
             try:
                 dataset.load(ctx, rows, loaded)
             except Exception:
@@ -627,6 +671,30 @@ def export_data(ctx: OperationContext, chosen: dict[str, list[str]], *, purpose:
             if rows:
                 exported[dataset.key] = rows
     return exported
+
+
+#: The datasets whose rows show an image, and the operations that set one of the library and upload a photo.
+IMAGE_OPERATIONS = {
+    "inventory.product": ("inventory.product.set_image", "inventory.product.upload_image"),
+    "service.service": ("service.service.set_image", "service.service.upload_image"),
+}
+
+
+def export_media(ctx: OperationContext, data: dict[str, list[dict]]) -> dict[str, bytes]:
+    """The photos of its own that the rows of ``data`` show, by name, read from ``ctx``'s hub; a row whose photo the
+    store no longer has travels without it (its ``image`` dropped), never with a reference the file cannot keep."""
+    media = {}
+    for key in IMAGE_OPERATIONS:
+        for row in data.get(key, []):
+            name = images.own_name(row.get("image", ""))
+            if name is None:
+                continue
+            content = images.read_photo(ctx.scope, row["image"])
+            if content is None:
+                del row["image"]
+            else:
+                media[name] = content
+    return media
 
 
 def counts(ctx: OperationContext) -> dict[str, int]:
@@ -760,8 +828,10 @@ def _created(loaded: Loaded, result: Any) -> str:
 
 
 def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, name: str, key: Callable[[dict], str],
-                 existing: set[str], build: Callable[[dict], dict], label: Callable[[dict], str]) -> None:
-    """Create each row by ``name`` unless its natural ``key`` is already there; a refused row fails alone."""
+                 existing: set[str], build: Callable[[dict], dict], label: Callable[[dict], str],
+                 after: Callable[[dict, str], None] | None = None) -> None:
+    """Create each row by ``name`` unless its natural ``key`` is already there; a refused row fails alone. ``after``
+    runs for each row created, with its id (its image)."""
     for row in rows:
         natural = key(row)
         if not natural:
@@ -771,11 +841,33 @@ def _create_each(ctx: OperationContext, rows: list[dict], loaded: Loaded, *, nam
             loaded.already += 1
             continue
         try:
-            _created(loaded, _call(ctx, name, **build(row)))
+            pk = _created(loaded, _call(ctx, name, **build(row)))
         except (OperationError, pydantic.ValidationError) as exc:
             loaded.refuse(label(row), _reason(exc))
             continue
         existing.add(natural)
+        if after is not None:
+            after(row, pk)
+
+
+def _load_image(ctx: OperationContext, loaded: Loaded, dataset_key: str, pk: str, row: dict, label: str) -> None:
+    """Show on the row just created the image its file names: one of the library through the app's ``set_image``, a
+    photo the file carries through its ``upload_image`` (a copy under a new name, within the plan's space). One that
+    cannot be set leaves the row without an image, and the report says why (INVENTORY-F33)."""
+    image = row.get("image")
+    if not isinstance(image, str) or not image.strip():
+        return
+    set_image, upload_image = IMAGE_OPERATIONS[dataset_key]
+    name = images.own_name(image)
+    try:
+        if name is None:
+            _call(ctx, set_image, id=pk, image=image)
+        elif name not in loaded.media:
+            loaded.warn(str(PHOTO_MISSING) % {"row": label})
+        else:
+            _call(ctx, upload_image, id=pk, data_base64=base64.b64encode(loaded.media[name]).decode("ascii"))
+    except (OperationError, pydantic.ValidationError) as exc:
+        loaded.warn(str(ROW_REFUSED) % {"row": label, "reason": _reason(exc)})
 
 
 # ── The datasets ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -826,6 +918,7 @@ def _inventory_product_rows(ctx: OperationContext) -> list[dict]:
             "categories": sorted(names[pk] for pk in row.category_ids if pk in names),
             "track_stock": row.track_stock,
             "is_active": row.is_active,
+            **({"image": row.image} if row.image else {}),
         }
         for row in _pages(ctx, "inventory.product.list")
     ]
@@ -891,6 +984,9 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
             _call(ctx, "inventory.product.update", id=made["id"], **patch)
         except (OperationError, pydantic.ValidationError) as exc:
             loaded.warn(str(ROW_REFUSED) % {"row": sku, "reason": _reason(exc)})
+    for made in by_sku.values():
+        row = made["row"]
+        _load_image(ctx, loaded, "inventory.product", made["id"], row, _text(row, "name") or _text(row, "sku"))
 
 
 # service: categories and services
@@ -933,7 +1029,12 @@ SERVICE_FIELDS = (
 
 def _service_rows(ctx: OperationContext) -> list[dict]:
     return [
-        {"name": row.name, "category": row.category_name or "", **{name: getattr(row, name) for name in SERVICE_FIELDS}}
+        {
+            "name": row.name,
+            "category": row.category_name or "",
+            **{name: getattr(row, name) for name in SERVICE_FIELDS},
+            **({"image": row.image} if row.image else {}),
+        }
         for row in _pages(ctx, "service.service.list")
     ]
 
@@ -948,7 +1049,8 @@ def _service_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> No
         return {"name": _text(row, "name"), "category": _text(row, "category") or None, **fields}
 
     _create_each(ctx, rows, loaded, name="service.service.create", key=lambda row: _key(_text(row, "name")),
-                 existing=existing, build=build, label=lambda row: _text(row, "name"))
+                 existing=existing, build=build, label=lambda row: _text(row, "name"),
+                 after=lambda row, pk: _load_image(ctx, loaded, "service.service", pk, row, _text(row, "name")))
 
 
 # table: zones and tables
