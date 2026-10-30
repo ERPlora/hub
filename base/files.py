@@ -3,7 +3,7 @@
 What the Files screen keeps lives in the hub file store (``storages["hub_files"]``, ``base.storage``: S3 in AWS, the
 disk locally) under the hub's prefix, in a folder of its own: ``hub-<hex>/files/<path>``. The modules keep theirs
 beside it (``website/img/``, ``avatars/``) and the manager never shows nor touches them; nothing of it is public
-(``/p/media/`` serves only the modules' published folders): a file is read through ``base.file.read``, with the
+(``/p/media/`` serves only the folders the apps declare, ``base.media``): a file is read through ``base.file.read``, with the
 session and the permission of who asks.
 
 A *name* is one segment (no ``/``, ``\\``, control character, lone dot, or the folder marker) of 255 UTF-8 bytes at

@@ -36,5 +36,6 @@ class BaseConfig(LiveAppConfig):
 
     def ready(self) -> None:
         # Importing the scheduler registers the check of the apps' scheduled tasks (tag "base"), the print channel the
-        # one of the print hosts' presence (base.E006) and the Home the one of the bell's clock (base.E007).
-        from base import home, scheduler, ws_print  # noqa: F401
+        # one of the print hosts' presence (base.E006), the Home the one of the bell's clock (base.E007) and the file
+        # server the one of the folders the apps declare (base.E010).
+        from base import home, media, scheduler, ws_print  # noqa: F401

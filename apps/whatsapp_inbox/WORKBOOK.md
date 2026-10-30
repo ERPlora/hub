@@ -1191,7 +1191,8 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
 - `TemplateSample` (de cada negocio, `host`): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
   `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
-  `sha256`, tipo, tamaño y nombre. No se sirve en `/p/media/`; una plantilla lo referencia con `PROTECT`.
+  `sha256`, tipo, tamaño y nombre. `/p/media/` lo sirve solo a una sesión del hub (`members_media` de `apps.py`; un
+  visitante recibe 404); una plantilla lo referencia con `PROTECT`.
   Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.MAX_FILE_BYTES`,
   25 MB; Meta admite 100). Un archivo nuevo cabe en el espacio del plan como en Archivos
   (`base.files.space_limit` del `plan.max_storage_bytes` de la foto del SaaS frente a `base.files.used_bytes`,

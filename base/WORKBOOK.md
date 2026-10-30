@@ -2941,7 +2941,7 @@ Implicados: ACCOUNTS-F38
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y
   `base.device.mode_set`, `base.device.list|rename|remove|prune` y `base.access.settings|settings_update`
   (`base.administer_hub`), y `base.profile.get|update|preferences_set|avatar_set|avatar_remove` (la foto, en
-  `avatars/` del almacén del hub, servida solo a una sesión: `MEMBERS_FOLDERS` de `base/media.py`). Eventos
+  `avatars/` del almacén del hub, servida solo a una sesión: `AVATARS_FOLDER` de `base/media.py`). Eventos
   `base.pin.set`, `base.device.mode_changed|renamed|removed|pruned`, `base.access.settings_changed` y
   `base.profile.updated`; `base/live.py` sigue con ellos las caras, los dispositivos, el dial y el perfil.
 - `base/spa.py` incrusta en `hub-home` `access` (`credential`, `switch_user`, `idle_minutes`) y `preferences` (la
@@ -2981,8 +2981,8 @@ Implicados: ACCOUNTS-F38
   además `base.upload_files`) y `delete` (`base.delete_files`). Rutas `/api/files`, `/api/files/raw` (los bytes con
   `Cache-Control: private, no-store`, adjunto salvo `inline` en un tipo que se puede enseñar, CSP `sandbox`; su
   descripción en JSON con `Accept: application/json`) y `/api/files/{upload,folder,rename,move,delete}`; eventos
-  `base.file.*` y consulta viva `base.file.list`. Nunca por `/p/media/` (público y con caché de un año: solo las
-  `PUBLIC_FOLDERS`). Topes: 25 MB por archivo (cuerpo de 35,1 MB en base64), nombre de 255 bytes, carpeta de 100
+  `base.file.*` y consulta viva `base.file.list`. Nunca por `/p/media/` (solo sirve las carpetas que declaran las apps,
+  abajo, y las fotos de las personas). Topes: 25 MB por archivo (cuerpo de 35,1 MB en base64), nombre de 255 bytes, carpeta de 100
   caracteres y ruta de 980 bytes; los programas (`BLOCKED_EXTENSIONS`, la lista de Gmail) se rechazan. Subir nunca pisa:
   la escritura es condicional (`If-None-Match: *` en S3, `O_EXCL` en disco) y, si otra subida del mismo nombre llegó
   antes, toma el siguiente nombre libre. Un listado lee solo la carpeta abierta (`Delimiter` en S3); el árbol de carpetas
@@ -2994,6 +2994,17 @@ Implicados: ACCOUNTS-F38
   enseña. Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
   `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A).
+- **`/p/media/<hex>/<nombre>`** (`base/media.py`, FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES): sirve, desde el
+  host de su hub y nunca el de otro, solo las carpetas del almacén que declara cada app en su `LiveAppConfig`:
+  `public_media` (cualquiera; caché pública de un año: `website/img/`, las imágenes de la web) y `members_media` (solo una
+  sesión de este hub, caché `private`: `whatsapp_inbox/samples/`, el archivo de la cabecera de una plantilla); las fotos de
+  las personas (`AVATARS_FOLDER`, `avatars/`) son de `base`, para las sesiones. Un visitante que pide un archivo de
+  miembros recibe el 404 de uno que no existe; una carpeta de miembros dentro de una pública sigue siendo de miembros, y
+  una app apagada en el negocio (`base.activation.off_apps`) no sirve ninguna de las suyas. Cada carpeta empieza por la
+  etiqueta de su app y una `/`, acaba en `/` y no sube (`..`, `.`, segmento vacío, `\`): una app nunca abre la carpeta de
+  otra. Lo que no cumple no se sirve y `base.E010` lo dice al arrancar. Una app que guarde archivos para enseñarlos los
+  declara ahí, sin tocar `base/`. Tests: `base/tests/test_media.py` (miembro, visitante, otro hub, app apagada, `..` y la
+  carpeta de otra app) y, por app, el suyo (`apps/whatsapp_inbox/tests/test_template_header_file.py`).
 - **Asistente** (APP-BASE-9, BASE-F92…F106; PLAN §30, ronda 2026-10-22b): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
   del shell y del Inicio. `base/assistant.py` (sin ORM) tiene el catálogo de herramientas (`catalog`: toda

@@ -42,6 +42,9 @@ class WhatsappInboxConfig(LiveAppConfig):
         "whatsapp_inbox.configure",
         "whatsapp_inbox.erase",
     ]
+    # The files of the templates' headers (samples.py), which the template's sheet shows to the hub's people only
+    # (base.media serves them at /p/media/ to a session of this hub; a visitor gets a 404).
+    members_media = ["whatsapp_inbox/samples/"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["whatsapp_inbox.*"],

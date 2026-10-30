@@ -538,9 +538,9 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   `innerHTML`; si fallan, se queda lo que pintó el servidor.
 - **Imágenes**: `services.upload_image` valida con Pillow (tipo real, tamaño, píxeles), guarda en
   `storages["hub_files"]` con clave por contenido y responde la URL de `base.media` (`/p/media/<hex>/website/img/…`,
-  caché de un año). `base.media` solo sirve las carpetas públicas (`PUBLIC_FOLDERS`, hoy `website/img/`): el almacén
-  guarda también documentos privados de otros módulos, que nunca salen por ahí; un nombre que es una carpeta en disco
-  responde 404. Al guardar, cada imagen del contenido tiene que ser una subida de este hub y su URL la escribe el
+  caché de un año). `base.media` solo sirve las carpetas que declara cada app: la web declara `website/img/` como pública
+  (`public_media` de `apps.py`); el almacén guarda también documentos privados de otros módulos, que nunca salen por ahí;
+  un nombre que es una carpeta en disco responde 404. Al guardar, cada imagen del contenido tiene que ser una subida de este hub y su URL la escribe el
   servidor.
 - **Reseñas de Google** (`reviews.py`, ronda 2026-10-22, decisión de Ioan: del servidor, sin JS de terceros, que la
   CSP prohíbe): `reviews.parse` lee la entrada (Place ID `ChIJ…`; enlace de Google Maps con `place_id=`,
