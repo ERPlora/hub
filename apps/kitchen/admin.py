@@ -10,7 +10,7 @@ ticket a cook is working on never waits for the cook in a circle.
 """
 
 from django.contrib import admin
-from django.db import transaction
+from live.operations import atomic
 
 from apps.kitchen.models import (
     CategoryRoute,
@@ -59,12 +59,12 @@ class StationAdmin(admin.ModelAdmin):
     )
 
     def delete_model(self, request, obj):
-        with transaction.atomic():
+        with atomic():
             locked_settings()
             super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
-        with transaction.atomic():
+        with atomic():
             locked_settings()
             super().delete_queryset(request, queryset)
 
@@ -217,12 +217,12 @@ class TicketAdmin(admin.ModelAdmin):
     )
 
     def delete_model(self, request, obj):
-        with transaction.atomic():
+        with atomic():
             locked_settings()
             super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
-        with transaction.atomic():
+        with atomic():
             locked_settings()
             super().delete_queryset(request, queryset)
 

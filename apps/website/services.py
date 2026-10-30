@@ -29,12 +29,11 @@ from typing import Any
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
-from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload
-from live.operations import INTERNAL, operation
+from live.operations import INTERNAL, on_commit, operation
 from live.outbox import record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
@@ -138,7 +137,7 @@ def save_site(ctx: OperationContext, data: SaveIn) -> dict:
     new = {"template": data.template, "theme": data.theme.model_dump(), "content": content.model_dump(mode="json")}
     place = reviews_place(new["content"])
     if place is not None and place != reviews_place(site.content or {}):
-        transaction.on_commit(partial(refresh_reviews, ctx.scope, new["content"]), robust=True)
+        on_commit(partial(refresh_reviews, ctx.scope, new["content"]), robust=True)
     if created or draft(site) != new:
         site.template, site.theme, site.content = new["template"], new["theme"], new["content"]
         site.updated_by = _actor(ctx)
@@ -177,8 +176,8 @@ def publish_site(ctx: OperationContext, data: NoIn) -> dict:
     site.updated_by = _actor(ctx)
     site.save()
     record_event(ctx, events.SITE_PUBLISHED, {"id": str(site.id), "version": site.published_version})
-    transaction.on_commit(partial(forget_cached, ctx.scope.key, previous, business_currency(ctx.scope)), robust=True)
-    transaction.on_commit(partial(refresh_reviews, ctx.scope, site.published_content["content"], again=True), robust=True)
+    on_commit(partial(forget_cached, ctx.scope.key, previous, business_currency(ctx.scope)), robust=True)
+    on_commit(partial(refresh_reviews, ctx.scope, site.published_content["content"], again=True), robust=True)
     return _publication(site)
 
 
@@ -204,7 +203,7 @@ def unpublish_site(ctx: OperationContext, data: NoIn) -> dict:
         site.updated_by = _actor(ctx)
         site.save()
         record_event(ctx, events.SITE_UNPUBLISHED, {"id": str(site.id), "version": site.published_version})
-        transaction.on_commit(
+        on_commit(
             partial(forget_cached, ctx.scope.key, site.published_version, business_currency(ctx.scope)), robust=True
         )
     return _publication(site)
@@ -300,22 +299,13 @@ def upload_image(ctx: OperationContext, data: ImageUploadIn) -> dict:
     if not kept:
         # Files' own check of the plan's space: the hub's prefix already counts its files and its apps' images.
         refuse_past_the_plans_space(ctx, store, len(raw))
-    image = Image.objects.filter(key=key, hub_id=hub).first()
-    if image is None:
-        try:
-            with transaction.atomic():
-                image = Image.objects.create(
-                    hub_id=hub,
-                    key=key,
-                    sha256=sha,
-                    content_type=data.content_type,
-                    width=width,
-                    height=height,
-                    size=len(raw),
-                )
-        except IntegrityError:
-            # The same file, uploaded at the same moment by someone else: theirs is ours.
-            image = Image.objects.get(key=key, hub_id=hub)
+    # The same file, uploaded at the same moment by someone else: theirs is ours. ``get_or_create`` recovers from the
+    # duplicate inside a savepoint on the alias the row goes to (the hub's own database), never on ``default``.
+    image, _created = Image.objects.get_or_create(
+        key=key,
+        hub_id=hub,
+        defaults={"sha256": sha, "content_type": data.content_type, "width": width, "height": height, "size": len(raw)},
+    )
     if not kept:
         store.save(key, ContentFile(raw))
     record_event(ctx, events.IMAGE_UPLOADED, {"id": str(image.id)})

@@ -3,7 +3,8 @@
 A hub's alias is copied from the static ``hub_template`` alias (PgBouncer in transaction mode: no pool,
 ``CONN_MAX_AGE`` 0, no server-side cursors, no prepared statements) with the hub's database as ``NAME``, and swapped
 in as a new ``connections.settings`` dict under a lock: the dict other threads are reading is never changed in place.
-A hub without a database of its own (``db_name=""``) stays on ``default``.
+A hub without a database of its own (``db_name=""``) stays on ``default``; a template is never a hub's database, and
+working in a hub leaves no connection open to the template it was cloned from (PLAN-DB §14.6).
 """
 
 import threading
@@ -15,6 +16,8 @@ import pytest
 from django.db import connections as django_connections
 
 from base.tenancy import connections, names
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 
 def pgbouncer_safe(settings: dict) -> bool:
@@ -178,3 +181,41 @@ def test_the_template_is_never_connected_to_by_registering():
     connections.register_hub_alias(hub_with_database())
 
     assert django_connections[connections.TEMPLATE_ALIAS].connection is None
+
+
+@pytest.mark.parametrize("vertical", [None, "test", "hair_salon"])
+def test_a_hub_naming_a_template_never_gets_an_alias(vertical):
+    # A template's database is only cloned: a connection to it makes CREATE DATABASE … TEMPLATE fail (55006), and a
+    # write in it would reach every hub cloned after. Only the migrator reaches it (``register_ddl_alias``).
+    template = names.template_db_name(connections.control_name(), vertical)
+    hub = SimpleNamespace(id=uuid.uuid7(), slug="acme", db_name=template, cluster=None)
+    before = django_connections.settings
+
+    with pytest.raises(names.InvalidDatabaseName, match="template"):
+        connections.register_hub_alias(hub)
+    with pytest.raises(names.InvalidDatabaseName):
+        connections.alias_for(hub)
+    assert django_connections.settings is before
+
+
+def _sessions_on(database: str) -> int:
+    """How many sessions of the server are connected to ``database`` now, this test's included (``pg_stat_activity``)."""
+    with django_connections["default"].cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = %s", [database])
+        return cursor.fetchone()[0]
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_working_in_a_hub_leaves_no_connection_open_to_its_template(hub_a, hub_databases):
+    assert _sessions_on(hub_databases.template) == 0
+    with use_hub(hub_a):
+        with django_connections[hubs.HUB_A_ALIAS].cursor() as cursor:
+            cursor.execute("SELECT 1")
+
+    assert _sessions_on(hub_databases.a) >= 1
+    assert _sessions_on(hub_databases.template) == 0
+    assert django_connections[connections.TEMPLATE_ALIAS].connection is None
+    # No alias of this process reaches the template: the migrator's, which built it, was forgotten after.
+    assert not [
+        alias for alias, settings in django_connections.settings.items() if settings["NAME"] == hub_databases.template
+    ]

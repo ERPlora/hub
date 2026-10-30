@@ -3,13 +3,11 @@
 Two hubs with a database of their own, each with its rows. Whatever runs as A (an operation, a request, a live
 re-run in the executor's thread) reaches A's database and never B's, watched on every alias at once; a write in B
 records its event in B's database and notifies B's channel, never A's; and B's session on A's host is no session
-(401), even for a member of both.
+(401), even for a member of both, and so is B's API key, looked for in A's database only.
 """
 
 import asyncio
 import json
-from contextlib import contextmanager
-from unittest import mock
 
 import pytest
 from django.contrib.auth import get_user_model, login
@@ -21,7 +19,9 @@ from live.executor import Executor, Stream, Subscription
 from live.models import OutboxEvent
 from live.operations import get as get_operation
 
-from base.models import Membership
+from apps.demo.models import Item
+from base import api_keys
+from base.models import ApiKey, Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
 
@@ -34,23 +34,6 @@ HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transacti
 @pytest.fixture(autouse=True)
 def every_hub_known(settings):
     settings.LIVE = {**settings.LIVE, "context_builder": "base.operations.HubContextBuilder"}
-
-
-@contextmanager
-def watched():
-    """Every statement any thread sends, by alias: a wrapper at the cursor, under every connection of every thread.
-
-    Scoped to the block (``mock.patch.object``): ``monkeypatch.undo()`` would also undo the test's other patches, the
-    ``no_test_fallback`` one included."""
-    sent: dict[str, list[str]] = {}
-    real = CursorWrapper._execute
-
-    def execute(self, sql, params, *ignored):
-        sent.setdefault(self.db.alias, []).append(sql)
-        return real(self, sql, params, *ignored)
-
-    with mock.patch.object(CursorWrapper, "_execute", execute):
-        yield sent
 
 
 def as_hub(hub) -> OperationContext:
@@ -78,7 +61,7 @@ def test_an_operation_as_a_reaches_a_and_never_b(hub_a, hub_b):
     create(hub_a, "Of A")
     create(hub_b, "Of B")
 
-    with watched() as sent:
+    with hubs.watched() as sent:
         names = listed(hub_a)
 
     # The watch is scoped: the rest of the test still runs as production (no fallback).
@@ -97,7 +80,7 @@ def test_a_request_as_a_reaches_a_and_never_b(client, hub_a, hub_b):
     Membership.objects.create(user=user, host=hub_a.slug, role=Membership.Role.ADMIN)
     client.force_login(user)
 
-    with watched() as sent:
+    with hubs.watched() as sent:
         response = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost")
 
     assert [row["name"] for row in response.json()["rows"]] == ["Of A"]
@@ -123,7 +106,7 @@ def test_a_live_rerun_as_a_reaches_a_and_never_b_in_the_executors_thread(hub_a, 
             executor.reset()
             executor.shutdown()
 
-    with watched() as sent:
+    with hubs.watched() as sent:
         asyncio.run(run_once())
 
     frame = stream.queue.get_nowait().decode()
@@ -169,3 +152,59 @@ def test_bs_session_on_as_host_is_no_session(client, hub_a, hub_b):
 
     assert client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost").status_code == 401
     assert client.get("/api/demo/items", HTTP_HOST=f"{hub_b.slug}.localhost").status_code == 200
+
+
+def new_key(hub) -> str:
+    """A key of ``hub``, made in its own database as its Employees › API keys screen makes one: its token."""
+    op = get_operation("base.api_key.create")
+    with context.use_hub(hub):
+        return op(as_hub(hub), op.input.model_validate({"name": "Till", "mode": "full"})).token
+
+
+@HUB_DB
+def test_bs_api_key_on_as_host_is_no_caller_and_never_reaches_b(client, hub_a, hub_b):
+    token = new_key(hub_b)
+    key = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+
+    with hubs.assert_only_alias(hubs.HUB_A_ALIAS) as sent:
+        refused = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost", **key)
+
+    assert refused.status_code == 401
+    # A looked for it in its own database, where no key of B exists, and never in phase 1's shared tables.
+    assert touches(sent, hubs.HUB_A_ALIAS, "base_apikey")
+    assert not touches(sent, "default", "base_apikey")
+    # The key is good on its own host: only A refuses it.
+    assert client.get("/api/demo/items", HTTP_HOST=f"{hub_b.slug}.localhost", **key).status_code == 200
+
+
+@HUB_DB
+def test_the_watch_fails_a_block_that_reaches_any_other_hub(hub_a, hub_b):
+    with hubs.assert_only_alias(hubs.HUB_A_ALIAS):
+        listed(hub_a)
+
+    with pytest.raises(AssertionError, match=hubs.HUB_B_ALIAS):
+        with hubs.assert_only_alias(hubs.HUB_A_ALIAS):
+            listed(hub_b)
+
+    # Phase 1's shared tables in control's database are no hub's own either: a hub's table read there fails it.
+    with pytest.raises(AssertionError, match="demo_item"):
+        with hubs.assert_only_alias(hubs.HUB_A_ALIAS), context.use_shared_database():
+            list(Item.objects.all())
+
+
+@HUB_DB
+def test_a_key_planted_in_the_shared_tables_never_opens_a_hub_with_its_own_database(client, hub_a):
+    # A key row left in phase 1's shared tables (by hand, or by a business before it moved) is nobody's: A looks for
+    # its keys in its own database only.
+    token = api_keys.new_token()
+    with context.use_shared_database():
+        ApiKey.objects.create(
+            name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full"
+        )
+
+    with hubs.assert_only_alias(hubs.HUB_A_ALIAS) as sent:
+        refused = client.get("/api/demo/items", HTTP_HOST=f"{hub_a.slug}.localhost", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    assert refused.status_code == 401
+    assert touches(sent, hubs.HUB_A_ALIAS, "base_apikey")
+    assert not touches(sent, "default", "base_apikey")

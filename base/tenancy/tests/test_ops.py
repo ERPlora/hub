@@ -248,12 +248,6 @@ def test_dropping_a_database_that_is_not_there_drops_nothing(hub_databases, made
     assert databases() == before
 
 
-def test_the_apps_a_database_recorded_are_read_from_it(hub_databases):
-    recorded = ops.recorded_apps(hub_databases.a)
-
-    assert {"base", "live", *hub_databases.apps} <= recorded
-
-
 @pytest.mark.django_db
 def test_the_control_database_is_never_dropped_nor_cloned_into():
     control = tenancy_connections.control_name()

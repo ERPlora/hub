@@ -34,15 +34,14 @@ import datetime as dt
 import logging
 from collections.abc import Callable, Iterable
 
-from django.apps import apps
-from django.db.migrations.loader import MigrationLoader
 from django.utils import timezone
 from live.context import system_context
 
 from base import registry, services
+from base.catalog import template_apps
 from base.schemas import DemoSlugIn
 from base.tenancy import connections as tenancy_connections
-from base.tenancy import identity, inventory, migrator, names, ops
+from base.tenancy import identity, migrator, names, ops
 from base.tenancy.context import use_control, use_hub
 from control.models import Hub
 
@@ -56,52 +55,15 @@ DUE_BATCH = 20
 Seed = Callable[[Hub], None]
 
 
-def hub_app_labels() -> frozenset[str]:
-    """The apps whose tables live in a hub's database: ``base``, ``live`` and the modules."""
-    return frozenset(
-        config.label
-        for config in apps.get_app_configs()
-        if config.name.startswith(inventory.HUB_MODULES_PACKAGE)
-        or inventory.APP_CLASSES.get(config.label) == inventory.HUB
-    )
-
-
-def portable_apps() -> frozenset[str]:
-    """The hub apps whose tables can live in a hub's own database: those that refer to no control model, nor need
-    (by their migrations) an app that does.
-
-    Phase 1 links some modules to control's users (``settings.AUTH_USER_MODEL``: staff, attendance, task,
-    whatsapp_inbox and what depends on them): their tables cannot be made in a hub's database until the hub has users
-    of its own (PLAN-DB §2), so the templates and ``seed_local_hubs`` leave them out.
-    """
-    hub_apps = hub_app_labels()
-    graph = MigrationLoader(None, ignore_no_migrations=True).graph
-    needs = {
-        label: {node[0] for leaf in graph.leaf_nodes() if leaf[0] == label for node in graph.forwards_plan(leaf)}
-        & hub_apps
-        for label in hub_apps
-    }
-    blocked = {
-        label
-        for label in hub_apps
-        for model in apps.get_app_config(label).get_models(include_auto_created=True)
-        if inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
-        for field in model._meta.get_fields()
-        if field.is_relation
-        and field.concrete
-        and field.related_model is not None
-        and inventory.classify(field.related_model) == inventory.CONTROL
-    }
-    while grown := {label for label in hub_apps - blocked if needs[label] & blocked}:
-        blocked |= grown
-    return frozenset(hub_apps - blocked)
-
-
-def schema_leaves(labels) -> dict[str, str]:
-    """``{app: its leaf migration in the code}`` for ``labels``: what ``Hub.schema_apps`` notes once they are at it."""
-    graph = MigrationLoader(None, ignore_no_migrations=True).graph
-    wanted = set(labels)
-    return {app: name for app, name in sorted(graph.leaf_nodes()) if app in wanted}
+def vertical_apps(vertical: str) -> list[str]:
+    """The apps a hub of ``vertical`` is born with (``base.catalog.template_apps``); none for no vertical, or for one no
+    module lists (its template's own apps are brought to the leaf all the same)."""
+    if not vertical:
+        return []
+    try:
+        return template_apps(vertical)
+    except ValueError:
+        return []
 
 
 def template_for(hub: Hub) -> str:
@@ -197,9 +159,9 @@ def _prepare(hub_id, *, apps: Iterable[str] = (), seed: Seed | None = None, tell
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
         hub = services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE)
-        labels = {"base", *apps} | (ops.recorded_apps(hub.db_name, cluster=hub.cluster) & hub_app_labels())
         try:
-            migrator.migrate_apps(ddl, sorted(labels))
+            # Its vertical's apps too: the template it was cloned from may still be being built (migrate_hubs).
+            migrator.ensure_schema(hub, add=["base", *vertical_apps(hub.vertical), *apps])
         except Exception as error:
             raise services.ProvisioningFailed("schema_failed", f"{type(error).__name__}: {error}") from error
         hub = services.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
@@ -207,7 +169,7 @@ def _prepare(hub_id, *, apps: Iterable[str] = (), seed: Seed | None = None, tell
             services.apply_kept_photo(hub)
             if seed is not None:
                 seed(hub)
-        services.provision_ready(hub_id, timezone.now(), schema_leaves(labels), tell_saas=tell_saas)
+        services.provision_ready(hub_id, timezone.now(), hub.schema_apps, tell_saas=tell_saas)
         logger.info("base.tenancy.provision.ready hub=%s database=%s", hub.slug, hub.db_name)
     except services.ProvisioningStopped as stopped:
         logger.info("base.tenancy.provision.stopped hub=%s: %s", hub_id, stopped)

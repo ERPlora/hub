@@ -9,7 +9,7 @@ Idempotent, through its operation (``base.hub.seed_local``). ``--check`` writes 
 ready (``base.hub.by_slugs``): the e2e's global setup asks it before the first spec.
 
 Where their data lives (round 2026-10-30 of PLAN-DB, S2a) follows what can live in a hub's own database
-(``base.tenancy.provision.portable_apps``): ``a`` and ``b`` turn every app on, so while some app cannot (its tables
+(``base.tenancy.migrator.portable_apps``): ``a`` and ``b`` turn every app on, so while some app cannot (its tables
 refer to control's users), new ones share control's database and the log says which apps hold them there; the day every
 app can, new ones are born with their own (``<control>_<hex>``), made here at once from ``<control>_template`` with
 every app's tables and every app on, under their ``hub_due`` lease (``migrate_hubs`` makes the template first). A
@@ -27,7 +27,7 @@ from base.queries import hubs_by_slugs
 from base.registry import REGISTRY_SCOPE
 from base.schemas import HubsBySlugIn, HubSeedLocalIn
 from base.services import hub_seed_local
-from base.tenancy import provision
+from base.tenancy import migrator, provision
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +64,8 @@ class Command(BaseCommand):
             for hub in found:
                 self.stdout.write(f"{hub.slug}: ready")
             return
-        every_app = provision.hub_app_labels()
-        blocked = sorted(every_app - provision.portable_apps())
+        every_app = migrator.hub_apps()
+        blocked = sorted(every_app - set(migrator.portable_apps()))
         if blocked:
             logger.warning(
                 "base.seed_local_hubs.shared_database: a and b share the control database: %s cannot have their "

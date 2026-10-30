@@ -21,13 +21,14 @@ from pathlib import Path
 import pytest
 from psycopg import sql
 from django.db import connections as django_connections
+from django.db.migrations.loader import MigrationLoader
 from django.utils import timezone
 from live.models import OutboxEvent
 
 from base import services
 from base.models import AppActivation, Location
 from base.tenancy import connections as tenancy_connections
-from base.tenancy import identity, names, ops, provision
+from base.tenancy import identity, migrator, names, ops, provision
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from control.models import Cluster, Hub, HubDue
@@ -126,7 +127,8 @@ def test_a_business_is_born_with_its_own_database_its_identity_and_its_schema(re
     assert provision.provision(hub) is True
 
     hub = fresh(hub)
-    expected = provision.schema_leaves({"base", "live", *hub_databases.apps})
+    graph = MigrationLoader(None, ignore_no_migrations=True).graph
+    expected = {app: leaf for app, leaf in graph.leaf_nodes() if app in {"base", "live", *hub_databases.apps}}
     assert (hub.status, hub.attempts, hub.last_error, hub.next_attempt_at) == ("ready", 0, "", None)
     assert hub.ready_at is not None and hub.schema_state == "current"
     assert hub.schema_apps == expected
@@ -458,16 +460,9 @@ def test_a_hub_without_a_name_for_its_database_fails_readably_and_nothing_reache
 # ── More apps than the template's, and a/b's own databases once every app can have one (seed_local_hubs) ────────────
 
 
-def test_the_apps_that_can_live_in_a_hubs_database_are_the_tests_templates():
-    assert provision.portable_apps() == frozenset(hubs.portable_apps())
-    assert "base" in provision.portable_apps() and "staff" not in provision.portable_apps()
-
-
 @pytest.fixture
 def small_template(django_db_blocker, hub_databases):
     """``<control>_template_small``: ``base`` alone (and what it needs), built as the tests' template is."""
-    from base.tenancy import migrator
-
     control = hub_databases.control
     name = names.template_db_name(control, "small")
     with django_db_blocker.unblock():
@@ -505,8 +500,8 @@ def test_a_hub_may_get_more_apps_than_its_template_and_a_seed_inside_its_databas
 @pytest.fixture
 def every_app_portable(monkeypatch):
     """The day every app a and b turn on can live in a hub's own database (here: only the portable ones)."""
-    portable = provision.portable_apps()
-    monkeypatch.setattr(provision, "hub_app_labels", lambda: portable)
+    portable = frozenset(migrator.portable_apps())
+    monkeypatch.setattr(migrator, "hub_apps", lambda: portable)
 
 
 @pytest.fixture
@@ -548,7 +543,7 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
                 assert hub.db_name in databases()
                 with use_hub(hub):
                     turned_on = set(AppActivation.objects.filter(host=hub.slug, state="on").values_list("app", flat=True))
-                assert {label for label in provision.portable_apps() if label not in ("base", "live")} <= turned_on
+                assert {label for label in migrator.portable_apps() if label not in ("base", "live")} <= turned_on
             assert "a: created (its own database)" in out.getvalue()
             # A second run leaves them as they are.
             again = StringIO()

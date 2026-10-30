@@ -161,13 +161,3 @@ def drop_database(name: str, *, cluster=None) -> bool:
         except psycopg.Error as error:
             raise DatabaseOpsError(f"{name!r} could not be dropped: {_reason(error)}") from error
     return existed
-
-
-def recorded_apps(name: str, *, cluster=None) -> set[str]:
-    """The apps the database ``name`` (a hub's, a demo's or a template's) on ``cluster`` recorded migrations of."""
-    names.validate(name, control=tenancy_connections.control_name())
-    with connect_ops(name, cluster=cluster) as conn:
-        try:
-            return {row[0] for row in conn.execute("SELECT DISTINCT app FROM django_migrations")}
-        except psycopg.Error as error:
-            raise DatabaseOpsError(f"The migrations of {name!r} could not be read: {_reason(error)}") from error

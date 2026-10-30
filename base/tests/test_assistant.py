@@ -194,7 +194,7 @@ def labels(card: dict) -> list[str]:
 
 def test_every_datum_of_the_card_is_named_in_the_persons_language():
     """gh:hub#1040, FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: a datum the screen does not name itself
-    (``assistant-card.ts`` ``FIELDS``) went by its schema's English title, in Spanish too («Session»,
+    (``FIELDS`` of the shared assistant's ``card.ts``) went by its schema's English title, in Spanish too («Session»,
     «Counted cash»)."""
     close = get("cash_register.session.close")
     arguments = {"session": "S-1", "closing_balance": 25000}
@@ -265,7 +265,7 @@ def titled(fields: list[dict]) -> dict[str, bool]:
 def test_a_title_its_app_wrote_is_marked_so_for_the_card_to_name_the_datum_by_it():
     """FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: a dangerous write of Tables said «Registro:
     5 (Terraza)» where its schema titles the check «Cuenta»: the screen names a datum it knows by its own word
-    (``assistant-card.ts`` ``FIELDS``: ``id`` is «Record») and could not tell the title its app wrote from one made up.
+    (``FIELDS`` of the shared assistant's ``card.ts``: ``id`` is «Record») and could not tell the title its app wrote from one made up.
     The card says which: a title its app wrote, said in the person's language, is ``titled``; one no catalog
     translates, the model's name of the field or the one pydantic makes up, never."""
     arguments = {"first_name": "Ana", "last_name": "Gil"}
@@ -399,8 +399,9 @@ def test_no_operation_lets_a_secret_reach_its_card_in_clear():
 
 
 def named_by_the_screen() -> set[str]:
-    """The data the card's screen names itself (``assistant-card.ts`` ``FIELDS``: «Record», «Reason»…)."""
-    source = (Path(settings.BASE_DIR) / "base/frontend/lib/assistant-card.ts").read_text()
+    """The data the card's screen names itself (``FIELDS`` of the shared assistant's ``card.ts``, @erplora/ui: «Record»,
+    «Reason»…)."""
+    source = (Path(settings.BASE_DIR) / "packages/ui/src/components/Assistant/card.ts").read_text()
     return set(re.findall(r"'([a-z_]+)'", re.search(r"const FIELDS = \[(.*?)\];", source, re.S).group(1)))
 
 
@@ -483,8 +484,8 @@ def named_operations() -> dict[str, dict[str, str]]:
 
 
 def named_actions() -> dict[str, dict[str, str]]:
-    """The verbs the card and its receipt name a write by, per language, as ``assistant-card.ts`` ``actionKey`` looks
-    them up: its whole operation's (``named_operations``), else its card's ``action``'s, ``base.assistant.card.actions``
+    """The verbs the card and its receipt name a write by, per language, as ``actionKey`` of ``lib/assistant-hub.ts``
+    looks them up: its whole operation's (``named_operations``), else its card's ``action``'s, ``base.assistant.card.actions``
     («other» is «Do this»). An operation goes by its name, with its dots; an action, which has none, by its own."""
     operations = named_operations()
     return {language: {**card["actions"], **operations[language]} for language, card in card_catalogues().items()}

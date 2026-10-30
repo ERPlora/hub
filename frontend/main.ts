@@ -17,15 +17,16 @@ import {
   type ThemePalette,
   toastSuccess,
 } from '@erplora/ui/shell';
+import { assistantMessages, configureAssistant, forgetAssistant } from '@erplora/ui/components';
 import { createLiveClient, type LiveClient, provideLiveClient, readSpaConfig } from '@erplora/ui/sdk';
 import { defineAsyncComponent, ref } from 'vue';
 import { isNavigationFailure, type RouteRecordRaw } from 'vue-router';
 
 import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/access';
-import { forgetAssistant } from '../base/frontend/lib/assistant';
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { installErrorReport } from '../base/frontend/lib/error-report';
 import { approvalPass } from '../base/frontend/lib/approval';
+import { HUB_ASSISTANT } from '../base/frontend/lib/assistant-hub';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { openReportProblem } from '../base/frontend/lib/report-problem';
 import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
@@ -94,9 +95,10 @@ export function appRoutes(routeFiles: Record<string, AppRoutes>): RouteRecordRaw
 /** An app's `frontend/locale/<lang>.json`, all under the app id (guard: main.test.ts). */
 export type AppCatalogue = Record<string, unknown>;
 
-/** Every app catalogue, by the language in its file name; distinct app ids, so a spread never collides. */
+/** Every app catalogue, by the language in its file name, over the shared assistant's words (`assistant`, its panel's);
+ *  distinct app ids, so a spread never collides. */
 export function appMessages(catalogues: Record<string, AppCatalogue>): CreateShellOptions['messages'] {
-  const messages: Record<string, AppCatalogue> = {};
+  const messages: Record<string, AppCatalogue> = { en: { ...assistantMessages.en }, es: { ...assistantMessages.es } };
   for (const [file, catalogue] of Object.entries(catalogues)) {
     const language = file.slice(file.lastIndexOf('/') + 1, -'.json'.length);
     messages[language] = { ...messages[language], ...catalogue };
@@ -165,6 +167,8 @@ export async function boot(
   doc: Document = document,
 ): Promise<void> {
   const config = readSpaConfig(doc);
+  // The shared assistant's panel (APP-BASE-9) as the Hub's: its routes, base's operations and words, who uses it.
+  configureAssistant(HUB_ASSISTANT);
   // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
   const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);

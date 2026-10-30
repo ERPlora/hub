@@ -6,7 +6,8 @@ transaction mode, no pool, ``CONN_MAX_AGE`` 0, no server-side cursors, no prepar
 as ``NAME`` and, for a hub on a :class:`control.models.Cluster`, that cluster's PgBouncer. Its ``NAME`` is the row's
 ``db_name`` (pre's ``pre_hub_<hex>``, a demo's ``<control>_demo_<hex>``), never derived from the id; an alias already
 registered with another database is refused (``HubAliasConflict``): every thread keeps its connection to the first
-one, so a hub moved to another database needs the process restarted.
+one, so a hub moved to another database needs the process restarted. A template's database (``<control>_template…``)
+never gets one: it is only cloned, and a connection to it would make its next clone fail (PLAN-DB §6).
 
 ``connections.settings`` is never changed in place: ``close_old_connections`` walks it from other threads, so a new
 dict with the alias is swapped in, under a lock, after looking again. A hub of the shared database (``db_name=""``,
@@ -88,9 +89,19 @@ def _take_this_threads_role(alias: str) -> None:
             connection.settings_dict = copy.deepcopy(current)
 
 
+def _not_a_template(name: str, control: str) -> str:
+    """``name``, unless it is one of ``control``'s templates (``InvalidDatabaseName``): only the migrator reaches those."""
+    template = names.template_db_name(control)
+    if name == template or name.startswith(f"{template}_"):
+        raise names.InvalidDatabaseName(f"{name!r} is a template: it is only cloned, never a hub's database.")
+    return name
+
+
 def register_hub_alias(hub) -> str:
-    """The alias of ``hub``'s own database, registered if this process has not yet; its name is validated first."""
-    name = names.validate(hub.db_name, control=control_name())
+    """The alias of ``hub``'s own database, registered if this process has not yet; its name is validated first, and
+    a template's is refused."""
+    control = control_name()
+    name = _not_a_template(names.validate(hub.db_name, control=control), control)
     alias = hub_alias(hub)
     registered = connections.settings.get(alias)
     if registered is not None and registered["NAME"] != name:
