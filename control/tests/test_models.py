@@ -49,6 +49,7 @@ def test_the_code_of_before_still_inserts_a_hub():
     hub = Hub.objects.get(pk=hub_id)
 
     assert (hub.db_name, hub.schema_state, hub.schema_apps, hub.is_platform) == ("", "current", {}, False)
+    assert (hub.attempts, hub.last_error, hub.next_attempt_at) == (0, "", None)
 
 
 def test_a_database_name_is_a_hubs_of_this_control_database():
@@ -82,6 +83,67 @@ def test_a_hub_is_due_once_keyed_by_the_hub():
     assert (due.lease_until, due.fiscal_oldest_pending_at) == (None, None)
 
 
+def test_a_hub_is_prepared_in_steps_and_ends_in_steps():
+    """PLAN-DB §6: ``requested → creating → migrating → seeding → ready``, ``failed`` to retry; the way out of a
+    business (``archiving``, ``dropping``) is declared for S2b."""
+    assert [Hub.Status(value) for value in ("creating", "migrating", "seeding", "archiving", "dropping")] == [
+        Hub.Status.CREATING,
+        Hub.Status.MIGRATING,
+        Hub.Status.SEEDING,
+        Hub.Status.ARCHIVING,
+        Hub.Status.DROPPING,
+    ]
+    assert max(len(value) for value in Hub.Status.values) <= Hub._meta.get_field("status").max_length
+
+
+def test_a_failed_preparation_keeps_its_attempts_its_error_and_its_next_attempt():
+    from django.utils import timezone
+
+    hub = Hub.objects.create(slug="acme")
+    assert (hub.attempts, hub.last_error, hub.next_attempt_at) == (0, "", None)
+
+    later = timezone.now()
+    Hub.objects.filter(pk=hub.pk).update(
+        status=Hub.Status.FAILED, attempts=2, last_error="The template is in use.", next_attempt_at=later
+    )
+    hub.refresh_from_db()
+
+    assert (hub.status, hub.attempts, hub.last_error, hub.next_attempt_at) == (
+        "failed",
+        2,
+        "The template is in use.",
+        later,
+    )
+
+
+def test_mark_due_makes_a_hub_due_and_only_ever_brings_it_forward():
+    import datetime as dt
+
+    from django.utils import timezone
+
+    hub = Hub.objects.create(slug="acme")
+    now = timezone.now()
+
+    HubDue.mark_due(hub, now)
+    HubDue.mark_due(hub, now + dt.timedelta(minutes=5))
+    assert HubDue.objects.get(pk=hub.pk).due_at == now
+
+    HubDue.mark_due(hub, now - dt.timedelta(minutes=1))
+    assert HubDue.objects.get(pk=hub.pk).due_at == now - dt.timedelta(minutes=1)
+    assert HubDue.objects.filter(pk=hub.pk).count() == 1
+
+
+def test_mark_due_without_a_time_is_now():
+    from django.utils import timezone
+
+    hub = Hub.objects.create(slug="acme")
+    before = timezone.now()
+
+    HubDue.mark_due(hub)
+
+    assert before <= HubDue.objects.get(pk=hub.pk).due_at <= timezone.now()
+
+
 def test_its_words_are_translated():
     from django.apps import apps
     from django.utils import translation
@@ -104,3 +166,12 @@ def test_its_words_are_translated():
         assert str(HubDue._meta.get_field("lease_until").verbose_name) == "reservado hasta"
         assert str(HubIdentity._meta.verbose_name) == "identidad del hub"
         assert registry.unavailable().message == "Este hub no se puede abrir ahora; inténtalo más tarde."
+        assert [str(Hub.Status(value).label) for value in ("creating", "migrating", "seeding")] == [
+            "Creando",
+            "Migrando",
+            "Sembrando datos",
+        ]
+        assert [str(Hub.Status(value).label) for value in ("archiving", "dropping")] == ["Archivando", "Borrando"]
+        assert str(Hub._meta.get_field("attempts").verbose_name) == "intentos"
+        assert str(Hub._meta.get_field("last_error").verbose_name) == "último error"
+        assert str(Hub._meta.get_field("next_attempt_at").verbose_name) == "próximo intento"

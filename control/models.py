@@ -6,16 +6,19 @@ writes it through ``/internal/hubs/{id}`` (``base.internal``) and the host gate 
 the demo's ``/auth/callback`` redeems here, without calling the SaaS back. Both moved from ``base`` in S1 keeping
 their tables (``base_hub``, ``base_democode``): their migration only moved them in Django's state.
 
-``Hub.db_name`` says where a hub's data lives: its own database (``<control>_<hex>``, ``demo_<hex>``;
+``Hub.db_name`` says where a hub's data lives: its own database (``<control>_<hex>``, ``<control>_demo_<hex>``;
 ``base.tenancy.names``) or, empty, control's, where every hub of phase 1 keeps its data until the cut of S5 (plan,
-decision 1). ``Cluster`` is a database cluster a hub's database is on; ``HubDue``, the work a hub has due (the
-worker's index, PLAN-DB §8): both wait for S2.
+decision 1); since S2 every new hub and demo is born with its own (round 2026-10-30 of PLAN-DB, decision 1).
+``Cluster`` is a database cluster a hub's database is on; ``HubDue``, the work a hub has due (the worker's index,
+PLAN-DB §8): since S2, the making of its database and a demo's drop (``base.tenancy.provision``).
 """
 
 import uuid
 
+import datetime as dt
+
 from django.core.exceptions import ValidationError
-from django.db import connections, models
+from django.db import connection, connections, models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
@@ -66,10 +69,13 @@ class Cluster(UUIDModel):
 class Hub(models.Model):
     """One hub this Hub serves, keyed by the SaaS's id (``PUT /internal/hubs/{id}``) or its own (a demo, ``a``/``b``).
 
-    ``status`` is PLAN-DB §6's vocabulary, the part phase 1 uses: ``requested`` → ``ready`` (at once: there is no
-    database to clone yet) → ``cancelled`` (the SaaS deleted the business; ``restore`` brings it back) or, for a
-    demo, ``expired`` → ``purged``. The host gate answers 404 to a slug without a row, 410 to one that is gone and
-    503 to one still being prepared. ``state`` is the SaaS's last photo (``PUT …/state``) as it came, with its
+    ``status`` is PLAN-DB §6's vocabulary: ``requested`` → ``creating`` (its database cloned) → ``migrating`` (its
+    schema checked) → ``seeding`` (what the sign-up brought) → ``ready``, or ``failed`` with its ``attempts``, its
+    ``last_error`` and its ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour) until it is ready; then
+    ``cancelled`` (the SaaS deleted the business; ``restore`` brings it back) or, for a demo, ``expired`` →
+    ``dropping`` → ``purged``. ``archiving`` and the business's ``dropping`` are S2b's (the dump and the drop after
+    the 90 days). The host gate answers 404 to a slug without a row, 410 to one that is gone and 503 to one still
+    being prepared. ``state`` is the SaaS's last photo (``PUT …/state``) as it came, with its
     monotonic ``state_version``: an older or equal one changes nothing. ``demo_session_key`` is the sha256 of the
     SaaS's browser session that owns a demo, never the session key itself.
 
@@ -81,11 +87,16 @@ class Hub(models.Model):
     class Status(models.TextChoices):
         # With a context: the apps translate the same English words for their own things («Lista», «Cancelada»).
         REQUESTED = "requested", pgettext_lazy("hub status", "Requested")
+        CREATING = "creating", pgettext_lazy("hub status", "Creating")
+        MIGRATING = "migrating", pgettext_lazy("hub status", "Migrating")
+        SEEDING = "seeding", pgettext_lazy("hub status", "Seeding")
         READY = "ready", pgettext_lazy("hub status", "Ready")
         FAILED = "failed", pgettext_lazy("hub status", "Failed")
         CANCELLED = "cancelled", pgettext_lazy("hub status", "Cancelled")
         EXPIRED = "expired", pgettext_lazy("hub status", "Expired")
         PURGED = "purged", pgettext_lazy("hub status", "Purged")
+        ARCHIVING = "archiving", pgettext_lazy("hub status", "Archiving")
+        DROPPING = "dropping", pgettext_lazy("hub status", "Dropping")
 
     class SchemaState(models.TextChoices):
         CURRENT = "current", pgettext_lazy("hub schema", "Current")
@@ -121,6 +132,9 @@ class Hub(models.Model):
         Cluster, on_delete=models.PROTECT, null=True, blank=True, related_name="hubs", verbose_name=_("cluster")
     )
     is_platform = models.BooleanField(_("platform hub"), default=False, db_default=False)
+    attempts = models.PositiveIntegerField(_("attempts"), default=0, db_default=0)
+    last_error = models.TextField(_("last error"), blank=True, default="", db_default="")
+    next_attempt_at = models.DateTimeField(_("next attempt"), null=True, blank=True)
     created_at = models.DateTimeField(pgettext_lazy("hub registry", "created at"), auto_now_add=True)
     updated_at = models.DateTimeField(pgettext_lazy("hub registry", "updated at"), auto_now=True)
     ready_at = models.DateTimeField(pgettext_lazy("hub registry", "ready at"), null=True, blank=True)
@@ -191,3 +205,21 @@ class HubDue(models.Model):
 
     def __str__(self) -> str:
         return f"{self.hub_id} @ {self.due_at:%Y-%m-%d %H:%M:%S}"
+
+    @classmethod
+    def mark_due(cls, hub, at: dt.datetime | None = None) -> None:
+        """Make ``hub`` due at ``at`` (now by default), or keep the earlier time it is already due at.
+
+        One statement (``INSERT … ON CONFLICT … LEAST``), so two callers at once leave one row at the earlier time.
+        On control's connection, in the caller's transaction: what wrote the work and its row commit together.
+        """
+        from django.utils import timezone
+
+        at = at or timezone.now()
+        table = connection.ops.quote_name(cls._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {table} (hub_id, due_at) VALUES (%s, %s) "
+                f"ON CONFLICT (hub_id) DO UPDATE SET due_at = LEAST({table}.due_at, EXCLUDED.due_at)",
+                [hub.pk, at],
+            )

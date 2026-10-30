@@ -96,3 +96,32 @@ msgstr "listo el"
 msgctxt "hub registry"
 msgid "cancelled at"
 msgstr "cancelado el"
+
+msgctxt "hub status"
+msgid "Creating"
+msgstr "Creando"
+
+msgctxt "hub status"
+msgid "Migrating"
+msgstr "Migrando"
+
+msgctxt "hub status"
+msgid "Seeding"
+msgstr "Sembrando datos"
+
+msgctxt "hub status"
+msgid "Archiving"
+msgstr "Archivando"
+
+msgctxt "hub status"
+msgid "Dropping"
+msgstr "Borrando"
+
+msgid "attempts"
+msgstr "intentos"
+
+msgid "last error"
+msgstr "último error"
+
+msgid "next attempt"
+msgstr "próximo intento"
