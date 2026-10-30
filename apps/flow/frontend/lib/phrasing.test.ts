@@ -297,4 +297,15 @@ describe('«Ask the assistant» in words (FLOW-F37, F38)', () => {
       /^The assistant wants to «Create a task»: it waits for a yes until /,
     );
   });
+
+  it('says a tool was not used because a datum the step fixes was empty, naming the datum', () => {
+    // FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF: nothing half done, and visible.
+    const empty = entry({ outcome: 'assistant_pinned_empty', operation: 'reservation.reservation.cancel', fields: ['on_behalf_of'] });
+    expect(describeLog(empty, [step], null, en)).toBe(
+      'The assistant tried «Cancel a reservation», but «On behalf of the customer», fixed by this step, was empty: it was not done.',
+    );
+    expect(describeLog(empty, [step], null, phrasing('es'))).toBe(
+      'El asistente ha intentado «Anular una reserva», pero «En nombre del cliente», que fija este paso, estaba vacío: no se ha hecho.',
+    );
+  });
 });
