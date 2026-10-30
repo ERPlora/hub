@@ -481,6 +481,7 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Las tarifas, con búsqueda, filtros y orden, en páginas de hasta 100 | ver | F01 | `pricing.price_list.list` | sí |
 | Una tarifa | ver | F03, F06 | `pricing.price_list.get` | sí |
 | Los precios de una tarifa, o los de un producto o un servicio en todas | ver | F06 | `pricing.price_item.list` | sí |
+| Un precio, con lo que muestra de él su tarifa y la moneda de esa tarifa, la de su precio | ver | F06, F08 | `pricing.price_item.get` | no |
 | Las reglas de descuento | ver | F09 | `pricing.rule.list` | sí |
 | El precio de una línea (tarifa, regla, descuento y total) | ver | F13 | `pricing.price.resolve` | no |
 

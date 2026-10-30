@@ -8,12 +8,15 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live.context import OperationContext, Scope
 from live.operations import get, registry
 
 from base import assistant
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen
 
-from .conftest import ctx_for, make_list, make_product
+from .conftest import ctx_for, make_item, make_list, make_product
 
 FRONTEND = Path(apps.get_app_config("pricing").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["pricing"]
@@ -96,4 +99,66 @@ def test_a_price_added_to_a_list_in_another_currency_is_said_in_that_currency(cu
 def test_a_price_on_a_list_that_is_not_there_is_said_as_sent():
     """No currency made up: the write refuses a list that does not exist, and the card does not paint a price in one."""
     card = assistant.card(get("pricing.price_item.add"), {"price_list": "NADA", "product": "Shampoo", "price": 1500}, "es", ctx_for(language="es"))
+    assert priced(card) == {"kind": "text", "value": 1500}
+
+
+#: The roles a business gives that change prices (``pricing.manage``): the manager is the least of them.
+WRITERS = ("hub_manager", "hub_admin", "hub_owner")
+
+
+def in_hub(hub, role: str = "hub_manager", **ctx) -> OperationContext:
+    return ctx_for(role, scope=Scope("host", hub.slug), language="es", **ctx)
+
+
+def a_price(currency: str = "USD"):
+    """A price of the shampoo in the list DOLARES, in ``currency``: what «cambia el precio del champú» names by its id."""
+    return make_item(make_list("DOLARES", currency=currency), make_product("Shampoo", "SH-1"), price=1200)
+
+
+def price_change(item, ctx: OperationContext | None) -> dict:
+    return assistant.card(get("pricing.price_item.update"), {"id": str(item.id), "price": 1500}, "es", ctx)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize("role", WRITERS)
+@pytest.mark.parametrize(
+    ("currency", "money"),
+    [("USD", {"currency": "USD", "decimals": 2}), ("PLN", {"currency": "PLN", "decimals": 2}), ("EUR", {"currency": "EUR", "decimals": 2})],
+    ids=["dollars", "zlotys", "the business's"],
+)
+def test_a_price_changed_on_a_list_in_another_currency_is_said_in_that_currency(currency, money, role, hub_a, no_fallback):
+    """«Pon el champú a 15 en la lista de dólares», a price named by its id: it goes in the minor unit of its list's
+    currency, and the card said it in the business's («15,00 €»), never «1500». It reads the price as the person who
+    changes it, every role that may."""
+    with use_hub(hub_a):
+        card = price_change(a_price(currency), in_hub(hub_a, role))
+    assert priced(card) == {"kind": "money", "value": 1500, "money": money}
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_price_of_another_business_is_said_as_sent_never_in_its_currency(hub_a, hub_b, no_fallback):
+    """The id of another business's price names none of this one (the write refuses it): no currency made up, neither
+    the other's nor this business's."""
+    with use_hub(hub_b):
+        theirs = a_price()
+    with use_hub(hub_a):
+        card = price_change(theirs, in_hub(hub_a))
+    assert priced(card) == {"kind": "text", "value": 1500}
+    with use_hub(hub_b):  # positive control: in its own business, in dollars
+        assert priced(price_change(theirs, in_hub(hub_b)))["money"] == {"currency": "USD", "decimals": 2}
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_nobody_behind_the_request_reads_no_price_for_its_card(hub_a, no_fallback):
+    """An automation's card (no person at hand) reads nothing for anybody: the price as sent."""
+    with use_hub(hub_a):
+        card = price_change(a_price(), None)
+    assert priced(card) == {"kind": "text", "value": 1500}
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_who_may_not_see_prices_reads_none_on_the_card(hub_a, no_fallback):
+    """Whoever asks without «view prices» (the write refuses them too) reads no list's currency: the price as sent."""
+    with use_hub(hub_a):
+        card = price_change(a_price(), in_hub(hub_a, permissions={"base.view_home"}))
     assert priced(card) == {"kind": "text", "value": 1500}
