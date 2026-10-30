@@ -483,6 +483,10 @@ Pasos:
    que la pararía («Se pararía aquí, y eso es la automatización funcionando»), lo que no se puede saber
    porque sale de un paso que no ha corrido, una espera y un paso sin permiso («Todavía no le has
    permitido …»).
+4. En un paso **Pedírselo al asistente**, debajo de «Se lo pediría al asistente: …», cada dato fijo (FLOW-F37)
+   con el valor que tendría («Anular una reserva › En nombre del cliente» y su valor); si uno saldría vacío, la
+   consulta o acción que no se usaría («No se usaría «…»: «…», que fija este paso, estaría vacío en esta
+   ejecución.»), y si sale de un paso que no ha corrido, «Sale de un paso anterior que no ha corrido: …».
 Entra: lo que hay en el editor, aunque no esté guardado, y el último aviso real de ese tipo.
 Sale: nada: no ejecuta, no guarda.
 Si falla: lo que no encaja en el documento se dice junto al paso; sin permiso para leer los avisos
@@ -1046,7 +1050,8 @@ Pasos:
 Entra: el encargo, lo que puede usar, sus datos fijos, cómo hace los cambios y las vueltas.
 Sale: el paso. Los pasos de después pueden insertar «Texto», lo que ha contestado, y, si un cambio esperó tu
 respuesta, «Aprobada», «Nota» y «Contestada por». **Probar** dice «Se lo pediría al asistente: …» con el encargo
-rellenado, sin pedírselo. Cada consulta o acción que nombra pasa a pedir su permiso.
+rellenado, sin pedírselo, y cada dato fijo con el valor que tendría, o qué no se usaría por quedar vacío
+(FLOW-F13). Cada consulta o acción que nombra pasa a pedir su permiso.
 Si falla: un encargo vacío, más de 10 vueltas, o un encargo con un secreto no se guardan; tampoco algo que el
 negocio no tiene, que necesita a una persona delante o que el asistente no puede usar («El asistente no puede
 usar «…».»), junto a **Qué puede usar**. Con «Anular una reserva» puesta y «Que lo haga por su cuenta», tampoco:
@@ -1302,8 +1307,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   correr, `services._spec` los quita de `parameters` (`properties` y `required`) de lo que se ofrece al modelo,
   `_pinned` los resuelve con `document.resolve` sobre `{"input", "steps"}` y `_with_pinned` los pone encima de los
   argumentos del modelo, antes de `_propose` (la propuesta guardada, y su tarjeta, ya los llevan) o de `run_tool`;
-  vacío (`None` o texto en blanco) → `flow.pinned_empty` al modelo y `assistant_pinned_empty` en el log, sin
-  proponer ni ejecutar. Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
+  vacío (`queries.fixed_value`: `None` o texto en blanco, la misma regla en «Probar») → `flow.pinned_empty` al
+  modelo y `assistant_pinned_empty` en el log, sin proponer ni ejecutar. «Probar» devuelve `pinned` por paso
+  (`PinnedOut`: `filled`, `empty` o `unknown` si lee un paso que no corre en la prueba). Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
   («Set a specific value»: la IA ignora el campo), n8n (parámetros sin `$fromAI()`), Copilot Studio («Set as a
   value»), LangChain (`InjectedToolArg`: fuera del esquema del modelo, puesto antes de la llamada), Intercom Fin
   (conectores sobre un atributo protegido), Salesforce Agentforce (input bindings), Merge (tool input overrides),
@@ -1488,8 +1494,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   tarjeta), `/flow/automations/new` (`?draft=` carga un borrador), `/flow/automations/:id` (`?tab=`) y
   `/flow/guide`.
 - La lista es `DataTable` en servidor con `useLiveList`/`useServerTable`, casillas y acciones de fila;
-  el editor es la columna del producto actual hecha en CSS propio (sin librería de lienzos: no hay
-  nodos), con `ion-reorder-group` para ordenar con el dedo.
+  `AutomationsPage` la monta siempre y la oculta (`v-show`) sin automatizaciones, para que su suscripción vaya
+  en el único flujo vivo de la página: montada al llegar el recuento, el SDK cerraba el flujo y abría otro
+  (`net::ERR_ABORTED` en cada visita; revisión 2026-10-30). El editor es la columna del producto actual hecha
+  en CSS propio (sin librería de lienzos: no hay nodos), con `ion-reorder-group` para ordenar con el dedo.
 - Las palabras de avisos y acciones salen de `frontend/lib/phrasing.ts`: frases escritas a mano para
   las conocidas y compuestas (app + palabras) para las demás, en `en` y `es`.
 - Los iconos son los registrados en la shell; los deseados esperan en `UI-REQUESTS.md`.
