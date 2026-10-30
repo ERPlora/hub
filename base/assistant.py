@@ -29,12 +29,14 @@ import time
 import unicodedata
 import uuid
 from collections.abc import AsyncIterator, Iterable
+import dataclasses
 from dataclasses import dataclass
 from functools import cache
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
+import pycountry
 import pydantic
 from babel.dates import format_date, format_time, get_datetime_format
 from django.conf import settings
@@ -250,6 +252,31 @@ def _is_money(name: str, prop: dict) -> bool:
     return prop.get(MONEY) is True or name.endswith("_cents")
 
 
+#: The mark of the datum that names the currency of the amounts beside it (``json_schema_extra={"currency": True}``, on
+#: a text: an ISO 4217 code), at any depth below it: a payment in dollars. Without one, or empty, the business's. As
+#: Stripe, Square or Shopify show an amount: in the currency of its operation, with that currency's decimals.
+CURRENCY = "currency"
+
+
+def _named_currency(value: Any, props: dict, defs: dict) -> tuple[bool, str | None]:
+    """The currency the datum its schema marks ``CURRENCY`` among ``props`` names in ``value`` (an object), taken as the
+    writes take it — spaces and case aside, an ISO 4217 code —: ``(True, <code>)``; ``(True, None)`` when it names none
+    (no such datum, or empty: the business's); ``(False, None)`` when it names one that is none, which its write
+    refuses: its amounts are said as sent, never in a currency made up."""
+    if not isinstance(value, dict):
+        return True, None
+    for name, prop in props.items():
+        if _resolved(prop, defs).get(CURRENCY) is not True:
+            continue
+        sent = value.get(name)
+        code = sent.strip().upper() if isinstance(sent, str) else ""
+        if sent is None or not code:
+            return True, None
+        known = len(code) == 3 and pycountry.currencies.get(alpha_3=code) is not None
+        return (True, code) if known else (False, None)
+    return True, None
+
+
 def _is_signed(prop: dict) -> bool:
     """Whether the schema declares the datum signed (``json_schema_extra={"signed": True}``): an amount (``MONEY``) that
     says over or short, as Cash register's difference, which the card writes with its sign («+» over)."""
@@ -404,13 +431,26 @@ _LEFT_OUT = object()
 class _Words:
     """What a card needs to say ``op``'s data in words: the person's language and the person (``ctx``: to read a
     record's name as them, the business's zone and currency; ``None`` for an automation's card, which names no
-    record); ``currency``, the one its amounts are in when it is not the business's (a preview's read answers it)."""
+    record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, or a
+    preview's read answers); ``priced`` false when the write names one that is none: its amounts go as sent."""
 
     op: Operation
     language: str
     ctx: OperationContext | None
     currency: str | None = None
+    priced: bool = True
     _business: Any = None
+
+    def within(self, value: Any, props: dict, defs: dict) -> "_Words":
+        """The words of the data of the object ``value``: in the currency it names (``CURRENCY``), else in this one."""
+        priced, currency = _named_currency(value, props, defs)
+        if priced and currency is None:
+            return self
+        return dataclasses.replace(self, currency=currency, priced=priced)
+
+    def money(self) -> dict | None:
+        """The currency of its amounts as the card's screen takes it, when it is not the business's."""
+        return {"currency": self.currency, "decimals": currency_decimals(self.currency)} if self.currency else None
 
     def business(self) -> Any:
         """Settings › Business, read as the person once per card and only when a datum needs it; ``False`` when it
@@ -425,9 +465,12 @@ class _Words:
         business = self.business()
         return (_zone_named(business.timezone) if business else None) or timezone.get_current_timezone()
 
-    def amount(self, value: int) -> str:
+    def amount(self, value: int) -> Any:
         """``value``, an amount in the minor unit of its currency (``currency``, else the business's; one that cannot
-        be read, the euro, as the card's own amounts then), as the Hub writes money in the person's language."""
+        be read, the euro, as the card's own amounts then), as the Hub writes money in the person's language; as sent
+        when its write names a currency that is none."""
+        if not self.priced:
+            return value
         business = self.business() if self.currency is None else None
         currency = self.currency or (business.currency if business else None) or DEFAULT_CURRENCY
         return money_text(value, currency, language=self.language)
@@ -529,8 +572,8 @@ def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words, inner: b
     (``_moment``), a value of a closed list by the label its app's models give it (``_choice_label``), a record by
     its name (``_reference``) or else ``_LEFT_OUT`` — left out of an object, none in a list (which still says how many
     it carries), as an attempt key (``ATTEMPT_KEY``) is, even empty; an amount (``MONEY``) inside an object or a list
-    as money (``_Words.amount``; on top, the card's own ``money`` paints it); what is none of them, or not what its
-    schema declares (the write refuses it), as sent."""
+    as money (``_Words.amount``; on top, the card's own ``money`` paints it), in the currency the object names
+    (``CURRENCY``); what is none of them, or not what its schema declares (the write refuses it), as sent."""
     prop = _fitting(value, prop, defs)
     if _is_attempt_key(prop):
         return _LEFT_OUT
@@ -550,8 +593,9 @@ def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words, inner: b
         props = prop.get("properties", {})
         extra = prop.get("additionalProperties")
         extra = extra if isinstance(extra, dict) else {}
+        own = words.within(value, props, defs)
         said = {
-            key: _said(inner, props.get(key, extra), defs, key if key in props else name, words, inner=True)
+            key: _said(inner, props.get(key, extra), defs, key if key in props else name, own, inner=True)
             for key, inner in value.items()
         }
         return {key: inner for key, inner in said.items() if inner is not _LEFT_OUT}
@@ -571,8 +615,9 @@ def _field(
     """One datum of a card, as its schema ``prop`` declares it: a secret hidden (``_hidden``) and, with the ``words``
     of its card, the rest in words (``_said``); ``None`` when it names a record the card cannot name or is an attempt
     key. An amount
-    carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (a preview's,
-    as its read answers it): without it, the card paints it in the business's. ``titled`` when ``label`` is the title
+    carries ``signed`` when its schema declares it so and ``money`` when it is in a currency of its own (the one its
+    write names, or a preview's, as its read answers it): without it, the card paints it in the business's; in a
+    currency its write names that is none, it is no amount but as sent. ``titled`` when ``label`` is the title
     its app wrote (``_own_title``): the screen calls it so over its own word for a datum it knows by its name
     (``assistant-card.ts`` ``FIELDS``: «Record» for an ``id`` Tables titles «Check»)."""
     # The title of the property itself, as its caller's ``label``: a ``$ref``'s own is its schema class's name.
@@ -587,7 +632,7 @@ def _field(
         kind = "empty"
     elif isinstance(value, bool):
         kind = "bool"
-    elif isinstance(value, int) and _is_money(name, prop):
+    elif isinstance(value, int) and _is_money(name, prop) and (words is None or words.priced):
         kind = "money"
     elif isinstance(value, list):
         kind = "list"
@@ -608,7 +653,8 @@ def _field(
 def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
     """What the person sees before ``op`` runs with ``arguments``: its app, its action, each datum it sends by its name
     in ``language`` (``_label``) and in words (``_said``: a moment, a value of a list, a record by its name, read as
-    ``ctx``'s person; an amount its schema marks (``MONEY``) as ``money``, ``signed`` when it declares it so), its risk
+    ``ctx``'s person; an amount its schema marks (``MONEY``) as ``money``, ``signed`` when it declares it so, in the
+    currency the write names, ``CURRENCY``), its risk
     and, for a dangerous one, what to type (``confirm_word``) — how many records when it names them by ``ids``, and
     ``blocked`` when it names none (not from the chat)."""
     schema = _schema(op)
@@ -623,11 +669,11 @@ def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | 
             count = len(ids)
         else:
             blocked = True
-    words = _Words(op, language, ctx)
+    words = _Words(op, language, ctx).within(arguments, props, defs)
     with translation.override(language):
         said = [
             # The title of the property itself: a ``$ref``'s own is its schema class's name.
-            _field(name, _label(op, name, prop.get("title")), prop, defs, arguments[name], words=words)
+            _field(name, _label(op, name, prop.get("title")), prop, defs, arguments[name], words.money(), words)
             for name, prop in props.items()
             if name in arguments
         ]
@@ -994,10 +1040,10 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   or a date: if no tool returned it, say you do not know or that you could not find it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
-- Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of the business's currency
-  ({example}), whatever its description says. To the person, write an amount in the currency its result gives (its
-  `currency`, with `currency_decimals` decimals) when it gives one, else in {currency} with {decimals} decimals; never
-  in the minor unit.
+- Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its
+  description says: the one a datum marked `"currency": true` beside it names, else the business's ({example}). To
+  the person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals)
+  when it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}
 - If something cannot be done from here (you have no tool for it), say on which screen it is done."""

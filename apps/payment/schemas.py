@@ -329,6 +329,7 @@ class PaymentIn(In):
         None,
         max_length=8,
         description="ISO 4217 code (e.g. EUR); without it, the business's currency.",
+        json_schema_extra={"currency": True},
     )
     idempotency_key: UUID | None = Field(
         None,
