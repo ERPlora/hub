@@ -32,6 +32,7 @@ def test_every_reading_is_live():
     assert set(queries()) == {
         "cash_register.settings.get",
         "cash_register.register.list",
+        "cash_register.register.get",
         "cash_register.session.list",
         "cash_register.session.current",
         "cash_register.session.get",
@@ -114,6 +115,7 @@ E_SHIFT = (
 def test_the_drawers_re_run_their_list_and_the_sessions_that_name_them():
     assert {
         "cash_register.register.list",
+        "cash_register.register.get",
         "cash_register.session.list",
         "cash_register.session.get",
     } <= (live_registry.affected([events.REGISTER_UPDATED]))

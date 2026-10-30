@@ -11,7 +11,12 @@
 // difference with its sign as «Cash register» writes it, in English and in Spanish («+€137.90», «+137,90 €»: over at a
 // glance; FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN, BASE-F97). A cashier with the blind count on
 // gets the summary and the card without the expected nor the difference, and the model never received them.
+// A write that names its session or its drawer by its id (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's
+// half is hub#416): the card says the session by its number and the drawer by its name, as the screens do, never by
+// the id the model sent (and, since hub#416, never left out for whoever may read them) — a count of the open shift and
+// the renaming of a drawer, in Spanish, cancelled: nothing changes.
 // What this file creates is deleted after it (its sessions, its drawer, its sale and its product); the settings go back.
+// flow: cash-register-assistant-card
 // flow: CASH_REGISTER-F09
 // flow: CASH_REGISTER-F07
 // flow: BASE-F97
@@ -20,7 +25,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, compactBar, EMPLOYEE, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
 import { STACK } from './stack';
@@ -28,6 +33,7 @@ import { STACK } from './stack';
 const KEY = 'FIX-CASH_REGISTER-NO-VOICE-CLOSE-WITH-ASSISTANT';
 const PREVIEW_KEY = 'FIX-HUB-CASH_REGISTER-ASSISTANT-CLOSE-CARD-WITHOUT-PREVIEW';
 const SIGN_KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-POSITIVE-DIFFERENCE-WITHOUT-SIGN';
+const RECORDS_KEY = 'FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
 const RUN = stamp();
 const SKU = `E2E-CRA-${RUN}`;
 /** The drawer this file opens its shifts on: the card names it. */
@@ -406,4 +412,90 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   await context.close();
   await settings(boss.context, { require_blind_count: settingsBefore.require_blind_count ?? false });
   await boss.context.close();
+});
+
+// ── The record a write names by its id, by its name (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS) ──
+
+/** The dangerous card ready for its capture: «Confirmación» focused, its label floated, then one frame for the label's
+ *  move to start, so `untilStill` waits for it (base-assistant.spec.ts). */
+async function confirmationReady(page: Page): Promise<void> {
+  const field = card(page).locator('[data-testid="assistant-confirm-input"]');
+  await expect(field).toHaveClass(/\bhas-focus\b/);
+  await expect(field).toHaveClass(/\blabel-floating\b/);
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+}
+
+/** «Confirmación» as its capture must show it: focused, its label floated and, in the same frame, nothing moving on the
+ *  page, the label's move included (base-assistant.spec.ts, rv-ui-35). */
+async function confirmationSettled(page: Page): Promise<boolean> {
+  await exposeMovingInPage(page);
+  return card(page)
+    .locator('[data-testid="assistant-confirm-input"]')
+    .evaluate(async (field) => {
+      const label = field.querySelector('.label-text-wrapper');
+      const look = () =>
+        label && `${JSON.stringify(label.getBoundingClientRect())} ${getComputedStyle(label).transform} ${getComputedStyle(label).opacity}`;
+      const before = look();
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+      const moving = (window as unknown as { __movingInPage: () => string[] }).__movingInPage();
+      return (
+        field.classList.contains('has-focus') &&
+        field.classList.contains('label-floating') &&
+        label !== null &&
+        look() === before &&
+        moving.length === 0
+      );
+    });
+}
+
+/** The owner in Spanish (the Hub's language cookie, as the sign-in sets it), on «Caja». */
+async function ownerInSpanish(browser: import('@playwright/test').Browser): Promise<{ context: BrowserContext; page: Page }> {
+  const { context, page } = await owner(browser);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${A}/cash_register/sessions`);
+  return { context, page };
+}
+
+test('cash-register-assistant-card — in Spanish a count of the open shift by its id names the session by its number, never by its id', async ({ browser }) => {
+  const { context, page } = await ownerInSpanish(browser);
+  const shift = await shiftWithACashSale(context, 10000);
+  await openPanel(page);
+  await ask(page, `E2E-ASK cash_register__count__add ${JSON.stringify({ session_id: shift.id, total: 12000 })}`);
+  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toBeVisible();
+    // A count is dangerous: its card lists each datum, the session by its number.
+    await expect(card(page)).toContainText(`Sesión: ${shift.number}`);
+    await expect(card(page)).not.toContainText(shift.id);
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${RECORDS_KEY}-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${RECORDS_KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  const counts = await api<{ total: number }>(context, A, 'GET', `/cash_register/counts?session_id=${shift.id}`);
+  expect(counts.data.total).toBe(0);
+  await context.close();
+});
+
+test('cash-register-assistant-card — in Spanish renaming a drawer by its id names it by its name, never by its id', async ({ browser }) => {
+  const { context, page } = await ownerInSpanish(browser);
+  await openPanel(page);
+  const renamed = `E2E Terraza ${RUN}`;
+  await ask(page, `E2E-ASK cash_register__register__update ${JSON.stringify({ register_id: drawerId, name: renamed })}`);
+  await expect(card(page)).toBeVisible({ timeout: 30_000 });
+  // Renaming is not dangerous: its card says the action with its data, the drawer it renames first.
+  await expect(card(page)).toContainText(`Cambiar en Caja: ${DRAWER} · ${renamed}`);
+  await expect(card(page)).not.toContainText(drawerId);
+  await capture(page, `${RECORDS_KEY}-drawer-1440`);
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  // The drawer's own read, the one the card names it by: unchanged.
+  const drawer = await api<{ name: string }>(context, A, 'GET', `/cash_register/registers/detail?register_id=${drawerId}`);
+  expect([drawer.status, drawer.data.name]).toEqual([200, DRAWER]);
+  await context.close();
 });

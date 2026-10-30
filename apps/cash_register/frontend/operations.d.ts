@@ -51,6 +51,10 @@ export interface RegisterOut {
   is_active: boolean;
 }
 
+export interface RegisterGetIn {
+  register_id: string;
+}
+
 export interface RegisterIn {
   name: string;
 }
@@ -283,6 +287,7 @@ declare module '@erplora/ui/sdk' {
     'cash_register.settings.get': { input: EmptyIn; output: SettingsOut };
     'cash_register.settings.update': { input: SettingsPatchIn; output: SettingsOut };
     'cash_register.register.list': { input: RegisterListIn; output: Page<RegisterOut> };
+    'cash_register.register.get': { input: RegisterGetIn; output: RegisterOut };
     'cash_register.register.create': { input: RegisterIn; output: RegisterOut };
     'cash_register.register.update': { input: RegisterUpdateIn; output: RegisterOut };
     'cash_register.session.list': { input: SessionListIn; output: Page<SessionRow> };

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:aa69c809a1d63fae737ef7e0cece5b2495b2c2b3a71cc9efdba3fe139b4c9c06 -->
+<!-- generated from WORKBOOK.md sha256:bfbd03f10e159b04f29b2a9f5fb686def65542344b133028d36b3a2218d5f5b7 -->
 
 ## What it is for and who it is for
 
@@ -351,7 +351,7 @@ Steps:
    blind count it does not tell them to whoever may not see them: the assistant does not know them
    either, F07), and whatever the shift review finds still open (F08).
 6. Then "Run this action?" shows with "Close in Cash register. Check each datum before going on.", the
-   session and the counted cash and, in "What will happen", what closing gives: the "Session", the
+   session by its number (never by its internal code) and the counted cash and, in "What will happen", what closing gives: the "Session", the
    "Drawer" (if the session has one), the "Expected in the drawer" and the "Difference", in the business's
    currency (with the blind count, whoever may not see the expected cash does not get those two, F07).
    Type "CONFIRM" and tap "Run it". That very session closes, in your name and with the three amounts,
@@ -551,7 +551,10 @@ Involved: CASH_REGISTER-F04, F10, F13
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own
 session) and the API, with the same rules and the same permissions. Designed for voice: a session is named
 by its number ("S-261014-0001") and, if it is not said which one, the open one is meant ("close the cash
-register", "record a cash out of €20"); a drawer, by its name.
+register", "record a cash out of €20"); a drawer, by its name. The assistant's confirmation says them the
+same way: the session it counts, records in, closes or prints, by its number, and the drawer it opens or
+changes, by its name, never by its internal code; it reads them with the permissions of whoever asks, so
+it names none to whoever may not see the sessions.
 
 ### What it offers: queries (they read and change nothing)
 
@@ -559,6 +562,7 @@ register", "record a cash out of €20"); a drawer, by its name.
 |---|---|---|---|
 | The cash register settings (the default ones if they were never saved, with no save date) | view sessions | F01 | `cash_register.settings.get` |
 | The drawers, with search by name, an active filter and pages (up to 100) | view sessions | F02, F03 | `cash_register.register.list` |
+| One drawer by its id, active or not: its name (the one the assistant's confirmation says) | view sessions | F02, F03 | `cash_register.register.get` |
 | The sessions, from the most recent to the oldest (or by when they were closed), with search by number, filters (status, number, drawer, dates and amounts) and pages | view sessions | F03, F09, F12 | `cash_register.session.list` |
 | The open session with its expected cash (if whoever asks may see it), whether the cash register is turned on and the sale lines in no shift (how many and their cash) | view sessions | F04, F10, F12, F17 | `cash_register.session.current` |
 | A session (by id or number) with its summary: sales by payment method, refunds, cash in, cash out, comps, expected, counted and difference | view sessions | F11, F16 | `cash_register.session.get` |

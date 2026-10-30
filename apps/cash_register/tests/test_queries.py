@@ -5,11 +5,12 @@ import datetime as dt
 
 import pytest
 from django.utils import timezone
+from live.context import OperationContext
 from live.errors import NotFound, PermissionDenied
 
 from apps.cash_register.models import Session
 from apps.cash_register.queries import DENOMINATIONS, count_total, currency_decimals
-from apps.cash_register.tests.conftest import ctx_for, open_session, run
+from apps.cash_register.tests.conftest import A, ctx_for, open_session, run
 
 pytestmark = pytest.mark.django_db
 
@@ -56,6 +57,31 @@ def test_drawers_are_listed_by_name_with_search_and_the_active_filter():
     assert [
         r.name for r in run("cash_register.register.list", {"search": "ba"}).rows
     ] == ["Back room", "Bar"]
+
+
+
+def test_a_drawer_is_read_by_its_id_active_or_not():
+    """The read the assistant's card names a drawer by (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS):
+    its name, also when it is inactive (reactivating it names it), for every till user."""
+    bar = run("cash_register.register.create", {"name": "Bar"})
+    run("cash_register.register.update", {"register_id": str(bar.id), "is_active": False})
+    read = run("cash_register.register.get", {"register_id": str(bar.id)}, ctx_for("hub_employee"))
+    assert read.model_dump() == {"id": bar.id, "name": "Bar", "is_active": False}
+
+
+def test_a_drawer_that_is_not_there_is_not_found():
+    with pytest.raises(NotFound) as refused:
+        run("cash_register.register.get", {"register_id": "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"})
+    assert refused.value.code == "cash_register.register_not_found"
+
+
+def test_nobody_without_view_sessions_reads_a_drawer():
+    """No account behind the request, or one that only counts: no drawer is read for them."""
+    bar = run("cash_register.register.create", {"name": "Bar"})
+    for permissions in (frozenset(), frozenset({"cash_register.add_count"})):
+        nobody = OperationContext(scope=A, actor=None, permissions=permissions)
+        with pytest.raises(PermissionDenied):
+            run("cash_register.register.get", {"register_id": str(bar.id)}, nobody)
 
 
 def test_the_currency_of_the_business_with_its_notes_and_coins():

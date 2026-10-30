@@ -296,7 +296,6 @@ def test_no_write_lets_an_id_or_an_iso_moment_reach_its_card():
 #: them out. Only ever lower: an app that marks its own lowers its number here, and none comes in.
 UNNAMED_REFERENCES = {
     "appointment": 34,
-    "cash_register": 6,
     "combo": 25,
     "customer": 22,
     "demo": 4,

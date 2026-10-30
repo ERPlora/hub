@@ -15,6 +15,8 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
+from base.schemas import names
+
 T = TypeVar("T")
 
 #: Just under ten trillion minor units of the business's currency (ninety-nine billion with two decimals): far above
@@ -34,6 +36,12 @@ ONE_LIST = _(
 COUNT_SOMETHING = _("Count the drawer: give its notes and coins or its total.")
 #: How «Open session» and the drawers of the settings name a drawer (the assistant's card names the datum by it).
 DRAWER = gettext_noop("Drawer")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a session by its number, as the sessions' list and every window of a shift («Cash count ·
+# S-…»); a drawer by its name, as «Open session» and the drawers of the settings. Every till role reads both.
+A_SESSION = names("cash_register.session.get", by="session_id", name=("number",))
+A_DRAWER = names("cash_register.register.get", by="register_id", name=("name",))
 
 
 def _text(max_length: int, min_length: int = 0) -> type[str]:
@@ -164,8 +172,12 @@ class RegisterIn(Closed):
     name: Name = Field(description="The drawer's name, e.g. Bar.")
 
 
+class RegisterGetIn(Closed):
+    register_id: UUID = Field(description="The drawer's id.")
+
+
 class RegisterUpdateIn(Closed):
-    register_id: UUID | None = Field(None, description="The drawer's id.")
+    register_id: UUID | None = Field(None, description="The drawer's id.", json_schema_extra=A_DRAWER)
     register_name: Name | None = Field(
         None, title=DRAWER, description="Its name, when the id is not known."
     )
@@ -190,7 +202,7 @@ class SessionRefIn(Closed):
     """Names a session; none = the open one."""
 
     session_id: UUID | None = Field(
-        None, description="The session's id; empty = the open one."
+        None, description="The session's id; empty = the open one.", json_schema_extra=A_SESSION
     )
     session: SessionNumber | None = Field(
         None, description="Its number, e.g. S-261014-0001; empty = the open one."
@@ -198,7 +210,7 @@ class SessionRefIn(Closed):
 
 
 class SessionGetIn(Closed):
-    session_id: UUID | None = Field(None, description="The session's id.")
+    session_id: UUID | None = Field(None, description="The session's id.", json_schema_extra=A_SESSION)
     session: SessionNumber | None = Field(
         None, description="Its number, e.g. S-261014-0001, when the id is not known."
     )
@@ -344,7 +356,7 @@ class CurrentOut(Schema):
 
 
 class SessionOpenIn(Closed):
-    register_id: UUID | None = Field(None, description="The drawer's id.")
+    register_id: UUID | None = Field(None, description="The drawer's id.", json_schema_extra=A_DRAWER)
     register_name: Name | None = Field(
         None,
         title=DRAWER,
