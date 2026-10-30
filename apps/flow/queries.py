@@ -39,7 +39,7 @@ from live.operations import Operation, operation, registry
 
 from apps.flow import document, recipes, vault
 from base import assistant as hub_assistant
-from base.business import babel_locale, money_text
+from base.business import babel_locale, currency_decimals, money_text
 from base.home import ISO_HOUR, moment
 from base.operations import business_currency
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
@@ -328,8 +328,10 @@ def fixed_value(raw: Any, data: dict) -> Any:
 def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps: set[str]) -> list[dict]:
     """What «Try it» says of the data an «Ask the assistant» step fixes: each, tool by tool, with the value it would
     have as the card of the change says it (FLOW-F29: a record by its name for whoever may read it, else left out;
-    never its id), empty (its tool would not be used) or unknown (it reads a step that does not run)."""
+    never its id; an amount with the business's currency, so the screen needs no live read of its own), empty (its
+    tool would not be used) or unknown (it reads a step that does not run)."""
     rows = []
+    currency = _currency(ctx.scope) if step.pinned else None
     for tool, fixed in (step.pinned or {}).items():
         filled = {}
         for field, raw in fixed.items():
@@ -345,6 +347,9 @@ def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps:
         if op is None or not filled:
             continue
         said = {field["name"]: field for field in hub_assistant.card(op, filled, ctx.language, ctx)["fields"]}
+        for field in said.values():
+            if field["kind"] == "money" and currency and "money" not in field:
+                field["money"] = {"currency": currency, "decimals": currency_decimals(currency)}
         for row in rows:
             if row["tool"] == tool and row["state"] == "filled":
                 row["said"] = said.get(row["field"])

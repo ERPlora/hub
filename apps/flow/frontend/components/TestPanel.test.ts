@@ -197,8 +197,9 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
   });
 
   // FLOW-F13 as FLOW-F29: each fixed datum in the words of the card of the change (base's `fieldText`), as the server
-  // says it for whoever tries it — a card by its name, a yes or no, an amount in the business's currency —; one the
-  // card leaves out (a record they may not read) has no row: never its id.
+  // says it for whoever tries it — a card by its name, a yes or no, an amount in the currency the server gives it,
+  // with no live read of its own (opening the tab would reopen the page's stream) —; one the card leaves out (a
+  // record they may not read) has no row: never its id.
   it('says each fixed datum as the card of the change says it, and leaves out what the card leaves out', async () => {
     const CANCEL = 'reservation.reservation.cancel';
     const UPDATE = 'reservation.reservation.update';
@@ -212,7 +213,7 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
       params: { prompt: 'Help', tools: [CANCEL, UPDATE], mode: 'ask' },
       pinned: [
         filled(CANCEL, 'on_behalf_of', { name: 'on_behalf_of', label: 'On behalf of the customer', kind: 'text', value: 'Lucía Pérez' }),
-        filled(CANCEL, 'amount', { name: 'amount', label: 'Amount', kind: 'money', value: 1500 }),
+        filled(CANCEL, 'amount', { name: 'amount', label: 'Amount', kind: 'money', value: 1500, money: { currency: 'EUR', decimals: 2 } }),
         filled(UPDATE, 'no_table', { name: 'no_table', label: 'No table', kind: 'bool', value: true }),
         filled(UPDATE, 'on_behalf_of', null),
       ],
@@ -222,8 +223,7 @@ describe('TestPanel: review 2026-10-15, item 1', () => {
       answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [step] }] },
     });
     await settle();
-    await m.live();
-    await m.result('base.business.get', { currency: 'EUR', currency_decimals: 2 });
+    expect(m.params('base.business.get')).toEqual([]);
     const value = (field: string, tool = CANCEL) => m.find(`flow-test-pinned-s1-${tool}-${field}`).findAll('span')[1].text();
     expect(value('on_behalf_of')).toBe('Lucía Pérez');
     expect(value('amount')).toBe('€15.00');

@@ -384,3 +384,15 @@ def test_trying_it_says_each_fixed_datum_as_the_card_of_the_change_says_it(gatew
     assert said(blind)[(CANCEL, "on_behalf_of")] == ("filled", None)
     assert lucia not in json.dumps(list(blind.values()))
     assert gateway.sent(CHAT) == []
+
+
+def test_trying_it_says_a_fixed_amount_in_the_business_s_currency():
+    # The amount comes with the business's currency, so «Try it» writes it as the card does without a live read of
+    # its own: opening the tab would otherwise reopen the page's live stream.
+    create = "service.service.create"
+    step = assistant(tools=[create], pinned={create: {"price": 1500}})
+    tried = run("flow.flow.test", {"document": json.dumps({"trigger": {"kind": "manual"}, "steps": [step]})})
+    [row] = tried.model_dump(mode="json")["steps"][0]["pinned"]
+    assert (row["said"]["kind"], row["said"]["value"], row["said"]["money"]) == (
+        "money", 1500, {"currency": "EUR", "decimals": 2}
+    )

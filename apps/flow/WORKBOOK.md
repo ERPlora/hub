@@ -1314,7 +1314,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   modelo y `assistant_pinned_empty` en el log, sin proponer ni ejecutar. «Probar» devuelve `pinned` por paso
   (`PinnedOut`: `filled`, `empty` o `unknown` si lee un paso que no corre en la prueba), cada `filled` con `said`,
   el dato de `base.assistant.card` (la tarjeta de FLOW-F29) leído con el `ctx` de quien prueba: `null` si la tarjeta
-  lo deja fuera (`_LEFT_OUT`), y entonces `TestPanel.vue` no lo pinta; los demás, con `fieldText` de base. Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
+  lo deja fuera (`_LEFT_OUT`), y entonces `TestPanel.vue` no lo pinta; los demás, con `fieldText` de base. Un importe
+  lleva la moneda del negocio en su `money` (la pone el servidor), para que abrir la pestaña no abra una lectura viva
+  más (reabriría el flujo de la página). Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
   («Set a specific value»: la IA ignora el campo), n8n (parámetros sin `$fromAI()`), Copilot Studio («Set as a
   value»), LangChain (`InjectedToolArg`: fuera del esquema del modelo, puesto antes de la llamada), Intercom Fin
   (conectores sobre un atributo protegido), Salesforce Agentforce (input bindings), Merge (tool input overrides),

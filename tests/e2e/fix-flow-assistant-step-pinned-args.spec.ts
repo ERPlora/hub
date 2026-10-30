@@ -151,15 +151,18 @@ for (const viewport of VIEWPORTS) {
       await settled(page);
       await capture(page, `${KEY}-${viewport.label}`);
 
-      // FLOW-F13: «Try it» says each fixed datum with the value it would have, and which tool would not be used
-      // because one would be empty — «Change a reservation» on behalf of a card the run is never given here.
+      // FLOW-F13: «Try it» says each fixed datum with the value it would have, as the card of the change names it (the
+      // guest by her name, never her card's id), and which tool would not be used because one would be empty —
+      // «Change a reservation» on behalf of a card the run is never given here.
       await pick(page, 'flow-assistant-addtool-s1', 'Change a reservation', 'Change a reservation');
       await pick(page, 'flow-assistant-addpin-s1', 'behalf', 'On behalf of the customer');
       await editor.locator(`[data-testid="flow-assistant-pin-s1-${UPDATE}-on_behalf_of-text-0"]`).fill('{{input.customer}}');
       await editor.locator('[data-testid=flow-editor-tab-test]').click();
       const tried = editor.locator('[data-testid=flow-test-step-s1]');
       await expect(tried).toContainText('Would ask the assistant');
-      await expect(tried.locator(`[data-testid="flow-test-pinned-s1-${CANCEL}-on_behalf_of"]`)).toContainText(writer.card);
+      const fixed = tried.locator(`[data-testid="flow-test-pinned-s1-${CANCEL}-on_behalf_of"]`);
+      await expect(fixed.locator('span')).toHaveText(['Cancel a reservation › On behalf of the customer', lucia]);
+      await expect(tried).not.toContainText(writer.card);
       await expect(tried.locator(`[data-testid="flow-test-pinnedempty-s1-${UPDATE}"]`)).toHaveText(
         '«Change a reservation» would not be used: «On behalf of the customer», fixed by this step, would be empty in this run.',
       );
