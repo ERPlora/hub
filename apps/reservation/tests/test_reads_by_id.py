@@ -9,6 +9,8 @@ import datetime as dt
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from base.models import Membership
@@ -215,3 +217,24 @@ def test_another_businesss_record_is_not_there(client, hub_a, hub_b, as_in_produ
     signed_in(client, hub_a)
     status, body = read(client, hub_a, path, theirs.id)
     assert status == 404 and body["error"]["code"].endswith("_not_found"), body
+
+
+# ── The lookups a write shares with its read lock the row for the write, never for the read ───────
+
+
+@pytest.mark.django_db
+def test_removing_a_slot_or_unblocking_a_date_locks_its_row_first_and_reading_one_locks_nothing():
+    """``delete_slot`` and ``delete_blocked`` find their record through the lookups the reads by id share
+    (``find_slot``, ``find_block``), locked (``FOR UPDATE``) as they were before they were shared; a read by id
+    locks nothing."""
+    slot, block = make_slot(), make_blocked()
+    with CaptureQueriesContext(connection) as reading:
+        run("reservation.time_slot.get", {"id": str(slot.id)})
+        run("reservation.blocked_date.get", {"id": str(block.id)})
+    assert not [query["sql"] for query in reading.captured_queries if "FOR UPDATE" in query["sql"]]
+    with CaptureQueriesContext(connection) as writing:
+        run("reservation.time_slot.delete", {"id": str(slot.id)})
+        run("reservation.blocked_date.delete", {"id": str(block.id)})
+    locked = [query["sql"] for query in writing.captured_queries if "FOR UPDATE" in query["sql"]]
+    assert any('"reservation_timeslot"' in sql for sql in locked), locked
+    assert any('"reservation_blockeddate"' in sql for sql in locked), locked
