@@ -11,7 +11,7 @@ from uuid import UUID
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
-from django.core.files.storage import storages
+from django.core.files.storage import Storage, storages
 from django.db.models import Max, Q
 from django.http import HttpRequest
 from django.utils import timezone, translation
@@ -1677,6 +1677,14 @@ DELETE_FILES = "base.delete_files"
 def space_limit(ctx: OperationContext) -> int | None:
     """The space for files of the plan in the SaaS's last photo of the hub of ``ctx``; ``None``: no limit."""
     return files.space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
+
+
+def refuse_past_the_plans_space(ctx: OperationContext, store: Storage, size: int) -> None:
+    """Files' 409 ``base.file_no_space`` (``base.files.refuse_past_the_space``) when ``size`` more bytes go past the
+    space the plan of ``ctx``'s hub includes, said in the caller's language (an API key's or the assistant's call has
+    no request). For the apps that keep a file in the hub file store: it takes the plan's space as Files does."""
+    with translation.override(ctx.language):
+        files.refuse_past_the_space(store, hub_id(ctx.scope), size, limit_bytes=space_limit(ctx))
 
 
 @operation(

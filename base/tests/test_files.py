@@ -284,6 +284,27 @@ def test_an_upload_past_the_plan_s_space_is_refused(store):
     assert files.upload(store, A, "", "c.pdf", b"x" * 500, limit_bytes=None)["size"] == 500
 
 
+def test_past_the_plan_s_space_one_refusal_says_the_same_for_every_app_that_keeps_files(store):
+    # FIX-HUB-BASE-PLAN-SPACE-CHECK-COPIED-IN-THREE-APPS: Files, the website's images and WhatsApp's header samples
+    # each copied this check, its code and its sentence; now they all refuse through this one.
+    put(store, A, "a.pdf", b"x" * 60)
+    assert files.refuse_past_the_space(store, A, 40, limit_bytes=100) is None  # up to the limit, it lets it in
+    assert files.refuse_past_the_space(store, A, 10**12, limit_bytes=None) is None  # no limit in the plan: none
+    assert files.refuse_past_the_space(store, B, 100, limit_bytes=100) is None  # A's files are not B's space
+
+    said = {}
+    for language in ("en", "es"):
+        with translation.override(language), pytest.raises(Conflict) as refused:
+            files.refuse_past_the_space(store, A, 1024**3 - 59, limit_bytes=1024**3)
+        assert (refused.value.status, refused.value.code, refused.value.fields) == (409, "base.file_no_space", None)
+        said[language] = refused.value.message
+    # What the person reads is what Files said before the check was shared.
+    assert said == {
+        "en": "There is no space left for that file: your plan includes 1 GB.",
+        "es": "No queda espacio para ese archivo: tu plan incluye 1 GB.",
+    }
+
+
 def test_an_upload_into_a_folder_that_is_not_there_is_refused(store):
     assert code_of(files.upload, store, A, "Nadie", "a.pdf", PDF) == "base.file_folder_missing"
 

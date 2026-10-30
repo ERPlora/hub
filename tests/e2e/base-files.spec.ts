@@ -8,12 +8,14 @@
 // sideways.
 //
 // The stack keeps the files on disk (`MEDIA_ROOT`); every test starts and ends with the business's files emptied
-// through the product's own operations.
+// through the product's own operations. «Space» also counts what the apps keep in the hub's store (the website's
+// images of an earlier spec), which no test of Files empties: each reads it first and expects it on screen.
 // flow: BASE-G82 BASE-G83 BASE-G84 BASE-G85 BASE-G86
 import { crc32, deflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { formatSize } from '../../base/frontend/lib/files';
 import { A, api, B, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
@@ -55,6 +57,7 @@ const NOTE = 'Pay the supplier on Friday.\nAsk for the March invoice.\n';
 interface Listing {
   folders: { path: string }[];
   files: { path: string; name: string }[];
+  space: { used_bytes: number };
 }
 
 /** Empties the business's files at `origin` with the owner's session, through `base.file.delete`. */
@@ -65,6 +68,13 @@ async function wipe(context: BrowserContext, origin: string): Promise<void> {
     const gone = await api(context, origin, 'POST', '/files/delete', { path });
     expect(gone.status, `deleting ${path} at ${origin}`).toBe(200);
   }
+}
+
+/** What the hub file store of `origin` takes now, the files its apps keep too: what «Space» says is used. */
+async function usedBytes(context: BrowserContext, origin: string): Promise<number> {
+  const { status, data } = await api<Listing>(context, origin, 'GET', '/files');
+  expect(status, `the listing of ${origin}`).toBe(200);
+  return data.space.used_bytes;
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -143,7 +153,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       }
       await expect(testid(page, 'files-empty')).toContainText('No files');
       await expect(testid(page, 'files-empty')).toContainText('Upload a file or drag it here.');
-      await expect(testid(page, 'files-space')).toHaveText(/^Space: 0 B used · No limit$/);
+      // No file of the business; what its apps keep (an earlier spec's website images) is used space all the same.
+      await expect(testid(page, 'files-space')).toHaveText(
+        `Space: ${formatSize(await usedBytes(context, A), 'en')} used · No limit`,
+      );
       // The tree is content of the page: on the left from a tablet up, a «Folders» selector on a phone.
       await expect(testid(page, 'files-tree')).toBeVisible({ visible: !narrow });
       await expect(testid(page, 'files-folder-select')).toBeVisible({ visible: narrow });
@@ -196,7 +209,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // BASE-G82 — folders first, then the files; «Space» counts what is kept.
       await expect(shown(page).locator('[data-item]')).toHaveCount(5);
       await expect(shown(page).locator('[data-item]').first()).toHaveAttribute('data-kind', 'folder');
-      await expect(testid(page, 'files-space')).toHaveText(/^Space: \d+ B used · No limit$/);
+      await expect(testid(page, 'files-space')).toHaveText(
+        `Space: ${formatSize(await usedBytes(context, A), 'en')} used · No limit`,
+      );
       // The open folder stands out in the tree and stays readable.
       if (!narrow) expect(await contrast(testid(page, 'files-root'))).toBeGreaterThanOrEqual(4.5);
       await snap(page, 'BASE-G82', width);
@@ -459,10 +474,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     const { context, page } = await hostPage(browser, A, { viewport, next: '/files' });
     try {
       await wipe(context, A);
+      // What `a`'s apps keep counts too (an earlier spec's website images): the first file tops it up to 600 KB.
+      const kept = await usedBytes(context, A);
+      expect(kept, 'what the apps of `a` keep leaves room for the test').toBeLessThan(600 * 1024);
       await page.reload();
       const meter = testid(page, 'files-space');
-      await expect(meter.locator('.usage-meter__label')).toHaveText('Space: 0 B of 1 MB');
-      await upload(page, [{ name: 'scan.dat', mimeType: 'application/octet-stream', buffer: Buffer.alloc(600 * 1024, 7) }]);
+      await expect(meter.locator('.usage-meter__label')).toHaveText(`Space: ${formatSize(kept, 'en')} of 1 MB`);
+      const scan = Buffer.alloc(600 * 1024 - kept, 7);
+      await upload(page, [{ name: 'scan.dat', mimeType: 'application/octet-stream', buffer: scan }]);
       await expect(item(page, 'scan.dat')).toBeVisible();
       await expect(meter.locator('.usage-meter__label')).toHaveText('Space: 600 KB of 1 MB');
       // The bar at the exact share, never figures rounded to GB.
