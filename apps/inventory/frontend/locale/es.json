@@ -97,7 +97,8 @@
         "sent": "La etiqueta ha ido a la impresora «{printer}».",
         "queued": "La etiqueta espera en la cola de impresión: ninguna impresora tiene la función «Etiqueta». Asígnasela a una en Impresión.",
         "error": "No se pudo imprimir la etiqueta del código de barras: {reason}"
-      }
+      },
+      "photo": "Foto"
     },
     "form": {
       "newTitle": "Nuevo producto",
@@ -123,7 +124,8 @@
       "categoriesSearch": "Busca una categoría para añadirla",
       "removeCategory": "Quitar {name}",
       "categoriesLoadError": "No se pudieron cargar las categorías",
-      "cancelEdit": "Cancelar edición"
+      "cancelEdit": "Cancelar edición",
+      "photoNotSaved": "El producto se ha guardado, pero la foto no: {reason}"
     },
     "stock": {
       "current": "Stock actual",

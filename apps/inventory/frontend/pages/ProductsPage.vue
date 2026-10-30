@@ -24,6 +24,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
+import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import CsvButtons from '../components/CsvButtons.vue';
 import ImportPreviewModal from '../components/ImportPreviewModal.vue';
 import ImportReportModal from '../components/ImportReportModal.vue';
@@ -125,6 +126,8 @@ const STATUS_LABELS: Record<ProductStatus, string> = {
 };
 
 const columns = computed<DataTableColumn<Product>[]>(() => [
+  // INVENTORY-F32: the photo's thumbnail before the name (its initials without one), in the list and on the cards.
+  { key: 'photo', label: t('inventory.products.photo'), sortable: false, cell: 'photo', width: '4rem' },
   { key: 'name', label: t('inventory.common.name'), sortable: true, priority: 'high', filter: { type: 'text', maxlength: 200 } },
   { key: 'sku', label: t('inventory.common.sku'), sortable: true, filter: { type: 'text', maxlength: 64 } },
   {
@@ -392,6 +395,14 @@ async function exportFile(): Promise<void> {
           @read-error="pageError = $t('inventory.import.readError')"
         />
       </template>
+      <template #photo="{ row }">
+        <ItemImage
+          class="inventory-products__photo"
+          :data-testid="`inventory-product-photo-${row.id}`"
+          :src="row.image_url"
+          :name="row.name"
+        />
+      </template>
       <template #stock="{ row }">
         <span data-testid="inventory-product-stock">{{ row.tracks_stock ? formatQuantity(row.stock, locale) : '—' }}</span>
       </template>
@@ -502,6 +513,12 @@ async function exportFile(): Promise<void> {
 </template>
 
 <style scoped>
+.inventory-products__photo {
+  width: 40px;
+  height: 40px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
 .inventory-products__status {
   display: inline-flex;
   flex-wrap: wrap;
