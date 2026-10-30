@@ -455,7 +455,7 @@ async function save(): Promise<void> {
               :testid="`${ID}-header-file-preview`"
             >
               <p :data-testid="`${ID}-header-file-name`">
-                <strong>{{ form.sample.name }}</strong> · {{ formatSize(form.sample.size, locale) }}
+                <strong>{{ form.sample.name }}</strong> · <span class="wa-template-form__size">{{ formatSize(form.sample.size, locale) }}</span>
               </p>
             </HeaderFilePreview>
             <p
@@ -677,6 +677,10 @@ async function save(): Promise<void> {
 </template>
 
 <style scoped>
+/* «6.2 KB» never splits across two lines. */
+.wa-template-form__size {
+  white-space: nowrap;
+}
 .wa-template-form {
   display: grid;
   gap: 14px;

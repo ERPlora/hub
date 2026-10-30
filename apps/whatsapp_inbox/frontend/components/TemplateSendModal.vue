@@ -182,7 +182,7 @@ watch(open, (isOpen) => {
             >
               <p data-testid="whatsapp-inbox-template-file-name">
                 {{ t(`whatsapp_inbox.templates.editor.headerFormats.${fileKind}`) }}:
-                <strong>{{ sample.name }}</strong> · {{ formatSize(sample.size, locale) }}
+                <strong>{{ sample.name }}</strong> · <span class="wa-template__size">{{ formatSize(sample.size, locale) }}</span>
               </p>
             </HeaderFilePreview>
             <p
@@ -256,6 +256,10 @@ watch(open, (isOpen) => {
 </template>
 
 <style scoped>
+/* «6.2 KB» never splits across two lines. */
+.wa-template__size {
+  white-space: nowrap;
+}
 .wa-template {
   display: grid;
   gap: 12px;
