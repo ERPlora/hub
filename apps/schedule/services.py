@@ -9,12 +9,12 @@ cover the same day never slip past each other's check; a special day's date is u
 from collections.abc import Iterable
 from typing import Any
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils import formats
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.schedule import events
@@ -124,7 +124,7 @@ def _save_special_day(row: SpecialDay) -> None:
     if SpecialDay.objects.filter(date=row.date).exclude(pk=row.pk).exists():
         raise _date_taken()
     try:
-        with transaction.atomic():
+        with atomic():
             row.save()
     except IntegrityError as error:
         if getattr(getattr(error.__cause__, "diag", None), "constraint_name", None) == SPECIAL_DAY_DATE_UNIQUE:

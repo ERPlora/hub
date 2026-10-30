@@ -13,7 +13,7 @@ import datetime as dt
 import uuid
 from decimal import Decimal
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import F
 from django.db.models.functions import Lower
 from django.utils import timezone, translation
@@ -21,7 +21,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict
-from live.operations import UnknownOperation, operation
+from live.operations import UnknownOperation, atomic, operation
 from live.operations import get as operation_named
 from live.outbox import record_event
 
@@ -119,7 +119,7 @@ def _locked_settings(ctx: OperationContext) -> tuple[Settings, bool]:
     if settings is not None:
         return settings, False
     try:
-        with transaction.atomic():
+        with atomic():
             return Settings.objects.create(updated_by=actor(ctx)), True
     except IntegrityError:
         return Settings.objects.select_for_update().get(), False
@@ -197,7 +197,7 @@ def create_register(ctx: OperationContext, data: RegisterIn) -> dict:
     if _name_taken(data.name):
         raise _refuse_taken_name()
     try:
-        with transaction.atomic():
+        with atomic():
             register = Register.objects.create(name=data.name, created_by=actor(ctx))
     except IntegrityError:
         raise _refuse_taken_name() from None
@@ -227,7 +227,7 @@ def update_register(ctx: OperationContext, data: RegisterUpdateIn) -> dict:
     if data.is_active is not None:
         register.is_active = data.is_active
     try:
-        with transaction.atomic():
+        with atomic():
             register.save(update_fields=["name", "is_active", "updated_at"])
     except IntegrityError:
         raise _refuse_taken_name() from None
@@ -374,7 +374,7 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
     day = timezone.localdate(now)
     sequence = _number(day)
     try:
-        with transaction.atomic():
+        with atomic():
             session = Session.objects.create(
                 number=session_number(day, sequence),
                 business_day=day,

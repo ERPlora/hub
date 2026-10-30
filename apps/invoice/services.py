@@ -19,13 +19,13 @@ from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction
 from uuid import UUID
 
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError
 from django.db.models import F
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError
-from live.operations import UnknownOperation, operation
+from live.operations import UnknownOperation, atomic, operation
 from live.operations import get as get_operation
 from live.outbox import record_event
 
@@ -1568,7 +1568,7 @@ def _queue_paper(ctx: OperationContext, request: dict) -> dict:
     except UnknownOperation:
         return dict(NOT_QUEUED)
     try:
-        with transaction.atomic():
+        with atomic():
             job = op(ctx, op.input.model_validate(request)).job
             if job is not None and job.printer_id is None:
                 raise _Unprintable

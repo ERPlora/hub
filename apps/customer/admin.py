@@ -7,7 +7,7 @@ group, a tag or a custom field locks it first (``lock_customers``, ``lock_rows``
 """
 
 from django.contrib import admin
-from django.db import transaction
+from live.operations import atomic
 
 from apps.customer.models import (
     Activity,
@@ -43,7 +43,7 @@ class LockedDeletion:
 
     # The actions run outside a transaction; the lock above lasts until the deletion ends.
     def response_action(self, request, queryset, *args, **kwargs):
-        with transaction.atomic():
+        with atomic():
             return super().response_action(request, queryset, *args, **kwargs)
 
 

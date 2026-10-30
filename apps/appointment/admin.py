@@ -9,7 +9,7 @@ event. What the database fills in (ids and timestamps) is shown, not edited. An 
 from collections.abc import Callable
 
 from django.contrib import admin
-from django.db import transaction
+from live.operations import atomic
 
 from apps.appointment.models import (
     Appointment,
@@ -43,7 +43,7 @@ class LockedDeletion:
 
     # The actions run outside a transaction; the lock above lasts until the deletion ends.
     def response_action(self, request, queryset, *args, **kwargs):
-        with transaction.atomic():
+        with atomic():
             return super().response_action(request, queryset, *args, **kwargs)
 
 
