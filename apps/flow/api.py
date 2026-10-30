@@ -20,6 +20,7 @@ from apps.flow.schemas import (
     FlowListIn,
     FlowRefIn,
     GrantIn,
+    QuestionRefIn,
     RecipeRefIn,
     RunIn,
     RunListIn,
@@ -101,6 +102,11 @@ async def run_list(request, params: Query[RunListIn]):
     return await run_operation(request, queries.list_runs, params)
 
 
+@bind(router, "flow.run.get", "/flow/runs/detail")
+async def run_get(request, params: Query[RunRefIn]):
+    return await run_operation(request, queries.get_run, params)
+
+
 @bind(router, "flow.run.retry", "/flow/runs/retry")
 async def run_retry(request, data: RunRefIn):
     return await run_operation(request, services.retry_run, data)
@@ -109,6 +115,11 @@ async def run_retry(request, data: RunRefIn):
 @bind(router, "flow.draft.list", "/flow/drafts")
 async def draft_list(request, params: Query[DraftListIn]):
     return await run_operation(request, queries.list_drafts, params)
+
+
+@bind(router, "flow.draft.get", "/flow/drafts/detail")
+async def draft_get(request, params: Query[DraftRefIn]):
+    return await run_operation(request, queries.get_draft, params)
 
 
 @bind(router, "flow.draft.propose", "/flow/drafts", status=201)
@@ -158,6 +169,11 @@ async def secret_delete(request, data: SecretRefIn):
 @bind(router, "flow.question.list", "/flow/questions")
 async def question_list(request):
     return await run_operation(request, queries.list_questions)
+
+
+@bind(router, "flow.question.get", "/flow/questions/detail")
+async def question_get(request, params: Query[QuestionRefIn]):
+    return await run_operation(request, queries.get_question, params)
 
 
 @bind(router, "flow.question.answer", "/flow/questions/answer")
