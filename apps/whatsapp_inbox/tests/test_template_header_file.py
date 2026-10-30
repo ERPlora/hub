@@ -12,13 +12,15 @@ answer» never blamed on ERPlora (gh:hub#2731).
 
 import base64
 import json
+from pathlib import Path
 
 import httpx
 import pydantic
 import pytest
 import respx
+from django.apps import apps
 from django.core.files.storage import storages
-from live.errors import Conflict, InvalidPayload
+from live.errors import Conflict, InvalidPayload, OperationError
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Template, TemplateSample
@@ -29,6 +31,7 @@ from apps.whatsapp_inbox.tests.test_services_templates import (  # noqa: F401 - 
     registering,
     written,
 )
+from base import files
 from base.models import Hub
 
 pytestmark = pytest.mark.django_db
@@ -302,6 +305,39 @@ def test_without_a_space_in_its_plan_another_business_keeps_its_file(hub_files):
     plan_space(len(JPEG) - 1)
 
     assert upload(ctx=ctx_for(scope=B)).name == "carta.jpg"
+
+
+def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_inbox_s(hub_files, monkeypatch):
+    # FIX-HUB-WHATSAPP-INBOX-PLAN-SPACE-CHECK-STILL-COPIED: the inbox copied Files' check and its sentence, so a change
+    # of the limit or of what it says was to be made here too. Now the header's file asks base's own check.
+    asked = []
+    monkeypatch.setattr(
+        files, "refuse_past_the_space", lambda store, hub, size, *, limit_bytes: asked.append((hub, size, limit_bytes))
+    )
+    plan_space(len(JPEG) - 1)
+
+    upload()  # base's check (here, one that lets everything in) decides: the inbox keeps the file
+
+    assert asked == [(Hub.objects.get(slug="a").id, len(JPEG), len(JPEG) - 1)]
+    upload(name="menu.jpg")  # the same file again is the same object: no space asked for
+    assert len(asked) == 1
+    catalogue = Path(apps.get_app_config("whatsapp_inbox").path, "locale", "es", "LC_MESSAGES", "django.po").read_text()
+    assert 'msgid "There is no space left for that file: your plan includes %(space)s."' not in catalogue
+
+
+def test_the_store_not_answering_while_the_space_is_measured_keeps_nothing(hub_files, monkeypatch):
+    """Files' own 503: the space could not be measured, so nothing is taken for «empty» and nothing is kept."""
+    plan_space(10 * MB)
+
+    def not_answering(*args, **kwargs):
+        raise OSError("the store did not answer")
+
+    monkeypatch.setattr(hub_files, "listdir", not_answering)
+    with pytest.raises(OperationError) as failed:
+        upload()
+
+    assert (failed.value.status, failed.value.code) == (503, "base.file_store_unavailable")
+    assert not TemplateSample.objects.exists()
 
 
 # ── Creating a template with it (F29) ───────────────────────────────────────────────────────────

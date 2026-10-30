@@ -808,9 +808,6 @@ msgstr "Este archivo pesa más de %(mb)s MB: elige uno más ligero."
 msgid "The file could not be kept: the business's file store did not answer. Try again in a moment."
 msgstr "No se pudo guardar el archivo: el almacén de archivos del negocio no contestó. Inténtalo de nuevo en un momento."
 
-msgid "There is no space left for that file: your plan includes %(space)s."
-msgstr "No queda espacio para ese archivo: tu plan incluye %(space)s."
-
 msgid "This template's header has no file."
 msgstr "La cabecera de esta plantilla no lleva archivo."
 
