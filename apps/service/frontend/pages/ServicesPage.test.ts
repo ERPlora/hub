@@ -87,10 +87,11 @@ describe('ServicesPage', () => {
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Services');
   });
 
-  it('paints Name, Category, Pricing, Price, Duration and Status, with the reason of «Not configured»', async () => {
+  it('paints Photo, Name, Category, Pricing, Price, Duration and Status, with the reason of «Not configured»', async () => {
     const s = await setup();
     await s.show(page(ROWS));
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
+      ['photo', 'Photo'],
       ['name', 'Name'],
       ['category_name', 'Category'],
       ['pricing_type', 'Pricing'],
@@ -98,10 +99,20 @@ describe('ServicesPage', () => {
       ['duration_minutes', 'Duration (min)'],
       ['status', 'Status'],
     ]);
-    expect(s.cells(0).slice(0, 6)).toEqual(['Haircut', 'Hair', 'Fixed price', '€22.50', '30', 'Active']);
-    expect(s.cells(1).slice(1, 3)).toEqual(['—', 'From']);
-    expect(s.cells(1)[5]).toContain('Not configured');
-    expect(s.cells(1)[5]).toContain('No tax category: it cannot be charged');
+    // The first cell is the photo's thumbnail, here the initials («H»: no photo).
+    expect(s.cells(0).slice(0, 7)).toEqual(['H', 'Haircut', 'Hair', 'Fixed price', '€22.50', '30', 'Active']);
+    expect(s.cells(1).slice(2, 4)).toEqual(['—', 'From']);
+    expect(s.cells(1)[6]).toContain('Not configured');
+    expect(s.cells(1)[6]).toContain('No tax category: it cannot be charged');
+  });
+
+  // SERVICE-F34: the service's photo thumbnail before its name (INVENTORY-F32).
+  it('each row shows the photo’s thumbnail, lazily and named by the service', async () => {
+    const s = await setup();
+    const url = '/p/catalog/beauty_hair/corte_mujer.webp';
+    await s.show(page([service('s1', { image: 'catalog:beauty_hair/corte_mujer', image_url: url })]));
+    const img = s.find('service-photo-s1').find('img');
+    expect([img.attributes('src'), img.attributes('alt'), img.attributes('loading')]).toEqual([url, 'Haircut', 'lazy']);
   });
 
   it('filters by column: the price in euros as cents, the status, and Archived is the archived view', async () => {
@@ -273,20 +284,20 @@ describe('ServicesPage', () => {
     it('paints the price in złoty for a business in Poland, never in euros', async () => {
       const s = await setup({ business: business(POLISH) });
       await s.show(page(ROWS));
-      expect(s.cells(0)[3].replace(/\s/g, ' ')).toBe('zł 22.50');
+      expect(s.cells(0)[4].replace(/\s/g, ' ')).toBe('zł 22.50');
       expect(s.wrapper.text()).not.toContain('€');
     });
 
     it('paints a price of 1500 yen as ¥1,500 for a business in Japan: the yen has no minor units', async () => {
       const s = await setup({ business: business(JAPANESE) });
       await s.show(page([service('s1', { price: 1500 })]));
-      expect(s.cells(0)[3]).toBe('¥1,500');
+      expect(s.cells(0)[4]).toBe('¥1,500');
     });
 
     it('paints a figure without a symbol until the business answers', async () => {
       const s = await setup({ business: null });
       await s.show(page(ROWS));
-      expect(s.cells(0)[3]).toBe('22.50');
+      expect(s.cells(0)[4]).toBe('22.50');
     });
 
     it('reads the price filter in the business currency’s minor units: «1500» is 1500 yen', async () => {
@@ -312,9 +323,9 @@ describe('ServicesPage', () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
     expect(s.prop('searchPlaceholder')).toBe('Buscar servicio…');
-    expect(s.cells(0)[2]).toBe('Precio fijo');
-    expect(s.cells(0)[3]).toMatch(/^22,50\s€$/);
-    expect(s.cells(1)[5]).toContain('Sin configurar');
+    expect(s.cells(0)[3]).toBe('Precio fijo');
+    expect(s.cells(0)[4]).toMatch(/^22,50\s€$/);
+    expect(s.cells(1)[6]).toContain('Sin configurar');
   });
 });
 

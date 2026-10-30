@@ -87,8 +87,10 @@
         "tax": "Categoría fiscal",
         "taxMissing": "Todavía no hay categorías fiscales. Configúralas en Impuestos antes de añadir servicios.",
         "create": "Crear servicio",
-        "save": "Guardar cambios"
-      }
+        "save": "Guardar cambios",
+        "photoNotSaved": "El servicio se ha guardado, pero la foto no: {reason}"
+      },
+      "photo": "Foto"
     },
     "professionals": {
       "title": "Profesionales que lo hacen",
