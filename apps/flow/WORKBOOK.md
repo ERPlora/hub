@@ -930,8 +930,9 @@ Sale: la primera vez, una automatización nueva, encendida, con **exactamente** 
 `flow.flow.granted`, `flow.flow.enabled`): nunca queda encendida a medias. Pulsar dos veces, o dos personas a
 la vez, es una sola automatización.
 Si falla: si quien la enciende no puede hacer él mismo algo de lo que pide («No puedes permitir lo que tú no
-puedes hacer: «…».»), no se crea nada; una que pide una app que el negocio no tiene no sale en su sección y la
-línea de abajo dice cuál falta; el mensaje en rojo dentro de la tarjeta.
+puedes hacer: «…».»), no se crea nada; una que pide una app que el negocio no tiene (aunque solo la use el
+asistente de un paso **Pedírselo al asistente**) no sale en su sección y la línea de abajo dice cuál falta; el
+mensaje en rojo dentro de la tarjeta.
 Implicados: FLOW-F04, FLOW-F12, FLOW-F21, FLOW-F34, FLOW-F35
 
 ### FLOW-F34 Poner en pausa una automatización que trae otra app, sin borrarla
@@ -1357,7 +1358,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   las suyas como datos en **su propio** `recipes.py` (`RECIPES`: `id`, `name`, `summary`, `description`,
   `trigger`, `steps` y `grants` = `{operación: por qué}`, con textos `gettext_lazy`; no importa nada de esta
   app). `recipes.shelf()` lee las de las apps activas y aparta, con su motivo y sin romper las demás, la que
-  nombra una app que el negocio no tiene (`flow.recipe_needs_apps`) o la que no se lee como automatización,
+  nombra una app que el negocio puede activar y no tiene, en su disparador, en un paso o entre los `tools` de un
+  paso `assistant` (`flow.recipe_needs_apps`, con esa app; lo de la plataforma, `base.…`, lo de esta app,
+  `flow.…`, o un nombre de ninguna app no es una app que activar y se aparta como `flow.recipe_invalid`
+  diciendo qué no existe) o la que no se lee como automatización,
   repite id o pide **otros** permisos que los que usan sus pasos, ni más ni menos, o uno que necesita a una
   persona (`flow.recipe_invalid`); un test (`test_every_recipe_the_apps_bring_is_offered`) exige que todas las
   del código se ofrezcan. Su **huella** (`digest`) es un sha256 de su documento en cada idioma y de sus

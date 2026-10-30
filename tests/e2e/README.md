@@ -97,10 +97,11 @@ Reglas que el e2e hace cumplir:
   nada (`fernet-keys.ts`).
 - Si la BD e2e aún no existe, `global-setup.ts` lo dice con la orden que la crea.
 - Las specs entran con las cuentas de demo del SaaS (`owner@example.com` y `employee@example.com`, con acceso a `a` y
-  `b`), que solo crea `manage.py demo_seed` del SaaS. `global-setup.ts` las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`,
-  por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir nada) y, si faltan, para antes de la primera spec con
-  la orden que las siembra; si esa BD no existe, con la que la crea. Sin ellas, cada login esperaba 30 s para caer con «The
-  email address and/or password you specified are not correct.».
+  `b`), que crea `manage.py demo_seed` del SaaS (en la receta, por medio de `whatsapp_hub_seed.py`, abajo). `global-setup.ts`
+  las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`, por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir
+  nada) y, si faltan, para antes de la primera spec con la orden de la receta que las siembra, ya con la BD y el puerto de
+  su Hub; si esa BD no existe, con la que la crea. Sin ellas, cada login esperaba 30 s para caer con «The email address
+  and/or password you specified are not correct.».
 
 Lo que no puede comprobar el e2e, y lo pide la receta:
 
@@ -119,30 +120,48 @@ Lo que no puede comprobar el e2e, y lo pide la receta:
   los intentos que protege.
 - **Una pila por checkout**: dos Vite del mismo checkout comparten `node_modules/.vite` y se rompen el uno al
   otro al optimizar dependencias (la página se queda en blanco). Cada pila sale de su worktree.
+- **Las cuentas de demo, sembradas con los ids que el Hub dio a `a` y `b`**: el SaaS empuja la foto de un negocio a
+  `/internal/hubs/{id}/state` y las specs de WhatsApp siembran erplora.com con `whatsapp_hub_seed.py` (abajo, «WhatsApp»),
+  que exige esos ids. Por eso la BD del Hub va primero (`database.ts` da a `a` y `b` sus ids con `seed_local_hubs`) y el SaaS
+  se siembra con ese mismo script, que corre `demo_seed` con ellos. Con `demo_seed` a secas, `a` y `b` nacen en el SaaS con
+  ids propios, y cada spec de WhatsApp cae con «whatsapp_hub_seed.py: a is … here and … in the Hub: drop this database»;
+  si te pasa, borra la BD del SaaS (`--drop`), créala otra vez y siémbrala como dice la receta.
+- **Esa siembra, con el `runserver` del Hub parado**: empuja la foto de `a` que tiene erplora.com, con su plan Gratis (un
+  dispositivo). Con el Hub parado se queda pendiente (imprime `{"delivered": false, "hub_error": ""}`, y es lo esperado) y
+  la vuelve a empujar la primera spec de WhatsApp, que antes guarda la foto de `a` y la repone al acabar
+  (`whatsapp-helpers.ts`). Con el Hub en marcha, `a` se quedaría con el plan Gratis para toda la pasada y una spec con dos
+  dispositivos perdería una sesión. Su `HUB_INTERNAL_URL` es el de este Hub, nunca el `:8000` compartido.
 
 Receta (pila en `8030`, desde la raíz de `erplora-next`; otra pila: otros puertos y otra BD):
 
 ```bash
 export COMPOSE_FILE="$PWD/compose.yaml"
-# 1. SaaS propio en 8031, desde un worktree del SaaS, sobre su BD saas_e2e_8031 y con su carpeta de correo
+# 1. La BD de la pila del Hub, desde su worktree: crea y migra hub_e2e_8030 y da a a y b sus ids
+cd <hub-wt>
+export E2E_HUB_PORT=8030 VITE_DEV_PORT=5203 SAAS_URL=http://localhost:8031 DB_NAME=hub_e2e_8030 \
+  E2E_MAIL_DIR=<saas-wt>/.mail-8031
+node tests/e2e/database.ts
+# 2. SaaS propio en 8031, desde un worktree del SaaS, sobre su BD saas_e2e_8031 y con su carpeta de correo
 cd <saas-wt>
 env -u DB_NAME E2E_SAAS_PORT=8031 node tests/e2e/database.ts        # crea y migra saas_e2e_8031
-env DB_NAME=saas_e2e_8031 uv run python manage.py demo_seed         # las cuentas de demo con las que entran las specs
+# las cuentas de demo con las que entran las specs, con a y b con los ids del Hub (el Hub, aún sin arrancar)
+env DB_NAME=saas_e2e_8031 HUB_INTERNAL_URL=http://127.0.0.1:8030 uv run python tests/e2e/panel/whatsapp_hub_seed.py \
+  $(docker compose exec -T postgres psql -U hub -d hub_e2e_8030 -At -c "select id from base_hub where slug in ('a', 'b') order by slug")
 env DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' HUB_INTERNAL_URL=http://localhost:8030 \
   EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True \
   uv run python manage.py runserver 127.0.0.1:8031   # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
-# 2. La pila del Hub, desde su worktree (en otra terminal)
+# 3. El Hub de la pila y la e2e, desde su worktree (en otra terminal, con COMPOSE_FILE y las variables de 1 exportadas)
 cd <hub-wt>
-export E2E_HUB_PORT=8030 VITE_DEV_PORT=5203 SAAS_URL=http://localhost:8031 DB_NAME=hub_e2e_8030 \
-  E2E_MAIL_DIR=<saas-wt>/.mail-8031
-node tests/e2e/database.ts                           # crea y migra hub_e2e_8030
-uv run python manage.py runserver 127.0.0.1:8030     # con las mismas variables
+uv run python manage.py runserver 127.0.0.1:8030
 CI=1 pnpm e2e
-# 3. Al terminar: parar ese runserver y su SaaS, y borrar las dos BD
+# 4. Al terminar: parar ese runserver y su SaaS, y borrar las dos BD
 node tests/e2e/database.ts --drop
 (cd <saas-wt> && env -u DB_NAME E2E_SAAS_PORT=8031 node tests/e2e/database.ts --drop)
 ```
+
+`$(…)` da los dos ids, primero el de `a`, como dos palabras (en bash y en zsh); la misma orden, ya con la BD y el puerto de
+la pila, la escribe `global-setup.ts` si la ejecución arranca sin las cuentas.
 
 ## La demo (`demo.spec.ts`)
 
@@ -174,7 +193,7 @@ escribe una clave real. Pide tres cosas al SaaS de la pila:
 
 - **La BD del SaaS sembrada con ese proveedor**, desde su worktree y antes de la primera ejecución:
   `env DB_NAME=saas_e2e_<Hub+1> uv run python tests/e2e/panel/assistant_seed.py gateway http://127.0.0.1:<Hub+2>/v1`
-  (además del `demo_seed` de la receta de arriba, como el resto de specs). La spec lo comprueba al arrancar y, si falta,
+  (además de la siembra de la receta de arriba, como el resto de specs). La spec lo comprueba al arrancar y, si falta,
   cae con «not seeded with this provider».
 - **`ASSISTANT_SERVICE_PROVIDER=e2e-local`** en el `runserver` del SaaS (con el resto de variables de la receta de
   arriba, también `E2E_RELAX_LOGIN_RATE_LIMIT=True`): sin ella el dictado responde 503.
@@ -204,7 +223,9 @@ un certificado de una autoridad propia de la ejecución. El código del SaaS no 
 (`HTTPS_PROXY`, `SSL_CERT_FILE` y la app de Meta del e2e; la lista, en la cabecera de `whatsapp-helpers.ts`). Esas
 variables no se escriben a mano: las imprime `node tests/e2e/whatsapp-graph.ts <puerto del Hub> <SAAS_URL>`, desde el
 checkout del Hub, que **antes** crea la autoridad en `tests/e2e/.artifacts/meta-graph-<puerto del Hub>/ca.pem` si aún
-no está (si está, la deja). El orden:
+no está (si está, la deja). La BD del SaaS va sembrada como dice la receta de «Varias ejecuciones a la vez», con los ids
+que el Hub dio a `a` y `b`: `seedErplora` (`whatsapp-helpers.ts`) vuelve a correr ese mismo `whatsapp_hub_seed.py` en
+cada spec que siembra, y lo rechaza si `a` tiene allí otro id. El orden del arranque del SaaS:
 
 1. Esa orden, dentro del arranque del SaaS (`env $(…)`): la autoridad existe antes de que el SaaS la lea.
 2. El SaaS arranca con esas variables (y las suyas de «Varias ejecuciones a la vez»).
