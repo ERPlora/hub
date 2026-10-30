@@ -130,7 +130,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
     from live.operations import registry
 
     operations = [op for name, op in registry.items() if name.startswith("service.")]
-    assert len(operations) == 45
+    # 45 + the service's image (SERVICE-F34, F35): set_image, upload_image, suggest_image.
+    assert len(operations) == 48
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}

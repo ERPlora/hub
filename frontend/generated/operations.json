@@ -987,6 +987,18 @@
     "method": "post",
     "path": "/api/service/services/restore"
   },
+  "service.service.set_image": {
+    "method": "post",
+    "path": "/api/service/services/image"
+  },
+  "service.service.upload_image": {
+    "method": "post",
+    "path": "/api/service/services/image/upload"
+  },
+  "service.service.suggest_image": {
+    "method": "get",
+    "path": "/api/service/services/image/suggest"
+  },
   "service.catalog.status": {
     "method": "get",
     "path": "/api/service/catalog/status"

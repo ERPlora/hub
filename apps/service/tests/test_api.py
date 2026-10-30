@@ -15,6 +15,7 @@ from apps.service.api import router
 from config.api import api
 
 from .conftest import make_customer, make_member, make_tax
+from .test_service_image import IMAGE_ROUTES
 
 ROUTES = {
     ("GET", "/service/services", "service.service.list"),
@@ -54,7 +55,7 @@ ROUTES = {
     ("POST", "/service/grants/adjust", "service.grant.adjust"),
     ("POST", "/service/grants/redeem", "service.grant.redeem"),
     ("GET", "/service/movements", "service.movement.list"),
-}
+} | IMAGE_ROUTES
 
 
 def get(client, path, host="a.localhost", **params):

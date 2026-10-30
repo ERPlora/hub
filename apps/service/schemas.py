@@ -20,6 +20,8 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
+from base.schemas import CatalogImageOut, names
+
 T = TypeVar("T")
 
 #: Just under ten trillion minor units of the business's currency (ninety-nine billion with two decimals):
@@ -185,6 +187,34 @@ class ServiceRefIn(In):
     def _said(self):
         _named(self.id, self.service, SAY_WHICH_SERVICE)
         return self
+
+
+# The service's image (SERVICE-F34, F35; round 2026-10-30, base.images): one of the shared library or a photo of its own.
+
+#: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
+AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
+#: 2 MB of photo is 2 796 204 characters of base64.
+PHOTO_BASE64_LENGTH = 2_796_204
+
+
+class ServiceImageIn(ServiceRefIn):
+    image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
+        title=gettext_noop("Image"),
+        description="The image the service shows: an image of the shared library by its reference, "
+        "catalog:<folder>/<name> (base.catalog_image.search, service.service.suggest_image), or empty for none.",
+        json_schema_extra=AN_IMAGE,
+    )
+
+
+class ServiceImageUploadIn(ServiceRefIn):
+    data_base64: str = Field(
+        max_length=PHOTO_BASE64_LENGTH,
+        description="The photo, a JPG, PNG or WebP of 2 MB at most, in base64; it is kept as a 512 × 512 WebP.",
+    )
+
+
+class ServiceImageSuggestIn(ServiceRefIn):
+    limit: int = Field(5, ge=1, le=20, description="How many images to propose (1 to 20).")
 
 
 class CategoryRefIn(In):
@@ -419,6 +449,11 @@ class ServiceOut(Schema):
     status: ServiceStatus
     is_active: bool
     archived_at: datetime | None
+    image: str = Field(
+        description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
+        "or empty."
+    )
+    image_url: str = Field(description="Where the Hub serves its image; empty: it has none (show its initials).")
     created_at: datetime
     updated_at: datetime
 
@@ -442,6 +477,19 @@ class ServiceSaleOut(Schema):
     tax_category_id: UUID | None
     tax_category_key: str | None
     needs_tax_setup: bool
+    image: str = Field(
+        description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
+        "or empty."
+    )
+    image_url: str = Field(description="Where the Hub serves its image; empty: it has none (show its initials).")
+
+
+class ServiceImageSuggestOut(Schema):
+    service_id: UUID = Field(description="The service the images are proposed for.")
+    query: str = Field(description="What was looked for in the library: the service's name.")
+    rows: list[CatalogImageOut] = Field(
+        description="The library's images that match its name, the best first; none is set until one is chosen."
+    )
 
 
 class ServicesOut(Schema):

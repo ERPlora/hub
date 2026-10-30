@@ -237,7 +237,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the thirty-seven routed service operations to apps/service/api.py (the reactions and the sessions of the till have no route)', () => {
+  it('binds the forty routed service operations to apps/service/api.py (the reactions and the sessions of the till have no route)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'service.service.list': { method: 'get', path: '/api/service/services' },
       'service.service.create': { method: 'post', path: '/api/service/services' },
@@ -247,6 +247,10 @@ describe('OPERATION_ROUTES', () => {
       'service.service.update': { method: 'post', path: '/api/service/services/update' },
       'service.service.archive': { method: 'post', path: '/api/service/services/archive' },
       'service.service.restore': { method: 'post', path: '/api/service/services/restore' },
+      // The service's image (SERVICE-F34, F35).
+      'service.service.set_image': { method: 'post', path: '/api/service/services/image' },
+      'service.service.upload_image': { method: 'post', path: '/api/service/services/image/upload' },
+      'service.service.suggest_image': { method: 'get', path: '/api/service/services/image/suggest' },
       'service.catalog.status': { method: 'get', path: '/api/service/catalog/status' },
       'service.category.list': { method: 'get', path: '/api/service/categories' },
       'service.category.create': { method: 'post', path: '/api/service/categories' },
@@ -277,7 +281,7 @@ describe('OPERATION_ROUTES', () => {
       'service.grant.redeem': { method: 'post', path: '/api/service/grants/redeem' },
       'service.movement.list': { method: 'get', path: '/api/service/movements' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(37);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(40);
   });
 
   it('binds the nineteen cash register operations to apps/cash_register/api.py: queries by GET, commands by POST', () => {

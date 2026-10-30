@@ -11,6 +11,7 @@ mantiene»); services.py reads it again after locking the voucher's row.
 
 import datetime as dt
 from dataclasses import dataclass
+from functools import partial
 from uuid import UUID
 
 from django.db.models import (
@@ -32,7 +33,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
@@ -74,6 +75,8 @@ from apps.service.schemas import (
     RedeemCheckIn,
     RedeemCheckOut,
     ServiceForSaleIn,
+    ServiceImageSuggestIn,
+    ServiceImageSuggestOut,
     ServiceListIn,
     ServiceOut,
     ServicePage,
@@ -86,6 +89,8 @@ from apps.service.schemas import (
 )
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
+from base import images
+from base.queries import business_language, image_library
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
 SERVICE_AMBIGUOUS = _("“%(said)s” matches several services: %(names)s. Say which one.")
@@ -341,7 +346,7 @@ SERVICE_FIELDS = (
 )
 
 
-def _service_row(service: Service) -> dict:
+def _service_row(service: Service, urls: images.Urls) -> dict:
     tax = service.tax_category
     return {
         **{field: getattr(service, field) for field in SERVICE_FIELDS},
@@ -349,15 +354,17 @@ def _service_row(service: Service) -> dict:
         "tax_category_key": tax.key if tax else None,
         "tax_category_name": tax.display_name if tax else None,
         "needs_tax_setup": needs_tax_setup(service),
+        "image": service.image,
+        "image_url": urls(service.image),
     }
 
 
-def load_service(service_id: UUID) -> dict:
-    """A service as a ``ServiceOut``; services.py returns it after a write."""
-    return _service_row(_services().get(pk=service_id))
+def load_service(service_id: UUID, scope: Scope) -> dict:
+    """A service of ``scope`` as a ``ServiceOut``; services.py returns it after a write."""
+    return _service_row(_services().get(pk=service_id), images.Urls(scope))
 
 
-def _sale_row(service: Service) -> dict:
+def _sale_row(service: Service, urls: images.Urls) -> dict:
     fields = (
         "id",
         "name",
@@ -378,6 +385,8 @@ def _sale_row(service: Service) -> dict:
         "category_name": service.category.name if service.category else None,
         "tax_category_key": service.tax_category.key if service.tax_category else None,
         "needs_tax_setup": needs_tax_setup(service),
+        "image": service.image,
+        "image_url": urls(service.image),
     }
 
 
@@ -687,7 +696,7 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
     return _page(
         _sorted(services, params.sort, SERVICE_ORDER, ("name", "id")),
         params,
-        _service_row,
+        partial(_service_row, urls=images.Urls(ctx.scope)),
     )
 
 
@@ -703,7 +712,33 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
     },
 )
 def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
-    return _service_row(find_service(data.id, data.service, rows=_services()))
+    return _service_row(find_service(data.id, data.service, rows=_services()), images.Urls(ctx.scope))
+
+
+@operation(
+    "service.service.suggest_image",
+    kind="query",
+    permission="service.view_service",
+    input=ServiceImageSuggestIn,
+    output=ServiceImageSuggestOut,
+    expose_api=True,
+    ai={
+        "description": "Propose images of ERPlora's shared image library for a service, named by its id or its name: "
+        "the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
+        "never sets one: show them, and set the one the person picks with service.service.set_image."
+    },
+)
+def suggest_image(ctx: OperationContext, data: ServiceImageSuggestIn) -> dict:
+    """SERVICE-F34: the library searched by the service's name in either of its languages, titled in the business's
+    (the one its services are named in)."""
+    service = find_service(data.id, data.service)
+    language = business_language(ctx)
+    found = image_library(ctx).search(service.name, language)
+    return {
+        "service_id": service.id,
+        "query": service.name,
+        "rows": [image.row(language) for image in found[: data.limit]],
+    }
 
 
 @operation(
@@ -726,7 +761,7 @@ def list_for_sale(ctx: OperationContext, params: ServiceForSaleIn) -> dict:
         services = services.filter(name__icontains=params.search)
     if params.category_id:
         services = services.filter(category_id=params.category_id)
-    return _page(services.order_by("name", "id"), params, _sale_row)
+    return _page(services.order_by("name", "id"), params, partial(_sale_row, urls=images.Urls(ctx.scope)))
 
 
 @operation(
