@@ -88,8 +88,8 @@ Name = _text(NAME_MAX_LENGTH)
 Said = _text(200)
 Search = _text(120, 0)
 Currency = Annotated[str, AfterValidator(_iso_currency), BeforeValidator(_upper)]
-Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, strict=True)]
-PositiveCents = Annotated[int, Field(gt=0, le=MAX_CENTS, strict=True)]
+Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, strict=True, json_schema_extra={"money": True})]
+PositiveCents = Annotated[int, Field(gt=0, le=MAX_CENTS, strict=True, json_schema_extra={"money": True})]
 Quantity = Annotated[Decimal, Field(gt=0, max_digits=15, decimal_places=3)]
 Percent = Annotated[Decimal, Field(gt=0, le=100, max_digits=5, decimal_places=2)]
 Units = Annotated[int, Field(ge=1, le=MAX_UNITS)]

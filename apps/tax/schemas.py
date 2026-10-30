@@ -475,6 +475,7 @@ class CalculateIn(_RegionOfTheCountry, Schema):
         ge=-MAX_AMOUNT,
         le=MAX_AMOUNT,
         description="The amount in whole cents (10000 = 100.00).",
+        json_schema_extra={"money": True},
     )
     tax_category_key: CategoryRef = Field(description=CATEGORY_REF)
     country_code: OptionalCountry = Field(

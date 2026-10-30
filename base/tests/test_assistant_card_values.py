@@ -782,3 +782,259 @@ def test_an_attempt_key_is_marked_only_on_a_text():
     misplaced = dataclasses.replace(keyed(), input=MisplacedIn, output=MisplacedIn)
     assert misplaced_marks(misplaced) == ["amount_cents", "visit"]
     assert [f"{name}:{path}" for name, op in sorted(registry.items()) for path in misplaced_marks(op)] == []
+
+
+# ── An amount, known by the mark of its schema (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS) ─────────
+
+#: The mark of an amount: a whole number in the minor unit of its currency (``json_schema_extra={"money": True}``).
+MONEY = {"money": True}
+
+
+class PricedLineIn(Schema):
+    text: str
+    unit_price: int = Field(description="The price of one unit, in minor units of the cart's currency.", json_schema_extra=MONEY)
+
+
+class PricedIn(Schema):
+    # The words of hub#361 and hub#359: neither says «in cents».
+    price: int = Field(description="The price, in minor units of the business's currency.", json_schema_extra=MONEY)
+    hourly_rate: int | None = Field(None, description="Hourly rate in whole cents.", json_schema_extra=MONEY)
+    quantity: int = Field(1, description="How many units.")
+    line: PricedLineIn | None = None
+    lines: list[PricedLineIn] = []
+
+
+def priced(input: type[Schema] = PricedIn) -> Operation:
+    return Operation(
+        name="demo.item.priced",
+        kind="command",
+        permission="demo.manage",
+        input=input,
+        output=input,
+        expose_api=False,
+        ai={"description": "A write with amounts."},
+        fn=lambda ctx, data: data,
+    )
+
+
+PRICED_ARGUMENTS = {
+    "price": 1500,
+    "hourly_rate": 1250,
+    "quantity": 2,
+    "line": {"text": "Café", "unit_price": 150},
+    "lines": [{"text": "Té", "unit_price": 1200}],
+}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("language", "country", "one", "twelve"),
+    [("es", "ES", "1,50\xa0€", "12,00\xa0€"), ("en", "ES", "€1.50", "€12.00"), ("es", "PL", "1,50\xa0PLN", "12,00\xa0PLN")],
+    ids=["es", "en", "a business in zlotys"],
+)
+def test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth(language, country, one, twelve):
+    """hub#361 and hub#359: a price «in minor units…» and a rate «in whole cents» reached the card as a bare figure
+    («Precio: 1500»): the card knew an amount only by the words «in cents». Now by its schema's mark: on top, money the
+    screen paints in the business's currency; inside an object or a list, said in it as the Hub writes money. A whole
+    number that is no amount stays as sent."""
+    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": country})
+    card = assistant.card(priced(), PRICED_ARGUMENTS, language, ctx=ctx(language=language))
+    shown = {field["name"]: (field["kind"], field["value"]) for field in card["fields"]}
+    assert shown == {
+        "price": ("money", 1500),
+        "hourly_rate": ("money", 1250),
+        "quantity": ("text", 2),
+        "line": ("object", {"text": "Café", "unit_price": one}),
+        "lines": ("list", [{"text": "Té", "unit_price": twelve}]),
+    }
+
+
+class WordsOnlyIn(Schema):
+    price: int = Field(description="Price in cents.")
+    total_cents: int = 0
+
+
+def test_words_alone_make_no_amount_its_mark_does():
+    """One way to say an amount, the mark: the words of a description are the model's, and rewriting them changes
+    nothing of the card. Every amount the assistant shows or fills carries its mark (the ratchet below)."""
+    card = assistant.card(priced(WordsOnlyIn), {"price": 1500, "total_cents": 4200}, "es")
+    assert [(field["name"], field["kind"]) for field in card["fields"]] == [("price", "text"), ("total_cents", "text")]
+
+
+class DueOut(Schema):
+    due: int = Field(description="What is left to pay.", json_schema_extra=MONEY)
+    note: str = ""
+
+
+class InvoicedPreviewOut(Schema):
+    totals: DueOut
+    currency: str = ""
+
+
+@pytest.mark.django_db
+def test_an_amount_inside_a_datum_of_a_preview_is_said_in_the_currency_its_read_answers(monkeypatch):
+    """As the amounts on top of «What will happen» (BASE-F98): an invoice keeps the currency it was issued in."""
+    from base.tests.test_assistant import count_preview, declaring
+
+    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
+    read = count_preview({"totals": {"due": 1200, "note": "R1"}, "currency": "USD"}, output=InvoicedPreviewOut)
+    write = declaring({"operation": read.name, "fields": ["totals"]})
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, write.name, write)
+    failure, fields = assistant.preview(ctx({*ADMIN, "demo.view", "demo.manage"}, language="en"), write, {"id": "7"})
+    assert failure is None
+    assert [(field["name"], field["kind"], field["value"]) for field in fields] == [
+        ("totals", "object", {"due": "$12.00", "note": "R1"})
+    ]
+
+
+def test_the_model_is_told_an_amount_by_its_mark_whatever_its_description_says():
+    """The tool the model fills carries the mark of each amount, at any depth, and its instructions say what the mark
+    means: the minor unit of the business's currency. Words like «in cents» are not what tells it."""
+    parameters = assistant.tool_spec(priced())["parameters"]
+    defs = parameters["$defs"]
+    assert assistant._resolved(parameters["properties"]["price"], defs)["money"] is True
+    assert assistant._resolved(parameters["properties"]["hourly_rate"], defs)["money"] is True
+    assert defs["PricedLineIn"]["properties"]["unit_price"]["money"] is True
+    assert "money" not in assistant._resolved(parameters["properties"]["quantity"], defs)
+    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
+    assert '`"money": true`' in text and "17.00 EUR → 1700" in text
+    assert "«in cents»" not in text
+
+
+# ── The ratchet: amounts nobody marks, by app ─────────────────────────────────────────────────────────────────────────
+
+#: How an amount says itself in this repo's schemas: a whole number named ``…_cents``, or whose description speaks of
+#: cents or of the minor unit (``in cents``, ``in whole cents``, ``in minor units``, «céntimos»). Not a percentage
+#: («Percent off in basis points»), a count, nor a text whose name says cents.
+AMOUNT_WORDS = re.compile(r"\bcents?\b|\bminor units?\b|\bcéntimos?\b", re.IGNORECASE)
+
+#: The amounts the assistant shows or fills that no ``money`` mark declares, by app: the card paints them as a bare
+#: figure and the model is not told their unit. Only ever lower: an app that marks its own lowers its number here, and
+#: none comes in.
+UNMARKED_AMOUNTS: dict[str, int] = {}
+
+
+def is_marked_amount(prop: dict) -> bool:
+    return prop.get("money") is True
+
+
+def looks_like_an_amount(name: str, prop: dict) -> bool:
+    return prop.get("type") == "integer" and (
+        name.endswith("_cents") or bool(AMOUNT_WORDS.search(str(prop.get("description", ""))))
+    )
+
+
+def data_of(schema: dict, names: list[str] | None = None) -> list[tuple[str, str, dict]]:
+    """Each datum of ``schema`` (only ``names`` on top, when given), at any depth: its name, its path and its schema."""
+    defs = schema.get("$defs", {})
+    found: list[tuple[str, str, dict]] = []
+
+    def walk(name: str, prop: dict, path: str, depth: int) -> None:
+        prop = assistant._resolved(prop, defs)
+        if depth > 8:
+            return
+        found.append((name, path, prop))
+        if isinstance(prop.get("items"), dict):
+            walk(name, prop["items"], f"{path}[]", depth + 1)
+        for inner, inner_prop in prop.get("properties", {}).items():
+            walk(inner, inner_prop, f"{path}.{inner}", depth + 1)
+
+    for name, prop in schema.get("properties", {}).items():
+        if names is None or name in names:
+            walk(name, prop, name, 0)
+    return found
+
+
+def assistant_data(op: Operation) -> list[tuple[str, str, dict]]:
+    """What the assistant shows or fills of the tool ``op``: its input (the model's parameters, a write's card) and,
+    for a write with a preview, the data of its read's answer the card shows («What will happen»)."""
+    found = data_of(op.input.model_json_schema())
+    declared = assistant.preview_of(op)
+    read = registry.get(declared["operation"]) if isinstance(declared, dict) else None
+    if read is not None:
+        found += [(name, f"preview:{path}", prop) for name, path, prop in data_of(read.output.model_json_schema(), declared["fields"])]
+    return found
+
+
+def tools() -> list[Operation]:
+    return [op for _, op in sorted(registry.items()) if assistant.is_tool(op)]
+
+
+def unmarked_amounts(op: Operation) -> list[str]:
+    """``op``'s data that look like an amount (``looks_like_an_amount``) and no mark declares so, at any depth."""
+    return [path for name, path, prop in assistant_data(op) if looks_like_an_amount(name, prop) and not is_marked_amount(prop)]
+
+
+def amounts_by_app(operations) -> dict[str, int]:
+    counted: dict[str, int] = {}
+    for op in operations:
+        if found := unmarked_amounts(op):
+            counted[op.app_label] = counted.get(op.app_label, 0) + len(found)
+    return dict(sorted(counted.items()))
+
+
+def test_every_amount_the_assistant_shows_or_fills_is_marked_but_the_known_ones():
+    """A new amount without its mark — or one whose mark is lost while its words say cents — fails here; an app that
+    marks its own lowers its number."""
+    assert amounts_by_app(tools()) == UNMARKED_AMOUNTS
+
+
+class UnmarkedPriceLineIn(Schema):
+    text: str
+    unit_price: int = Field(description="The price of one unit, in minor units.")
+
+
+class UnmarkedAmountsIn(Schema):
+    price: int = Field(description="The price, in minor units of the business's currency.")
+    hourly_rate: int | None = Field(None, description="Hourly rate in whole cents.")
+    total_cents: int = 0
+    lines: list[UnmarkedPriceLineIn] = []
+    marked: int = Field(0, description="Price in cents.", json_schema_extra=MONEY)
+    discount_percent_bp: int = Field(0, description="Percent off in basis points (1050 = 10.50 %).")
+    quantity: int = Field(1, description="How many units.")
+    note_cents: str = Field("", description="A note, in cents as written.")
+
+
+def test_the_ratchet_counts_an_amount_nobody_marks_and_nothing_else():
+    """The words of hub#361 («in minor units») and hub#359 («in whole cents») give an amount away, a name in
+    ``_cents`` too, at any depth; a marked one, a percentage, a count or a text are not counted."""
+    op = priced(UnmarkedAmountsIn)
+    assert unmarked_amounts(op) == ["price", "hourly_rate", "total_cents", "lines[].unit_price"]
+    assert amounts_by_app([op, op]) == {"demo": 8}
+
+
+def test_no_amount_the_card_painted_as_money_stops_being_one():
+    """What the card painted as money by its words before (a whole number named ``_cents`` or described «in cents»)
+    carries the mark now, every one of them: nothing that was money stops being so."""
+    def by_words(name: str, prop: dict) -> bool:
+        return prop.get("type") == "integer" and (name.endswith("_cents") or "in cents" in str(prop.get("description", "")).lower())
+
+    painted = {(op.name, path) for op in tools() for name, path, prop in assistant_data(op) if by_words(name, prop)}
+    marked = {(op.name, path) for op in tools() for _, path, prop in assistant_data(op) if is_marked_amount(prop)}
+    assert len(painted) > 50
+    assert sorted(painted - marked) == []
+
+
+def misplaced_money(op: Operation) -> list[str]:
+    """``op``'s data marked ``money`` that are no whole number, at any depth, in what it takes and what it answers."""
+    return [
+        f"{side}:{path}"
+        for side, schema in (("in", op.input.model_json_schema()), ("out", op.output.model_json_schema()))
+        for _, path, prop in data_of(schema)
+        if is_marked_amount(prop) and prop.get("type") != "integer"
+    ]
+
+
+class MisplacedMoneyIn(Schema):
+    name: str = Field(json_schema_extra=MONEY)
+    ratio: float = Field(json_schema_extra=MONEY)
+    line: PricedLineIn = Field(json_schema_extra=MONEY)
+    price: int = Field(json_schema_extra=MONEY)
+
+
+def test_an_amount_is_marked_only_on_a_whole_number():
+    """An amount goes in the minor unit of its currency, a whole number: the mark on a text, a fraction or an object
+    would paint as money what is none. Every operation of every app, at any depth."""
+    assert misplaced_money(priced(MisplacedMoneyIn)) == ["in:name", "in:ratio", "in:line", "out:name", "out:ratio", "out:line"]
+    assert [f"{name}:{path}" for name, op in sorted(registry.items()) for path in misplaced_money(op)] == []

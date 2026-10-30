@@ -638,8 +638,10 @@ class SettlePreviewIn(Schema):
 
 class SettlePreviewOut(Schema):
     name: str = Field(title="Owner")
-    total_cents: int
-    expected_balance: int | None = Field(description="The cash there should be, in cents; none when it is hidden.")
+    total_cents: int = Field(json_schema_extra={"money": True})
+    expected_balance: int | None = Field(
+        description="The cash there should be, in cents; none when it is hidden.", json_schema_extra={"money": True}
+    )
     asked_by: str = Field(title="Person")
     note: str = ""
 
@@ -731,10 +733,10 @@ def test_a_preview_whose_data_do_not_fit_comes_back_with_the_field(settle):
 
 
 class CountPreviewOut(Schema):
-    expected_balance: int | None = Field(description="The cash there should be, in cents.")
+    expected_balance: int | None = Field(description="The cash there should be, in cents.", json_schema_extra={"money": True})
     difference: int | None = Field(
         description="Counted − expected, in cents (positive = over, negative = short).",
-        json_schema_extra={"signed": True},
+        json_schema_extra={"signed": True, "money": True},
     )
 
 
@@ -776,8 +778,8 @@ class PricedPreviewOut(Schema):
     """A read whose amounts are in a currency of its own (an invoice's), as Invoicing's previews answer it."""
 
     note: str = ""
-    total_cents: int
-    difference: int | None = Field(description="Counted − expected, in cents.", json_schema_extra={"signed": True})
+    total_cents: int = Field(json_schema_extra={"money": True})
+    difference: int | None = Field(description="Counted − expected, in cents.", json_schema_extra={"signed": True, "money": True})
     currency: str = ""
     currency_decimals: int | None = None
 
@@ -874,30 +876,35 @@ def test_a_preview_is_checked_at_start(monkeypatch, write, why):
 
 class SignedNameOut(Schema):
     name: str = Field(title="Owner", json_schema_extra={"signed": True})
-    total_cents: int = Field(json_schema_extra={"signed": True})
+    total_cents: int = Field(json_schema_extra={"signed": True, "money": True})
     paid_cents: str = Field(description="What was paid, in cents, as written.", json_schema_extra={"signed": True})
+    counted: int = Field(description="Counted − expected, in cents.", json_schema_extra={"signed": True})
 
 
 def test_a_preview_marks_signed_only_an_amount(monkeypatch):
-    """A sign means over or short: only an amount in cents may be declared signed, said at start like the rest. A
-    text whose name says cents is no amount either: a number is what takes a sign."""
+    """A sign means over or short: only an amount — a whole number its schema marks ``money`` — may be declared
+    signed, said at start like the rest. A text whose name says cents is no amount, nor a number whose description
+    says cents without the mark (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS)."""
     read = count_preview({}, SignedNameOut)
     monkeypatch.setitem(registry, read.name, read)
     monkeypatch.setitem(
-        registry, SETTLE.name, declaring({"operation": read.name, "fields": ["name", "total_cents", "paid_cents"]})
+        registry,
+        SETTLE.name,
+        declaring({"operation": read.name, "fields": ["name", "total_cents", "paid_cents", "counted"]}),
     )
     [error] = preview_errors()
-    assert "marks name signed, but it is no amount in cents" in error.msg
-    assert "marks paid_cents signed, but it is no amount in cents" in error.msg
+    assert "marks name signed, but it is no amount marked money" in error.msg
+    assert "marks paid_cents signed, but it is no amount marked money" in error.msg
+    assert "marks counted signed, but it is no amount marked money" in error.msg
     assert "total_cents" not in error.msg
 
 
 @pytest.mark.parametrize(
     ("prop", "value"),
     [
-        ({"type": "string", "signed": True}, "Ana"),
-        ({"type": "integer", "description": "Counted − expected, in cents.", "signed": True}, None),
-        ({"type": "integer", "description": "Counted − expected, in cents.", "signed": "yes"}, 13790),
+        ({"type": "string", "signed": True, "money": True}, "Ana"),
+        ({"type": "integer", "description": "Counted − expected.", "signed": True, "money": True}, None),
+        ({"type": "integer", "description": "Counted − expected.", "signed": "yes", "money": True}, 13790),
     ],
     ids=["a text", "an amount left empty", "not declared with True"],
 )
@@ -947,7 +954,8 @@ def test_the_instructions_set_the_language_the_money_and_the_screens():
     # gh:hub#1046: the old assistant answered anything (films, cinemas) on the business's allowance.
     assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
-    assert "EUR" in text and "cents" in text
+    # An amount by its mark, not by the words «in cents» (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS).
+    assert "EUR" in text and '"money": true' in text and "minor unit" in text
     assert "[Ajustes](/settings)" in text
     assert "Bar Pepe" in text
 

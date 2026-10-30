@@ -284,10 +284,10 @@ class PaymentListIn(PageIn):
         None, description="Paid on this day or earlier (YYYY-MM-DD)."
     )
     amount_min: int | None = Field(
-        None, ge=0, description="Lowest amount, in minor units (cents in euros)."
+        None, ge=0, description="Lowest amount, in minor units (cents in euros).", json_schema_extra={"money": True}
     )
     amount_max: int | None = Field(
-        None, ge=0, description="Highest amount, in minor units (cents in euros)."
+        None, ge=0, description="Highest amount, in minor units (cents in euros).", json_schema_extra={"money": True}
     )
     sort: PaymentSort = Field(
         "-payment_date",
@@ -309,6 +309,7 @@ class PaymentIn(In):
     amount: int = Field(
         le=MAX_AMOUNT,
         description="The amount in minor units of the currency (cents in euros: 12,50 € is 1250), above 0.",
+        json_schema_extra={"money": True},
     )
     beneficiary_name: Beneficiary = Field(
         description="Who receives the money (a supplier, a person)."

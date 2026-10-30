@@ -76,7 +76,7 @@ Said = _text(NAME_MAX_LENGTH, 1)
 TaxKey = _text(120)
 Choices = Annotated[int, Field(ge=0, le=MAX_CHOICES)]
 Order = Annotated[int, Field(ge=0, le=2_147_483_647)]
-Delta = Annotated[int, Field(ge=-MAX_DELTA, le=MAX_DELTA)]
+Delta = Annotated[int, Field(ge=-MAX_DELTA, le=MAX_DELTA, json_schema_extra={"money": True})]
 Search = _text(NAME_MAX_LENGTH)
 
 
