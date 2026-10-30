@@ -500,3 +500,18 @@ async def assistant_transcribe(request, data: AssistantTranscribeIn):
 @bind(router, "base.location.list", "/locations")
 async def location_list(request):
     return await run_operation(request, queries.location_list)
+
+
+# ── The shared image library (round 2026-10-30, base.image_catalog) ────────────────────────────────────────────────
+
+from base.schemas import CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
+
+
+@bind(router, "base.catalog_image.search", "/catalog/images")
+async def catalog_image_search(request, params: Query[CatalogImageSearchIn]):
+    return await run_operation(request, queries.catalog_image_search, params)
+
+
+@bind(router, "base.catalog_image.get", "/catalog/images/detail")
+async def catalog_image_get(request, params: Query[CatalogImageRefIn]):
+    return await run_operation(request, queries.catalog_image_get, params)

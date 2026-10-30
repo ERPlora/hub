@@ -1985,3 +1985,11 @@ msgstr "Dispositivo"
 #: schemas.py
 msgid "API key"
 msgstr "Clave de API"
+
+#: queries.py
+msgid "The image library cannot be read right now. Try again in a while."
+msgstr "La librería de imágenes no se puede leer ahora. Inténtalo de nuevo en un rato."
+
+#: queries.py
+msgid "This image is not in the image library."
+msgstr "Esta imagen no está en la librería de imágenes."

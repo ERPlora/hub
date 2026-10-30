@@ -43,6 +43,14 @@
     "method": "get",
     "path": "/api/locations"
   },
+  "base.catalog_image.search": {
+    "method": "get",
+    "path": "/api/catalog/images"
+  },
+  "base.catalog_image.get": {
+    "method": "get",
+    "path": "/api/catalog/images/detail"
+  },
   "base.blueprint.list": {
     "method": "get",
     "path": "/api/settings/data/blueprints"
