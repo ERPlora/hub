@@ -87,6 +87,15 @@ describe('FlowList', () => {
     expect(second.text()).toContain('Paused');
   });
 
+  it('a long name and when it starts, cut with «…» where they do not fit, are read whole in their tooltip (FLOW-F02)', async () => {
+    const long = 'Tell the customer by WhatsApp when their reservation changes and remind them the day before';
+    const s = await setup([flow('f1', { name: long })]);
+    const [row] = s.rowsShown();
+    const titled = row.findAll('[title]').map((el) => [el.text(), el.attributes('title')]);
+    expect(titled).toContainEqual([long, long]);
+    expect(titled).toContainEqual(['When a sale is charged', 'When a sale is charged']);
+  });
+
   it('«Showing», «Starts with» and «Order» query the server again', async () => {
     const s = await setup();
     await ionValue(s.find('flow-list-state').element, 'paused');

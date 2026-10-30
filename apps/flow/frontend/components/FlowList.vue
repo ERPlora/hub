@@ -283,8 +283,11 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
       </template>
       <template #name="{ row }">
         <span class="flow-list__name">
-          <strong>{{ row.name }}</strong>
-          <span class="flow-list__when">{{ describeTrigger(row.trigger, catalog, phrasing) }}</span>
+          <strong :title="row.name">{{ row.name }}</strong>
+          <span
+            class="flow-list__when"
+            :title="describeTrigger(row.trigger, catalog, phrasing)"
+          >{{ describeTrigger(row.trigger, catalog, phrasing) }}</span>
         </span>
       </template>
       <template #lastRun="{ row }">
@@ -373,6 +376,13 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
   flex-direction: column;
   gap: 0.1rem;
   min-width: 0;
+}
+/* FLOW-F02 - The table's cell keeps its span on one line with «…», but not the lines stacked inside it: the name ran
+   on to the edge and was cut mid-word. Each line ends in «…» itself; its one line comes from the cell, so on a card,
+   which wraps, the «Name» is still read whole. */
+.flow-list__name > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .flow-list__state {
   display: inline-flex;
