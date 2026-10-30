@@ -46,7 +46,7 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('tax.'))).toHaveLength(18);
   });
 
-  it('binds the twenty-eight routed inventory operations to apps/inventory/api.py (the two sale reactions have no route)', () => {
+  it('binds the thirty-one routed inventory operations to apps/inventory/api.py (the two sale reactions have no route)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'inventory.product.list': { method: 'get', path: '/api/inventory/products' },
       'inventory.product.get': { method: 'get', path: '/api/inventory/products/detail' },
@@ -58,6 +58,10 @@ describe('OPERATION_ROUTES', () => {
       'inventory.product.update': { method: 'post', path: '/api/inventory/products/update' },
       'inventory.product.delete': { method: 'post', path: '/api/inventory/products/delete' },
       'inventory.product.set_sold_out': { method: 'post', path: '/api/inventory/products/sold_out' },
+      // The product's image (INVENTORY-F30, F31).
+      'inventory.product.set_image': { method: 'post', path: '/api/inventory/products/image' },
+      'inventory.product.upload_image': { method: 'post', path: '/api/inventory/products/image/upload' },
+      'inventory.product.suggest_image': { method: 'get', path: '/api/inventory/products/image/suggest' },
       // The barcode label goes to the printing queue (INVENTORY-F25).
       'inventory.product.print_label': { method: 'post', path: '/api/inventory/products/print_label' },
       'inventory.product_category.list': { method: 'get', path: '/api/inventory/product_categories' },
@@ -78,7 +82,7 @@ describe('OPERATION_ROUTES', () => {
       'inventory.config.get': { method: 'get', path: '/api/inventory/config' },
       'inventory.config.update': { method: 'post', path: '/api/inventory/config' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('inventory.'))).toHaveLength(28);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('inventory.'))).toHaveLength(31);
   });
 
   it('binds the 41 customer operations that have a route (apps/customer/api.py); purchase.record/void are the system\'s', () => {

@@ -1027,6 +1027,7 @@ datos de quien lo provocó.
 | Ventas | El número del tique o la factura de una venta, para la Referencia de un movimiento | F16 | `sale.sale.get` |
 | Impresión | Mandar la etiqueta a la impresora con la función «Etiqueta» | F25 | `printing.job.create` |
 | Plataforma | La moneda del negocio (la de su país; en el hub propio de ERPlora, la del país de su emisor), para escribir los precios y costes del CSV, leerlos al importar y ponerla en la etiqueta | F09, F11, F25 | `base.business.get` |
+| Plataforma | El título de la imagen de la librería que se pone a un artículo, para que la tarjeta del asistente la nombre por su título y no por su referencia | F30 | `base.catalog_image.get` |
 
 Inventario no usa nada más de otras apps: el número de una venta le llega en su aviso, y el de su tique o
 factura se lo da Ventas, no Facturación.

@@ -271,8 +271,18 @@ def test_search_is_a_read_for_everyone_of_the_hub_and_a_tool_of_the_assistant():
     assert "image" in op.ai["description"] and "library" in op.ai["description"]
 
 
-def test_search_answers_the_best_images_first_titled_in_the_persons_language(image_library):
-    page = get("base.catalog_image.search")(ctx_with(HOME, language="es"), CatalogImageSearchIn(query="leche"))
+def speaks(language: str, slug: str = "a") -> None:
+    """The business ``slug`` works in ``language`` (as erplora.com registered it)."""
+    from base.models import Hub
+
+    Hub.objects.filter(slug=slug).update(language=language)
+
+
+@pytest.mark.django_db
+def test_search_answers_the_best_images_first_titled_in_the_businesss_language(image_library):
+    speaks("es")
+
+    page = get("base.catalog_image.search")(ctx_with(HOME, language="en"), CatalogImageSearchIn(query="leche"))
 
     first = page.rows[0].model_dump()
     assert first == {
@@ -282,9 +292,19 @@ def test_search_answers_the_best_images_first_titled_in_the_persons_language(ima
         "title": "Café con leche",
         "url": "/p/catalog/hospitality/cafe_con_leche.webp",
     }
-    assert (page.total, page.limit, page.offset) == (2, 20, 0)
+    assert (page.total, page.limit, page.offset) == (2, 60, 0)
 
 
+@pytest.mark.django_db
+def test_a_business_in_a_language_the_library_does_not_speak_reads_english_titles(image_library):
+    speaks("fr")
+
+    page = get("base.catalog_image.search")(ctx_with(HOME, language="es"), CatalogImageSearchIn(query="leche"))
+
+    assert page.rows[0].title == "White coffee"
+
+
+@pytest.mark.django_db
 def test_search_pages_its_answer(image_library):
     page = get("base.catalog_image.search")(ctx_with(HOME), CatalogImageSearchIn(query="", limit=2, offset=2))
 
@@ -292,11 +312,13 @@ def test_search_pages_its_answer(image_library):
     assert ([row.name for row in page.rows], page.total) == (["patatas_bravas", "cafe_con_leche"], 5)
 
 
+@pytest.mark.django_db
 def test_search_needs_the_home(image_library):
     with pytest.raises(PermissionDenied):
         get("base.catalog_image.search")(ctx_with(), CatalogImageSearchIn(query="leche"))
 
 
+@pytest.mark.django_db
 def test_search_says_when_the_library_cannot_be_read(settings, tmp_path):
     settings.CATALOG_DIR = str(tmp_path / "nowhere")
 
@@ -304,9 +326,10 @@ def test_search_says_when_the_library_cannot_be_read(settings, tmp_path):
         get("base.catalog_image.search")(ctx_with(HOME), CatalogImageSearchIn(query="leche"))
 
     assert (refused.value.status, refused.value.code) == (503, "base.image_library_unavailable")
-    assert "image library" in refused.value.message
+    assert refused.value.message == "The image library could not be loaded."
 
 
+@pytest.mark.django_db
 def test_it_is_said_in_the_persons_language(settings, tmp_path, image_library):
     with pytest.raises(NotFound) as missing:
         get("base.catalog_image.get")(ctx_with(HOME, language="es"), CatalogImageRefIn(reference="catalog:x/y"))
@@ -314,8 +337,8 @@ def test_it_is_said_in_the_persons_language(settings, tmp_path, image_library):
     with pytest.raises(OperationError) as refused:
         get("base.catalog_image.search")(ctx_with(HOME, language="es"), CatalogImageSearchIn(query="leche"))
 
-    assert missing.value.message == "Esta imagen no está en la librería de imágenes."
-    assert refused.value.message == "La librería de imágenes no se puede leer ahora. Inténtalo de nuevo en un rato."
+    assert missing.value.message == "Esa imagen ya no está en la librería. Elige otra."
+    assert refused.value.message == "No se pudo cargar la librería de imágenes."
 
 
 @pytest.mark.parametrize("folder", ["../etc", "Hospitality", "a/b"])
@@ -324,7 +347,9 @@ def test_search_refuses_a_folder_that_is_no_folder(folder):
         CatalogImageSearchIn(query="", folder=folder)
 
 
+@pytest.mark.django_db
 def test_get_names_an_image_by_its_reference_in_the_persons_language(image_library):
+    speaks("en")
     image = get("base.catalog_image.get")(ctx_with(HOME, language="es"), CatalogImageRefIn(reference="catalog:hospitality/cafe_solo"))
 
     assert (image.title, image.url) == ("Café solo", "/p/catalog/hospitality/cafe_solo.webp")

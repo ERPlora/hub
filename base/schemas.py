@@ -1567,7 +1567,7 @@ class CatalogImageSearchIn(Schema):
         description="Only this folder of the library: beauty_body, beauty_hair, fitness, hospitality, retail or "
         "wellness_spa.",
     )
-    limit: int = Field(20, ge=1, le=50, description="How many images to return (1 to 50).")
+    limit: int = Field(60, ge=1, le=100, description="How many images to return (1 to 100).")
     offset: int = Field(0, ge=0, description="How many images to skip, to read the next pages.")
 
 

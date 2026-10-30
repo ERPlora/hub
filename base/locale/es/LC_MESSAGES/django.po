@@ -1987,9 +1987,25 @@ msgid "API key"
 msgstr "Clave de API"
 
 #: queries.py
-msgid "The image library cannot be read right now. Try again in a while."
-msgstr "La librería de imágenes no se puede leer ahora. Inténtalo de nuevo en un rato."
+msgid "The image library could not be loaded."
+msgstr "No se pudo cargar la librería de imágenes."
 
-#: queries.py
-msgid "This image is not in the image library."
-msgstr "Esta imagen no está en la librería de imágenes."
+#: images.py
+msgid "That image is no longer in the library. Choose another one."
+msgstr "Esa imagen ya no está en la librería. Elige otra."
+
+#: images.py
+msgid "Choose an image of the library or upload a photo."
+msgstr "Elige una imagen de la librería o sube una foto."
+
+#: images.py
+msgid "That file is not a photo. Upload a JPG, PNG or WebP image."
+msgstr "Ese archivo no es una foto. Sube una imagen JPG, PNG o WebP."
+
+#: images.py
+msgid "The photo weighs more than 2 MB. Choose a lighter one."
+msgstr "La foto pesa más de 2 MB. Elige una más ligera."
+
+#: images.py
+msgid "The photo could not be saved. Try again."
+msgstr "No se pudo guardar la foto. Inténtalo de nuevo."

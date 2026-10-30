@@ -448,3 +448,11 @@ msgstr "Líneas de la venta"
 
 msgid "Returned lines"
 msgstr "Líneas devueltas"
+
+#: models.py
+msgid "image"
+msgstr "imagen"
+
+#: schemas.py
+msgid "Image"
+msgstr "Imagen"

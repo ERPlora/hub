@@ -1799,7 +1799,7 @@ def location_list(ctx: OperationContext, data: LocationListIn) -> dict:
 from base import image_catalog  # noqa: E402
 from base.schemas import CatalogImageOut, CatalogImagePage, CatalogImageRefIn, CatalogImageSearchIn  # noqa: E402
 
-LIBRARY_UNAVAILABLE = gettext_lazy("The image library cannot be read right now. Try again in a while.")
+LIBRARY_UNAVAILABLE = gettext_lazy("The image library could not be loaded.")
 
 
 def image_library(ctx: OperationContext) -> image_catalog.Library:
@@ -1815,11 +1815,17 @@ def image_library(ctx: OperationContext) -> image_catalog.Library:
             ) from None
 
 
+def business_language(ctx: OperationContext) -> str:
+    """The language the business works in, as erplora.com registered it (Settings › Business), else the deployment's:
+    what its products and services are named in, so what the library's images are titled in on its screens."""
+    language = Hub.objects.filter(slug=ctx.scope.key).values_list("language", flat=True).first()
+    return language or settings.LANGUAGE_CODE
+
+
 @operation(
     "base.catalog_image.search",
     kind="query",
     permission=VIEW_HOME,
-    database=False,
     input=CatalogImageSearchIn,
     output=CatalogImagePage,
     ai={
@@ -1831,10 +1837,12 @@ def image_library(ctx: OperationContext) -> image_catalog.Library:
 )
 def catalog_image_search(ctx: OperationContext, data: CatalogImageSearchIn) -> dict:
     """The library is everyone's: who may see the hub's Home may look an image up (the screens that set one need their
-    own app's permission). Titled in the person's language; any language matches."""
-    found = image_library(ctx).search(data.query, ctx.language, folder=data.folder)
+    own app's permission). Any language matches; titled in the business's (INVENTORY-F30: in English when it is not
+    Spanish)."""
+    language = business_language(ctx)
+    found = image_library(ctx).search(data.query, language, folder=data.folder)
     return {
-        "rows": [image.row(ctx.language) for image in found[data.offset : data.offset + data.limit]],
+        "rows": [image.row(language) for image in found[data.offset : data.offset + data.limit]],
         "total": len(found),
         "limit": data.limit,
         "offset": data.offset,
@@ -1854,10 +1862,13 @@ def catalog_image_search(ctx: OperationContext, data: CatalogImageSearchIn) -> d
     },
 )
 def catalog_image_get(ctx: OperationContext, data: CatalogImageRefIn) -> dict:
-    """What the assistant's card says of an image a write sets (``refers``): its title, never the raw reference."""
+    """What the assistant's card says of an image a write sets (``refers``): its title in the person's language (the
+    card's), never the raw reference."""
+    from base.images import IMAGE_UNKNOWN
+
     parsed = image_catalog.parse_reference(data.reference)
     image = image_library(ctx).get(*parsed) if parsed else None
     if image is None:
         with translation.override(ctx.language):
-            raise NotFound(gettext("This image is not in the image library."), code="base.image_not_in_library")
+            raise NotFound(str(IMAGE_UNKNOWN), code="base.image_unknown")
     return image.row(ctx.language)
