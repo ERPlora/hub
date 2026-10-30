@@ -7,6 +7,8 @@ PIN or give and take away a badge. A person removed on erplora.com and invited a
 of them. The roles are the four of erplora.com, with how many people and permissions each has.
 """
 
+import base64
+import hashlib
 import json
 
 import pytest
@@ -21,7 +23,7 @@ from live.operations import get as get_operation
 from base import access, services
 from base import people as people_rules
 from base.permissions import permissions_for
-from base.models import Credential, Hub, Membership
+from base.models import AccessSettings, Credential, Hub, Membership
 from base.tests.test_access_pin import a_device, door
 
 pytestmark = pytest.mark.django_db
@@ -238,17 +240,33 @@ class TestRemoveAPin:
         assert Credential.objects.get(username="saas:3").pin_hash != ""
 
 
+# A hub key whose digest of CARD-0003 holds "0003" (…b800030c…): with the random key of each run, about one in a
+# thousand did, and a test that looked for the card's digits in its digest fell with no change of code.
+KEY_WHOSE_DIGEST_HOLDS_0003 = "0" * 61 + "33f"
+
+
 class TestABadge:
     """BASE-G140: whoever runs the business gives a person a badge, or takes it away; never their own."""
 
     def test_the_card_is_kept_as_its_digest_never_its_number(self, client, adam, eva):
+        AccessSettings.objects.create(badge_key=KEY_WHOSE_DIGEST_HOLDS_0003)
+        digest = access.badge_digest("CARD-0003", key=bytes.fromhex(KEY_WHOSE_DIGEST_HOLDS_0003))
+        assert "0003" in digest, "the key keeps the trap of the old test"
         client.force_login(adam)
         response = post(client, "/people/badge", {"person": "saas:3", "badge": " card-0003 "})
         assert response.status_code == 200, response.content
         assert response.json()["ways"]["badge"] is True
         kept = Credential.objects.get(username="saas:3")
-        assert kept.badge_digest == access.badge_digest("CARD-0003", key=services.badge_key())
-        assert "0003" not in kept.badge_digest and kept.badge_set_at is not None
+        assert kept.badge_digest == digest and kept.badge_set_at is not None
+        number = b"CARD-0003"
+        assert kept.badge_digest not in {
+            " card-0003 ",
+            "card-0003",
+            number.decode(),
+            number.hex(),
+            base64.b64encode(number).decode(),
+            hashlib.sha256(number).hexdigest(),
+        }
         assert OutboxEvent.objects.filter(name="base.person.badge_set").count() == 1
 
     def test_and_then_the_card_opens_the_way_in_as_that_person(self, client, adam, eva):
