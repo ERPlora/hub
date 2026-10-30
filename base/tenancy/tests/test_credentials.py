@@ -1,7 +1,7 @@
 """The roles a hub's database is reached with, per cluster (round 2026-10-30, S2a; PLAN-DB §5 and §10; aws#23).
 
 A hub on no cluster, or on one without a secret, uses the environment's roles: the default connection's for the app
-(``hub_app``) and ``DB_MIGRATOR_USER`` for the migrator. A cluster with ``secret_name`` has its own, in two Secrets
+(``hub_app``) and ``DB_MIGRATOR_USER`` for the migrator, which a process without it does not have (never the app's). A cluster with ``secret_name`` has its own, in two Secrets
 Manager secrets under that prefix, ``…/app`` and ``…/migrator`` (the web may read only the first), each read once per
 ten minutes and kept in the process; a secret that cannot be read is a readable failure, never the environment's roles
 in its place. Where the cluster is comes from its row, never from the secrets. The web's alias of a hub carries the
@@ -111,13 +111,23 @@ def test_without_a_cluster_the_environments_roles_are_used(settings):
     assert (migrator.user, migrator.password) == ("hub_migrator", "env-migrator")
 
 
-def test_without_a_migrators_role_the_migrator_is_the_default_connections_own(settings):
+def test_without_a_migrators_role_there_is_no_migrator_never_the_apps_role(settings):
+    """Fails closed (review of hub#469): a process without ``DB_MIGRATOR_*`` (the web) has no migrator, and the app's
+    role (``hub_app``, ``DB_USER``) never stands in for it."""
     settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "", ""
-    default = settings.DATABASES["default"]
 
-    found = credentials.credentials_for(None, credentials.MIGRATOR)
+    with pytest.raises(credentials.CredentialsUnavailable, match="DB_MIGRATOR_USER"):
+        credentials.credentials_for(None, credentials.MIGRATOR)
+    with pytest.raises(credentials.CredentialsUnavailable, match="DB_MIGRATOR_USER"):
+        credentials.credentials_for(cluster(secret_name=""), credentials.MIGRATOR)
+    assert credentials.credentials_for(None, credentials.APP).user == settings.DATABASES["default"]["USER"]
 
-    assert (found.user, found.password) == (default["USER"], default["PASSWORD"])
+
+def test_a_migrators_user_without_its_password_is_no_migrator_either(settings):
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "hub_migrator", ""
+
+    with pytest.raises(credentials.CredentialsUnavailable, match="DB_MIGRATOR_PASSWORD"):
+        credentials.credentials_for(None, credentials.MIGRATOR)
 
 
 def test_a_cluster_without_a_secret_uses_the_environments_roles(secrets):

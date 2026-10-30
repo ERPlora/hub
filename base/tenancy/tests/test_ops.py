@@ -82,13 +82,19 @@ def test_the_migrators_role_reaches_the_maintenance_connection_and_a_hubs_ddl_al
     assert (ddl["USER"], ddl["PASSWORD"]) == ("hub_migrator", "its-password")
 
 
-def test_without_a_migrators_role_the_default_connections_is_used(settings):
+def test_without_a_migrators_role_nothing_is_made_nor_dropped_as_the_app(settings, hub_databases):
+    """A process without ``DB_MIGRATOR_*`` (the web) opens no maintenance connection and no ``__ddl`` alias: a
+    readable failure, never ``hub_app``."""
+    from base.tenancy.credentials import CredentialsUnavailable
+
     settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "", ""
-    default = django_connections.settings["default"]
 
-    conninfo = tenancy_connections.migrator_conninfo("postgres")
-
-    assert (conninfo["user"], conninfo["password"]) == (default["USER"], default["PASSWORD"])
+    with pytest.raises(CredentialsUnavailable):
+        tenancy_connections.migrator_conninfo("postgres")
+    with pytest.raises(CredentialsUnavailable):
+        tenancy_connections.register_ddl_alias(hub_databases.a)
+    with pytest.raises(CredentialsUnavailable):
+        ops.drop_database(names.hub_db_name(hub_databases.control, uuid.uuid7()))
 
 
 def test_a_clone_is_a_copy_of_its_template_and_a_second_one_makes_nothing(hub_databases, made):

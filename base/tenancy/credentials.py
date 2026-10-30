@@ -5,8 +5,9 @@ roles: :data:`APP` (``hub_app``: a hub's alias, in the web and the worker) or :d
 ``__ddl`` alias and the maintenance connection, ``base.tenancy.ops``, which only the worker and ``hub-migrate`` open).
 
 - A hub on no cluster (``Hub.cluster`` empty: the settings' own server), or on a cluster without ``secret_name``: the
-  environment's, the default connection's role for the app (``DB_USER``) and ``DB_MIGRATOR_USER`` for the migrator
-  (the default connection's role where it is not set: local development, the tests).
+  environment's, the default connection's role for the app (``DB_USER``) and ``DB_MIGRATOR_USER``/``_PASSWORD`` for
+  the migrator, which only the worker and ``hub-migrate`` have (the settings make them the default connection's in
+  development only): without them, ``CredentialsUnavailable``, never the app's role.
 - A cluster with ``secret_name``: its own, from the Secrets Manager secret of that role under that prefix,
   ``<secret_name>/app`` (``app_user``, ``app_password``) or ``<secret_name>/migrator`` (``migrator_user``,
   ``migrator_password``). The web's task role may read only ``…/app`` (aws#23), and only a migrator's connection asks
@@ -62,10 +63,22 @@ def secrets_client():
 
 
 def environment_credentials(role: str) -> Credentials:
-    """The environment's ``role``: the default connection's for the app, ``DB_MIGRATOR_USER``'s for the migrator."""
-    default = settings.DATABASES["default"]
-    if role == MIGRATOR and settings.DB_MIGRATOR_USER:
+    """The environment's ``role``: the default connection's for the app, ``DB_MIGRATOR_USER``'s for the migrator.
+
+    Fails closed: a process without ``DB_MIGRATOR_USER`` and its password (the web) has no migrator, and the app's role
+    never stands in for it (``CredentialsUnavailable``)."""
+    if role == MIGRATOR:
+        for variable, value in (
+            ("DB_MIGRATOR_USER", settings.DB_MIGRATOR_USER),
+            ("DB_MIGRATOR_PASSWORD", settings.DB_MIGRATOR_PASSWORD),
+        ):
+            if not value:
+                raise CredentialsUnavailable(
+                    f"{variable} is not set: this process has no migrator's role (only the worker and hub-migrate "
+                    "have it, never the web), and the app's role never stands in for it."
+                )
         return Credentials(user=settings.DB_MIGRATOR_USER, password=settings.DB_MIGRATOR_PASSWORD)
+    default = settings.DATABASES["default"]
     return Credentials(user=default["USER"], password=default["PASSWORD"])
 
 

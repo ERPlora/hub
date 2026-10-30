@@ -235,9 +235,10 @@ DATABASES = {
 # The migrator's role (hub_migrator: DDL and CREATEDB; PLAN-DB §10) for the direct connections that make and change a
 # hub's database: its `<db_name>__ddl` alias and the maintenance connection to `postgres` (base.tenancy.connections,
 # base.tenancy.ops). Only the worker and the hub-migrate task have it (aws stacks/prod/apps.tf,
-# hub_migrator_credentials; never the web). Empty, the default connection's own role: local development and the tests.
-DB_MIGRATOR_USER = config("DB_MIGRATOR_USER", default="")
-DB_MIGRATOR_PASSWORD = config("DB_MIGRATOR_PASSWORD", default="")
+# hub_migrator_credentials; never the web). Unset, there is no migrator (base.tenancy.credentials fails closed, never
+# hub_app), except in development (DEBUG, the suite), where the compose Postgres's user is every role.
+DB_MIGRATOR_USER = config("DB_MIGRATOR_USER", default=DATABASES["default"]["USER"] if DEBUG else "")
+DB_MIGRATOR_PASSWORD = config("DB_MIGRATOR_PASSWORD", default=DATABASES["default"]["PASSWORD"] if DEBUG else "")
 
 # The SaaS's `saas` database, schema `shared`, only for register_apps (round 16, PLAN §21; spec §3.3).
 # Declared only where its credentials exist: in production the worker task (SHARED_DB_USER, role

@@ -28,6 +28,8 @@ ENV_KEYS = (
     "DB_NAME",
     "DB_USER",
     "DB_PASSWORD",
+    "DB_MIGRATOR_USER",
+    "DB_MIGRATOR_PASSWORD",
     "DB_HOST",
     "DB_PORT",
     "SAAS_URL",
@@ -950,6 +952,18 @@ def test_a_long_test_db_name_is_shortened_the_same_every_run_and_apart_from_anot
         "hub_template": f"{shortened}_template",
     }
     assert test_names(OTHER_LONG_TEST_DB_NAME)["default"] not in (shortened, OTHER_LONG_TEST_DB_NAME)
+
+
+def test_the_migrators_role_is_the_default_connections_only_in_development(load_settings):
+    """Locally (and in the suite) the compose Postgres's user is every role; in AWS only the worker and hub-migrate
+    carry DB_MIGRATOR_* (aws stacks/prod/apps.tf), and without them there is no migrator (base.tenancy.credentials)."""
+    development = load_settings(**DEVELOPMENT_ENV, DB_USER="hub", DB_PASSWORD="hub-pw")
+    production = load_settings(**PRODUCTION_ENV, DB_USER="hub_app", DB_PASSWORD="app-pw")
+    worker = load_settings(**PRODUCTION_ENV, DB_MIGRATOR_USER="hub_migrator", DB_MIGRATOR_PASSWORD="migrator-pw")
+
+    assert (development["DB_MIGRATOR_USER"], development["DB_MIGRATOR_PASSWORD"]) == ("hub", "hub-pw")
+    assert (production["DB_MIGRATOR_USER"], production["DB_MIGRATOR_PASSWORD"]) == ("", "")
+    assert (worker["DB_MIGRATOR_USER"], worker["DB_MIGRATOR_PASSWORD"]) == ("hub_migrator", "migrator-pw")
 
 
 def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_in_development(load_settings):
