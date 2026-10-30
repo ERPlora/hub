@@ -151,12 +151,19 @@ def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_
 
 def test_a_hub_already_ready_is_left_as_it_is(registry, monkeypatch, told):
     hub = registry.hub(status=Hub.Status.READY)
-    cloned = []
+    cloned, written = [], []
     monkeypatch.setattr(ops, "clone_database", lambda *args, **kwargs: cloned.append(args))
 
-    assert provision.provision(hub) is True
+    def record(execute, sql, params, many, context):
+        if not sql.lstrip().upper().startswith("SELECT"):
+            written.append(sql)
+        return execute(sql, params, many, context)
 
-    assert cloned == [] and told == []
+    with django_connections["default"].execute_wrapper(record):
+        assert provision.provision(hub) is True
+
+    # Read once, nothing written: no lease taken, no row of hub_due made and dropped.
+    assert cloned == [] and told == [] and written == []
     assert fresh(hub).status == "ready" and not HubDue.objects.filter(pk=hub.pk).exists()
     assert hub.db_name not in databases()
 
@@ -339,6 +346,35 @@ def test_the_due_pass_prepares_what_is_due_and_leaves_what_waits_for_its_retry(r
     assert fresh(due).status == "ready" and fresh(waiting).status == "failed"
     assert HubDue.objects.get(pk=waiting.pk).due_at == later
     assert not HubDue.objects.filter(pk=due.pk).exists()
+
+
+def test_a_failed_hub_made_due_early_for_something_else_waits_for_its_retry(registry, told):
+    now = timezone.now()
+    later = now + dt.timedelta(minutes=5)
+    hub = registry.hub(status=Hub.Status.FAILED, attempts=1, next_attempt_at=later)
+    HubDue.mark_due(hub, now)
+
+    provision.run_due(now)
+
+    hub = fresh(hub)
+    assert (hub.status, hub.attempts) == ("failed", 1) and hub.db_name not in databases()
+    assert HubDue.objects.get(pk=hub.pk).due_at == later
+
+
+def test_its_seeding_runs_inside_its_own_database(registry, monkeypatch, told):
+    hub = registry.hub()
+    seeded = []
+
+    def seed(row):
+        from base.tenancy.context import current
+
+        seeded.append((row.pk, current().alias))
+
+    monkeypatch.setattr(services, "apply_kept_photo", seed)
+
+    provision.provision(hub)
+
+    assert seeded == [(hub.pk, tenancy_connections.hub_alias(hub))]
 
 
 def test_a_hub_held_by_another_worker_is_not_taken(registry, told):

@@ -623,6 +623,27 @@ def test_restore_brings_a_cancelled_hub_back(client, db, registered):
     assert answer.status_code == 200 and answer.json()["status"] == "ready"
 
 
+def test_restore_of_a_business_cancelled_before_its_database_was_finished_makes_it_again(client, db):
+    signed(client, "put", HUB_PATH, REGISTRY)
+    signed(client, "delete", HUB_PATH, {"id": NEW_ID})
+    HubDue.objects.filter(pk=NEW_ID).delete()
+
+    answer = signed(client, "post", f"{HUB_PATH}/restore", {"id": NEW_ID}, with_v2=True)
+
+    assert answer.status_code == 200 and answer.json()["status"] == "requested"
+    assert HubDue.objects.filter(pk=NEW_ID).exists()
+
+
+def test_restore_of_a_business_whose_database_was_made_opens_it_again(client, db):
+    signed(client, "put", HUB_PATH, REGISTRY)
+    Hub.objects.filter(pk=NEW_ID).update(status="ready", ready_at=Hub.objects.get(pk=NEW_ID).created_at)
+    signed(client, "delete", HUB_PATH, {"id": NEW_ID})
+
+    answer = signed(client, "post", f"{HUB_PATH}/restore", {"id": NEW_ID}, with_v2=True)
+
+    assert answer.status_code == 200 and answer.json()["status"] == "ready"
+
+
 def test_restore_of_a_purged_hub_is_hub_purged(client, db, registered):
     # Literal: the SaaS's _restore compares this code and marks the business deleted.
     Hub.objects.filter(pk=HUB_ID).update(status="purged")
