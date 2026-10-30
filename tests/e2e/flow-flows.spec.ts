@@ -304,12 +304,13 @@ for (const viewport of VIEWPORTS) {
       await shown(page).locator('[data-testid=flow-list-bulk-enable]').click();
       await expect(row).toContainText('Active');
       await expect(row.locator('ion-toggle')).toHaveClass(/toggle-checked/);
-      // The knob slides in its shadow root, out of `settled`'s sight: the shot waits until it rests on.
+      // The knob is on the «on» side; it slides there in its shadow root, which `settled` (in `snap`) sees too, so the
+      // shot waits until it rests.
       await expect
         .poll(() =>
           row.locator('ion-toggle').evaluate((toggle) => {
             const knob = toggle.shadowRoot?.querySelector('.toggle-icon-wrapper');
-            return !toggle.shadowRoot?.getAnimations().length && !!knob && new DOMMatrix(getComputedStyle(knob).transform).m41 > 0;
+            return !!knob && new DOMMatrix(getComputedStyle(knob).transform).m41 > 0;
           }),
         )
         .toBe(true);
