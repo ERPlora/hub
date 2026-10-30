@@ -256,3 +256,27 @@ def test_the_control_database_is_never_dropped_nor_cloned_into():
         ops.drop_database(control)
     with pytest.raises(names.InvalidDatabaseName):
         ops.clone_database(control, template=names.template_db_name(control))
+
+
+def test_a_migrators_alias_registered_again_never_keeps_another_roles_connection(
+    settings, hub_databases, django_db_blocker
+):
+    """CI of hub#471: a migrator's alias registered with one role and forgotten left this thread's connection object
+    behind; registered again with another role, it must not reach the server with the first one."""
+    from base.tenancy.tests import hubs as test_hubs
+
+    default = django_connections.settings["default"]
+    before = django_connections.settings
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "hub_migrator", "its-password"
+    alias = tenancy_connections.register_ddl_alias(hub_databases.a)
+    assert django_connections[alias].settings_dict["USER"] == "hub_migrator"
+    test_hubs.forget_aliases(before)
+
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = default["USER"], default["PASSWORD"]
+    tenancy_connections.register_ddl_alias(hub_databases.a)
+
+    assert django_connections[alias].settings_dict["USER"] == default["USER"]
+    with django_db_blocker.unblock(), django_connections[alias].cursor() as cursor:
+        cursor.execute("SELECT current_user")
+        assert cursor.fetchone()[0] == default["USER"]
+    django_connections[alias].close()

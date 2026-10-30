@@ -178,7 +178,10 @@ def register_ddl_alias(db_name: str, *, cluster=None) -> str:
         settings["OPTIONS"].pop("pool", None)
         return settings
 
-    return _register(f"{db_name}{names.DDL_SUFFIX}", build)
+    alias = _register(f"{db_name}{names.DDL_SUFFIX}", build)
+    # A connection object this thread kept from an earlier registration (forgotten since) reaches as that one's role.
+    _take_this_threads_role(alias)
+    return alias
 
 
 def close_hub_aliases(hub) -> None:
