@@ -11,14 +11,14 @@ Times are the server's (``timezone.now()``); the distance to the workplace is me
 import datetime as dt
 from typing import Any
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Case, DateTimeField, F, Value, When
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from geopy.distance import geodesic
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.attendance import events
@@ -279,7 +279,7 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
     _check_radius(values, source, where)
     user = actor_user(ctx)
     try:
-        with transaction.atomic():
+        with atomic():
             record = Record.objects.create(
                 member=member,
                 clock_in_at=now,
@@ -362,7 +362,7 @@ def start_break(ctx: OperationContext, data: BreakIn) -> dict:
     if Break.objects.filter(record=record, ended_at__isnull=True).exists():
         raise running
     try:
-        with transaction.atomic():
+        with atomic():
             pause = Break.objects.create(
                 record=record, started_at=max(now, record.clock_in_at)
             )
@@ -427,7 +427,7 @@ def _correct(
     record.work_date = business_date(clock_in_at)
     record.updated_by = actor_user(ctx)
     try:
-        with transaction.atomic():
+        with atomic():
             record.save()
     except IntegrityError:
         raise Conflict(

@@ -34,7 +34,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload
-from live.operations import INTERNAL, operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
@@ -303,7 +303,7 @@ def upload_image(ctx: OperationContext, data: ImageUploadIn) -> dict:
     image = Image.objects.filter(key=key, hub_id=hub).first()
     if image is None:
         try:
-            with transaction.atomic():
+            with atomic():
                 image = Image.objects.create(
                     hub_id=hub,
                     key=key,
