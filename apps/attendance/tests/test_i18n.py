@@ -161,6 +161,41 @@ def test_short_labels_carry_their_context():
         assert key in entries, key
 
 
+def said_in_spanish(key: str) -> str:
+    """How the Hub says a catalogue entry in Spanish: every app's catalogue merged, the first one to have it winning."""
+    with translation.override("es"):
+        if "\x04" in key:
+            context, msgid = key.split("\x04", 1)
+            return translation.pgettext(context, msgid)
+        return translation.gettext(key)
+
+
+def test_no_other_apps_catalogue_says_a_text_of_attendance_its_own_way():
+    """Staff's «working day» is a weekday of a schedule («día de trabajo»), attendance's the legal day («jornada»): an
+    entry another catalogue also has, without its own context, was said the other app's way."""
+    entries = po_entries(LOCALE / "django.po")
+    assert len(entries) > 60  # positive control: the catalogue was read
+    shadowed = {key: said_in_spanish(key) for key, (msgstr, _) in entries.items() if said_in_spanish(key) != msgstr}
+    assert shadowed == {}
+
+
+def test_a_working_day_is_a_jornada_in_spanish_and_a_working_day_in_english():
+    """What the models call the day, the end of a break and the settings' slot: their admin and every screen or card
+    that names a datum by its model (the assistant's card, an automation's fields) say them as attendance does."""
+    names = lambda: [  # noqa: E731
+        str(Record._meta.verbose_name),
+        str(Record._meta.verbose_name_plural),
+        str(Break._meta.get_field("record").verbose_name),
+        str(Correction._meta.get_field("record").verbose_name),
+        str(Break._meta.get_field("ended_at").verbose_name),
+        str(AttendanceSettings._meta.get_field("slot").verbose_name),
+    ]
+    with translation.override("es"):
+        assert names() == ["jornada", "jornadas", "jornada", "jornada", "terminó a las", "hueco"]
+    with translation.override("en"):
+        assert names() == ["working day", "working days", "working day", "working day", "ended at", "slot"]
+
+
 @pytest.mark.django_db
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
     client.force_login(make_user("boss", host="a", role="hub_admin"))

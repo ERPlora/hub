@@ -118,15 +118,18 @@ msgstr "creado el"
 msgid "updated at"
 msgstr "actualizado el"
 
+msgctxt "attendance"
 msgid "working day"
 msgstr "jornada"
 
+msgctxt "attendance"
 msgid "working days"
 msgstr "jornadas"
 
 msgid "started at"
 msgstr "empezó a las"
 
+msgctxt "attendance"
 msgid "ended at"
 msgstr "terminó a las"
 
@@ -169,6 +172,7 @@ msgstr "corrección"
 msgid "corrections"
 msgstr "correcciones"
 
+msgctxt "attendance"
 msgid "slot"
 msgstr "hueco"
 
