@@ -6,14 +6,27 @@
 // `vue-tsc` run), plant a `process.env` in SPA files in memory and prove the SPA's project reports it, and prove
 // the split left nothing the single project checked out of `pnpm typecheck`, nor out of the project an editor
 // opens each file in (the root tsconfig.json only references the projects).
-import { existsSync, globSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, globSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
-import { expect, it } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 
 import viteConfig from './vite.config';
+
+// The real `readFileSync`, watched: the files these tests read are read at once beforehand (see `readsOneByOne`).
+vi.mock('node:fs', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs')>();
+  return { ...fs, readFileSync: vi.fn(fs.readFileSync) };
+});
+// And the reads at once, watched: each file is asked for together with the rest, and once (see `readAll`).
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...fs, readFile: vi.fn(fs.readFile) };
+});
 
 const root = dirname(fileURLToPath(import.meta.url));
 // vue-tsc's own extension: without it a project lists no .vue file.
@@ -21,85 +34,251 @@ const VUE: ts.FileExtensionInfo[] = [{ extension: '.vue', isMixedContent: true, 
 
 const scripts: Record<string, string> = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
 
-/** A tsconfig parsed as `vue-tsc` (or an editor, with the same `options`) reads it. */
-function parseConfig(config: string, options: ts.CompilerOptions, extensions: ts.FileExtensionInfo[]) {
-  const parsed = ts.getParsedCommandLineOfConfigFile(
-    config,
-    options,
-    {
-      ...ts.sys,
-      onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
-        throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
-      },
-    },
-    undefined,
-    undefined,
-    extensions,
-  );
+/** Each walk of the repo for a tsconfig's files, once per run: a `vue-tsc` run and an editor read the same tsconfigs. */
+const walks = new Map<string, string[]>();
+
+const configHost: ts.ParseConfigFileHost = {
+  ...ts.sys,
+  readDirectory: (...walk: Parameters<typeof ts.sys.readDirectory>) => {
+    const key = JSON.stringify(walk);
+    if (!walks.has(key)) walks.set(key, ts.sys.readDirectory(...walk));
+    return walks.get(key)!;
+  },
+  onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
+    throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+  },
+};
+
+/** Each tsconfig parsed, by the options it was read with (see the `beforeAll`). */
+const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
+
+/** A tsconfig parsed as `vue-tsc` (or an editor, with the same `options`) reads it, its .vue files included, once per run. */
+function parseConfig(config: string, options: ts.CompilerOptions): ts.ParsedCommandLine {
+  const key = JSON.stringify([config, options]);
+  const known = parsedConfigs.get(key);
+  if (known) return known;
+  const parsed = ts.getParsedCommandLineOfConfigFile(config, options, configHost, undefined, undefined, VUE);
   if (!parsed) throw new Error(`${config} could not be read`);
+  parsedConfigs.set(key, parsed);
   return parsed;
 }
 
 /** A `vue-tsc` run of a package.json script, parsed as that run reads its tsconfig. */
-function vueTscProject(command: string, extensions: ts.FileExtensionInfo[]): ts.ParsedCommandLine {
+function vueTscProject(command: string): ts.ParsedCommandLine {
   const [bin, ...args] = command.trim().split(/\s+/);
   const { options, fileNames, errors } = ts.parseCommandLine(args);
   if (bin !== 'vue-tsc' || errors.length || fileNames.length) {
     throw new Error(`"${command.trim()}" is not a plain vue-tsc run`);
   }
   const project = resolve(root, options.project ?? 'tsconfig.json');
-  return parseConfig(project.endsWith('.json') ? project : join(project, 'tsconfig.json'), options, extensions);
+  return parseConfig(project.endsWith('.json') ? project : join(project, 'tsconfig.json'), options);
 }
 
 /** Each `vue-tsc` run chained in the `typecheck` script. */
-function typecheckProjects(extensions: ts.FileExtensionInfo[] = []): ts.ParsedCommandLine[] {
-  return scripts.typecheck.split('&&').map((command) => vueTscProject(command, extensions));
+function typecheckProjects(): ts.ParsedCommandLine[] {
+  return scripts.typecheck.split('&&').map(vueTscProject);
 }
 
-const checked = (project: ts.ParsedCommandLine) => new Set(project.fileNames.map((file) => resolve(file)));
+/** The files of each project, listed once (an editor's lookup asks for them for each file of the repo). */
+const checkedFiles = new WeakMap<ts.ParsedCommandLine, Set<string>>();
+
+function checked(project: ts.ParsedCommandLine): Set<string> {
+  let files = checkedFiles.get(project);
+  if (!files) checkedFiles.set(project, (files = new Set(project.fileNames.map((file) => resolve(file)))));
+  return files;
+}
+
+/** A tsconfig as an editor reads it: without a command line. */
+const editorConfig = (config: string) => parseConfig(config, {});
 
 /**
  * The tsconfig an editor (tsserver) opens a file in: the nearest tsconfig.json above it if it holds the file,
  * else the first of its references that does; none means an inferred project, without this repo's settings
  * (no `bundler` resolution, so every `@erplora/ui/*` import shows as missing).
  */
-function editorProject(file: string, parse: (config: string) => ts.ParsedCommandLine): string | undefined {
+function editorProject(file: string): string | undefined {
   for (let dir = dirname(file); ; dir = dirname(dir)) {
     const config = join(dir, 'tsconfig.json');
     if (ts.sys.fileExists(config)) {
-      const parsed = parse(config);
+      const parsed = editorConfig(config);
       if (checked(parsed).has(file)) return config;
       const references = (parsed.projectReferences ?? []).map(ts.resolveProjectReferencePath);
-      return references.find((reference) => checked(parse(reference)).has(file));
+      return references.find((reference) => checked(editorConfig(reference)).has(file));
     }
     if (dir === root) return undefined;
   }
 }
 
-it('reports a process.env planted in the shell entry and in an app of the SPA', () => {
+/** A file of this repo (the submodules are their own, as are the dependencies). */
+const ownFile = (file: string) => !/^(packages|node_modules)\//.test(relative(root, file));
+
+/**
+ * Every project these tests read: each `vue-tsc` run of the `typecheck` and `build` scripts, and each tsconfig an
+ * editor opens their files in (tsconfig.json, whose references are those runs', or the run's own, as tests/e2e's).
+ */
+function projectsRead(): ts.ParsedCommandLine[] {
+  const runs = [...typecheckProjects(), vueTscProject(scripts.build.split('&&')[0])];
+  const configs = [join(root, 'tsconfig.json'), ...runs.map((run) => run.options.configFilePath as string)];
+  return [...runs, ...configs.map(editorConfig)];
+}
+
+/** The text of each file these tests read, by its path, read once per run (see `readAll`). */
+const texts = new Map<string, string | undefined>();
+
+/** A file's bytes as TypeScript's own read decodes them: UTF-8 without its byte order mark; UTF-16, by that read. */
+function decoded(file: string, bytes: Buffer): string | undefined {
+  const utf16 = bytes.length >= 2 && ((bytes[0] === 0xfe && bytes[1] === 0xff) || (bytes[0] === 0xff && bytes[1] === 0xfe));
+  if (utf16) return ts.sys.readFile(file);
+  const text = bytes.toString('utf8');
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+/**
+ * Reads at once each file not read yet. With the machine loaded, a file's first open waits on its own: 760 files
+ * read one by one took 75 s, 99 ms each against 0.5 at rest (2026-10-30), and waiting for them together takes a
+ * fraction of their sum. A file that cannot be read is `undefined`, as TypeScript's own read returns it.
+ */
+async function readAll(files: Iterable<string>): Promise<void> {
+  const unread = [...new Set([...files].map((file) => resolve(file)))].filter((file) => !texts.has(file));
+  const read = await Promise.all(unread.map((file) => readFile(file).then((bytes) => decoded(file, bytes), () => undefined)));
+  unread.forEach((file, index) => texts.set(file, read[index]));
+}
+
+/** A file's text: what was read, or (once) from the disk. */
+function readText(file: string): string | undefined {
+  const path = resolve(file);
+  if (!texts.has(path)) texts.set(path, ts.sys.readFile(path));
+  return texts.get(path);
+}
+
+/**
+ * Reads at once every file a TypeScript program over `rootNames` loads, before it is built: each pass builds it
+ * from what was read (a file not read yet, as empty) and reads at once what it asked for, until it asks for nothing
+ * new. Each pass parses only what it had not parsed with the same text.
+ */
+async function readProgram(rootNames: readonly string[], options: ts.CompilerOptions): Promise<void> {
+  const parsed = new Map<string, ts.SourceFile>();
+  for (let wanted: Iterable<string> = rootNames; ; ) {
+    await readAll(wanted);
+    const asked = new Set<string>();
+    const host = ts.createCompilerHost(options);
+    host.readFile = (file) => {
+      const path = resolve(file);
+      if (texts.has(path)) return texts.get(path);
+      asked.add(path);
+      return '';
+    };
+    const getSourceFile = host.getSourceFile;
+    host.getSourceFile = (file, version, onError) => {
+      const known = parsed.get(file);
+      if (known && known.text === host.readFile(file)) return known;
+      const source = getSourceFile(file, version, onError);
+      if (source) parsed.set(file, source);
+      return source;
+    };
+    ts.createProgram({ rootNames, options, host });
+    if (asked.size === 0) return;
+    wanted = asked;
+  }
+}
+
+/** What `run` returns, and how many files it read from the disk one at a time (by Node's or TypeScript's read). */
+async function readsOneByOne<T>(run: () => T | Promise<T>): Promise<[T, number]> {
+  const typescript = vi.spyOn(ts.sys, 'readFile');
+  const node = vi.mocked(readFileSync).mock.calls.length;
+  try {
+    const result = await run();
+    return [result, typescript.mock.calls.length + vi.mocked(readFileSync).mock.calls.length - node];
+  } finally {
+    typescript.mockRestore();
+  }
+}
+
+// Parsing a project walks the repo for its files, and the tests read the same projects again and again (each run of
+// the typecheck and build scripts, and an editor's); listing a project's files resolves each of them, and the editor's
+// lookup asked for them once per file of the repo. At rest that is 1.3 s and 160 garbage collections; under load what
+// counts is the opening of files and folders, whose time is the machine's (1,687 files read in 38–50 s with 15 busy
+// cores, 0.1–0.3 s at rest): a run opened 2,588 folders, 930 of them in one test, and a test of this file took 118 s
+// beside `pnpm test` at load ~30 (2026-10-29). Here, once per run (465 folders), with the limit of the guardrails that
+// read the whole tree; each test keeps its own work (the planted program, the build's reads) and its 60 s (2026-10-30).
+beforeAll(() => {
+  for (const project of projectsRead()) checked(project);
+}, 60_000);
+
+it('reads the projects the warm-up parsed: no test walks the repo for a project, nor lists its files, again', () => {
+  const walk = vi.spyOn(ts.sys, 'readDirectory');
+  try {
+    const projects = projectsRead();
+    for (const project of projects) {
+      const file = [...checked(project)].find(ownFile);
+      if (file) editorProject(file);
+    }
+    // Another command line over a tsconfig already read lists the same files: the walk is not repeated.
+    vueTscProject('vue-tsc --noEmit --strict -p tsconfig.app.json');
+    const again = projectsRead();
+
+    expect(walk).not.toHaveBeenCalled();
+    // Read again, each is the project parsed before, with the list of its files made before.
+    expect(projects.filter((project, index) => again[index] !== project || checked(again[index]) !== checked(project)).length).toBe(0);
+  } finally {
+    walk.mockRestore();
+  }
+});
+
+it('reads at once each file not read yet, as TypeScript decodes it, and none of them twice', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tsconfig-test-'));
+  try {
+    const files = [
+      ['plain.ts', Buffer.from('export const plain = 1;\n')],
+      ['bom.ts', Buffer.from('﻿export const bom = 1;\n')],
+      ['utf16.ts', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('export const utf16 = 1;\n', 'utf16le')])],
+    ] as const;
+    for (const [name, bytes] of files) writeFileSync(join(dir, name), bytes);
+    const paths = [...files.map(([name]) => join(dir, name)), join(dir, 'missing.ts')];
+    const before = vi.mocked(readFile).mock.calls.length;
+
+    const reading = readAll(paths);
+    // Each asked for before the first comes back: one after another, each would wait for the last.
+    expect(vi.mocked(readFile).mock.calls.length - before).toBe(paths.length);
+    await reading;
+    await readAll(paths);
+
+    expect(vi.mocked(readFile).mock.calls.length - before).toBe(paths.length);
+    expect(paths.map(readText)).toEqual(paths.map((path) => ts.sys.readFile(path)));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it('reports a process.env planted in the shell entry and in an app of the SPA', async () => {
   const planted = ['frontend/main.ts', 'apps/demo/frontend/routes.ts'].map((name) => join(root, name));
   const spa = typecheckProjects().find((candidate) => checked(candidate).has(planted[0]));
   if (!spa) throw new Error('no project of the typecheck script holds frontend/main.ts');
   expect(planted.filter((file) => !checked(spa).has(file)).map((file) => relative(root, file))).toEqual([]);
 
+  // TypeScript reads no .vue file (vue-tsc's own): the program takes the rest of the project.
+  const rootNames = spa.fileNames.filter((file) => !file.endsWith('.vue'));
+  await readProgram(rootNames, spa.options);
   const host = ts.createCompilerHost(spa.options);
-  const readFile = host.readFile.bind(host);
   host.readFile = (file) => {
-    const text = readFile(file);
+    const text = readText(file);
     return planted.includes(resolve(file)) ? `${text}\nexport const planted = process.env.VITE_DEV_PORT;\n` : text;
   };
-  const program = ts.createProgram({ rootNames: spa.fileNames, options: spa.options, host });
-
-  const errors = planted.flatMap((file) => {
-    const source = program.getSourceFile(file);
-    if (!source) throw new Error(`${relative(root, file)} is not in the program`);
-    return program.getSemanticDiagnostics(source).map((diagnostic) => [relative(root, file), diagnostic.code]);
+  const [errors, oneByOne] = await readsOneByOne(() => {
+    const program = ts.createProgram({ rootNames, options: spa.options, host });
+    return planted.flatMap((file) => {
+      const source = program.getSourceFile(file);
+      if (!source) throw new Error(`${relative(root, file)} is not in the program`);
+      return program.getSemanticDiagnostics(source).map((diagnostic) => [relative(root, file), diagnostic.code]);
+    });
   });
   // TS2591: Cannot find name 'process' (Node's types are not in the project's `types`).
   expect(errors).toEqual([
     ['frontend/main.ts', 2591],
     ['apps/demo/frontend/routes.ts', 2591],
   ]);
+  // Built from its files read at once beforehand: TypeScript read none of them from the disk while building it.
+  expect(oneByOne).toBe(0);
 }, 60_000);
 
 it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA, its tests and the root config', () => {
@@ -116,7 +295,7 @@ it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA
     undefined,
     VUE,
   ).fileNames.map((file) => resolve(file));
-  const files = new Set(typecheckProjects(VUE).flatMap((project) => [...checked(project)]));
+  const files = new Set(typecheckProjects().flatMap((project) => [...checked(project)]));
 
   expect(single.filter((file) => file.endsWith('.vue')).length).toBeGreaterThan(0);
   expect(single.filter((file) => file.endsWith('.test.ts')).length).toBeGreaterThan(0);
@@ -124,21 +303,15 @@ it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA
 }, 60_000);
 
 it('opens every file pnpm typecheck checks, in an editor, in a project that checks it', () => {
-  const parsed = new Map<string, ts.ParsedCommandLine>();
-  const parse = (config: string) => {
-    if (!parsed.has(config)) parsed.set(config, parseConfig(config, {}, VUE));
-    return parsed.get(config)!;
-  };
   // Each file of this repo (the submodules are their own) with the tsconfigs of the runs that check it.
   const runs = new Map<string, Set<string>>();
-  for (const project of typecheckProjects(VUE)) {
-    for (const file of checked(project)) {
-      if (/^(packages|node_modules)\//.test(relative(root, file))) continue;
+  for (const project of typecheckProjects()) {
+    for (const file of [...checked(project)].filter(ownFile)) {
       runs.set(file, (runs.get(file) ?? new Set()).add(resolve(project.options.configFilePath as string)));
     }
   }
 
-  const lost = [...runs].filter(([file, configs]) => !configs.has(editorProject(file, parse) ?? ''));
+  const lost = [...runs].filter(([file, configs]) => !configs.has(editorProject(file) ?? ''));
   expect(runs.size).toBeGreaterThan(0);
   expect(lost.map(([file]) => relative(root, file))).toEqual([]);
 }, 60_000);
@@ -199,7 +372,7 @@ it('copies into the image every tsconfig Vite reads to compile the SPA: tsconfig
 });
 
 it('type-checks the SPA in pnpm build too: the image runs it, and a run without its project checks nothing', () => {
-  const spa = vueTscProject(scripts.build.split('&&')[0], VUE);
+  const spa = vueTscProject(scripts.build.split('&&')[0]);
   const files = ['frontend/main.ts', 'apps/demo/frontend/routes.ts'].map((name) => join(root, name));
 
   expect(files.filter((file) => !checked(spa).has(file)).map((file) => relative(root, file))).toEqual([]);
@@ -230,15 +403,18 @@ function landing(path: string): string {
  * (also lazily), what their `import.meta.glob`s match, and Vite's entries. Paths relative to the repo; a glob
  * that matches nothing here is reported, as it would match nothing in the image either, without an error.
  */
-function spaBuildReads(): { files: Set<string>; emptyGlobs: string[] } {
-  const spa = vueTscProject(scripts.build.split('&&')[0], VUE);
+async function spaBuildReads(): Promise<{ files: Set<string>; emptyGlobs: string[] }> {
+  const spa = vueTscProject(scripts.build.split('&&')[0]);
   const input = viteConfig.build?.rollupOptions?.input;
   const entries = typeof input === 'string' ? [input] : Array.isArray(input) ? input : Object.values(input ?? {});
   const files = new Set([...checked(spa)].map((file) => relative(root, file)).filter((file) => !file.startsWith('node_modules/')));
   for (const entry of entries) files.add(relative(root, resolve(root, entry)));
   const emptyGlobs: string[] = [];
-  for (const file of [...files].filter((name) => /\.(ts|vue)$/.test(name) && !name.endsWith('.d.ts'))) {
-    const source = readFileSync(join(root, file), 'utf8');
+  const scanned = [...files].filter((name) => /\.(ts|vue)$/.test(name) && !name.endsWith('.d.ts'));
+  await readAll(scanned.map((file) => join(root, file)));
+  for (const file of scanned) {
+    const source = readText(join(root, file));
+    if (source === undefined) throw new Error(`${file} cannot be read`);
     const folder = dirname(join(root, file));
     for (const pattern of SPECIFIERS) {
       for (const [, specifier] of source.matchAll(pattern)) files.add(relative(root, landing(resolve(folder, specifier))));
@@ -272,17 +448,19 @@ function dockerIgnored(): (file: string) => boolean {
   return (file) => matchers.some((matcher) => matcher.test(file));
 }
 
-it('copies into the image every file pnpm build reads for the SPA, and keeps none of them out by .dockerignore', () => {
+it('copies into the image every file pnpm build reads for the SPA, and keeps none of them out by .dockerignore', async () => {
   // 2026-10-22: hub#168 gave base its own frontend/ (the Home, the bell, «Upgrade plan»), which main.ts imports and
   // globs; the `web` stage copied frontend/ and apps/ only, so the image's `pnpm build` failed on the import (and a
   // glob alone would have built a hub without its Home, silently). The CI's `pnpm build` runs on the whole checkout.
   const sources = webStageCopies();
   const ignored = dockerIgnored();
-  const { files, emptyGlobs } = spaBuildReads();
+  const [{ files, emptyGlobs }, oneByOne] = await readsOneByOne(spaBuildReads);
 
   expect([...files]).toEqual(expect.arrayContaining(['frontend/main.ts', 'base/frontend/lib/home.ts', 'base/frontend/routes.ts']));
   expect(emptyGlobs).toEqual([]);
   expect([...files].filter((file) => !copiedBy(sources, file)).sort()).toEqual([]);
   expect([...files].filter((file) => ignored(file)).sort()).toEqual([]);
+  // Its files read at once (those the planted program read, taken from it), none one by one from the disk.
+  expect(oneByOne).toBe(0);
 }, 60_000);
 
