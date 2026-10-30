@@ -10,7 +10,7 @@
 // `afterAll` removes all of it, with the holds, the table's checks and their orders.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown, untilStill } from './helpers';
+import { A, api, psql, settled, shot, shown, untilStill } from './helpers';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -461,6 +461,16 @@ test('Seating a party leaves the next reservation of its table held: Reserved ag
   }
 });
 
+/** The book's list as cards at the size just set, with the reservation `id` among them. The resize settles first: back
+ *  from a phone the list is the table again (#274) and the table folds its actions anew for the new width. Acting
+ *  before, the card's «Edit» or the «⋮» of the previous width was taken and then detached under the click, and the
+ *  test hung until its timeout (1 run in 2 after the specs of flow). Once picked, the cards stay and never fold. */
+async function asCards(page: Page, view: Locator, id: string): Promise<void> {
+  await settled(page);
+  await view.locator('[data-testid=reservation-list-view-cards]').click();
+  await expect(view.locator(`.data-table__cards [data-testid=reservation-list-row][data-id="${id}"]`)).toBeVisible();
+}
+
 /** The «when» row of the reservation form shows each label and value whole: none cut by its box or its icon. */
 async function expectWholeWhen(form: Locator, size: string): Promise<void> {
   for (const field of ['date', 'time', 'party_size', 'duration_minutes']) {
@@ -546,7 +556,7 @@ test('A phone typed without prefix for a chosen card is kept international; one 
     await expect(row).toContainText(grouped);
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await view.locator('[data-testid=reservation-list-view-cards]').click();
+      await asCards(page, view, id);
       await expect(row).toContainText(grouped);
       await expect(row).not.toContainText(`+34${typed}`);
       await row.scrollIntoViewIfNeeded();
@@ -554,9 +564,10 @@ test('A phone typed without prefix for a chosen card is kept international; one 
       await page.screenshot({ path: shot(`FIX-HUB-RESERVATION-GUEST-PHONE-NOT-NORMALIZED-${viewport.label}`), fullPage: true });
     }
     // Opened from its card at each size, as a phone, a tablet and a desktop open it (a card never folds its actions
-    // into «⋮», which a resize repaints): the field keeps what is sent (E.164).
+    // into «⋮», which a resize repaints; `asCards`): the field keeps what is sent (E.164).
     for (const viewport of VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await asCards(page, view, id);
       await rowAction(page, 'reservation-list', id, 'edit');
       await expect(form).toBeVisible();
       await expect(phone).toHaveValue(`+34${typed}`);
@@ -566,6 +577,7 @@ test('A phone typed without prefix for a chosen card is kept international; one 
       await expect(form).toBeHidden();
     }
     await page.setViewportSize({ width: 1280, height: 860 });
+    await asCards(page, view, id);
     await rowAction(page, 'reservation-list', id, 'edit');
     await phone.fill('600111');
     await form.locator('[data-testid=reservation-form-submit]').click();

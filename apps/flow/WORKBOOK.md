@@ -448,10 +448,12 @@ Entra: los pasos guardados y los permisos que tiene.
 Sale: la lista completa de permisos de la automatización (`flow.flow.granted`). Antes del primer
 guardado no hay nada que autorizar: la pestaña lo dice y pide guardar.
 Si falla: si la lista nombra algo que no existe en el negocio, o algo que necesita a una persona delante
-(anular, devolver, borrar datos, enviar a Hacienda…), se rechaza entera y se dice qué. Nadie concede lo
+(anular, devolver, borrar datos, enviar a Hacienda, sentar a un grupo que llega…), se rechaza entera y se
+dice qué. Nadie concede lo
 que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».» (tampoco una
 integración con su clave). Cada paso actúa solo con el permiso que se le concedió, nunca con todos los
-de quien la montó.
+de quien la montó. Reservar con solo el nombre y el teléfono de quien reserva busca o crea su ficha de
+cliente sin autorizar nada de Clientes.
 Implicados: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16
 
 ### FLOW-F13 Probar sin que haga nada
@@ -1209,9 +1211,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Catálogo sin inventar nombres**: los avisos son los `events.ALL` de las apps activas (todas declaran
   el suyo); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
   declara su app (las de «solo la plataforma» quedan fuera) **y que no necesitan a una persona delante**:
-  toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) queda
-  fuera y se rechaza al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión
-  2026-10-15). En la fase 1 «activas» son las instaladas (como `base.session.me`); la fase 2 lo cambia por
+  toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) o que
+  se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`,
+  revisión 2026-10-30; ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
+  al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). En la fase 1 «activas» son las instaladas (como `base.session.me`); la fase 2 lo cambia por
   la foto del SaaS en `queries.active_apps`.
 - **Con qué actúa**: el motor solo llama a las operaciones de la lista `grants`, que fija un propietario
   o administrador, que se valida entera contra el catálogo y que solo contiene lo que quien la concede
@@ -1220,6 +1223,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`<app>.view…`, para contestar con lo que hizo), nunca con todos: los controles internos de la
   operación siguen valiendo (el «no elevation» del motor viejo); en el idioma de quien la guardó, que es el de
   lo que escriben sus pasos y el del motivo que leen los pasos siguientes (`steps.<id>.error_message`).
+  Lo que una operación pide a otra app para hacer su propio trabajo lo añade esa operación solo para esa
+  llamada, nunca el paso (`reservation.reservation.create` busca o crea la ficha por teléfono con
+  `card_keeper`, como lee Horarios con `reader`): `_step_context` no gana permisos de otras apps
+  (`test_services_safety.py`).
 - **El motivo de una parada, en el idioma de quien lo lee** (FLOW-F16; mismo patrón que `message_reason` de
   whatsapp_inbox, hub#384): la ejecución (`error_reason`) y la entrada del paso que falló (`error.reason`)
   guardan el **nombre** del motivo propio del motor y sus datos (`queries.REASONS`: el código, salvo donde un

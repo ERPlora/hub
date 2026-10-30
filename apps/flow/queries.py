@@ -123,8 +123,10 @@ def grantable_operations() -> dict[str, Operation]:
 
 def needs_a_person(op: Operation) -> bool:
     """An action the assistant confirms before running (``ai.risk == "high"``: voiding, refunding,
-    erasing, sending to the tax agency…): never for an automation, which acts with nobody in front."""
-    return (op.ai or {}).get("risk") == "high"
+    erasing, sending to the tax agency…) or one done in person (``ai.in_person``: seating a party at the
+    door): never for an automation, which acts with nobody in front."""
+    ai = op.ai or {}
+    return ai.get("risk") == "high" or ai.get("in_person") is True
 
 
 def catalog_operations() -> dict[str, Operation]:
