@@ -807,6 +807,12 @@ mesa se nombra por su id o por su número («mesa 4»), con la zona si el númer
 terraza»); una zona por su id o por su nombre; un cliente por su id, su nombre o su teléfono. Si un
 nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 
+Antes de cambiar nada, el asistente pide confirmación y dice por su nombre, nunca por un código, lo que
+toca cada cambio: la mesa con su zona, como 5 (Terraza), porque el número se repite entre zonas; la zona;
+la cuenta por dónde está (su mesa con su zona, o «Aparcada»); la cuenta de Ventas por su título; el
+cliente por su ficha; la reserva por el nombre que pinta en la mesa, y cada línea que se mueve al dividir
+por su nombre. Lo que la persona no puede ver (la cuenta de Ventas, sin permiso en Ventas) no sale.
+
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
 | Qué da | Quién puede | Flujos | Servicio |
@@ -814,10 +820,12 @@ nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 | Las zonas con sus mesas y las libres, búsqueda, filtros, orden y páginas (hasta 100) | ver zonas | F01, F06 | `table.zone.list` |
 | Una zona | ver zonas | F06 | `table.zone.get` |
 | Las mesas con su estado vivo (comensales, desde cuándo, camarero, cliente, reserva), en orden natural, con búsqueda, filtros y páginas | ver mesas | F02, F09 | `table.table.list` |
-| Una mesa con sus cuentas abiertas | ver mesas | F09–F17 | `table.table.get` |
+| Una mesa con sus cuentas abiertas y su nombre con la zona, como 5 (Terraza) | ver mesas | F09–F17 | `table.table.get` |
 | Las cuentas de la sala (abiertas, cerradas, todas), con cobrado, filtros y páginas | ver cuentas | F22 | `table.session.list` |
-| Una cuenta de mesa | ver cuentas | F21, F22 | `table.session.get` |
+| Una cuenta de mesa y dónde está: su mesa con la zona, o «Aparcada» | ver cuentas | F21, F22 | `table.session.get` |
 | Las cuentas de mesa de una cuenta de Ventas (para el TPV: la mesa de la cuenta en pantalla) | ver cuentas | F12, F13, F24 | `table.session.by_order` |
+| Una línea de la cuenta de Ventas de una mesa, con su nombre y su cantidad, como las lista «Dividir cuenta» | ver cuentas | F17 | `table.session.line` |
+| La retención que una reserva tiene en su mesa, mientras la retiene, con el nombre que pinta | ver mesas | F10, F28 | `table.hold.by_reservation` |
 | Los camareros que han abierto cuentas (para el filtro) | ver cuentas | F22 | `table.waiter.list` |
 | Si el plano está montado (mesas en uso y zonas), para «Elegir mesa» del TPV y el paso «Tus mesas» del Inicio | ver mesas | F02 | `table.floor.status` |
 | Los ajustes de sala | ver ajustes | F08 | `table.settings.get` |

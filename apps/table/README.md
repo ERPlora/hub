@@ -34,9 +34,9 @@ reservada o fuera de servicio, cuántos comensales hay, desde cuándo y quién l
 | `LiveAppConfig` | `kind = "app"`, icono `ion:grid-outline` (el viejo, `ion:restaurant-outline`, espera en `UI-REQUESTS.md`), categoría `restaurant`, gratuita (`premium = False`) |
 | Verticales | `restaurant` (entra en su plantilla) |
 | `requires` | `["sale", "customer"]`; Ventas no requiere Mesas: solo sabe de títulos |
-| Usa de otras apps | Ventas: `sale.order.open`, `.set_label`, `.split`, `.merge` y `.void`, en la misma transacción, y lee `Order` y `Sale`. Clientes: `customer.order.link`, su `OrderLink` y `find_customer`. Reservas no es un requisito: es ella la que llama a Mesas (`table.hold.*`, `table.session.open` con `reservation_id`) |
+| Usa de otras apps | Ventas: `sale.order.open`, `.set_label`, `.split`, `.merge` y `.void`, en la misma transacción, y lee `Order`, `OrderLine` y `Sale`. Clientes: `customer.order.link`, su `OrderLink` y `find_customer`. Reservas no es un requisito: es ella la que llama a Mesas (`table.hold.*`, `table.session.open` con `reservation_id`) |
 | Pantallas | `/table/floor-plan`, `/table/zones`, `/table/tables`, `/table/sessions`, `/table/settings`; «Elegir mesa» del TPV la monta Ventas (SALE-F19) |
-| Operaciones | 10 consultas (`queries.py`) y 26 acciones (`services.py`), todas con `ai=`; 31 rutas en `/api/table/…` (las 5 de la plataforma no tienen ruta) |
+| Operaciones | 12 consultas (`queries.py`) y 26 acciones (`services.py`), todas con `ai=`; 33 rutas en `/api/table/…` (las 5 de la plataforma no tienen ruta). Cada id que toma una acción lleva la marca `refers` de la lectura que lo nombra en la tarjeta del asistente (`base.E009`) |
 | Eventos | 18, `table.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `sale.order.completed`/`voided` (`table.session.close_by_order`) y a `customer.customer.erased` (`table.hold.forget_customer`), por el relay del outbox |
 | Tarea programada | `expire_table_holds` → `table.hold.expire`, `0 * * * *`, `collapse` (la corre el worker) |
 | Inicio | El paso «Tus mesas» (`setup`: `table.floor.status`, hecho con una mesa en uso, orden 100, recomendado, para quien crea mesas, lleva a `/table/tables`); sin paneles ni campana, como el módulo viejo |
