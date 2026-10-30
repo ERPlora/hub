@@ -2219,6 +2219,10 @@
     "method": "get",
     "path": "/api/table/sessions/by_order"
   },
+  "table.session.line": {
+    "method": "get",
+    "path": "/api/table/sessions/line"
+  },
   "table.session.open": {
     "method": "post",
     "path": "/api/table/sessions/open"
@@ -2274,6 +2278,10 @@
   "table.settings.update": {
     "method": "post",
     "path": "/api/table/settings"
+  },
+  "table.hold.by_reservation": {
+    "method": "get",
+    "path": "/api/table/holds/by_reservation"
   },
   "table.hold.place": {
     "method": "post",

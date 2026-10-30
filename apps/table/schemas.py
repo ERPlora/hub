@@ -6,11 +6,18 @@ number («4») and, when the number repeats, its zone («the terrace»); a zone 
 their name or phone. Every input refuses a field it does not declare; an edit changes only the fields
 it sends. Moments travel ISO 8601 with their zone; money in cents.
 
+Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+checked at start by ``base.E009``): the assistant's card says which zone, table, check, check of Sales, customer,
+reservation or line, as the person who confirms reads it, never by the id. A table by its number with its zone
+(«5 (Terrace)»: the number repeats across zones), a check by where it is, a reservation by the name its hold paints
+on the table (Tables does not require Reservations) and a line by its name.
+
 The inputs of the reactions to other apps' events (Sales, Customers, Reservations) read only what they
 need from the emitter's payload and ignore the rest, never refuse it.
 """
 
 import datetime as dt
+from decimal import Decimal
 from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
@@ -27,6 +34,7 @@ from apps.table.models import (
     MIN_BOX,
     MIN_MINUTES,
 )
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -52,6 +60,19 @@ ZONE_COLOUR = gettext_noop("Zone colour")
 DESTINATION_TABLE = gettext_noop("Destination table")
 DESTINATION_ZONE = gettext_noop("Destination zone")
 MOVE_TO_ZONE = gettext_noop("Move to zone")
+# The record a write acts on (its ``id``), as the room's screens call it.
+ZONE = gettext_noop("Zone")
+TABLE = gettext_noop("Table")
+CHECK = gettext_noop("Check")
+
+#: The marks of the ids of the records a write names (``names``): the read that names each one, and by what.
+A_ZONE = names("table.zone.get")
+A_TABLE = names("table.table.get", name=("label",))
+A_CHECK = names("table.session.get", name=("label",))
+A_SALES_CHECK = names("sale.order.get", by="order_id", name=("label",))
+A_CUSTOMER = names("customer.customer.detail")
+A_RESERVATION = names("table.hold.by_reservation", by="reservation_id", name=("label",))
+A_LINE = names("table.session.line")
 
 Color = Literal[
     "primary", "secondary", "tertiary", "success", "warning", "danger", "medium"
@@ -180,7 +201,7 @@ class DeletedOut(Schema):
 
 
 class ZoneRefIn(In):
-    id: UUID | None = Field(None, description="The zone's id.")
+    id: UUID | None = Field(None, title=ZONE, description="The zone's id.", json_schema_extra=A_ZONE)
     zone: Said | None = Field(
         None, description="The zone's name, when its id is not known (e.g. said aloud)."
     )
@@ -192,7 +213,7 @@ class ZoneRefIn(In):
 
 
 class TableRefIn(In):
-    id: UUID | None = Field(None, description="The table's id.")
+    id: UUID | None = Field(None, title=TABLE, description="The table's id.", json_schema_extra=A_TABLE)
     table: Said | None = Field(
         None,
         description="The table's number (or its name), when its id is not known, e.g. «4».",
@@ -209,7 +230,7 @@ class TableRefIn(In):
 
 
 class SessionRefIn(In):
-    id: UUID | None = Field(None, description="The table check's id.")
+    id: UUID | None = Field(None, title=CHECK, description="The table check's id.", json_schema_extra=A_CHECK)
     table: Said | None = Field(
         None,
         description="The number of the table the check is open at, when its id is not known.",
@@ -225,7 +246,9 @@ class SessionRefIn(In):
 
 
 class ByIdIn(In):
-    id: UUID = Field(description="The id of the record.")
+    """Deleting a closed check names it by its id alone."""
+
+    id: UUID = Field(title=CHECK, description="The table check's id.", json_schema_extra=A_CHECK)
 
 
 # ── Zones ────────────────────────────────────────────────────────────────────────────────────────
@@ -328,7 +351,7 @@ class TableListIn(PageIn):
 
 
 class TableIn(In):
-    zone_id: UUID | None = Field(None, description="The zone it goes in.")
+    zone_id: UUID | None = Field(None, description="The zone it goes in.", json_schema_extra=A_ZONE)
     zone: Said | None = Field(
         None, description="The name of the zone it goes in, when its id is not known."
     )
@@ -354,7 +377,7 @@ class TableIn(In):
 
 
 class TableBulkIn(In):
-    zone_id: UUID | None = Field(None, description="The zone they go in.")
+    zone_id: UUID | None = Field(None, description="The zone they go in.", json_schema_extra=A_ZONE)
     zone: Said | None = Field(
         None, description="The name of the zone they go in, when its id is not known."
     )
@@ -390,7 +413,7 @@ class TablePatchIn(TableRefIn):
     capacity: Seats | None = Field(None, description="The new seats.")
     shape: Shape | None = Field(None, description="The new shape.")
     move_to_zone_id: UUID | None = Field(
-        None, title=MOVE_TO_ZONE, description="The zone it moves to."
+        None, title=MOVE_TO_ZONE, description="The zone it moves to.", json_schema_extra=A_ZONE
     )
     move_to_zone: Said | None = Field(
         None, title=MOVE_TO_ZONE, description="The name of the zone it moves to."
@@ -405,7 +428,7 @@ class TablePatchIn(TableRefIn):
 
 
 class TableMoveIn(In):
-    id: UUID = Field(description="The table's id.")
+    id: UUID = Field(title=TABLE, description="The table's id.", json_schema_extra=A_TABLE)
     position_x: Coordinate = Field(description="Left edge on the plan, in pixels.")
     position_y: Coordinate = Field(description="Top edge on the plan, in pixels.")
     width: Side | None = Field(
@@ -445,6 +468,10 @@ class TableCheckOut(Schema):
 class TableOut(Schema):
     id: UUID = Field(description="The table's id.")
     number: str = Field(description="Number.")
+    label: str = Field(
+        description="The table as the room's screens name it, in the reader's language: its number with its zone "
+        "(«5 (Terrace)»), since the number repeats across zones."
+    )
     name: str = Field(description="Name.")
     capacity: int = Field(description="Seats.")
     shape: Shape = Field(description="Shape.")
@@ -520,6 +547,10 @@ class SessionOut(Schema):
     id: UUID = Field(description="The table check's id.")
     table_id: UUID | None = Field(description="Its table (none when parked).")
     table_number: str | None = Field(description="Its table's number.")
+    label: str = Field(
+        description="Where the check is, in the reader's language: its table with its zone («5 (Terrace)»), or "
+        "«Parked»."
+    )
     zone_id: UUID | None = Field(description="Its table's zone.")
     zone_name: str | None = Field(description="Its zone's name.")
     order_id: UUID | None = Field(description="Its open check of Sales.")
@@ -558,7 +589,7 @@ class SessionsOut(Schema):
 
 
 class SessionOpenIn(In):
-    table_id: UUID | None = Field(None, description="The table to seat.")
+    table_id: UUID | None = Field(None, description="The table to seat.", json_schema_extra=A_TABLE)
     table: Said | None = Field(
         None, description="The number of the table to seat, e.g. «4»."
     )
@@ -573,8 +604,9 @@ class SessionOpenIn(In):
     order_id: UUID | None = Field(
         None,
         description="An open check of Sales to bring to the table (e.g. a bar check); empty = a new one.",
+        json_schema_extra=A_SALES_CHECK,
     )
-    customer_id: UUID | None = Field(None, description="The customer of the check.")
+    customer_id: UUID | None = Field(None, description="The customer of the check.", json_schema_extra=A_CUSTOMER)
     customer: Said | None = Field(
         None,
         title=gettext_noop("Customer"),
@@ -585,6 +617,7 @@ class SessionOpenIn(In):
         title=gettext_noop("Reservation"),
         description="The reservation whose party sits: only its hold of the table is spent; empty = every hold "
         "already showing the table Reserved.",
+        json_schema_extra=A_RESERVATION,
     )
 
     @model_validator(mode="after")
@@ -597,13 +630,14 @@ class SessionCloseIn(SessionRefIn):
     order_id: UUID | None = Field(
         None,
         description="The check of Sales the screen saw on it: a different one now refuses the close.",
+        json_schema_extra=A_SALES_CHECK,
     )
     notes: Notes | None = Field(None, description="A note added to the check's notes.")
 
 
 class SessionTransferIn(SessionRefIn):
     to_table_id: UUID | None = Field(
-        None, title=DESTINATION_TABLE, description="The table it goes to."
+        None, title=DESTINATION_TABLE, description="The table it goes to.", json_schema_extra=A_TABLE
     )
     to_table: Said | None = Field(
         None, title=DESTINATION_TABLE, description="The number of the table it goes to."
@@ -625,9 +659,10 @@ class SessionMergeIn(SessionRefIn):
         None,
         title=gettext_noop("Into check"),
         description="The check that stays (another one of the same table too).",
+        json_schema_extra=A_CHECK,
     )
     into_table_id: UUID | None = Field(
-        None, title=DESTINATION_TABLE, description="The table whose check stays."
+        None, title=DESTINATION_TABLE, description="The table whose check stays.", json_schema_extra=A_TABLE
     )
     into_table: Said | None = Field(
         None,
@@ -648,7 +683,7 @@ class SessionMergeIn(SessionRefIn):
 
 
 class SessionSplitIn(SessionRefIn):
-    line_ids: list[UUID] = Field(
+    line_ids: list[Annotated[UUID, Field(json_schema_extra=A_LINE)]] = Field(
         default_factory=list,
         max_length=MAX_LINES,
         title=gettext_noop("Lines to move"),
@@ -663,8 +698,8 @@ class SessionGuestsIn(SessionRefIn):
 
 
 class SessionRestoreIn(In):
-    id: UUID = Field(description="The parked check.")
-    table_id: UUID | None = Field(None, description="The table it sits at.")
+    id: UUID = Field(title=CHECK, description="The parked check.", json_schema_extra=A_CHECK)
+    table_id: UUID | None = Field(None, description="The table it sits at.", json_schema_extra=A_TABLE)
     table: Said | None = Field(None, description="The number of the table it sits at.")
     zone: Said | None = Field(
         None, description="That table's zone, when its number repeats."
@@ -678,12 +713,23 @@ class SessionRestoreIn(In):
 
 class SessionLinkOrderIn(SessionRefIn):
     order_id: UUID = Field(
-        description="The open check of Sales that becomes the table's."
+        description="The open check of Sales that becomes the table's.", json_schema_extra=A_SALES_CHECK
     )
 
 
 class ByOrderIn(In):
     order_id: UUID = Field(description="The check of Sales.")
+
+
+class LineRefIn(In):
+    id: UUID = Field(description="The line's id, in the check of Sales of a table check.")
+
+
+class LineOut(Schema):
+    id: UUID = Field(description="The line's id.")
+    name: str = Field(description="Its name, as «Split check» lists it.")
+    quantity: Decimal = Field(description="Quantity.")
+    unit: str = Field(description="Unit of the quantity.")
 
 
 class SplitOut(Schema):
@@ -749,7 +795,7 @@ class SettingsIn(In):
 
 
 class HoldPlaceIn(In):
-    table_id: UUID | None = Field(None, description="The table to hold.")
+    table_id: UUID | None = Field(None, description="The table to hold.", json_schema_extra=A_TABLE)
     table: Said | None = Field(None, description="The number of the table to hold.")
     zone: Said | None = Field(
         None, description="Its zone, when the same number is in several zones."
@@ -777,6 +823,10 @@ class HoldPlaceIn(In):
         if self.held_until <= self.held_from:
             raise ValueError(str(HOLD_ENDS_BEFORE))
         return self
+
+
+class HoldByReservationIn(In):
+    reservation_id: UUID = Field(description="The reservation of Reservations whose hold of a table is wanted.")
 
 
 class HoldReleaseIn(In):

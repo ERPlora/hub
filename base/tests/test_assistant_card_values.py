@@ -315,7 +315,6 @@ UNNAMED_REFERENCES = {
     "schedule": 4,
     "service": 35,
     "staff": 15,
-    "table": 29,
     "task": 15,
     "tax": 4,
     "verifactu": 6,

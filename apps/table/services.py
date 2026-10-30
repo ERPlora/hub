@@ -43,19 +43,21 @@ from apps.table.models import (
     Zone,
 )
 from apps.table.queries import (
+    HOLD_NOT_FOUND,
     business_zone,
+    check_label,
     current_settings,
     ended_orders,
     find_session,
     find_table,
     find_zone,
+    hold_row,
     live_sessions,
     order_is_open,
     reserving_holds,
     seatable,
     session_out,
     settings_row,
-    table_label,
     table_out,
     zone_rows,
     zones_now,
@@ -142,9 +144,6 @@ BILL_MISMATCH = _("This table's bill has changed. Reload the list and try again.
 ORDER_NOT_OPEN = _("That check is no longer open in Sales.")
 ORDER_ELSEWHERE = _("That check is already at table %(table)s.")
 NOTHING_TO_MERGE = _("That table has no other open check to merge with.")
-HOLD_NOT_FOUND = _(
-    "That hold is not there any more: it was released, it expired, or that booking never held a table."
-)
 SALE_UNAVAILABLE = _(
     "Sales is not available in this business: the table's check cannot be opened or changed."
 )
@@ -661,7 +660,7 @@ def _bring_order(ctx: OperationContext, order_id: UUID, table: Table) -> None:
         .first()
     )
     if holder is not None:
-        where = table_label(holder.table) if holder.table_id else str(S.PARKED.label)
+        where = check_label(holder)
         raise Conflict(
             str(ORDER_ELSEWHERE) % {"table": where}, code="table.order_elsewhere"
         )
@@ -1123,20 +1122,6 @@ def close_by_order(ctx: OperationContext, data: ByOrderIn) -> dict:
 
 
 # ── Holds ────────────────────────────────────────────────────────────────────────────────────────
-
-
-def hold_row(hold: Hold) -> dict:
-    return {
-        "id": hold.pk,
-        "table_id": hold.table_id,
-        "source": hold.source,
-        "source_ref": hold.source_ref,
-        "held_from": hold.held_from,
-        "held_until": hold.held_until,
-        "party_size": hold.party_size,
-        "label": hold.label,
-        "status": hold.status,
-    }
 
 
 def _in_service(table: Table) -> bool:

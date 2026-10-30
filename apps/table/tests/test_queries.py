@@ -13,7 +13,7 @@ import random
 import uuid
 
 import pytest
-from django.utils import timezone
+from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
 
@@ -524,6 +524,84 @@ def test_the_settings_are_the_factory_ones_until_saved_and_say_the_business_zone
     }
     TableSettings.objects.create(prompt_guests_on_seat=False, timer_warning_minutes=30)
     assert run("table.settings.get", {}).timer_warning_minutes == 30
+
+
+# ── What names a record on the assistant's card (table-assistant-card) ───────────────────────────
+
+
+def test_a_table_says_its_number_with_its_zone_in_the_language_of_whoever_reads_it():
+    """The number of a table repeats across zones: its label says which one («5 (Terrace)»), as the room's lists do."""
+    five, seven = make_table("5", zone=make_zone("Terrace")), make_table("7")
+    assert [run("table.table.get", {"id": str(t.id)}).label for t in (five, seven)] == ["5 (Terrace)", "7 (no zone)"]
+    assert sorted(row["label"] for row in tables()) == ["5 (Terrace)", "7 (no zone)"]
+    with translation.override("es"):
+        assert run("table.table.get", {"id": str(seven.id)}).label == "7 (sin zona)"
+
+
+def test_a_check_says_where_it_is_its_table_with_its_zone_or_parked():
+    seated = make_session(make_table("5", zone=make_zone("Terrace")))
+    away = make_session(None, status="parked")
+    assert [run("table.session.get", {"id": str(s.id)}).label for s in (seated, away)] == ["5 (Terrace)", "Parked"]
+    assert sorted(row["label"] for row in sessions()) == ["5 (Terrace)", "Parked"]
+    with translation.override("es"):
+        assert run("table.session.get", {"id": str(away.id)}).label == "Aparcada"
+
+
+def test_a_reservation_is_found_by_the_hold_it_keeps_on_its_table():
+    """Tables knows a reservation of Reservations only by its hold: the name it paints on the table, while it holds."""
+    booking, released, manual = uuid.uuid7(), uuid.uuid7(), uuid.uuid7()
+    table = make_table("2", zone=make_zone("Terrace"))
+    make_hold(table, source="reservation", ref=str(booking), label="Pedro")
+    make_hold(table, source="reservation", ref=str(released), label="", status="released")
+    make_hold(table, source="manual", ref=str(manual), label="Luis")
+    held = run("table.hold.by_reservation", {"reservation_id": str(booking)})
+    assert (held.label, held.table_id, held.source, held.status) == ("Pedro", table.id, "reservation", "held")
+    for gone in (released, manual, uuid.uuid7()):
+        with pytest.raises(NotFound) as missing:
+            run("table.hold.by_reservation", {"reservation_id": str(gone)})
+        assert missing.value.code == "table.hold_not_found"
+
+
+def test_a_hold_whose_time_is_over_holds_nothing_even_before_the_sweep():
+    booking = uuid.uuid7()
+    make_hold(make_table("2"), source="reservation", ref=str(booking), label="Pedro", starts_in=-180, lasts=60)
+    with pytest.raises(NotFound):
+        run("table.hold.by_reservation", {"reservation_id": str(booking)})
+
+
+def test_a_line_of_the_check_of_a_table_is_found_by_its_id(product):
+    """«Split check» lists the lines of the table's check of Sales: one of them by its id, with its name."""
+    order = open_check("Table 5")
+    make_session(make_table("5"), order_id=order.id)
+    line = add_line(order.id, product(name="Caña", sku="CANA"), quantity="2").lines[-1]
+    found = run("table.session.line", {"id": str(line.id)})
+    assert (found.id, found.name, found.quantity, found.unit) == (line.id, "Caña", line.quantity, line.unit)
+
+
+def test_a_line_no_table_holds_or_removed_is_not_found(product):
+    """Tables reads only the lines of the checks of its tables, never any other check of Sales, nor a removed line."""
+    elsewhere = open_check("Bar")
+    loose = add_line(elsewhere.id, product(name="Caña", sku="CANA")).lines[-1]
+    order = open_check("Table 5")
+    make_session(make_table("5"), order_id=order.id)
+    removed = add_line(order.id, product(name="Bravas", sku="BRAV")).lines[-1]
+    run("sale.order.remove_line", {"order_id": str(order.id), "line_id": str(removed.id)}, system_context(A))
+    for line in (loose, removed):
+        with pytest.raises(NotFound) as missing:
+            run("table.session.line", {"id": str(line.id)})
+        assert missing.value.code == "table.line_not_found"
+
+
+def test_whoever_reads_the_checks_reads_their_lines_and_the_holds_whoever_reads_the_tables():
+    booking = uuid.uuid7()
+    make_hold(make_table("2"), source="reservation", ref=str(booking), label="Pedro")
+    assert run("table.hold.by_reservation", {"reservation_id": str(booking)}, ctx_for(EMPLOYEE)).label == "Pedro"
+    for name, data in (
+        ("table.hold.by_reservation", {"reservation_id": str(booking)}),
+        ("table.session.line", {"id": str(uuid.uuid7())}),
+    ):
+        with pytest.raises(PermissionDenied):
+            run(name, data, ctx_for(permissions=set()))
 
 
 # ── Permissions ──────────────────────────────────────────────────────────────────────────────────
