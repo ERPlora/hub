@@ -1094,6 +1094,7 @@ buscar y va por páginas de hasta 100.
 | Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |
 | Los ajustes del inventario | gestionar ajustes | F19 | `inventory.config.get` |
+| Hasta cinco imágenes de la librería para la foto de un producto, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver productos | F30 | `inventory.product.suggest_image` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -1104,6 +1105,8 @@ buscar y va por páginas de hasta 100.
 | Cambia un producto: datos, activo o inactivo, control de stock y categorías | cambiar productos | un clic | F02, F03, F05, F08, F20 | `inventory.product.update` |
 | Elimina un producto | eliminar productos | escribir para confirmar | F04 | `inventory.product.delete` |
 | Marca un producto como agotado o lo vuelve a poner a la venta | cambiar productos | un clic | F29 | `inventory.product.set_sold_out` |
+| Pone la foto de un producto, de la librería, o se la quita | cambiar productos | un clic | F30 | `inventory.product.set_image` |
+| Sube la foto propia de un producto (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | cambiar productos | no es del asistente: el archivo se elige en la ficha | F31 | `inventory.product.upload_image` |
 | Añade un producto a una categoría | cambiar productos | un clic | F08 | `inventory.product_category.add` |
 | Quita un producto de una categoría | cambiar productos | un clic | F08 | `inventory.product_category.remove` |
 | Crea una categoría | crear categorías | un clic | F06 | `inventory.category.create` |

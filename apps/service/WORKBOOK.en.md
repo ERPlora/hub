@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fd2275b0c82a2db283bce411c8a1b7f05b60de1c771239cf1acba3240968a419 -->
+<!-- generated from WORKBOOK.md sha256:42a844046fda4d5daebb7d4c6568a8cf448752393eee3413a9adaa79f348b18a -->
 
 ## What it is for and who it is for
 
@@ -883,8 +883,9 @@ her phone. If a name fits several, it says which and asks to choose (409
 | Whether a session can be spent and why not | spend sessions | F21 | `service.grant.redeem_check` |
 | The customer's vouchers that can pay for a service, the one spent first and why | spend sessions | F22 | `service.grant.tender_options` |
 | A voucher's movements | view voucher balances | F19 | `service.movement.list` |
+| Up to five images of the library for a service's photo, by its name and titled in the business's language; it sets none | view services | F34 | `service.service.suggest_image` |
 
-All of them, except the checks, can be followed live.
+All of them, except the checks and the images proposed, can be followed live.
 
 ### What it offers: actions (they change data)
 
@@ -895,6 +896,8 @@ All of them, except the checks, can be followed live.
 | Changes a service (only what is sent) | edit services | F02, F03 | `service.service.update` |
 | Archives a service | archive services | F04 | `service.service.archive` |
 | Restores an archived service | edit services | F05 | `service.service.restore` |
+| Sets a service's photo, from the library, or removes it | edit services | F34 | `service.service.set_image` |
+| Uploads a service's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | edit services | F35 | `service.service.upload_image` |
 | Creates a category | create categories | F07 | `service.category.create` |
 | Changes a category (only what is sent) | edit categories | F07 | `service.category.update` |
 | Deletes a category | delete categories | F08 | `service.category.delete` |

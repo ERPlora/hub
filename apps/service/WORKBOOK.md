@@ -920,8 +920,9 @@ teléfono. Si un nombre vale para varios, se dice cuáles y se pide que elija (4
 | Si se puede gastar una sesión y por qué no | gastar sesiones | F21 | `service.grant.redeem_check` |
 | Los bonos de una clienta que pueden pagar un servicio, el que se gasta primero y por qué | gastar sesiones | F22 | `service.grant.tender_options` |
 | Los movimientos de un bono | ver saldos de bonos | F19 | `service.movement.list` |
+| Hasta cinco imágenes de la librería para la foto de un servicio, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver servicios | F34 | `service.service.suggest_image` |
 
-Todas, menos las comprobaciones, se pueden seguir en vivo.
+Todas, menos las comprobaciones y las imágenes propuestas, se pueden seguir en vivo.
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -932,6 +933,8 @@ Todas, menos las comprobaciones, se pueden seguir en vivo.
 | Cambia un servicio (solo lo enviado) | editar servicios | F02, F03 | `service.service.update` |
 | Archiva un servicio | archivar servicios | F04 | `service.service.archive` |
 | Restaura un servicio archivado | editar servicios | F05 | `service.service.restore` |
+| Pone la foto de un servicio, de la librería, o se la quita | editar servicios | F34 | `service.service.set_image` |
+| Sube la foto propia de un servicio (JPG, PNG o WebP de hasta 2 MB; se guarda en WebP de 512 × 512) | editar servicios | F35 | `service.service.upload_image` |
 | Crea una categoría | crear categorías | F07 | `service.category.create` |
 | Cambia una categoría (solo lo enviado) | editar categorías | F07 | `service.category.update` |
 | Elimina una categoría | eliminar categorías | F08 | `service.category.delete` |
