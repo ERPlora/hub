@@ -1084,6 +1084,9 @@ UNATTENDED = (
 )
 #: What the assistant hears of a call of its answer that was not made: one change waits for a person at a time.
 NOT_MADE = hub_assistant.error_content("not_made", "Not made: ask for one change at a time.")
+#: What the assistant hears of a call whose fixed datum is empty in this run: the tool is not used (nothing half done).
+PINNED_EMPTY_CODE = "flow.pinned_empty"
+PINNED_EMPTY_TOLD = "Not made: %(fields)s, fixed by this step, is empty in this run, so this tool cannot be used now."
 CHANGES = {
     "ask": "A change you ask for is not made yet: it waits for a person's yes, so say what you proposed.",
     "auto": "A change you ask for is made at once, for real.",
@@ -1117,6 +1120,48 @@ def _offered(flow: Flow, step: dict) -> dict[str, Operation]:
         if name in flow.grants and op is not None and hub_assistant.is_tool(op):
             tools[name] = op
     return tools
+
+
+def _spec(op: Operation, step: dict) -> dict:
+    """``op`` as the step offers it to the assistant: without the data the step fixes, which it never sees."""
+    spec = hub_assistant.tool_spec(op)
+    fixed = (step.get("pinned") or {}).get(op.name)
+    if not fixed:
+        return spec
+    parameters = dict(spec["parameters"])
+    parameters["properties"] = {name: prop for name, prop in parameters.get("properties", {}).items() if name not in fixed}
+    if "required" in parameters:
+        parameters["required"] = [name for name in parameters["required"] if name not in fixed]
+    return {**spec, "parameters": parameters}
+
+
+def _pinned(run: FlowRun, step: dict, op: Operation) -> tuple[dict, list[str]]:
+    """``(values, empty)``: the data the step fixes for ``op``, filled in with the run's data as its prompt is, and
+    the names of those empty now (a path not found, a text with nothing in it)."""
+    data = {"input": run.input, "steps": run.outputs}
+    values: dict[str, Any] = {}
+    empty: list[str] = []
+    for name, raw in ((step.get("pinned") or {}).get(op.name) or {}).items():
+        value = document.resolve(raw, data)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            empty.append(name)
+        else:
+            values[name] = value
+    return values, empty
+
+
+def _with_pinned(arguments: str, values: dict) -> str:
+    """The model's ``arguments`` with the step's fixed data put in over whatever it sent for them; arguments that are
+    no JSON object are left as they are (the tool refuses them before running)."""
+    if not values:
+        return arguments
+    try:
+        sent = json.loads(arguments or "{}")
+    except ValueError:
+        return arguments
+    if not isinstance(sent, dict):
+        return arguments
+    return json.dumps({**sent, **values}, ensure_ascii=False)
 
 
 def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
@@ -1217,7 +1262,7 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
     return {
         "claimed": True,
         "messages": turn["messages"],
-        "tools": [hub_assistant.tool_spec(op) for op in _offered(flow, step).values()],
+        "tools": [_spec(op, step) for op in _offered(flow, step).values()],
         "instructions": instructions,
         "continuation": turn["continuation"],
     }
@@ -1230,6 +1275,7 @@ def _propose(
     step: dict,
     op: Operation,
     call: Any,
+    arguments: str,
     later: list[str],
     turn: dict,
     said: str,
@@ -1253,7 +1299,7 @@ def _propose(
         expires_at=now + dt.timedelta(hours=72),
         created_at=now,
     )
-    proposal = {"call_id": call.call_id, "operation": op.name, "arguments": call.arguments, "later": later}
+    proposal = {"call_id": call.call_id, "operation": op.name, "arguments": arguments, "later": later}
     run.outputs = {**run.outputs, TURN: {**turn, "proposal": proposal}}
     _log(run, step, "assistant_proposed", now, operation=op.name, until=question.expires_at.isoformat())
     run.status = FlowRun.Status.ASKING
@@ -1293,15 +1339,21 @@ def assistant_round(ctx: OperationContext, data: AssistantRoundIn) -> dict:
     with translation.override(flow.language):
         for index, call in enumerate(data.calls):
             op = hub_assistant.operation_of(call.name, tools)
+            fixed, empty = _pinned(run, step, op) if op is not None else ({}, [])
             if op is None:
                 content = hub_assistant.error_content("not_available", "That tool was not offered in this step.")
+            elif empty:
+                told = PINNED_EMPTY_TOLD % {"fields": ", ".join(f"«{name}»" for name in empty)}
+                content = hub_assistant.error_content(PINNED_EMPTY_CODE, told)
+                _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
             elif op.kind == "command" and step.get("mode", "ask") == "ask":
                 later = [behind.call_id for behind in data.calls[index + 1 :]]
                 asked_turn = {**turn, "messages": messages, "continuation": data.continuation}
-                _propose(ctx, run, flow, step, op, call, later, asked_turn, data.text, now)
+                arguments = _with_pinned(call.arguments, fixed)
+                _propose(ctx, run, flow, step, op, call, arguments, later, asked_turn, data.text, now)
                 return {"go_on": False}
             else:
-                outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, call.arguments)
+                outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, _with_pinned(call.arguments, fixed))
                 _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
                 content = outcome.content
             messages.append({"role": "tool", "tool_call_id": call.call_id, "content": content})

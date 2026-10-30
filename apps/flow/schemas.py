@@ -384,6 +384,15 @@ class AskStep(In):
 
 
 OperationName = Annotated[str, StringConstraints(strip_whitespace=True, max_length=96, pattern=NAME_RE.pattern)]
+InputName = Annotated[str, StringConstraints(strip_whitespace=True, max_length=64, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
+D_PINNED = (
+    "Data a tool always gets, fixed by the automation: `{tool: {input: value}}`, a tool of `tools` and an input of "
+    "that tool, each value as in a step's `params` (a literal, a path such as `steps.s1.id` or text with `{{…}}`), "
+    "filled in when it runs. The assistant never sees them and can neither change nor leave them out: what it sends "
+    "for them is replaced. A tool whose fixed datum is empty when it runs is not used. E.g. "
+    '`{"reservation.reservation.cancel": {"on_behalf_of": "{{steps.s1.id}}"}}`: it only cancels on behalf of the '
+    "customer an earlier step read."
+)
 
 
 class AssistantStep(In):
@@ -400,6 +409,9 @@ class AssistantStep(In):
         default_factory=list,
         max_length=20,
         description="The reads and actions it may use, by name: each one is a permission of the automation.",
+    )
+    pinned: Annotated[dict[OperationName, dict[InputName, Any]], Field(max_length=20)] | None = Field(
+        None, description=D_PINNED
     )
     mode: Literal["ask", "auto"] = Field(
         "ask",
@@ -436,7 +448,7 @@ def _reads(step: Any) -> list[str]:
     if step.kind == "ask":
         return reads + document.references([step.title, step.details])
     if step.kind == "assistant":
-        return reads + document.references(step.prompt)
+        return reads + document.references([step.prompt, step.pinned or {}])
     return reads
 
 
@@ -451,7 +463,7 @@ def _call_only(step: Any) -> list[str]:
     elif step.kind == "ask":
         found += document.references([step.title, step.details])
     elif step.kind == "assistant":
-        found += document.references(step.prompt)
+        found += document.references([step.prompt, step.pinned or {}])
     return [path for path in found if path.startswith(("secret.", "run."))]
 
 

@@ -110,6 +110,11 @@ ASK_FIRST = frozenset({"reservation.reservation.cancel"})
 NO_SECRET = _("There is no secret called «%(name)s».")
 BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
 NOT_FOR_THE_ASSISTANT = _("The assistant cannot use «%(name)s».")
+PINNED_NOT_A_TOOL = _(
+    "«%(name)s» has fixed data but the assistant may not use it: add it to what it may use or remove its fixed data."
+)
+PINNED_NO_INPUT = _("«%(field)s» is no datum of «%(name)s».")
+PINNED_EMPTY = _("Give «%(field)s» of «%(name)s» a value, or remove it.")
 
 #: How many names an ambiguous reference lists.
 AMBIGUOUS_SHOWN = 5
@@ -313,6 +318,22 @@ def operation_problem(name: str, kind: str | None = None, *, asking: bool = Fals
     return None
 
 
+def pinned_problem(tools: list[str], pinned: dict[str, dict[str, Any]]) -> str | None:
+    """Why the fixed data of an «Ask the assistant» step cannot be saved (the first reason), or ``None``: each is of a
+    tool the step may use, names a datum that tool asks for and has a value."""
+    for name, fixed in pinned.items():
+        op = grantable_operations().get(name)
+        if name not in tools or op is None:
+            return str(PINNED_NOT_A_TOOL) % {"name": name}
+        inputs = {field["name"] for field in action_fields(op)}
+        for field, value in fixed.items():
+            if field not in inputs:
+                return str(PINNED_NO_INPUT) % {"field": field, "name": name}
+            if value is None or (isinstance(value, str) and not value.strip()):
+                return str(PINNED_EMPTY) % {"field": field, "name": name}
+    return None
+
+
 def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], str]:
     """What a document names that this business does not have, by field (``trigger.event``,
     ``steps.<n>.operation``), and the code of the refusal: ``flow.high_risk`` when a step needs a
@@ -344,6 +365,9 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
                     problem_code, problems[f"steps.{index}.tools"] = problem
                     code = HIGH_RISK_CODE if problem_code == HIGH_RISK_CODE else code
                     break
+            problem = pinned_problem(step.tools, step.pinned or {})
+            if problem is not None:
+                problems[f"steps.{index}.pinned"] = problem
             continue
         if step.kind not in ("command", "query"):
             continue
