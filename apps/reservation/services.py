@@ -53,8 +53,10 @@ from apps.reservation.queries import (
     business_zone,
     engine_blocks,
     entry_out,
+    find_block,
     find_entry,
     find_reservation,
+    find_slot,
     hours_of,
     in_service,
     rules_of,
@@ -176,10 +178,7 @@ TARGET_WORDS = {
 NOT_EDITABLE = _("This reservation can no longer change: only its notes.")
 ENTRY_CONVERTED = _("This entry was already converted into a reservation.")
 SLOT_OVERLAPS = _("That slot overlaps another one of the same day (%(start)s–%(end)s).")
-SLOT_NOT_FOUND = _("That time slot does not exist in this business.")
 BLOCK_EXISTS = _("That date is already blocked at that time.")
-BLOCK_NOT_FOUND = _("That blocked date does not exist in this business.")
-BLOCK_AMBIGUOUS = _("That date is blocked at several times: say which one by its id.")
 MIN_ABOVE_MAX = _("The minimum guests cannot be more than the maximum.")
 TABLE_NOT_FREE = _(
     "Table %(table)s is taken right now: free it, or move the reservation to another table before seating it."
@@ -948,14 +947,7 @@ def create_slot(ctx: OperationContext, data: TimeSlotIn) -> dict:
     },
 )
 def delete_slot(ctx: OperationContext, data: TimeSlotRefIn) -> dict:
-    rows = TimeSlot.objects.select_for_update().filter(is_deleted=False)
-    if data.id is not None:
-        rows = rows.filter(pk=data.id)
-    else:
-        rows = rows.filter(day_of_week=data.day_of_week, start_time=data.start_time)
-    slot = rows.first()
-    if slot is None:
-        raise NotFound(str(SLOT_NOT_FOUND), code="reservation.slot_not_found")
+    slot = find_slot(data.id, data.day_of_week, data.start_time, lock=True)
     slot.is_deleted, slot.deleted_at = True, timezone.now()
     _stamp(slot, ctx)
     slot.save()
@@ -1019,16 +1011,7 @@ def create_blocked(ctx: OperationContext, data: BlockedDateIn) -> dict:
     },
 )
 def delete_blocked(ctx: OperationContext, data: BlockedDateRefIn) -> dict:
-    rows = BlockedDate.objects.select_for_update().filter(is_deleted=False)
-    rows = (
-        rows.filter(pk=data.id) if data.id is not None else rows.filter(date=data.date)
-    )
-    found = list(rows[:2])
-    if not found:
-        raise NotFound(str(BLOCK_NOT_FOUND), code="reservation.blocked_date_not_found")
-    if len(found) > 1:
-        raise Conflict(str(BLOCK_AMBIGUOUS), code="reservation.blocked_date_ambiguous")
-    block = found[0]
+    block = find_block(data.id, data.date, lock=True)
     block.is_deleted, block.deleted_at = True, timezone.now()
     _stamp(block, ctx)
     block.save()

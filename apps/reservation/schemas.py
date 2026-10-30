@@ -7,6 +7,12 @@ customer by their name or phone, a slot by its weekday and start, a waitlist ent
 input refuses a field it does not declare; an edit changes only the fields it sends. A reservation's day
 and time are the business's wall clock (``2026-10-15``, ``21:00``).
 
+Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+checked at start by ``base.E009``): the assistant's card says which reservation, entry, slot, blocked date,
+customer or table, as the person who confirms reads it, never by the id. Reservation's own records by the
+``label`` its reads by id answer (as the book's dialogs say them), a customer by the name of their card
+(Customers) and a table by its number (Tables).
+
 The inputs of the reactions to Customers' events read only what they need from its payload and ignore the
 rest, never refuse it.
 """
@@ -27,6 +33,7 @@ from pydantic import (
 )
 
 from apps.reservation.models import MAX_GUESTS, MAX_MINUTES
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -131,6 +138,14 @@ D_GUEST_PHONE = (
     "is created."
 )
 D_TABLE_ID = "The table to book (an id of Tables)."
+#: The marks of the ids of the records a write names (``names``): the read that names each one, and by what.
+A_RESERVATION = names("reservation.reservation.get", name=("label",))
+AN_ENTRY = names("reservation.waitlist.get", name=("label",))
+A_SLOT = names("reservation.time_slot.get", name=("label",))
+A_BLOCK = names("reservation.blocked_date.get", name=("label",))
+A_CUSTOMER = names("customer.customer.detail")
+A_TABLE = names("table.table.get", name=("number",))
+D_LABEL = "The words it is named by, in the caller's language, as the book's screens say it: «{example}»."
 D_TABLE = "The table's number, e.g. «5», when its id is not known."
 D_ZONE = "The table's zone, when the same number is in several zones."
 D_OVERBOOK = (
@@ -231,7 +246,9 @@ class ReservationListIn(PageIn):
 
 
 class ReservationRefIn(In):
-    id: UUID | None = Field(None, description="The reservation's id.")
+    id: UUID | None = Field(
+        None, description="The reservation's id.", json_schema_extra=A_RESERVATION
+    )
     guest: Said | None = Field(
         None,
         title=GUEST,
@@ -252,7 +269,9 @@ class ReservationRefIn(In):
 
 class ReservationIn(In):
     customer_id: UUID | None = Field(
-        None, description="The guest's customer card (an id of Customers)."
+        None,
+        description="The guest's customer card (an id of Customers).",
+        json_schema_extra=A_CUSTOMER,
     )
     customer: Said | None = Field(
         None,
@@ -268,7 +287,9 @@ class ReservationIn(In):
         None,
         description="How long the table is kept, in minutes; empty = the book's default (120).",
     )
-    table_id: UUID | None = Field(None, description=D_TABLE_ID)
+    table_id: UUID | None = Field(
+        None, description=D_TABLE_ID, json_schema_extra=A_TABLE
+    )
     table: Said | None = Field(None, description=D_TABLE)
     zone: Said | None = Field(None, title=ZONE, description=D_ZONE)
     source: BookingSource = Field(
@@ -302,7 +323,9 @@ class ReservationPatchIn(ReservationRefIn):
     duration_minutes: Minutes | None = Field(
         None, description="The new duration, in minutes."
     )
-    table_id: UUID | None = Field(None, description="The new table (an id of Tables).")
+    table_id: UUID | None = Field(
+        None, description="The new table (an id of Tables).", json_schema_extra=A_TABLE
+    )
     table: Said | None = Field(None, description="The new table's number, e.g. «5».")
     zone: Said | None = Field(None, title=ZONE, description=D_ZONE)
     no_table: bool = Field(
@@ -316,14 +339,20 @@ class ReservationPatchIn(ReservationRefIn):
     )
     overbook: bool = Field(False, title=BOOK_ANYWAY, description=D_OVERBOOK)
     on_behalf_of: UUID | None = Field(
-        None, title=ON_BEHALF_OF, description=D_ON_BEHALF_OF
+        None,
+        title=ON_BEHALF_OF,
+        description=D_ON_BEHALF_OF,
+        json_schema_extra=A_CUSTOMER,
     )
 
 
 class CancelIn(ReservationRefIn):
     reason: _text(500) = Field("", description="Why it is cancelled (optional).")
     on_behalf_of: UUID | None = Field(
-        None, title=ON_BEHALF_OF, description=D_ON_BEHALF_OF
+        None,
+        title=ON_BEHALF_OF,
+        description=D_ON_BEHALF_OF,
+        json_schema_extra=A_CUSTOMER,
     )
 
 
@@ -375,6 +404,12 @@ class ReservationOut(Schema):
     )
     created_at: dt.datetime = Field(description="When it was taken.")
     updated_at: dt.datetime = Field(description="When it last changed.")
+
+
+class ReservationDetailOut(ReservationOut):
+    label: str = Field(
+        description=D_LABEL.format(example="Ana García · 15 oct 2026 · 21:00")
+    )
 
 
 class ReservationPage(Page[ReservationOut]):
@@ -526,7 +561,9 @@ class TimeSlotIn(In):
 
 
 class TimeSlotRefIn(In):
-    id: UUID | None = Field(None, description="The slot's id.")
+    id: UUID | None = Field(
+        None, description="The slot's id.", json_schema_extra=A_SLOT
+    )
     day_of_week: Weekday | None = Field(
         None, description="Its weekday, when the id is not known."
     )
@@ -550,6 +587,10 @@ class TimeSlotOut(Schema):
     max_covers: int | None = Field(
         description="How many guests fit; empty = not limited."
     )
+
+
+class TimeSlotDetailOut(TimeSlotOut):
+    label: str = Field(description=D_LABEL.format(example="Jueves · 20:00–23:30"))
 
 
 class TimeSlotPage(Page[TimeSlotOut]):
@@ -607,7 +648,9 @@ class BlockedDateIn(In):
 
 
 class BlockedDateRefIn(In):
-    id: UUID | None = Field(None, description="The blocked date's id.")
+    id: UUID | None = Field(
+        None, description="The blocked date's id.", json_schema_extra=A_BLOCK
+    )
     date: dt.date | None = Field(
         None, description="Its day, YYYY-MM-DD, when the id is not known."
     )
@@ -617,6 +660,12 @@ class BlockedDateRefIn(In):
         if self.id is None and self.date is None:
             raise ValueError(str(SAY_WHICH_BLOCK))
         return self
+
+
+class BlockedDateDetailOut(BlockedDateOut):
+    label: str = Field(
+        description=D_LABEL.format(example="15 oct 2026 · 13:00–16:00")
+    )
 
 
 class BlockedDatePage(Page[BlockedDateOut]):
@@ -656,7 +705,9 @@ class WaitlistListIn(PageIn):
 
 class WaitlistIn(In):
     customer_id: UUID | None = Field(
-        None, description="The guest's customer card (an id of Customers)."
+        None,
+        description="The guest's customer card (an id of Customers).",
+        json_schema_extra=A_CUSTOMER,
     )
     customer: Said | None = Field(
         None, description="The guest's customer card by name, phone or email."
@@ -677,7 +728,9 @@ class WaitlistIn(In):
 
 
 class WaitlistRefIn(In):
-    id: UUID | None = Field(None, description="The entry's id.")
+    id: UUID | None = Field(
+        None, description="The entry's id.", json_schema_extra=AN_ENTRY
+    )
     guest: Said | None = Field(
         None,
         title=GUEST,
@@ -728,6 +781,12 @@ class WaitlistOut(Schema):
     is_converted: bool = Field(description="True once it became a reservation.")
     reservation_id: UUID | None = Field(description="The reservation it became.")
     created_at: dt.datetime = Field(description="When it was written down.")
+
+
+class WaitlistDetailOut(WaitlistOut):
+    label: str = Field(
+        description=D_LABEL.format(example="Luis Pérez · 15 oct 2026 · 21:00")
+    )
 
 
 class WaitlistPage(Page[WaitlistOut]):
