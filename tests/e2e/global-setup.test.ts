@@ -18,6 +18,7 @@ import globalSetup, {
   type CommandResult,
   type Spawn,
 } from './global-setup';
+import { STACK } from './stack';
 
 const HUB_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -245,16 +246,38 @@ describe('assertLocalHubsRegistered', () => {
 });
 
 // flow: ninguno — arnés e2e del Hub (FIX-HUB-E2E-README-PARALLEL-STACK-MISSES-DEMO-SEED)
-// The specs sign in with the SaaS's demo accounts (`login` of helpers.ts), which only `manage.py demo_seed` of the SaaS
+// The specs sign in with the SaaS's demo accounts (`login` of helpers.ts), which the SaaS's `manage.py demo_seed`
 // creates. A stack's own SaaS on its fresh database (`saas_e2e_<port>`, the SaaS's tests/e2e/database.ts) has none: on
 // 2026-10-28 the README's recipe never said it, and every login waited 30 s to fail with «The email address and/or
 // password you specified are not correct.». The run stops before the first spec with the command that seeds them,
 // reading the SaaS's database with one select (it writes nothing there).
+// hub-e2e-stack (FIX-HUB-E2E-README-DEMO-SEED-BREAKS-WHATSAPP-SPECS): that command is erplora.com's WhatsApp seed with
+// this Hub's ids of `a` and `b` (it runs `demo_seed` with them), never `demo_seed` alone: `demo_seed` gives them ids of
+// its own, and every WhatsApp spec then fell on «whatsapp_hub_seed.py: a is … here and … in the Hub: drop this
+// database». It runs with this Hub's runserver stopped: with it running, the seed's photo puts `a` on erplora.com's
+// Free plan (one device) for every spec after it.
 describe('assertDemoAccountsSeeded', () => {
   const SEEDED: CommandResult = { status: 0, stdout: 'employee@example.com\nowner@example.com\n', stderr: '' };
   const NONE: CommandResult = { status: 0, stdout: '', stderr: '' };
   /** The local demo hubs `a` and `b` (`seed_local_hubs`), both of which every demo account must reach. */
   const DEMO_HUBS_COUNT = 2;
+  /** The Hub of a stack of its own (README «Varias ejecuciones a la vez»), and the shared one on :8000. */
+  const HUB_8030 = { database: 'hub_e2e_8030', hubPort: 8030 };
+  const SHARED_HUB = { database: 'hub', hubPort: 8000 };
+  /** erplora.com's seed on `saas_e2e_8031` with the ids of `a` and `b` (in that order) of `hub_e2e_8030`. */
+  const SEED_8031 =
+    '`env DB_NAME=saas_e2e_8031 HUB_INTERNAL_URL=http://127.0.0.1:8030 uv run python tests/e2e/panel/whatsapp_hub_seed.py ' +
+    '$(docker compose exec -T postgres psql -U hub -d hub_e2e_8030 -At -c "select id from base_hub where slug in (\'a\', \'b\') order by slug")`';
+
+  /** What `check` threw (it must throw). */
+  function thrown(check: () => void): string {
+    try {
+      check();
+    } catch (error) {
+      return (error as Error).message;
+    }
+    throw new Error('it did not throw');
+  }
 
   /** A psql double on the SaaS's database: one answer, and every statement it got. */
   function fakeSaasSql(answer: CommandResult): { statements: string[]; run: (statement: string) => CommandResult } {
@@ -269,7 +292,7 @@ describe('assertDemoAccountsSeeded', () => {
   it('passes when both demo accounts have access to a and b, asking it with one select', () => {
     const saas = fakeSaasSql(SEEDED);
 
-    expect(() => assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031')).not.toThrow();
+    expect(() => assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031', HUB_8030)).not.toThrow();
     expect(saas.statements).toHaveLength(1);
     expect(saas.statements[0]).toMatch(/^select /);
     for (const word of ["'owner@example.com'", "'employee@example.com'", "'a'", "'b'", 'accounts_user', 'accounts_hubmembership']) {
@@ -282,28 +305,48 @@ describe('assertDemoAccountsSeeded', () => {
   it('counts an account as seeded only with access to every demo hub, a and b', () => {
     const saas = fakeSaasSql(SEEDED);
 
-    assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031');
+    assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031', HUB_8030);
     expect(saas.statements[0]).toContain(`having count(distinct m.hub_slug) = ${DEMO_HUBS_COUNT}`);
   });
 
-  it('stops the run naming the missing accounts and the exact command that seeds them', () => {
-    expect(() => assertDemoAccountsSeeded(fakeSaasSql(NONE).run, 'saas_e2e_8031')).toThrow(
+  it("stops the run naming the missing accounts and the exact command that seeds them with this Hub's ids", () => {
+    expect(() => assertDemoAccountsSeeded(fakeSaasSql(NONE).run, 'saas_e2e_8031', HUB_8030)).toThrow(
       'The SaaS of this stack (database saas_e2e_8031) lacks the demo accounts the specs sign in with: ' +
         'owner@example.com, employee@example.com, with access to the hubs a and b. Every login would fail with ' +
-        '«The email address and/or password you specified are not correct.». Seed them with ' +
-        "`env DB_NAME=saas_e2e_8031 uv run python manage.py demo_seed` from the SaaS's checkout and retry " +
-        '(tests/e2e/README.md, «Varias ejecuciones a la vez»). If that SaaS runs on another database, export ' +
-        'E2E_SAAS_DB=<its database>.',
+        "«The email address and/or password you specified are not correct.». Stop this Hub's runserver, seed them from " +
+        `the SaaS's checkout with ${SEED_8031} (a and b take this Hub's ids, which WhatsApp's specs need), start the ` +
+        'runserver again and retry (tests/e2e/README.md, «Varias ejecuciones a la vez»). If that SaaS runs on another ' +
+        'database, export E2E_SAAS_DB=<its database>.',
     );
   });
 
-  it('names only the account that is missing, on the database it read', () => {
+  it('never offers demo_seed alone, which gives a and b ids of its own that WhatsApp\'s seed refuses', () => {
+    const missingAccounts = thrown(() => assertDemoAccountsSeeded(fakeSaasSql(NONE).run, 'saas_e2e_8031', HUB_8030));
+    const missingDatabase = thrown(() =>
+      assertDemoAccountsSeeded(
+        fakeSaasSql({ status: 2, stdout: '', stderr: 'FATAL:  database "saas_e2e_8031" does not exist\n' }).run,
+        'saas_e2e_8031',
+        HUB_8030,
+      ),
+    );
+
+    for (const message of [missingAccounts, missingDatabase]) {
+      expect(message).not.toContain('manage.py demo_seed');
+      expect(message).toContain(SEED_8031);
+      expect(message).toContain("Stop this Hub's runserver");
+    }
+  });
+
+  it('names only the account that is missing, on the database it read, with the ids of the Hub it runs beside', () => {
     const run = fakeSaasSql({ status: 0, stdout: 'owner@example.com\n', stderr: '' }).run;
 
-    expect(() => assertDemoAccountsSeeded(run, 'saas')).toThrow(
+    expect(() => assertDemoAccountsSeeded(run, 'saas', SHARED_HUB)).toThrow(
       '(database saas) lacks the demo accounts the specs sign in with: employee@example.com, with access',
     );
-    expect(() => assertDemoAccountsSeeded(run, 'saas')).toThrow('`env DB_NAME=saas uv run python manage.py demo_seed`');
+    expect(() => assertDemoAccountsSeeded(run, 'saas', SHARED_HUB)).toThrow(
+      '`env DB_NAME=saas HUB_INTERNAL_URL=http://127.0.0.1:8000 uv run python tests/e2e/panel/whatsapp_hub_seed.py ' +
+        '$(docker compose exec -T postgres psql -U hub -d hub -At -c ',
+    );
   });
 
   it("says how to create the stack's SaaS database when it does not exist yet", () => {
@@ -315,12 +358,12 @@ describe('assertDemoAccountsSeeded', () => {
         '"saas_e2e_8031" does not exist\n',
     };
 
-    expect(() => assertDemoAccountsSeeded(fakeSaasSql(missing).run, 'saas_e2e_8031')).toThrow(
-      "The database of this stack's SaaS (saas_e2e_8031) does not exist. From the SaaS's checkout, create and migrate " +
-        'it with `env -u DB_NAME E2E_SAAS_PORT=8031 node tests/e2e/database.ts`, seed its demo accounts with ' +
-        '`env DB_NAME=saas_e2e_8031 uv run python manage.py demo_seed`, start that SaaS with DB_NAME=saas_e2e_8031 and ' +
-        'retry (tests/e2e/README.md, «Varias ejecuciones a la vez»). If it runs on another database, export ' +
-        'E2E_SAAS_DB=<its database>.',
+    expect(() => assertDemoAccountsSeeded(fakeSaasSql(missing).run, 'saas_e2e_8031', HUB_8030)).toThrow(
+      "The database of this stack's SaaS (saas_e2e_8031) does not exist. Stop this Hub's runserver and, from the SaaS's " +
+        'checkout, create and migrate it with `env -u DB_NAME E2E_SAAS_PORT=8031 node tests/e2e/database.ts`, seed its ' +
+        `demo accounts with ${SEED_8031} (a and b take this Hub's ids, which WhatsApp's specs need), start that SaaS ` +
+        'with DB_NAME=saas_e2e_8031 and this runserver again, and retry (tests/e2e/README.md, «Varias ejecuciones a la ' +
+        'vez»). If it runs on another database, export E2E_SAAS_DB=<its database>.',
     );
   });
 
@@ -330,20 +373,20 @@ describe('assertDemoAccountsSeeded', () => {
       stdout: '',
       stderr: 'ERROR:  relation "accounts_user" does not exist\nLINE 1: select u.email from accounts_user u\n',
     };
-    expect(() => assertDemoAccountsSeeded(fakeSaasSql(unmigrated).run, 'saas_e2e_8031')).toThrow(
+    expect(() => assertDemoAccountsSeeded(fakeSaasSql(unmigrated).run, 'saas_e2e_8031', HUB_8030)).toThrow(
       /^Could not read the demo accounts of the SaaS of this stack \(database saas_e2e_8031\): psql exited with 1:\nERROR: {2}relation "accounts_user" does not exist\nLINE 1: select u\.email from accounts_user u$/,
     );
 
-    expect(() => assertDemoAccountsSeeded(fakeSaasSql(UNREACHABLE).run, 'saas')).toThrow(/^Could not read[^\n]*\n[^\n]*Connection refused$/);
+    expect(() => assertDemoAccountsSeeded(fakeSaasSql(UNREACHABLE).run, 'saas', SHARED_HUB)).toThrow(/^Could not read[^\n]*\n[^\n]*Connection refused$/);
 
     // Only `saas_e2e_<port>` comes from the SaaS's database.ts with E2E_SAAS_PORT: any other missing one is what psql said.
     const own: CommandResult = { status: 2, stdout: '', stderr: 'FATAL:  database "saas_fix_e2e_a" does not exist\n' };
-    expect(() => assertDemoAccountsSeeded(fakeSaasSql(own).run, 'saas_fix_e2e_a')).toThrow(
+    expect(() => assertDemoAccountsSeeded(fakeSaasSql(own).run, 'saas_fix_e2e_a', HUB_8030)).toThrow(
       /^Could not read[^\n]*\(database saas_fix_e2e_a\): psql exited with 2:\nFATAL: {2}database "saas_fix_e2e_a" does not exist$/,
     );
 
     const never: CommandResult = { status: null, stdout: '', stderr: 'spawnSync docker ENOENT' };
-    expect(() => assertDemoAccountsSeeded(fakeSaasSql(never).run, 'saas')).toThrow(/psql exited with no status:\nspawnSync docker ENOENT$/);
+    expect(() => assertDemoAccountsSeeded(fakeSaasSql(never).run, 'saas', SHARED_HUB)).toThrow(/psql exited with no status:\nspawnSync docker ENOENT$/);
   });
 });
 
@@ -436,5 +479,13 @@ describe('globalSetup', () => {
     expect(() => globalSetup({ workers: 1 }, manage.run, () => ({ status: 0, stdout: '', stderr: '' }))).toThrow(
       'lacks the demo accounts the specs sign in with: owner@example.com, employee@example.com',
     );
+  });
+
+  it("offers the seed with the ids and the port of this stack's Hub, never its SaaS's", () => {
+    const manage = readyManagePy();
+    const none = (): CommandResult => ({ status: 0, stdout: '', stderr: '' });
+
+    expect(() => globalSetup({ workers: 1 }, manage.run, none)).toThrow(`HUB_INTERNAL_URL=http://127.0.0.1:${STACK.hubPort} `);
+    expect(() => globalSetup({ workers: 1 }, manage.run, none)).toThrow(`psql -U hub -d ${STACK.database} -At -c `);
   });
 });

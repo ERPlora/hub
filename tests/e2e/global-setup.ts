@@ -8,7 +8,8 @@
 // hubs `a` and `b` are ready in the registry (`seed_local_hubs --check`; without them every host is a 404), and last
 // that the stack's SaaS has the demo accounts the specs sign in with (`demo_seed` of the SaaS; one select on its
 // database, `STACK.saasDatabase`): on its fresh e2e database it has none, and every login failed on «The email address
-// and/or password you specified are not correct.» after 30 s (2026-10-28).
+// and/or password you specified are not correct.» after 30 s (2026-10-28). The command it offers is erplora.com's
+// WhatsApp seed with this Hub's ids of `a` and `b`, never `demo_seed` alone, whose own ids that seed refuses.
 // Before all that it refuses more than one worker: `--workers=N` overrides `workers: 1` of playwright.config.ts, and
 // specs running at once on the one stack delete each other's data (2026-10-23: the agenda spec timed out).
 import { spawnSync } from 'node:child_process';
@@ -17,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { FullConfig } from '@playwright/test';
 
-import { isE2eDatabase, STACK } from './stack.ts';
+import { isE2eDatabase, type Stack, STACK } from './stack.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HUB_DIR = resolve(HERE, '..', '..');
@@ -129,10 +130,25 @@ const SEEDED_ACCOUNTS =
 
 const RECIPE = 'tests/e2e/README.md, «Varias ejecuciones a la vez»';
 const ELSEWHERE = 'export E2E_SAAS_DB=<its database>.';
+const HUB_IDS = "this Hub's ids, which WhatsApp's specs need";
 
-/** Throws, writing nothing, unless the SaaS's `database` has every demo account with access to `a` and `b`. */
-export function assertDemoAccountsSeeded(sql: SaasSql, database: string): void {
-  const seed = `\`env DB_NAME=${database} uv run python manage.py demo_seed\``;
+/** The command, from the SaaS's checkout, that seeds its `database` with the demo accounts and gives `a` and `b` the ids
+ * they have in `hub`: erplora.com's WhatsApp seed (`tests/e2e/panel/whatsapp_hub_seed.py`), which runs `demo_seed` with
+ * them. `demo_seed` alone gives them ids of its own, and that seed then refuses the database («drop this database»).
+ * Its photo goes to `hub`'s port, which must not be listening yet: delivered, it puts `a` on erplora.com's Free plan
+ * (one device) for every spec after it. */
+function seedCommand(database: string, hub: Pick<Stack, 'database' | 'hubPort'>): string {
+  const ids = `docker compose exec -T postgres psql -U hub -d ${hub.database} -At -c "select id from base_hub where slug in (${quoted(DEMO_HUBS)}) order by slug"`;
+  return (
+    `\`env DB_NAME=${database} HUB_INTERNAL_URL=http://127.0.0.1:${hub.hubPort} ` +
+    `uv run python tests/e2e/panel/whatsapp_hub_seed.py $(${ids})\``
+  );
+}
+
+/** Throws, writing nothing, unless the SaaS's `database` has every demo account with access to `a` and `b`; the command
+ * it offers seeds them with the ids `a` and `b` have in `hub`, the Hub the SaaS runs beside. */
+export function assertDemoAccountsSeeded(sql: SaasSql, database: string, hub: Pick<Stack, 'database' | 'hubPort'>): void {
+  const seed = seedCommand(database, hub);
   const read = sql(SEEDED_ACCOUNTS);
   if (read.status === 0) {
     const seeded = new Set(read.stdout.split(/\r?\n/).map((line) => line.trim()));
@@ -141,9 +157,9 @@ export function assertDemoAccountsSeeded(sql: SaasSql, database: string): void {
     throw new Error(
       `The SaaS of this stack (database ${database}) lacks the demo accounts the specs sign in with: ` +
         `${missing.join(', ')}, with access to the hubs ${DEMO_HUBS.join(' and ')}. Every login would fail with ` +
-        '«The email address and/or password you specified are not correct.». ' +
-        `Seed them with ${seed} from the SaaS's checkout and retry (${RECIPE}). ` +
-        `If that SaaS runs on another database, ${ELSEWHERE}`,
+        "«The email address and/or password you specified are not correct.». Stop this Hub's runserver, seed them " +
+        `from the SaaS's checkout with ${seed} (a and b take ${HUB_IDS}), start the runserver again and retry ` +
+        `(${RECIPE}). If that SaaS runs on another database, ${ELSEWHERE}`,
     );
   }
   const output = [read.stdout.trim(), read.stderr.trim()].filter(Boolean).join('\n');
@@ -151,9 +167,10 @@ export function assertDemoAccountsSeeded(sql: SaasSql, database: string): void {
   const own = /^saas_e2e_(\d+)$/.exec(database);
   if (own && output.includes(`database "${database}" does not exist`)) {
     throw new Error(
-      `The database of this stack's SaaS (${database}) does not exist. From the SaaS's checkout, create and migrate it ` +
-        `with \`env -u DB_NAME E2E_SAAS_PORT=${own[1]} node tests/e2e/database.ts\`, seed its demo accounts with ${seed}, ` +
-        `start that SaaS with DB_NAME=${database} and retry (${RECIPE}). If it runs on another database, ${ELSEWHERE}`,
+      `The database of this stack's SaaS (${database}) does not exist. Stop this Hub's runserver and, from the SaaS's ` +
+        `checkout, create and migrate it with \`env -u DB_NAME E2E_SAAS_PORT=${own[1]} node tests/e2e/database.ts\`, ` +
+        `seed its demo accounts with ${seed} (a and b take ${HUB_IDS}), start that SaaS with DB_NAME=${database} and ` +
+        `this runserver again, and retry (${RECIPE}). If it runs on another database, ${ELSEWHERE}`,
     );
   }
   const exit = read.status === null ? 'no status' : String(read.status);
@@ -197,5 +214,5 @@ export default function globalSetup(
   assertSingleWorker(config.workers);
   assertMigrationsApplied(manage, STACK.database);
   assertLocalHubsRegistered(manage, STACK.database);
-  assertDemoAccountsSeeded(saas, STACK.saasDatabase);
+  assertDemoAccountsSeeded(saas, STACK.saasDatabase, STACK);
 }
