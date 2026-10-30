@@ -862,6 +862,10 @@ class TemplateSampleOut(Schema):
     content_type: str = Field(description="image/jpeg, image/png, video/mp4 or application/pdf.")
     size: int = Field(description="Its size in bytes.")
     name: str = Field(description="The name it was chosen with.")
+    url: str = Field(
+        description="Where the Hub shows it to the hub's people (/p/media/…, opened only with a session of this hub); "
+        "empty when it cannot."
+    )
 
 
 class TemplateButtonOut(Schema):

@@ -30,10 +30,10 @@ from typing import Any
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.db import IntegrityError, transaction
-from django.utils import timezone, translation
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
-from live.errors import Conflict, InvalidPayload
+from live.errors import InvalidPayload
 from live.operations import operation
 from live.outbox import record_event
 from PIL import Image as PILImage
@@ -54,9 +54,8 @@ from apps.website.schemas import (
     SiteOut,
 )
 from apps.website.storage import image_key, image_url
-from base.files import human_space, space_limit, used_bytes
-from base.models import Hub
 from base.operations import business_currency, hub_id
+from base.queries import refuse_past_the_plans_space
 
 #: The longest side of an image the website takes, in pixels.
 MAX_IMAGE_SIDE = 8000
@@ -71,8 +70,6 @@ EMPTY_FILE = _("The file is empty.")
 TOO_HEAVY = _("The image may weigh 5 MB at most.")
 NOT_THAT_TYPE = _("This file is not a %(type)s image.")
 TOO_LARGE = _("The image may be %(side)s pixels a side at most.")
-#: Files' own sentence (``base.files.upload``): the website's images take the same space as the business's files.
-NO_SPACE = _("There is no space left for that file: your plan includes %(space)s.")
 
 
 def _actor(ctx: OperationContext) -> str:
@@ -281,17 +278,6 @@ def _measured(raw: bytes, content_type: str) -> tuple[int, int]:
     return width, height
 
 
-def _refuse_past_the_plans_space(ctx: OperationContext, store, hub: uuid.UUID, size: int) -> None:
-    """409 ``base.file_no_space`` when ``size`` more bytes go past the space the business's plan includes (the SaaS's
-    photo, as Files reads it): what the hub's prefix takes already counts its files and its apps' images."""
-    limit = space_limit(Hub.objects.filter(slug=ctx.scope.key).values_list("state", flat=True).first())
-    if limit is not None and used_bytes(store, hub) + size > limit:
-        # Said in the caller's language, as Files says it (an API key's call is not the editor's).
-        with translation.override(ctx.language):
-            said = str(NO_SPACE) % {"space": human_space(limit)}
-        raise Conflict(said, code="base.file_no_space")
-
-
 # Not an assistant tool (no ``ai=``): it takes the file in base64, up to 5 MB; the editor uploads it.
 @operation(
     "website.image.upload",
@@ -310,7 +296,8 @@ def upload_image(ctx: OperationContext, data: ImageUploadIn) -> dict:
     store = storages["hub_files"]
     kept = store.exists(key)
     if not kept:
-        _refuse_past_the_plans_space(ctx, store, hub, len(raw))
+        # Files' own check of the plan's space: the hub's prefix already counts its files and its apps' images.
+        refuse_past_the_plans_space(ctx, store, len(raw))
     image = Image.objects.filter(key=key, hub_id=hub).first()
     if image is None:
         try:

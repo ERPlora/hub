@@ -127,6 +127,69 @@ def test_the_people_of_the_hub_open_the_file_and_a_visitor_never_does(client):
     assert response["Cache-Control"].startswith("private")
 
 
+def sign_in(client, host: str = "a") -> None:
+    """A session of ``host``'s hub, as its people have after the jump from erplora.com."""
+    from django.contrib.auth import get_user_model
+
+    from base.middleware import SESSION_HOST_KEY
+    from base.models import Membership
+
+    user = get_user_model().objects.create_user(username=f"saas:{host}-42", password="pw")
+    Membership.objects.create(user=user, host=host, role=Membership.Role.EMPLOYEE)
+    client.force_login(user)
+    session = client.session
+    session[SESSION_HOST_KEY] = host
+    session.save()
+
+
+def test_the_file_says_where_its_hubs_people_open_it_and_nobody_else_does(client):
+    # FIX-HUB-WHATSAPP-INBOX-TEMPLATE-SHEET-SHOWS-NO-HEADER-THUMBNAIL: the sheet shows the header's photo from the
+    # address the file comes with, under the inbox's members' folder of /p/media/: a session of its hub opens it, a
+    # visitor gets a 404, and another business's file names its own hub, which this host never serves.
+    out = upload()
+    hub = Hub.objects.get(slug="a")
+    assert out.url.startswith(f"/p/media/{hub.id.hex}/whatsapp_inbox/samples/") and out.url.endswith(".jpg")
+    assert client.get(out.url, HTTP_HOST="a.localhost:8000").status_code == 404
+
+    sign_in(client)
+    response = client.get(out.url, HTTP_HOST="a.localhost:8000")
+    assert (response.status_code, response["Content-Type"]) == (200, "image/jpeg")
+    assert b"".join(response.streaming_content) == JPEG
+
+    foreign = upload(OTHER_JPEG, name="de-b.jpg", ctx=ctx_for(scope=B))
+    assert foreign.url.startswith(f"/p/media/{Hub.objects.get(slug='b').id.hex}/whatsapp_inbox/samples/")
+    assert client.get(foreign.url, HTTP_HOST="a.localhost:8000").status_code == 404
+
+
+@respx.mock
+def test_the_template_and_its_edit_on_its_way_carry_the_address_of_their_file(
+    django_capture_on_commit_callbacks, delivered
+):
+    row = approved_with_photo(delivered)
+    first = run("whatsapp_inbox.template.list", {}).rows[0].header_sample
+    new = upload(OTHER_JPEG, name="carta-otono.jpg")
+
+    with django_capture_on_commit_callbacks(execute=False):
+        run("whatsapp_inbox.template.update", {**with_file(new.id), "id": str(row.id)})
+
+    [listed] = run("whatsapp_inbox.template.list", {}).rows
+    kept = TemplateSample.objects.get(pk=row.header_sample_id)
+    assert listed.header_sample.url == first.url == upload(name="otra.jpg").url != new.url
+    assert first.url.endswith(f"/{kept.key.rsplit('/', 1)[1]}")
+    assert listed.draft.header_sample.url == new.url
+
+
+@pytest.mark.parametrize("key", ["", "website/img/ab.jpg", "hub-zz/whatsapp_inbox/samples/ab.jpg", "hub-%s/website/img/ab.jpg"])
+def test_a_key_that_is_no_samples_of_a_hub_has_no_address(key):
+    from apps.whatsapp_inbox import samples
+
+    hub = Hub.objects.get(slug="a")
+    assert samples.sample_url(key.replace("%s", hub.id.hex)) == ""
+    assert samples.sample_url(f"hub-{hub.id.hex}/whatsapp_inbox/samples/ab.jpg") == (
+        f"/p/media/{hub.id.hex}/whatsapp_inbox/samples/ab.jpg"
+    )
+
+
 def test_the_same_file_twice_is_one_object_in_the_store(hub_files):
     first, second = upload(name="carta.jpg"), upload(name="menu.jpg")
 

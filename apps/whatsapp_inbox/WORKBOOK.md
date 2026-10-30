@@ -827,8 +827,9 @@ Pasos:
    (respuestas rápidas juntas, hasta dos enlaces y una llamada; diez como mucho).
 3. Para una cabecera con foto, vídeo o documento, elegir «Foto», «Vídeo» o «Documento» en **Tipo de
    cabecera** y pulsar **Elegir archivo** (una foto JPEG o PNG hasta 5 MB, un vídeo MP4 hasta 16 MB o un
-   PDF hasta 25 MB): se guarda al momento en los archivos del negocio y la hoja enseña su nombre y su peso.
-   Meta revisa la plantilla con ese archivo; sin él no se puede enviar a revisión.
+   PDF hasta 25 MB): se guarda al momento en los archivos del negocio y la hoja enseña su miniatura (la
+   foto, o el primer fotograma del vídeo con el signo de reproducir; un documento, su icono) junto a su
+   nombre y su peso. Meta revisa la plantilla con ese archivo; sin él no se puede enviar a revisión.
 4. Pulsar **Enviar a revisión de Meta**: la plantilla sale en la lista «Sin enviar a Meta» con
    «Enviándose a Meta…» y pasa a «En revisión» en cuanto Meta la recibe. La de una cabecera con archivo
    nombra el suyo («Foto: …»).
@@ -846,7 +847,9 @@ debajo y no se guarda («Elige una foto JPEG o PNG.», «Elige un vídeo MP4.»,
 uno que pesa de más también («Este archivo pesa más de 5 MB: elige uno más ligero.»); uno que no cabe en el
 espacio para archivos del plan (lo cuentan juntos los archivos del negocio y los de las cabeceras), como
 en Archivos: «No queda espacio para ese archivo: tu plan incluye {space}.»; si no se pudo subir: «No se pudo
-subir el archivo. Inténtalo de nuevo.». Si al entregarla el archivo ya no está en los
+subir el archivo. Inténtalo de nuevo.». Si la foto o el vídeo no se pueden enseñar, la hoja lo dice bajo
+su nombre («No se ha podido mostrar la foto.», «No se ha podido mostrar el vídeo.») y se sigue pudiendo
+enviar. Si al entregarla el archivo ya no está en los
 archivos del negocio, la lista dice «No aceptada: El archivo de la cabecera ya no está en los archivos del
 negocio: vuelve a elegirlo con Editar.». Si Meta no la acepta o pide esperar, la lista
 dice «No aceptada: …» con el motivo de Meta («Meta no ha contestado. Inténtalo de nuevo en unos
@@ -863,8 +866,8 @@ Actor: propietario, administrador
 Pantalla: Ajustes, Plantilla (hoja)
 Pasos:
 1. En **Ajustes → Plantillas de Meta**, pulsar **Editar** en la fila (o tocarla).
-2. Cambiar el texto, los ejemplos, la cabecera (también su archivo, con **Cambiar archivo**), el pie o los
-   botones (la categoría, solo si Meta la rechazó; el nombre y el idioma no cambian) y pulsar **Guardar y
+2. Cambiar el texto, los ejemplos, la cabecera (también su archivo, que la hoja enseña con su miniatura, con
+   **Cambiar archivo**), el pie o los botones (la categoría, solo si Meta la rechazó; el nombre y el idioma no cambian) y pulsar **Guardar y
    enviar a Meta**.
 3. Una plantilla aprobada se sigue enviando tal como Meta la aprobó mientras el cambio va de camino
    («Hasta que Meta apruebe los cambios, se sigue enviando la aprobada.»); en cuanto Meta lo recibe, pasa
@@ -933,10 +936,11 @@ Pasos:
 1. En **Responder**, pulsar **Plantilla**: se abre «Enviar una plantilla» con las plantillas
    **aprobadas** que el Hub sabe rellenar (nombre, idioma, categoría y texto).
 2. Elegir una y rellenar sus variables (`{{1}}`, `{{2}}`…); la vista previa enseña el texto final.
-3. Si su cabecera lleva una foto, un vídeo o un documento, la hecha aquí trae ya el suyo (su nombre y su
-   peso, con **Cambiar archivo**) y la hecha en WhatsApp Manager pide **Elegir archivo** («Ningún archivo
-   elegido»): se guarda al momento en los archivos del negocio, con lo que admite («JPEG o PNG, hasta 5 MB.»)
-   y «El cliente recibe la plantilla con este archivo.».
+3. Si su cabecera lleva una foto, un vídeo o un documento, la hecha aquí trae ya el suyo (su miniatura, su
+   nombre y su peso, con **Cambiar archivo**) y la hecha en WhatsApp Manager pide **Elegir archivo** («Ningún
+   archivo elegido»): se guarda al momento en los archivos del negocio y se ve su miniatura, con lo que admite
+   («JPEG o PNG, hasta 5 MB.») y «El cliente recibe la plantilla con este archivo.»; la foto o el vídeo que
+   no se pueden enseñar lo dicen como en F29.
 4. Pulsar **Enviar**: el mensaje aparece en el hilo como en F32; el de una cabecera con archivo lo nombra
    («Foto · carta.jpg»).
 También por el asistente o la API a un número que aún no ha escrito («envía la plantilla de
@@ -1197,7 +1201,10 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
   `sha256`, tipo, tamaño y nombre. `/p/media/` lo sirve solo a una sesión del hub (`members_media` de `apps.py`; un
-  visitante recibe 404); una plantilla lo referencia con `PROTECT`.
+  visitante recibe 404) en la `url` que lleva su salida (`samples.sample_url`, vacía para una clave fuera de esa
+  carpeta), de donde la hoja y «Enviar una plantilla» pintan su miniatura (`HeaderFilePreview.vue`: `<img>`, o
+  `<video preload="metadata">` con el primer fotograma; `'self'` en la CSP); una plantilla lo referencia con
+  `PROTECT`.
   Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.MAX_FILE_BYTES`,
   25 MB; Meta admite 100). Un archivo nuevo cabe en el espacio del plan como en Archivos
   (`base.files.space_limit` del `plan.max_storage_bytes` de la foto del SaaS frente a `base.files.used_bytes`,

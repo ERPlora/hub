@@ -480,12 +480,7 @@ def upload(
         }
         raise InvalidPayload(message, code="base.file_too_large", fields={"content_base64": message})
     _require_folder(store, hub, folder)
-    if limit_bytes is not None and used_bytes(store, hub) + len(content) > limit_bytes:
-        raise Conflict(
-            gettext("There is no space left for that file: your plan includes %(space)s.")
-            % {"space": human_space(limit_bytes)},
-            code="base.file_no_space",
-        )
+    refuse_past_the_space(store, hub, len(content), limit_bytes=limit_bytes)
     # The free name is worked out, then written only if nobody wrote it meanwhile (another upload of the same name at
     # the same moment): if somebody did, the next free name, never over the other's file.
     for _attempt in range(MAX_NAME_RACES):
@@ -723,6 +718,18 @@ def space_limit(state: object) -> int | None:
     plan = state.get("plan") if isinstance(state, dict) else None
     limit = plan.get("max_storage_bytes") if isinstance(plan, dict) else None
     return limit if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0 else None
+
+
+def refuse_past_the_space(store: Storage, hub: uuid.UUID, size: int, *, limit_bytes: int | None) -> None:
+    """409 ``base.file_no_space`` when ``size`` more bytes go past ``limit_bytes`` (the plan's space; ``None``: no
+    limit) with what ``hub``'s prefix already takes: its files and what its apps keep. The one check of the plan's
+    space: Files and every app that keeps a file in the hub file store refuse through it, with the same sentence."""
+    if limit_bytes is not None and used_bytes(store, hub) + size > limit_bytes:
+        raise Conflict(
+            gettext("There is no space left for that file: your plan includes %(space)s.")
+            % {"space": human_space(limit_bytes)},
+            code="base.file_no_space",
+        )
 
 
 def human_space(size: int) -> str:
