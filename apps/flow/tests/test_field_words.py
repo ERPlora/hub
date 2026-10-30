@@ -49,8 +49,9 @@ def without_words(names: dict[str, set[str]]) -> dict[str, list[str]]:
 
 
 def catalog_names() -> dict[str, set[str]]:
+    """Everything the editor offers, the cancellations only «Ask me first» may use included (``ask_first_catalog``)."""
     names: dict[str, set[str]] = defaultdict(set)
-    for name, op in queries.catalog_operations().items():
+    for name, op in queries.ask_first_catalog().items():
         for field in queries.action_fields(op):
             names[field["name"]].add(f"{name} asks for it")
         for output in queries.action_outputs(op):
@@ -64,6 +65,7 @@ def test_the_catalog_reaches_every_module_with_actions():
     names = catalog_names()
     assert "appointment.appointment.get leaves it" in names["start_date_label"]
     assert "reservation.reservation.get leaves it" in names["date_label"]
+    assert "reservation.reservation.cancel asks for it" in names["reason"]
 
 
 def test_every_field_an_action_asks_for_or_leaves_has_its_words():

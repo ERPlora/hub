@@ -43,6 +43,9 @@ from apps.flow.queries import (
     MANAGE,
     RESUME_DAYS,
     SYSTEM,
+    action_label,
+    ask_first_catalog,
+    asked_first,
     catalog_operations,
     catalog_problems,
     grantable_operations,
@@ -120,6 +123,7 @@ QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.
 QUESTION_CLOSED = _("This question is closed: its automation no longer waits for it.")
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
 ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
+APPROVAL_BEYOND_YOU = _("Only someone who may do it themselves can say yes to «%(name)s».")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
 HISTORY_DAYS = 90
@@ -458,8 +462,9 @@ def grant(ctx: OperationContext, data: GrantIn) -> dict:
     flow = resolve_flow(data.id, data.flow, lock=True)
     problems: dict[str, str] = {}
     code = "invalid_payload"
+    asking = asked_first(flow.steps)
     for index, name in enumerate(data.operations):
-        problem = operation_problem(name)
+        problem = operation_problem(name, asking=name in asking)
         if problem is not None:
             problem_code, problems[f"operations.{index}"] = problem
             if problem_code == HIGH_RISK_CODE:
@@ -468,7 +473,7 @@ def grant(ctx: OperationContext, data: GrantIn) -> dict:
         raise InvalidPayload(next(iter(problems.values())), code=code, fields=problems)
     # Nobody grants more than they may do themselves (an API key with flow:write included); a call's
     # origin is the automation's own permission, which whoever manages it already holds.
-    offered = catalog_operations()
+    offered = grantable_operations()
     beyond = {
         f"operations.{index}": str(GRANT_BEYOND_CALLER) % {"name": name}
         for index, name in enumerate(data.operations)
@@ -490,7 +495,7 @@ def _recipe_grants(ctx: OperationContext, recipe: recipes.Recipe) -> list[str]:
     """The recipe's permissions, which whoever turns it on or restores it must hold themselves (FLOW-F12's
     rule: nobody allows what they may not do)."""
     wanted = recipes.grants(recipe)
-    offered = catalog_operations()
+    offered = grantable_operations()  # an offered recipe asks only for what its steps may use (recipes.shelf)
     for name in wanted:
         if not ctx.has(offered[name].permission):
             raise PermissionDenied(str(GRANT_BEYOND_CALLER) % {"name": name})
@@ -1102,8 +1107,8 @@ def _back_to_assistant(ctx: OperationContext, run: FlowRun, flow: Flow, step: di
 
 def _offered(flow: Flow, step: dict) -> dict[str, Operation]:
     """The tools of the step: what it names AND the automation was granted, of the active apps, that the assistant
-    may use; never a person's permissions."""
-    catalog = catalog_operations()
+    may use; never a person's permissions. Cancelling a booking (``ASK_FIRST``) only when it asks first."""
+    catalog = ask_first_catalog() if step.get("mode", "ask") == "ask" else catalog_operations()
     tools: dict[str, Operation] = {}
     for name in step.get("tools") or []:
         op = catalog.get(name)
@@ -1447,6 +1452,17 @@ def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left:
     _go_on(ctx, run, flow, now)
 
 
+def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
+    """A yes to the assistant's change that needs a person in front (cancelling a booking, ``ASK_FIRST``) is only of
+    someone who may make it themselves: the yes lends nothing (the old engine's «no elevation»); the change still runs
+    as the automation."""
+    proposal = (run.outputs.get(TURN) or {}).get("proposal") or {}
+    op = grantable_operations().get(str(proposal.get("operation") or ""))
+    if op is not None and needs_a_person(op) and not ctx.has(op.permission):
+        message = str(APPROVAL_BEYOND_YOU) % {"name": action_label(op, ctx.language)}
+        raise PermissionDenied(message, code="flow.approval_beyond_you")
+
+
 @operation(
     "flow.question.answer",
     kind="command",
@@ -1483,6 +1499,8 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
         goes_on = data.approve or question.on_no == "continue"
         if goes_on and not flow.enabled:
             raise Conflict(str(DISABLED), code="flow.disabled")
+        if data.approve:
+            _may_say_yes(ctx, run)
     who = _who(ctx)
     question.status = Question.Status.APPROVED if data.approve else Question.Status.REJECTED
     question.decided_by, question.decided_at, question.note = who, now, data.note

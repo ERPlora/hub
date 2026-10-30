@@ -35,13 +35,22 @@ const id = computed(() => props.step.id);
 const error = (field: string): string | undefined => props.errors[`steps.${props.index}.${field}`];
 const label = (name: string): string => actionLabel(name, props.catalog, phrasing.value);
 
+/** What only «Ask me first» may use (cancelling a booking): never offered to a step that does it on its own. */
+const askFirst = (name: string): boolean => !!props.catalog?.actions.find((action) => action.name === name)?.ask_first;
+
 /** What it may still be given: the assistant's reads and actions of the active apps, by app and name. */
 const addable = computed<ComboOption[]>(() =>
   (props.catalog?.actions ?? [])
     .filter((action) => action.assistant && !props.step.tools.includes(action.name))
+    .filter((action) => props.step.mode === 'ask' || !action.ask_first)
     .map((action) => ({ id: action.name, label: label(action.name), hint: action.app_name, app: action.app_name }))
     .sort((a, b) => a.app.localeCompare(b.app, phrasing.value.locale) || a.label.localeCompare(b.label, phrasing.value.locale))
     .map(({ id: name, label: text, hint }) => ({ id: name, label: text, hint })),
+);
+
+/** The chosen ones that wait for the yes of someone who may do them, said under the mode while it asks first. */
+const waitsForWho = computed<string>(() =>
+  props.step.mode === 'ask' ? props.step.tools.filter(askFirst).map((name) => `«${label(name)}»`).join(', ') : '',
 );
 
 function change(patch: Partial<AssistantStep>): void {
@@ -163,6 +172,11 @@ function setRounds(text: string | null | undefined): void {
       class="flow-card__hint"
       :data-testid="`flow-assistant-modehint-${id}`"
     >{{ $t(`flow.assistant.modeHints.${step.mode}`) }}</span>
+    <span
+      v-if="waitsForWho"
+      class="flow-card__hint"
+      :data-testid="`flow-assistant-askfirst-${id}`"
+    >{{ $t('flow.assistant.askFirst', { actions: waitsForWho }) }}</span>
     <span class="flow-card__hint">{{ $t('flow.assistant.answerHint') }}</span>
   </div>
 </template>

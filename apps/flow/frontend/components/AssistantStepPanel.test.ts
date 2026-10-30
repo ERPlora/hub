@@ -10,13 +10,20 @@ import ValueBox from './ValueBox.vue';
 
 const STEP: Step = { id: 's1', kind: 'assistant', prompt: 'Book {{input.name}}', tools: ['task.task.list'], mode: 'ask', max_rounds: 6 };
 
-const action = (name: string, kind: 'command' | 'query', assistant: boolean) => ({
-  name, kind, app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: [], assistant,
+const action = (name: string, kind: 'command' | 'query', assistant: boolean, ask_first = false) => ({
+  name, kind, app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: [], assistant, ask_first,
 });
 const CATALOG: CatalogOut = {
   events: [],
-  actions: [action('task.task.list', 'query', true), action('task.task.create', 'command', true), action('customer.health.detail', 'query', false)],
+  actions: [
+    action('task.task.list', 'query', true),
+    action('task.task.create', 'command', true),
+    action('customer.health.detail', 'query', false),
+    action('reservation.reservation.cancel', 'command', true, true),
+  ],
 };
+const options = (s: Awaited<ReturnType<typeof setup>>) =>
+  (s.wrapper.findComponent({ name: 'Combo' }).props('options') as { id: string }[]).map((option) => option.id);
 
 async function setup(step: Step = STEP, errors: Record<string, string> = {}) {
   const m = await mountFlow(AssistantStepPanel, { props: { step, index: 0, steps: [step], catalog: CATALOG, errors, pick: async () => 'input.name' } });
@@ -36,7 +43,7 @@ describe('AssistantStepPanel', () => {
     const s = await setup();
     expect(s.find('flow-assistant-tool-s1-task.task.list').text()).toBe('Look for tasks');
     const combo = s.wrapper.findComponent({ name: 'Combo' });
-    expect((combo.props('options') as { id: string }[]).map((option) => option.id)).toEqual(['task.task.create']);
+    expect(options(s)).toEqual(['reservation.reservation.cancel', 'task.task.create']);
     combo.vm.$emit('update:modelValue', { id: 'task.task.create', label: 'Create' });
     expect(s.emitted().at(-1)).toMatchObject({ tools: ['task.task.list', 'task.task.create'] });
     // Once added, the search holds the choice and then nothing again (the Combo empties its field), the same Combo:
@@ -59,6 +66,18 @@ describe('AssistantStepPanel', () => {
     expect(s.emitted().at(-1)).toMatchObject({ mode: 'auto' });
     const own = await setup({ ...STEP, mode: 'auto' });
     expect(own.find('flow-assistant-modehint-s1').text()).toBe('It makes the changes on its own, as this automation, with the permissions you gave it.');
+  });
+
+  it('offers cancelling a booking only when it asks first, and says who can say yes to it', async () => {
+    const asking = await setup({ ...STEP, tools: ['reservation.reservation.cancel'] });
+    expect(asking.find('flow-assistant-askfirst-s1').text()).toBe(
+      'Only after a yes from someone who may do it themselves: «Cancel a reservation».',
+    );
+    const own = await setup({ ...STEP, mode: 'auto' });
+    expect(options(own)).toEqual(['task.task.create']);
+    expect(own.wrapper.find('[data-testid="flow-assistant-askfirst-s1"]').exists()).toBe(false);
+    const plain = await setup();
+    expect(plain.wrapper.find('[data-testid="flow-assistant-askfirst-s1"]').exists()).toBe(false);
   });
 
   it('takes from one to ten turns', async () => {

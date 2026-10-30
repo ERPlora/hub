@@ -71,6 +71,14 @@ describe('StepNode', () => {
     expect(s.emitted()).toEqual([{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: '' } }]);
   });
 
+  it('«Do something» never offers what only «Ask me first» may do (cancelling a booking)', async () => {
+    const cancel = { name: 'reservation.reservation.cancel', kind: 'command', app: 'reservation', app_name: 'Reservations', description: '', fields: [], outputs: [], assistant: true, ask_first: true };
+    const catalog = { ...CATALOG, actions: [...CATALOG.actions, cancel] } as unknown as CatalogOut;
+    const step: Step = { id: 's1', kind: 'command', operation: '', params: {} };
+    const m = await mountFlow(StepNode, { props: { step, index: 0, steps: [step], catalog, open: true, errors: {}, choices: [], pick: async () => 'input.name' } });
+    expect((m.wrapper.findComponent(Combo).props('options') as { id: string }[]).map((option) => option.id)).toEqual(['task.task.create']);
+  });
+
   it('fills what the action asks for: the required always, the rest when added', async () => {
     const s = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Hi' } });
     const boxes = () => s.wrapper.findAllComponents(ValueBox).map((box) => [box.props('label'), box.props('required'), box.props('modelValue')]);

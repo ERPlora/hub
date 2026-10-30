@@ -65,7 +65,7 @@ const actions = computed<ComboOption[]>(() => {
   const step = props.step;
   if (step.kind !== 'command' && step.kind !== 'query') return [];
   return (props.catalog?.actions ?? [])
-    .filter((action) => action.kind === step.kind)
+    .filter((action) => action.kind === step.kind && !action.ask_first)
     .map((action) => ({ id: action.name, label: actionLabel(action.name, props.catalog, phrasing.value), hint: `${action.app_name} · ${action.name}`, app: action.app_name }))
     .sort((a, b) => a.app.localeCompare(b.app, phrasing.value.locale) || a.label.localeCompare(b.label, phrasing.value.locale))
     .map(({ id: name, label, hint }) => ({ id: name, label, hint }));

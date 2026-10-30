@@ -76,8 +76,15 @@ UNKNOWN_ACTION = _("That action does not exist in this business: «%(name)s».")
 NOT_AN_ACTION = _("«%(name)s» only reads: use «Look something up».")
 NOT_A_READ = _("«%(name)s» changes data: use «Do something».")
 HIGH_RISK = _("«%(name)s» needs a person in front: an automation cannot do it.")
+ASK_FIRST_ONLY = _("«%(name)s» needs a person's yes first: choose «Ask me first».")
 #: The code of a refusal of an action that needs a person, when it is saved, granted or run.
 HIGH_RISK_CODE = "flow.high_risk"
+#: What needs a person in front that an automation may still be granted, only for an «Ask the assistant» step that
+#: asks first: cancelling a reservation a guest asks to cancel, done once someone who may cancel it says yes (Zapier's
+#: Human in the Loop and n8n's human review gate the step that cannot be undone; Fresha's AI Concierge cancels within
+#: the business's policy). Never what is done in person, money, fiscal records nor erasing. An appointment's waits
+#: for Appointments to take a change from an automation at all (today: «You may only change your own appointments.»).
+ASK_FIRST = frozenset({"reservation.reservation.cancel"})
 NO_SECRET = _("There is no secret called «%(name)s».")
 BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
 NOT_FOR_THE_ASSISTANT = _("The assistant cannot use «%(name)s».")
@@ -129,9 +136,30 @@ def needs_a_person(op: Operation) -> bool:
     return ai.get("risk") == "high" or ai.get("in_person") is True
 
 
+def asks_first(op: Operation) -> bool:
+    """An action that needs a person in front that an «Ask me first» step may still propose (``ASK_FIRST``), never
+    one done in person."""
+    return op.name in ASK_FIRST and needs_a_person(op) and (op.ai or {}).get("in_person") is not True
+
+
 def catalog_operations() -> dict[str, Operation]:
     """What an automation may be granted and run: the grantable operations that do not need a person."""
     return {name: op for name, op in grantable_operations().items() if not needs_a_person(op)}
+
+
+def ask_first_catalog() -> dict[str, Operation]:
+    """What an «Ask the assistant» step that asks first may be granted and offered: the catalog and ``ASK_FIRST``."""
+    return {name: op for name, op in grantable_operations().items() if not needs_a_person(op) or asks_first(op)}
+
+
+def asked_first(steps: list[dict]) -> set[str]:
+    """The tools of the steps that ask first («Ask me first», the default of «Ask the assistant»)."""
+    return {
+        str(name)
+        for step in steps
+        if step.get("kind") == "assistant" and step.get("mode", "ask") == "ask"
+        for name in step.get("tools") or []
+    }
 
 
 def read_permissions(op: Operation) -> frozenset[str]:
@@ -210,7 +238,8 @@ def action_outputs(op: Operation) -> list[str]:
     output=CatalogOut,
     ai={
         "description": "What an automation can start on and do in this business: the events of the active apps "
-        "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for."
+        "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for. "
+        "One with `ask_first` only goes in an «Ask the assistant» step with «Ask me first»."
     },
 )
 def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
@@ -230,8 +259,9 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
                 "fields": action_fields(op),
                 "outputs": action_outputs(op),
                 "assistant": hub_assistant.is_tool(op),
+                "ask_first": asks_first(op),
             }
-            for name, op in catalog_operations().items()
+            for name, op in ask_first_catalog().items()
         ]
     return {
         "events": sorted(events, key=lambda event: (event["app"], event["name"])),
@@ -239,10 +269,10 @@ def read_catalog(ctx: OperationContext, data: CatalogIn) -> dict:
     }
 
 
-def operation_problem(name: str, kind: str | None = None) -> tuple[str, str] | None:
+def operation_problem(name: str, kind: str | None = None, *, asking: bool = False) -> tuple[str, str] | None:
     """``(code, message)`` of why an automation may not run the operation ``name`` (as a step of
-    ``kind``, when given), or ``None`` when it may. A call's origin (``http:https://host``) is checked as
-    an address."""
+    ``kind``, when given; for a step that asks first, ``asking``), or ``None`` when it may. A call's origin
+    (``http:https://host``) is checked as an address."""
     if name.startswith(document.HTTP_GRANT) and kind is None:
         address = name[len(document.HTTP_GRANT) :]
         if document.origin(address) != address:
@@ -251,8 +281,9 @@ def operation_problem(name: str, kind: str | None = None) -> tuple[str, str] | N
     op = grantable_operations().get(name)
     if op is None:
         return "invalid_payload", str(UNKNOWN_ACTION) % {"name": name}
-    if needs_a_person(op):
-        return HIGH_RISK_CODE, str(HIGH_RISK) % {"name": name}
+    if needs_a_person(op) and not (asking and asks_first(op)):
+        message = ASK_FIRST_ONLY if kind is None and asks_first(op) else HIGH_RISK
+        return HIGH_RISK_CODE, str(message) % {"name": name}
     if kind == "command" and op.kind != "command":
         return "invalid_payload", str(NOT_AN_ACTION) % {"name": name}
     if kind == "query" and op.kind != "query":
@@ -284,7 +315,7 @@ def catalog_problems(trigger: Any, steps: list[Any]) -> tuple[dict[str, str], st
             continue
         if step.kind == "assistant":
             for name in step.tools:
-                problem = operation_problem(name)
+                problem = operation_problem(name, asking=step.mode == "ask")
                 if problem is None and not hub_assistant.is_tool(grantable_operations()[name]):
                     problem = ("invalid_payload", str(NOT_FOR_THE_ASSISTANT) % {"name": name})
                 if problem is not None:

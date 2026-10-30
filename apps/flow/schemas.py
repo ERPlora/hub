@@ -855,6 +855,8 @@ class CatalogActionOut(Schema):
     outputs: list[str]
     #: Whether «Ask the assistant» may use it (its ``ai=`` offers it to the assistant).
     assistant: bool = False
+    #: Whether it needs a person's yes first: only an «Ask the assistant» step with «Ask me first» may use it.
+    ask_first: bool = False
 
 
 class CatalogOut(Schema):
