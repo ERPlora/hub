@@ -243,8 +243,11 @@ def _resolved(prop: dict, defs: dict) -> dict:
 MONEY = "money"
 
 
-def _is_money(prop: dict) -> bool:
-    return prop.get(MONEY) is True
+def _is_money(name: str, prop: dict) -> bool:
+    """Whether the datum ``name`` is an amount: its schema's mark (``MONEY``). A name in ``_cents`` still counts while
+    the schemas of Automations' tests give one without its mark; no tool of the assistant does (the ratchet
+    ``UNMARKED_AMOUNTS`` of ``base/tests/test_assistant_card_values.py``). A description's words never do."""
+    return prop.get(MONEY) is True or name.endswith("_cents")
 
 
 def _is_signed(prop: dict) -> bool:
@@ -533,7 +536,7 @@ def _said(value: Any, prop: dict, defs: dict, name: str, words: _Words, inner: b
         return _LEFT_OUT
     if value is None or value == "":
         return value
-    if inner and _is_money(prop) and isinstance(value, int) and not isinstance(value, bool):
+    if inner and _is_money(name, prop) and isinstance(value, int) and not isinstance(value, bool):
         return words.amount(value)
     if REFERS in prop or (prop.get("format") == "uuid" and _is_uuid(value)):
         return _reference(value, prop, words)
@@ -584,7 +587,7 @@ def _field(
         kind = "empty"
     elif isinstance(value, bool):
         kind = "bool"
-    elif isinstance(value, int) and _is_money(prop):
+    elif isinstance(value, int) and _is_money(name, prop):
         kind = "money"
     elif isinstance(value, list):
         kind = "list"
@@ -884,7 +887,7 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     problems += [
         f"marks {name} signed, but it is no amount marked money"
         for name, prop in shown.items()
-        if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(prop))
+        if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(name, prop))
     ]
     problems += [
         f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields

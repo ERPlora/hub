@@ -851,14 +851,14 @@ def test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth(lan
 
 class WordsOnlyIn(Schema):
     price: int = Field(description="Price in cents.")
-    total_cents: int = 0
+    rate: int = Field(description="Hourly rate in whole cents.")
 
 
 def test_words_alone_make_no_amount_its_mark_does():
-    """One way to say an amount, the mark: the words of a description are the model's, and rewriting them changes
-    nothing of the card. Every amount the assistant shows or fills carries its mark (the ratchet below)."""
-    card = assistant.card(priced(WordsOnlyIn), {"price": 1500, "total_cents": 4200}, "es")
-    assert [(field["name"], field["kind"]) for field in card["fields"]] == [("price", "text"), ("total_cents", "text")]
+    """The words of a description are for the model, and rewriting them changes nothing of the card: the mark says an
+    amount. Every amount the assistant shows or fills carries its mark (the ratchet below)."""
+    card = assistant.card(priced(WordsOnlyIn), {"price": 1500, "rate": 1250}, "es")
+    assert [(field["name"], field["kind"]) for field in card["fields"]] == [("price", "text"), ("rate", "text")]
 
 
 class DueOut(Schema):
