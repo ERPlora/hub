@@ -544,6 +544,42 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await context.close();
 });
 
+// flow: base-assistant-money-mark (BASE-F97)
+// FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS: the card knew an amount only by the words «in cents» of
+// its description, so a payment «in minor units of the currency» said «1500»: now by the mark its app declares, whatever
+// its words, «15,00 €». Cancelled: nothing is recorded.
+test('base-assistant-money-mark — in Spanish a payment says its amount in the business’s currency, never in its minor unit', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = before.data.apps.some((app) => app.id === 'payment' && app.state === 'on');
+  await turnOn(context, A, 'payment');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur' };
+  await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s€/);
+    await expect(card(page)).not.toContainText('1500');
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  if (!wasOn) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
+    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
 // flow: assistant-card (BASE-F97)
 // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a booking's card said each datum as the model sent it («2026-11-02T10:00:00+01:00»,
 // «counter», the customer's and the professional's ids): now its day and time as the person's language writes them, at the
