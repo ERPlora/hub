@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:571d4af3cfa1b5a063c4e1fcaaca86d9621861075a7041bcc40961379e05694d -->
+<!-- generated from WORKBOOK.md sha256:b159af20d23f5f353f0e487c0c23faa40c06e0224e099190d81b0b113f512f47 -->
 
 ## What it is for and who it is for
 
@@ -459,6 +459,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | The price lists, with search, filters and sorting, in pages of up to 100 | view | F01 | `pricing.price_list.list` | yes |
 | A price list | view | F03, F06 | `pricing.price_list.get` | yes |
 | The prices of a price list, or those of a product or a service in all of them | view | F06 | `pricing.price_item.list` | yes |
+| A price, with what its price list shows of it and that list's currency, the one its price is in | view | F06, F08 | `pricing.price_item.get` | no |
 | The discount rules | view | F09 | `pricing.rule.list` | yes |
 | The price of a line (price list, rule, discount and total) | view | F13 | `pricing.price.resolve` | no |
 

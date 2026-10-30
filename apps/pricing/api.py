@@ -10,6 +10,7 @@ from ninja import Query, Router
 
 from apps.pricing import queries, services
 from apps.pricing.schemas import (
+    PriceItemIdIn,
     PriceItemIn,
     PriceItemListIn,
     PriceItemPatchIn,
@@ -73,6 +74,11 @@ async def price_list_activate(request, data: PriceListRefIn):
 @bind(router, "pricing.price_item.list", "/pricing/price_items")
 async def price_item_list(request, params: Query[PriceItemListIn]):
     return await run_operation(request, queries.list_price_items, params)
+
+
+@bind(router, "pricing.price_item.get", "/pricing/price_items/detail")
+async def price_item_get(request, params: Query[PriceItemIdIn]):
+    return await run_operation(request, queries.get_price_item, params)
 
 
 @bind(router, "pricing.price_item.add", "/pricing/price_items", status=201)

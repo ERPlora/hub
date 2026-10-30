@@ -7,8 +7,12 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
+from live.context import Scope
 from live.errors import Conflict, NotFound
 from live.operations import get
+
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 from .conftest import (
     TODAY,
@@ -198,6 +202,79 @@ def test_tied_prices_follow_the_list_s_direction():
         assert ids(column, "asc") == expected, column
         assert ids(column, "desc") == expected[::-1], column
     assert [row for offset in (0, 2) for row in ids("price", "desc", limit=2, offset=offset)] == expected[::-1]
+
+
+# A price by its id: what the list shows of it and the currency of its list (the assistant's card says its price in it)
+
+
+def test_a_price_is_read_by_its_id_with_what_the_list_shows_and_its_list_s_currency():
+    dollars = make_list("DOLARES", "Dollar prices", currency="USD")
+    shampoo = make_product("Shampoo", "SH-1", price=1500)
+    item = make_item(dollars, shampoo, price=1200, min_quantity="10")
+    make_item(make_list("VIP"), shampoo, price=1100)
+    found = run("pricing.price_item.get", {"id": str(item.id)})
+    listed = run("pricing.price_item.list", {"price_list": "DOLARES"}).rows[0]
+    assert found.model_dump() == {**listed.model_dump(), "currency": "USD"}
+    assert (found.id, found.price_list_code, found.name, found.min_quantity, found.price) == (
+        item.id,
+        "DOLARES",
+        "Shampoo",
+        Decimal("10.000"),
+        1200,
+    )
+
+
+def test_a_price_of_a_service_is_read_by_its_id_in_the_business_s_currency():
+    item = make_item(make_list("VIP"), None, price=1600, service_id=uuid.uuid7(), service_name="Haircut")
+    found = run("pricing.price_item.get", {"id": str(item.id)})
+    assert (found.kind, found.name, found.sku, found.currency) == ("service", "Haircut", None, "EUR")
+
+
+def test_a_price_that_is_not_there_or_of_a_deleted_product_is_not_found():
+    gone = make_item(make_list("VIP"), make_product("Wax", "WX", is_deleted=True))
+    for missing in (gone.id, uuid.uuid7()):
+        with pytest.raises(NotFound) as caught:
+            run("pricing.price_item.get", {"id": str(missing)})
+        assert caught.value.code == "pricing.price_item_not_found"
+
+
+def test_the_employee_reads_a_price_and_a_caller_without_the_permission_does_not():
+    from live.errors import PermissionDenied
+
+    item = make_item(make_list("VIP"), make_product("Shampoo", "SH-1"))
+    assert run("pricing.price_item.get", {"id": str(item.id)}, role="hub_employee").id == item.id
+    op = get("pricing.price_item.get")
+    with pytest.raises(PermissionDenied):
+        op(ctx_for(permissions=set()), op.input.model_validate({"id": str(item.id)}))
+
+
+def test_whoever_may_change_a_price_may_read_it():
+    """The assistant's card reads the price as the person who changes it: a role that changes prices and does not read
+    them would see its card in the business's currency, just in the common case."""
+    from live.meta import all_live_app_configs, permissions_for_role
+
+    update, read = get("pricing.price_item.update"), get("pricing.price_item.get")
+    writers = [
+        role
+        for role in ("hub_owner", "hub_admin", "hub_manager", "hub_employee")
+        if update.permission in permissions_for_role(all_live_app_configs(), role)
+    ]
+    assert writers == ["hub_owner", "hub_admin", "hub_manager"]  # positive control: the employee does not change them
+    assert all(ctx_for(role).has(read.permission) for role in writers)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_price_of_another_business_is_not_found_there(hub_a, hub_b, no_fallback):
+    """A business reads its own prices only: the id of another's is no price of its own, never its currency."""
+    with use_hub(hub_b):
+        theirs = make_item(make_list("DOLARES", currency="USD"), make_product("Shampoo", "SH-1"))
+    with use_hub(hub_a):
+        op = get("pricing.price_item.get")
+        with pytest.raises(NotFound) as caught:
+            op(ctx_for(scope=Scope("host", hub_a.slug)), op.input.model_validate({"id": str(theirs.id)}))
+    assert caught.value.code == "pricing.price_item_not_found"
+    with use_hub(hub_b):  # positive control: it is there, in its own business
+        assert op(ctx_for(scope=Scope("host", hub_b.slug)), op.input.model_validate({"id": str(theirs.id)})).currency == "USD"
 
 
 # Rules (F09)
