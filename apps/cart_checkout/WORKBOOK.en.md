@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9db2f3f12c779dcf6e0fd3c2cbe759faa45700749e6d8cec0c62fec80c00562b -->
+<!-- generated from WORKBOOK.md sha256:87fb9ebf29636d7e1fd9237505bec92387def528a7b0860364b863f1b3d00049 -->
 
 ## What it is for and who it is for
 
@@ -139,7 +139,8 @@ Screen: assistant
 Steps:
 1. Ask the assistant to add a product to a cart, saying the cart (its session, or the customer's email or
    name), the product's reference and name, the quantity and the unit price.
-2. Confirm the assistant's card.
+2. Confirm the assistant's card, which says the cart by its session (for example, sess_a1b2c3) or by the
+   customer said, never by its internal code.
 3. The line is saved and the cart's totals (items and amount) are recalculated.
 In: the cart; the product's reference and name (free text: they are not checked against the
 catalogue), optional SKU and variant attributes (size, colour…), a quantity greater than zero and at most
@@ -160,7 +161,8 @@ Actor: manager, administrator, owner, assistant
 Screen: assistant
 Steps:
 1. Ask the assistant to change the quantity of a line, or to remove it.
-2. Confirm the card.
+2. Confirm the card, which says the line by its product (for example, Champú), never by its internal
+   code.
 3. With a quantity greater than zero the line changes and its total is recalculated with the price kept
    in the line; with a quantity of zero the line is removed. There is also the order "remove line", which only removes.
 4. The cart's totals are recalculated in the same operation.
@@ -178,7 +180,8 @@ Actor: manager, administrator, owner, assistant
 Screen: assistant
 Steps:
 1. Ask the assistant to empty a cart.
-2. Confirm the card.
+2. Confirm the card, which says the cart by its session (for example, sess_a1b2c3), never by its
+   internal code.
 3. All its lines are removed and the totals go back to zero; the cart stays **Active**.
 In: the cart.
 Out: the cart with no lines, totals at zero (`cart_checkout.cart.cleared`). Emptying one that was already
@@ -207,7 +210,8 @@ Screen: Carts
 Steps:
 1. In **Carts**, on the row, tap **Delete**.
 2. Confirm "Delete the cart …?" with **Delete**; **Cancel** leaves it as it was.
-3. The cart disappears from the list. The assistant asks for a stronger confirmation (a dangerous action).
+3. The cart disappears from the list. The assistant asks for a stronger confirmation (a dangerous action)
+   and says the cart by its session.
 In: the cart.
 Out: the cart deleted in any status, also Converted (`cart_checkout.cart.deleted`). Its
 orders still exist and its session is free for another cart.
@@ -240,7 +244,8 @@ Screen: assistant
 Steps:
 1. Ask the assistant to start the order of a cart and, if you want, the customer's email, the
    shipping and billing addresses, the shipping method, the payment method and some notes.
-2. Confirm the card.
+2. Confirm the card, which says the cart by its session (for example, sess_a1b2c3), never by its
+   internal code.
 3. An **Initiated** order shows in **Orders** with the number `OS-YYYYMMDD-NNNN` (consecutive per day
    of the business, with no gaps) and the cart's total copied at that moment, in its currency.
 In: the cart; the customer's email (without it, the cart's); addresses (if the billing one is missing the
@@ -263,7 +268,7 @@ Steps:
 In: the order (by its number or its id).
 Out: status Paid and time of the payment (`cart_checkout.order.paid`). Nothing is charged and no amount, method
 or receipt is asked for, and no sale, invoice, fiscal record, cash movement or stock movement is created. The
-assistant asks for a stronger confirmation.
+assistant asks for a stronger confirmation and says the order by its number (OS-YYYYMMDD-NNNN).
 If it fails: only an Initiated order is marked; in another status it is refused saying which one it is in. The
 employee cannot.
 Involved: none
@@ -280,7 +285,7 @@ Steps:
 In: the order and the reason (up to 500 characters).
 Out: status Failed, the reason and the time (`cart_checkout.order.failed`). An order already Paid can also
 fail, as today: **it leaves no trace of a refund** (there are no refunds in this app). The cart
-stays as it was. The assistant asks for a stronger confirmation.
+stays as it was. The assistant asks for a stronger confirmation and says the order by its number.
 If it fails: a Completed or already Failed order is refused; an empty reason, under its field, without losing
 what was written.
 Involved: none

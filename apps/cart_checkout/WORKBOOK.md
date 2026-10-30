@@ -149,7 +149,8 @@ Pantalla: asistente
 Pasos:
 1. Pide al asistente añadir un producto a un carrito, diciendo el carrito (su sesión, o el email o el
    nombre del cliente), la referencia y el nombre del producto, la cantidad y el precio por unidad.
-2. Confirma la tarjeta del asistente.
+2. Confirma la tarjeta del asistente, que dice el carrito por su sesión (por ejemplo, sess_a1b2c3) o por
+   el cliente dicho, nunca por su código interno.
 3. La línea queda guardada y los totales del carrito (ítems e importe) se recalculan.
 Entra: el carrito; referencia y nombre del producto (texto libre: no se comprueban contra el
 catálogo), SKU y atributos de variante (talla, color…) opcionales, cantidad mayor que cero y como mucho
@@ -171,7 +172,8 @@ Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
 Pasos:
 1. Pide al asistente cambiar la cantidad de una línea, o quitarla.
-2. Confirma la tarjeta.
+2. Confirma la tarjeta, que dice la línea por su producto (por ejemplo, Champú), nunca por su código
+   interno.
 3. Con cantidad mayor que cero la línea cambia y su total se recalcula con el precio guardado en la
    línea; con cantidad cero la línea se quita. También existe la orden «quitar línea», que solo quita.
 4. Los totales del carrito se recalculan en la misma operación.
@@ -190,7 +192,8 @@ Actor: responsable, administrador, propietario, asistente
 Pantalla: asistente
 Pasos:
 1. Pide al asistente vaciar un carrito.
-2. Confirma la tarjeta.
+2. Confirma la tarjeta, que dice el carrito por su sesión (por ejemplo, sess_a1b2c3), nunca por su
+   código interno.
 3. Se quitan todas sus líneas y los totales vuelven a cero; el carrito sigue **Activo**.
 Entra: el carrito.
 Sale: el carrito sin líneas, totales a cero (`cart_checkout.cart.cleared`). Vaciar uno que ya estaba
@@ -221,7 +224,8 @@ Pantalla: Carritos
 Pasos:
 1. En **Carritos**, en la fila, pulsa **Borrar**.
 2. Confirma «¿Borrar el carrito …?» con **Borrar**; **Cancelar** lo deja como estaba.
-3. El carrito desaparece de la lista. El asistente pide confirmación reforzada (acción peligrosa).
+3. El carrito desaparece de la lista. El asistente pide confirmación reforzada (acción peligrosa)
+   y dice el carrito por su sesión.
 Entra: el carrito.
 Sale: el carrito borrado en cualquier estado, también Convertido (`cart_checkout.cart.deleted`). Sus
 pedidos siguen existiendo y su sesión queda libre para otro carrito.
@@ -256,7 +260,8 @@ Pantalla: asistente
 Pasos:
 1. Pide al asistente iniciar el pedido de un carrito y, si quieres, el email del cliente, las
    direcciones de envío y de facturación, el método de envío, el método de pago y unas notas.
-2. Confirma la tarjeta.
+2. Confirma la tarjeta, que dice el carrito por su sesión (por ejemplo, sess_a1b2c3), nunca por su
+   código interno.
 3. Aparece en **Pedidos** un pedido **Iniciado** con número `OS-AAAAMMDD-NNNN` (correlativo por día
    del negocio, sin huecos) y el total del carrito copiado en ese momento, en su moneda.
 Entra: el carrito; el email del cliente (sin él, el del carrito); direcciones (si falta la de
@@ -280,7 +285,7 @@ Pasos:
 Entra: el pedido (por su número o su id).
 Sale: estado Pagado y hora del pago (`cart_checkout.order.paid`). No se cobra ni se pide importe, medio
 ni justificante, y no se crea venta, factura, registro fiscal, movimiento de caja ni de stock. El
-asistente pide confirmación reforzada.
+asistente pide confirmación reforzada y dice el pedido por su número (OS-AAAAMMDD-NNNN).
 Si falla: solo se marca un pedido Iniciado; en otro estado se rechaza diciendo en cuál está. El
 empleado no puede.
 Implicados: ninguno
@@ -298,7 +303,7 @@ Pasos:
 Entra: el pedido y el motivo (hasta 500 caracteres).
 Sale: estado Fallido, el motivo y la hora (`cart_checkout.order.failed`). Un pedido ya Pagado también
 puede fallar, como hoy: **no deja rastro de devolución** (no hay devoluciones en esta app). El carrito
-sigue como estaba. El asistente pide confirmación reforzada.
+sigue como estaba. El asistente pide confirmación reforzada y dice el pedido por su número.
 Si falla: un pedido Completado o ya Fallido se rechaza; un motivo vacío, debajo de su campo, sin perder
 lo escrito.
 Implicados: ninguno

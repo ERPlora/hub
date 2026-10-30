@@ -21,6 +21,7 @@ msgstr "Borrar los datos personales de sus clientes"
 msgid "%(email)s: personal data erased from %(carts)s cart(s) and %(orders)s order(s)."
 msgstr "%(email)s: datos personales borrados de %(carts)s carrito(s) y %(orders)s pedido(s)."
 
+msgctxt "cart_checkout"
 msgid "Choose a hub first (its link in the SaaS admin): the action runs on that hub."
 msgstr "Elige primero un hub (su enlace en el admin del SaaS): la acción se ejecuta en ese hub."
 
@@ -96,6 +97,7 @@ msgstr "nombre del cliente"
 msgid "status"
 msgstr "estado"
 
+msgctxt "cart_checkout"
 msgid "items"
 msgstr "ítems"
 
@@ -117,6 +119,7 @@ msgstr "notas"
 msgid "abandonment reason"
 msgstr "motivo del abandono"
 
+msgctxt "cart_checkout"
 msgid "deleted at"
 msgstr "borrado el"
 
@@ -165,6 +168,7 @@ msgstr "dirección de facturación"
 msgid "shipping method"
 msgstr "método de envío"
 
+msgctxt "cart_checkout"
 msgid "payment method"
 msgstr "método de pago"
 
@@ -174,15 +178,19 @@ msgstr "motivo del fallo"
 msgid "placed at"
 msgstr "iniciado el"
 
+msgctxt "cart_checkout"
 msgid "paid at"
 msgstr "pagado el"
 
+msgctxt "cart_checkout"
 msgid "failed at"
 msgstr "fallido el"
 
+msgctxt "cart_checkout"
 msgid "completed at"
 msgstr "completado el"
 
+msgctxt "cart_checkout"
 msgid "order"
 msgstr "pedido"
 
@@ -214,6 +222,7 @@ msgstr "Esa línea de carrito no existe en este negocio."
 msgid "That order does not exist in this business."
 msgstr "Ese pedido no existe en este negocio."
 
+msgctxt "cart_checkout"
 msgid "Enter a valid email."
 msgstr "Introduce un email válido."
 

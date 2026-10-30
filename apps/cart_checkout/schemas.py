@@ -17,7 +17,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import gettext_noop
+from django.utils.translation import gettext_noop, pgettext_lazy
 from ninja import Field, Schema
 from pydantic import AfterValidator, ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -25,10 +25,12 @@ from apps.cart_checkout.models import (
     EMAIL_MAX_LENGTH,
     METHOD_MAX_LENGTH,
     NAME_MAX_LENGTH,
+    OWN,
     REASON_MAX_LENGTH,
     SESSION_MAX_LENGTH,
     SKU_MAX_LENGTH,
 )
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -41,13 +43,20 @@ NOTES_MAX_LENGTH = 2000
 MAX_FREE_FIELDS = 20
 FREE_VALUE_MAX_LENGTH = 255
 
-EMAIL_INVALID = _("Enter a valid email.")
+EMAIL_INVALID = pgettext_lazy(OWN, "Enter a valid email.")
 CURRENCY_UNKNOWN = _("That is not a currency code (ISO 4217, such as EUR).")
 EXPIRY_PASSED = _("The expiry must be in the future.")
 QUANTITY_NOT_POSITIVE = _("The quantity must be greater than 0.")
 REASON_REQUIRED = _("Say why the order failed: the reason stays on the order.")
 SAY_WHICH_CART = _("Say which cart: its id, its session code, or its customer's email or name.")
 SAY_WHICH_ORDER = _("Say which order: its id, or its number.")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a cart by its session code, as the Carts list and «Delete the cart …?» say it; a line by its
+# product; an order by its number, as the Orders list.
+A_CART = names("cart_checkout.cart.get", by="cart_id", name=("session_token",))
+A_LINE = names("cart_checkout.item.get", by="item_id", name=("product_name",))
+AN_ORDER = names("cart_checkout.order.get", by="order_id", name=("order_number",))
 
 CartStatus = Literal["active", "abandoned", "converted", "expired"]
 OrderStatus = Literal["initiated", "paid", "failed", "completed"]
@@ -145,7 +154,7 @@ class Page(Schema, Generic[T]):
 
 
 class CartRefIn(In):
-    cart_id: UUID | None = Field(None, description="The cart's id.")
+    cart_id: UUID | None = Field(None, description="The cart's id.", json_schema_extra=A_CART)
     session_token: SessionCode | None = Field(
         None, description="The cart's session code (e.g. sess_a1b2c3), when its id is not known."
     )
@@ -290,7 +299,7 @@ class CartDetailOut(CartOut):
 
 
 class ItemRefIn(In):
-    item_id: UUID = Field(title=gettext_noop("Cart line"), description="The line's id.")
+    item_id: UUID = Field(title=gettext_noop("Cart line"), description="The line's id.", json_schema_extra=A_LINE)
 
 
 class ItemAddIn(CartRefIn):
@@ -357,7 +366,9 @@ class ItemListIn(PageIn):
 
 
 class OrderRefIn(In):
-    order_id: UUID | None = Field(None, title=gettext_noop("Order"), description="The order's id.")
+    order_id: UUID | None = Field(
+        None, title=gettext_noop("Order"), description="The order's id.", json_schema_extra=AN_ORDER
+    )
     order_number: Said | None = Field(
         None, description="The order's number (e.g. OS-20261014-0003), when its id is not known."
     )

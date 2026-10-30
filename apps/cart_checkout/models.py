@@ -14,6 +14,9 @@ numbers the orders by day.
   ``UPDATE … RETURNING`` in the transaction of the order (never a sequence).
 
 Phase 1 has no tenancy (like ``apps.demo``): phase 2 moves these tables to each hub's database.
+
+A name other apps' catalogues also have and say their way («order» is an «orden» there, a «pedido» here) carries the
+context ``cart_checkout`` (``OWN``), or the Spanish of the app installed first would win.
 """
 
 from decimal import Decimal
@@ -34,6 +37,8 @@ ORDER_NUMBER_MAX_LENGTH = 32
 REASON_MAX_LENGTH = 500
 #: A quantity: up to 999 999 999 999.999 units, three decimals (as sale and inventory).
 QUANTITY = {"max_digits": 15, "decimal_places": 3}
+#: The context of a text other apps' catalogues also have (module docstring).
+OWN = "cart_checkout"
 
 
 class CartStatus(models.TextChoices):
@@ -76,7 +81,7 @@ class Cart(Audited):
         _("status"), max_length=16, choices=Status.choices, default=Status.ACTIVE
     )
     # The sum of the lines: their quantities, and their totals in the minor unit of ``currency``.
-    total_items = models.DecimalField(_("items"), default=Decimal("0"), **QUANTITY)
+    total_items = models.DecimalField(pgettext_lazy(OWN, "items"), default=Decimal("0"), **QUANTITY)
     total_amount = models.BigIntegerField(_("total"), default=0)
     # The business's when it was created (services.py), or the one the customer asked for: never a fixed euro.
     currency = models.CharField(_("currency"), max_length=3)
@@ -84,7 +89,7 @@ class Cart(Audited):
     last_activity_at = models.DateTimeField(_("last activity"), null=True, blank=True)
     notes = models.TextField(_("notes"), blank=True)
     abandon_reason = models.TextField(_("abandonment reason"), blank=True)
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    deleted_at = models.DateTimeField(pgettext_lazy(OWN, "deleted at"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("cart")
@@ -164,7 +169,7 @@ class Order(Audited):
     shipping_address = models.JSONField(_("shipping address"), default=dict, blank=True)
     billing_address = models.JSONField(_("billing address"), default=dict, blank=True)
     shipping_method = models.CharField(_("shipping method"), max_length=METHOD_MAX_LENGTH, blank=True)
-    payment_method = models.CharField(_("payment method"), max_length=METHOD_MAX_LENGTH, blank=True)
+    payment_method = models.CharField(pgettext_lazy(OWN, "payment method"), max_length=METHOD_MAX_LENGTH, blank=True)
     status = models.CharField(
         _("status"), max_length=16, choices=Status.choices, default=Status.INITIATED
     )
@@ -175,12 +180,12 @@ class Order(Audited):
     notes = models.TextField(_("notes"), blank=True)
     failure_reason = models.TextField(_("failure reason"), blank=True)
     placed_at = models.DateTimeField(_("placed at"), null=True, blank=True)
-    paid_at = models.DateTimeField(_("paid at"), null=True, blank=True)
-    failed_at = models.DateTimeField(_("failed at"), null=True, blank=True)
-    completed_at = models.DateTimeField(_("completed at"), null=True, blank=True)
+    paid_at = models.DateTimeField(pgettext_lazy(OWN, "paid at"), null=True, blank=True)
+    failed_at = models.DateTimeField(pgettext_lazy(OWN, "failed at"), null=True, blank=True)
+    completed_at = models.DateTimeField(pgettext_lazy(OWN, "completed at"), null=True, blank=True)
 
     class Meta:
-        verbose_name = _("order")
+        verbose_name = pgettext_lazy(OWN, "order")
         verbose_name_plural = _("orders")
         ordering = ["-created_at", "-id"]
         indexes = [
