@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:42a844046fda4d5daebb7d4c6568a8cf448752393eee3413a9adaa79f348b18a -->
+<!-- generated from WORKBOOK.md sha256:c8f5691aa10094384e8021efa9dc6f23e370a72dc24b90d006ee8aa86d7b99d9 -->
 
 ## What it is for and who it is for
 
@@ -74,7 +74,8 @@ Services opens from the **Services** menu and has three tabs: **Services**, **Ca
 the app refuses it even if they try through the API or the assistant.
 
 ### Services
-Table with the search box "Search service…", columns **Name, Category, Pricing** (Fixed price, Hourly,
+Table with the search box "Search service…", columns **Photo** (the thumbnail, or the initials over its
+colour), **Name, Category, Pricing** (Fixed price, Hourly,
 From, Variable, Free), **Price** (in the business's currency), **Duration (min)** and **Status**: **Active**, **Not configured** (with the
 reason below, "No tax category: it cannot be charged") or **Archived**. It sorts by any column and, with
 the **Filters** button, it filters by Name, Category, Pricing, Price (from–to, in the business's currency),
@@ -94,8 +95,11 @@ booked are kept." and, if Appointments has upcoming appointments with it, "{coun
 appointment(s) still use this service. They keep their booking, price and length; only new bookings
 stop.".
 
-The service photo (SERVICE-F34 and F35, not done yet) will add the "Photo" field to the form, with
-"Choose from the library", "Upload photo" and "Remove photo", for whoever may edit services.
+The service photo (SERVICE-F34 and F35): for whoever may edit services, the form has "Photo", with the
+photo (or the initials and "No photo: its initials are shown"), "Choose from the library" and "Upload
+photo" when it has none, or "Change" and "Remove photo" when it has one, and the note "JPG, PNG or WebP of
+up to 2 MB". The "Image library" window is Inventory's, with "Hair" and "Beauty" first; while the photo
+uploads, the button says "Uploading photo…".
 
 ### Categories
 Table with the search box "Search category…" and columns **Name, Parent category, Order** and
@@ -193,8 +197,8 @@ Amounts, durations and dates show in the format of the language of whoever is lo
 | SERVICE-F31 | Assign a professional to a service | done |
 | SERVICE-F32 | Change or remove a professional from a service | done |
 | SERVICE-F33 | Know who can perform a service | done |
-| SERVICE-F34 | Choose a service's image from the library | not done |
-| SERVICE-F35 | Upload the service's own photo | not done |
+| SERVICE-F34 | Choose a service's image from the library | done |
+| SERVICE-F35 | Upload the service's own photo | done |
 
 ### SERVICE-F01 Add a service
 Status: done
@@ -796,7 +800,7 @@ If it fails: a service that does not exist, "That service does not exist in this
 Involved: SERVICE-F31, APPOINTMENT-F01
 
 ### SERVICE-F34 Choose a service's image from the library
-Status: not done
+Status: done
 Actor: manager, assistant
 Screen: Services
 Steps:
@@ -821,13 +825,15 @@ service with its image. The candidates come from `service.service.suggest_image`
 `base.catalog_image.search` and `service.service.set_image` sets or removes the photo.
 If it fails: if the library does not answer, "The image library could not be loaded." with "Retry", and
 the service can still be saved without a photo. No results: "No image matches your search. Try another
-word or upload a photo.". An image the library no longer has is refused on saving ("That image is no
-longer in the library. Choose another one.") and nothing is saved. Whoever may not edit services does
-not see "Photo", and the app refuses it through the assistant or the API too.
+word or upload a photo.". An image the library no longer has is refused on saving the photo: the form
+says "The service has been saved, but the photo has not: That image is no longer in the library. Choose
+another one." with "Retry", and the service keeps the photo it had (through the assistant or the API
+nothing is saved). Whoever may not edit services does not see "Photo", and the app refuses it through the
+assistant or the API too.
 Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32
 
 ### SERVICE-F35 Upload the service's own photo
-Status: not done
+Status: done
 Actor: manager
 Screen: Services
 Steps:
@@ -844,12 +850,13 @@ another one, choosing one from the library or "Remove photo" deletes the previou
 archiving the service keeps it, in case it is restored (SERVICE-F05). When the business is exported
 (BASE-F35) the photo travels inside the file and is copied to the business that imports it, like the
 items' photos (INVENTORY-F33). The upload is `service.service.upload_image`, also through the API.
-If it fails: next to "Photo", and nothing is uploaded: an image over 2 MB, "The photo is over 2 MB.
-Choose a lighter one."; a file that is not an image, "That file is not a photo. Upload a JPG, PNG or WebP
-image."; with no space left in the plan, "There is no space left for that file: your plan includes
-<space>."; if the store does not answer, "The photo could not be saved. Try again.". If the service was
-saved and the photo was not, the form says so ("The service has been saved, but the photo has not:
-<reason>") with "Retry", and the service keeps the photo it had.
+If it fails: next to "Photo", on choosing it, and nothing is uploaded: an image over 2 MB, "The photo
+weighs more than 2 MB. Choose a lighter one."; a file that is not an image, "That file is not a photo.
+Upload a JPG, PNG or WebP image.". If the service was saved and the photo was not, the form says so ("The
+service has been saved, but the photo has not: <reason>") with "Retry", which only uploads the photo
+again, and the service keeps the photo it had; the reason is, with no space left in the plan, "There is
+no space left for that file: your plan includes <space>." and, if the store does not answer, "The photo
+could not be saved. Try again.".
 Involved: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
 
 ## Services: what goes in and what comes out

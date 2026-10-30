@@ -1,7 +1,7 @@
 # Workbook — Inventario (app)
 Prefijo: INVENTORY
 Alcance MVP: transversal
-Estado de la app: en uso; parcial F12 (espera al núcleo); F30 a F33 sin hacer (la foto del artículo, 2026-10-30)
+Estado de la app: en uso; parcial F12 (espera al núcleo)
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -138,9 +138,14 @@ crear), la casilla «Controlar stock de este artículo» con su nota, «Unidad d
 fiscal» («Elige una categoría fiscal») y «Categorías» (si hay alguna), y «Guardar» / «Guardar
 cambios» («Guardando…»).
 
-La foto del artículo (INVENTORY-F30 a F32, sin hacer todavía) añadirá la miniatura a la tabla y a las
-tarjetas, el campo «Foto» al formulario, con «Elegir de la librería», «Subir foto» y «Quitar foto», para
-quien puede cambiar productos, y la foto arriba en la ficha.
+La foto del artículo (INVENTORY-F30 a F32): la tabla lleva la columna «Foto», delante del nombre, con la
+miniatura de la foto o las iniciales sobre su color, y las tarjetas su línea «Foto»; la ficha la enseña
+arriba, más grande. Para quien puede cambiar productos, el formulario lleva al final «Foto»: la foto (o
+las iniciales y «Sin foto: se ven sus iniciales»), «Elegir de la librería» y «Subir foto» si no tiene, o
+«Cambiar» y «Quitar foto» si la tiene, y la nota «JPG, PNG o WebP de hasta 2 MB». La ventana «Librería de
+imágenes» enseña «Cargando imágenes…» mientras busca, «Ninguna imagen coincide con tu búsqueda. Prueba con
+otra palabra o sube una foto.» si no encuentra nada y «No se pudo cargar la librería de imágenes.» con
+«Reintentar» si falla; abajo, «Subir foto». Mientras sube la foto, el botón dice «Subiendo foto…».
 
 Vacía: «Sin productos». Cargando: «Cargando…». Error: el aviso de la tabla con «Reintentar». Un
 rechazo del formulario sale dentro del panel; el de una acción de fila, encima de la tabla.
@@ -256,10 +261,10 @@ fueran los del negocio.
 | INVENTORY-F27 | Entregar el catálogo al TPV, a Cocina y a Menús | hecho |
 | INVENTORY-F28 | Completar el primer paso «Tu catálogo» | hecho |
 | | **Foto del artículo** | |
-| INVENTORY-F30 | Elegir la imagen de un artículo desde la librería | no hecho |
-| INVENTORY-F31 | Subir una foto propia del artículo | no hecho |
-| INVENTORY-F32 | La foto en la ficha del TPV | no hecho |
-| INVENTORY-F33 | Las fotos viajan en el blueprint | no hecho |
+| INVENTORY-F30 | Elegir la imagen de un artículo desde la librería | hecho |
+| INVENTORY-F31 | Subir una foto propia del artículo | hecho |
+| INVENTORY-F32 | La foto en la ficha del TPV | hecho |
+| INVENTORY-F33 | Las fotos viajan en el blueprint | hecho |
 
 Todos los flujos son comunes a los dos verticales (restaurante y peluquería).
 
@@ -939,7 +944,7 @@ Implicados: SALE-F01, INVENTORY-F27, COMBO-F12
 
 ### INVENTORY-F30 Elegir la imagen de un artículo desde la librería
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30: una librería de imágenes compartida por todos los negocios, con título y sinónimos en español y en inglés; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) old:inventory/WORKFLOW.md (Foto del artículo en la ficha, duda 6) -->
-Estado: no hecho
+Estado: hecho
 Actor: administrador, responsable, asistente
 Pantalla: Productos
 Pasos:
@@ -970,13 +975,15 @@ Si falla: si la librería no contesta, «No se pudo cargar la librería de imág
 el producto se sigue pudiendo guardar sin foto. Sin resultados: «Ninguna imagen coincide con tu
 búsqueda. Prueba con otra palabra o sube una foto.». El asistente que no encuentra candidatas lo dice y
 propone subir una foto desde la ficha. Una imagen que la librería ya no tiene se rechaza al guardar
-(«Esa imagen ya no está en la librería. Elige otra.») y no se guarda nada. Quien no puede cambiar
-productos no ve «Foto», y la app lo rechaza también por el asistente o la API.
+la foto: el panel dice «El producto se ha guardado, pero la foto no: Esa imagen ya no está en la librería.
+Elige otra.» con «Reintentar», y el artículo se queda con la foto que tenía (por el asistente o la API no
+se guarda nada). Quien no puede cambiar productos no ve «Foto», y la app lo rechaza también por el
+asistente o la API.
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, BASE-F93
 
 ### INVENTORY-F31 Subir una foto propia del artículo
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30: cada negocio guarda las fotos de sus artículos en su propia carpeta, convertidas a WebP de 512 × 512 y de hasta 2 MB al subirlas; encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next) -->
-Estado: no hecho
+Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
@@ -993,17 +1000,17 @@ apunta a ella y Inventario avisa del cambio (`inventory.product.updated`); el TP
 (INVENTORY-F32). Subir otra, elegir una de la librería o «Quitar foto» borra la anterior de la carpeta;
 eliminar el artículo (INVENTORY-F04), también. La subida es `inventory.product.upload_image`, también
 por la API.
-Si falla: junto a «Foto», y no se sube nada: una imagen de más de 2 MB, «La foto pesa más de 2 MB.
-Elige una más ligera.»; un archivo que no es una imagen, «Ese archivo no es una foto. Sube una imagen
-JPG, PNG o WebP.»; sin espacio en el plan, «No queda espacio para ese archivo: tu plan incluye
-<espacio>.»; si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.». Si el
-artículo se guardó y la foto no, el panel lo dice («El producto se ha guardado, pero la foto no:
-<motivo>») con «Reintentar», y el artículo se queda con la foto que tenía.
+Si falla: junto a «Foto», al elegirla, y no se sube nada: una imagen de más de 2 MB, «La foto pesa más
+de 2 MB. Elige una más ligera.»; un archivo que no es una imagen, «Ese archivo no es una foto. Sube una
+imagen JPG, PNG o WebP.». Si el artículo se guardó y la foto no, el panel lo dice («El producto se ha
+guardado, pero la foto no: <motivo>») con «Reintentar», que solo vuelve a subir la foto, y el artículo se
+queda con la foto que tenía; el motivo es, sin espacio en el plan, «No queda espacio para ese archivo: tu
+plan incluye <espacio>.» y, si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.».
 Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F28
 
 ### INVENTORY-F32 La foto en la ficha del TPV
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30; hoy la baldosa del TPV pinta las iniciales sobre un degradado, SALE-F01) -->
-Estado: no hecho
+Estado: hecho
 Actor: empleado, cajero
 Pantalla: Ventas: Vender; Productos; Ficha del producto
 Pasos:
@@ -1014,8 +1021,9 @@ Pasos:
    ahora: nunca un hueco ni una imagen rota.
 3. Las baldosas de los menús (Menús) siguen la misma regla: su foto si la tienen y, si no, sus
    iniciales.
-4. En **Inventario → Productos**, cada fila lleva delante del nombre la miniatura de la foto (o las
-   iniciales), en la tabla y en las tarjetas; la ficha del producto la enseña arriba, más grande.
+4. En **Inventario → Productos**, cada fila lleva delante del nombre, en la columna «Foto», la miniatura
+   de la foto (o las iniciales), y cada tarjeta su línea «Foto»; la ficha del producto la enseña arriba,
+   más grande.
 Entra: la foto de cada artículo, de la librería o propia.
 Sale: nada: solo se enseña. Las imágenes de la librería se guardan en el dispositivo y no se vuelven a
 pedir; las propias solo las ve quien ha entrado en el negocio.
@@ -1025,7 +1033,7 @@ Implicados: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
 
 ### INVENTORY-F33 Las fotos viajan en el blueprint
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30: las fotos propias viajan dentro del archivo exportado y las de la librería como referencia) gh:hub#1008 gh:hub#1006 -->
-Estado: no hecho
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias
 Pasos:
@@ -1289,7 +1297,7 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   INVENTORY-F09); desactivar una categoría (cambio 5); `inventory.products.unit_of` y
   `inventory.products.stock_levels`, que eran lecturas internas de los handlers (aquí la unidad sale en
   la ficha y en `inventory.unit.list`, y el saldo se lee dentro de la transacción).
-- **La foto del artículo (INVENTORY-F30 a F33, sin hacer; decisión de Ioan del 2026-10-30, encargo
+- **La foto del artículo (INVENTORY-F30 a F33, hechas el 2026-10-30; decisión de Ioan del 2026-10-30, encargo
   `docs/plans/2026-10-30-blueprints-imagenes-prompt.md` de erplora-next)**:
   - `Product.image`: texto validado con una referencia lógica, nunca una URL (un `.blueprint.zip` es inmutable
     y una URL horneada se pudre si cambia el dominio, el bucket o la CDN): `catalog:<carpeta>/<nombre>` (la
@@ -1313,10 +1321,26 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
     `base/media.py`; en local sin bucket, desde `blueprints/img/` (ruta configurable). Las propias, por
     `/p/media/<hub>/inventory/products/…`: inventory declara `members_media` con esa carpeta (hoy no declara
     ninguna).
-  - TPV: `apps/sale/frontend/components/pos/ProductTile.vue` y `ComboTiles.vue` pintan hoy `initials()` sobre
-    `tileGradient()` (`till.ts`); pasan a la foto con las iniciales de respaldo, también en el `error` de la
-    imagen. El menú lleva foto, de la librería o propia, como el artículo: lo decidió Menús con `market-decision`
-    (COMBO-F14, 2026-10-30); sin ella, su baldosa sigue con las iniciales.
+  - TPV: `apps/sale/frontend/components/pos/ProductTile.vue`, `ServiceTile.vue` y `ComboTiles.vue` pintan la foto con
+    `ItemImage` de base (`base/frontend/components/ItemImage.vue`): `image_url` entera (`fit="contain"`: las fotos de
+    la librería son recortes sobre blanco y una baldosa ancha solo enseñaría una franja), cargada en diferido, con
+    `alt` el nombre; sin foto, o en el `error` de la imagen, las iniciales sobre su color (`initials()` y
+    `tileGradient()` viven en `base/frontend/lib/item-image.ts` y `till.ts` los reexporta). El menú lleva foto, de
+    la librería o propia, como el artículo: lo decidió Menús con `market-decision` (COMBO-F14, 2026-10-30).
+  - Pantallas: un solo campo para artículo, servicio y menú, `base/frontend/components/ImageField.vue` (el borrador
+    `ImageDraft` de `base/frontend/lib/item-image.ts`: referencia de la librería, foto propia leída en el
+    dispositivo en base64 tras comprobar tipo y 2 MB, o ninguna), con la ventana
+    `base/frontend/components/ImageLibraryModal.vue` (`base.catalog_image.search`, 60 por página, pestañas por
+    carpeta, la respuesta vieja se descarta). Nada se manda al elegir: `useImageSave` manda, tras guardar el
+    artículo, `set_image` (librería o vacío) o `upload_image` (foto propia), y un fallo se queda en el panel con
+    «Reintentar» (solo la foto) y «Guardar» apagado. La pantalla no usa `suggest_image`: buscar el nombre del
+    artículo da las mismas candidatas, paginadas; `suggest_image` es la herramienta del asistente. Lista:
+    columna `photo` (`ItemImage` de 40 px) en `ProductsPage.vue`; ficha: 128 px arriba en
+    `ProductDetailModal.vue`. Tests: `base/frontend/lib/item-image.test.ts`, `base/frontend/components/ItemImage.test.ts`,
+    `ImageLibraryModal.test.ts`, `ImageField.test.ts`, `frontend/components/ProductFormModal.test.ts`
+    («ProductFormModal: photo»), `ProductDetailModal.test.ts`, `frontend/pages/ProductsPage.test.ts`, las baldosas
+    en `apps/sale/frontend/components/pos/*Tile*.test.ts`, y en Chrome `tests/e2e/inventory-photo.spec.ts` (F30, F31
+    y F32 a 390, 834 y 1440). F33: `base/tests/test_blueprint_images.py`.
   - Blueprint (`base/blueprint.py`): los `file:` viajan en `media/…` dentro del zip (como hub#1008 del producto
     viejo) y al importar se copian con un `<uuid>` nuevo; los `catalog:` viajan tal cual. Importar dos veces
     no duplica (el SKU se salta); `undo` y `reset` borran las copias. Límites desde el 2026-10-30
@@ -1382,8 +1406,8 @@ que su `WORKFLOW.md` tenía anotados. Cada uno se puede vetar antes de construir
 | Elemento de la referencia | Qué hará la app | Flujo |
 |---|---|---|
 | Ficha con nombre, SKU, precio, coste, categoría fiscal, código de barras y unidad | sí | F01, F02 |
-| Foto del artículo en la ficha, la lista y el TPV | no todavía: flujos escritos y sin hacer (duda 6 resuelta el 2026-10-30) | F30, F31, F32 |
-| Fotos de los artículos en la copia o la plantilla exportada | no todavía: flujo escrito y sin hacer | F33 |
+| Foto del artículo en la ficha, la lista y el TPV | sí: de la librería común o propia, con las iniciales si no hay (duda 6 resuelta el 2026-10-30) | F30, F31, F32 |
+| Fotos de los artículos en la copia o la plantilla exportada | sí: las propias dentro del archivo, las de la librería como referencia | F33 |
 | Precio por una cantidad distinta de la unidad (por 100 g, por kg con stock en g) | parcial: solo por el asistente o la API (duda 12) | F01, F26 |
 | Categoría fiscal obligatoria y existente al guardar | sí | F01, F02 |
 | Activar y desactivar sin borrar | sí | F03 |

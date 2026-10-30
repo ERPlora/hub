@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:764033ed58a896698f5b753eecd2b4f56c42fc9a8f770d63abec87d1f64727f7 -->
+<!-- generated from WORKBOOK.md sha256:8ad8dcb8ff062e1378428431f31755fc73493bd9b139d5be8f26e25432cb3c0a -->
 
 ## What it is for and who it is for
 
@@ -70,7 +70,8 @@ Initial setup, step by step:
 
 ### Menus
 Menu **Menus**. Table of menus with the search box "Search a menu…" (it searches by name and by
-kitchen name), table or cards view and columns: Name (sorts and filters), "Closed price" (in the business's currency; sorts), "How
+kitchen name), table or cards view and columns: "Photo" (the thumbnail, or the initials over its colour),
+Name (sorts and filters), "Closed price" (in the business's currency; sorts), "How
 it is sold" ("Eat in" or "Take away"; sorts and filters), "On sale" (Yes or No; sorts and filters) and
 Order (sorts). Pages of 50, by order and name. With the right to manage there is a **+** button and,
 per row, "Edit details" and "Withdraw"; without it, only the list is seen. Tapping a row opens the
@@ -135,7 +136,7 @@ one.
 | COMBO-F11 | Send the menu to the kitchen | done |
 | COMBO-F12 | Mark a choice as sold out | done |
 | COMBO-F13 | When a product leaves the catalogue | done |
-| COMBO-F14 | The menu's photo | not done |
+| COMBO-F14 | The menu's photo | done |
 
 ### COMBO-F01 Look up and search the menus
 Status: done
@@ -442,7 +443,7 @@ on its own; meanwhile, they stay marked and nobody sells them.
 Involved: INVENTORY-F04, COMBO-F06
 
 ### COMBO-F14 The menu's photo
-Status: not done
+Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
 Steps:
@@ -457,11 +458,13 @@ Out: the menu with its photo (announces: menu changed); the till shows it on its
 reloading (INVENTORY-F32), and the list of menus, in its row. The photo of its own is kept in the
 business's folder, only the business's people see it and it counts against its plan's space; uploading
 another one, choosing one of the library, "Remove photo" or withdrawing the menu (COMBO-F04) deletes it.
-If it fails: the same notices as the product's photo: "That image is no longer in the library. Choose
-another one.", "The photo weighs more than 2 MB. Choose a lighter one.", "That file is not a photo.
-Upload a JPG, PNG or WebP image.", "There is no space left for that file: your plan includes <space>."
-and "The photo could not be saved. Try again."; the menu keeps the photo it had. A menu without a
-photo, or whose photo does not load, shows its initials.
+If it fails: the same notices as the product's photo. Next to "Photo", on choosing it, and nothing is
+uploaded: "The photo weighs more than 2 MB. Choose a lighter one." and "That file is not a photo. Upload
+a JPG, PNG or WebP image.". If the menu was saved and the photo was not, the window says so ("The menu
+has been saved, but the photo has not: <reason>") with "Retry", which only sends the photo again, and
+the menu keeps the photo it had; the reason is "That image is no longer in the library. Choose another
+one.", "There is no space left for that file: your plan includes <space>." or "The photo could not be
+saved. Try again.". A menu without a photo, or whose photo does not load, shows its initials.
 Involved: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
 ## Services: what goes in and what comes out
