@@ -76,13 +76,14 @@ def priced(card: dict) -> dict:
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("currency", "money"),
-    [("USD", {"currency": "USD", "decimals": 2}), ("JPY", {"currency": "JPY", "decimals": 0})],
-    ids=["dollars", "yen"],
+    [("USD", {"currency": "USD", "decimals": 2}), ("PLN", {"currency": "PLN", "decimals": 2})],
+    ids=["dollars", "zlotys"],
 )
 @pytest.mark.parametrize("named", ["price_list_id", "price_list"], ids=["by its id", "by its code"])
 def test_a_price_added_to_a_list_in_another_currency_is_said_in_that_currency(currency, money, named):
     """«Pon el champú a 15 en la lista de dólares»: the price goes in the minor unit of the list's currency, and the
-    card said it in the business's («15,00 €»). It reads the list as the person, by what the write names it."""
+    card said it in the business's («15,00 €»). It reads the list as the person, by what the write names it. A list
+    is always in a currency with two decimals (``D_CURRENCY``): none in yen."""
     price_list = make_list("DOLARES", currency=currency)
     product = make_product("Shampoo", "SH-1")
     which = {"price_list_id": str(price_list.id), "price_list": "DOLARES"}[named]
