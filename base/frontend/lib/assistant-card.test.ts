@@ -144,6 +144,17 @@ describe('a datum that is an object', () => {
     expect(fieldText({ name: 'denominations', label: 'Billetes y monedas', kind: 'object', value: denominations }, opts)).toBe(
       '20: 1 · 50: 2 · 0.50: 4',
     );
+    // A figure written with a decimal comma is one too; one counted as nothing is left out, as any empty datum.
+    expect(fieldText({ name: 'denominations', label: 'Billetes y monedas', kind: 'object', value: { '0,50': 4, '20': null } }, opts)).toBe(
+      '0,50: 4',
+    );
+  });
+
+  it('a key with a figure only in part of it is still a name: an address’s line1 (cart_checkout’s free fields)', () => {
+    const address = { line1: 'Calle Mayor 1', '2nd_line': '2º B', postal_code: '36201', city: 'Vigo' };
+    expect(fieldText({ name: 'shipping_address', label: 'Dirección de envío', kind: 'object', value: address }, opts)).toBe(
+      'Calle Mayor 1 · 2º B · 36201 · Vigo',
+    );
   });
 
   it('a secret stays hidden as the server sends it', () => {
