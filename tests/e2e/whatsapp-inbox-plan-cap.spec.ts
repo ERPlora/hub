@@ -20,7 +20,7 @@ import { join, resolve } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, REPO_DIR, SAAS, shot, shown } from './helpers';
+import { A, api, capture, login, psql, REPO_DIR, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
 import { messageSends } from './whatsapp-graph';
@@ -197,7 +197,7 @@ test.describe('the month nearly spent', () => {
       await expect(near).toBeInViewport();
       await settled(page);
       await noHorizontalScroll(page, `inbox ${viewport.label}`);
-      await page.screenshot({ path: shot(`${NEAR}-${viewport.label}`) });
+      await capture(page, `${NEAR}-${viewport.label}`);
     }
     await page.setViewportSize({ width: 1280, height: 860 });
 
@@ -214,7 +214,7 @@ test.describe('the month nearly spent', () => {
       await expect(month).toBeInViewport();
       await settled(page);
       await noHorizontalScroll(page, `settings ${viewport.label}`);
-      await page.screenshot({ path: shot(`${NEAR}-settings-${viewport.label}`) });
+      await capture(page, `${NEAR}-settings-${viewport.label}`);
     }
   });
 });
