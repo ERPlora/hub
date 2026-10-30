@@ -114,8 +114,10 @@ function openFlow(flow: FlowOut, tab?: string): void {
       <QuestionInbox :alone="false" />
       <DraftTray @ready="draftsReady = true" />
       <RecipeRepairs />
+      <!-- Mounted with the page and only hidden while there is none: its subscription goes on the page's one stream,
+           instead of arriving with the count and reopening it. -->
       <FlowList
-        v-if="total > 0"
+        v-show="total > 0"
         :catalog="catalog"
         :all-total="total"
         @open="openFlow($event)"
