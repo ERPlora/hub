@@ -12,7 +12,7 @@
 //     viewports;
 //   - the list filters behind the table's funnel (price in euros), with its count, at every width; an
 //     amount it cannot read is said under its field and does not filter.
-import { expect, type Locator, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { A, api, login, psql, record, shot, shown } from './helpers';
 import {
@@ -27,6 +27,7 @@ import {
   productsReady,
   rowAction,
   searchProducts,
+  settledChipFit,
   shoot,
   shootFlow,
   stamp,
@@ -206,107 +207,6 @@ const CHIP_VIEWPORTS = [
   { label: '1280', width: 1280, height: 800, roomy: true },
   { label: '1440', width: 1440, height: 900, roomy: true },
 ];
-
-/** How a «Not configured» chip sits in its box (`within`: the table cell, the card's value or the form's field):
- *  what is wrong with it (none = its icon in sight and its text on one line, whole or ending in «…»; `whole`: it
- *  has to be whole; `titled`: its `title` is its whole text) and its measurements for the report. A part is in
- *  sight when it lies inside the box and inside every box between them that clips (`overflow` not `visible`, the
- *  chip itself included). */
-async function chipFit(
-  chip: Locator,
-  options: { within: string; whole?: boolean; titled?: boolean },
-): Promise<{ problems: string[]; metrics: Record<string, unknown> }> {
-  return chip.evaluate((el, { within: selector, whole: mustFit, titled }) => {
-    const px = (n: number) => Math.round(n * 10) / 10;
-    const box = el.closest(selector);
-    if (!box) return { problems: [`no ${selector} around the chip`], metrics: {} };
-    const sight = (node: Element) => {
-      const r = box.getBoundingClientRect();
-      const span = { left: r.left, right: r.right };
-      for (let up = node.parentElement; up && up !== box; up = up.parentElement) {
-        if (getComputedStyle(up).overflowX === 'visible') continue;
-        const c = up.getBoundingClientRect();
-        span.left = Math.max(span.left, c.left);
-        span.right = Math.min(span.right, c.right);
-      }
-      return span;
-    };
-    const inSight = (node: Element) => {
-      const r = node.getBoundingClientRect();
-      const s = sight(node);
-      return { ok: r.width >= 1 && r.left >= s.left - 0.5 && r.right <= s.right + 0.5, at: `${px(r.left)}–${px(r.right)}`, sight: `${px(s.left)}–${px(s.right)}` };
-    };
-    const problems: string[] = [];
-    const chipAt = inSight(el);
-    if (!chipAt.ok) problems.push(`the chip (${chipAt.at}) sticks out of its box (${chipAt.sight})`);
-    const icon = el.querySelector('ion-icon');
-    const iconAt = icon ? inSight(icon) : null;
-    if (!icon || !iconAt || getComputedStyle(icon).visibility === 'hidden') problems.push('the chip has no icon');
-    else if (!iconAt.ok) problems.push(`its icon (${iconAt.at}) is out of sight (${iconAt.sight})`);
-    // The box that paints the text: the nearest ancestor of its text that is not inline.
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let text: Node | null = walker.nextNode();
-    while (text && !text.textContent?.trim()) text = walker.nextNode();
-    let painter: Element | null = text?.parentElement ?? null;
-    while (painter && painter !== el && getComputedStyle(painter).display === 'inline') painter = painter.parentElement;
-    const whole = (el.querySelector('ion-label')?.textContent ?? '').trim();
-    if (!text || !painter || !whole) return { problems: [...problems, 'the chip has no text'], metrics: {} };
-    const style = getComputedStyle(painter);
-    const fits = painter.scrollWidth <= painter.clientWidth;
-    const ellipsis = style.textOverflow === 'ellipsis' && style.overflowX === 'hidden' && style.whiteSpace === 'nowrap';
-    if (mustFit && !fits) problems.push(`its text is not whole though the row has room (${painter.scrollWidth} > ${painter.clientWidth})`);
-    else if (!fits && !ellipsis) {
-      problems.push(
-        `its text is cut with no «…» (${painter.scrollWidth} > ${painter.clientWidth}; text-overflow ${style.textOverflow}, overflow ${style.overflowX}, white-space ${style.whiteSpace})`,
-      );
-    }
-    // One line: a chip that wraps its text is not whole on its row.
-    const range = document.createRange();
-    range.selectNodeContents(text);
-    const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
-    if (lines > 1) problems.push(`its text wraps to ${lines} lines`);
-    const textAt = inSight(painter);
-    if (!textAt.ok) problems.push(`its text (${textAt.at}) is cut by a box around it (${textAt.sight})`);
-    const title = el.getAttribute('title');
-    if (titled && title !== whole) problems.push(`its title «${title}» is not its whole text «${whole}»`);
-    return {
-      problems,
-      metrics: {
-        box: sight(el),
-        chip: chipAt.at,
-        icon: iconAt?.at,
-        text: { at: textAt.at, scrollWidth: painter.scrollWidth, clientWidth: painter.clientWidth, fits, ellipsis, lines },
-        title,
-        whole,
-      },
-    };
-  }, options);
-}
-
-/** The chip's problems once the layout settles (`[]` = it fits): the table refits to its box after a resize (columns,
- *  cards) and a step on its way may look right, so a measurement counts only when the next one finds it unchanged. */
-async function settledChipFit(
-  chip: Locator,
-  options: Parameters<typeof chipFit>[1],
-  message: string,
-): Promise<Awaited<ReturnType<typeof chipFit>>> {
-  let last = '';
-  let fit: Awaited<ReturnType<typeof chipFit>> = { problems: [], metrics: {} };
-  await expect
-    .configure({ soft: true })
-    .poll(
-      async () => {
-        fit = await chipFit(chip, options);
-        const now = JSON.stringify(fit);
-        const settled = now === last;
-        last = now;
-        return settled ? fit.problems : ['settling'];
-      },
-      { message },
-    )
-    .toEqual([]);
-  return fit;
-}
 
 // flow: INVENTORY-F05 (chip «Sin configurar» de Productos)
 test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and its text whole or ending in «…», at every width', async ({
