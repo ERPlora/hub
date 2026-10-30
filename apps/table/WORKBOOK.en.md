@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:068e6a8aae1c30c879020477c7907c40ed412915c2d23755b76661e9f5da9f7f -->
+<!-- generated from WORKBOOK.md sha256:69dd561846a263dfdda497bf7c1c0a2aaac98fe84af7ab4f96b89105dae2a32e -->
 
 ## What it is for and who it is for
 
@@ -774,6 +774,13 @@ named by its id or by its number ("table 4"), with the zone if the number is rep
 terrace"); a zone by its id or by its name; a customer by their id, their name or their phone. If a name
 matches several, it is refused saying which ones (409 `*_ambiguous`).
 
+Before changing anything, the assistant asks for confirmation and says by its name, never by a code, what
+each change touches: the table with its zone, like 5 (Terrace), because the number is repeated across
+zones; the zone; the check by where it is (its table with its zone, or "Parked"); the Sales check by its
+title; the customer by their card; the booking by the name it paints on the table, and each line that moves
+when splitting by its name. What the person cannot see (the Sales check, without permission in Sales) does
+not show.
+
 ### What it offers: queries (they read and change nothing)
 
 | What it gives | Who can | Flows | Service |
@@ -781,10 +788,12 @@ matches several, it is refused saying which ones (409 `*_ambiguous`).
 | The zones with their tables and the free ones, search, filters, order and pages (up to 100) | view zones | F01, F06 | `table.zone.list` |
 | A zone | view zones | F06 | `table.zone.get` |
 | The tables with their live status (guests, since when, server, customer, booking), in natural order, with search, filters and pages | view tables | F02, F09 | `table.table.list` |
-| A table with its open checks | view tables | F09–F17 | `table.table.get` |
+| A table with its open checks and its name with the zone, like 5 (Terrace) | view tables | F09–F17 | `table.table.get` |
 | The checks of the room (open, closed, all), with charged, filters and pages | view checks | F22 | `table.session.list` |
-| A table check | view checks | F21, F22 | `table.session.get` |
+| A table check and where it is: its table with the zone, or "Parked" | view checks | F21, F22 | `table.session.get` |
 | The table checks of a Sales check (for the till: the table of the check on screen) | view checks | F12, F13, F24 | `table.session.by_order` |
+| A line of the Sales check of a table, with its name and its quantity, as "Split check" lists them | view checks | F17 | `table.session.line` |
+| The hold a booking keeps on its table, while it holds it, with the name it paints | view tables | F10, F28 | `table.hold.by_reservation` |
 | The servers who have opened checks (for the filter) | view checks | F22 | `table.waiter.list` |
 | Whether the plan is set up (tables in use and zones), for "Choose table" of the till and the "Your tables" step of the Home | view tables | F02 | `table.floor.status` |
 | The room settings | view settings | F08 | `table.settings.get` |

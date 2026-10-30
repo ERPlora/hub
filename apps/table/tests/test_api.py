@@ -33,6 +33,7 @@ ROUTES = {
     ("GET", "/table/sessions", "table.session.list"),
     ("GET", "/table/sessions/detail", "table.session.get"),
     ("GET", "/table/sessions/by_order", "table.session.by_order"),
+    ("GET", "/table/sessions/line", "table.session.line"),
     ("POST", "/table/sessions/open", "table.session.open"),
     ("POST", "/table/sessions/close", "table.session.close"),
     ("POST", "/table/sessions/transfer", "table.session.transfer"),
@@ -48,6 +49,7 @@ ROUTES = {
     ("GET", "/table/settings", "table.settings.get"),
     ("POST", "/table/settings", "table.settings.update"),
     ("POST", "/table/holds", "table.hold.place"),
+    ("GET", "/table/holds/by_reservation", "table.hold.by_reservation"),
     ("POST", "/table/holds/release", "table.hold.release"),
 }
 
