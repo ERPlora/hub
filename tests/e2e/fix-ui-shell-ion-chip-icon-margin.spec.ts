@@ -13,7 +13,7 @@
 // flow: ui-shell-ion-chip-icon-margin
 import { expect, type Locator, test } from '@playwright/test';
 
-import { A, api, login, psql, record, shot, shown } from './helpers';
+import { A, api, capture, login, psql, record, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, dialog, productsReady, stamp, VIEWPORTS } from './inventory-helpers';
 
 const KEY = 'FIX-UI-SHELL-ION-CHIP-ICON-MARGIN-WIPED-BY-PREFLIGHT';
@@ -115,22 +115,20 @@ test('ui-shell-ion-chip-icon-margin — the «Not configured» chip keeps its ic
       if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
       const marker = shown(page).locator(`[data-testid=inventory-products-unconfigured-${product.id}]`);
       await expect(marker).toBeVisible();
-      await page.waitForTimeout(400);
+      // The table refits to its box after a resize: `capture` waits until nothing moves, then the chip is measured.
+      await capture(page, `${KEY}-${vp.label}`);
       const list = await iconBox(marker, 'first');
       record(`${KEY}-list-${vp.label}`, list);
-      await page.screenshot({ path: shot(`${KEY}-${vp.label}`) });
 
       await marker.click();
       const form = dialog(page, 'inventory-product-form');
       const formChip = form.locator('[data-testid=inventory-product-tax-unconfigured]');
       await expect(formChip).toBeVisible();
-      await page.waitForTimeout(400);
+      await formChip.scrollIntoViewIfNeeded();
+      if (vp.label === '390') await capture(page, `${KEY}-form-390`);
+      else await untilStill(page, `the product form at ${vp.label}: still moving`);
       const inForm = await iconBox(formChip, 'first');
       record(`${KEY}-form-${vp.label}`, inForm);
-      if (vp.label === '390') {
-        await formChip.scrollIntoViewIfNeeded();
-        await page.screenshot({ path: shot(`${KEY}-form-390`) });
-      }
       await form.locator('[data-testid=inventory-product-form-cancel]').click();
       await expect(form).toBeHidden();
 
