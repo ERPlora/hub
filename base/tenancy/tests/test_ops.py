@@ -21,6 +21,16 @@ from base.tenancy.tests import hubs
 pytestmark = pytest.mark.usefixtures("hub_databases")
 
 
+@pytest.fixture(autouse=True)
+def on_the_tests_control_database(settings):
+    """These tests make and drop real databases next to control's: only ever the tests' own. pytest-django sets the
+    test databases up only when the session has a ``django_db`` test (this module has one); without it control would
+    still be the developer's database."""
+    control = tenancy_connections.control_name()
+    if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
+        pytest.fail(f"The control database is {control!r}, not the tests': run this module whole, not one test of it.")
+
+
 def databases() -> set[str]:
     """The databases of this session's control database (other sessions make and drop theirs meanwhile)."""
     control = tenancy_connections.control_name()
@@ -208,3 +218,13 @@ def test_the_apps_a_database_recorded_are_read_from_it(hub_databases):
     recorded = ops.recorded_apps(hub_databases.a)
 
     assert {"base", "live", *hub_databases.apps} <= recorded
+
+
+@pytest.mark.django_db
+def test_the_control_database_is_never_dropped_nor_cloned_into():
+    control = tenancy_connections.control_name()
+
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.drop_database(control)
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.clone_database(control, template=names.template_db_name(control))
