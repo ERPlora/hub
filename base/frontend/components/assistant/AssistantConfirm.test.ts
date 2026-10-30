@@ -92,6 +92,38 @@ describe('AssistantConfirm', () => {
     expect(body()).not.toContain('Do this');
   });
 
+  it('emptying a cart says «Vaciar», not «Quitar», the verb of taking one of its lines out; a cash count says the count', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: the server's `action` is `clear`, as Kitchen's taking
+    // a route away; the card names the verb of its whole operation.
+    const clear: AssistantCard = {
+      ...NORMAL,
+      operation: 'cart_checkout.cart.clear',
+      app: 'cart_checkout',
+      app_name: 'Carrito y pago',
+      action: 'clear',
+      fields: [{ name: 'cart_id', label: 'Carrito', kind: 'text', value: 'S-1', titled: true }],
+    };
+    await card(clear);
+    expect(body()).toContain('Vaciar en Carrito y pago: S-1');
+    document.body.innerHTML = '';
+    await card({ ...clear, app_name: 'Cart & Checkout' }, false, 'en');
+    expect(body()).toContain('Clear in Cart & Checkout: S-1');
+    document.body.innerHTML = '';
+    const count: AssistantCard = {
+      ...HIGH,
+      operation: 'cash_register.count.add',
+      app: 'cash_register',
+      app_name: 'Caja',
+      action: 'add',
+      fields: [{ name: 'session_id', label: 'Sesión', kind: 'text', value: '7', titled: true }],
+      count: null,
+      confirm_word: 'CONFIRMAR',
+    };
+    await card(count);
+    expect(body()).toContain('Registrar arqueo en Caja. Revisa cada dato antes de seguir.');
+    expect(body()).not.toContain('Añadir');
+  });
+
   it('a dangerous one sends what the person typed, as typed, for the server to check it again (rv-hub-247)', async () => {
     const { wrapper, dialog } = await card(HIGH);
     dialog.vm.$emit('update:typed', ' 3 ');

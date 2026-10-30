@@ -14,12 +14,14 @@
 // A write that names its session or its drawer by its id (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's
 // half is hub#416): the card says the session by its number and the drawer by its name, as the screens do, never by
 // the id the model sent (and, since hub#416, never left out for whoever may read them) — a count of the open shift and
-// the renaming of a drawer, in Spanish, cancelled: nothing changes.
+// the renaming of a drawer, in Spanish, cancelled: nothing changes. The count's card says «Registrar arqueo», as «Caja»
+// does, never «Añadir» (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART, BASE-F97).
 // What this file creates is deleted after it (its sessions, its drawer, its sale and its product); the settings go back.
 // flow: cash-register-assistant-card
 // flow: CASH_REGISTER-F09
 // flow: CASH_REGISTER-F07
 // flow: BASE-F97
+// flow: base-assistant-card-verbs
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -457,7 +459,7 @@ async function ownerInSpanish(browser: import('@playwright/test').Browser): Prom
   return { context, page };
 }
 
-test('cash-register-assistant-card — in Spanish a count of the open shift by its id names the session by its number, never by its id', async ({ browser }) => {
+test('cash-register-assistant-card, base-assistant-card-verbs — in Spanish a count of the open shift says «Registrar arqueo» and names the session by its number, never by its id', async ({ browser }) => {
   const { context, page } = await ownerInSpanish(browser);
   const shift = await shiftWithACashSale(context, 10000);
   await openPanel(page);
@@ -467,6 +469,8 @@ test('cash-register-assistant-card — in Spanish a count of the open shift by i
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toBeVisible();
     // A count is dangerous: its card lists each datum, the session by its number.
+    await expect(card(page)).toContainText('Registrar arqueo en Caja. Revisa cada dato antes de seguir.');
+    await expect(card(page)).not.toContainText('Añadir');
     await expect(card(page)).toContainText(`Sesión: ${shift.number}`);
     await expect(card(page)).not.toContainText(shift.id);
     await confirmationReady(page);

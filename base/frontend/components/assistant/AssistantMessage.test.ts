@@ -101,6 +101,30 @@ describe('AssistantMessage', () => {
     en.wrapper.unmount();
   });
 
+  it('a receipt says the verb its card said: emptying a cart «Vaciar», taking a line out «Quitar», a cash count the count', async () => {
+    // FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: «Hecho: Quitar en Carrito y pago» for an emptied cart.
+    const executed = [
+      { name: 'cart_checkout.cart.clear', app: 'cart_checkout', app_name: 'Carrito y pago', outcome: 'ok' },
+      { name: 'cart_checkout.item.remove', app: 'cart_checkout', app_name: 'Carrito y pago', outcome: 'cancelled' },
+      { name: 'cash_register.count.add', app: 'cash_register', app_name: 'Caja', outcome: 'ok' },
+    ];
+    const es = await mountBubble(answer({ text: 'Hecho.', executed }));
+    expect(es.wrapper.findAll('[data-testid="assistant-receipt"]').map((row) => row.text())).toEqual([
+      'Hecho: Vaciar en Carrito y pago',
+      'No se hizo, cancelado: Quitar en Carrito y pago',
+      'Hecho: Registrar arqueo en Caja',
+    ]);
+    es.wrapper.unmount();
+    const names = { cart_checkout: 'Cart & Checkout', cash_register: 'Cash register' };
+    const en = await mountBubble(answer({ text: 'Done.', executed }), { appNameOf: (app: string) => names[app as keyof typeof names] }, 'en');
+    expect(en.wrapper.findAll('[data-testid="assistant-receipt"]').map((row) => row.text())).toEqual([
+      'Done: Clear in Cart & Checkout',
+      'Not done, cancelled: Remove in Cart & Checkout',
+      'Done: Register count in Cash register',
+    ]);
+    en.wrapper.unmount();
+  });
+
   it('a receipt names where it happened as the server says it: the platform by its screen, never «base»', async () => {
     // FIX-HUB-BASE-ASSISTANT-CARD-FIELD-LABELS-IN-ENGLISH: the menu has no section «base», so the receipt said «en base».
     const executed = [{ name: 'base.access.settings_update', app: 'base', app_name: 'Ajustes', outcome: 'cancelled' }];
