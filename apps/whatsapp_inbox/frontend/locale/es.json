@@ -216,6 +216,10 @@
         },
         "fileTooHeavy": "Este archivo pesa más de {mb} MB: elige uno más ligero.",
         "fileUploadFailed": "No se pudo subir el archivo. Inténtalo de nuevo.",
+        "previewFailed": {
+          "IMAGE": "No se ha podido mostrar la foto.",
+          "VIDEO": "No se ha podido mostrar el vídeo."
+        },
         "body": "Texto",
         "bodyHint": "Donde va una variable, escribe su número entre dobles llaves, empezando por el 1.",
         "example": "Ejemplo de la variable {n}",

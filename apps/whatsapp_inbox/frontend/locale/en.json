@@ -216,6 +216,10 @@
         },
         "fileTooHeavy": "This file weighs more than {mb} MB: choose a lighter one.",
         "fileUploadFailed": "The file could not be uploaded. Try again.",
+        "previewFailed": {
+          "IMAGE": "The photo could not be shown.",
+          "VIDEO": "The video could not be shown."
+        },
         "body": "Text",
         "bodyHint": "Where a variable goes, write its number between double braces, starting with 1.",
         "example": "Example for variable {n}",
