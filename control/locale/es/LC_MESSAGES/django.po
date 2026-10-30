@@ -140,3 +140,6 @@ msgstr "El prefijo de los dos secretos de Secrets Manager de este clúster (…/
 
 msgid "Empty: its hubs are reached on its writer, directly."
 msgstr "Vacío: a sus hubs se llega por su escritor, directamente."
+
+msgid "leased by"
+msgstr "reservado por"

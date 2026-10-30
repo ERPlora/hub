@@ -32,6 +32,7 @@ Control is written through ``base.services`` only (its doors to the ORM); the da
 
 import datetime as dt
 import logging
+import time
 from collections.abc import Callable, Iterable
 
 from django.utils import timezone
@@ -49,8 +50,9 @@ logger = logging.getLogger(__name__)
 
 #: How long a hub's lease (``hub_due.lease_until``) lasts; every step renews it.
 LEASE = dt.timedelta(seconds=60)
-#: How many due hubs one pass of the worker takes.
+#: How many due hubs one pass of the worker takes, and for how long it goes on taking them (a tick of the worker).
 DUE_BATCH = 20
+DUE_PASS_SECONDS = 30.0
 #: What a seeding writes in the hub's database, inside ``use_hub``.
 Seed = Callable[[Hub], None]
 
@@ -118,14 +120,21 @@ def drop(hub, *, now: dt.datetime | None = None) -> bool:
             services.release_hub(hub.id, timezone.now())
 
 
-def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH) -> int:
-    """The worker's pass over ``hub_due``: take up to ``limit`` hubs due by ``now`` that nobody holds, make the
-    databases still to make (a failed one once its ``next_attempt_at`` came) and drop the demos that ended; how many
-    it worked on. A hub that fails is logged and given back: the others go on."""
+def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: float = DUE_PASS_SECONDS) -> int:
+    """The worker's pass over ``hub_due``: one hub at a time, each leased right before it is worked on (so no lease runs
+    out while it waits its turn), up to ``limit`` hubs or ``budget`` seconds: make the databases still to make (a
+    failed one once its ``next_attempt_at`` came) and drop the demos that ended (a failed drop once its wait is over);
+    how many it worked on. A hub that fails is logged and given back: the others go on."""
     now = now or timezone.now()
+    started = time.monotonic()
     worked = 0
     with use_control():
-        for hub_id in services.claim_due_hubs(now, limit, LEASE):
+        for _ in range(limit):
+            if time.monotonic() - started > budget:
+                break
+            hub_id = services.claim_next_due_hub(now, LEASE)
+            if hub_id is None:
+                break
             try:
                 hub = services.registry_row(hub_id)
                 if hub is None:

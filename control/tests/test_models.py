@@ -95,7 +95,7 @@ def test_a_hub_is_due_once_keyed_by_the_hub():
     due = HubDue.objects.create(hub=hub, due_at=timezone.now())
 
     assert due.pk == hub.pk
-    assert (due.lease_until, due.fiscal_oldest_pending_at) == (None, None)
+    assert (due.lease_until, due.fiscal_oldest_pending_at, due.lease_owner) == (None, None, "")
 
 
 def test_a_hub_is_prepared_in_steps_and_ends_in_steps():

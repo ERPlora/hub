@@ -35,7 +35,9 @@ import hashlib
 import io
 import json
 import logging
+import os
 import secrets
+import socket
 import time
 import unicodedata
 from collections.abc import Callable, Iterable
@@ -1034,58 +1036,74 @@ def registry_row_by_slug(slug: str) -> Hub | None:
     return Hub.objects.select_related("cluster").filter(slug=slug).first()
 
 
-def _leased(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> None:
-    HubDue.objects.filter(pk=hub_id).update(lease_until=now + lease)
+#: This process's name on the leases it holds (``HubDue.lease_owner``): host, pid and a draw of its own.
+LEASE_OWNER = f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(4)}"
 
 
-def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> Hub | None:
-    """Make ``hub_id`` due now and take its lease; ``None`` when someone else holds it (or no such hub)."""
+def _free(now: dt.datetime) -> Q:
+    return Q(lease_until__isnull=True) | Q(lease_until__lte=now)
+
+
+def _leased(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> None:
+    """Renew ``owner``'s lease of ``hub_id``; ``ProvisioningStopped`` when it is no longer ``owner``'s (it ran out and
+    another worker took it): nothing more is written for it here."""
+    if not HubDue.objects.filter(pk=hub_id, lease_owner=owner).update(lease_until=now + lease):
+        raise ProvisioningStopped(f"the lease of {hub_id} is no longer {owner}'s: another worker holds it now.")
+
+
+def _take(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> None:
+    HubDue.objects.filter(pk=hub_id).update(lease_until=now + lease, lease_owner=owner)
+
+
+def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> Hub | None:
+    """Make ``hub_id`` due now and take its lease for ``owner`` (this process); ``None`` when someone else holds it
+    (or no such hub)."""
     with _control_transaction():
         hub = Hub.objects.filter(pk=hub_id).first()
         if hub is None:
             return None
         HubDue.mark_due(hub, now)
-        free = (
-            HubDue.objects.select_for_update(skip_locked=True)
-            .filter(pk=hub_id)
-            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now))
-            .exists()
-        )
+        free = HubDue.objects.select_for_update(skip_locked=True).filter(_free(now), pk=hub_id).exists()
         if not free:
             return None
-        _leased(hub_id, now, lease)
+        _take(hub_id, now, lease, owner)
     return registry_row(hub_id)
 
 
-def claim_due_hubs(now: dt.datetime, limit: int, lease: dt.timedelta) -> list[UUID]:
-    """Take the lease of up to ``limit`` hubs due by ``now`` that nobody holds, the longest due first."""
+def claim_next_due_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
+    """Take for ``owner`` the lease of the hub due longest by ``now`` that nobody holds: one at a time, right before
+    it is worked on, so no lease runs out while it waits its turn in a pass."""
     with _control_transaction():
-        due = list(
+        due = (
             HubDue.objects.select_for_update(skip_locked=True)
-            .filter(due_at__lte=now)
-            .filter(Q(lease_until__isnull=True) | Q(lease_until__lte=now))
+            .filter(_free(now), due_at__lte=now)
             .order_by("due_at")
-            .values_list("hub_id", flat=True)[:limit]
+            .values_list("hub_id", flat=True)
+            .first()
         )
-        HubDue.objects.filter(pk__in=due).update(lease_until=now + lease)
+        if due is None:
+            return None
+        _take(due, now, lease, owner)
     return due
 
 
-def release_hub(hub_id: UUID, now: dt.datetime) -> None:
-    """Give the lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop: at its
-    ``next_attempt_at`` when the last try failed), else gone."""
+def release_hub(hub_id: UUID, now: dt.datetime, *, owner: str = LEASE_OWNER) -> None:
+    """Give ``owner``'s lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop: at its
+    ``next_attempt_at`` when the last try failed), else gone. A lease that is no longer ``owner``'s is left alone."""
     with _control_transaction():
         hub = Hub.objects.filter(pk=hub_id).first()
-        due = HubDue.objects.select_for_update().filter(pk=hub_id)
+        due = HubDue.objects.select_for_update().filter(pk=hub_id, lease_owner=owner)
+        if not due.exists():
+            return
         if hub is not None and (
             hub.status == Hub.Status.FAILED or (hub.status == Hub.Status.DROPPING and hub.next_attempt_at)
         ):
-            due.update(due_at=hub.next_attempt_at or now, lease_until=None)
+            due.update(due_at=hub.next_attempt_at or now, lease_until=None, lease_owner="")
         elif hub is not None and (
             hub.status in registry.PREPARING_STATUSES
             or (hub.is_demo and hub.status in (Hub.Status.EXPIRED, Hub.Status.DROPPING))
         ):
-            due.update(due_at=now, lease_until=None)
+            due.update(due_at=now, lease_until=None, lease_owner="")
         else:
             due.delete()
 
@@ -1129,23 +1147,34 @@ def _preparing(hub_id: UUID, now: dt.datetime) -> Hub:
     return hub
 
 
-def provision_step(hub_id: UUID, status: str, now: dt.datetime, lease: dt.timedelta) -> Hub:
-    """Note that ``hub_id`` is at the step ``status`` of its preparation and renew its lease;
-    ``ProvisioningStopped`` when it left its preparation meanwhile."""
+def provision_step(
+    hub_id: UUID, status: str, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER
+) -> Hub:
+    """Note that ``hub_id`` is at the step ``status`` of its preparation and renew ``owner``'s lease;
+    ``ProvisioningStopped`` when it left its preparation meanwhile or the lease is no longer ``owner``'s."""
     with _control_transaction():
         hub = _preparing(hub_id, now)
+        _leased(hub_id, now, lease, owner)
         if hub.status != status:
             hub.status = status
             hub.save(update_fields=["status", "updated_at"])
-        _leased(hub_id, now, lease)
     return hub
 
 
-def provision_ready(hub_id: UUID, now: dt.datetime, schema_apps: dict[str, str], *, tell_saas: bool = True) -> Hub:
+def provision_ready(
+    hub_id: UUID,
+    now: dt.datetime,
+    schema_apps: dict[str, str],
+    *,
+    tell_saas: bool = True,
+    owner: str = LEASE_OWNER,
+) -> Hub:
     """``hub_id`` is ready: its schema as the migrator left it; a business's SaaS hears it after the COMMIT (unless
-    ``tell_saas`` is false: the local hubs)."""
+    ``tell_saas`` is false: the local hubs). ``ProvisioningStopped`` if the lease is no longer ``owner``'s."""
     with _control_transaction():
         hub = _preparing(hub_id, now)
+        if not HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists():
+            raise ProvisioningStopped(f"the lease of {hub_id} is no longer {owner}'s: another worker holds it now.")
         hub.status, hub.ready_at = Hub.Status.READY, now
         hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
         hub.schema_apps, hub.schema_state = schema_apps, Hub.SchemaState.CURRENT
@@ -1167,14 +1196,16 @@ def provision_ready(hub_id: UUID, now: dt.datetime, schema_apps: dict[str, str],
     return hub
 
 
-def provision_failed(hub_id: UUID, now: dt.datetime, error: str) -> Hub | None:
+def provision_failed(hub_id: UUID, now: dt.datetime, error: str, *, owner: str = LEASE_OWNER) -> Hub | None:
     """The preparation of ``hub_id`` failed with ``error``: ``failed``, tried again after :func:`retry_delay`.
 
-    ``None`` when the hub left its preparation meanwhile: nothing to try again."""
+    ``None`` when the hub left its preparation meanwhile, or its lease is no longer ``owner``'s: nothing is noted."""
     with _control_transaction():
         try:
             hub = _preparing(hub_id, now)
         except ProvisioningStopped:
+            return None
+        if not HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists():
             return None
         hub.attempts += 1
         hub.status, hub.last_error = Hub.Status.FAILED, error[:LAST_ERROR_MAX]
@@ -1184,7 +1215,7 @@ def provision_failed(hub_id: UUID, now: dt.datetime, error: str) -> Hub | None:
     return hub
 
 
-def demo_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> Hub | None:
+def demo_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> Hub | None:
     """The demo ``hub_id``, which ended, is being dropped (``dropping``, its lease renewed); ``None`` if it is no demo
     that ended, was purged already, or whose last drop failed and waits for its ``next_attempt_at``.
 
@@ -1195,20 +1226,20 @@ def demo_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> Hub | 
             return None
         if hub.status == Hub.Status.DROPPING and hub.next_attempt_at is not None and hub.next_attempt_at > now:
             return None
+        _leased(hub_id, now, lease, owner)
         if hub.status != Hub.Status.DROPPING:
             hub.status = Hub.Status.DROPPING
             hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
             hub.save(update_fields=["status", "attempts", "last_error", "next_attempt_at", "updated_at"])
-        _leased(hub_id, now, lease)
     return hub
 
 
-def demo_drop_failed(hub_id: UUID, now: dt.datetime, error: str) -> None:
+def demo_drop_failed(hub_id: UUID, now: dt.datetime, error: str, *, owner: str = LEASE_OWNER) -> None:
     """The drop of the demo ``hub_id`` failed with ``error``: noted, and tried again after :func:`retry_delay` (its
-    ``hub_due`` waits for it: never every tick)."""
+    ``hub_due`` waits for it: never every tick). Nothing is noted once its lease is no longer ``owner``'s."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().filter(pk=hub_id, status=Hub.Status.DROPPING).first()
-        if hub is None:
+        if hub is None or not HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists():
             return
         hub.attempts += 1
         hub.last_error = f"drop_failed: {error}"[:LAST_ERROR_MAX]

@@ -207,7 +207,9 @@ class HubDue(models.Model):
     """When a hub has work due in the worker (PLAN-DB §8): its outbox, tasks, fiscal sending or activations.
 
     One row per hub, keyed by it: ``mark_due`` moves ``due_at`` earlier, the worker takes the due ones with
-    ``SKIP LOCKED`` and a lease (``lease_until``), and ``fiscal_oldest_pending_at`` feeds the oldest-pending metric.
+    ``SKIP LOCKED`` and a lease (``lease_until``) that is its process's (``lease_owner``): only its holder renews or
+    gives it back, so a worker whose lease ran out and was taken over never writes over the one that took it.
+    ``fiscal_oldest_pending_at`` feeds the oldest-pending metric.
     """
 
     hub = models.OneToOneField(
@@ -215,6 +217,7 @@ class HubDue(models.Model):
     )
     due_at = models.DateTimeField(_("due at"))
     lease_until = models.DateTimeField(_("leased until"), null=True, blank=True)
+    lease_owner = models.CharField(_("leased by"), max_length=128, blank=True, default="", db_default="")
     fiscal_oldest_pending_at = models.DateTimeField(_("oldest fiscal record pending since"), null=True, blank=True)
 
     class Meta:

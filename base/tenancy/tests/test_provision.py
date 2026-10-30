@@ -457,6 +457,54 @@ def test_a_hub_without_a_name_for_its_database_fails_readably_and_nothing_reache
     assert told == []
 
 
+# ── The lease is its holder's (review of hub#471, I2) ──────────────────────────────────────────────────────────────
+
+
+def test_a_lease_another_worker_took_over_once_it_expired_is_never_touched_by_its_first_holder(registry, told):
+    hub = registry.hub()
+    now = timezone.now()
+    assert services.claim_hub(hub.pk, now, provision.LEASE, owner="worker-1") is not None
+    later = now + provision.LEASE + dt.timedelta(seconds=1)
+    assert services.claim_hub(hub.pk, later, provision.LEASE, owner="worker-2") is not None
+
+    with pytest.raises(services.ProvisioningStopped, match="lease"):
+        services.provision_step(hub.pk, Hub.Status.CREATING, later, provision.LEASE, owner="worker-1")
+    assert services.provision_failed(hub.pk, later, "too late", owner="worker-1") is None
+    services.release_hub(hub.pk, later, owner="worker-1")
+
+    due = HubDue.objects.get(pk=hub.pk)
+    assert (due.lease_owner, due.lease_until) == ("worker-2", later + provision.LEASE)
+    assert (fresh(hub).status, fresh(hub).attempts) == ("requested", 0)
+
+
+def test_a_lease_is_never_taken_while_its_holder_keeps_it(registry, told):
+    hub = registry.hub()
+    now = timezone.now()
+    services.claim_hub(hub.pk, now, provision.LEASE, owner="worker-1")
+
+    assert services.claim_hub(hub.pk, now + dt.timedelta(seconds=30), provision.LEASE, owner="worker-2") is None
+    assert services.claim_next_due_hub(now + dt.timedelta(seconds=30), provision.LEASE, owner="worker-2") is None
+
+
+def test_the_due_pass_leases_one_hub_at_a_time_right_before_it_works_on_it(registry, monkeypatch, told):
+    first, second = registry.hub(), registry.hub()
+    now = timezone.now()
+    HubDue.mark_due(first, now - dt.timedelta(seconds=2))
+    HubDue.mark_due(second, now - dt.timedelta(seconds=1))
+    seen = []
+
+    def prepare(hub_id, **kwargs):
+        other = second if hub_id == first.pk else first
+        seen.append((hub_id, HubDue.objects.get(pk=other.pk).lease_owner))
+
+    monkeypatch.setattr(provision, "_prepare", prepare)
+
+    assert provision.run_due(now) == 2
+
+    # While the first is worked on, the second is nobody's yet: its lease starts when its turn comes.
+    assert seen[0] == (first.pk, "")
+
+
 # ── More apps than the template's, and a/b's own databases once every app can have one (seed_local_hubs) ────────────
 
 
