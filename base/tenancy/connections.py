@@ -4,7 +4,7 @@ A hub with a database of its own (``Hub.db_name``) gets its alias, ``hub_<hex of
 time a process uses it: a copy of the static ``hub_template`` alias (``config/settings.py``: the PgBouncer sidecar in
 transaction mode, no pool, ``CONN_MAX_AGE`` 0, no server-side cursors, no prepared statements) with the hub's database
 as ``NAME`` and, for a hub on a :class:`control.models.Cluster`, that cluster's PgBouncer. Its ``NAME`` is the row's
-``db_name`` (pre's ``pre_hub_<hex>``, a demo's ``demo_<hex>``), never derived from the id; an alias already
+``db_name`` (pre's ``pre_hub_<hex>``, a demo's ``<control>_demo_<hex>``), never derived from the id; an alias already
 registered with another database is refused (``HubAliasConflict``): every thread keeps its connection to the first
 one, so a hub moved to another database needs the process restarted.
 
@@ -13,18 +13,26 @@ dict with the alias is swapped in, under a lock, after looking again. A hub of t
 phase 1 until S5) stays on ``default``.
 
 The migrator's alias, ``<db_name>__ddl`` (PLAN-DB §4 and §7), is the same database reached directly, without
-PgBouncer and without the control database's pool: only the migrator and the tests' template builder use it.
+PgBouncer and without the control database's pool, as the migrator's role (``settings.DB_MIGRATOR_USER``; the default
+connection's where it is not set): only the migrator, the provisioning (``base.tenancy.provision``) and the tests'
+template builder use it. :func:`migrator_conninfo` is the same connection in libpq's terms, for ``psycopg`` itself
+(``base.tenancy.ops``: ``CREATE``/``DROP DATABASE`` on the maintenance database ``postgres``).
 """
 
 import copy
 import threading
 
+from django.conf import settings as django_settings
 from django.db import DEFAULT_DB_ALIAS, connections
 
 from base.tenancy import names
 
 #: The static alias every hub's alias is copied from; nobody connects to it.
 TEMPLATE_ALIAS = "hub_template"
+#: Options of a Django alias that are Django's or psycopg's, not libpq's.
+NON_LIBPQ_OPTIONS = frozenset(
+    {"pool", "isolation_level", "assume_role", "cursor_factory", "context", "prepare_threshold", "server_side_binding"}
+)
 
 _lock = threading.Lock()
 
@@ -73,12 +81,38 @@ def register_hub_alias(hub) -> str:
     return _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides))
 
 
+def _migrator_role() -> tuple[str, str]:
+    """The migrator's user and password: ``DB_MIGRATOR_USER``/``_PASSWORD``, or the default connection's."""
+    if django_settings.DB_MIGRATOR_USER:
+        return django_settings.DB_MIGRATOR_USER, django_settings.DB_MIGRATOR_PASSWORD
+    default = connections.settings[DEFAULT_DB_ALIAS]
+    return default["USER"], default["PASSWORD"]
+
+
+def migrator_conninfo(dbname: str) -> dict:
+    """The migrator's direct connection to ``dbname`` in libpq's terms (``psycopg.connect(**…)``): the default
+    connection's server, TLS and timeout, the migrator's role, no pool."""
+    default = connections.settings[DEFAULT_DB_ALIAS]
+    user, password = _migrator_role()
+    options = {key: value for key, value in default["OPTIONS"].items() if key not in NON_LIBPQ_OPTIONS}
+    return {**options, "dbname": dbname, "host": default["HOST"], "port": default["PORT"], "user": user, "password": password}
+
+
 def register_ddl_alias(db_name: str) -> str:
-    """The migrator's alias of the database ``db_name`` (``<db_name>__ddl``): direct, no pool, closed after use."""
+    """The migrator's alias of the database ``db_name`` (``<db_name>__ddl``): direct, as the migrator's role, no pool,
+    closed after use."""
     names.validate(db_name, control=control_name())
 
     def build() -> dict:
-        settings = _copied(DEFAULT_DB_ALIAS, NAME=db_name, CONN_MAX_AGE=0, DISABLE_SERVER_SIDE_CURSORS=True)
+        user, password = _migrator_role()
+        settings = _copied(
+            DEFAULT_DB_ALIAS,
+            NAME=db_name,
+            USER=user,
+            PASSWORD=password,
+            CONN_MAX_AGE=0,
+            DISABLE_SERVER_SIDE_CURSORS=True,
+        )
         settings["OPTIONS"].pop("pool", None)
         return settings
 

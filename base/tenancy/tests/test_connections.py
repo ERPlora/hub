@@ -91,7 +91,7 @@ def test_registering_again_changes_nothing():
 def test_an_alias_never_moves_to_another_database_while_the_process_runs():
     hub = hub_with_database()
     connections.register_hub_alias(hub)
-    hub.db_name = names.demo_db_name(hub.id)
+    hub.db_name = names.demo_db_name(connections.control_name(), hub.id)
 
     with pytest.raises(connections.HubAliasConflict):
         connections.register_hub_alias(hub)
