@@ -1,7 +1,8 @@
 // Test helper of base's Home and its pieces of the chrome: the SDK's live harness (fake clock, fake network
 // serving the stream and the API) on the hub's generated op → route map, the shell's i18n with base's
-// catalogues merged in, a session, the shell's config, a memory router with the routes a test names and Ionic's
-// router API on it (`useIonRouter`).
+// catalogues and the shared assistant's words merged in, the assistant configured as the Hub's (both as main.ts
+// does), a session, the shell's config, a memory router with the routes a test names and Ionic's router API on it
+// (`useIonRouter`).
 import {
   createShellI18n,
   provideSession,
@@ -10,6 +11,7 @@ import {
   type SessionStatus,
   type ShellSidebar,
 } from '@erplora/ui/shell';
+import { assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { mount } from '@vue/test-utils';
 import { vi } from 'vitest';
@@ -24,11 +26,14 @@ import {
   type StreamCall,
 } from '../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
+import { HUB_ASSISTANT } from '../lib/assistant-hub';
 import type { Business } from '../operations';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+
+configureAssistant(HUB_ASSISTANT);
 
 export const OWNER: SessionMe = {
   user: { id: 'u1', label: 'Ana' },
@@ -145,7 +150,13 @@ export async function mountBase(component: Component, options: MountOptions = {}
     props: options.props,
     attachTo: document.body,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
+      plugins: [
+        router,
+        createShellI18n({
+          locale: options.locale ?? 'en',
+          messages: { en: { ...assistantMessages.en, ...en }, es: { ...assistantMessages.es, ...es } },
+        }),
+      ],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client, navManager: ionRouter },
       stubs: options.stubs,
     },

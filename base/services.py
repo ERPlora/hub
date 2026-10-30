@@ -1357,21 +1357,13 @@ def has_own_database(hub: Hub | None) -> bool:
     },
 )
 def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
-    """The plan of what each app would lose, or empty the apps chosen with the business's name typed (BASE-G109)."""
+    """The plan of what each app would lose, or empty the apps chosen with the business's name typed (BASE-G109).
+
+    Without the business's own database the reset is refused before anything of it is read (PLAN-DB §14.14)."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        confirm_with = hub.name.strip() if hub and hub.name.strip() else ctx.scope.key
-        sections = blueprint.reset_plan(ctx)
-        answer = {
-            "dry_run": data.dry_run,
-            "confirm_with": confirm_with,
-            "available": has_own_database(hub),
-            "sections": sections,
-            "apps": [],
-        }
-        if data.dry_run:
-            return answer
-        if not answer["available"]:
+        available = has_own_database(hub)
+        if not data.dry_run and not available:
             raise Conflict(
                 gettext(
                     "Resetting the business is not available yet. Undo a load instead, or remove what you want "
@@ -1379,6 +1371,17 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
                 ),
                 code="base.reset_shared_database",
             )
+        confirm_with = hub.name.strip() if hub and hub.name.strip() else ctx.scope.key
+        sections = blueprint.reset_plan(ctx)
+        answer = {
+            "dry_run": data.dry_run,
+            "confirm_with": confirm_with,
+            "available": available,
+            "sections": sections,
+            "apps": [],
+        }
+        if data.dry_run:
+            return answer
         chosen = list(dict.fromkeys(data.apps))
         offered = {section["id"] for section in sections}
         if not chosen or not set(chosen) <= offered:
@@ -2230,12 +2233,17 @@ API_KEY_LAST_USE_EVERY = dt.timedelta(minutes=1)
 def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyCaller | None":
     """The caller of ``token`` on the published operation ``op``, in the request's hub (``base.api_keys.KeyDoor``).
 
-    ``None`` (the session's door goes on) on a business that shares phase 1's database, or for a token nobody issued
-    here (counted against the address); 429 once the address tried too many, or the key passed its pace; 403 when the
-    key may not do this on this app."""
+    401 ``base.api_keys_unavailable`` on a business that shares phase 1's database, where no key exists: a request
+    that brings one is refused for that reason, never let through by a session (PLAN-DB §14.14). ``None`` (the
+    session's door goes on) without a hub, or for a token nobody issued here (counted against the address); 429 once
+    the address tried too many, or the key passed its pace; 403 when the key may not do this on this app."""
     hub = getattr(request, "hub", None)
-    if not has_own_database(hub):
+    if hub is None:
         return None
+    if not has_own_database(hub):
+        raise Unauthorized(
+            gettext("API keys are not available yet for this business."), code="base.api_keys_unavailable"
+        )
     address = client_key(request)
     wait = api_keys.KEY_ADDRESS_LIMIT.wait(hub.slug, address)
     if wait:

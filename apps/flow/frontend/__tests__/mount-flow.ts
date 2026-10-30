@@ -1,9 +1,10 @@
 // Test helper of the flow app's pages and components, as `mount-task.ts` is the task app's: the SDK's
 // live harness (fake clock, fake network serving the stream and the API) on the hub's op → route map,
-// the shell's i18n with the flow catalogues merged in (and base's, as the shell merges every app's: the assistant's
-// card speaks with base's words), a session and a memory router.
+// the shell's i18n with the flow catalogues merged in (and base's and the shared assistant's, as the shell merges them:
+// the assistant's card speaks with their words), a session and a memory router.
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `IonModalStub`
 // (imported from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
+import { assistantMessages } from '@erplora/ui/components';
 import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/shell';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
@@ -73,7 +74,13 @@ export async function mountFlow(component: Component, options: MountOptions = {}
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } })],
+      plugins: [
+        router,
+        createShellI18n({
+          locale: options.locale ?? 'en',
+          messages: { en: { ...assistantMessages.en, ...baseEn, ...en }, es: { ...assistantMessages.es, ...baseEs, ...es } },
+        }),
+      ],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },
