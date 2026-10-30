@@ -124,6 +124,11 @@ export interface ReservationOut {
   updated_at: string;
 }
 
+/** A read by id also says the words the book names it by, in the caller's language (the assistant's card says them). */
+export interface ReservationDetailOut extends ReservationOut {
+  label: string;
+}
+
 export interface ReleasedOut {
   released: number;
 }
@@ -141,6 +146,10 @@ export interface BlockedDateOut {
   is_full_day: boolean;
   blocked_from: string | null;
   blocked_until: string | null;
+}
+
+export interface BlockedDateDetailOut extends BlockedDateOut {
+  label: string;
 }
 
 export interface SpanOut {
@@ -230,6 +239,10 @@ export interface TimeSlotOut {
   max_covers: number | null;
 }
 
+export interface TimeSlotDetailOut extends TimeSlotOut {
+  label: string;
+}
+
 export interface BlockedDateListIn extends PageIn {
   date_from?: string;
   date_to?: string;
@@ -307,6 +320,10 @@ export interface WaitlistOut {
   created_at: string;
 }
 
+export interface WaitlistDetailOut extends WaitlistOut {
+  label: string;
+}
+
 export interface ConvertedOut {
   entry: WaitlistOut;
   reservation: ReservationOut;
@@ -342,7 +359,7 @@ export interface SettingsOut {
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'reservation.reservation.list': { input: ReservationListIn; output: Page<ReservationOut> };
-    'reservation.reservation.get': { input: ReservationRefIn; output: ReservationOut };
+    'reservation.reservation.get': { input: ReservationRefIn; output: ReservationDetailOut };
     'reservation.reservation.create': { input: ReservationIn; output: ReservationOut };
     'reservation.reservation.update': { input: ReservationPatchIn; output: ReservationOut };
     'reservation.reservation.confirm': { input: ReservationRefIn; output: ReservationOut };
@@ -355,12 +372,15 @@ declare module '@erplora/ui/sdk' {
     'reservation.availability.day': { input: DayIn; output: DayOut };
     'reservation.availability.tables': { input: TablesIn; output: FreeTablesOut };
     'reservation.time_slot.list': { input: TimeSlotListIn; output: Page<TimeSlotOut> };
+    'reservation.time_slot.get': { input: TimeSlotRefIn; output: TimeSlotDetailOut };
     'reservation.time_slot.create': { input: TimeSlotIn; output: TimeSlotOut };
     'reservation.time_slot.delete': { input: TimeSlotRefIn; output: DeletedOut };
     'reservation.blocked_date.list': { input: BlockedDateListIn; output: Page<BlockedDateOut> };
+    'reservation.blocked_date.get': { input: BlockedDateRefIn; output: BlockedDateDetailOut };
     'reservation.blocked_date.create': { input: BlockedDateIn; output: BlockedDateOut };
     'reservation.blocked_date.delete': { input: BlockedDateRefIn; output: DeletedOut };
     'reservation.waitlist.list': { input: WaitlistListIn; output: Page<WaitlistOut> };
+    'reservation.waitlist.get': { input: WaitlistRefIn; output: WaitlistDetailOut };
     'reservation.waitlist.create': { input: WaitlistIn; output: WaitlistOut };
     'reservation.waitlist.update': { input: WaitlistPatchIn; output: WaitlistOut };
     'reservation.waitlist.convert': { input: WaitlistConvertIn; output: ConvertedOut };

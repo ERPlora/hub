@@ -309,7 +309,6 @@ UNNAMED_REFERENCES = {
     "payment": 9,
     "pricing": 25,
     "printing": 11,
-    "reservation": 18,
     "sale": 101,
     "schedule": 4,
     "service": 35,
