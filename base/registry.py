@@ -21,10 +21,16 @@ from base.schemas import HubOut
 #: The scope of the registry's operations (``base.hub.*``): the platform's, never a hub's.
 REGISTRY_SCOPE = Scope("platform", "registry")
 
-#: The statuses of a hub that ended: its host answers 410.
-GONE_STATUSES = frozenset({Hub.Status.CANCELLED, Hub.Status.EXPIRED, Hub.Status.PURGED})
-#: The statuses of a hub still being prepared: its host answers 503 and asks to try again.
-PREPARING_STATUSES = frozenset({Hub.Status.REQUESTED, Hub.Status.FAILED})
+#: The statuses of a hub that ended (its way out included: a business archived and dropped, a demo dropped): its host
+#: answers 410.
+GONE_STATUSES = frozenset(
+    {Hub.Status.CANCELLED, Hub.Status.ARCHIVING, Hub.Status.EXPIRED, Hub.Status.DROPPING, Hub.Status.PURGED}
+)
+#: The statuses of a hub still being prepared (its database made, its schema checked, its sign-up seeded, or a failed
+#: step waiting for its retry; PLAN-DB §6): its host answers 503 and asks to try again.
+PREPARING_STATUSES = frozenset(
+    {Hub.Status.REQUESTED, Hub.Status.CREATING, Hub.Status.MIGRATING, Hub.Status.SEEDING, Hub.Status.FAILED}
+)
 
 
 def hub_by_slug(slug: str) -> Hub | None:
@@ -61,7 +67,7 @@ def is_suspended(hub: Hub) -> bool:
 
 
 def is_preparing(hub: Hub) -> bool:
-    """Whether ``hub`` is not ready yet (requested, or its preparation failed and is retried)."""
+    """Whether ``hub`` is not ready yet (requested, being prepared, or its preparation failed and is retried)."""
     return hub.status in PREPARING_STATUSES
 
 
