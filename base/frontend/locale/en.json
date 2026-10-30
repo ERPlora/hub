@@ -1249,6 +1249,7 @@
           "fail": "Mark as failed",
           "fire": "Send to the kitchen",
           "fire_due": "Start",
+          "flag": "Flag for attention",
           "forget_category": "Remove",
           "forget_customer": "Forget the customer",
           "forget_group": "Remove",

@@ -52,7 +52,8 @@
       "goToSettings": "Ir a Ajustes",
       "capReached": "Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.",
       "notIncluded": "Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se puede enviar nada hasta que mejores el plan.",
-      "erased": "Se han borrado los datos de este número."
+      "erased": "Se han borrado los datos de este número.",
+      "needsAttention": "Necesita atención"
     },
     "conversation": {
       "close": "Cerrar",
@@ -294,6 +295,39 @@
         "disconnectStays": "Las conversaciones guardadas no se tocan.",
         "disconnected": "WhatsApp desconectado.",
         "noNumber": "erplora.com no tenía ningún número conectado para este negocio."
+      }
+    },
+    "autoReplies": {
+      "title": "¿Para qué lo usas?",
+      "loadError": "No se pudieron cargar las respuestas automáticas.",
+      "on": "Activa",
+      "off": "Desactivada",
+      "turnOn": "Activar",
+      "turnOff": "Desactivar",
+      "notNow": "Ahora no",
+      "onlyOwner": "Solo un dueño o un administrador puede activarlo.",
+      "needsApp": "“{name}” necesita la aplicación {apps}.",
+      "seeApps": "Ver aplicaciones",
+      "outdated": "Hay una versión mejorada de esta respuesta automática.",
+      "update": "Actualizar",
+      "updateTitle": "Actualizar la respuesta automática",
+      "updateConfirm": "La nueva sustituye a la actual, también los cambios hechos a mano, y seguirá encendida o en pausa como esté.",
+      "updated": "Hecho: esta respuesta automática ya funciona con la última versión.",
+      "gone": "Esta respuesta automática ya no existe aquí: vuelve a activarla.",
+      "updateFailed": "No se pudo actualizar. Inténtalo otra vez.",
+      "reviewFirst": "Las reviso yo antes",
+      "apps": {
+        "flow": "Automatizaciones",
+        "customer": "Clientes"
+      },
+      "tables": {
+        "name": "Reservar mesa",
+        "explain": "WhatsApp contesta solo: mira las mesas libres, reserva la mesa de quien escribe cuando tú dices que sí y le contesta.",
+        "confirm": "WhatsApp contestará solo: mira las mesas libres, reserva la mesa de quien escribe cuando tú digas que sí y le contesta. ¿Lo activas?",
+        "done": "Listo. Escríbete desde otro móvil: “quiero mesa para dos mañana”.",
+        "confirmSelf": "Las reservas se confirman solas",
+        "review": "Cada reserva nueva te espera en Reservas con “Confirmar”.",
+        "confirmError": "No se pudo guardar cómo se confirman las reservas. Inténtalo otra vez."
       }
     }
   }

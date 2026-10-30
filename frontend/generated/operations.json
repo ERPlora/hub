@@ -1963,9 +1963,17 @@
     "method": "post",
     "path": "/api/whatsapp_inbox/conversations/erase"
   },
+  "whatsapp_inbox.conversation.flag": {
+    "method": "post",
+    "path": "/api/whatsapp_inbox/conversations/flag"
+  },
   "whatsapp_inbox.message.list": {
     "method": "get",
     "path": "/api/whatsapp_inbox/messages"
+  },
+  "whatsapp_inbox.message.get": {
+    "method": "get",
+    "path": "/api/whatsapp_inbox/messages/detail"
   },
   "whatsapp_inbox.message.send": {
     "method": "post",

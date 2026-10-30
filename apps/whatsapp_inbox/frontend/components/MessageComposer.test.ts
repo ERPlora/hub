@@ -34,6 +34,7 @@ const conversation = (over: Partial<ConversationDetailOut> = {}): ConversationDe
   last_message_direction: 'inbound',
   last_message_kind: 'text',
   last_inbound_at: '2026-10-15T09:50:00Z',
+  flagged: false,
   created_at: '2026-10-15T09:50:00Z',
   window_open: true,
   window_expires_at: '2026-10-16T09:50:00Z',
