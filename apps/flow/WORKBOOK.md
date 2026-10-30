@@ -866,7 +866,8 @@ Entra: la decisión y la nota (por voz: «aprueba la devolución de Ana»), con 
 tarjeta del asistente nombra la pregunta por lo que pregunta, nunca por su código.
 Sale: la respuesta con quién, cuándo y la nota (`flow.question.answered`). Un sí sigue con los pasos
 siguientes, que pueden leer «Aprobada», «Nota» y «Contestada por»; un no hace lo que dice el paso: para la
-ejecución («Cancelada: Marta contestó que no a «…».») o sigue. El historial dice «Marta contestó que sí:
+ejecución («Cancelada: Marta contestó que no a «…».»; en un cambio del asistente, «…» es su acción, «Anular una
+reserva», en el idioma de quien lee el historial) o sigue. El historial dice «Marta contestó que sí:
 «…»». Quien lleva el negocio ve todas; un responsable, las de los responsables y los empleados; un
 empleado, las de los empleados.
 Si falla: la tarjeta se queda con el motivo: «Alguien ya contestó a esta. No se ha hecho nada dos veces.»
@@ -887,8 +888,9 @@ Pasos:
 2. Las cierra como caducadas y hace lo que dice su paso: contarlo como un no (lo que haga un no), parar o
    seguir con los pasos siguientes.
 Entra: las preguntas que esperan, con su plazo.
-Sale: la pregunta caducada (`flow.question.expired`) y su ejecución cancelada («Cancelada: nadie contestó
-«…» a tiempo.») o seguida, con «Caducado» para un «Solo sigue si…» posterior; el historial dice «Nadie contestó
+Sale: la pregunta caducada (`flow.question.expired`) y su ejecución cancelada («Cancelada: nadie contestó a
+tiempo «…».»; en un cambio del asistente, FLOW-F38, «…» es su acción, «Reservar una cita», en el idioma de quien
+lee el historial) o seguida, con «Caducado» para un «Solo sigue si…» posterior; el historial dice «Nadie contestó
 a tiempo». Un segundo repaso no vuelve a cerrar nada.
 Si falla: una pregunta vencida que aún no ha cerrado el repaso ya no se puede contestar; si la automatización
 está en pausa y tocaba seguir, la ejecución se cancela («Cancelada: la automatización se puso en pausa
@@ -1093,7 +1095,8 @@ Pasos:
      cambio hecho, o lo que la acción no aceptó, y que los demás no se han hecho), para que lo cuente o pida el
      siguiente, que vuelve a esperar su sí; la ejecución no sigue hasta que contesta sin pedir nada. Esa vuelta no
      gasta otro mensaje si el sí llega en 15 minutos; más tarde cuenta como una primera vuelta (un mensaje del mes,
-     FLOW-F39). Un no, o nadie contesta en 72 horas, cancela la ejecución sin hacer nada (FLOW-F29, F30).
+     FLOW-F39). Un no, o nadie contesta en 72 horas, cancela la ejecución sin hacer nada, y el historial dice la
+     acción que no se hizo («Cancelada: Marta contestó que no a «Anular una reserva».», FLOW-F29, F30).
      «Anular una reserva» solo la aprueba quien también puede anular reservas: a cualquier otro se le dice «Solo
      puede decir que sí a «Anular una reserva» quien también puede hacerlo.» y la pregunta sigue esperando;
    - con «Que lo haga por su cuenta», se hace en el acto, como la automatización, con las mismas comprobaciones
@@ -1355,7 +1358,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `action`, con `queries.action_label` (el nombre del historial: `flow.actions.<op>` de `frontend/locale`; sin él,
   su verbo, su app y su cosa, nunca vacío ni el nombre de la operación); así lo dice también una pregunta guardada
   antes, sin migración. Una pregunta de «Preguntar antes a alguien», o cuya acción ya no existe, lleva `action`
-  vacío y su título tal cual. `QuestionInbox.vue` la pinta justo debajo del título. Mercado: la tarjeta de
+  vacío y su título tal cual. `QuestionInbox.vue` la pinta justo debajo del título. Un no o el silencio a ese
+  cambio guardan en el motivo de la ejecución (`flow.question_rejected`, `flow.question_expired`) también su
+  `operation` (`services._asked_for`, con `queries.proposal_held`), y `queries.say` dice entonces su acción en lugar
+  del título (`NAMED_BY_ITS_ACTION`), en el idioma de quien lee el historial; sin la acción, el título guardado. Mercado: la tarjeta de
   confirmación del chat de `base` («¿Ejecutar esta acción?» y debajo la acción), Intercom Fin (título fijo «Fin
   requires your decision» y debajo la pregunta), Copilot Studio, Square Managerbot y Shopify Sidekick (lo que va a
   hacer antes de aprobar), el diálogo de herramientas de VS Code (el nombre de la herramienta) y Toast (la

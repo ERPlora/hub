@@ -73,6 +73,7 @@ from apps.flow.queries import (
     can_answer,
     TURN,
     ASSISTANT_WANTS,
+    proposal_held,
     PERSON_PARAMS,
     words_for,
 )
@@ -786,6 +787,13 @@ def _own(code: str, key: str = "", *, fields: dict | None = None, technical: str
     automation's) and kept by name and values for whoever reads it later."""
     reason = {"key": key or code, "values": values}
     return StepFailed(code, say(reason), fields=fields, technical=technical, reason=reason)
+
+
+def _asked_for(run: FlowRun) -> dict[str, str]:
+    """For the reason of a question nobody said yes to: the operation of the assistant's change it asked about, kept so
+    the History names it by its action when it is read (``queries.say``); nothing for an «Ask someone first» one."""
+    proposal = proposal_held(run)
+    return {"operation": str(proposal["operation"])} if proposal and proposal.get("operation") else {}
 
 
 def _log(run: FlowRun, step: dict, outcome: str, now: dt.datetime, **more: Any) -> None:
@@ -1567,7 +1575,7 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
             left = {"approved": data.approve, "expired": False, "note": data.note, "answered_by": who}
             _carry_on(ctx, run, flow, step, left, now)
         else:
-            no = _own("flow.question_rejected", who=who, title=question.title)
+            no = _own("flow.question_rejected", who=who, title=question.title, **_asked_for(run))
             _finish(ctx, run, FlowRun.Status.CANCELLED, now, no)
     return {"id": question.id, "run_id": run.id, "status": run.status}
 
@@ -1609,7 +1617,7 @@ def expire_questions(ctx: OperationContext, data: DueIn) -> dict:
         with translation.override(flow.language):
             _log(run, step, "expired", now)
             if policy != "continue":
-                silence = _own("flow.question_expired", title=question.title)
+                silence = _own("flow.question_expired", title=question.title, **_asked_for(run))
                 _finish(ctx, run, FlowRun.Status.CANCELLED, now, silence)
             elif flow.deleted_at is not None:
                 _finish(ctx, run, FlowRun.Status.CANCELLED, now, _own("flow.deleted"))

@@ -4,7 +4,9 @@
 // that asks first, granted «Cancel a reservation», runs, and the worker asks the assistant (`workerAsks`), which wants
 // to cancel it. Its card was titled «The assistant wants to change something in «Reservations»» and never said
 // CANCEL: now, right under its title, it says «Cancel a reservation» to whoever reads it in English and «Anular una
-// reserva», under «El asistente quiere cambiar algo en «Reservas»», to whoever reads it in Spanish. A no cancels nothing.
+// reserva», under «El asistente quiere cambiar algo en «Reservas»», to whoever reads it in Spanish. A no cancels nothing,
+// and the History says what was refused by its action too («Cancelada: … contestó que no a «Anular una reserva».»), in
+// the language of whoever reads it, never «… a «El asistente quiere cambiar algo en «Reservas»»».
 // flow: FLOW-F29 FLOW-F38
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -159,6 +161,21 @@ for (const viewport of VIEWPORTS) {
       await expect(card).toHaveCount(0);
       expect(psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('cancelled');
       expect(await statusOf(context, reservation)).toBe('pending');
+
+      // The History names what was refused by its action, in the reader's language.
+      const runId = psql(`select id from flow_flowrun where flow_id = '${flowId}'`);
+      await page.goto(`/flow/automations/${flowId}`);
+      await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
+      const why = shown(page).locator(`[data-testid=flow-run-trouble-${runId}] .flow-history__why`);
+      await expect(why).toHaveText(/^Cancelada: .+ contestó que no a «Anular una reserva»\.$/);
+      await shown(page).locator(`[data-testid=flow-run-trouble-${runId}]`).scrollIntoViewIfNeeded();
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await capture(page, `${KEY}-history-${viewport.label}`);
+      await context.addCookies([{ name: 'django_language', value: 'en', domain: new URL(A).hostname, path: '/' }]);
+      await page.reload();
+      await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
+      await expect(why).toHaveText(/^Cancelled: .+ answered no to «Cancel a reservation»\.$/);
     } finally {
       await context.close();
     }

@@ -344,3 +344,56 @@ def test_a_question_an_automation_step_asks_says_no_action_and_keeps_its_words(c
         run=ran, flow=flow, step_id="s1", title="Refund?", details="Ana, 15 €", expires_at=NOON + dt.timedelta(hours=72)
     )
     assert (row_of(question, OWNER, "en")["action"], row_of(question, OWNER, "en")["title"]) == ("", "Refund?")
+
+
+# --- The run it cancels says the action too ----------------------------------------------------------------------
+# A no, or nobody answering, cancelled the run with «Cancelled: Marta answered no to «The assistant wants to change
+# something in «Reservations»».»: the History said that something was refused, never what. Now it names the action of
+# the change, as the card does, in the language of whoever reads the History; an «Ask someone first» question keeps
+# what was asked.
+
+
+def history_of(flow: Flow, language: str):
+    """The History of ``flow`` as a person whose screen is in ``language`` reads it: its runs and one by id."""
+    ctx = ctx_for(language=language)
+    [row] = run("flow.run.list", {"flow_id": str(flow.id)}, ctx).rows
+    return row.error_message, run("flow.run.get", {"id": str(row.id)}, ctx).error_message
+
+
+def test_a_no_to_the_assistant_s_change_names_its_action_in_the_readers_language(gateway, clock, worker):
+    clock(NOON)
+    question = waiting_in(worker, gateway, "es", "reservation.reservation.cancel", {"id": RESERVATION})
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": False})
+    assert history_of(question.flow, "en") == ("Cancelled: tester answered no to «Cancel a reservation».",) * 2
+    assert history_of(question.flow, "es") == ("Cancelada: tester contestó que no a «Anular una reserva».",) * 2
+
+
+def test_nobody_answering_the_assistant_s_change_names_its_action_in_the_readers_language(gateway, clock, worker):
+    from live.context import system_context
+
+    from .conftest import A
+
+    clock(NOON)
+    question = waiting_in(worker, gateway, "en", "appointment.appointment.create", {"customer": "Ana López"})
+    clock(NOON + dt.timedelta(hours=72))
+    assert run("flow.question.expire_due", {}, system_context(A)).count == 1
+    assert history_of(question.flow, "es") == ("Cancelada: nadie contestó a tiempo «Reservar una cita».",) * 2
+    assert history_of(question.flow, "en") == ("Cancelled: nobody answered «Book an appointment» in time.",) * 2
+
+
+def test_a_no_to_a_change_whose_action_is_gone_says_what_was_kept(gateway, clock, worker, plan, monkeypatch):
+    clock(NOON)
+    question = waiting_in(worker, gateway, "en", PLAN.name, CHORE)
+    worker.request("flow.question.answer", {"id": str(question.id), "approve": False})
+    monkeypatch.delitem(registry, PLAN.name)
+    said = f"Cancelada: tester contestó que no a «{question.title}»."
+    assert history_of(question.flow, "es") == (said, said)
+
+
+def test_a_no_to_an_ask_someone_first_question_keeps_what_was_asked(clock):
+    clock(NOON)
+    flow = make_flow(language="es", trigger_kind=Flow.Trigger.MANUAL, steps=[{"id": "s1", "kind": "ask", "title": "Refund?"}])
+    ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
+    question = Question.objects.get(run_id=ran.id)
+    run("flow.question.answer", {"id": str(question.id), "approve": False})
+    assert history_of(flow, "en") == ("Cancelled: tester answered no to «Refund?».",) * 2

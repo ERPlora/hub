@@ -743,6 +743,8 @@ ASSISTANT_GONE_UNNAMED = _("That action is no longer allowed or available, so th
 
 #: A change of the assistant no longer granted (code ``flow.not_allowed``), named for a person when it is read.
 ASSISTANT_GONE_KEY = "flow.assistant_gone"
+#: The reasons of a question nobody said yes to that, for the assistant's change, name its action (``say``).
+NAMED_BY_ITS_ACTION = frozenset({"flow.question_rejected", "flow.question_expired"})
 #: The engine's own reasons, by name (the code, but where one code says different things): a run and the entry of
 #: the step that failed keep the name and its values, and the reason is said when it is read, in the reader's
 #: language (FLOW-F16). A name never equals a code it does not say whole: a run kept with its words alone
@@ -814,6 +816,12 @@ def say(reason: dict, said: str = "") -> str:
         if op is None:
             return str(ASSISTANT_GONE_UNNAMED)
         values["name"] = action_label(op, (translation.get_language() or "en").split("-")[0])
+    elif key in NAMED_BY_ITS_ACTION and values.get("operation"):
+        # The assistant's change nobody said yes to, by its action as the History names it now («Cancel a
+        # reservation»), not by the title kept in the automation's language; one that no longer exists, by that title.
+        op = registry.get(str(values["operation"]))
+        if op is not None:
+            values["title"] = action_label(op, (translation.get_language() or "en").split("-")[0])
     try:
         return str(words) % values
     except (KeyError, TypeError, ValueError):
@@ -1370,14 +1378,19 @@ def can_answer(ctx: OperationContext, role: str) -> bool:
     return ctx.has(ROLE_PERMISSION.get(role, MANAGE)) or ctx.has(MANAGE)
 
 
-def proposal_of(question: Question) -> tuple[Operation, dict] | None:
-    """The change the assistant wants that ``question`` waits on (FLOW-F38, «Ask me first») — its action and what it
-    would send —, or ``None``: a run waits on one change at a time, the one its assistant step holds; an «Ask someone
-    first» question, or a change whose action is gone, has none."""
-    run = question.run
+def proposal_held(run: FlowRun) -> dict | None:
+    """The change the assistant wants that ``run`` waits on (FLOW-F38, «Ask me first»), as its step keeps it, or
+    ``None``: a run waits on one change at a time, the one its assistant step holds; an «Ask someone first» step has
+    none."""
     steps = run.definition.get("steps") or []
     step = steps[run.step_index] if run.step_index < len(steps) else {}
-    proposal = (run.outputs.get(TURN) or {}).get("proposal") if step.get("kind") == "assistant" else None
+    return (run.outputs.get(TURN) or {}).get("proposal") if step.get("kind") == "assistant" else None
+
+
+def proposal_of(question: Question) -> tuple[Operation, dict] | None:
+    """The change the assistant wants that ``question`` waits on — its action and what it would send —, or ``None``:
+    an «Ask someone first» question, or a change whose action is gone, has none (``proposal_held``)."""
+    proposal = proposal_held(question.run)
     op = registry.get(str(proposal.get("operation") or "")) if proposal else None
     if op is None:
         return None
