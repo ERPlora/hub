@@ -25,7 +25,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, compactBar, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { createProduct, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, stamp } from './sale-helpers';
 import { STACK } from './stack';
@@ -472,7 +472,7 @@ test('cash-register-assistant-card — in Spanish a count of the open shift by i
     await confirmationReady(page);
     await untilStill(page);
     expect(await confirmationSettled(page), `${RECORDS_KEY}-${vp.label} caught before it settled`).toBe(true);
-    await page.screenshot({ path: shot(`${RECORDS_KEY}-${vp.label}`) });
+    await capture(page, `${RECORDS_KEY}-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
@@ -491,8 +491,7 @@ test('cash-register-assistant-card — in Spanish renaming a drawer by its id na
   // Renaming is not dangerous: its card says the action with its data, the drawer it renames first.
   await expect(card(page)).toContainText(`Cambiar en Caja: ${DRAWER} · ${renamed}`);
   await expect(card(page)).not.toContainText(drawerId);
-  await untilStill(page);
-  await page.screenshot({ path: shot(`${RECORDS_KEY}-drawer-1440`) });
+  await capture(page, `${RECORDS_KEY}-drawer-1440`);
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   // The drawer's own read, the one the card names it by: unchanged.
