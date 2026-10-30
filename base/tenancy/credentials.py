@@ -13,14 +13,17 @@ roles: :data:`APP` (``hub_app``: a hub's alias, in the web and the worker) or :d
   ``migrator_password``). The web's task role may read only ``…/app`` (aws#23), and only a migrator's connection asks
   for ``…/migrator``. Their ``host``, ``port``, ``pooler_host`` and ``pooler_port`` are not read: where the cluster is
   is its row's (``control.Cluster``), which the admin edits. Each secret is read once per :data:`SECRET_TTL_SECONDS`
-  and kept in the process (a rotation reaches every task within that while); one that cannot be read, or is out of
-  its shape, is :class:`CredentialsUnavailable` with its name and the reason, never the environment's roles in its
-  place, and it is read again on the next call.
+  and kept in the process (a rotation reaches every task within that while: ``base.tenancy.connections`` puts the new
+  ones in the hub's alias); one that cannot be read, or is out of its shape, is :class:`CredentialsUnavailable` with
+  its name and the reason, never the environment's roles in its place. A refresh that fails after a good read keeps
+  the last good ones, logged, and asks again after :data:`STALE_RETRY_SECONDS`: a hub never goes down because Secrets
+  Manager did for a moment; only a secret never read fails closed.
 
 The passwords never show in a ``repr``.
 """
 
 import json
+import logging
 import os
 import threading
 import time
@@ -34,8 +37,12 @@ MIGRATOR = "migrator"
 ROLE_KEYS = {APP: ("app_user", "app_password"), MIGRATOR: ("migrator_user", "migrator_password")}
 #: How long a cluster's secret is kept in the process before it is read again.
 SECRET_TTL_SECONDS = 600
+#: After a failed refresh, how long the last good credentials are used before the secret is asked again.
+STALE_RETRY_SECONDS = 60
 #: The region of the secrets when the environment names none: ERPlora runs in Ireland (``base.storage``).
 DEFAULT_REGION = "eu-west-1"
+
+logger = logging.getLogger(__name__)
 
 #: Monotonic seconds: the tests' clock replaces it.
 _clock = time.monotonic
@@ -94,7 +101,16 @@ def credentials_for(cluster, role: str) -> Credentials:
     kept = _cache.get(secret_id)
     if kept is not None and kept[0] > now:
         return kept[1]
-    found = _read(secret_id, ROLE_KEYS[role])
+    try:
+        found = _read(secret_id, ROLE_KEYS[role])
+    except CredentialsUnavailable as failed:
+        if kept is None:
+            raise
+        # Read well before: the last good ones go on (a hub never goes down for a refresh), asked again soon.
+        logger.warning("base.tenancy.credentials.stale %s: %s; the last good ones are kept.", secret_id, failed)
+        with _lock:
+            _cache[secret_id] = (now + STALE_RETRY_SECONDS, kept[1])
+        return kept[1]
     with _lock:
         _cache[secret_id] = (now + SECRET_TTL_SECONDS, found)
     return found

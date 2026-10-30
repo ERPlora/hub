@@ -304,3 +304,61 @@ def test_a_hub_reached_through_a_pgbouncer_keeps_the_templates_options(secrets, 
     options = django_connections.settings[alias]["OPTIONS"]
 
     assert "sslmode" not in options and "sslrootcert" not in options
+
+
+# ── Rotation and a Secrets Manager that fails after a good read (review of hub#471, I4) ──────────────────────────────
+
+
+def test_a_secret_that_fails_on_its_refresh_keeps_the_last_good_one_and_says_so(secrets, clock, caplog):
+    first = credentials.credentials_for(cluster(), credentials.APP)
+    clock.value += credentials.SECRET_TTL_SECONDS + 1
+    secrets.secrets[APP_SECRET] = RuntimeError("ThrottlingException")
+
+    kept = credentials.credentials_for(cluster(), credentials.APP)
+    again = credentials.credentials_for(cluster(), credentials.APP)
+
+    assert kept == again == first
+    assert "base.tenancy.credentials.stale" in caplog.text and APP_SECRET in caplog.text
+    # It is not asked again on every use: once more after a short wait.
+    assert secrets.reads == [APP_SECRET, APP_SECRET]
+    clock.value += credentials.STALE_RETRY_SECONDS + 1
+    secrets.secrets[APP_SECRET] = APP_VALUES | {"app_password": "rotated"}
+    assert credentials.credentials_for(cluster(), credentials.APP).password == "rotated"
+
+
+def test_a_rotated_password_reaches_a_hubs_alias_already_registered_and_its_open_connection(secrets, clock):
+    hub = a_hub(on=cluster())
+    alias = tenancy_connections.register_hub_alias(hub)
+    wrapper = django_connections[alias]
+    assert wrapper.settings_dict["PASSWORD"] == "app-secret"
+
+    secrets.secrets[APP_SECRET] = APP_VALUES | {"app_password": "rotated"}
+    clock.value += credentials.SECRET_TTL_SECONDS + 1
+    tenancy_connections.register_hub_alias(hub)
+
+    assert django_connections.settings[alias]["PASSWORD"] == "rotated"
+    assert django_connections[alias].settings_dict["PASSWORD"] == "rotated"
+
+
+def test_another_threads_connection_takes_the_rotated_password_when_it_opens_the_hub_again(secrets, clock):
+    import threading
+
+    hub = a_hub(on=cluster())
+    alias = tenancy_connections.register_hub_alias(hub)
+    seen = {}
+
+    def other_thread(step):
+        tenancy_connections.register_hub_alias(hub)
+        seen[step] = django_connections[alias].settings_dict["PASSWORD"]
+
+    first = threading.Thread(target=other_thread, args=("before",))
+    first.start()
+    first.join()
+    secrets.secrets[APP_SECRET] = APP_VALUES | {"app_password": "rotated"}
+    clock.value += credentials.SECRET_TTL_SECONDS + 1
+    tenancy_connections.register_hub_alias(hub)
+    second = threading.Thread(target=other_thread, args=("after",))
+    second.start()
+    second.join()
+
+    assert seen == {"before": "app-secret", "after": "rotated"}

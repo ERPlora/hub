@@ -63,14 +63,29 @@ def _copied(base_alias: str, **overrides) -> dict:
     return copy.deepcopy(connections.settings[base_alias]) | overrides
 
 
-def _register(alias: str, build) -> str:
-    """Swap in a new ``connections.settings`` with ``alias`` (``build()`` its settings) unless it is there already."""
-    if alias in connections.settings:
+def _register(alias: str, build, *, replace: bool = False) -> str:
+    """Swap in a new ``connections.settings`` with ``alias`` (``build()`` its settings) unless it is there already, or
+    with its settings built again (``replace``)."""
+    if alias in connections.settings and not replace:
         return alias
     with _lock:
-        if alias not in connections.settings:
+        if replace or alias not in connections.settings:
             connections.settings = {**connections.settings, alias: build()}
     return alias
+
+
+#: What a rotation of a cluster's secret changes in a hub's alias.
+ROLE_KEYS = ("USER", "PASSWORD")
+
+
+def _take_this_threads_role(alias: str) -> None:
+    """This thread's connection of ``alias``, if it has one, with the role its settings say now: closed and given them
+    (another thread's takes them when that thread opens the hub again: every request does, through ``use_hub``)."""
+    current = connections.settings[alias]
+    for connection in connections.all(initialized_only=True):
+        if connection.alias == alias and any(connection.settings_dict.get(key) != current[key] for key in ROLE_KEYS):
+            connection.close()
+            connection.settings_dict = copy.deepcopy(current)
 
 
 def register_hub_alias(hub) -> str:
@@ -100,7 +115,10 @@ def register_hub_alias(hub) -> str:
                 "PORT": port,
                 "OPTIONS": copy.deepcopy(connections.settings[TEMPLATE_ALIAS]["OPTIONS"]) | tls,
             }
-    return _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides))
+    rotated = registered is not None and any(registered[key] != overrides.get(key, registered[key]) for key in ROLE_KEYS)
+    _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides), replace=rotated)
+    _take_this_threads_role(alias)
+    return alias
 
 
 def _writer(cluster) -> tuple[str, int]:
