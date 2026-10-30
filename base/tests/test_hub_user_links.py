@@ -47,6 +47,22 @@ EXPANDS = [
             ("attendancesettings", "updated_by", "updated_by_hub_user", "updated_by_id"),
         ],
     ),
+    (
+        "task",
+        "0002_hub_users",
+        "0001_initial",
+        [("task", "created_by", "created_by_hub_user", "created_by_id"), ("comment", "author", "author_hub_user", "author_id")],
+    ),
+    (
+        "whatsapp_inbox",
+        "0010_hub_users",
+        "0009_conversation_needs_attention",
+        [
+            ("conversation", "assigned_to", "assigned_to_hub_user", "assigned_to_id"),
+            ("message", "sent_by", "sent_by_hub_user", "sent_by_id"),
+            ("note", "author", "author_hub_user", "author_id"),
+        ],
+    ),
 ]
 
 
@@ -108,6 +124,11 @@ def _row(historical, app: str, model: str, old: str, user):
     def staff_member():
         return historical.get_model("staff", "Member").objects.create(first_name="Ana", last_name="López")
 
+    def conversation():
+        # One live conversation per number: each row its own.
+        phone = f"+346002{historical.get_model('whatsapp_inbox', 'Conversation').objects.count():05d}"
+        return historical.get_model("whatsapp_inbox", "Conversation").objects.create(phone=phone)
+
     def working_day():
         return historical.get_model("attendance", "Record").objects.create(
             member=staff_member(), clock_in_at=AT, work_date=AT.date()
@@ -128,6 +149,14 @@ def _row(historical, app: str, model: str, old: str, user):
             "reason": "Forgot to clock out",
         },
         ("attendance", "attendancesettings"): dict,
+        ("task", "task"): lambda: {"number": "TSK-20261006-0001", "title": "Restock"},
+        ("whatsapp_inbox", "conversation"): lambda: {"phone": "+34600111111"},
+        ("whatsapp_inbox", "message"): lambda: {"conversation": conversation(), "direction": "outbound", "kind": "text", "sent_at": AT},
+        ("whatsapp_inbox", "note"): lambda: {"conversation": conversation(), "text": "Call back", "created_at": AT},
+        ("task", "comment"): lambda: {
+            "task": historical.get_model("task", "Task").objects.create(number="TSK-20261006-0002", title="Mop"),
+            "text": "On it",
+        },
     }
     return historical.get_model(app, model).objects.create(**needs[(app, model)](), **{f"{old}_id": user.pk})
 

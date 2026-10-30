@@ -85,6 +85,8 @@ from base.schemas import (
     FileOut,
     FileReadIn,
     HubGetIn,
+    HubUserGetIn,
+    HubUserOut,
     HubOut,
     HubsBySlugIn,
     HubsBySlugOut,
@@ -1310,6 +1312,18 @@ def hub_user_of(ctx: OperationContext) -> HubUser | None:
     if not is_a_person(ctx.actor):
         return None
     return HubUser.objects.filter(username=ctx.actor.get_username()).first()
+
+
+# Not an assistant tool: what the cards of the writes that link a person read to name them (``REFERS``).
+@operation("base.hub_user.get", kind="query", permission=VIEW_HOME, input=HubUserGetIn, output=HubUserOut, ai=INTERNAL)
+def hub_user_get(ctx: OperationContext, data: HubUserGetIn) -> dict[str, Any]:
+    """A person of this business by their id in its database (``base.HubUser``), with access to it (a ``Membership``
+    on the scope's host, control's): how a staff record's user or a conversation's assignee is named on the
+    assistant's card. Anyone else, here or in another business, is ``NotFound``."""
+    person = HubUser.objects.filter(pk=data.id).first()
+    if person is None or not Membership.objects.filter(host=ctx.scope.key, user__username=person.username).exists():
+        raise NotFound(gettext("That person is not in this business."), code="base.person_not_found")
+    return {"id": person.pk, "name": person.display_name}
 
 
 def signed_in_username(ctx: OperationContext) -> str:

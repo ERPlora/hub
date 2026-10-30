@@ -18,12 +18,14 @@ import pytest
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from live.context import OperationContext, Scope, system_context
+from live.errors import NotFound, PermissionDenied
+from live.operations import get
 
 from base import queries, services
 from base.api_keys import KeyCaller
 from base.models import Hub, HubUser, Membership
 from base.registry import REGISTRY_SCOPE
-from base.schemas import HubStateIn
+from base.schemas import HubStateIn, HubUserGetIn
 from base.tenancy import inventory
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -293,3 +295,34 @@ class TestTheMigration:
         self.migration.make_hub_users(django_apps, SimpleNamespace(connection=SimpleNamespace(alias="hub_x__ddl")))
 
         assert not HubUser.objects.exists()
+
+
+class TestTheReadThatNamesThem:
+    """``base.hub_user.get``: a person of this business by their id, as the assistant's cards name whoever a write
+    links (a staff record's user, a conversation's assignee) instead of by the id."""
+
+    read = staticmethod(lambda ctx, person_id: get("base.hub_user.get")(ctx, HubUserGetIn(id=person_id)))
+
+    def test_it_names_a_person_with_access_to_this_business(self):
+        ana = account_copy(ANA_ID, name="Ana López")
+        Membership.objects.create(user=ana, host="a", role="hub_employee")
+        person = services.ensure_hub_user(ana)
+
+        answer = self.read(as_person(ana), person.pk)
+
+        assert answer.model_dump() == {"id": person.pk, "name": "Ana López"}
+
+    def test_someone_of_another_business_or_nobody_is_not_found(self):
+        olga = account_copy(OLGA_ID, name="Olga")
+        Membership.objects.create(user=olga, host="b", role="hub_owner")
+        elsewhere = services.ensure_hub_user(olga)
+        caller = account_copy(ANA_ID)
+        Membership.objects.create(user=caller, host="a", role="hub_employee")
+
+        for person_id in (elsewhere.pk, uuid.uuid7()):
+            with pytest.raises(NotFound):
+                self.read(as_person(caller), person_id)
+
+    def test_it_needs_a_person_of_the_hub(self):
+        with pytest.raises(PermissionDenied):
+            self.read(OperationContext(scope=Scope("host", "a"), actor=None, permissions=frozenset()), uuid.uuid7())

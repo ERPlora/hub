@@ -26,6 +26,8 @@ from pydantic import (
     model_validator,
 )
 
+from base.schemas import names
+
 T = TypeVar("T")
 
 # Validation messages (English source, Spanish in locale/).
@@ -156,6 +158,8 @@ D_ROLE_ID = (
     "Id of the role (a catalogue label such as «stylist»; it grants no permission)."
 )
 D_ROLE = "Name of the role, when its id is not known (an active role of this business)."
+#: A person of the business by their id in its database: the card names them (``base.hub_user.get``).
+A_PERSON = names("base.hub_user.get")
 D_USER_ID = "Id of the business user (account) the record hangs from; one user, one live record."
 D_HIRE_DATE = "Hire date (YYYY-MM-DD)."
 D_BOOKABLE = "Whether the person takes appointments."
@@ -298,7 +302,7 @@ class MemberIn(Schema):
     employee_number: EmployeeNumber = Field("", description=D_EMPLOYEE_NUMBER)
     role_id: UUID | None = Field(None, description=D_ROLE_ID)
     role: Text100 | None = Field(None, description=D_ROLE)
-    user_id: UUID | None = Field(None, description=D_USER_ID)
+    user_id: UUID | None = Field(None, description=D_USER_ID, json_schema_extra=A_PERSON)
     hire_date: dt.date | None = Field(None, description=D_HIRE_DATE)
     status: MemberStatus = Field(
         "active", description="Status the record is born with; active by default."
@@ -327,7 +331,7 @@ class MemberPatchIn(MemberRefIn):
     )
     role: Text100 | None = Field(None, description=D_ROLE)
     user_id: UUID | None = Field(
-        None, description=D_USER_ID + " Send null to unlink it."
+        None, description=D_USER_ID + " Send null to unlink it.", json_schema_extra=A_PERSON
     )
     hire_date: dt.date | None = Field(
         None, description=D_HIRE_DATE + " Send null to clear it."

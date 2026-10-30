@@ -70,6 +70,19 @@ def test_existing_corrections_get_who_made_them(make_user):
     assert (by_system.is_system, by_system.created_by_name) == (True, "")
 
 
+def test_in_a_hub_s_own_database_it_joins_no_control_users(monkeypatch):
+    # Tenancy W10: a hub's own database has no auth_user to join (its history replays there), and no corrections of
+    # before; the coordinates of the shared device still go.
+    shared = _day(source="shared", in_lat=40.4, in_lng=-3.7)
+    monkeypatch.setattr(MIGRATION.router, "allow_migrate_model", lambda alias, model: False)
+    monkeypatch.setattr(MIGRATION, "_name_the_corrections", lambda *args: pytest.fail("it read control's users"))
+
+    run_forward()
+
+    shared.refresh_from_db()
+    assert (shared.in_lat, shared.in_lng) == (None, None)
+
+
 def test_coordinates_of_the_shared_device_are_dropped_and_the_rest_stays():
     shared = _day(
         in_lat=40.4,

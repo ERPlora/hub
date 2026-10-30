@@ -33,8 +33,8 @@ def team(make_user):
     return {
         "boss": boss,
         "worker": worker,
-        "boss_member": make_member("Marta", "Jefa", user=boss),
-        "worker_member": make_member("Bea", "Ruiz", user=worker),
+        "boss_member": make_member("Marta", "Jefa", user=boss.person),
+        "worker_member": make_member("Bea", "Ruiz", user=worker.person),
         "ana": make_member("Ana", "López"),
     }
 
@@ -52,7 +52,7 @@ def as_manager(team):
 
 def test_a_manager_sees_every_task_and_an_employee_their_own(team):
     make_task("Mine by assignment", assigned_to=team["worker_member"])
-    make_task("Mine by creation", created_by=team["worker"], assigned_to=team["ana"])
+    make_task("Mine by creation", created_by=team["worker"].person, assigned_to=team["ana"])
     make_task("Ana's", assigned_to=team["ana"])
     make_task("Nobody's")
     assert sorted(titles(run("task.task.list", ctx=as_manager(team)))) == [
@@ -68,7 +68,7 @@ def test_a_manager_sees_every_task_and_an_employee_their_own(team):
 
 def test_an_employee_without_a_staff_record_sees_what_they_created(make_user):
     lone = make_user("lone", role="hub_employee")
-    make_task("Created by me", created_by=lone)
+    make_task("Created by me", created_by=lone.person)
     make_task("Someone else's")
     assert titles(run("task.task.list", ctx=ctx_for("hub_employee", actor=lone))) == ["Created by me"]
 
@@ -112,7 +112,7 @@ def test_a_row_carries_its_project_parent_assignee_creator_and_counts(team):
         project=project,
         parent=parent,
         assigned_to=team["ana"],
-        created_by=team["boss"],
+        created_by=team["boss"].person,
         due_date=dt.date(2026, 10, 20),
         tags=["stock"],
     )
@@ -129,7 +129,7 @@ def test_a_row_carries_its_project_parent_assignee_creator_and_counts(team):
     assert (row.assignee_name, row.created_by_name, row.created_by_id) == (
         "Ana López",
         "Marta Jefa",
-        team["boss"].pk,
+        team["boss"].person.pk,
     )
     assert (row.subtask_count, row.comment_count, row.tags, row.due_date) == (
         1,
@@ -141,7 +141,7 @@ def test_a_row_carries_its_project_parent_assignee_creator_and_counts(team):
 
 def test_a_creator_without_a_name_reads_as_their_email_or_username(make_user):
     plain = make_user("plain")
-    task = make_task(created_by=plain)
+    task = make_task(created_by=plain.person)
     assert run("task.task.detail", {"id": str(task.id)}).created_by_name == "plain"
 
 
@@ -377,7 +377,7 @@ def test_an_employee_reads_only_their_own_subtasks(team):
 
 def test_comments_newest_first_with_their_author(team):
     task = make_task()
-    make_comment(task, "First", author=team["boss"])
+    make_comment(task, "First", author=team["boss"].person)
     make_comment(task, "Second")
     page = run("task.comment.list", {"task_id": str(task.id)})
     assert [(row.text, row.author_name) for row in page.rows] == [
@@ -458,7 +458,7 @@ def test_an_employee_reads_nothing_of_a_parent_they_do_not_see(team):
 
 
 def test_a_parent_the_employee_sees_is_named(team):
-    parent = make_task("My parent", number="TSK-20261014-0098", created_by=team["worker"])
+    parent = make_task("My parent", number="TSK-20261014-0098", created_by=team["worker"].person)
     child = make_task("Mine", parent=parent, assigned_to=team["worker_member"])
     assert run("task.task.detail", {"id": str(child.id)}, ctx=as_employee(team)).parent_title == "My parent"
 

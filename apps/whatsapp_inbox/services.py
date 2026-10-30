@@ -29,8 +29,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Value
-from django.db.models.functions import Concat, Lower
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
 from live.errors import (
@@ -132,7 +131,9 @@ from apps.whatsapp_inbox.schemas import (
 from base import outbound
 from base.files import STORE_ERRORS
 from base.operations import hub_id
+from base.models import HubUser
 from base.queries import refuse_past_the_plans_space
+from base.services import acting_hub_user
 
 logger = logging.getLogger(__name__)
 
@@ -1035,7 +1036,7 @@ def _queue_message(
                 status=Message.Status.QUEUED,
                 status_at=now,
                 client_message_id=key,
-                sent_by=ctx.actor if actor_id(ctx) is not None else None,
+                sent_by=acting_hub_user(ctx),
                 sent_at=now,
                 host=ctx.scope.key,
             )
@@ -1387,40 +1388,39 @@ def mark_read(ctx: OperationContext, data: ConversationRefIn) -> dict:
     return conversation_out(conversation)
 
 
-def _assignee(ctx: OperationContext, data: AssignIn):
-    """The person ``data`` names (a member of this business), or ``None`` to unassign."""
+def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
+    """The person ``data`` names (a person of this business's database with access to it), or ``None`` to unassign."""
     if data.unassign:
         return None
     people = team(ctx)
     if data.assignee_id is not None:
-        member = people.filter(user_id=data.assignee_id).first()
-        if member is None:
+        person = people.filter(pk=data.assignee_id).first()
+        if person is None:
             raise InvalidPayload(
                 str(NOT_IN_BUSINESS), fields={"assignee": str(NOT_IN_BUSINESS)}
             )
-        return member.user
+        return person
     reference = (data.assignee or "").strip()
     if reference.lower() == "me":
-        me = actor_id(ctx)
+        # Whoever takes it is a person of the business's database: made if their session came before it (W10).
+        me = acting_hub_user(ctx)
         if me is None:
             raise InvalidPayload(
                 str(NOT_A_PERSON), fields={"assignee": str(NOT_A_PERSON)}
             )
-        member = people.filter(user_id=me).first()
-        if member is None:
+        person = people.filter(pk=me.pk).first()
+        if person is None:
             raise InvalidPayload(
                 str(NOT_IN_BUSINESS), fields={"assignee": str(NOT_IN_BUSINESS)}
             )
-        return member.user
+        return person
+    # The full name, the first name (its first word), the username or the email.
     matches = list(
-        people.annotate(
-            full_name=Lower(Concat("user__first_name", Value(" "), "user__last_name"))
-        )
-        .filter(
-            Q(user__username__iexact=reference)
-            | Q(user__email__iexact=reference)
-            | Q(full_name=reference.lower())
-            | Q(user__first_name__iexact=reference)
+        people.filter(
+            Q(username__iexact=reference)
+            | Q(email__iexact=reference)
+            | Q(name__iexact=reference)
+            | Q(name__istartswith=f"{reference} ")
         )
         .order_by("id")[:2]
     )
@@ -1430,7 +1430,7 @@ def _assignee(ctx: OperationContext, data: AssignIn):
     if len(matches) > 1:
         message = str(SEVERAL_CALLED % {"reference": reference})
         raise InvalidPayload(message, fields={"assignee": message})
-    return matches[0].user
+    return matches[0]
 
 
 @operation(
@@ -1474,7 +1474,9 @@ def assign(ctx: OperationContext, data: AssignIn) -> dict:
         conversation.assigned_to = person
         _save(conversation, "assigned_to")
         record_event(
-            ctx, events.ASSIGNED, {"id": str(conversation.id), "assigned_to_id": target}
+            ctx,
+            events.ASSIGNED,
+            {"id": str(conversation.id), "assigned_to_id": None if target is None else str(target)},
         )
     return conversation_out(conversation)
 
@@ -1724,7 +1726,7 @@ def erase(ctx: OperationContext, data: ConversationRefIn) -> dict:
 )
 def add_note(ctx: OperationContext, data: NoteAddIn) -> dict:
     conversation = find_conversation(data.id, data.conversation)
-    author = ctx.actor if actor_id(ctx) is not None else None
+    author = acting_hub_user(ctx)
     note = Note.objects.create(
         conversation=conversation,
         text=data.text,

@@ -136,6 +136,15 @@ class HubStateOut(Schema):
     version: int
 
 
+class HubUserGetIn(Schema):
+    id: UUID = Field(description="The person's id in the business's database.")
+
+
+class HubUserOut(Schema):
+    id: UUID
+    name: str = Field(description="Their name, else their email, else how the Hub knows them.")
+
+
 class HubUserSyncIn(Schema):
     """The people of the SaaS's photo (``members``), for the business's own database (``base.hub_user.sync``)."""
 

@@ -557,7 +557,7 @@ def test_a_text_is_kept_queued_and_leaves_only_after_the_commit(make_user, djang
         "hub",
         "sent",
         "wamid.OUT",
-        luis,
+        luis.person,
     )
     c.refresh_from_db()
     assert (c.unread_count, c.last_message_direction, c.last_message_at) == (0, "outbound", NOW)
@@ -966,15 +966,15 @@ def test_an_employee_takes_a_conversation_but_assigns_nobody_else(make_user):
         {"id": str(conv().id), "assignee": "me"},
         ctx_for("hub_employee", actor=luis),
     )
-    assert (out.assigned_to_id, out.assigned_to_name) == (luis.id, "Luis")
+    assert (out.assigned_to_id, out.assigned_to_name) == (luis.person.id, "Luis")
     with pytest.raises(PermissionDenied):
         run(
             "whatsapp_inbox.conversation.assign",
-            {"id": str(conv().id), "assignee_id": marta.id},
+            {"id": str(conv().id), "assignee_id": str(marta.person.id)},
             ctx_for("hub_employee", actor=luis),
         )
     assert events("whatsapp_inbox.conversation.assigned") == [
-        {"id": str(conv().id), "assigned_to_id": luis.id}
+        {"id": str(conv().id), "assigned_to_id": str(luis.person.id)}
     ]
 
 
@@ -1032,16 +1032,16 @@ def test_without_the_assign_permission_nobody_takes_it_from_somebody_else(make_u
     receive("wamid.1")
     luis = make_user("luis", first_name="Luis")
     marta = make_user("marta", first_name="Marta")
-    run("whatsapp_inbox.conversation.assign", {"id": str(conv().id), "assignee_id": marta.id}, ctx_for("hub_manager"))
+    run("whatsapp_inbox.conversation.assign", {"id": str(conv().id), "assignee_id": str(marta.person.id)}, ctx_for("hub_manager"))
     for payload in ({"assignee": "me"}, {"assignee": "me", "only_if_unassigned": False}, {"unassign": True}):
         with pytest.raises(Conflict) as excinfo:
             run("whatsapp_inbox.conversation.assign", {"id": str(conv().id), **payload}, ctx_for("hub_employee", actor=luis))
         assert excinfo.value.code == "whatsapp_inbox.already_assigned"
         assert excinfo.value.message == "This conversation is already with Marta."
-    assert conv().assigned_to_id == marta.id
+    assert conv().assigned_to_id == marta.person.id
     # A manager may take it over.
-    taken = run("whatsapp_inbox.conversation.assign", {"id": str(conv().id), "assignee_id": luis.id}, ctx_for("hub_manager"))
-    assert taken.assigned_to_id == luis.id
+    taken = run("whatsapp_inbox.conversation.assign", {"id": str(conv().id), "assignee_id": str(luis.person.id)}, ctx_for("hub_manager"))
+    assert taken.assigned_to_id == luis.person.id
 
 
 def test_only_people_of_this_business_are_assigned(make_user):
@@ -1050,7 +1050,7 @@ def test_only_people_of_this_business_are_assigned(make_user):
     with pytest.raises(InvalidPayload) as excinfo:
         run(
             "whatsapp_inbox.conversation.assign",
-            {"id": str(conv().id), "assignee_id": stranger.id},
+            {"id": str(conv().id), "assignee_id": str(stranger.person.id)},
         )
     assert set(excinfo.value.fields) == {"assignee"}
 
@@ -1280,7 +1280,7 @@ def test_a_note_keeps_its_author_and_only_they_or_a_manager_delete_it(make_user)
     )
     assert (note.text, note.author_id, note.author_name, note.created_at) == (
         "Llamar mañana",
-        luis.id,
+        luis.person.id,
         "Luis",
         NOW,
     )
