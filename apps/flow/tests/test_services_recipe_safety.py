@@ -89,6 +89,13 @@ def yes(worker, ran: FlowRun) -> None:  # noqa: F811
     worker()
 
 
+def shown_on_the_card(ran: FlowRun) -> dict:
+    """``{datum: value}`` as «Waiting for your answer» shows the change ``ran`` waits on."""
+    question = Question.objects.get(run_id=ran.id)
+    [row] = [row for row in run("flow.question.list", {}, ctx_for(permissions=MAY_CANCEL)).rows if row.id == question.id]
+    return {field["name"]: field["value"] for field in row.model_dump(mode="json")["fields"]}
+
+
 def lucia_writes(guests) -> dict:  # noqa: F811
     return {"name": "Lucía", "customer": str(guests["lucia"].id)}
 
@@ -157,6 +164,19 @@ def test_a_change_proposed_before_the_fix_and_still_waiting_is_made_with_the_fix
     assert "reservation.customer_mismatch" in json.dumps(told(gateway))
 
 
+def test_the_card_of_a_change_waiting_from_before_says_on_whose_behalf_the_yes_makes_it(
+    declared, gateway, worker, guests  # noqa: F811
+):
+    # FLOW-F29: the yes is given knowing what it does, never what the old step let the assistant choose.
+    declared(("reservation", table()))
+    flow_id = str(run("flow.recipe.enable", {"recipe": REF}, ctx_for("hub_owner")).flow.id)
+    call = {"id": str(guests["other"].id), "on_behalf_of": str(guests["marta"].id)}
+    ran = asked(worker, gateway, flow_id, call, lucia_writes(guests))
+    declared(("reservation", table(pinned=THEIRS)))
+
+    assert shown_on_the_card(ran)["on_behalf_of"] == "Lucía Pérez"
+
+
 def test_a_change_waiting_from_before_whose_fixed_datum_is_empty_now_is_not_made_at_the_yes(
     declared, gateway, worker, guests  # noqa: F811
 ):
@@ -165,6 +185,8 @@ def test_a_change_waiting_from_before_whose_fixed_datum_is_empty_now_is_not_made
     call = {"id": str(guests["other"].id), "on_behalf_of": str(guests["marta"].id)}
     ran = asked(worker, gateway, flow_id, call, {"name": "Lucía"})
     declared(("reservation", table(pinned=THEIRS)))
+    # Its card no longer names whom the assistant chose: the yes will not make it on their behalf.
+    assert "on_behalf_of" not in shown_on_the_card(ran)
 
     yes(worker, ran)
 

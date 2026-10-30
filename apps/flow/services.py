@@ -53,7 +53,7 @@ from apps.flow.queries import (
     asked_first,
     catalog_operations,
     catalog_problems,
-    fixed_value,
+    pinned_values,
     grantable_operations,
     needs_a_person,
     operation_problem,
@@ -1149,16 +1149,7 @@ def _spec(op: Operation, step: dict) -> dict:
 def _pinned(run: FlowRun, step: dict, op: Operation) -> tuple[dict, list[str]]:
     """``(values, empty)``: the data the step fixes for ``op``, filled in with the run's data as its prompt is, and
     the names of those empty now (a path not found, a text with nothing in it)."""
-    data = {"input": run.input, "steps": run.outputs}
-    values: dict[str, Any] = {}
-    empty: list[str] = []
-    for name, raw in ((step.get("pinned") or {}).get(op.name) or {}).items():
-        value = fixed_value(raw, data)
-        if value is None:
-            empty.append(name)
-        else:
-            values[name] = value
-    return values, empty
+    return pinned_values(run, step, op.name)
 
 
 def _with_pinned(arguments: str, values: dict) -> str:
