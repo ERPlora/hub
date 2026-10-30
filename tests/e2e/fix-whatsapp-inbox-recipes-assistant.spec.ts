@@ -6,9 +6,9 @@
 // No card books appointments (F14). The owner turns «Book a table» on (its answer and its notice, in Automations'
 // gallery too: FLOW-F33); the message of a guest who wrote before (their card, come by WhatsApp, already in Customers)
 // comes in as erplora.com pushes it; the worker's relay hands its event to Automations, whose run reads it, thanks them,
-// finds their card and asks the assistant with only what the answer was granted, naming that card; the reservation it
-// wants, with only their name and phone, waits in «Waiting for your answer» with whom it is for, and the owner's
-// «Approve» books it in Reservas, on the card Reservas finds by that phone with no right of the step in Customers.
+// finds their card and asks the assistant with only what the answer was granted, never naming that card: the step fixes
+// it on the booking (FLOW-F38); the reservation it wants, with only their name and phone, waits in «Waiting for your
+// answer» with whom it is for, and the owner's «Approve» books it in Reservas, on that card.
 // «Turn off» pauses both, never deleting them (F17).
 // flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F14 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33 FLOW-F12
 import { execFile, execSync } from 'node:child_process';
@@ -186,14 +186,17 @@ for (const viewport of VIEWPORTS) {
       const before = chats();
       await relay(parkedEvent(flowId));
 
-      // The assistant was told their card and offered only what the answer grants of the Hub's operations
-      // (`<app>__<entity>__<action>`; the SaaS adds its own clock), and wanted to book: nothing is booked yet.
+      // The assistant was never told their card nor offered to say it (the step fixes it), was offered only what the
+      // answer grants of the Hub's operations (`<app>__<entity>__<action>`; the SaaS adds its own clock), and wanted to
+      // book: nothing is booked yet.
       const turns = provider.seen.filter((seen) => seen.path === '/v1/chat/completions').slice(before);
       expect(turns).toHaveLength(1);
-      expect(JSON.stringify(turns[0].body)).toContain(`their customer card is ${guest.data.id}:`);
-      const tools = ((turns[0].body as { tools?: { function: { name: string } }[] }).tools ?? [])
-        .map((tool) => tool.function.name)
-        .filter((name) => name.includes('__'));
+      expect(JSON.stringify(turns[0].body)).not.toContain(guest.data.id);
+      type Tool = { function: { name: string; parameters?: { properties?: Record<string, unknown> } } };
+      const offered = (turns[0].body as { tools?: Tool[] }).tools ?? [];
+      const create = offered.find((tool) => tool.function.name === 'reservation__reservation__create');
+      expect(Object.keys(create?.function.parameters?.properties ?? {})).not.toContain('customer_id');
+      const tools = offered.map((tool) => tool.function.name).filter((name) => name.includes('__'));
       expect(tools).toEqual([
         'reservation__availability__day',
         'reservation__availability__tables',
