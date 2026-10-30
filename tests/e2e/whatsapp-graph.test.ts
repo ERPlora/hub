@@ -5,7 +5,7 @@
 // credentials (8 calls in one pass of the inbox), and one started with it failed the specs whose Graph had gone.
 // flow: WHATSAPP_INBOX-F01
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -32,6 +32,7 @@ import {
   META_APP,
   NUMBER_ID,
   PROBE_CODE,
+  runCli,
   startGraph,
   startGraphThread,
   TEMPLATE_ID,
@@ -152,6 +153,60 @@ describe('erploraEnv', () => {
     const header = source.slice(0, source.indexOf('\nimport '));
     for (const name of Object.keys(erploraEnv(RUN))) expect(header, name).toContain(`${name}=`);
   });
+});
+
+// The command erplora.com is started with (FIX-HUB-E2E-SAAS-ASSISTANT-502-BEFORE-META-CA-EXISTS): an erplora.com started
+// with SSL_CERT_FILE naming an authority that is not there yet (the Graph makes one only when the first WhatsApp spec
+// starts it) fails every outgoing call, even a plain http one: its assistant answered the Hub 502 and the assistant
+// specs fell without saying why.
+describe('runCli', () => {
+  const artifacts = mkdtempSync(join(tmpdir(), 'meta-graph-cli-'));
+  const ca = join(artifacts, 'meta-graph-8240', 'ca.pem');
+  const said = { lines: [] as string[], errors: [] as string[] };
+  const deps = { artifacts, hubDir: HUB_DIR, print: (line: string) => said.lines.push(line), fail: (line: string) => said.errors.push(line) };
+
+  afterAll(() => {
+    rmSync(artifacts, { recursive: true, force: true });
+  });
+
+  it('makes the run’s authority before it names it: erplora.com never starts trusting a file that is not there', () => {
+    expect(existsSync(ca)).toBe(false);
+    expect(runCli(['8240', 'http://localhost:8241'], deps)).toBe(0);
+    expect(said.lines).toEqual(Object.entries(erploraEnv({ ...RUN, ca })).map(([name, value]) => `${name}=${value}`));
+    expect(readFileSync(ca, 'utf8')).toMatch(/^-----BEGIN CERTIFICATE-----\n/);
+  }, 60_000);
+
+  it('keeps the authority already there', () => {
+    const before = readFileSync(ca, 'utf8');
+    said.lines.length = 0;
+    expect(runCli(['8240', 'http://localhost:8241/'], deps)).toBe(0);
+    expect(said.lines).toContain(`SSL_CERT_FILE=${ca}`);
+    expect(readFileSync(ca, 'utf8')).toBe(before);
+  });
+
+  it('refuses what it does not understand, saying how it is called, and makes nothing', () => {
+    const wrong = [[], ['8240'], ['8240', 'http://localhost:8241', 'more'], ['8a', 'http://localhost:8241'], ['65530', 'http://localhost:8241'], ['8250', 'localhost:8251']];
+    for (const args of wrong) {
+      said.errors.length = 0;
+      expect(runCli(args, deps), args.join(' ')).toBe(2);
+      expect(said.errors.join('\n'), args.join(' ')).toContain('node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL>');
+    }
+    expect(existsSync(join(artifacts, 'meta-graph-8250'))).toBe(false);
+    expect(said.errors.join('\n')).toContain('tests/e2e/README.md, «WhatsApp»');
+    expect(readFileSync(join(HERE, 'README.md'), 'utf8')).toMatch(/^## WhatsApp /m);
+  });
+
+  it('runs as a script from erplora.com’s checkout, its authority in this checkout’s .artifacts', () => {
+    const folder = join(HERE, '.artifacts', 'meta-graph-64990');
+    rmSync(folder, { recursive: true, force: true });
+    try {
+      const out = execFileSync('node', [join(HERE, 'whatsapp-graph.ts'), '64990', 'http://localhost:64991'], { cwd: tmpdir(), encoding: 'utf8' });
+      expect(out.trim().split('\n')).toContain(`SSL_CERT_FILE=${join(folder, 'ca.pem')}`);
+      expect(existsSync(join(folder, 'ca.pem'))).toBe(true);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
 
 const config = (body: Record<string, unknown>, status = 200): DoorAnswer => ({ status, body });

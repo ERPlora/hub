@@ -34,8 +34,12 @@
 //   SSL_CERT_FILE=<this checkout>/tests/e2e/.artifacts/meta-graph-<hub port>/ca.pem   the authority it trusts the
 //                                                     Graph with (made again whenever the Graph starts; read per call);
 // besides its own DB_NAME, VITE_DEV_PORT, HUB_CALLBACK_TEMPLATE, HUB_ADMIN_CALLBACK_URL and EMAIL_FILE_PATH
-// (tests/e2e/README.md, «Varias ejecuciones a la vez»). `E2E_SAAS_DIR` (that checkout; by default `../saas` beside
-// this one) and `E2E_SAAS_DB` (by default `saas_e2e_<SAAS_URL's port>`) say where it is.
+// (tests/e2e/README.md, «Varias ejecuciones a la vez»). Nobody types those by hand: erplora.com starts with
+// `env $(node <this checkout>/tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL>) … manage.py runserver …`, which makes
+// that authority first if it is not there yet (tests/e2e/README.md, «WhatsApp»); started with SSL_CERT_FILE naming a
+// missing file, every call erplora.com makes fails, even to the e2e's assistant provider (502 before any WhatsApp spec
+// ran). `E2E_SAAS_DIR` (that checkout; by default `../saas` beside this one) and `E2E_SAAS_DB` (by default
+// `saas_e2e_<SAAS_URL's port>`) say where it is.
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
