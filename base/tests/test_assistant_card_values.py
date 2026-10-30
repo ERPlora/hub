@@ -302,7 +302,6 @@ UNNAMED_REFERENCES = {
     "combo": 25,
     "customer": 22,
     "demo": 4,
-    "flow": 10,
     "inventory": 15,
     "invoice": 12,
     "kitchen": 23,

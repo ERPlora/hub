@@ -14,11 +14,14 @@ QUERIES = {
     "flow.flow.status",
     "flow.flow.test",
     "flow.run.list",
+    "flow.run.get",
     "flow.draft.list",
+    "flow.draft.get",
     "flow.catalog.read",
     "flow.event.sample",
     "flow.secret.list",
     "flow.question.list",
+    "flow.question.get",
     "flow.recipe.list",
 }
 COMMANDS = {
@@ -231,7 +234,7 @@ def test_people_need_view_to_read_and_manage_to_change(flow_operations):
     for name, op in flow_operations.items():
         if name in SYSTEM:
             continue
-        if name in {"flow.question.list", "flow.question.answer"}:
+        if name in {"flow.question.list", "flow.question.get", "flow.question.answer"}:
             # FLOW-F29: whoever may answer something; each question then asks for its own role.
             assert op.permission == "flow.answer", name
         elif name in {"flow.flow.test", "flow.event.sample", "flow.secret.list"}:

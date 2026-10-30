@@ -2107,6 +2107,10 @@
     "method": "get",
     "path": "/api/flow/runs"
   },
+  "flow.run.get": {
+    "method": "get",
+    "path": "/api/flow/runs/detail"
+  },
   "flow.run.retry": {
     "method": "post",
     "path": "/api/flow/runs/retry"
@@ -2114,6 +2118,10 @@
   "flow.draft.list": {
     "method": "get",
     "path": "/api/flow/drafts"
+  },
+  "flow.draft.get": {
+    "method": "get",
+    "path": "/api/flow/drafts/detail"
   },
   "flow.draft.propose": {
     "method": "post",
@@ -2146,6 +2154,10 @@
   "flow.question.list": {
     "method": "get",
     "path": "/api/flow/questions"
+  },
+  "flow.question.get": {
+    "method": "get",
+    "path": "/api/flow/questions/detail"
   },
   "flow.question.answer": {
     "method": "post",
