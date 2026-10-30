@@ -98,8 +98,8 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 - El botón **Nueva automatización**, arriba a la derecha; en el móvil es solo su **+**, para que el título
   se lea entero.
 - **Esperan tu respuesta** — solo si hay alguna pregunta que puedas contestar: cada tarjeta, de qué
-  automatización viene, la pregunta y sus detalles (en un cambio del asistente, además, cada dato que mandaría,
-  en palabras), a quién se le hizo, qué pasa si nadie contesta y qué hace un no, **Añadir una nota
+  automatización viene, la pregunta y sus detalles (en un cambio del asistente, además, justo debajo de la
+  pregunta, lo que quiere hacer —«Anular una reserva»— y cada dato que mandaría, en palabras), a quién se le hizo, qué pasa si nadie contesta y qué hace un no, **Añadir una nota
   (opcional)**, **Aprobar** y **No** (FLOW-F29). Un responsable o un empleado,
   que solo contestan, ven solo esto: «No hay nada esperando tu respuesta.» cuando no hay nada.
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
@@ -847,8 +847,11 @@ Pasos:
    antes primero: de qué automatización viene, la pregunta y sus detalles (con sus datos en palabras, FLOW-F28),
    «Preguntado a los responsables.
    Quien lleva el negocio también puede contestar.», qué pasa si nadie contesta («Si nadie contesta antes
-   del …, cuenta como un no.») y qué hace un no. Si es un cambio que quiere hacer el asistente (FLOW-F38), sus
-   detalles son lo que dijo y, debajo, cada dato que mandaría, uno por línea, como lo dice su tarjeta en el
+   del …, cuenta como un no.») y qué hace un no. Si es un cambio que quiere hacer el asistente (FLOW-F38), la
+   tarjeta dice primero qué quiere hacer: justo debajo de la pregunta («El asistente quiere cambiar algo en
+   «Reservas»»), la acción con el nombre que le da el historial («Anular una reserva», «Reservar una cita»),
+   las dos en tu idioma aunque la automatización esté escrita en otro, también en una pregunta que ya esperaba.
+   Sus detalles son lo que dijo y, debajo, cada dato que mandaría, uno por línea, como lo dice su tarjeta en el
    chat (BASE-F97): una fecha y una hora en tu idioma y a la hora del negocio («Empieza a las: 2 nov 2026,
    10:00»), un valor de una lista cerrada con el nombre que le da su app («Reservada por: Mostrador»), un
    importe en la moneda del negocio, un sí o un no como «Sí» o «No», una lista por cuántos elementos lleva
@@ -1083,8 +1086,8 @@ Pasos:
    ha usado «…».».
 4. Lo que quiere cambiar:
    - con «Que me lo pregunte», no se hace: espera en **Esperan tu respuesta** como «El asistente quiere cambiar
-     algo en «…»», con lo que dijo y los datos que mandaría, dichos en palabras para quien la abre como en la
-     tarjeta del chat (FLOW-F29), y la ejecución se para ahí («El asistente quiere «…»: espera un
+     algo en «…»», con lo que quiere hacer justo debajo («Anular una reserva»), lo que dijo y los datos que
+     mandaría, dichos en palabras y en el idioma de quien la abre como en la tarjeta del chat (FLOW-F29), y la ejecución se para ahí («El asistente quiere «…»: espera un
      sí hasta el ….»). Espera un cambio cada vez: si pide varios a la vez, los de detrás del primero no se hacen.
      Un sí lo hace en ese momento, como la automatización, y el paso vuelve al asistente con lo que ha pasado (el
      cambio hecho, o lo que la acción no aceptó, y que los demás no se han hecho), para que lo cuente o pida el
@@ -1168,7 +1171,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |
 | Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26 | `flow.secret.list` |
-| Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente sus datos en palabras, leídos como esa persona (en vivo) | contestar | F29, F38 | `flow.question.list` |
+| Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente su acción y sus datos en palabras, leídos como esa persona y en su idioma (en vivo) | contestar | F29, F38 | `flow.question.list` |
 | Una pregunta que espera respuesta, como sale en «Esperan tu respuesta», solo para quien puede contestarla | contestar (su rol) | F29 | `flow.question.get` |
 | Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F33–F36 | `flow.recipe.list` |
 
@@ -1337,7 +1340,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   formateador. Gana lo más sencillo para quien escribe: en lo que lee una persona sale ya en palabras, sin sintaxis.
 - **Los datos del cambio que espera un sí** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES):
   `_propose` guarda en `Question.details` solo lo que dijo el asistente; `flow.question.list` añade `fields` con
-  `queries.proposal_fields`, que lee la propuesta que el paso `assistant` guarda en `run.outputs["_turn"]` (una a
+  `queries.question_row`, que lee con `queries.proposal_of` la propuesta que el paso `assistant` guarda en `run.outputs["_turn"]` (una a
   la vez, la misma que hace `_make_proposal` tras el sí) y la pasa por `base.assistant.card` con el `ctx` de quien
   lee: fechas en su idioma y a la hora del negocio, listas cerradas por su etiqueta y registros por la lectura de
   su marca `refers`, ejecutada como esa persona (si no puede leerlo, el dato no sale). La pantalla los pinta con
@@ -1345,6 +1348,19 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   moneda de `base.business.get`. Una pregunta de «Preguntar antes a alguien» no trae `fields`.
   `appointment.appointment.cancel` tampoco, todavía: Citas niega todo cambio de una automatización
   (`may_change` pide `appointment.change_appointment` o la ficha propia, y el paso no tiene ninguna de las dos).
+- **La acción del cambio que espera un sí** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION):
+  la tarjeta se titulaba siempre «El asistente quiere cambiar algo en «Reservas»», también al anular: quien aprobaba
+  no leía la acción. `queries.question_row` calcula al leer, con `ctx.language` de quien lee, el título
+  (`ASSISTANT_WANTS`, que vive en `queries.py` y `_propose` sigue guardando en `Question.title` para los avisos) y
+  `action`, con `queries.action_label` (el nombre del historial: `flow.actions.<op>` de `frontend/locale`; sin él,
+  su verbo, su app y su cosa, nunca vacío ni el nombre de la operación); así lo dice también una pregunta guardada
+  antes, sin migración. Una pregunta de «Preguntar antes a alguien», o cuya acción ya no existe, lleva `action`
+  vacío y su título tal cual. `QuestionInbox.vue` la pinta justo debajo del título. Mercado: la tarjeta de
+  confirmación del chat de `base` («¿Ejecutar esta acción?» y debajo la acción), Intercom Fin (título fijo «Fin
+  requires your decision» y debajo la pregunta), Copilot Studio, Square Managerbot y Shopify Sidekick (lo que va a
+  hacer antes de aprobar), el diálogo de herramientas de VS Code (el nombre de la herramienta) y Toast (la
+  anulación pide al encargado su código): gana un título que dice quién pide y dónde, y la acción en la primera
+  línea, que además no rompe los filtros de las specs de WhatsApp que leen ese título.
 - **Cada registro de la tarjeta del asistente, por su nombre** (revisión 2026-10-30,
   FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS): cada id que nombra un registro en una escritura lleva su
   marca `refers` (`names` de `base/schemas.py`; `base.E009` la comprueba al arrancar), a una lectura por id de

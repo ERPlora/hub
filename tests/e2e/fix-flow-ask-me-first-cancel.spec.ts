@@ -160,6 +160,8 @@ for (const viewport of VIEWPORTS) {
       const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
       await expect(card).toBeVisible();
       await expect(card).toContainText('The assistant wants to change something in «Reservations»');
+      // It says the action, not only that something changes (FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION).
+      await expect(card.locator('[data-testid^=flow-question-action-]')).toHaveText('Cancel a reservation');
       await card.locator('[data-testid^=flow-question-yes-]').click();
       await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
       await expect(card).toHaveCount(0);
