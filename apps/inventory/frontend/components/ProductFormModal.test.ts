@@ -504,4 +504,19 @@ describe('ProductFormModal: photo', () => {
     );
     expect(s.el('inventory-product-photo-retry')?.textContent?.trim()).toBe('Reintentar');
   });
+
+  it('closing without saving discards the photo chosen; opening another product shows its own', async () => {
+    const s = await setup({ product: product(WITH_PHOTO) });
+    s.el('inventory-product-image-remove')!.click();
+    await flush();
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    await flush();
+    expect(s.el('inventory-product-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(WITH_PHOTO.image_url);
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ product: product({ id: 'p2', name: 'Green tea' }), open: true });
+    await flush();
+    expect(s.el('inventory-product-image-preview')?.querySelector('img')).toBeNull();
+    expect(s.el('inventory-product-image-preview')?.textContent?.trim()).toBe('GT');
+  });
 });

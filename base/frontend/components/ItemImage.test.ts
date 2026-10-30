@@ -19,6 +19,13 @@ describe('ItemImage', () => {
     expect(w.find('.item-image__initials').exists()).toBe(false);
   });
 
+  it('covers its box by default; a wide box (a till tile) may show the whole photo instead', () => {
+    const cover = mount(ItemImage, { props: { src: URL, name: 'Té' } });
+    expect(cover.get('img').classes()).not.toContain('item-image__photo--contain');
+    const contain = mount(ItemImage, { props: { src: URL, name: 'Té', fit: 'contain' } });
+    expect(contain.get('img').classes()).toContain('item-image__photo--contain');
+  });
+
   it('without a photo shows the initials over the name’s colour', () => {
     for (const src of ['', null, undefined]) {
       const w = mount(ItemImage, { props: { src, name: 'Café con leche' } });

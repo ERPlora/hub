@@ -42,6 +42,7 @@ const label = computed(() => {
   >
     <ItemImage
       class="pos-tile__thumb"
+      fit="contain"
       :src="product.image_url"
       :name="product.name"
       aria-hidden="true"

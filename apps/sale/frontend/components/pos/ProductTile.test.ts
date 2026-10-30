@@ -78,6 +78,8 @@ describe('ProductTile', () => {
     const thumb = m.find('pos-product-p1').find('.pos-tile__thumb');
     const img = thumb.get('img');
     expect([img.attributes('src'), img.attributes('alt'), img.attributes('loading')]).toEqual([url, 'Café con leche', 'lazy']);
+    // The library's photos are cut-outs on white: the wide tile shows the whole of it, never a slice.
+    expect(img.classes()).toContain('item-image__photo--contain');
     expect(thumb.text()).toBe('');
     expect(m.find('pos-product-p1').find('.pos-tile__name').text()).toBe('Café con leche');
   });

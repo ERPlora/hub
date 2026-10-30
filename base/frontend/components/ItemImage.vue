@@ -3,7 +3,8 @@
 // covering its box, loaded lazily and named by the item; its initials over its colour when it has none or the photo
 // does not load (offline, deleted, no longer in the library), never a gap nor a broken image. The box's size and the
 // initials' type size are its parent's (a till tile, a list's thumbnail, the form's preview); what the parent lays over
-// it (a till tile's warning) goes in the default slot.
+// it (a till tile's warning) goes in the default slot. `fit="contain"` shows the whole photo in a wide box (a till
+// tile): the library's photos are cut-outs on white, and covering a wide box would leave only a slice of them.
 import { computed, ref, watch } from 'vue';
 
 import { initials, tileGradient } from '../lib/item-image';
@@ -13,6 +14,8 @@ const props = defineProps<{
   src?: string | null;
   /** The item's name: its photo's text alternative and its initials. */
   name: string;
+  /** How the photo fills its box: all of it covered (default) or the whole photo shown. */
+  fit?: 'cover' | 'contain';
 }>();
 
 /** The current photo could not be loaded. */
@@ -38,6 +41,7 @@ const style = computed(() => (shown.value ? undefined : { background: tileGradie
     <img
       v-if="shown"
       class="item-image__photo"
+      :class="{ 'item-image__photo--contain': fit === 'contain' }"
       :src="shown"
       :alt="name"
       loading="lazy"
@@ -72,6 +76,9 @@ const style = computed(() => (shown.value ? undefined : { background: tileGradie
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.item-image__photo--contain {
+  object-fit: contain;
 }
 .item-image__initials {
   line-height: 1;

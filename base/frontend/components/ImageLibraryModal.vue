@@ -293,7 +293,7 @@ const tid = (part: string) => `${props.testid}-${part}`;
 <style scoped>
 .image-library__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
   gap: 12px;
 }
 .image-library__tile {

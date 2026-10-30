@@ -344,4 +344,18 @@ describe('ServiceFormModal: photo', () => {
     await settle();
     expect(writes(s).map((call) => call.body)).toEqual([{ id: 's1' }, { id: 's1', image: '' }]);
   });
+
+  it('closing without saving discards the photo chosen; opening another service shows its own', async () => {
+    const s = await setup(WITH_PHOTO);
+    await click(s.inDoc('service-form-image-remove'));
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.inDoc('service-form-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(WITH_PHOTO.image_url);
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ service: { ...CUT, id: 's2', name: 'Beard trim' }, open: true });
+    await settle();
+    expect(s.inDoc('service-form-image-preview')?.querySelector('img')).toBeNull();
+    expect(s.inDoc('service-form-image-preview')?.textContent?.trim()).toBe('BT');
+  });
 });

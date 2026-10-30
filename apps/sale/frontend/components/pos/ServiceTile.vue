@@ -42,6 +42,7 @@ const price = computed(() => {
   >
     <ItemImage
       class="pos-tile__thumb"
+      fit="contain"
       :src="service.image_url"
       :name="service.name"
       aria-hidden="true"

@@ -287,4 +287,19 @@ describe('MenuFormModal: photo', () => {
     await settle();
     expect(writes(s).map((call) => call.body)).toEqual([{ id: 'm1' }, { id: 'm1', image: '' }]);
   });
+
+  it('closing without saving discards the photo chosen; opening another menu shows its own', async () => {
+    const s = await setup(WITH_PHOTO);
+    await click(s.inDoc('combo-menu-form-image-remove'));
+    expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')).toBeNull();
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(MENU_DIA.url);
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ combo: { ...MENU, id: 'm2', name: 'Kids menu' }, open: true });
+    await settle();
+    expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')).toBeNull();
+    expect(s.inDoc('combo-menu-form-image-preview')?.textContent?.trim()).toBe('KM');
+  });
 });

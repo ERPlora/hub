@@ -53,6 +53,7 @@ const failed = computed(() => !!error.value && !['app_inactive', 'permission_den
   >
     <ItemImage
       class="pos-menu__thumb"
+      fit="contain"
       :src="menu.image_url"
       :name="menu.name"
       aria-hidden="true"

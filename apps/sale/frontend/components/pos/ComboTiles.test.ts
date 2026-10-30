@@ -74,6 +74,7 @@ describe('ComboTiles', () => {
       'Menú del día',
       'lazy',
     ]);
+    expect(thumb.get('img').classes()).toContain('item-image__photo--contain');
     expect(s.find('pos-menu-m2').find('.pos-menu__thumb').text()).toBe('MI');
     await thumb.get('img').trigger('error');
     expect(s.find('pos-menu-m1').find('.pos-menu__thumb').text()).toBe('MD');

@@ -63,6 +63,7 @@ describe('ServiceTile', () => {
       service().name,
       'lazy',
     ]);
+    expect(thumb.get('img').classes()).toContain('item-image__photo--contain');
     await thumb.get('img').trigger('error');
     expect(thumb.find('img').exists()).toBe(false);
     expect(thumb.text()).toBe('CD');
