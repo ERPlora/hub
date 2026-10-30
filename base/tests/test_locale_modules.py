@@ -7,9 +7,9 @@ against the later module: that is the one Spanish gets wrong, and its cure lives
 own goes through ``pgettext_lazy`` with a context of its own, or says it the earlier way when the sense is the same.
 The earlier module says it first and is right; moving a module in ``INSTALLED_APPS`` would only move its cases onto
 another. Django's own apps (``admin``, ``auth``…) come before every module and count here too (``auth``'s ``active``
-is «activo»); the platform (``control``, ``base``) and ``live`` against the modules are
-``base/tests/test_locale_platform.py`` and ``tests/test_live_translations.py``. A contexted message only meets the
-same message with the same context; plural forms are left out.
+is «activo»); the platform's (``control``, ``base``) and ``live``'s messages without context against the modules
+are ``base/tests/test_locale_platform.py`` and ``tests/test_live_translations.py``, and their contexted ones count
+here. A contexted message only meets the same message with the same context; plural forms are left out.
 """
 
 from pathlib import Path
@@ -68,10 +68,10 @@ def spoken() -> list[tuple[str, str, str, str, str]]:
 
 def shadowed() -> dict[str, list[str]]:
     """Each module's messages that Spanish shows in an earlier app's words, by module; the platform's and ``live``'s
-    are their own tests'."""
+    without context are their own tests' (which leave the contexted ones out)."""
     cases: dict[str, list[str]] = {}
     for module, message, text, app, shown in spoken():
-        if shown != text and app not in (*PLATFORM, "live"):
+        if shown != text and (app not in (*PLATFORM, "live") or "\x04" in message):
             cases.setdefault(module, []).append(f"{module}: {message!r} «{text}», Spanish says {app}'s «{shown}»")
     return cases
 
