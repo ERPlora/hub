@@ -18,6 +18,7 @@ import globalSetup, {
   type CommandResult,
   type Spawn,
 } from './global-setup';
+import { STACK } from './stack';
 
 const HUB_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -478,5 +479,13 @@ describe('globalSetup', () => {
     expect(() => globalSetup({ workers: 1 }, manage.run, () => ({ status: 0, stdout: '', stderr: '' }))).toThrow(
       'lacks the demo accounts the specs sign in with: owner@example.com, employee@example.com',
     );
+  });
+
+  it("offers the seed with the ids and the port of this stack's Hub, never its SaaS's", () => {
+    const manage = readyManagePy();
+    const none = (): CommandResult => ({ status: 0, stdout: '', stderr: '' });
+
+    expect(() => globalSetup({ workers: 1 }, manage.run, none)).toThrow(`HUB_INTERNAL_URL=http://127.0.0.1:${STACK.hubPort} `);
+    expect(() => globalSetup({ workers: 1 }, manage.run, none)).toThrow(`psql -U hub -d ${STACK.database} -At -c `);
   });
 });
