@@ -20,7 +20,7 @@ from io import StringIO
 import psycopg
 import pytest
 from django.core.management import CommandError, call_command
-from django.db import DatabaseError, OperationalError, connection
+from django.db import DatabaseError, OperationalError, connection, connections
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.recorder import MigrationRecorder
 
@@ -65,8 +65,13 @@ def templates_built(django_db_setup, django_db_blocker):
     """This module's templates, built once on the test database's server and dropped at its end."""
     with pytest.MonkeyPatch.context() as patch, django_db_blocker.unblock():
         patch.setattr(migrator, "templates", small_templates)
-        for template in small_templates():
-            migrator.ensure_template(template)
+        before = connections.settings
+        try:
+            for template in small_templates():
+                migrator.ensure_template(template)
+        finally:
+            # Its aliases would outlive the module, and a later test case refuses an alias it was not told about.
+            hubs.forget_aliases(before)
         yield small_templates()
         for template in reversed(small_templates()):
             hubs.drop_database(template.db_name)
@@ -315,6 +320,12 @@ def test_every_server_gets_its_templates_and_each_hub_migrates_on_its_own(
     finally:
         for name in reversed(made):
             hubs.drop_database(name, control=second_control)
+
+
+def test_the_templates_of_this_module_leave_no_migrator_alias_behind(small):
+    """A ``__ddl`` alias left in the settings breaks every later test case of the process that reaches all of them
+    (``makemigrations --check``'s consistency check: «queries to '…__ddl' are not allowed in this test»)."""
+    assert [alias for alias in connections.settings if alias.endswith(names.DDL_SUFFIX)] == []
 
 
 def test_a_failure_exits_non_zero_with_the_reason(monkeypatch):
