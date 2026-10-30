@@ -116,10 +116,11 @@ def create_database(name: str) -> None:
         )
 
 
-def drop_database(name: str) -> None:
-    """Drop the database ``name`` if it exists, whoever is still connected to it."""
+def drop_database(name: str, *, control: str | None = None) -> None:
+    """Drop the database ``name`` (one of ``control``'s names, default this session's) if it exists, whoever is still
+    connected to it."""
     with _maintenance() as conn:
-        _drop(conn, name, tenancy_connections.control_name())
+        _drop(conn, name, tenancy_connections.control_name() if control is None else control)
 
 
 def forget_aliases(before: dict) -> None:
@@ -228,9 +229,8 @@ def make_hub(db, make_cluster):
 
     def make(db_name: str = "", **fields) -> Hub:
         fields.setdefault("id", uuid.uuid7())
-        made.append(
-            Hub.objects.create(slug=f"t-{uuid.uuid4().hex[:12]}", status=Hub.Status.READY, db_name=db_name, **fields)
-        )
+        fields.setdefault("status", Hub.Status.READY)
+        made.append(Hub.objects.create(slug=f"t-{uuid.uuid4().hex[:12]}", db_name=db_name, **fields))
         return made[-1]
 
     yield make

@@ -4,12 +4,14 @@
 
 1. the control database (``default``), under a session advisory lock, so two overlapping deploys never migrate it at
    once (the second waits, then finds nothing to apply): ``migrate_control``;
-2. the templates, as canaries (``templates``, ``ensure_template``): ``<control>_template``, the platform alone, and one
+2. the templates, as canaries, on every server the hubs live on (``clusters_to_migrate``: ``CREATE DATABASE …
+   TEMPLATE`` clones only within one): ``<control>_template``, the platform alone, and one
    ``<control>_template_<vertical>`` per vertical of ``base.catalog``, cloned from it, with the tables of that
-   vertical's apps and every app off (PLAN-DB round 2026-10-30, proposal (h)). One missing is created; one whose list
-   changed is brought up to date, never rebuilt;
+   vertical's apps and every app off (PLAN-DB round 2026-10-30, proposal (h)) (``templates``, ``ensure_template``).
+   One missing is created; one whose list changed is brought up to date, never rebuilt;
 3. every hub with a database of its own that is behind the code (``is_behind``, from ``Hub.schema_apps``: a deploy
-   without migrations opens none), ERPlora's own first, then at most ``HUB_WORKERS`` at once: ``migrate_hubs_behind``.
+   without migrations opens none), each on its own server, ERPlora's own first, then at most ``HUB_WORKERS`` at once:
+   ``migrate_hubs_behind``.
 
 ``ensure_schema(hub, add=())`` is the only function that changes a hub's schema (PLAN-DB §7): through the hub's direct
 ``<db_name>__ddl`` alias, under the schema lock of that database (``pg_try_advisory_lock(hashtext('erplora.schema'))``:
@@ -22,8 +24,9 @@ It never steps back and never deletes a table. ``pending_control``, ``pending_te
 The only module of ``base/`` and ``apps/`` that names a connection by hand and takes session advisory locks
 (``tests/test_guardrails.py``): the control database and the hubs' ``__ddl`` aliases are reached directly, never through
 PgBouncer, so a session lock holds for as long as its function runs. ``CREATE DATABASE`` (a missing template) goes
-through a direct autocommit connection to the ``postgres`` database with the migrator's credentials (``default``'s in
-the ``hub-migrate`` task: ``hub_migrator``), a database's name only as ``sql.Identifier`` (``base.tenancy.names``).
+through a direct autocommit connection to that server's ``postgres`` database, a database's name only as
+``sql.Identifier`` (``base.tenancy.names``). On a hub's or a template's server the migrator connects with its own
+credentials (``migrator_credentials``: ``hub_migrator``'s in the ``hub-migrate`` task and the worker).
 """
 
 import copy
@@ -36,11 +39,11 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
+import decouple
 import psycopg
-from decouple import config
 from django.apps import apps as django_apps
 from django.core.management import call_command
-from django.db import DEFAULT_DB_ALIAS, connections
+from django.db import DEFAULT_DB_ALIAS, Error, connections
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.recorder import MigrationRecorder
@@ -122,7 +125,7 @@ class ClusterTarget:
     host: str
     port: int
     migrator_user: str
-    migrator_password: str
+    migrator_password: str = field(repr=False)
     control: str
     cluster_id: uuid.UUID | None = None
 
@@ -342,8 +345,8 @@ def migrator_credentials(cluster) -> tuple[str, str]:
     """
     settings = connections.settings[DEFAULT_DB_ALIAS]
     return (
-        config("DB_MIGRATOR_USER", default=settings["USER"]),
-        config("DB_MIGRATOR_PASSWORD", default=settings["PASSWORD"]),
+        decouple.config("DB_MIGRATOR_USER", default=settings["USER"]),
+        decouple.config("DB_MIGRATOR_PASSWORD", default=settings["PASSWORD"]),
     )
 
 
@@ -435,7 +438,7 @@ def ensure_schema(hub, *, add: Iterable[str] = (), lock_wait: float = SCHEMA_LOC
     applied, has = _migrate_database(
         hub.db_name, target, lambda found: set(platform_apps()) | found | added, lock_wait
     )
-    installed = {config.label for config in django_apps.get_app_configs()}
+    installed = {app.label for app in django_apps.get_app_configs()}
     schema_apps = {label: name for label, name in (hub.schema_apps or {}).items() if label not in installed} | has
     Hub.objects.filter(pk=hub.pk).update(
         schema_apps=schema_apps, schema_state=Hub.SchemaState.CURRENT, updated_at=timezone.now()
@@ -497,8 +500,12 @@ def _migrate_database(
             applied = migrate_apps(alias, targets(set(_last_migrations(connection))))
             return applied, _last_migrations(connection)
         finally:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT pg_advisory_unlock(hashtext('erplora.schema'))")
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_advisory_unlock(hashtext('erplora.schema'))")
+            except Error:
+                # Never hides why the run failed: the lock goes with the session, closed below.
+                logger.warning("migrate_hubs: the schema lock of %s could not be released; closing.", db_name)
     finally:
         # Closing ends the session, and with it any lock it still held.
         connection.close()
@@ -582,12 +589,6 @@ def hubs_with_a_database() -> list:
     )
 
 
-def hubs_behind() -> list:
-    """Of ``hubs_with_a_database``, the ones behind the code (``is_behind``); opens none of their databases."""
-    leaves = code_leaves()
-    return [hub for hub in hubs_with_a_database() if is_behind(hub, leaves)]
-
-
 def migrate_hubs_behind(*, workers: int = HUB_WORKERS) -> HubsPass:
     """``ensure_schema`` of every hub behind: ERPlora's own first, then the rest ``workers`` at a time. A hub that
     fails is marked ``behind`` (its traceback logged) and the others go on."""
@@ -617,18 +618,19 @@ def _migrate_hub_in_thread(hub) -> str | None:
 
 def _migrate_hub(hub) -> str | None:
     """``ensure_schema(hub)``, tried again on a lock timeout; ``None`` if done, else why it was left behind."""
-    for attempt in range(1, LOCK_TIMEOUT_ATTEMPTS + 1):
+    attempt = 1
+    while True:
         try:
             ensure_schema(hub)
             return None
         except Exception as error:
             if _is_lock_timeout(error) and attempt < LOCK_TIMEOUT_ATTEMPTS:
                 logger.warning("migrate_hubs: %s hit a lock timeout (attempt %d), trying again.", hub.slug, attempt)
+                attempt += 1
                 continue
             logger.exception("migrate_hubs: the hub %s (%s) was left behind.", hub.slug, hub.db_name)
             _mark_behind(hub)
             return f"{type(error).__name__}: {error}"
-    raise AssertionError("unreachable: the last attempt returns")
 
 
 def _mark_behind(hub) -> None:

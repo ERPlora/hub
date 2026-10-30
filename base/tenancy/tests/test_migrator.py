@@ -65,7 +65,8 @@ def database_oid(name: str) -> int | None:
 
 def rows(name: str, table: str) -> int:
     with hubs._maintenance(name) as conn:
-        return conn.execute(psycopg.sql.SQL("SELECT count(*) FROM {}").format(psycopg.sql.Identifier(table))).fetchone()[0]
+        query = psycopg.sql.SQL("SELECT count(*) FROM {}").format(psycopg.sql.Identifier(table))
+        return conn.execute(query).fetchone()[0]
 
 
 def tables_of(apps) -> set[str]:
@@ -168,6 +169,7 @@ def test_the_open_clusters_and_the_closed_ones_with_hubs_are_migrated_through_th
         control=control(),
         cluster_id=opened_one.id,
     )
+    assert "its-secret" not in repr(target)  # never in a log or a test's report
 
 
 def test_the_settings_own_server_stays_while_a_hub_without_a_cluster_lives_on_it(make_cluster, make_hub):
@@ -354,6 +356,19 @@ def test_a_failed_run_leaves_neither_the_lock_nor_the_connection(new_database, m
         assert other.execute("SELECT pg_try_advisory_lock(hashtext('erplora.schema'))").fetchone()[0]
     hub.refresh_from_db()
     assert hub.schema_apps == {}
+
+
+def test_a_failed_run_reports_its_own_error_even_when_its_connection_died(new_database, make_hub, monkeypatch):
+    hub = make_hub(new_database)
+
+    def dying(alias, labels):
+        connections[alias].connection.close()  # the server went away in the middle of the run
+        raise RuntimeError("the migration broke")
+
+    monkeypatch.setattr(migrator, "migrate_apps", dying)
+
+    with pytest.raises(RuntimeError, match="the migration broke"):
+        migrator.ensure_schema(hub)
 
 
 def test_two_runs_on_one_hub_at_once_one_waits_and_neither_fails(new_database, monkeypatch, make_hub):
