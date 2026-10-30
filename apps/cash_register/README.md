@@ -42,7 +42,7 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
 | `requires` | `["sale"]`; Ventas no requiere Caja (sería un ciclo): pregunta por nombre a `cash_register.session.current` |
 | Usa de otras apps | Ventas, su requisito: lee `Sale`, `SalePayment`, `RefundPayment` y sus cuentas abiertas (`sale.order.list`). Sin requisito, por nombre: Cocina (`kitchen.ticket.board`) e Impresión (`printing.job.summary`; `printing.job.create` encola el informe) |
 | Pantallas | `/cash_register/sessions`, `/cash_register/sessions/:id`, `/cash_register/settings` |
-| Operaciones | 9 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=`; rutas en `/api/cash_register/…` |
+| Operaciones | 10 consultas (`queries.py`) y 9 acciones (`services.py`), todas con `ai=`; rutas en `/api/cash_register/…` |
 | Eventos | 7, `cash_register.<entidad>.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Tarea programada | `auto_close_sessions` → `cash_register.session.auto_close`, `*/5 * * * *`, `collapse` (la corre el worker) |
 | Migraciones | `0001_initial`; los índices que necesita de Ventas están en `sale/0005_cash_register_indexes` |

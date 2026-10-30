@@ -371,7 +371,7 @@ Pasos:
    quien no lo ve no se lo dice: el asistente tampoco lo conoce, F07), y lo que la revisión del turno
    encuentre pendiente (F08).
 6. Después sale «¿Ejecutar esta acción?» con «Cerrar en Caja. Revisa cada dato antes de seguir.», la
-   sesión y el efectivo contado y, en «Lo que va a pasar», lo que da el cierre: la «Sesión», el «Cajón»
+   sesión por su número (nunca por su código interno) y el efectivo contado y, en «Lo que va a pasar», lo que da el cierre: la «Sesión», el «Cajón»
    (si la sesión tiene uno), el «Esperado en el cajón» y la «Diferencia», con la moneda del negocio (con
    el arqueo ciego, a quien no ve el esperado no le salen esos dos, F07). Escribe «CONFIRMAR» y pulsa
    «Ejecutar». Se cierra esa misma sesión, a tu nombre y con los tres importes, igual que desde la
@@ -575,7 +575,10 @@ Implicados: CASH_REGISTER-F04, F10, F13
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de la propia
 persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: una sesión se
 nombra por su número («S-261014-0001») y, si no se dice cuál, se entiende la abierta («cierra la
-caja», «apunta una salida de 20 €»); un cajón, por su nombre.
+caja», «apunta una salida de 20 €»); un cajón, por su nombre. La confirmación del asistente los dice
+igual: la sesión que cuenta, apunta, cierra o imprime, por su número, y el cajón que abre o cambia, por
+su nombre, nunca por su código interno; los lee con los permisos de quien lo pide, así que a quien no
+puede ver las sesiones no le nombra ninguna.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -583,6 +586,7 @@ caja», «apunta una salida de 20 €»); un cajón, por su nombre.
 |---|---|---|---|
 | Los ajustes de caja (los de fábrica si nunca se guardaron, sin fecha de guardado) | ver sesiones | F01 | `cash_register.settings.get` |
 | Los cajones, con búsqueda por nombre, filtro de activos y páginas (hasta 100) | ver sesiones | F02, F03 | `cash_register.register.list` |
+| Un cajón por su id, activo o no: su nombre (el que dice la confirmación del asistente) | ver sesiones | F02, F03 | `cash_register.register.get` |
 | Las sesiones, de la más reciente a la más antigua (o por cuándo se cerraron), con búsqueda por número, filtros (estado, número, cajón, fechas e importes) y páginas | ver sesiones | F03, F09, F12 | `cash_register.session.list` |
 | La sesión abierta con su esperado (si quien pregunta puede verlo), si la caja está activada y los cobros fuera de turno (cuántos y su efectivo) | ver sesiones | F04, F10, F12, F17 | `cash_register.session.current` |
 | Una sesión (por id o número) con su resumen: ventas por forma de pago, devoluciones, entradas, salidas, invitaciones, esperado, contado y diferencia | ver sesiones | F11, F16 | `cash_register.session.get` |
