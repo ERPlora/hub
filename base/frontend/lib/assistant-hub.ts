@@ -1,5 +1,6 @@
 // The Hub's configuration of the shared assistant (`@erplora/ui/components`; the SaaS mounts the same chat with its
-// own): `configureAssistant(HUB_ASSISTANT)` when the SPA boots (main.ts) and before every test (vitest.setup.ts).
+// own): `configureAssistant(HUB_ASSISTANT)` when the SPA boots (main.ts), and in the test helpers that mount its pieces
+// (`mountBase`, `mount-sale`).
 // - A turn goes to `base.assistant.turn`'s route; the allowance, a dictation and a report through base's operations.
 // - Whoever sees the Home uses it (BASE-G110); whoever administers the business upgrades the plan, on erplora.com's
 //   page the Home's block gives (gh:hub#1259).
@@ -88,7 +89,7 @@ export function hubApproval(ask?: AskApproval): AssistantApproval {
 }
 
 /** base's modules are read when each piece runs, never when this is built: a test that mocks one of them (an app's
- *  `approval` without `approvalPass`) still loads it (vitest.setup.ts configures it before each test). */
+ *  `approval` without `approvalPass`) still loads this file through a helper that configures it. */
 export const HUB_ASSISTANT: AssistantConfig = {
   turnUrl: '/api/assistant/turn',
   elevationToken: () => approvalPass(),

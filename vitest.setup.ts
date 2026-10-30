@@ -8,8 +8,7 @@
 // naming where it was armed. It watches the real timers, not Vitest's fake clock: a file with fake timers of its
 // own works as before, and a timer put on a fake clock dies with that clock — it cannot outlive the page.
 // A page mounted alone paints the icons the running app paints (`createShell` registers them when the app starts), and
-// Ionic's elements attach as in a browser (`fillHappyDomGaps`, as packages/ui's own setup does). The shared assistant
-// is configured as the Hub boots it by the second setup file, base/frontend/__tests__/assistant.setup.ts.
+// Ionic's elements attach as in a browser (`fillHappyDomGaps`, as packages/ui's own setup does).
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

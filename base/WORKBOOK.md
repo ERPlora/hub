@@ -3154,8 +3154,8 @@ Implicados: ACCOUNTS-F38
   en `frontend/main.ts`. El Hub lo configura con `configureAssistant(HUB_ASSISTANT)` (`base/frontend/lib/assistant-hub.ts`:
   ruta del turno, `base.assistant.usage`/`transcribe`/`report`, `base.view_home` para usarlo, `base.administer_hub` y
   el `plan_url` de `hub-home` para mejorar el plan, la aprobación de encargado y los verbos y pantallas del catálogo de
-  `base`) al arrancar y antes de cada test (`vitest.setup.ts`), y le pone su conversación vacía con los atajos de la
-  configuración (`AssistantSetupEmpty.vue`, en el slot `empty` del panel). Los textos propios del chat son
+  `base`) al arrancar y en los helpers de test que montan sus piezas (`mountBase`, `mount-sale`), y le pone su
+  conversación vacía con los atajos de la configuración (`AssistantSetupEmpty.vue`, en el slot `empty` del panel). Los textos propios del chat son
   `assistantMessages` del paquete (raíz `assistant`, `en` + `es`), que `appMessages` de `frontend/main.ts` mezcla con
   los de las apps; en `base.assistant` quedan solo los del Hub (`more`, `empty`, `setupIntro`, `shortcuts`, `setup`,
   `card.actions`, `card.operations` y `screens`). Estado por pestaña en `state.ts` del paquete; la conversación, en

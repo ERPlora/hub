@@ -85,10 +85,9 @@ describe('vite.config', () => {
     expect(config.test?.exclude).toEqual(['**/node_modules/**', '**/dist/**']);
   });
 
-  it('runs the hub setup before every test file: no real timer outlives a test, and the assistant is the Hub\'s', () => {
-    // As packages/ui's; proven by its own test (vitest.setup.test.ts), which the suite collects. The assistant's, a
-    // file of base's tests (its type project is the tests', not the root config's).
-    expect(config.test?.setupFiles).toEqual(['./vitest.setup.ts', './base/frontend/__tests__/assistant.setup.ts']);
+  it('runs the hub setup before every test file: no real timer outlives a test', () => {
+    // As packages/ui's; proven by its own test (vitest.setup.test.ts), which the suite collects.
+    expect(config.test?.setupFiles).toEqual(['./vitest.setup.ts']);
     expect(config.test?.include).toEqual(expect.arrayContaining(['vitest.setup.test.ts']));
   });
 });
