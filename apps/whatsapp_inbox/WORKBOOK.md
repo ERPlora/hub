@@ -1635,7 +1635,7 @@ la ficha de otra persona (`reservation.customer_mismatch`, RESERVATION-F18, rese
 las reglas de un cliente que reserva él mismo y sin tocar la mesa ni las notas internas,
 `reservation.staff_only_field`). Por eso el encargo no menciona `on_behalf_of`. Lo prueban
 `tests/test_relay_auto_replies.py::test_the_answer_never_cancels_or_changes_another_guest_s_reservation_whatever_the_assistant_sends`
-y `tests/test_recipes.py::test_the_table_answer_changes_and_cancels_only_on_their_card_fixed_by_the_answer_never_by_the_assistant`.
+y `tests/test_recipes.py::test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_behalf`.
 La tarjeta de Ajustes enciende la respuesta y su aviso (F26). La receta cambió de huella al añadir la anulación y otra
 vez al fijar la ficha: quien ya la tenía encendida la ve como versión nueva en Automatizaciones y la actualiza con F18
 (lo mismo que **Restaurar la de fábrica**, FLOW-F35); hasta entonces sigue con el encargo viejo, que pide la ficha al

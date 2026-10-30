@@ -234,7 +234,7 @@ def test_the_table_answer_that_did_it_on_its_own_would_not_be_offered(monkeypatc
 THEIR_CARD = "{{steps.s6.id}}{{steps.s7.id}}"
 
 
-def test_the_table_answer_changes_and_cancels_only_on_their_card_fixed_by_the_answer_never_by_the_assistant():
+def test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_behalf():
     """F25: ``on_behalf_of`` is fixed by the step (FLOW-F38), which the assistant never sees nor can change: the prompt
     does not ask it for it, and still names the reservation it may cancel, the one read before by their number."""
     for language in ("en", "es"):

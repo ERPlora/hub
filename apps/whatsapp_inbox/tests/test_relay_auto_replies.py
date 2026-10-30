@@ -392,19 +392,19 @@ def tool_inputs(seen, name: str) -> set[str]:
     return set(tool["parameters"].get("properties", {}))
 
 
-@pytest.mark.parametrize("whose", [None, "marta"], ids=["leaves_it_out", "names_marta"])
+@pytest.mark.parametrize("naming", ["by_id", "by_id_on_marta_s_behalf", "by_her_name_and_day"])
 @pytest.mark.parametrize(
     ("tool", "change"),
     [("reservation.reservation.cancel", {}), ("reservation.reservation.update", {"time": "22:00"})],
     ids=["cancel", "update"],
 )
 def test_the_answer_never_cancels_or_changes_another_guest_s_reservation_whatever_the_assistant_sends(
-    gateway, tick, django_capture_on_commit_callbacks, tool, change, whose  # noqa: F811 - the fixture
+    gateway, tick, django_capture_on_commit_callbacks, tool, change, naming  # noqa: F811 - the fixture
 ):
     """F25: whose card a change goes on is fixed by the answer to the card of the number that writes, never asked of
-    the assistant (FLOW-F38). Lucía asks to cancel or move Marta's table and the assistant names it by its id, without
-    saying on whose behalf or saying Marta's: after the yes, Marta's reservation is as it was and the assistant hears
-    Reservas' refusal."""
+    the assistant (FLOW-F38). Lucía asks to cancel or move Marta's table and the assistant names it by its id or by
+    Marta's name and day, saying nothing of on whose behalf or saying Marta's: after the yes, Marta's reservation is as
+    it was and the assistant hears Reservas' refusal."""
     connect()
     open_week()
     run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
@@ -413,9 +413,13 @@ def test_the_answer_never_cancels_or_changes_another_guest_s_reservation_whateve
     marta = run("customer.customer.create", {"name": "Marta Ruiz", "phone": "600999888"}, ctx_for("hub_owner"))
     day = timezone.localdate() + dt.timedelta(days=3)
     theirs = make_reservation(
-        date=day, time="21:00", customer_id=marta.id, guest_name="Marta", guest_phone="+34600999888", party_size=2
+        date=day, time="21:00", customer_id=marta.id, guest_name="Marta Ruiz", guest_phone="+34600999888", party_size=2
     )
-    sent = {"id": str(theirs.id), **change, **({"on_behalf_of": str(marta.id)} if whose else {})}
+    sent = {
+        "by_id": {"id": str(theirs.id)},
+        "by_id_on_marta_s_behalf": {"id": str(theirs.id), "on_behalf_of": str(marta.id)},
+        "by_her_name_and_day": {"guest": "Marta Ruiz", "day": day.isoformat()},
+    }[naming] | change
     gateway.reply(CHAT, json=wants(tool, sent))
     gateway.reply(CHAT, json=said("No encuentro ninguna reserva a tu nombre."))
     lucia_writes("Anula la reserva de Marta Ruiz del sábado" if not change else "Pasa la de Marta Ruiz a las 22")
