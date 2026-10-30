@@ -931,7 +931,7 @@ def paid(arguments: dict, language: str = "es") -> dict:
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    ("sent", "money", "line"),
+    ("sent", "money"),
     [
         ("USD", USD),
         ("JPY", {"currency": "JPY", "decimals": 0}),
@@ -1112,6 +1112,19 @@ def test_a_record_is_read_only_for_its_amounts_and_one_not_named_leaves_the_busi
     assert ledger_reads == []
     assert entered(ENTRY)["price"] == {"name": "price", "kind": "money", "value": 1500}
     assert ledger_reads == []
+
+
+def test_the_model_is_told_an_amount_on_a_record_is_in_that_records_currency():
+    """A line of a cart in dollars, a price of a list in yen: its tool carries the mark on the datum that names the
+    record, and its instructions say the amount beside it is in the minor unit of that record's currency."""
+    parameters = assistant.tool_spec(priced(LedgerEntryIn))["parameters"]
+    assert assistant._resolved(parameters["properties"]["ledger_id"], parameters.get("$defs", {}))["currency"] == {
+        "read": "demo.item.ledger",
+        "by": "id",
+        "code": "code",
+    }
+    text = assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
+    assert '`"currency": {"read": …}`' in text and '`"currency": true`' in text
 
 
 def currency_errors() -> list:

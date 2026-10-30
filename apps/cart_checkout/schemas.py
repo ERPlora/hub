@@ -30,7 +30,7 @@ from apps.cart_checkout.models import (
     SESSION_MAX_LENGTH,
     SKU_MAX_LENGTH,
 )
-from base.schemas import names
+from base.schemas import in_currency_of, names
 
 T = TypeVar("T")
 
@@ -154,15 +154,20 @@ class Page(Schema, Generic[T]):
 
 
 class CartRefIn(In):
-    cart_id: UUID | None = Field(None, description="The cart's id.", json_schema_extra=A_CART)
+    cart_id: UUID | None = Field(
+        None, description="The cart's id.", json_schema_extra={**A_CART, **in_currency_of("cart_checkout.cart.get", by="cart_id")}
+    )
     session_token: SessionCode | None = Field(
-        None, description="The cart's session code (e.g. sess_a1b2c3), when its id is not known."
+        None,
+        description="The cart's session code (e.g. sess_a1b2c3), when its id is not known.",
+        json_schema_extra=in_currency_of("cart_checkout.cart.get", by="session_token"),
     )
     customer: Said | None = Field(
         None,
         title=gettext_noop("Customer"),
         description="The cart's customer, when neither its id nor its code is known: their exact email "
         "or part of their name (e.g. said aloud).",
+        json_schema_extra=in_currency_of("cart_checkout.cart.get", by="customer"),
     )
 
     @model_validator(mode="after")

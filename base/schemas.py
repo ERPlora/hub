@@ -21,6 +21,12 @@ def names(read: str, by: str = "id", name: tuple[str, ...] = ("name",)) -> dict:
     return {"refers": {"read": read, "by": by, "name": list(name)}}
 
 
+def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:
+    """The mark of a datum that names a record in a currency of its own, a cart or a price list (base/assistant.py
+    ``CURRENCY``): the assistant's card says the amounts beside it in the currency ``read`` answers (its ``code``)."""
+    return {"currency": {"read": read, "by": by, "code": code}}
+
+
 #: A device by its name or, with none, by what it is («Chrome · macOS»), as Settings › Devices says it.
 DEVICE_NAMES = ("name", "agent")
 

@@ -6,11 +6,14 @@ pricing's: the titles of its schemas and the ``verbose_name`` of its models, wit
 import json
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from live.operations import get, registry
 
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
+
+from .conftest import ctx_for, make_list, make_product
 
 FRONTEND = Path(apps.get_app_config("pricing").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["pricing"]
@@ -58,3 +61,38 @@ def test_the_card_names_the_rule_it_changes_as_the_discount_rules_screen_does():
     for name in ("pricing.rule.update", "pricing.rule.deactivate", "pricing.rule.activate"):
         assert labels(assistant.card(get(name), {"rule": "VERANO"}, "es")) == ["Regla de descuento"]
         assert labels(assistant.card(get(name), {"rule": "VERANO"}, "en")) == ["Discount rule"]
+
+
+# ── A price in the currency of its list (BASE-F97) ────────────────────────────────────────────────────────────────────
+
+
+def priced(card: dict) -> dict:
+    """The price the card shows, as the screen paints it: its kind, its figure and its currency when it is not the
+    business's."""
+    [price] = [field for field in card["fields"] if field["name"] == "price"]
+    return {key: price[key] for key in ("kind", "value", "money") if key in price}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("currency", "money"),
+    [("USD", {"currency": "USD", "decimals": 2}), ("JPY", {"currency": "JPY", "decimals": 0})],
+    ids=["dollars", "yen"],
+)
+@pytest.mark.parametrize("named", ["price_list_id", "price_list"], ids=["by its id", "by its code"])
+def test_a_price_added_to_a_list_in_another_currency_is_said_in_that_currency(currency, money, named):
+    """«Pon el champú a 15 en la lista de dólares»: the price goes in the minor unit of the list's currency, and the
+    card said it in the business's («15,00 €»). It reads the list as the person, by what the write names it."""
+    price_list = make_list("DOLARES", currency=currency)
+    product = make_product("Shampoo", "SH-1")
+    which = {"price_list_id": str(price_list.id), "price_list": "DOLARES"}[named]
+    arguments = {named: which, "product_id": str(product.id), "price": 1500}
+    card = assistant.card(get("pricing.price_item.add"), arguments, "es", ctx_for(language="es"))
+    assert priced(card) == {"kind": "money", "value": 1500, "money": money}
+
+
+@pytest.mark.django_db
+def test_a_price_on_a_list_that_is_not_there_is_said_as_sent():
+    """No currency made up: the write refuses a list that does not exist, and the card does not paint a price in one."""
+    card = assistant.card(get("pricing.price_item.add"), {"price_list": "NADA", "product": "Shampoo", "price": 1500}, "es", ctx_for(language="es"))
+    assert priced(card) == {"kind": "text", "value": 1500}
