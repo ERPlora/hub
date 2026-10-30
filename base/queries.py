@@ -51,8 +51,10 @@ from base.schemas import (
     AppListOut,
     DeviceCurrentIn,
     DeviceCurrentOut,
+    DeviceByIdIn,
     DeviceListIn,
     DeviceListOut,
+    DeviceOut,
     ProfileIn,
     ProfileOut,
     BellCountersIn,
@@ -65,14 +67,18 @@ from base.schemas import (
     BusinessOut,
     DatasetListIn,
     DatasetListOut,
+    ImportIdIn,
     ImportListIn,
     ImportListOut,
+    ImportOut,
     DemoSlugIn,
     DemoStatusOut,
     EventListIn,
     EventListOut,
+    FailedEventIn,
     FailedEventListIn,
     FailedEventListOut,
+    FailedEventOut,
     FileListIn,
     FileListOut,
     FileOut,
@@ -95,7 +101,7 @@ from base.schemas import (
     WidgetListOut,
 )
 from base import people as people_rules
-from base.schemas import ApiKeyListIn, ApiKeyListOut, PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
+from base.schemas import ApiKeyIdIn, ApiKeyListIn, ApiKeyListOut, ApiKeyOut, PersonDetailOut, PersonIn, PersonListIn, PersonListOut, RoleListIn, RoleListOut
 from base.models import ApiKey
 from live.meta import module_configs
 from live.operations import registry as operation_registry
@@ -536,6 +542,22 @@ def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
 
 
 @operation(
+    "base.import.detail",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=ImportIdIn,
+    output=ImportOut,
+    ai={"description": "Reads one template or file loaded into this business, by its id, as the list of loads shows it."},
+)
+def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
+    """One load of Settings › Data (BASE-G107), as its row."""
+    load = ImportBatch.objects.filter(pk=data.id).first()
+    if load is None:
+        raise NotFound(gettext("This load is not there any more."))
+    return blueprint.describe_load(load)
+
+
+@operation(
     "base.dataset.list",
     kind="query",
     permission=ADMINISTER_HUB,
@@ -766,6 +788,35 @@ def failed_event_list(ctx: OperationContext, data: FailedEventListIn) -> dict:
         return {"items": [_failed_event(delivery, on) for delivery in page], "total": failed.count()}
 
 
+@operation(
+    "base.failed_event.detail",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=FailedEventIn,
+    output=FailedEventOut,
+    ai={
+        "description": "Reads one failed event of this hub by its id, as the list of failed events shows it: the event, "
+        "the app that sent it and the one that could not take it, the attempts and whether it can be resent."
+    },
+)
+def failed_event_detail(ctx: OperationContext, data: FailedEventIn) -> dict:
+    """One failed event of System (a delivery the relay gave up on), of the hub of ``ctx`` only."""
+    delivery = (
+        EventDelivery.objects.select_related("event")
+        .filter(
+            pk=data.id,
+            status=EventDelivery.Status.DEAD,
+            event__scope_kind=ctx.scope.kind,
+            event__scope_key=ctx.scope.key,
+        )
+        .first()
+    )
+    if delivery is None:
+        raise NotFound(gettext("That failed event is no longer in the queue: refresh the list."))
+    with translation.override(ctx.language):
+        return _failed_event(delivery, active_apps(ctx.scope))
+
+
 def _failed_event(delivery: EventDelivery, on: frozenset[str]) -> dict:
     source = delivery.event.name.split(".", 1)[0]
     return {
@@ -974,16 +1025,37 @@ def device_current(ctx: OperationContext, data: DeviceCurrentIn) -> dict[str, An
 def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
     """«Devices» of Settings › General (BASE-G63): never a device's token, which is its proof. Phase 1 lists the rows
     of the shared table (every scope's), as every hub model does until each hub has its database."""
+    rows = _device_rows(ctx, list(TrustedDevice.objects.order_by("-last_entry_at")))
+    return {"devices": rows, "unused": sum(row["unused"] for row in rows)}
+
+
+@operation(
+    "base.device.detail",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=DeviceByIdIn,
+    output=DeviceOut,
+    ai={"description": "Reads one device someone entered this hub from, by its id, as the devices list shows it: its name first."},
+)
+def device_detail(ctx: OperationContext, data: DeviceByIdIn) -> dict[str, Any]:
+    """One device of «Devices» (BASE-G63), as its row: what the assistant's card names a device by."""
+    device = TrustedDevice.objects.filter(pk=data.id).first()
+    if device is None:
+        raise NotFound(gettext("That device is no longer registered here. Refresh the list."))
+    return _device_rows(ctx, [device])[0]
+
+
+def _device_rows(ctx: OperationContext, devices: list[TrustedDevice]) -> list[dict[str, Any]]:
+    """``devices`` as «Devices» lists them, with whether each has a session open now and until when."""
     now = timezone.now()
     here = device_of(ctx.request)
-    devices = list(TrustedDevice.objects.order_by("-last_entry_at"))
     until = dict(
         SessionOwner.objects.filter(host=ctx.scope.key, device_id__in=[d.pk for d in devices], session__expire_date__gt=now)
         .values("device_id")
         .annotate(until=Max("session__expire_date"))
         .values_list("device_id", "until")
     )
-    rows = [
+    return [
         {
             "id": device.pk,
             "name": device.name,
@@ -999,7 +1071,6 @@ def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
         }
         for device in devices
     ]
-    return {"devices": rows, "unused": sum(row["unused"] for row in rows)}
 
 
 def _unused(device: TrustedDevice, here: TrustedDevice | None, now) -> bool:
@@ -1350,6 +1421,26 @@ def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
     available = bool(hub is not None and hub.db_name)
     keys = [api_key_out(key) for key in ApiKey.objects.all()] if available else []
     return {"available": available, "keys": keys, "apps": api_apps(ctx)}
+
+
+@operation(
+    "base.api_key.detail",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=ApiKeyIdIn,
+    output=ApiKeyOut,
+    ai={
+        "description": "Reads one API key of this business by its id, as the list of keys shows it: its name, the start "
+        "of its token (never the whole), what it may do and whether it was revoked."
+    },
+)
+def api_key_detail(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
+    """One key of Employees › API keys; none while the business shares phase 1's database (``api_key_list``)."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    key = ApiKey.objects.filter(pk=data.id).first() if hub is not None and hub.db_name else None
+    if key is None:
+        raise NotFound(gettext("That key no longer exists. Refresh the list and try again."))
+    return api_key_out(key)
 
 
 # ── People and permissions: a manager's approval (APP-BASE-5) ──────────────────────────────────────────────────────

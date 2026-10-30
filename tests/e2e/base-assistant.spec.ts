@@ -528,6 +528,53 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
   await context.close();
 });
 
+// flow: assistant-card (BASE-F97)
+// FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a write of the platform that names its record by an id (removing a device,
+// revoking an API key…) no longer said which once the id left the card: now the card names it as its screen does — a
+// device by its name or, with none, by what it is, as Settings › Devices. Revoking an API key names its key the same way
+// (base/tests: hub `a` shares phase 1's database and has no keys to revoke here). Cancelled: the device stays.
+test('assistant-card — in Spanish removing a device names it as Settings › Devices does, never by its id', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES-device';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  type Device = { id: string; name: string; agent: string; current: boolean };
+  const listed = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
+  expect(listed.status, JSON.stringify(listed.data)).toBe(200);
+  const device = listed.data.devices.find((row) => row.current) ?? listed.data.devices[0];
+  expect(device, JSON.stringify(listed.data.devices)).toBeDefined();
+  // Named as the business names it in Settings › Devices (headless Chromium says no browser it knows, so it has nothing
+  // else to be said by), and given its name back at the end.
+  const rename = async (name: string) => {
+    const renamed = await api(context, A, 'POST', '/devices/rename', { id: device!.id, name });
+    expect(renamed.status, JSON.stringify(renamed.data)).toBe(200);
+  };
+  await rename('Barra');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  await ask(page, `E2E-ASK base__device__remove {"id":"${device!.id}"}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Quitar en Ajustes. Revisa cada dato antes de seguir.');
+    await expect(card(page)).toContainText('Registro: Barra');
+    await expect(card(page)).not.toContainText(device!.id);
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  const after = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
+  expect(after.data.devices.map((row) => row.id)).toContain(device!.id);
+  await rename(device!.name);
+  await context.close();
+});
+
 // flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
 // FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what a dangerous write sends («Persona:
 // saas:3»), never what it will do. Base's own preview: «Remove the PIN» names whose PIN goes, as its read

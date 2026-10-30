@@ -342,8 +342,9 @@ def _hidden(value: Any, prop: dict, defs: dict) -> Any:
 # ── Each datum in words: a moment, a value of a list, a record (FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES) ──
 
 #: The mark of a datum that names a record (``json_schema_extra={"refers": {"read": "<a query>", "by": "<its input>",
-#: "name": "<the datum of its answer that names it>"}}``): the card names it by that read, run as the person. A datum
-#: the schema says is an id (``format: uuid``) without it is left out of the card. ``base.E009`` checks it at start.
+#: "name": "<the datum of its answer that names it>"}}``, or a list of them: the first one not empty, as a device with
+#: no name is said by what it is): the card names it by that read, run as the person. A datum the schema says is an id
+#: (``format: uuid``) without it is left out of the card. ``base.E009`` checks it at start.
 REFERS = "refers"
 
 #: The moments a schema declares (``format``), said as the person's language writes them.
@@ -427,8 +428,15 @@ def _reference(value: Any, prop: dict, words: _Words) -> Any:
     failure, answer = _run(words.ctx, read, {declared.get("by"): value})
     if failure is not None:
         return _LEFT_OUT
-    name = answer.model_dump(mode="json").get(declared.get("name"))
-    return name if isinstance(name, str) and name.strip() else _LEFT_OUT
+    said = answer.model_dump(mode="json")
+    names = [said.get(field) for field in _names(declared)]
+    return next((name for name in names if isinstance(name, str) and name.strip()), _LEFT_OUT)
+
+
+def _names(declared: dict) -> list:
+    """The data of the read's answer that name the record, in the order the mark gives them."""
+    name = declared.get("name")
+    return [name] if isinstance(name, str) else name if isinstance(name, list) else []
 
 
 #: The type of a value each JSON Schema type names.
@@ -871,7 +879,12 @@ def _marks(prop: dict, defs: dict, path: str = "", depth: int = 0) -> list[tuple
 
 
 def _reference_problems(op: Operation, declared: Any) -> list[str]:
-    if not isinstance(declared, dict) or not all(isinstance(declared.get(key), str) for key in ("read", "by", "name")):
+    if (
+        not isinstance(declared, dict)
+        or not all(isinstance(declared.get(key), str) for key in ("read", "by"))
+        or not _names(declared)
+        or not all(isinstance(name, str) for name in _names(declared))
+    ):
         return ["is not a read, by and name"]
     read = registry.get(declared["read"])
     if read is None:
@@ -884,8 +897,8 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
         problems.append(f"names {read.name}, of {read.app_label}, which {op.app_label} does not require")
     if declared["by"] not in read.input.model_fields:
         problems.append(f"names {read.name}, which takes no {declared['by']}")
-    if declared["name"] not in _output_schema(read).get("properties", {}):
-        problems.append(f"names {read.name}, which gives no {declared['name']}")
+    given = _output_schema(read).get("properties", {})
+    problems += [f"names {read.name}, which gives no {name}" for name in _names(declared) if name not in given]
     return problems
 
 

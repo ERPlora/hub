@@ -15,12 +15,18 @@ from uuid import UUID
 
 import pytest
 from django.core import checks
+from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
 
-from base import assistant
-from base.models import Hub, Membership
+from base import access, assistant
+from base.models import Hub, Membership, TrustedDevice
+from base.tenancy import context
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
+from base.tests.test_record_details import api_key, failed_event, load, signed_in
+from base.tests.test_record_details import device as a_device
 from base.tests.test_services_assistant import call, turn
 
 A = Scope("host", "a")
@@ -180,6 +186,58 @@ def test_a_record_the_person_may_not_read_or_that_is_not_there_is_left_out_never
     assert values(assistant.card(op, {"person": "saas:3"}, "es")) == {}
 
 
+@pytest.mark.parametrize(("language", "label"), [("es", "Terracota"), ("en", "Terracotta")])
+def test_a_palette_is_said_by_the_name_my_profile_gives_it(language, label):
+    card = assistant.card(get("base.profile.preferences_set"), {"palette": "terracotta"}, language)
+    assert values(card) == {"palette": label}
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_every_record_a_write_of_base_names_by_its_id_is_named_on_its_card(client, hub_a, monkeypatch):
+    """«Revoke» an API key, remove or rename a device, resend or discard a failed event, undo a load or load again what
+    did not go in: the card says which, by the name its screen gives it (base's own reads by id), never by the id."""
+    monkeypatch.setattr(context, "_test_fallback", None)
+    signed_in(client, hub_a)
+    key, device, delivery, batch = (made(client, hub_a) for made in (api_key, a_device, failed_event, load))
+    owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=ADMIN, language="es")
+    writes = [
+        ("base.api_key.revoke", {"id": key}, {"id": "Tienda online"}),
+        ("base.device.remove", {"id": device}, {"id": "Barra"}),
+        ("base.device.rename", {"id": device, "name": "Caja"}, {"id": "Barra", "name": "Caja"}),
+        ("base.failed_event.retry", {"id": delivery}, {"id": "sale.sale.completed"}),
+        ("base.failed_event.discard", {"id": delivery, "reason": "Ya hecho"}, {"id": "sale.sale.completed", "reason": "Ya hecho"}),
+        ("base.import.undo", {"id": batch}, {"id": "Peluquería"}),
+        ("base.blueprint.import", {"retry_of": batch}, {"retry_of": "Peluquería"}),
+    ]
+    with use_hub(hub_a):
+        shown = {name: values(assistant.card(get(name), arguments, "es", ctx=owner)) for name, arguments, _ in writes}
+    assert shown == {name: expected for name, _, expected in writes}
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_device_nobody_named_is_said_by_what_it_is_as_the_devices_list_says_it(hub_a, monkeypatch):
+    """Settings › Devices shows «Unnamed device» and, under it, what it is («Chrome · macOS»): the card, the latter."""
+    monkeypatch.setattr(context, "_test_fallback", None)
+    with use_hub(hub_a):
+        device = TrustedDevice.objects.create(
+            token_digest=access.token_digest("unnamed"), agent="Chrome · macOS", last_entry_at=timezone.now()
+        )
+        owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=ADMIN, language="es")
+        assert values(assistant.card(get("base.device.remove"), {"id": str(device.pk)}, "es", ctx=owner)) == {
+            "id": "Chrome · macOS"
+        }
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_device_with_no_name_nor_a_browser_it_knows_is_left_out(hub_a, monkeypatch):
+    """Devices shows it only as «Unnamed device», which says nothing of which: the card leaves it out, never its id."""
+    monkeypatch.setattr(context, "_test_fallback", None)
+    with use_hub(hub_a):
+        device = TrustedDevice.objects.create(token_digest=access.token_digest("bare"), last_entry_at=timezone.now())
+        owner = OperationContext(scope=Scope("host", hub_a.slug), actor="saas:1", permissions=ADMIN, language="es")
+        assert values(assistant.card(get("base.device.remove"), {"id": str(device.pk)}, "es", ctx=owner)) == {}
+
+
 @pytest.mark.django_db
 def test_the_card_a_turn_shows_names_the_person_and_says_the_moment(make_user):
     make_user("saas:3", host="a", role=Membership.Role.EMPLOYEE, first_name="Eva", last_name="Gil")
@@ -239,7 +297,6 @@ def test_no_write_lets_an_id_or_an_iso_moment_reach_its_card():
 UNNAMED_REFERENCES = {
     "appointment": 34,
     "attendance": 6,
-    "base": 7,
     "cart_checkout": 10,
     "cash_register": 6,
     "combo": 25,
@@ -270,7 +327,6 @@ UNNAMED_REFERENCES = {
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models of their app give no label,
 #: by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
-    "base": 1,
     "invoice": 4,
     "kitchen": 1,
     "printing": 1,
@@ -392,6 +448,8 @@ def test_the_marks_of_every_app_are_sound():
         (marking({"read": "base.person.pin_remove", "by": "person", "name": "name"}), "not a read"),
         (marking({"read": "base.person.detail", "by": "who", "name": "name"}), "takes no who"),
         (marking({"read": "base.person.detail", "by": "person", "name": "full_name"}), "gives no full_name"),
+        (marking({"read": "base.person.detail", "by": "person", "name": ["name", "nick"]}), "gives no nick"),
+        (marking({"read": "base.person.detail", "by": "person", "name": []}), "is not a read, by and name"),
         (
             marking({"read": "appointment.appointment.get", "by": "id", "name": "number"}),
             "of appointment, which demo does not require",

@@ -1934,3 +1934,38 @@ msgstr "Archivo o carpeta"
 #: base/schemas.py
 msgid "Move to"
 msgstr "Mover a"
+
+#: models.py
+msgctxt "palette"
+msgid "The business's palette"
+msgstr "La paleta del negocio"
+
+#: models.py
+msgctxt "palette"
+msgid "Terracotta"
+msgstr "Terracota"
+
+#: models.py
+msgctxt "palette"
+msgid "Corporate"
+msgstr "Corporativo"
+
+#: models.py
+msgctxt "palette"
+msgid "Minimal"
+msgstr "Minimalista"
+
+#: models.py
+msgctxt "palette"
+msgid "Forest"
+msgstr "Bosque"
+
+#: models.py
+msgctxt "palette"
+msgid "Ocean"
+msgstr "Océano"
+
+#: models.py
+msgctxt "palette"
+msgid "Violet"
+msgstr "Violeta"
