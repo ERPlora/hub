@@ -31,6 +31,7 @@ from apps.whatsapp_inbox.schemas import (
     TemplateCreateIn,
     TemplateListIn,
     TemplateRefIn,
+    TemplateSampleRefIn,
     TemplateSampleUploadIn,
     TemplateUpdateIn,
 )
@@ -231,6 +232,11 @@ async def template_create(request, data: TemplateCreateIn):
 @decorate_view(accept_body_up_to(MAX_SAMPLE_BODY))
 async def template_upload_sample(request, data: TemplateSampleUploadIn):
     return await run_operation(request, services.upload_sample, data)
+
+
+@bind(router, "whatsapp_inbox.template_sample.detail", "/whatsapp_inbox/templates/samples/detail")
+async def template_sample_detail(request, params: Query[TemplateSampleRefIn]):
+    return await run_operation(request, queries.template_sample_detail, params)
 
 
 @bind(router, "whatsapp_inbox.template.update", "/whatsapp_inbox/templates/update")
