@@ -173,6 +173,23 @@ def _build() -> HubDatabases:
     return hubs
 
 
+@contextmanager
+def clone_of_the_template(hubs: HubDatabases, name: str) -> Iterator[str]:
+    """The database ``name``, cloned from the session's template as an alta does, before its identity is written;
+    dropped after the block (``WITH (FORCE)``: an alias the block left open does not keep it)."""
+    with _maintenance() as conn:
+        conn.execute(
+            sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                names.identifier(name, control=hubs.control), names.identifier(hubs.template, control=hubs.control)
+            )
+        )
+    try:
+        yield name
+    finally:
+        with _maintenance() as conn:
+            _drop(conn, name, hubs.control)
+
+
 def drop(hubs: HubDatabases) -> None:
     for alias in (HUB_A_ALIAS, HUB_B_ALIAS):
         connections[alias].close()
