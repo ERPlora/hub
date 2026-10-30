@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:868922c7d6f33e438c61edf6b9d7c52cfff48245d75c18701870f29c8cfad120 -->
+<!-- generated from WORKBOOK.md sha256:9705b92b104698836eefe4234f4b4dfe3f4a0ca77c790852caf5eba2f8f2c853 -->
 
 ## What it is for and who it is for
 
@@ -2266,7 +2266,9 @@ Steps:
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
      desk", not the internal value); and a record, by its name when its app lets whoever asks read it ("Person: Eva
-     Gil"): otherwise the card leaves it out, never by its code. Everything shows in the person's language, also the
+     Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
+     the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
+     receives it all the same when it runs. Everything shows in the person's language, also the
      name of each datum when the card puts it on its own line (BASE-F98): the
      same one its app calls it by, never a technical name. An action of the platform itself is named by the screen where
      it is done, for example "Change in Settings" or "Delete in Files". Each action shows with its own verb, never a
