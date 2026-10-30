@@ -231,6 +231,18 @@ class Profile(UUIDModel):
         LIGHT = "light", _("Light")
         DARK = "dark", _("Dark")
 
+    class Palette(models.TextChoices):
+        """The palettes of «My profile», by the names it shows them."""
+
+        BUSINESS = "", pgettext_lazy("palette", "The business's palette")
+        ERPLORA = "erplora", "ERPlora"
+        TERRACOTTA = "terracotta", pgettext_lazy("palette", "Terracotta")
+        CORPORATE = "corporate", pgettext_lazy("palette", "Corporate")
+        MINIMAL = "minimal", pgettext_lazy("palette", "Minimal")
+        FOREST = "forest", pgettext_lazy("palette", "Forest")
+        OCEAN = "ocean", pgettext_lazy("palette", "Ocean")
+        VIOLET = "violet", pgettext_lazy("palette", "Violet")
+
     username = models.CharField(_("person"), max_length=150, unique=True)
     first_name = models.CharField(_("first name"), max_length=150, blank=True)
     last_name = models.CharField(_("last name"), max_length=150, blank=True)
@@ -238,7 +250,7 @@ class Profile(UUIDModel):
     avatar = models.CharField(_("photo"), max_length=255, blank=True)
     language = models.CharField(_("language"), max_length=8, choices=Language.choices, blank=True)
     theme_mode = models.CharField(_("appearance"), max_length=8, choices=ThemeMode.choices, blank=True)
-    palette = models.CharField(_("palette"), max_length=16, blank=True)
+    palette = models.CharField(_("palette"), max_length=16, choices=Palette.choices, blank=True)
     updated_at = models.DateTimeField(pgettext_lazy("profile", "updated at"), auto_now=True)
 
     class Meta:

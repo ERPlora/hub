@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d423084d98895b176940f154f020c05ef7b50383592dc2eda926deaf0208f1b6 -->
+<!-- generated from WORKBOOK.md sha256:868922c7d6f33e438c61edf6b9d7c52cfff48245d75c18701870f29c8cfad120 -->
 
 ## What it is for and who it is for
 
@@ -2262,8 +2262,12 @@ Steps:
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
      no sign when it balances); a yes or a no, as "Yes" or "No"; a list, by how many items it carries, and a datum
      that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
-     cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). Everything
-     shows in the person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the
+     cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
+     time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
+     alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
+     desk", not the internal value); and a record, by its name when its app lets whoever asks read it ("Person: Eva
+     Gil"): otherwise the card leaves it out, never by its code. Everything shows in the person's language, also the
+     name of each datum when the card puts it on its own line (BASE-F98): the
      same one its app calls it by, never a technical name. An action of the platform itself is named by the screen where
      it is done, for example "Change in Settings" or "Delete in Files". Each action shows with its own verb, never a
      generic one: rectifying an invoice says "Rectify in Invoicing".
@@ -2275,7 +2279,7 @@ Steps:
      Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". If the
      person changes language, the earlier receipts show entirely in the new one, the app's name too.
 In: the action, its data and its risk, as its app declares them; the business's currency and, in "What will happen",
-the one its app gives.
+the one its app gives; the business's time zone.
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". If the page is reloaded with the card open nothing is done, and the answer ends in "The

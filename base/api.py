@@ -35,6 +35,7 @@ from base.schemas import (
     FileRenameIn,
     FileUploadIn,
     HubResetIn,
+    ImportIdIn,
     ImportUndoIn,
     PinSetIn,
     PreferencesIn,
@@ -131,6 +132,11 @@ async def import_list(request):
     return await run_operation(request, queries.import_list)
 
 
+@bind(router, "base.import.detail", "/settings/data/imports/detail")
+async def import_detail(request, data: Query[ImportIdIn]):
+    return await run_operation(request, queries.import_detail, data)
+
+
 @bind(router, "base.import.undo", "/settings/data/imports/undo")
 async def import_undo(request, data: ImportUndoIn):
     return await run_operation(request, services.import_undo, data)
@@ -170,6 +176,11 @@ async def event_list(request):
 @bind(router, "base.failed_event.list", "/system/failed-events")
 async def failed_event_list(request, params: Query[FailedEventListIn]):
     return await run_operation(request, queries.failed_event_list, params)
+
+
+@bind(router, "base.failed_event.detail", "/system/failed-events/detail")
+async def failed_event_detail(request, data: Query[FailedEventIn]):
+    return await run_operation(request, queries.failed_event_detail, data)
 
 
 @bind(router, "base.failed_event.retry", "/system/failed-events/retry")
@@ -275,6 +286,11 @@ async def device_list(request):
     return await run_operation(request, queries.device_list)
 
 
+@bind(router, "base.device.detail", "/devices/detail")
+async def device_detail(request, data: Query[DeviceByIdIn]):
+    return await run_operation(request, queries.device_detail, data)
+
+
 @bind(router, "base.device.rename", "/devices/rename")
 async def device_rename(request, data: DeviceRenameIn):
     return await run_operation(request, services.device_rename, data)
@@ -372,6 +388,11 @@ async def role_list(request):
 @bind(router, "base.api_key.list", "/keys")
 async def api_key_list(request):
     return await run_operation(request, queries.api_key_list)
+
+
+@bind(router, "base.api_key.detail", "/keys/detail")
+async def api_key_detail(request, data: Query[ApiKeyIdIn]):
+    return await run_operation(request, queries.api_key_detail, data)
 
 
 @bind(router, "base.api_key.create", "/keys")

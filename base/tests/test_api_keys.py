@@ -117,6 +117,18 @@ class TestNotYetAvailable:
         for slug in ("a", "b"):
             assert get(client, f"{slug}.localhost:8000", CARTS, **bearer(token)).status_code == 401
 
+    @pytest.mark.django_db
+    def test_nor_is_one_of_the_shared_tables_read_by_its_id(self, client):
+        """What names a key on the assistant's card (``base.api_key.detail``) reads none either."""
+        token = api_keys.new_token()
+        with context.use_shared_database():
+            planted = ApiKey.objects.create(
+                name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full"
+            )
+        client.force_login(member("a"))
+        answer = get(client, "a.localhost:8000", f"/keys/detail?id={planted.pk}")
+        assert (answer.status_code, code(answer)) == (404, "not_found")
+
 
 @HUB_DB
 class TestCreate:
