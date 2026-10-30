@@ -107,11 +107,12 @@ administrador ven **Borrar datos de este número**.
 Avisos encima de la lista: «Reconectando…» mientras vuelve la conexión en vivo; el número sin
 conectar («WhatsApp no está conectado. Conecta el número del negocio en Ajustes para recibir y enviar
 mensajes.») o por reconectar («WhatsApp pide volver a conectar el número en Ajustes: hasta entonces no se
-puede enviar nada.»), los dos con **Ir a Ajustes** para quien puede configurar; los mensajes del plan
+puede enviar nada.»), los dos con **Ir a Ajustes** para quien puede configurar; desde el 80 % de los mensajes
+del mes, los que quedan («Te quedan 30 de 150 mensajes de WhatsApp de tu plan este mes.»); los mensajes del plan
 gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen
 llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.») o un plan que
 no incluye ninguno («Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se
-puede enviar nada hasta que mejores el plan.»), los dos con **Mejorar el plan** para quien puede configurar.
+puede enviar nada hasta que mejores el plan.»), los tres con **Mejorar el plan** para quien puede configurar.
 Vacía: «Sin conversaciones.», a la vista bajo el buscador también en el móvil; con búsqueda o filtro:
 «Sin resultados»; cargando: indicador; error de lista: el motivo con **Reintentar**; error del panel: el
 motivo que da el Hub o «No se pudo cargar la conversación»; una foto o una nota de voz que no carga: «No se ha
@@ -123,10 +124,10 @@ administrador. Tres bloques: **Tu número** («Conectado» con el número y el n
 conectar» o «Hay que reconectar»; sin conectar o por reconectar, «Comprobando con erplora.com…» y luego
 **Conectar WhatsApp** o **Volver a conectar**, o el motivo por el que todavía no se puede; conectado o por
 reconectar, **Desconectar**, que pregunta antes); **Este mes** (los mensajes
-enviados frente a los del plan, y en el tope «Has usado todos los mensajes de tu plan este mes.»; si el plan
-no incluye ninguno, «Tu plan no incluye mensajes de WhatsApp.»; antes de que erplora.com hable, «erplora.com
-todavía no ha informado de los mensajes de este mes.»; en el tope, **Mejorar el plan**, que abre los planes
-de erplora.com); y **Plantillas de Meta**: tabla con **Nombre**,
+enviados frente a los del plan; desde el 80 %, «Te quedan 30 de 150 mensajes de tu plan este mes.», y en el tope
+«Has usado todos los mensajes de tu plan este mes.»; si el plan no incluye ninguno, «Tu plan no incluye mensajes de
+WhatsApp.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este mes.»; desde
+el 80 % y en el tope, **Mejorar el plan**, que abre los planes de erplora.com); y **Plantillas de Meta**: tabla con **Nombre**,
 **Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Sin enviar a Meta,
 Aprobada, En revisión, Rechazada, Pausada por Meta, Desactivada por Meta, Borrada en WhatsApp Manager;
 debajo, cuando toca, «Enviándose a Meta…», «No aceptada: …», «Cambios sin enviar: …» o «Borrándose en
@@ -444,22 +445,27 @@ Pantalla: Bandeja de entrada, Ajustes
 Pasos:
 1. **Ajustes → Este mes** enseña los mensajes enviados este mes frente a los del plan; los dos
    números los pone erplora.com. Si el plan no incluye mensajes de WhatsApp, lo dice («Tu plan no incluye
-   mensajes de WhatsApp.»), nunca que no tiene límite; en el tope, «Has usado todos los mensajes de tu plan este
-   mes.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este mes.».
-2. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
+   mensajes de WhatsApp.»), nunca que no tiene límite; desde el 80 % de los del plan, por ejemplo, «Te quedan 30
+   de 150 mensajes de tu plan este mes.» con **Mejorar el plan**; en el tope, «Has usado todos los mensajes de tu
+   plan este mes.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este
+   mes.».
+2. Desde el 80 % de los mensajes del mes, la bandeja lo avisa encima de la lista, por ejemplo, «Te quedan 30 de 150
+   mensajes de WhatsApp de tu plan este mes.»; quien puede configurar ve **Mejorar el plan**, que abre los planes
+   de erplora.com. Por debajo del 80 %, nada. La cuenta se mueve sola, sin recargar.
+3. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
    la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
    enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve **Mejorar el plan**, que abre
    los planes de erplora.com.
-3. Lo que escriben los clientes se sigue guardando.
-4. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado; si el
+4. Lo que escriben los clientes se sigue guardando.
+5. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado; si el
    plan no incluye mensajes, sigue.
 Entra: el consumo y el tope del mes que manda erplora.com (0: el plan no incluye ninguno).
-Sale: el aviso en la bandeja; nada se guarda.
+Sale: el aviso en la bandeja y en Ajustes; nada se guarda.
 Si falla: si erplora.com rechaza un envío por el tope (las cifras del Hub iban por detrás), el mensaje no
 llega a Meta ni se cuenta, queda «No entregado» y lo dice con «Los mensajes de WhatsApp de tu plan de este mes
 están gastados: no se puede enviar nada hasta el mes que viene.», nunca como motivo de Meta; si pide ir más
 despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
-Implicados: erplora.com
+Implicados: erplora.com, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f14 -->
@@ -1519,11 +1525,12 @@ mercado: Meta «manual flow» y Embedded Signup, HubSpot, Chatwoot, respond.io, 
 clic, `window.open` de `https://www.facebook.com/<graph_version>/dialog/oauth?client_id=<app_id>&config_id=<config_id>&response_type=code&override_default_response_type=true&redirect_uri=<redirect_uri>&state=<slug>.<32 hex>&display=popup&extras={"setup":{}}`.
 Mientras corre, Meta manda a esta página por `postMessage`, desde `https://*.facebook.com`, la sesión
 (`WA_EMBEDDED_SIGNUP`: `FINISH*` con `waba_id`, `phone_number_id`, `business_id`; `CANCEL` o `ERROR` con su
-motivo); al terminar lleva el navegador a `redirect_uri` con `?code=…&state=…` (o `error`). **Propuesta a
-erplora.com** (FIX de su carril): `GET /whatsapp/return`, pública, con COOP `unsafe-none`, que hace
+motivo); al terminar lleva el navegador a `redirect_uri` con `?code=…&state=…` (o `error`). **La vuelta en
+erplora.com** (hecha en saas#71; `PLAN-SAAS.md` §19, ronda 2026-10-30, «Alta embebida sin el SDK de Facebook»):
+`GET /whatsapp/return`, pública, sin sesión ni BD, con COOP `unsafe-none` solo en esa vista, que hace
 `window.opener.postMessage({"type": "erplora.whatsapp.signup", "state", "code" | "error", "error_description"},
-"https://<slug>.erplora.com")` con el `slug` del `state` y se cierra; y el canje del código en la puerta 11 con
-ese mismo `redirect_uri` (Meta lo exige: error 100/36008). El Hub solo acepta la sesión de facebook.com y la
+"https://<slug>.erplora.com")` con el `slug` del `state` (ni reservados ni demos) y se cierra; y el canje del código
+en la puerta 11 con ese mismo `redirect_uri` (Meta lo exige: error 100/36008). El Hub solo acepta la sesión de facebook.com y la
 vuelta del origen de `redirect_uri` con el `state` de ese intento; sin sesión en 3 s tras el código, «Meta no
 ha dicho qué cuenta de WhatsApp Business se eligió». Riesgo no medido: que Meta mande la sesión a una ventana
 abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta del permiso
@@ -1612,16 +1619,6 @@ Lo que falta, fuera de esta app:
 
 ### Contradicciones escritas, sin resolver
 
-- `PLAN-SAAS.md` (fila de `assistant`, `speech`, `whatsapp_inbox`, `notify` ≈l.45; ≈l.758; ≈l.875) y
-  `PLAN-HUB.md` (≈l.71 y ≈l.461) dicen que WhatsApp **sale del SaaS** y que el Hub llama a Meta
-  directamente. Esta app sigue el encargo del 2026-10-15: la cuenta de WhatsApp Business, el webhook de
-  Meta y el registro de plantillas siguen en el SaaS, y el Hub habla con él por `/internal`. Falta la
-  ronda nueva que lo decida en los planes.
-- `PLAN-SAAS.md` (bloque 12: «Ninguna [pantalla] en el panel: la bandeja y sus ajustes son del Hub») no
-  dice dónde se crean las plantillas, y el WORKBOOK anterior las mandaba a erplora.com. Decidido en la
-  migración (mercado: Odoo, WATI, Respond.io, Twilio, Gupshup, AiSensy, Interakt y Zoko las crean en su
-  propio panel; el producto actual las creaba en el Hub): **se crean, editan y borran en el Hub**
-  (Ajustes) y erplora.com solo las registra en Meta (puertas 8 y 9). Falta escribirlo como ronda.
 - F24: el producto actual no creaba ficha a quien pedía mesa por WhatsApp («su ficha si ya existe (no se
   crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
   (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; la respuesta de
@@ -1632,6 +1629,22 @@ Lo que falta, fuera de esta app:
   «Borradas en WhatsApp Manager» las plantillas de `a`; y el mensaje que sale del Hub y el número que se
   pide olvidar guardan su negocio, porque el worker los retomaba con el suyo y «Reintentar» o volver a
   borrar desde otro negocio los entregaban con el de quien lo pedía.
+
+Resueltas en los planes, y fuera de esta lista:
+
+- «WhatsApp sale del SaaS y el Hub llama a Meta»: la derogan las rondas 2026-10-21 de `PLAN-SAAS.md` §1.1 y de
+  `PLAN-HUB.md` §8 (APP-WHATSAPP, saas#63): WhatsApp se queda en erplora.com como única pasarela con Meta y el Hub
+  habla con él por `/internal` (puertas 1–12 de «Contrato con el SaaS»); la ronda 2026-10-30 de `PLAN-SAAS.md` §19
+  (cierre de `whatsapp`, saas#157) lo da por cerrado. El Hub nunca llama a Meta.
+- Dónde se crean las plantillas: en el Hub (Ajustes), y erplora.com solo las registra en Meta (puertas 8 y 9), por la
+  ronda 2026-10-21 de `PLAN-SAAS.md` §1.1 (APP-WHATSAPP_INBOX-1, hub#118; mercado: Odoo, WATI, Respond.io, Twilio,
+  Gupshup, AiSensy, Interakt y Zoko).
+- El cupo de WhatsApp lo cuenta y lo frena erplora.com, y el Hub solo enseña sus cifras: `PLAN-SAAS.md` §19 (ronda
+  2026-10-30), que resuelve para WhatsApp el «el Hub cuenta» de `PLAN-HUB.md` §8 (2026-10-15).
+- El aviso al 80 % del cupo (`PLAN-HUB.md` §8, 2026-10-15; señalado en `PLAN-SAAS.md` §19): se queda. F13 avisa desde el
+  80 % en la bandeja y en Ajustes, con las cifras de erplora.com, como el asistente (BASE-F104); decidido al migrar con
+  el mercado (WATI, respond.io, Gupshup, Zoko, Twilio, Odoo, Fresha y ActiveCampaign avisan antes de agotar el saldo o
+  el cupo; aquí el tope corta los envíos, sin paquetes ni exceso).
 
 ### Cambios frente al producto actual
 
