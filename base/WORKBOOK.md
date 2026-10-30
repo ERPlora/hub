@@ -2375,7 +2375,11 @@ Pasos:
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
      «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: el importe sale tal como se
-     escribió y la acción la rechaza al ejecutarse. Uno de «Lo que va a pasar» que su app da en otra moneda sale en la
+     escribió y la acción la rechaza al ejecutarse. Si la acción se hace sobre algo que tiene su propia moneda, sale en
+     la de eso: añadir una línea a un carrito en dólares dice «12,50 $», y poner un precio en una tarifa en yenes,
+     «1500 ¥»; si eso no se puede leer (no existe o quien pregunta no puede verlo), el importe sale tal como se
+     escribió y lo decide la acción. Todos los importes de una tarjeta se escriben igual, arriba o dentro de un dato
+     que agrupa otros: «1,50 $» en los dos, nunca «1,50 US$» al lado. Uno de «Lo que va a pasar» que su app da en otra moneda sale en la
      suya: rectificar una factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
@@ -2401,8 +2405,8 @@ Pasos:
   5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
      persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app.
-Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio y, en «Lo que va a pasar»,
-la que dé su app; la zona horaria del negocio.
+Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
+que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio.
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Si se recarga la página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se
@@ -3074,8 +3078,10 @@ Implicados: ACCOUNTS-F38
   (`base/tests/test_assistant_card_values.py`); un importe, el que su esquema marca `json_schema_extra={"money": True}`
   (`MONEY`, siempre sobre un entero en la unidad menor de su moneda; en un tipo anotado, como `Cents` de Servicios,
   vale en cada uso), sale arriba como `kind="money"` (lo pinta la pantalla en la moneda del negocio o, en la vista
-  previa, en la que dé su lectura) y, dentro de un objeto o de una lista, dicho por el servidor en esa misma moneda
-  (`_Words.amount`, con `money_text`); las palabras de su descripción no cuentan (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS:
+  previa, en la que dé su lectura) y, dentro de un objeto o de una lista, igual: el servidor lo manda como dinero
+  (`_Words.amount`: `{"kind": "money", "value": …, "money"?: …}`) y la pantalla lo escribe como el de arriba
+  (`assistant-card.ts`, `isAmount` y `formatValue` con `narrowSymbol`: un mismo símbolo en toda la tarjeta, «1,50 $» y
+  no «1,50 US$» al lado; `money_text` queda para correos, PDF y avisos, donde «US$» desambigua); las palabras de su descripción no cuentan (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS:
   «in minor units» y «in whole cents» dejaban un precio como «1500»; un nombre en `_cents` vale aún, mientras los
   tests de Automatizaciones lo usan sin marca), `signed` exige la marca (`base.E005`) y las instrucciones del turno
   dicen al modelo que un dato marcado `"money": true` va en la unidad menor; lo comprueban
@@ -3087,12 +3093,33 @@ Implicados: ACCOUNTS-F38
   marca, en la entrada de cada herramienta y en los datos de su vista previa; hoy vacío), con
   `test_an_amount_is_marked_only_on_a_whole_number`; la moneda de esos importes, la que nombra el dato de su
   escritura que su esquema marca `json_schema_extra={"currency": True}` (`CURRENCY`, siempre sobre un texto; vale
-  para los importes de su mismo objeto y de lo que cuelga de él; hoy `currency` de `payment.payment.create`), tomada
-  como la toman las escrituras (sin espacios, en mayúsculas, un código ISO 4217 que `pycountry` conoce) y con los
-  decimales de esa moneda (`currency_decimals`: ninguno en yenes): arriba va en el `money` del dato y, dentro de un
-  objeto, en el texto que dice el servidor; vacía o sin ese dato, la del negocio; una que no lo es no se inventa: sus
-  importes salen tal cual (arriba, `kind="text"`) y la escritura la rechaza; las instrucciones dicen al modelo que la
-  unidad menor es la de esa moneda; lo comprueban
+  para los importes de su mismo objeto y de lo que cuelga de él; hoy `currency` de `payment.payment.create`) o, sobre
+  el dato que nombra un registro con moneda propia, la lectura de su app que la da
+  (`base.schemas.in_currency_of("<query>", by="<su entrada>", code="<el dato de su respuesta>")`, que es
+  `{"currency": {"read", "by", "code"}}`; hoy `cart_id`, `session_token` y `customer` de las escrituras de Carrito y
+  pago, con `cart_checkout.cart.get`, y `price_list_id` y `price_list` de `pricing.price_item.add`, con
+  `pricing.price_list.get`), corrida como la persona (`_run`, como el nombre de un registro) solo si el objeto lleva
+  algún importe (`_sends_amount`) y del primer dato marcado que venga relleno; tomada como la toman las escrituras
+  (sin espacios, en mayúsculas, un código ISO 4217 que `pycountry` conoce) y con los decimales de esa moneda
+  (`currency_decimals`: ninguno en yenes): arriba y dentro de un objeto va en el `money` del importe; vacía o sin ese
+  dato, la del negocio; una que no lo es, o un registro cuya moneda no se puede leer (no existe, la persona no puede
+  leerlo, su respuesta no es una moneda o no hay persona, como en una automatización), no se inventa: sus importes
+  salen tal cual (arriba, `kind="text"`) y lo decide la escritura; `base.E011` comprueba al arrancar que cada marca
+  `currency` es `True` o una query de su app, de `base` o de una que requiere, que toma ese dato y da ese código; las
+  instrucciones dicen al modelo que la unidad menor es la de esa moneda, también la del registro; lo comprueban
+  `test_an_amount_of_a_write_on_a_record_is_in_that_records_currency` (por id, por nombre y en yenes),
+  `test_an_amount_only_inside_an_object_is_also_in_the_records_currency`,
+  `test_an_amount_on_a_record_whose_currency_cannot_be_read_is_shown_as_sent`,
+  `test_without_the_person_a_records_currency_is_never_read`,
+  `test_a_record_is_read_only_for_its_amounts_and_one_not_named_leaves_the_businesss`,
+  `test_a_currency_mark_is_checked_at_start`, `test_the_model_is_told_an_amount_on_a_record_is_in_that_records_currency`,
+  los de Carrito y pago y Tarifas en su `tests/test_integration_assistant.py` (un carrito y una tarifa en dólares y en
+  yenes, de verdad), el trinquete
+  `test_every_amount_on_a_record_in_a_currency_of_its_own_says_how_to_read_it_but_the_known_ones`
+  (`UNPRICED_RECORD_AMOUNTS`, que solo baja: un importe de una escritura cuya descripción dice «<x>'s currency», salvo
+  la del negocio, sin marca `currency` en su objeto ni encima; hoy Tarifas 1, `pricing.price_item.update`, que nombra
+  el precio por su id y ninguna lectura de Tarifas da por ese id la moneda de su tarifa),
+  `test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency` (dólares, yenes y « usd »),
   `test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency` (dólares, yenes y « usd »),
   `test_an_amount_in_a_currency_that_is_none_is_shown_as_sent_never_in_another`,
   `test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts`, el trinquete

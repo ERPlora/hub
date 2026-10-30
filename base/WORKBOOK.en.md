@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8108266730356f907c4c19ae6c4739a11f78708385ddf9c67413bbdc1c9529d2 -->
+<!-- generated from WORKBOOK.md sha256:dd888bc399d7310cc16d0b52e3e7c8318c24c0bda7de70967b7e7697a65c4529 -->
 
 ## What it is for and who it is for
 
@@ -2260,7 +2260,11 @@ Steps:
      understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
      the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a
      payment in dollars says "$15.00", and in yen, without decimals; a currency that does not exist is not made up:
-     the amount shows as written and the action refuses it when it runs. One of "What will happen" that its app gives
+     the amount shows as written and the action refuses it when it runs. If the action is done on something that has
+     its own currency, the amount shows in that one: adding a line to a cart in dollars says "$12.50", and setting a
+     price on a price list in yen, "¥1,500"; if that cannot be read (it does not exist or whoever asks cannot see it),
+     the amount shows as written and the action decides. Every amount of a card is written the same way, on top or
+     inside a datum that groups others: "$1.50" in both, never "US$1.50" beside it. One of "What will happen" that its app gives
      in another currency shows in its own: rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
@@ -2288,8 +2292,8 @@ Steps:
   5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
      Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". If the
      person changes language, the earlier receipts show entirely in the new one, the app's name too.
-In: the action, its data and its risk, as its app declares them; the business's currency and, in "What will happen",
-the one its app gives; the business's time zone.
+In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
+done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone.
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". If the page is reloaded with the card open nothing is done, and the answer ends in "The
