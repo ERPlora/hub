@@ -52,7 +52,7 @@ describe('attendance routes.ts', () => {
     expect([...paths, '/attendance/settings']).toEqual(routes.map((r) => r.path));
   });
 
-  it('binds the fifteen routed operations to apps/attendance/api.py: queries by GET, commands by POST', () => {
+  it('binds the sixteen routed operations to apps/attendance/api.py: queries by GET, commands by POST', () => {
     const attendance = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('attendance.')));
     expect(attendance).toEqual({
       'attendance.record.current': { method: 'get', path: '/api/attendance/current' },
@@ -69,6 +69,7 @@ describe('attendance routes.ts', () => {
       // The Home's «Clocked in now» (ATTENDANCE-F11): how many are in, for base's panel.
       'attendance.presence.count': { method: 'get', path: '/api/attendance/presence/count' },
       'attendance.person.list': { method: 'get', path: '/api/attendance/people' },
+      'attendance.person.detail': { method: 'get', path: '/api/attendance/people/detail' },
       'attendance.settings.get': { method: 'get', path: '/api/attendance/settings' },
       'attendance.settings.update': { method: 'post', path: '/api/attendance/settings' },
     });

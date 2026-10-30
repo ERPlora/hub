@@ -16,6 +16,7 @@ from apps.attendance.schemas import (
     CorrectIn,
     CorrectionListIn,
     PersonListIn,
+    PersonRefIn,
     PresenceListIn,
     RecordExportIn,
     RecordListIn,
@@ -98,6 +99,11 @@ async def presence_count(request):
 @bind(router, "attendance.person.list", "/attendance/people")
 async def person_list(request, params: Query[PersonListIn]):
     return await run_operation(request, queries.list_people, params)
+
+
+@bind(router, "attendance.person.detail", "/attendance/people/detail")
+async def person_detail(request, params: Query[PersonRefIn]):
+    return await run_operation(request, queries.person_detail, params)
 
 
 @bind(router, "attendance.settings.get", "/attendance/settings")
