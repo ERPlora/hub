@@ -7,7 +7,8 @@ dicts; it imports nothing of this app): an ``id`` unique in the app, its ``name`
 reads them from the active apps and offers the ones this business can run; the rest are set aside with
 their reason (``SetAside``) and never break the others:
 
-- ``flow.recipe_needs_apps``: it names an event or an operation of an app this business does not have;
+- ``flow.recipe_needs_apps``: it names an event, an operation or an assistant's tool of an app this business
+  does not have;
 - ``flow.recipe_invalid``: it does not read as an automation, it repeats an id, or it asks for other
   permissions than the ones its steps use — never more (the old Hub's «exactly its permissions») and
   never fewer (it would fail at its first run) —, or one that needs a person in front.
@@ -34,7 +35,7 @@ from django.utils.functional import Promise
 from django.utils.module_loading import module_has_submodule
 from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
-from live.meta import LiveAppConfig
+from live.meta import LiveAppConfig, module_configs
 
 from apps.flow import document, queries
 from apps.flow.models import Flow
@@ -144,6 +145,19 @@ def digest(recipe: Recipe) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def _apps_named(parsed: CreateIn) -> set[str]:
+    """The apps a business can turn on whose event, operation or assistant's tool ``parsed`` names. The
+    platform's own (``base.…``), this app's own and an unknown name are none: refused as unknown, by name."""
+    named = [parsed.trigger.event] if parsed.trigger.kind == "event" else []
+    for step in parsed.steps:
+        if step.kind in ("command", "query"):
+            named.append(step.operation)
+        elif step.kind == "assistant":
+            named += step.tools
+    apps = {config.label for config in module_configs()} - {"flow"}
+    return {name.split(".", 1)[0] for name in named} & apps
+
+
 def _problem(config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str, ...]] | None:
     """``(code, message, apps it lacks)`` of why this business cannot offer ``declared``; ``None`` when it can."""
     if not isinstance(declared, dict) or not RECIPE_ID.fullmatch(str(declared.get("id", ""))):
@@ -158,10 +172,7 @@ def _problem(config: LiveAppConfig, declared: Any) -> tuple[str, str, tuple[str,
         first = error.errors()[0]
         where = ".".join(str(part) for part in first["loc"])
         return INVALID, str(NOT_A_RECIPE) % {"problem": f"{where}: {first['msg']}"}, ()
-    active = queries.active_apps()
-    named = [parsed.trigger.event] if parsed.trigger.kind == "event" else []
-    named += [step.operation for step in parsed.steps if step.kind in ("command", "query")]
-    lacking = tuple(sorted({name.split(".", 1)[0] for name in named} - set(active)))
+    lacking = tuple(sorted(_apps_named(parsed) - set(queries.active_apps())))
     if lacking:
         return NEEDS_APPS, str(NEEDS_APPS_MESSAGE) % {"apps": ", ".join(lacking)}, lacking
     problems, _code = queries.catalog_problems(parsed.trigger, parsed.steps)
