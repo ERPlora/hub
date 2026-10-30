@@ -23,6 +23,10 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     ``live.broker``; phase 1's shared database (``use_shared_database``) only where the list says, until S5; the
     tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
     ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``): S2's first step moved the last ones.
+(g) Operations that need the hub's own database (PLAN-DB §14.14, round 2026-10-30, decision 3): in a hub that still
+    shares control's (``db_name=""``) each refuses with its domain error before it reads or writes anything of the
+    business in ``default``, an API key is refused for that reason (never let through by a session), and none of them
+    is code allowed on phase 1's shared database (``SHARED_DATABASE_USERS``).
 (f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
     import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
     it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo, and the helpers of its
@@ -36,6 +40,7 @@ import ast
 import re
 from pathlib import Path, PurePosixPath
 
+import pytest
 from django.conf import settings
 
 HUB_DIR = Path(__file__).resolve().parent.parent
@@ -1130,3 +1135,178 @@ def test_no_test_reads_the_clock_at_import():
         "and a run that crosses midnight or New Year's Eve compares it with the next one: ask for the `today` fixture, "
         f"or read the clock inside the test: {offenders}"
     )
+
+
+# ── (g) Operations that need the hub's own database (PLAN-DB §14.14) ─────────────────────────────────────────────────
+
+#: Any key's id: no key exists in a hub without its own database.
+ANY_KEY = "0193a2b4-0000-7000-8000-000000000001"
+#: The operations that run only in a hub with its own database (round 2026-10-30, Ioan's decision 3), with what each
+#: answers in one that still shares control's (``db_name=""``): ``{operation: (payload, status, code)}``, a domain error
+#: that never names the infrastructure. S2b/S3 add the usage (``base.plan.usage``, ``/internal/usage``) and the apps'
+#: activation; S5 retires the ``db_name=""`` branch and, with it, these errors. ``base.api_key.detail`` still answers
+#: as for a key that does not exist (404, ``base/queries.py``), not yet its 409.
+OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
+    "base.api_key.create": ({"name": "Till", "mode": "full"}, 409, "base.api_keys_unavailable"),
+    "base.api_key.rotate": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
+    "base.api_key.revoke": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
+    "base.api_key.detail": ({"id": ANY_KEY}, 404, "not_found"),
+    "base.hub.reset": ({"dry_run": False, "apps": ["sale"], "confirm": "a"}, 409, "base.reset_shared_database"),
+}
+#: What the screens of those features read in any hub: in one without its own database the answer says «not available
+#: yet» (the screen's notice; an error would paint its load failure) and holds nothing of the feature's.
+OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
+    "base.api_key.list": ({}, {"available": False, "keys": []}),
+}
+#: Tables of a hub that those operations may still read in control's database for a hub without its own, each with its
+#: reason; anything else of a hub's there is the business's data and is never touched.
+SHARED_MODE_READS: dict[str, str] = {
+    "base_appactivation": (
+        "round 2026-10-30, decision (i): a hub without its own database turns its apps on and off in control's until "
+        "S5, and what is on is read before any operation runs."
+    ),
+}
+#: The helpers those operations run through outside the file that defines them (their ``services.py`` helpers live in
+#: that same file): the key's door.
+OWN_DATABASE_HELPERS = ("base/api_keys.py",)
+
+
+def _business_tables() -> set[str]:
+    """Every table of a hub's model (and of the outbox), but those ``SHARED_MODE_READS`` lets through."""
+    from django.apps import apps
+
+    from base.tenancy import inventory
+
+    return {
+        model._meta.db_table
+        for model in apps.get_models(include_auto_created=True)
+        if inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
+    } - set(SHARED_MODE_READS)
+
+
+def business_touches(sent: dict[str, list[str]], tables: set[str]) -> dict[str, list[str]]:
+    """``{alias: [table, …]}`` for every statement of ``sent`` that names one of ``tables`` (quoted, as Django does)."""
+    found = {
+        alias: sorted({table for statement in statements for table in tables if f'"{table}"' in statement})
+        for alias, statements in sent.items()
+    }
+    return {alias: names for alias, names in found.items() if names}
+
+
+def own_database_problems(defined_in: dict[str, str], shared_users) -> list[str]:
+    """``operation (file)`` for every operation of ``defined_in`` (``{operation: file}``) whose file, or a helper of
+    ``OWN_DATABASE_HELPERS``, may run on phase 1's shared database (``shared_users``)."""
+    problems = [f"{name} ({path})" for name, path in sorted(defined_in.items()) if path in shared_users]
+    return problems + [f"helper ({path})" for path in OWN_DATABASE_HELPERS if path in shared_users]
+
+
+def _defined_in(name: str) -> str:
+    import inspect
+
+    from live.operations import get
+
+    return Path(inspect.getsourcefile(get(name).fn)).resolve().relative_to(HUB_DIR).as_posix()
+
+
+def test_the_own_database_checks_see_what_they_must():
+    tables = {"sale_order", "base_apikey"}
+    sent = {
+        "default": ['SELECT "base_hub"."id" FROM "base_hub"', 'SELECT COUNT(*) FROM "sale_order"'],
+        "hub_x": ['INSERT INTO "base_apikey" ("id") VALUES (%s)'],
+    }
+    assert business_touches(sent, tables) == {"default": ["sale_order"], "hub_x": ["base_apikey"]}
+    assert business_touches({"default": ['SELECT "base_hub"."id" FROM "base_hub"']}, tables) == {}
+    assert "base_hub" not in _business_tables() and "base_appactivation" not in _business_tables()
+    assert {"base_apikey", "sale_order", "live_outboxevent"} <= _business_tables()
+
+    defined = {"base.api_key.create": "base/services.py", "base.api_key.list": "base/queries.py"}
+    assert own_database_problems(defined, {"base/services.py": "why"}) == ["base.api_key.create (base/services.py)"]
+    assert own_database_problems(defined, {"base/api_keys.py": "why"}) == ["helper (base/api_keys.py)"]
+    assert own_database_problems(defined, SHARED_DATABASE_USERS) == []
+
+
+def test_no_operation_that_needs_the_own_database_may_run_on_the_shared_one():
+    defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
+    assert set(defined.values()) <= {"base/services.py", "base/queries.py"}, defined
+
+    problems = own_database_problems(defined, SHARED_DATABASE_USERS)
+
+    assert problems == [], (
+        "What needs the hub's own database never runs on phase 1's shared one (PLAN-DB §14.14): take it out of "
+        f"SHARED_DATABASE_USERS: {problems}"
+    )
+
+
+def _as_admin_of(slug: str):
+    from live.context import OperationContext, Scope
+
+    return OperationContext(scope=Scope("host", slug), actor="ana", permissions=frozenset({"*"}), language="en")
+
+
+def _run_in_a_hub_without_its_database(name: str, payload: dict):
+    """``name`` as an administrator of ``a`` (``db_name=""``, phase 1), in its context; ``(answer or error, sent)``."""
+    from live.errors import OperationError
+    from live.operations import get
+
+    from base.models import Hub
+    from base.tenancy import context
+    from base.tenancy.tests import hubs
+
+    hub = Hub.objects.get(slug="a")
+    assert not hub.db_name
+    op = get(name)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(context, "_test_fallback", None)  # as production: the request's hub, nothing else
+        with hubs.watched() as sent, context.use_hub(hub):
+            try:
+                outcome = op(_as_admin_of(hub.slug), op.input.model_validate(payload))
+            except OperationError as error:
+                outcome = error
+    return outcome, sent
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("name", sorted(OWN_DATABASE_OPERATIONS))
+def test_in_a_hub_without_its_own_database_each_refuses_and_touches_no_business_data(name):
+    from live.errors import OperationError
+
+    payload, status, code = OWN_DATABASE_OPERATIONS[name]
+
+    refused, sent = _run_in_a_hub_without_its_database(name, payload)
+
+    assert isinstance(refused, OperationError), refused
+    assert (refused.status, refused.code) == (status, code)
+    assert set(sent) <= {"default"}, sent
+    assert business_touches(sent, _business_tables()) == {}
+    assert any('"base_hub"' in statement for statement in sent["default"])
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("name", sorted(OWN_DATABASE_READS))
+def test_in_a_hub_without_its_own_database_its_screen_reads_not_available_and_no_business_data(name):
+    payload, answer = OWN_DATABASE_READS[name]
+
+    read, sent = _run_in_a_hub_without_its_database(name, payload)
+
+    assert read.model_dump(mode="json", include=set(answer)) == answer
+    assert set(sent) <= {"default"}, sent
+    assert business_touches(sent, _business_tables()) == {}
+
+
+@pytest.mark.django_db
+def test_an_api_key_on_a_hub_without_its_own_database_is_refused_for_that_reason_not_let_through_by_a_session(client):
+    from django.contrib.auth import get_user_model
+
+    from base.models import Membership
+
+    user = get_user_model().objects.create_user(username="ana", password="pw")
+    Membership.objects.create(user=user, host="a", role=Membership.Role.ADMIN)
+    client.force_login(user)
+    key = {"HTTP_AUTHORIZATION": "Bearer erpk_live_" + "x" * 43}
+
+    refused = client.get("/api/demo/items", HTTP_HOST="a.localhost", **key)
+
+    assert refused.status_code == 401
+    assert refused.json()["error"]["code"] == "base.api_keys_unavailable"
+    # Without the key, the same session goes on as always.
+    assert client.get("/api/demo/items", HTTP_HOST="a.localhost").status_code == 200

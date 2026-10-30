@@ -9,6 +9,7 @@ Per test session (and xdist worker), next to its control database ``<control>``:
 
 The names are the production rule's (``base.tenancy.names``), so two sessions or two workers never share one. They are
 dropped when the session ends. The rows in control (``hub_a``, ``hub_b``) are the root ``conftest.py``'s fixtures.
+:func:`watched` and :func:`assert_only_alias` see every statement of every thread by alias: «A never reaches B».
 """
 
 import uuid
