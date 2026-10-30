@@ -7,9 +7,9 @@ tiene su mitad desde saas#63 (2026-10-21) y los flujos que cruzan con él están
 el erplora.com real con un número de pruebas (solo Meta se simula): recibir, el eco del móvil, los estados,
 la opción tocada, contestar, enviar una plantilla, editarla y borrarla, olvidar un número, conectar el número,
 llegar al tope del mes (F13), la lista de plantillas que erplora.com trae de Meta (F27, F28) y crear una plantilla
-con foto en la cabecera (F29). Los avisos de la cita y de la mesa confirmadas (F23, F26) ya salen por WhatsApp; las
-respuestas automáticas que reservan cita o mesa por WhatsApp (F14–F22, F24, F25) están escritas y esperan al asistente
-del Hub.
+con foto en la cabecera (F29). Los avisos de la cita y de la mesa confirmadas (F23, F26) ya salen por WhatsApp, y
+**Reservar mesa** (F15, F24) contesta sola por WhatsApp con el asistente y reserva tras tu **Aprobar**; **Reservar
+citas** (F14, F21, F22) no se ofrece todavía, porque Citas aún no acepta la cita que reserva una automatización.
 
 > Manual de usuario y especificación de la app `whatsapp_inbox`. Se escribe **antes** que el código:
 > no se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -177,15 +177,15 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F11 | Borrar los datos de una clienta desde su ficha | hecho | comun |
 | WHATSAPP_INBOX-F12 | Unir dos fichas de la misma clienta | hecho | comun |
 | WHATSAPP_INBOX-F13 | Ver el consumo del mes y llegar al tope | hecho | comun |
-| WHATSAPP_INBOX-F14 | Activar «Reservar citas» | hecho | peluqueria |
+| WHATSAPP_INBOX-F14 | Activar «Reservar citas» | parcial — **Reservar citas** no se ofrece todavía: tras tu **Aprobar** en **Esperan tu respuesta**, Citas rechazaba la cita que proponía el asistente, porque una automatización solo reserva con el permiso de sus propias citas, no a nombre de una profesional; hasta que Citas la acepte, la tarjeta no sale en Ajustes ni su respuesta automática en la galería de Automatizaciones, y a la clienta que pide cita por WhatsApp se le contesta desde la bandeja | peluqueria |
 | WHATSAPP_INBOX-F15 | Activar «Reservar mesa» | hecho | restaurante |
 | WHATSAPP_INBOX-F16 | Decidir si las reservas por WhatsApp se confirman solas | hecho | comun |
 | WHATSAPP_INBOX-F17 | Desactivar una respuesta automática | hecho | comun |
 | WHATSAPP_INBOX-F18 | Actualizar una respuesta automática a su versión mejorada | hecho | comun |
 | WHATSAPP_INBOX-F19 | Elegir el hueco escribiendo en vez de tocando | parcial — la respuesta automática contesta cada mensaje sin ver el anterior: los huecos se le ofrecen escritos en una lista numerada, sin opciones para tocar, y si después escribe `el 2` se le vuelve a preguntar; falta guardar la última lista ofrecida a ese número | comun |
 | WHATSAPP_INBOX-F20 | Cuando el asistente no puede contestar | hecho | comun |
-| WHATSAPP_INBOX-F21 | La clienta pide cita por WhatsApp | parcial — tras tu «Aprobar» en **Esperan tu respuesta**, Citas rechaza la cita («Solo puedes reservar tus propias citas.»): una automatización todavía no puede reservar a nombre de una profesional; el acuse, la ficha, los huecos y la propuesta sí llegan, y la cita se reserva a mano desde la Agenda | peluqueria |
-| WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | parcial — anular no se le puede encargar a una automatización (Citas solo anula con una persona delante), así que el asistente le dice que alguien del equipo se la anula; mover choca con lo mismo que F21: tras tu «Aprobar», Citas rechaza el cambio; hoy se anula o se mueve a mano desde la Agenda | peluqueria |
+| WHATSAPP_INBOX-F21 | La clienta pide cita por WhatsApp | parcial — no se ofrece todavía: tras tu **Aprobar** en **Esperan tu respuesta**, Citas rechazaba la cita que proponía el asistente, porque una automatización solo reserva con el permiso de sus propias citas, no a nombre de una profesional; por eso **Reservar citas** (F14) no sale, y hoy a la clienta se le contesta desde la bandeja y la cita se reserva a mano en la Agenda | peluqueria |
+| WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | parcial — no se ofrece todavía, por lo mismo que F21; y anular no se le puede encargar a una automatización (Citas solo anula con una persona delante), así que, cuando se ofrezca, el asistente le dirá que alguien del equipo se la anula; hoy se anula o se mueve a mano desde la Agenda | peluqueria |
 | WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | hecho | peluqueria |
 | WHATSAPP_INBOX-F24 | El cliente pide mesa por WhatsApp | hecho | restaurante |
 | WHATSAPP_INBOX-F25 | El cliente anula o cambia su mesa por WhatsApp | parcial — anular no se le puede encargar a una automatización (Reservas solo anula con una persona delante), así que el asistente le dice que alguien del equipo se la anula; cambiarla sí se puede; hoy se anula a mano en Reservas | restaurante |
@@ -463,37 +463,26 @@ Implicados: erplora.com
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f14 -->
-Estado: hecho
+Estado: parcial — **Reservar citas** no se ofrece todavía: tras tu **Aprobar** en **Esperan tu respuesta**,
+Citas rechazaba la cita que proponía el asistente, porque una automatización solo reserva con el permiso de sus
+propias citas, no a nombre de una profesional; hasta que Citas la acepte, la tarjeta no sale en Ajustes ni su
+respuesta automática en la galería de Automatizaciones, y a la clienta que pide cita por WhatsApp se le contesta
+desde la bandeja
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
-1. En **Ajustes → ¿Para qué lo usas?**, la tarjeta **Reservar citas** explica qué hace: «WhatsApp contesta solo:
-   lee tu agenda, ofrece los huecos libres y reserva o mueve la cita de la clienta que escribe cuando tú dices que
-   sí.».
-2. Pulsa **Activar**: sale «WhatsApp contestará solo: lee tu agenda, ofrece los huecos libres y reserva o mueve la
-   cita de la clienta que escribe cuando tú digas que sí.» con **Activar** y **Ahora no**. Si «Reservar mesa» está
-   encendida, debajo dice «Solo una respuesta automática puede contestar en tu número: al activar esta se apaga
-   «Reservar mesa».».
-3. Pulsa **Activar**: primero se apaga «Reservar mesa» si estaba encendida, y después la tarjeta pasa a
-   «Activa» con **Desactivar** y dice «Listo. Escríbete desde otro móvil: “quiero cita mañana”.».
-4. Aparece el interruptor de confirmación (F16).
-5. Si las dos llegan a estar encendidas desde Automatizaciones, cada tarjeta encendida avisa: «“Reservar
-   mesa” también está encendida: cada mensaje recibe dos respuestas automáticas. Desactiva la que no uses.»
-   (o nombrando «Reservar citas»); desactivar una (F17) quita el aviso.
+1. En **Ajustes → ¿Para qué lo usas?**, la tarjeta **Reservar citas** explica qué hace: WhatsApp contesta solo, lee
+   tu agenda, ofrece los huecos libres y reserva o mueve la cita de la clienta que escribe cuando tú dices que sí.
+2. Pulsa **Activar** y confírmalo: la tarjeta pasa a «Activa» con **Desactivar**.
+3. Aparece el interruptor de confirmación de las citas (F16).
 Entra: que Citas, Clientes y Automatizaciones estén activas en el negocio; el asistente lo pone erplora.com.
-Sale: las automatizaciones «WhatsApp → cita reservada» y «Avisar por WhatsApp a la clienta cuando se confirma su
-cita» encendidas (la primera vez, con exactamente los permisos que piden) y, si estaba encendida, «WhatsApp → mesa
-reservada» en pausa: una sola respuesta automática contesta en el número. Salen en Automatizaciones, en **Viene con
-«Bandeja de WhatsApp»**, y ponerlas en pausa allí deja esta tarjeta apagada. «WhatsApp → cita reservada» le pide
-al asistente con «Que me lo pregunte»: solo puede mirar los huecos libres y reservar o mover la cita de quien
-escribe, y lo que quiera reservar o mover te espera antes en **Esperan tu respuesta** (F21).
-Si falla: la tarjeta dice el motivo, pone en pausa lo que llegó a encender y vuelve a encender la respuesta
-que había apagado, para que el número nunca se quede sin contestar; sin permiso, «Solo un dueño o un
-administrador puede activarlo.»; sin Automatizaciones o sin Clientes, la tarjeta dice «“Reservar citas” necesita
-la aplicación Automatizaciones.» (o «Clientes») con **Ver aplicaciones** y no ofrece **Activar**; sin Citas, la
-tarjeta no aparece.
-Implicados: APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F26, FLOW-F31, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F37,
-FLOW-F38, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F23
+Sale: la respuesta automática de citas y «Avisar por WhatsApp a la clienta cuando se confirma su cita» encendidas,
+con exactamente los permisos que piden; la respuesta le pide al asistente con «Que me lo pregunte» y lo que quiera
+reservar o mover te espera antes en **Esperan tu respuesta** (F21). Hoy solo el aviso se puede encender, desde
+Automatizaciones (F23).
+Si falla: como en F15, nombrando Citas.
+Implicados: APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F26, FLOW-F33, FLOW-F37, FLOW-F38, WHATSAPP_INBOX-F15,
+WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F23
 
 ### WHATSAPP_INBOX-F15 Activar «Reservar mesa»
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f15 -->
@@ -504,23 +493,23 @@ Pasos:
 1. En **Ajustes → ¿Para qué lo usas?**, la tarjeta **Reservar mesa** explica qué hace: «WhatsApp contesta solo: mira
    las mesas libres, reserva la mesa de quien escribe cuando tú dices que sí y le contesta.».
 2. Pulsa **Activar**: sale «WhatsApp contestará solo: mira las mesas libres, reserva la mesa de quien escribe cuando
-   tú digas que sí y le contesta. ¿Lo activas?» con **Activar** y **Ahora no**. Si «Reservar citas» está encendida,
-   debajo dice «Solo una respuesta automática puede contestar en tu número: al activar esta se apaga
-   «Reservar citas».».
-3. Pulsa **Activar**: primero se apagan «Reservar citas» y su aviso de cita confirmada si estaban
-   encendidos, y después la tarjeta pasa a «Activa» con **Desactivar** y dice «Listo. Escríbete desde otro
-   móvil: “quiero mesa para dos mañana”.».
+   tú digas que sí y le contesta. ¿Lo activas?» con **Activar** y **Ahora no**.
+3. Pulsa **Activar**: la tarjeta pasa a «Activa» con **Desactivar** y dice «Listo. Escríbete desde otro móvil:
+   “quiero mesa para dos mañana”.».
 4. Aparece el interruptor de confirmación (F16).
-5. Con las dos encendidas desde Automatizaciones, el mismo aviso que en F14, nombrando «Reservar citas».
 Entra: que Reservas, Clientes y Automatizaciones estén activas en el negocio; el asistente lo pone erplora.com.
 Sale: las automatizaciones «WhatsApp → mesa reservada» y «Avisar por WhatsApp al cliente cuando se confirma su
-reserva» encendidas con exactamente sus permisos, y las de la cita en pausa si estaban encendidas, como en F14;
-salen en Automatizaciones, en **Viene con «Bandeja de WhatsApp»**, y ponerlas en pausa allí deja esta tarjeta
-apagada. La mesa (o la lista de espera) que el asistente quiera reservar o cambiar te espera antes en **Esperan
-tu respuesta** (F24).
-Si falla: igual que F14, nombrando Reservas o Clientes; la respuesta de citas que se apagó vuelve a
-encenderse.
-Implicados: RESERVATION-F17, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F37, FLOW-F38, WHATSAPP_INBOX-F24
+reserva» encendidas (la primera vez, con exactamente los permisos que piden). Salen en Automatizaciones, en **Viene
+con «Bandeja de WhatsApp»**, y ponerlas en pausa allí deja esta tarjeta apagada. «WhatsApp → mesa reservada» le
+pide al asistente con «Que me lo pregunte»: solo puede mirar cómo va el día y las mesas libres, y reservar, cambiar
+la reserva o apuntar en la lista de espera a quien escribe; lo que quiera hacer te espera antes en **Esperan tu
+respuesta** (F24).
+Si falla: la tarjeta dice el motivo y pone en pausa lo que llegó a encender; sin permiso, «Solo un dueño o un
+administrador puede activarlo.»; sin Automatizaciones o sin Clientes, la tarjeta dice «“Reservar mesa” necesita la
+aplicación Automatizaciones.» (o «Clientes») con **Ver aplicaciones** y no ofrece **Activar**; sin Reservas,
+**¿Para qué lo usas?** no aparece.
+Implicados: RESERVATION-F17, CUSTOMER-F26, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F37, FLOW-F38, WHATSAPP_INBOX-F24,
+WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F16 Decidir si las reservas por WhatsApp se confirman solas
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f16 -->
@@ -528,21 +517,19 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Ajustes
 Pasos:
-1. Con la tarjeta en «Activa», elige debajo **Las citas se confirman solas** (o **Las reservas se confirman
-   solas**) o **Las reviso yo antes**; cada opción ocupa su fila entera y su texto pasa a la línea siguiente en
-   el móvil, nunca cortado.
-2. Con «Las reviso yo antes» sale dónde esperan: «Cada cita nueva te espera en la Agenda con “Confirmar”.»
-   o «Cada reserva nueva te espera en Reservas con “Confirmar”.».
-3. El cambio se guarda al momento en Citas o en Reservas, no en esta app.
-4. El interruptor no abarca lo mismo en los dos negocios: en Citas decide solo las citas que reserva la
-   propia clienta; en Reservas decide toda reserva nueva, también la que se toma a mano.
-Entra: cómo confirma hoy la app que lleva la agenda. Sin cambiarlo, Citas confirma sola y Reservas revisa.
-Sale: la regla cambiada en Citas o en Reservas; la respuesta automática la lee antes de cada reserva y se la
-cuenta al asistente, que le dice a quien escribe si queda confirmada o si el negocio se la confirma. En la
-peluquería, con «Las citas se confirman solas», la cita nace confirmada y eso dispara también el aviso de F23.
-Si falla: «No se pudo guardar cómo se confirman las citas. Inténtalo otra vez.» (o «No se pudo guardar cómo se
-confirman las reservas. Inténtalo otra vez.»), y el interruptor vuelve a como estaba.
-Implicados: APPOINTMENT-F18, APPOINTMENT-F19, RESERVATION-F04, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15
+1. Con la tarjeta **Reservar mesa** en «Activa», elige debajo **Las reservas se confirman solas** o **Las reviso yo
+   antes**; cada opción ocupa su fila entera y su texto pasa a la línea siguiente en el móvil, nunca cortado.
+2. Con «Las reviso yo antes» sale dónde esperan: «Cada reserva nueva te espera en Reservas con “Confirmar”.».
+3. El cambio se guarda al momento en Reservas, no en esta app, y decide toda reserva nueva, también la que se toma
+   a mano.
+4. En la peluquería, el interruptor de las citas llega con **Reservar citas** (F14).
+Entra: cómo confirma hoy Reservas. Sin cambiarlo, Reservas revisa.
+Sale: la regla cambiada en Reservas; la respuesta automática la lee antes de cada reserva y se la cuenta al
+asistente, que le dice a quien escribe si queda confirmada o si el restaurante se la confirma. Con «Las reservas se
+confirman solas», la reserva nace confirmada y eso dispara también el aviso de F26.
+Si falla: «No se pudo guardar cómo se confirman las reservas. Inténtalo otra vez.», y el interruptor vuelve a como
+estaba.
+Implicados: RESERVATION-F04, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F17 Desactivar una respuesta automática
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f17 -->
@@ -558,7 +545,7 @@ quede una respuesta encendida detrás de una tarjeta apagada. Desactivar es pone
 Automatizaciones sigue en su lista como «En pausa», con sus permisos y su historial, y ponerla en pausa desde allí
 deja esta tarjeta apagada igual.
 Si falla: la tarjeta dice el motivo y se vuelve a pintar con lo que de verdad sigue encendido.
-Implicados: FLOW-F34, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15
+Implicados: FLOW-F34, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F18 Actualizar una respuesta automática a su versión mejorada
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f18 -->
@@ -576,7 +563,7 @@ Sale: solo esas automatizaciones vuelven a la versión que trae la app hoy, cons
 es lo mismo que «Restaurar la de fábrica» en Automatizaciones.
 Si falla: «Esta respuesta automática ya no existe aquí: vuelve a activarla.» o «No se pudo actualizar.
 Inténtalo otra vez.»; el aviso sigue mientras quede algo sin actualizar.
-Implicados: FLOW-F35, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15
+Implicados: FLOW-F35, WHATSAPP_INBOX-F15
 
 ### WHATSAPP_INBOX-F19 Elegir el hueco escribiendo en vez de tocando
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f19 -->
@@ -603,9 +590,8 @@ Estado: hecho
 Actor: sistema
 Pantalla: WhatsApp: chat del cliente; Bandeja de entrada
 Pasos:
-1. Si el asistente falla o no dice nada, el cliente recibe un texto fijo: en la cita «Perdona, ahora mismo
-   no puedo mirar la agenda. Alguien del equipo te contestará por aquí en cuanto pueda.»; en la mesa, «Perdona,
-   ahora mismo no puedo mirar las reservas. Alguien del equipo te contestará por aquí en cuanto pueda.».
+1. Si el asistente falla o no dice nada, el cliente recibe un texto fijo: «Perdona, ahora mismo no puedo mirar
+   las reservas. Alguien del equipo te contestará por aquí en cuanto pueda.».
 2. Su conversación queda marcada «Necesita atención», que se ve junto a su nombre en la bandeja, y la campana la
    cuenta entre los clientes que esperan respuesta (F09).
 3. No se le manda nada más en ese turno.
@@ -617,18 +603,19 @@ Pasos:
 Entra: lo que contestó el asistente en ese turno.
 Sale: una disculpa y la marca de atención (`whatsapp_inbox.conversation.flagged`).
 Si falla: si la marca no se puede poner, la disculpa sale igual y el mensaje sigue sin leer en la bandeja.
-Implicados: WHATSAPP_INBOX-F09, WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24
+Implicados: WHATSAPP_INBOX-F09, WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F21 La clienta pide cita por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f21 -->
-Estado: parcial — tras tu «Aprobar» en **Esperan tu respuesta**, Citas rechaza la cita («Solo puedes reservar
-tus propias citas.»): una automatización todavía no puede reservar a nombre de una profesional; el acuse, la ficha,
-los huecos y la propuesta sí llegan, y la cita se reserva a mano desde la Agenda
+Estado: parcial — no se ofrece todavía: tras tu **Aprobar** en **Esperan tu respuesta**, Citas rechazaba la cita
+que proponía el asistente, porque una automatización solo reserva con el permiso de sus propias citas, no a nombre
+de una profesional; por eso **Reservar citas** (F14) no sale, y hoy a la clienta se le contesta desde la bandeja y
+la cita se reserva a mano en la Agenda
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
 Pasos:
 1. La clienta escribe, por ejemplo, `¿Tenéis hueco mañana por la tarde para un corte?`.
-2. Recibe al momento un acuse fijo: «¡Gracias por escribirnos! Miro la agenda y te contesto ahora mismo.».
+2. Recibe al momento un acuse fijo: que se mira la agenda y se le contesta ahora mismo.
 3. Si no tiene ficha, se le crea una con origen WhatsApp.
 4. El asistente mira los huecos libres de verdad. Si su mensaje fija servicio, día y hora y está libre, propone
    reservarla con la profesional que trabaja a esa hora; si no, le contesta con una lista corta y numerada de huecos
@@ -650,9 +637,9 @@ WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 La clienta anula o mueve su cita por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f22 -->
-Estado: parcial — anular no se le puede encargar a una automatización (Citas solo anula con una persona
-delante), así que el asistente le dice que alguien del equipo se la anula; mover choca con lo mismo que F21: tras
-tu «Aprobar», Citas rechaza el cambio; hoy se anula o se mueve a mano desde la Agenda
+Estado: parcial — no se ofrece todavía, por lo mismo que F21; y anular no se le puede encargar a una
+automatización (Citas solo anula con una persona delante), así que, cuando se ofrezca, el asistente le dirá que
+alguien del equipo se la anula; hoy se anula o se mueve a mano desde la Agenda
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
 Pasos:
@@ -664,9 +651,8 @@ Pasos:
    en **Esperan tu respuesta**; con **Aprobar** se mueve.
 5. Recibe la respuesta con lo que ha pasado.
 Entra: el mensaje y la última cita de esa clienta.
-Sale: hoy, la propuesta de mover en **Esperan tu respuesta**, que Citas rechaza al aprobarla. Cuando funcione, la
-cita anulada o movida en Citas como si la anulara o moviera ella misma (`appointment.appointment.cancelled`,
-`appointment.appointment.rescheduled`); nunca la de otra persona.
+Sale: cuando se ofrezca, la cita anulada o movida en Citas como si la anulara o moviera ella misma
+(`appointment.appointment.cancelled`, `appointment.appointment.rescheduled`); nunca la de otra persona.
 Si falla: F20; si Citas lo rechaza, se le explica. Con los mensajes del plan del mes gastados no se anula ni
 se mueve nada, no recibe respuesta y la conversación queda con «Necesita atención» (F13).
 Implicados: APPOINTMENT-F04, APPOINTMENT-F06, FLOW-F38, WHATSAPP_INBOX-F20
@@ -691,7 +677,8 @@ Pasos:
 5. Fuera de las 24 horas desde el último mensaje de la clienta, el aviso sale con la plantilla de Utilidad
    aprobada, porque WhatsApp no deja mandar texto libre.
 6. El aviso sale con cualquier confirmación de una cita con conversación, también la de una cita que nace ya
-   confirmada porque «Las citas se confirman solas» está encendido (F16).
+   confirmada porque **Confirmar automáticamente las citas que reserva la clienta** está encendido en Citas
+   (APPOINTMENT-F18).
 Entra: la cita confirmada (Citas), la ficha de la clienta (Clientes) y la conversación cuyo número es
 exactamente el de su ficha.
 Sale: un WhatsApp a la clienta, que se ve en su conversación de la bandeja (`whatsapp_inbox.message.sent`);
@@ -1123,9 +1110,8 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
 - **Automatizaciones**: la receta de esta app «Avisar por WhatsApp a la clienta cuando se confirma su cita»
   (F23) lee la ficha, busca la conversación con `conversation.by_phone` y avisa con `message.notify`; las
   automatizaciones del negocio usan el mismo `message.notify` (FLOW-F31). Para saber qué contestó la clienta,
-  el aviso `message.received` (F38). Las respuestas automáticas «WhatsApp → cita reservada» y «WhatsApp → mesa
-  reservada» (F21, F24) empiezan en `message.received`, leen el mensaje con `message.get` y marcan la conversación
-  con `conversation.flag` (F20).
+  el aviso `message.received` (F38). La respuesta automática «WhatsApp → mesa reservada» (F24) empieza en
+  `message.received`, lee el mensaje con `message.get` y marca la conversación con `conversation.flag` (F20).
 - El **asistente**: todas las operaciones, con referencias humanas («responde a Ana», «asigna la
   conversación de Ana a Luis», «envía la plantilla recordatorio al número que te dicto», «crea una
   plantilla de recordatorio»).
@@ -1577,7 +1563,7 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 ### Respuestas automáticas: lo que falta
 
 F14–F26 son recetas de fábrica de esta app sobre el registro de Automatizaciones (`apps/flow/recipes.py`,
-FLOW-F33 a F36), y las tarjetas de **Ajustes → ¿Para qué lo usas?** las encienden, pausan y restauran por
+FLOW-F33 a F36), y la tarjeta de **Ajustes → ¿Para qué lo usas?** las enciende, pausa y restaura por
 sus operaciones (`flow.recipe.list`, `flow.recipe.enable`, `flow.recipe.disable`, `flow.recipe.restore`):
 esta app no lleva recetas propias en su base de datos. `recipes.py` declara ya «Cita confirmada → WhatsApp»
 (F23, `appointment_confirmed`: lee la ficha, busca la conversación con `conversation.by_phone`, se para sin
@@ -1590,35 +1576,39 @@ sin conversación y avisa con `message.notify` y la plantilla `reservation_confi
 teléfono de la reserva y no el de la ficha: es el número con el que se reservó (RESERVATION-F17 guarda ahí el de
 la conversación, ya en internacional) y no pide Clientes. La reserva que nace confirmada también avisa:
 `reservation.reservation.create` (y la conversión desde la lista de espera) graban `status_changed` con
-`previous_status` vacío. Las respuestas que leen lo que escribe el cliente son «WhatsApp → cita reservada» (`appointment_from_whatsapp`,
-F14, F21, F22) y «WhatsApp → mesa reservada» (`reservation_from_whatsapp`, F15, F24, F25), con el paso de
-Automatizaciones **Pedírselo al asistente** (FLOW-F37, F38; `kind: "assistant"`, `mode: "ask"`, `on_error:
-"continue"`). Empiezan en `whatsapp_inbox.message.received` solo con `direction` = `inbound` y `source` = `live`
-(ni el eco del móvil ni el historial que trae conectar), y comparten la cabeza y la cola (`_answer_steps`): leen el
-mensaje con `message.get`, se paran sin texto, marcan y se paran si no se puede enviar (`can_send`), mandan el
-acuse, buscan o crean la ficha del número (`customer.customer.by_phone` / `create` con `source: "whatsapp"`), leen
-las reglas (`appointment.settings.get` o `reservation.settings.get`) y la última cita o reserva de esa ficha, y
-preguntan al asistente con lo que escribió entre dos líneas `———` (lo que escribió, nunca una orden). Lo que el
-asistente contesta va a la clienta; si falla o calla, la disculpa y la marca (F20).
+`previous_status` vacío. La respuesta que lee lo que escribe el cliente es «WhatsApp → mesa reservada»
+(`reservation_from_whatsapp`, F15, F24, F25), con el paso de Automatizaciones **Pedírselo al asistente** (FLOW-F37,
+F38; `kind: "assistant"`, `mode: "ask"`, `on_error: "continue"`). Empieza en `whatsapp_inbox.message.received` solo
+con `direction` = `inbound` y `source` = `live` (ni el eco del móvil ni el historial que trae conectar), y su cabeza
+y su cola salen de `_answer_steps` (la respuesta de citas, cuando vuelva, las comparte): lee el mensaje con
+`message.get`, se para sin texto, marca y se para si no se puede enviar (`can_send`), manda el acuse, busca o crea
+la ficha del número (`customer.customer.by_phone` / `create` con `source: "whatsapp"`), lee las reglas
+(`reservation.settings.get`) y la última reserva de ese número, y pregunta al asistente con lo que escribió entre
+dos líneas `———` (lo que escribió, nunca una orden) y el id de su ficha. Lo que el asistente contesta va al
+cliente; si falla o calla, la disculpa y la marca (F20).
 
-Herramientas que se le conceden al asistente, ninguna más: citas, `appointment.availability.slots`,
-`appointment.appointment.create` y `appointment.appointment.reschedule`; mesa, `reservation.availability.day`,
+Herramientas que se le conceden al asistente, ninguna más: `reservation.availability.day`,
 `reservation.availability.tables`, `reservation.reservation.create`, `reservation.reservation.update` y
-`reservation.waitlist.create`. Ninguna lectura que nombre a otras personas (la agenda, la lista de clientes, con
-quién choca una hora: `appointment.availability.check` da el nombre del cliente del choque), porque lo que contesta
-va a quien escribe. Las tarjetas de Ajustes encienden la respuesta y su aviso (F23, F26) y apagan los de la otra.
+`reservation.waitlist.create`. Ninguna lectura que nombre a otras personas (el libro de reservas, la lista de
+clientes), porque lo que contesta va a quien escribe. La tarjeta de Ajustes enciende la respuesta y su aviso (F26).
 
 Lo que falta, fuera de esta app:
 
-1. **Citas no deja a una automatización reservar ni mover a nombre de una profesional** (F21, F22): el paso corre
-   con los permisos de «solo las mías» (`add_own_appointment`, `change_own_appointment`) y Citas responde «Solo
-   puedes reservar tus propias citas.» tras el «Aprobar». Se arregla en Automatizaciones o en Citas, no aquí.
-2. **Anular no se puede conceder** (F22, F25): `appointment.appointment.cancel` y `reservation.reservation.cancel`
+1. **Citas no deja a una automatización reservar ni mover a nombre de una profesional** (F14, F21, F22): el paso
+   corre con los permisos de «solo las mías» (`add_own_appointment`, `change_own_appointment`) y Citas rechaza la
+   cita tras el **Aprobar** (`permission_denied`). Mientras no se arregle en Automatizaciones o en Citas, la
+   respuesta de citas (`appointment_from_whatsapp`) no está en `recipes.py` ni su tarjeta en Ajustes.
+2. **Reservas solo reserva sin buscar a nadie si recibe la ficha por su id** (F24): con solo el teléfono,
+   `reservation.reservation.create` busca la ficha con `customer.customer.by_phone`, que pide `customer.view`, y
+   el paso del asistente solo lleva los permisos de Reservas (`permission_denied`). Por eso el encargo da al
+   asistente el id de la ficha y le pide reservar en ella; que funcione también sin el id se arregla en
+   Automatizaciones o en Reservas.
+3. **Anular no se puede conceder** (F22, F25): `appointment.appointment.cancel` y `reservation.reservation.cancel`
    son de riesgo alto y Automatizaciones no los concede ni con «Que me lo pregunte»; el asistente dice a quien
    escribe que alguien del equipo se lo anula.
-3. **F19**: cada mensaje se contesta sin el anterior; elegir «el 2» necesita guardar la última lista ofrecida por
+4. **F19**: cada mensaje se contesta sin el anterior; elegir «el 2» necesita guardar la última lista ofrecida por
    conversación (24 h) y casar con ella lo escrito.
-4. Un «No» o una propuesta caducada paran la ejecución: quien escribe se queda con el acuse (Automatizaciones).
+5. Un «No» o una propuesta caducada paran la ejecución: quien escribe se queda con el acuse (Automatizaciones).
 
 ### Contradicciones escritas, sin resolver
 
@@ -1634,8 +1624,8 @@ Lo que falta, fuera de esta app:
   (Ajustes) y erplora.com solo las registra en Meta (puertas 8 y 9). Falta escribirlo como ronda.
 - F24: el producto actual no creaba ficha a quien pedía mesa por WhatsApp («su ficha si ya existe (no se
   crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
-  (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; en las
-  citas también se crea (F21, CUSTOMER-F26).
+  (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; la respuesta de
+  citas, cuando se ofrezca, también la creará (F21, CUSTOMER-F26).
 - Fase 1 sin tenencia: las conversaciones de `a` y `b` comparten tablas (solo los avisos vivos van por
   hub), como en todas las apps de la fase 1. El número y las plantillas ya no: `Channel` y `Template` son
   de cada negocio (ver «Modelo»), porque la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
@@ -1666,7 +1656,7 @@ Lo que falta, fuera de esta app:
   erplora.com, que es quien habla con Meta.
 - **No edita las plantillas con foto, vídeo o documento hechas en WhatsApp Manager** (F28): se envían desde
   aquí eligiendo el archivo, pero se cambian allí.
-- **No reserva, mueve ni cambia nada sin tu «Aprobar»** (F21, F22, F24, F25): la respuesta automática contesta
+- **No reserva ni cambia nada sin tu «Aprobar»** (F24, F25): la respuesta automática contesta
   sola, pero cada cambio que quiere el asistente espera en **Esperan tu respuesta**. Tampoco anula: lo hace
   alguien del equipo («Respuestas automáticas: lo que falta»).
 - **No hace campañas** ni envíos masivos.
