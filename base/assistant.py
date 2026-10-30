@@ -9,7 +9,9 @@ gateway (``saas`` ``assistant/internal.py``), without the ORM.
   what was asked (``relevant``, at most ``MAX_TOOLS``), never the whole catalogue. A tool runs as the person, by its
   own operation (``run_tool``): the same permission, transaction and refusals as the button on the screen.
 - **A write never runs without the person's yes**: its card (``card``) says what it will send, each datum by its name
-  in the person's language (the name its app's models give it: their metadata, no query); ``risk="high"`` asks
+  in the person's language (the name its app's models give it: their metadata, no query) and in words — a moment as
+  their language writes it, at the business's hour; a value of a closed list by its label; a record by its name, as
+  the read its schema marks answers it to them, or not at all: never by its id —; ``risk="high"`` asks
   to type a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many; such a write
   that names no record is not done from the chat (``blocked``). Such a write may show what it will do (``preview``):
   a read of its own app its ``ai=`` names, run as the person before the card; one that cannot be read shows no card.
