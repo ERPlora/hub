@@ -10,7 +10,7 @@ category it names (a service put in it) waits for it or is waited for, never in 
 
 from django import forms
 from django.contrib import admin
-from django.db import transaction
+from live.operations import atomic
 
 from apps.service.models import (
     CATEGORY_CYCLE,
@@ -105,12 +105,12 @@ class CategoryAdmin(admin.ModelAdmin):
     # and then reads what that write left, instead of waiting for it in a circle or deleting a category
     # the write had just named (refused at the COMMIT).
     def delete_model(self, request, obj):
-        with transaction.atomic():
+        with atomic():
             lock_tree()
             super().delete_model(request, obj)
 
     def delete_queryset(self, request, queryset):
-        with transaction.atomic():
+        with atomic():
             lock_tree()
             super().delete_queryset(request, queryset)
     list_display = ("name", "parent", "sort_order", "is_deleted")

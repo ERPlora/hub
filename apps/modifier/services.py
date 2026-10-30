@@ -9,11 +9,11 @@ product or category a group is applied to, an option's tax category) is held unt
 ``held``): a deletion at the same time waits for it, or ends first and the write finds it gone.
 """
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.inventory import queries as inventory_queries
@@ -389,7 +389,7 @@ def _save(row, **options) -> None:
     """Save in a savepoint, so that a name or a link another save took at the same time, or a rule the
     database holds, says so on its field."""
     try:
-        with transaction.atomic():
+        with atomic():
             row.save(**options)
     except IntegrityError as exc:
         for constraint, (field, message, code) in _CONSTRAINTS.items():

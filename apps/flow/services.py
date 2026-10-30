@@ -24,13 +24,13 @@ import uuid
 from typing import Any
 
 import pydantic
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models.functions import Coalesce
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
-from live.operations import Operation, get, operation
+from live.operations import Operation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.flow import document, events, gateway, http, recipes, vault
@@ -553,7 +553,7 @@ def enable_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
         flow = Flow(recipe=recipe.ref, grants=wanted, enabled=True, created_by=_actor(ctx))
         _apply_recipe(ctx, flow, recipe, now)
         try:
-            with transaction.atomic():
+            with atomic():
                 flow.save()
         except IntegrityError:
             # Turned on at the same time by someone else: theirs is the one (the unique recipe per business).

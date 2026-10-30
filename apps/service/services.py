@@ -12,13 +12,13 @@ breaking it at the COMMIT, and one deleted meanwhile is refused as one deleted b
 
 import datetime as dt
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.customer.models import Customer
@@ -520,7 +520,7 @@ def _parent(parent_id, said, *, hold: bool = False) -> Category | None:
 def _save_unique(instance, constraint: str, message, code: str) -> None:
     """Save in a savepoint: a name another write took meanwhile says so with the check's 409."""
     try:
-        with transaction.atomic():
+        with atomic():
             instance.save()
     except IntegrityError as exc:
         if constraint in str(exc):
@@ -1344,7 +1344,7 @@ def hold_session(ctx: OperationContext, data: HoldIn) -> dict:
         code, message = REDEEM_REFUSALS[refusal]
         raise Conflict(str(message), code=code)
     try:
-        with transaction.atomic():
+        with atomic():
             session = Redemption.objects.create(
                 grant=grant,
                 service=service,

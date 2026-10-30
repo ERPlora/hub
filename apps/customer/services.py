@@ -11,14 +11,14 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 import pydantic
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Max
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.ninja import FIELD_MESSAGES
-from live.operations import INTERNAL, operation
+from live.operations import INTERNAL, atomic, operation
 from live.outbox import record_event
 
 from apps.customer import events
@@ -192,7 +192,7 @@ def _changes(instance, sent: dict) -> dict:
 def _save_named(instance, message, code: str) -> None:
     """Saves a group, tag or field; a name already taken among the active ones is a 409 under «name»."""
     try:
-        with transaction.atomic():
+        with atomic():
             instance.save()
     except IntegrityError as exc:
         if "_name_unique" not in str(exc):
