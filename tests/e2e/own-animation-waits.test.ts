@@ -140,6 +140,23 @@ describe('the e2e waits for «nothing moves» with the one detector of helpers.t
     expect(filesRead() - before).toBe(0);
   });
 
+  it('reads a folder’s files at once: each asked for before the first comes back, none by a read of its own', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'own-animation-waits-'));
+    try {
+      writeFileSync(join(dir, 'zz-one.spec.ts'), 'document.getAnimations();\n');
+      writeFileSync(join(dir, 'zz-two.spec.ts'), 'export {};\n');
+      const [together, alone] = [vi.mocked(readFile).mock.calls.length, vi.mocked(readFileSync).mock.calls.length];
+
+      const scan = readsByFile(dir);
+      const asked = [vi.mocked(readFile).mock.calls.length - together, vi.mocked(readFileSync).mock.calls.length - alone];
+
+      expect(await scan).toEqual({ 'zz-one.spec.ts': 1 });
+      expect(asked).toEqual([2, 0]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('no file asks for animations more times than the ratchet lists: a new wait is settled(page) or untilStill(page)', async () => {
     expect(overTheRatchet(await readsByFile()), WAIT_WITH_THE_DETECTOR).toEqual([]);
   });

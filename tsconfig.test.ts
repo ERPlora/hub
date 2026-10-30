@@ -6,8 +6,9 @@
 // `vue-tsc` run), plant a `process.env` in SPA files in memory and prove the SPA's project reports it, and prove
 // the split left nothing the single project checked out of `pnpm typecheck`, nor out of the project an editor
 // opens each file in (the root tsconfig.json only references the projects).
-import { existsSync, globSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, globSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,6 +21,11 @@ import viteConfig from './vite.config';
 vi.mock('node:fs', async (importOriginal) => {
   const fs = await importOriginal<typeof import('node:fs')>();
   return { ...fs, readFileSync: vi.fn(fs.readFileSync) };
+});
+// And the reads at once, watched: each file is asked for together with the rest, and once (see `readAll`).
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...fs, readFile: vi.fn(fs.readFile) };
 });
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -216,6 +222,31 @@ it('reads the projects the warm-up parsed: no test walks the repo for a project,
     expect(projects.filter((project, index) => again[index] !== project || checked(again[index]) !== checked(project)).length).toBe(0);
   } finally {
     walk.mockRestore();
+  }
+});
+
+it('reads at once each file not read yet, as TypeScript decodes it, and none of them twice', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tsconfig-test-'));
+  try {
+    const files = [
+      ['plain.ts', Buffer.from('export const plain = 1;\n')],
+      ['bom.ts', Buffer.from('﻿export const bom = 1;\n')],
+      ['utf16.ts', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('export const utf16 = 1;\n', 'utf16le')])],
+    ] as const;
+    for (const [name, bytes] of files) writeFileSync(join(dir, name), bytes);
+    const paths = [...files.map(([name]) => join(dir, name)), join(dir, 'missing.ts')];
+    const before = vi.mocked(readFile).mock.calls.length;
+
+    const reading = readAll(paths);
+    // Each asked for before the first comes back: one after another, each would wait for the last.
+    expect(vi.mocked(readFile).mock.calls.length - before).toBe(paths.length);
+    await reading;
+    await readAll(paths);
+
+    expect(vi.mocked(readFile).mock.calls.length - before).toBe(paths.length);
+    expect(paths.map(readText)).toEqual(paths.map((path) => ts.sys.readFile(path)));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
