@@ -3,6 +3,8 @@
 // `assistant-confirm.test.ts` and `assistant-danger.test.ts`.
 import { describe, expect, it } from 'vitest';
 
+import en from '../locale/en.json';
+import es from '../locale/es.json';
 import { actionKey, type AssistantCard, cardLine, fieldLabelKey, fieldLines, fieldText, typedMatches } from './assistant-card';
 
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -182,6 +184,29 @@ describe('the lines of a dangerous write', () => {
       'Efectivo esperado: 230,00\u00a0€',
     ]);
     expect(fieldLines([], opts)).toEqual([]);
+  });
+
+  // FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: transferring a check said «Registro: 5
+  // (Terraza)» where Tables titles it «Cuenta»: the screen's word for a datum it knows by its name (`id`) hid the title
+  // its app wrote, which the server marks `titled`.
+  const said = (catalogue: unknown) => ({
+    ...opts,
+    t: (key: string) => String(key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], catalogue)),
+  });
+
+  it('a datum its app titles is called by that title, over the screen’s word for its name', () => {
+    const check = { name: 'id', kind: 'text' as const, value: '5 (Terraza)', titled: true };
+    expect(fieldLines([{ ...check, label: 'Cuenta' }], said(es))).toEqual(['Cuenta: 5 (Terraza)']);
+    expect(fieldLines([{ ...check, label: 'Check' }], said(en))).toEqual(['Check: 5 (Terraza)']);
+  });
+
+  it('one its app does not title keeps the screen’s word for its name, in English and in Spanish', () => {
+    // The server's label for an untitled `id` is the model's («ID»), or pydantic's made-up title for another.
+    const device = { name: 'id', label: 'ID', kind: 'text' as const, value: 'Barra' };
+    const name = { name: 'name', label: 'Name', kind: 'text' as const, value: 'Corte caballero' };
+    expect(fieldLines([device, name], said(es))).toEqual(['Registro: Barra', 'Nombre: Corte caballero']);
+    expect(fieldLines([device, name], said(en))).toEqual(['Record: Barra', 'Name: Corte caballero']);
+    expect(fieldLines([{ ...device, titled: false }], said(es))).toEqual(['Registro: Barra']);
   });
 });
 
