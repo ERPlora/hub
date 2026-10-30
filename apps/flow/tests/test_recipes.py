@@ -177,6 +177,28 @@ def test_an_app_named_by_a_step_and_by_a_tool_is_needed_once(declared, monkeypat
 
 
 @pytest.mark.parametrize(
+    "more",
+    [
+        # Its only reference to Reservations is the event it starts on…
+        {"trigger": {"kind": "event", "event": "reservation.reservation.created"}},
+        # …or a step that looks something up.
+        {
+            "steps": [
+                {"id": "s1", "kind": "query", "operation": "reservation.reservation.get", "params": {"id": "input.id"}}
+            ],
+            "grants": {"reservation.reservation.get": "Looks it up."},
+        },
+    ],
+    ids=["trigger", "query"],
+)
+def test_an_app_named_only_by_the_trigger_or_by_a_step_that_reads_is_needed(declared, monkeypatch, more):
+    declared(("appointment", declaration(**more)))
+    without(monkeypatch, "reservation")
+    _, set_aside = recipes.shelf()
+    assert [(item.code, item.apps) for item in set_aside] == [("flow.recipe_needs_apps", ("reservation",))]
+
+
+@pytest.mark.parametrize(
     ("kind", "name"),
     [
         # The platform's own tools are no app to turn on.
