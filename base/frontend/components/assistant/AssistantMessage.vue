@@ -69,7 +69,7 @@ const receipts = computed(() =>
   (props.bubble.executed ?? []).map((row) => ({
     outcome: row.outcome,
     text: t(`base.assistant.receipts.${row.outcome}`, {
-      action: t(actionKey(row.name.split('.').at(-1) ?? '')),
+      action: t(actionKey(row.name)),
       app: placeOf(row),
     }),
   })),

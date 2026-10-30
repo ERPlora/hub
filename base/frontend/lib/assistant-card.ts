@@ -52,8 +52,21 @@ export interface CardFormat {
  *  this». */
 const ACTIONS: Readonly<Record<string, string>> = en.base.assistant.card.actions;
 
-export function actionKey(action: string): string {
-  return `base.assistant.card.actions.${Object.hasOwn(ACTIONS, action) ? action : 'other'}`;
+/** The verb of a write whose action's verb does not say what it does (`base.assistant.card.operations.<app>.<entity>.
+ *  <action>`): emptying a cart (`cart_checkout.cart.clear`) is not taking a route away, Kitchen's `clear`, nor a cash
+ *  count adding anything (FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART). */
+const OPERATIONS: Readonly<Record<string, Readonly<Record<string, Readonly<Record<string, string>>>>>> =
+  en.base.assistant.card.operations;
+
+/** The key of the verb of a write, by its operation's name (`<app>.<entity>.<action>`; an action alone is one too):
+ *  its own, else its action's, else «Do this». */
+export function actionKey(operation: string): string {
+  const [app, entity, action] = operation.split('.');
+  const entities = Object.hasOwn(OPERATIONS, app) ? OPERATIONS[app] : {};
+  const actions = entity !== undefined && Object.hasOwn(entities, entity) ? entities[entity] : {};
+  if (action !== undefined && Object.hasOwn(actions, action)) return `base.assistant.card.operations.${operation}`;
+  const last = operation.split('.').at(-1) ?? '';
+  return `base.assistant.card.actions.${Object.hasOwn(ACTIONS, last) ? last : 'other'}`;
 }
 
 /** The platform's screens a receipt names by their key (`base.assistant.screens.<key>`, base's catalogue: the names
