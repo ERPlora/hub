@@ -65,7 +65,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.live_registry import ALL_EVENTS
 from live.models import OutboxEvent
 from live.operations import get as get_operation
-from live.operations import operation
+from live.operations import INTERNAL, operation
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from PIL import Image as PILImage
@@ -563,7 +563,15 @@ def _slug_taken() -> Conflict:
     return Conflict(gettext("Another hub has this address."), code="base.slug_taken")
 
 
-@operation("base.hub.register", kind="command", permission=None, input=HubRegistryIn, output=HubRegisterOut)
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation(
+    "base.hub.register",
+    kind="command",
+    permission=None,
+    input=HubRegistryIn,
+    output=HubRegisterOut,
+    ai=INTERNAL,
+)
 def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
     """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``ready`` at once in phase 1.
 
@@ -651,7 +659,8 @@ def report_ready(hub_id: UUID) -> None:
         logger.warning("base.hub.ready_unreported hub=%s: the SaaS answered %s.", hub_id, status)
 
 
-@operation("base.hub.state_apply", kind="command", permission=None, input=HubStateIn, output=HubStateOut)
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation("base.hub.state_apply", kind="command", permission=None, input=HubStateIn, output=HubStateOut, ai=INTERNAL)
 def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     """Keep the SaaS's photo of ``data.id`` if it is newer than the one kept; an equal or older one changes nothing.
 
@@ -697,7 +706,15 @@ def _wake_open_apps(slug: str) -> None:
 # ── The sessions of a SaaS account (/internal/sessions/revoke) ───────────────────────────────────────────────────
 
 
-@operation("base.session.revoke", kind="command", permission=None, input=SessionRevokeIn, output=SessionRevokeOut)
+# Not an assistant tool: the platform's end of a session, no person.
+@operation(
+    "base.session.revoke",
+    kind="command",
+    permission=None,
+    input=SessionRevokeIn,
+    output=SessionRevokeOut,
+    ai=INTERNAL,
+)
 def session_revoke(ctx: OperationContext, data: SessionRevokeIn) -> dict:
     """End the Hub's sessions of the SaaS account ``data.user_id``: those on the business ``data.hub_id`` or, without
     it, every one of them, the Hub admin's included (PLAN-SAAS §2.1, OIDC's back-channel logout).
@@ -845,7 +862,8 @@ def _sync_photo_blocks(hub: Hub, labels: Iterable[str]) -> None:
             logger.warning("base.app.photo_block_refused %s of hub %s: %s", label, hub.slug, refused.message)
 
 
-@operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut)
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut, ai=INTERNAL)
 def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
     """The SaaS deleted the business: its host answers 410 from now on; its members and data stay, for a restore."""
     internal_only(ctx)
@@ -859,7 +877,8 @@ def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
     return hub_answer(hub)
 
 
-@operation("base.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubOut)
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation("base.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubOut, ai=INTERNAL)
 def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
     """Bring a cancelled hub back (``ready``); a hub that never ended stays as it is; a purged one is ``hub_purged``."""
     internal_only(ctx)
@@ -872,7 +891,15 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
     return hub_answer(hub)
 
 
-@operation("base.hub.seed_local", kind="command", permission=None, input=HubSeedLocalIn, output=HubSeedLocalOut)
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation(
+    "base.hub.seed_local",
+    kind="command",
+    permission=None,
+    input=HubSeedLocalIn,
+    output=HubSeedLocalOut,
+    ai=INTERNAL,
+)
 def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
     """Leave the local hubs ``data.slugs`` ready in the registry, with an id of their own (``seed_local_hubs``), and
     every app on, its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off).
@@ -965,7 +992,8 @@ def _locked_demo(slug: str) -> Hub:
     return hub
 
 
-@operation("base.demo.create", kind="command", permission=None, input=DemoCreateIn, output=DemoOut)
+# Not an assistant tool: the SaaS's door to the demo (/internal), no person.
+@operation("base.demo.create", kind="command", permission=None, input=DemoCreateIn, output=DemoOut, ai=INTERNAL)
 def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
     """This browser's demo: its live one (``created`` false, nothing spent), or a new, empty ``demo-<8 hex>``.
 
@@ -1021,7 +1049,8 @@ def _code_hash(code: str) -> str:
     return hashlib.sha256(code.encode()).hexdigest()
 
 
-@operation("base.demo.code_create", kind="command", permission=None, input=DemoCodeIn, output=DemoCodeOut)
+# Not an assistant tool: the SaaS's door to the demo (/internal), no person.
+@operation("base.demo.code_create", kind="command", permission=None, input=DemoCodeIn, output=DemoCodeOut, ai=INTERNAL)
 def demo_code_create(ctx: OperationContext, data: DemoCodeIn) -> dict:
     """A one-time code into the demo ``data.slug`` for the browser that owns it, valid ``DEMO_CODE_TTL_SECONDS``.
 
@@ -1091,7 +1120,8 @@ def open_demo_session(request: HttpRequest, hub: Hub):
     return user
 
 
-@operation("base.demo.expire", kind="command", permission=None, input=DemoSlugIn, output=DemoStatusOut)
+# Not an assistant tool: the SaaS's door to the demo (/internal), no person.
+@operation("base.demo.expire", kind="command", permission=None, input=DemoSlugIn, output=DemoStatusOut, ai=INTERNAL)
 def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
     """End the demo ``data.slug`` now: its host answers 410 at once and the reaper purges it on its next pass.
 
@@ -1109,7 +1139,8 @@ def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
     return _demo_status(hub)
 
 
-@operation("base.demo.purge", kind="command", permission=None, input=DemoSlugIn, output=DemoStatusOut)
+# Not an assistant tool: the SaaS's door to the demo (/internal), no person.
+@operation("base.demo.purge", kind="command", permission=None, input=DemoSlugIn, output=DemoStatusOut, ai=INTERNAL)
 def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
     """Purge the demo ``data.slug``, which ended: its codes, its owner and its role go, and :func:`purge_demo_data`
     gets it; the row stays ``purged`` as a tombstone (410) for ``DEMO_TOMBSTONE_DAYS``.
@@ -2391,7 +2422,7 @@ from base.schemas import ApiDocSettingsIn, ApiDocSettingsOut, ApiDocSettingsUpda
     ai={
         "description": "Shows or hides the documentation of this business's API (for whoever connects another "
         "system); it comes hidden.",
-        "risk": "low",
+        "risk": "normal",
     },
 )
 def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn) -> dict:

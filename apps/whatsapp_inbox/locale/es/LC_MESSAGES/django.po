@@ -817,6 +817,9 @@ msgstr "Elige el archivo de la cabecera: la plantilla se envía con él."
 msgid "The header's file is no longer in the business's files: send the template again choosing its file."
 msgstr "El archivo de la cabecera ya no está en los archivos del negocio: vuelve a enviar la plantilla eligiendo su archivo."
 
+msgid "That file is not among the business's files."
+msgstr "Ese archivo no está entre los archivos del negocio."
+
 msgid "Reads the message the customer wrote, the number of her conversation and what to call her."
 msgstr "Lee el mensaje que escribió la clienta, el número de su conversación y cómo llamarla."
 

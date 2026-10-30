@@ -3033,14 +3033,20 @@ Implicados: ACCOUNTS-F38
   carpeta de otra app) y, por app, el suyo (`apps/whatsapp_inbox/tests/test_template_header_file.py`).
 - **Asistente** (APP-BASE-9, BASE-F92…F106; PLAN §30, ronda 2026-10-22b): es **plataforma** dentro de `base/`, no un
   módulo `kind="app"`: lo traen todos los planes (el cupo mensual llega en la foto; 0 = sin asistente) y sus piezas son
-  del shell y del Inicio. `base/assistant.py` (sin ORM) tiene el catálogo de herramientas (`catalog`: toda
-  `@operation` de las apps activas cuyo `ai=` tiene descripción y cuyo permiso tiene la persona, o que su app deja
-  aprobar a un responsable (`approvals.label_of`), salvo las «Not an assistant tool» / «System only», las sin permiso,
-  las de la plataforma (un permiso que ninguna app declara, `<app>.system` o `system.<app>`: sus reacciones y tareas
-  programadas, que solo alcanza `*`; `declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga
-  su `ai=`), las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
+  del shell y del Inicio. Las mecánicas que no dependen de la pasarela son de `live.assistant` (las mismas del panel
+  del SaaS; `docs/plans/2026-10-30-asistente-saas.md` §2 de la raíz) y `base/assistant.py` (sin ORM) las reexporta con
+  lo suyo (`_Words`, pantallas, `ALWAYS`, `NOT_FROM_CHAT`, checks y pasarela): el catálogo de herramientas (`catalog`:
+  toda `@operation` de las apps activas cuyo `ai=` es una herramienta (`Operation.ai_spec()` es un `AI`) y cuyo permiso
+  tiene la persona, o que su app deja aprobar a un responsable (`approvals.label_of`). Toda operación declara `ai=`
+  (`live.E017`): `AI(description=…, risk=…)` o `ai=INTERNAL`; un `dict` se sigue aceptando y `ai_spec()` lo lee como
+  `INTERNAL` si no tiene descripción, si dice «Not an assistant tool» / «System only» o si es de la plataforma (sin
+  permiso, o con uno que ninguna app declara, `<app>.system` o `system.<app>`: sus reacciones y tareas programadas, que
+  solo alcanza `*`; `live.meta.declared_permissions`: ni siquiera un superusuario las recibe, diga lo que diga su
+  `ai=`). Fuera también las `base.assistant.*` y `NOT_FROM_CHAT` = `base.hub.reset` y `base.blueprint.export`; que el
+  catálogo de dueño, encargado, empleado y superusuario no se movió con E017 lo guarda
+  `base/tests/test_catalog_unchanged_by_e017.py`), `relevant` (como mucho `MAX_TOOLS` = 40 por turno, por las palabras de las dos últimas
   preguntas; `base.setup.status` y `base.business.get` siempre), la tarjeta (`card`: `ai={"risk": "high"}` pide
-  `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `base`, o el número de `ids`; sin `ids`, `blocked`; cada
+  `CONFIRM_WORD`, «CONFIRMAR» por `pgettext` con contexto `assistant` del catálogo de `live`, o el número de `ids`; sin `ids`, `blocked`; cada
   dato con su nombre en el idioma de la persona, `_label`: el `title` del esquema si un catálogo lo traduce, o tal
   cual en inglés; si no, el `verbose_name` del campo del mismo nombre en los modelos de su app, primero el de la
   entidad de la operación; si no, el `title` por los catálogos. Un dato sin campo de modelo lleva
@@ -3097,8 +3103,8 @@ Implicados: ACCOUNTS-F38
   el dato que nombra un registro con moneda propia, la lectura de su app que la da
   (`base.schemas.in_currency_of("<query>", by="<su entrada>", code="<el dato de su respuesta>")`, que es
   `{"currency": {"read", "by", "code"}}`; hoy `cart_id`, `session_token` y `customer` de las escrituras de Carrito y
-  pago, con `cart_checkout.cart.get`, y `price_list_id` y `price_list` de `pricing.price_item.add`, con
-  `pricing.price_list.get`), corrida como la persona (`_run`, como el nombre de un registro) solo si el objeto lleva
+  pago, con `cart_checkout.cart.get`; `price_list_id` y `price_list` de `pricing.price_item.add`, con
+  `pricing.price_list.get`, e `id` de `pricing.price_item.update`, con `pricing.price_item.get`), corrida como la persona (`_run`, como el nombre de un registro) solo si el objeto lleva
   algún importe (`_sends_amount`) y del primer dato marcado que venga relleno; tomada como la toman las escrituras
   (sin espacios, en mayúsculas, un código ISO 4217 que `pycountry` conoce) y con los decimales de esa moneda
   (`currency_decimals`: ninguno en yenes): arriba y dentro de un objeto va en el `money` del importe; vacía o sin ese
@@ -3117,8 +3123,7 @@ Implicados: ACCOUNTS-F38
   yenes, de verdad), el trinquete
   `test_every_amount_on_a_record_in_a_currency_of_its_own_says_how_to_read_it_but_the_known_ones`
   (`UNPRICED_RECORD_AMOUNTS`, que solo baja: un importe de una escritura cuya descripción dice «<x>'s currency», salvo
-  la del negocio, sin marca `currency` en su objeto ni encima; hoy Tarifas 1, `pricing.price_item.update`, que nombra
-  el precio por su id y ninguna lectura de Tarifas da por ese id la moneda de su tarifa),
+  la del negocio, sin marca `currency` en su objeto ni encima; hoy ninguno),
   `test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency` (dólares, yenes y « usd »),
   `test_an_amount_in_a_currency_that_is_none_is_shown_as_sent_never_in_another`,
   `test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts`, el trinquete

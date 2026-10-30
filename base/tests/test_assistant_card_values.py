@@ -320,7 +320,7 @@ UNNAMED_REFERENCES = {
     "tax": 4,
     "verifactu": 6,
     "website": 5,
-    "whatsapp_inbox": 22,
+    "whatsapp_inbox": 14,
 }
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models of their app give no label,
@@ -684,9 +684,7 @@ ATTEMPT_KEY_NAME = re.compile(r"idempoten|attempt_key|^(?:job|submit)_key$|^clie
 #: The attempt keys of the assistant's writes no ``attempt_key`` mark declares, by app: their card shows them, or
 #: leaves them out only as an id it cannot name. Only ever lower: an app that marks its own lowers its number here,
 #: and none comes in.
-UNMARKED_ATTEMPT_KEYS = {
-    "whatsapp_inbox": 4,
-}
+UNMARKED_ATTEMPT_KEYS: dict[str, int] = {}
 
 
 def is_attempt_key(prop: dict) -> bool:
@@ -1429,10 +1427,8 @@ def test_a_currency_is_marked_only_on_a_text():
 RECORD_CURRENCY = re.compile(r"\b(?!business's\b)\w+'s currency\b")
 
 #: The amounts of the assistant's writes in the currency of a record that no ``currency`` mark beside them (or above
-#: them) says how to read, by app: the card paints them in the business's currency. Only ever lower. Pricing's
-#: ``price_item.update`` names its price by the price's id, and no read of Pricing answers the currency of the list of a
-#: price by that id.
-UNPRICED_RECORD_AMOUNTS = {"pricing": 1}
+#: them) says how to read, by app: the card paints them in the business's currency. Only ever lower.
+UNPRICED_RECORD_AMOUNTS: dict[str, int] = {}
 
 
 def unpriced_record_amounts(op: Operation) -> list[str]:

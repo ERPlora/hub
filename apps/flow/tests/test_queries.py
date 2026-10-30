@@ -11,6 +11,8 @@ from django.utils import timezone, translation
 from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
+from live.operations import AI, INTERNAL, Operation
+from ninja import Schema
 
 from apps.flow import queries
 from apps.flow.models import Draft, Flow, FlowRun
@@ -476,6 +478,23 @@ def test_the_catalog_never_offers_an_action_that_needs_a_person():
     ):
         assert name not in actions, name
     assert {"task.task.create", "customer.note.add"} <= actions
+
+
+def test_a_typed_declaration_needs_a_person_as_its_dictionary_did():
+    """``live.E017`` (T1 of the SaaS assistant's plan): ``AI(...)`` and ``INTERNAL`` are read as the dictionaries were —
+    a high risk needs a person, ``INTERNAL`` is nothing for the assistant —, and only a dictionary says «in person»."""
+
+    def declared(ai):
+        return Operation(
+            name="task.task.probe", kind="command", permission="task.manage", input=Schema, output=Schema,
+            expose_api=False, ai=ai, fn=lambda ctx, data: {},
+        )
+
+    assert queries.needs_a_person(declared(AI(description="Voids the task.", risk="high")))
+    assert not queries.needs_a_person(declared(AI(description="Adds a task.")))
+    assert not queries.needs_a_person(declared(INTERNAL))
+    assert queries.needs_a_person(declared({"description": "Seats a party.", "in_person": True}))
+    assert not queries.asks_first(declared(INTERNAL))
 
 
 def test_try_says_an_action_that_needs_a_person_is_not_for_automations():

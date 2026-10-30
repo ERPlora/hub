@@ -19,6 +19,7 @@ from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
 from apps.whatsapp_inbox.models import NAMED_VARIABLE
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -83,6 +84,10 @@ CONVERSATION_REFERENCE = (
     "The conversation's number (any format: +34 600 111 222, 600111222) or the name of the customer or "
     "of their WhatsApp profile, when the id is not known."
 )
+
+# The assistant's card names a template header's file by this read (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: by the name it was chosen with, as the template's sheet shows it. Whoever sends reads it.
+A_SAMPLE = names("whatsapp_inbox.template_sample.detail")
 
 
 # ── Pages: every list is paginated, limit ≤ 100 ─────────────────────────────────────────────────
@@ -442,6 +447,7 @@ class TemplateSendIn(Schema):
         title=gettext_noop("File"),
         description="For a template whose header is a photo, a video or a document: the id "
         "whatsapp_inbox.template_sample.upload answered for the file to send; without it, the template's own file.",
+        json_schema_extra=A_SAMPLE,
     )
 
 
@@ -467,7 +473,8 @@ class SendIn(Schema):
     )
     client_message_id: UUID = Field(
         description="A key of the caller's own for THIS message (a new UUID per message, the same on a retry): "
-        "sending again with it never sends twice."
+        "sending again with it never sends twice.",
+        json_schema_extra={"attempt_key": True},
     )
 
     @field_validator("conversation")
@@ -758,6 +765,7 @@ class TemplateWriteIn(Schema):
         None,
         description="For an IMAGE, VIDEO or DOCUMENT header: the id whatsapp_inbox.template_sample.upload answered "
         "for its file (Meta reviews the template with it; the same one again keeps it).",
+        json_schema_extra=A_SAMPLE,
     )
     body: _text(1024, 1) = Field(description="The text, up to 1024 characters, with {{1}}, {{2}}… where the variables go.")
     body_examples: list[_text(1024)] = Field(
@@ -770,7 +778,8 @@ class TemplateWriteIn(Schema):
     )
     submit_key: UUID = Field(
         description="A key of the caller's own for THIS save (a new UUID per save, the same on a retry): saving "
-        "again with it never registers the template twice."
+        "again with it never registers the template twice.",
+        json_schema_extra={"attempt_key": True},
     )
 
     @field_validator("header", "footer")
@@ -854,6 +863,10 @@ class TemplateSampleUploadIn(Schema):
     content_base64: str = Field(
         max_length=MAX_SAMPLE_BASE64, title=gettext_noop("File"), description="The file, in base64."
     )
+
+
+class TemplateSampleRefIn(Schema):
+    id: UUID = Field(description="The file's id, as whatsapp_inbox.template_sample.upload answered it.")
 
 
 class TemplateSampleOut(Schema):
