@@ -9,14 +9,15 @@ A row keeps one reference, never a URL (a ``.blueprint.zip`` never changes; a UR
   the hub's sessions only);
 - empty: no image (the till shows its initials).
 
-A photo comes in as a JPG, PNG or WebP of :data:`MAX_UPLOAD_BYTES` at most, in base64 (:func:`decode`), and is kept as a
-WebP of :data:`SIDE` × :data:`SIDE`, the middle of it cropped to a square (cover), turned upright as the phone took it,
-quality :data:`QUALITY` and without what the camera wrote in it (:func:`to_webp`); a WebP that already is one, with
-nothing written in it, is kept as it came (an exported blueprint's photo loses nothing when it is loaded again). Each
-upload is a file of its own, named by a new UUIDv7 (:func:`keep_photo`), counted against the plan's space as Files
-counts its own (``base.queries.refuse_past_the_plans_space``). The photo a row lets go is deleted once its change is
-saved (:func:`let_go`): only its upload writes a ``file:`` reference (:func:`check` refuses one set by hand), so no
-two rows share a photo. No ORM here: the apps' ``services.py`` and ``queries.py`` call these.
+A photo comes in as a JPG, PNG or WebP of :data:`MAX_UPLOAD_BYTES` at most, in base64 (:func:`decode`), of
+:data:`MAX_PIXELS` at most (checked before its pixels are decoded), and is kept as a WebP of :data:`SIDE` ×
+:data:`SIDE`, the middle of it cropped to a square (cover), turned upright as the phone took it, quality :data:`QUALITY`
+and without what the camera wrote in it (:func:`to_webp`); a WebP that already is one, with nothing written in it, whose
+pixels decode and with nothing after its end, is kept as it came (an exported blueprint's photo loses nothing when it is
+loaded again). Each upload is a file of its own, named by a new UUIDv7 (:func:`keep_photo`), counted against the plan's
+space as Files counts its own (``base.queries.refuse_past_the_plans_space``). The photo a row lets go is deleted once
+its change is saved (:func:`let_go`): only its upload writes a ``file:`` reference (:func:`check` refuses one set by
+hand), so no two rows share a photo. No ORM here: the apps' ``services.py`` and ``queries.py`` call these.
 """
 
 import base64
@@ -56,6 +57,11 @@ QUALITY = 85
 #: The longest side a photo may have, checked before its pixels are decoded (a small file can unfold into a huge
 #: picture): a phone's camera takes up to 8064 × 6048.
 MAX_SIDE = 10_000
+#: The most pixels a photo may have, checked before they are decoded too: a flat 10 000 × 10 000 PNG weighs some 300 KB
+#: and unfolds into 400 MB, and Pillow's own guard lets it through (it warns past 89 MP, refuses past 179 MP).
+#: 40 MP × 4 bytes a pixel (Pillow keeps RGB in 4) ≈ 160 MB at worst for one decode. A 12 MP phone photo (4000 × 3000)
+#: fits; a full 48 MP one (8064 × 6048) weighs far more than :data:`MAX_UPLOAD_BYTES` and is refused before.
+MAX_PIXELS = 40_000_000
 #: The formats taken, as Pillow names them.
 FORMATS = ("JPEG", "PNG", "WEBP")
 
@@ -153,14 +159,22 @@ def to_webp(raw: bytes, *, language: str | None = None) -> bytes:
     with translation.override(language or translation.get_language()):
         try:
             with PILImage.open(io.BytesIO(raw)) as image:
-                if image.format not in FORMATS or max(image.size) > MAX_SIDE:
+                width, height = image.size
+                if image.format not in FORMATS or max(width, height) > MAX_SIDE or width * height > MAX_PIXELS:
                     raise _invalid(str(PHOTO_INVALID))
-                if _kept_as_it_came(image):
-                    return raw
+                if image.format == "JPEG":
+                    # Decoded at the smallest scale (1/2, 1/4, 1/8) still past twice the side kept: less memory.
+                    image.draft("RGB", (SIDE * 2, SIDE * 2))
+                # Decoded whole before anything is kept: a header that reads is no proof its pixels do.
                 image.load()
-                upright = ImageOps.exif_transpose(image)
-                mode = "RGBA" if "A" in upright.getbands() or "transparency" in upright.info else "RGB"
-                square = ImageOps.fit(upright.convert(mode), (SIDE, SIDE), method=PILImage.Resampling.LANCZOS)
+                if _kept_as_it_came(image, raw):
+                    return raw
+                # Turned upright and into its mode without a copy of what was decoded (only a turn or a new mode
+                # makes one): the decoded pixels stay the most memory a photo takes.
+                ImageOps.exif_transpose(image, in_place=True)
+                mode = "RGBA" if "A" in image.getbands() or "transparency" in image.info else "RGB"
+                pixels = image if image.mode == mode else image.convert(mode)
+                square = ImageOps.fit(pixels, (SIDE, SIDE), method=PILImage.Resampling.LANCZOS)
                 buffer = io.BytesIO()
                 square.save(buffer, "WEBP", quality=QUALITY)
                 return buffer.getvalue()
@@ -168,10 +182,12 @@ def to_webp(raw: bytes, *, language: str | None = None) -> bytes:
             raise _invalid(str(PHOTO_INVALID)) from None
 
 
-def _kept_as_it_came(image: PILImage.Image) -> bool:
+def _kept_as_it_came(image: PILImage.Image, raw: bytes) -> bool:
+    """A WebP already as it would be kept, that ends where its RIFF header says (nothing hidden after its end)."""
     return (
         image.format == "WEBP"
         and image.size == (SIDE, SIDE)
+        and len(raw) == int.from_bytes(raw[4:8], "little") + 8
         and not getattr(image, "is_animated", False)
         and not image.info.get("exif")
         and not image.info.get("xmp")

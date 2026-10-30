@@ -4,20 +4,23 @@ A product, a service or a set menu keeps one reference: ``catalog:<folder>/<name
 ``base.image_catalog``), ``file:<app>/<folder>/<uuid7 hex>.webp`` (a photo of its own, under its hub's prefix of the
 hub file store, served by ``/p/media/`` to the hub's sessions) or nothing. A photo of its own comes in as a JPG, PNG or
 WebP of 2 MB at most and is kept as a WebP of 512 × 512 (the middle of it, cropped to a square, quality 85), counted
-against the plan's space; a WebP that already is one is kept as it came. A reference is never a URL: the URL is made
-when the row is read.
+against the plan's space; a WebP that already is one (whole, nothing after its end) is kept as it came. A picture of
+too many pixels is refused before they are decoded. A reference is never a URL: the URL is made when the row is read.
 """
 
 import base64
 import io
 import re
+import struct
 import uuid
+import zlib
 
 import pytest
 from django.core.files.storage import storages
 from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, OperationError
 from PIL import Image as PILImage
+from PIL import ImageFile, ImageOps
 
 from base import files, images
 from base.models import Hub
@@ -52,6 +55,36 @@ def picture(fmt: str = "PNG", size: tuple[int, int] = (800, 600), mode: str = "R
     buffer = io.BytesIO()
     image.save(buffer, fmt, **save)
     return buffer.getvalue()
+
+
+def flat_png(width: int, height: int) -> bytes:
+    """A grey RGB PNG of ``width`` × ``height``, written row by row so the test never holds its pixels: a flat picture
+    squeezes to almost nothing (10 000 × 10 000 is some 300 KB, decoded 400 MB)."""
+    row = b"\0" + b"\x80" * (3 * width)  # the filter byte (none), then three bytes a pixel
+    squeeze = zlib.compressobj(9)
+    body = b"".join(squeeze.compress(row) for _ in range(height)) + squeeze.flush()
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)  # 8 bits, truecolour, no interlace
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", body) + chunk(b"IEND", b"")
+
+
+class Decoded(Exception):
+    """The pixels of a picture were decoded (what a refusal must come before)."""
+
+
+def refuse_decoding(monkeypatch) -> None:
+    def load(image):
+        raise Decoded(image.size)
+
+    monkeypatch.setattr(ImageFile.ImageFile, "load", load)
+
+
+def riff_end(webp: bytes) -> int:
+    """Where a WebP ends by what its RIFF header says: its declared size and the 8 bytes of the header itself."""
+    return int.from_bytes(webp[4:8], "little") + 8
 
 
 def opened(raw: bytes) -> PILImage.Image:
@@ -189,6 +222,17 @@ def test_a_photo_becomes_a_webp_of_512_by_512_cut_from_its_middle(fmt):
     assert kept.convert("RGB").getpixel((5, 256))[1] > 100
 
 
+def test_a_photo_is_never_copied_whole_on_its_way_to_the_kept_webp(monkeypatch):
+    # Its decoded pixels are the most memory it takes (``MAX_PIXELS``): turning it upright or into its mode adds none.
+    copies = []
+    copy = PILImage.Image.copy
+    monkeypatch.setattr(PILImage.Image, "copy", lambda image: copies.append(image.size) or copy(image))
+
+    images.to_webp(picture("PNG", (2000, 1500)))
+
+    assert (2000, 1500) not in copies
+
+
 def test_a_tall_photo_keeps_its_middle_too():
     kept = opened(images.to_webp(picture("PNG", (300, 900))))
 
@@ -215,6 +259,37 @@ def test_a_webp_of_512_by_512_without_metadata_is_kept_as_it_came():
     raw = picture("WEBP", (512, 512), quality=60)
 
     assert images.to_webp(raw) == raw
+
+
+def test_a_webp_of_512_by_512_whose_pixels_are_damaged_is_refused_never_kept():
+    # Its header still reads (512 × 512, nothing written in it): only decoding its pixels finds the damage.
+    raw = bytearray(picture("WEBP", (512, 512), quality=60))
+    raw[40:-10] = b"\xff" * (len(raw) - 50)
+
+    with pytest.raises(InvalidPayload) as refused:
+        images.to_webp(bytes(raw))
+
+    assert refused.value.code == "base.photo_invalid"
+
+
+def test_a_webp_of_512_by_512_cut_in_half_is_refused():
+    raw = picture("WEBP", (512, 512), quality=60)
+
+    with pytest.raises(InvalidPayload) as refused:
+        images.to_webp(raw[: len(raw) // 2])
+
+    assert refused.value.code == "base.photo_invalid"
+
+
+def test_what_follows_the_end_of_a_webp_of_512_by_512_is_never_kept():
+    raw = picture("WEBP", (512, 512), quality=60)
+
+    kept = images.to_webp(raw + b"\0" * 100_000)
+
+    # Made again from its pixels: a WebP that ends where its header says, the same picture.
+    assert len(kept) == riff_end(kept)
+    assert opened(kept).size == (images.SIDE, images.SIDE)
+    assert opened(kept).convert("RGB").getpixel((256, 256))[1] > 100
 
 
 def test_what_a_photo_says_of_where_it_was_taken_is_dropped():
@@ -257,6 +332,37 @@ def test_a_photo_with_too_many_pixels_is_refused_before_it_is_decoded():
         images.to_webp(raw)
 
     assert refused.value.code == "base.photo_invalid"
+
+
+@pytest.mark.filterwarnings("ignore::PIL.Image.DecompressionBombWarning")  # Pillow only warns: what this is about
+def test_a_flat_picture_of_100_megapixels_is_refused_before_its_pixels_are_decoded(monkeypatch):
+    raw = flat_png(10_000, 10_000)  # no side past the limit, light enough to upload, 400 MB once decoded
+    assert len(raw) <= images.MAX_UPLOAD_BYTES
+    refuse_decoding(monkeypatch)
+
+    with pytest.raises(InvalidPayload) as refused:
+        images.to_webp(raw)
+
+    assert refused.value.code == "base.photo_invalid"
+
+
+def test_a_phone_photo_of_12_megapixels_is_taken_and_decoded_at_a_smaller_scale(monkeypatch):
+    raw = picture("JPEG", (4000, 3000))
+    decoded = []
+    upright = ImageOps.exif_transpose
+
+    def turn(image, **kw):
+        decoded.append(image.size)
+        return upright(image, **kw)
+
+    monkeypatch.setattr(ImageOps, "exif_transpose", turn)
+
+    kept = opened(images.to_webp(raw))
+
+    assert (kept.format, kept.size) == ("WEBP", (images.SIDE, images.SIDE))
+    assert kept.convert("RGB").getpixel((256, 256))[1] > 100  # its middle, the green third
+    # The JPEG decoder halves it as it reads (2000 × 1500, still past twice the side kept), never the full 12 MP.
+    assert decoded == [(2000, 1500)]
 
 
 def test_the_refusals_are_said_in_the_persons_language():

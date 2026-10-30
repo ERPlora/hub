@@ -38,6 +38,7 @@ import json
 import logging
 import re
 import zipfile
+import zlib
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -296,14 +297,19 @@ def manifest(*, name: str, language: str, country: str, purpose: str, created_at
 
 
 def _member_bytes(archive: zipfile.ZipFile, name: str, budget: list[int]) -> bytes:
-    """A member's bytes, read in chunks against what is left of the inflated budget."""
+    """A member's bytes, read in chunks against what is left of the inflated budget; one damaged after it was written
+    (a CRC that does not match, a broken or short deflate stream, encrypted, compressed in a way zip readers do not
+    know) makes the file unreadable."""
     chunks = []
-    with archive.open(name) as member:
-        while chunk := member.read(65536):
-            budget[0] -= len(chunk)
-            if budget[0] < 0:
-                raise BlueprintInvalid("too_big")
-            chunks.append(chunk)
+    try:
+        with archive.open(name) as member:
+            while chunk := member.read(65536):
+                budget[0] -= len(chunk)
+                if budget[0] < 0:
+                    raise BlueprintInvalid("too_big")
+                chunks.append(chunk)
+    except (zipfile.BadZipFile, zlib.error, RuntimeError, NotImplementedError):
+        raise BlueprintInvalid("unreadable") from None
     return b"".join(chunks)
 
 
