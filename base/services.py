@@ -2612,7 +2612,7 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
         arguments = None
     if not isinstance(arguments, dict):
         return assistant.run_tool(ctx, op, call.arguments), None
-    card = assistant.card(op, arguments, ctx.language)
+    card = assistant.card(op, arguments, ctx.language, ctx)
     if decision is None or decision.call_id != call.call_id:
         if card["blocked"]:
             return None, card

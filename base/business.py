@@ -58,7 +58,7 @@ def money_text(cents: int | Decimal, currency: str, *, language: str | None = No
     cents = Decimal(cents)
     whole = cents == cents.to_integral_value()
     units = cents.scaleb(-get_currency_precision(currency))
-    locale = _locale(language or translation.get_language() or settings.LANGUAGE_CODE)
+    locale = babel_locale(language or translation.get_language() or settings.LANGUAGE_CODE)
     text = format_currency(
         units if whole else units.normalize(),
         currency,
@@ -90,14 +90,14 @@ def _letter(char: str) -> bool:
 
 def currency_label(currency: str, language: str) -> str:
     """«EUR · Euro»: the code, then its name in ``language``."""
-    return f"{currency} · {_capital(get_currency_name(currency, locale=_locale(language)))}"
+    return f"{currency} · {_capital(get_currency_name(currency, locale=babel_locale(language)))}"
 
 
 def country_name(country: str, language: str) -> str:
     """«España» / «Spain»; the code itself when CLDR does not name it, and nothing without one."""
     if not country:
         return ""
-    name = _locale(language).territories.get(country.upper())
+    name = babel_locale(language).territories.get(country.upper())
     return _capital(name) if name else country
 
 
@@ -105,11 +105,11 @@ def language_name(code: str, language: str) -> str:
     """«Español» / «Spanish»: the language ``code`` named in ``language``."""
     if not code:
         return ""
-    name = _locale(language).languages.get(code.lower())
+    name = babel_locale(language).languages.get(code.lower())
     return _capital(name) if name else code
 
 
-def _locale(language: str) -> Locale:
+def babel_locale(language: str) -> Locale:
     """``language`` as Django writes it (``es-es``) or as Babel does (``es_ES``); English for one CLDR does not know."""
     try:
         return Locale.parse((language or "en").replace("_", "-"), sep="-")

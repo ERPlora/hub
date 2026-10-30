@@ -10,7 +10,7 @@ import pytest
 from django.urls import resolve
 from django.utils import timezone
 from live.context import OperationContext, Scope
-from live.errors import PermissionDenied
+from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
@@ -198,6 +198,16 @@ def test_the_failed_events_of_this_hub_newest_first_with_what_failed():
         "last_error": "Conflict: Set up the issuer first.",
         "retryable": True,
     }
+
+
+def test_one_failed_event_is_read_by_its_id_as_the_list_shows_it_and_only_this_hubs():
+    """``base.failed_event.detail``, what names a failed event on the assistant's card: this hub's and still failed;
+    another hub's (phase 1 shares the table) or one resent meanwhile is not there."""
+    mine = delivery(event())
+    assert run("base.failed_event.detail", ADMIN, id=str(mine.id)) == run("base.failed_event.list", ADMIN)["items"][0]
+    for other in (delivery(event(B)), delivery(event(), status=EventDelivery.Status.PENDING)):
+        with pytest.raises(NotFound):
+            run("base.failed_event.detail", ADMIN, id=str(other.id))
 
 
 def test_a_failed_event_for_an_app_that_is_not_on_cannot_be_retried(monkeypatch):

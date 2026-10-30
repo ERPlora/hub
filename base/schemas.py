@@ -15,6 +15,16 @@ from ninja import Schema
 from pydantic import Field
 
 
+def names(read: str, by: str = "id", name: tuple[str, ...] = ("name",)) -> dict:
+    """The mark of a datum that names a record by its id (base/assistant.py ``REFERS``): the assistant's card names it
+    as ``read`` answers it (the first of ``name`` not empty), never by the id."""
+    return {"refers": {"read": read, "by": by, "name": list(name)}}
+
+
+#: A device by its name or, with none, by what it is («Chrome · macOS»), as Settings › Devices says it.
+DEVICE_NAMES = ("name", "agent")
+
+
 class SessionMeIn(Schema):
     pass
 
@@ -505,7 +515,9 @@ class BlueprintImportIn(BlueprintSourceIn):
         description="The apps to load; none = every app of the blueprint.",
     )
     retry_of: UUID | None = Field(
-        None, description="A load that did not go in whole: load again what did not, from the same template."
+        None,
+        description="A load that did not go in whole: load again what did not, from the same template.",
+        json_schema_extra=names("base.import.detail"),
     )
 
 
@@ -613,8 +625,14 @@ class DatasetListOut(Schema):
     apps: list[AppDatasetsOut] = Field(description="By name.")
 
 
-class ImportUndoIn(Schema):
-    id: UUID
+class ImportIdIn(Schema):
+    """A load of this business, by its id."""
+
+    id: UUID = Field(json_schema_extra=names("base.import.detail"))
+
+
+class ImportUndoIn(ImportIdIn):
+    """A load to undo: the rows it created go."""
 
 
 class RemovalOut(Schema):
@@ -760,11 +778,11 @@ class FailedEventListOut(Schema):
 class FailedEventIn(Schema):
     """A failed event of the hub of the request, by its id."""
 
-    id: UUID
+    id: UUID = Field(json_schema_extra=names("base.failed_event.detail"))
 
 
 class FailedEventDiscardIn(Schema):
-    id: UUID
+    id: UUID = Field(json_schema_extra=names("base.failed_event.detail"))
     #: Why it is discarded (optional): kept with who and when.
     reason: str = Field(default="", max_length=500)
 
@@ -851,12 +869,12 @@ class DeviceListOut(Schema):
 
 
 class DeviceRenameIn(Schema):
-    id: UUID
+    id: UUID = Field(json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))
     name: str = Field(max_length=80, description="«Bar», «Kitchen»: 60 characters at most once trimmed.")
 
 
 class DeviceByIdIn(Schema):
-    id: UUID
+    id: UUID = Field(json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))
 
 
 class DeviceRemoveOut(Schema):
@@ -986,6 +1004,7 @@ class PersonIn(Schema):
         max_length=150,
         title=gettext_noop("Person"),
         description="The ``id`` of a person of ``base.person.list``.",
+        json_schema_extra=names("base.person.detail", by="person"),
     )
 
 
@@ -1066,7 +1085,7 @@ class ApiKeyCreateIn(Schema):
 
 
 class ApiKeyIdIn(Schema):
-    id: UUID
+    id: UUID = Field(json_schema_extra=names("base.api_key.detail"))
 
 
 class ApiKeyTokenOut(Schema):
