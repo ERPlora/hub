@@ -6,6 +6,7 @@ export function tableRow(overrides: Partial<TableOut> = {}): TableOut {
   return {
     id: 't1',
     number: '4',
+    label: '4 (Dining room)',
     name: '',
     capacity: 4,
     shape: 'square',
@@ -70,6 +71,7 @@ export function sessionRow(overrides: Partial<SessionOut> = {}): SessionOut {
     id: 's1',
     table_id: 't1',
     table_number: '4',
+    label: '4 (Dining room)',
     zone_id: 'z1',
     zone_name: 'Dining room',
     order_id: 'o1',

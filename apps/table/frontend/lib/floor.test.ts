@@ -10,6 +10,7 @@ function table(overrides: Partial<TableOut> = {}): TableOut {
   return {
     id: 't1',
     number: '1',
+    label: '1 (Dining room)',
     name: '',
     capacity: 4,
     shape: 'square',

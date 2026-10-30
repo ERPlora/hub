@@ -360,6 +360,9 @@ msgstr "Esa mesa no tiene ninguna otra cuenta abierta con la que fusionar."
 msgid "That hold is not there any more: it was released, it expired, or that booking never held a table."
 msgstr "Esa retención ya no está: se soltó, ha vencido, o esa reserva nunca llegó a retener una mesa."
 
+msgid "That line is not on the check of any table."
+msgstr "Esa línea no está en la cuenta de ninguna mesa."
+
 msgid "Sales is not available in this business: the table's check cannot be opened or changed."
 msgstr "Ventas no está disponible en este negocio: no se puede abrir ni cambiar la cuenta de la mesa."
 
@@ -381,6 +384,15 @@ msgstr "Primer número"
 
 msgid "Move to zone"
 msgstr "Mover a la zona"
+
+msgid "Zone"
+msgstr "Zona"
+
+msgid "Table"
+msgstr "Mesa"
+
+msgid "Check"
+msgstr "Cuenta"
 
 msgid "Customer"
 msgstr "Cliente"

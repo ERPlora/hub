@@ -12,8 +12,10 @@ from apps.table import queries, services
 from apps.table.schemas import (
     ByIdIn,
     ByOrderIn,
+    HoldByReservationIn,
     HoldPlaceIn,
     HoldReleaseIn,
+    LineRefIn,
     SessionCloseIn,
     SessionGuestsIn,
     SessionLinkOrderIn,
@@ -125,6 +127,11 @@ async def session_by_order(request, params: Query[ByOrderIn]):
     return await run_operation(request, queries.sessions_by_order, params)
 
 
+@bind(router, "table.session.line", "/table/sessions/line")
+async def session_line(request, params: Query[LineRefIn]):
+    return await run_operation(request, queries.get_line, params)
+
+
 @bind(router, "table.session.open", "/table/sessions/open", status=201)
 async def session_open(request, data: SessionOpenIn):
     return await run_operation(request, services.open_session, data)
@@ -199,6 +206,11 @@ async def settings_update(request, data: SettingsIn):
 
 
 # Holds
+
+
+@bind(router, "table.hold.by_reservation", "/table/holds/by_reservation")
+async def hold_by_reservation(request, params: Query[HoldByReservationIn]):
+    return await run_operation(request, queries.hold_by_reservation, params)
 
 
 @bind(router, "table.hold.place", "/table/holds", status=201)

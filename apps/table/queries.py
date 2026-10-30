@@ -44,11 +44,15 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 
 from apps.customer.models import OrderLink
-from apps.sale.models import Order, Sale
+from apps.sale.models import Order, OrderLine, Sale
 from apps.table.models import Hold, Table, TableSession, TableSettings, Zone
 from apps.table.schemas import (
     ByOrderIn,
     FloorStatusOut,
+    HoldByReservationIn,
+    HoldOut,
+    LineOut,
+    LineRefIn,
     NoIn,
     SessionListIn,
     SessionOut,
@@ -90,6 +94,10 @@ SESSION_NOT_ACTIVE = _(
 SESSION_AMBIGUOUS = _("Table %(number)s has %(count)s open checks: say which one.")
 TABLE_LABEL = _("%(number)s (%(zone)s)")
 NO_ZONE = _("no zone")
+HOLD_NOT_FOUND = _(
+    "That hold is not there any more: it was released, it expired, or that booking never held a table."
+)
+LINE_NOT_FOUND = _("That line is not on the check of any table.")
 
 ZONE_ORDER = {
     "sort_order": ("sort_order",),
@@ -260,6 +268,11 @@ def table_label(table: Table) -> str:
         "number": table.number,
         "zone": table.zone.name if table.zone_id else NO_ZONE,
     }
+
+
+def check_label(session: TableSession) -> str:
+    """Where a check is: its table with its zone («5 (Terrace)»), or parked."""
+    return table_label(session.table) if session.table_id else str(TableSession.Status.PARKED.label)
 
 
 def find_table(
@@ -433,6 +446,7 @@ def table_rows(tables: list[Table], now: dt.datetime) -> list[dict]:
             {
                 "id": table.pk,
                 "number": table.number,
+                "label": table_label(table),
                 "name": table.name,
                 "capacity": table.capacity,
                 "shape": table.shape,
@@ -548,6 +562,7 @@ def session_rows(sessions: list[TableSession]) -> list[dict]:
                 "id": session.pk,
                 "table_id": session.table_id,
                 "table_number": table.number if table else None,
+                "label": check_label(session),
                 "zone_id": table.zone_id if table else None,
                 "zone_name": table.zone.name if table and table.zone_id else None,
                 "order_id": session.order_id,
@@ -573,6 +588,20 @@ def session_rows(sessions: list[TableSession]) -> list[dict]:
             }
         )
     return out
+
+
+def hold_row(hold: Hold) -> dict:
+    return {
+        "id": hold.pk,
+        "table_id": hold.table_id,
+        "source": hold.source,
+        "source_ref": hold.source_ref,
+        "held_from": hold.held_from,
+        "held_until": hold.held_until,
+        "party_size": hold.party_size,
+        "label": hold.label,
+        "status": hold.status,
+    }
 
 
 def session_out(session: TableSession) -> dict:
@@ -776,6 +805,26 @@ def sessions_by_order(ctx: OperationContext, params: ByOrderIn) -> dict:
 
 
 @operation(
+    "table.session.line",
+    kind="query",
+    permission="table.view_session",
+    input=LineRefIn,
+    output=LineOut,
+    expose_api=True,
+    ai={
+        "description": "Get one line of the check of Sales of a table check by its id: its name and quantity, as "
+        "«Split check» lists it."
+    },
+)
+def get_line(ctx: OperationContext, params: LineRefIn) -> dict:
+    held = TableSession.objects.filter(is_deleted=False, order_id__isnull=False).values("order_id")
+    line = OrderLine.objects.live().filter(pk=params.id, order_id__in=held).first()
+    if line is None:
+        raise NotFound(str(LINE_NOT_FOUND), code="table.line_not_found")
+    return {"id": line.id, "name": line.name, "quantity": line.quantity, "unit": line.unit}
+
+
+@operation(
     "table.waiter.list",
     kind="query",
     permission="table.view_session",
@@ -848,3 +897,34 @@ def settings_row(settings: TableSettings) -> dict:
 )
 def get_settings(ctx: OperationContext, params: NoIn) -> dict:
     return settings_row(current_settings())
+
+
+# --- Holds ---------------------------------------------------------------------------------------
+
+
+@operation(
+    "table.hold.by_reservation",
+    kind="query",
+    permission="table.view_table",
+    input=HoldByReservationIn,
+    output=HoldOut,
+    expose_api=True,
+    ai={
+        "description": "Get the hold a reservation of Reservations keeps on its table, while it holds it: the table, "
+        "its window and the name it paints on the table."
+    },
+)
+def hold_by_reservation(ctx: OperationContext, params: HoldByReservationIn) -> dict:
+    hold = (
+        Hold.objects.filter(
+            source=Hold.Source.RESERVATION,
+            source_ref=str(params.reservation_id),
+            status=Hold.Status.HELD,
+            held_until__gt=timezone.now(),
+        )
+        .order_by("held_from", "id")
+        .first()
+    )
+    if hold is None:
+        raise NotFound(str(HOLD_NOT_FOUND), code="table.hold_not_found")
+    return hold_row(hold)

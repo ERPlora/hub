@@ -153,6 +153,8 @@ export interface TableCheckOut {
 export interface TableOut {
   id: string;
   number: string;
+  /** Its number with its zone, in the reader's language: «5 (Terrace)». */
+  label: string;
   name: string;
   capacity: number;
   shape: TableShape;
@@ -201,6 +203,8 @@ export interface SessionOut {
   id: string;
   table_id: string | null;
   table_number: string | null;
+  /** Where it is, in the reader's language: its table with its zone («5 (Terrace)»), or «Parked». */
+  label: string;
   zone_id: string | null;
   zone_name: string | null;
   order_id: string | null;
@@ -286,6 +290,18 @@ export interface ByOrderIn {
   order_id: string;
 }
 
+export interface LineRefIn {
+  id: string;
+}
+
+/** A line of the check of Sales of a table check (quantity: decimal as text). */
+export interface LineOut {
+  id: string;
+  name: string;
+  quantity: string;
+  unit: string;
+}
+
 export interface SplitOut {
   session: SessionOut;
   new_session: SessionOut;
@@ -334,6 +350,10 @@ export interface HoldPlaceIn {
   label?: string;
 }
 
+export interface HoldByReservationIn {
+  reservation_id: string;
+}
+
 export interface HoldReleaseIn {
   source?: HoldSource;
   source_ref: string;
@@ -368,6 +388,7 @@ declare module '@erplora/ui/sdk' {
     'table.session.list': { input: SessionListIn; output: Page<SessionOut> };
     'table.session.get': { input: SessionRefIn; output: SessionOut };
     'table.session.by_order': { input: ByOrderIn; output: SessionsOut };
+    'table.session.line': { input: LineRefIn; output: LineOut };
     'table.session.open': { input: SessionOpenIn; output: SessionOut };
     'table.session.close': { input: SessionCloseIn; output: SessionOut };
     'table.session.transfer': { input: SessionTransferIn; output: SessionOut };
@@ -382,6 +403,7 @@ declare module '@erplora/ui/sdk' {
     'table.floor.status': { input: NoInput; output: FloorStatusOut };
     'table.settings.get': { input: NoInput; output: SettingsOut };
     'table.settings.update': { input: SettingsIn; output: SettingsOut };
+    'table.hold.by_reservation': { input: HoldByReservationIn; output: HoldOut };
     'table.hold.place': { input: HoldPlaceIn; output: HoldOut };
     'table.hold.release': { input: HoldReleaseIn; output: HoldOut };
   }

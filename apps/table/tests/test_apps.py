@@ -150,7 +150,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     from live.operations import registry
 
     operations = [op for name, op in registry.items() if name.startswith("table.")]
-    assert len(operations) == 36
+    assert len(operations) == 38
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
