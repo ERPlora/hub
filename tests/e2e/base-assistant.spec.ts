@@ -575,6 +575,107 @@ test('assistant-card — in Spanish removing a device names it as Settings › D
   await context.close();
 });
 
+// flow: RESERVATION-F06 RESERVATION-F08 (the card: BASE-F97)
+// FIX-HUB-RESERVATION-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every record a write of
+// Reservations names by its id — for whom, which table, which reservation — once the UUID left it. Now each one by the
+// name its screen gives it, read as the person: booking says the customer by the name of their card (and the day and the
+// time: a normal card's line carries its first three data); moving a reservation to another table says which
+// reservation, as the book's own dialog does (its guest, its day and its time), and the table by its number. Cancelled:
+// nothing is booked nor moved. What the test made is deleted at the end.
+test('RESERVATION-F06 — booking a table, the card names the customer; moving a reservation, the reservation and its new table; never by an id', async ({ browser }) => {
+  const KEY = 'FIX-HUB-RESERVATION-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const needed = ['customer', 'table', 'schedule', 'reservation'];
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  await turnOn(context, A, ...needed);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const made = async <T>(path: string, body: unknown): Promise<T> => {
+    const answer = await api<T>(context, A, 'POST', path, body);
+    expect(answer.status, `${path}: ${JSON.stringify(answer.data)}`).toBe(201);
+    return answer.data;
+  };
+  // A week from today, on the business's calendar (Madrid), at 21:30: always ahead, whenever the suite runs.
+  const ahead = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(ahead);
+  const weekday = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const stamp = String(Date.now() % 100_000_000).padStart(8, '0');
+  const name = `Ana García ${stamp.slice(-4)}`;
+  const phone = `+346${stamp}`;
+  const customer = await made<{ id: string }>('/customer/customers', { name, phone });
+  const zone = await made<{ id: string }>('/table/zones', { name: `E2E Card ${stamp}` });
+  const table = await made<{ id: string; number: string }>('/table/tables', { zone_id: zone.id, number: '7', capacity: 4 });
+  // The book takes reservations in a slot; one of the stack's own already covering that evening serves as well.
+  const slot = await api<{ id: string }>(context, A, 'POST', '/reservation/time_slots', {
+    day_of_week: weekday, start_time: '21:00', end_time: '23:30', max_reservations: 10,
+  });
+  expect([201, 409], JSON.stringify(slot.data)).toContain(slot.status);
+  const booked = await made<{ id: string }>('/reservation/reservations', {
+    customer_id: customer.id, guest_phone: phone, date, time: '21:30', party_size: 2, source: 'in_person',
+  });
+  // The words the book names it by, as its read by id answers them in the person's language («Ana García 1234 · 6 nov
+  // 2026 · 21:30»): what the card must say of it.
+  const read = await api<{ label: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${booked.id}`);
+  expect(read.status, JSON.stringify(read.data)).toBe(200);
+  const label = read.data.label;
+  expect(label.startsWith(`${name} · `), label).toBe(true);
+  expect(label, label).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  const ids = [customer.id, table.id, booked.id];
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  // Booking: for whom (the customer's card by its name), the day and the time; the table goes among its data, by number.
+  const booking = { customer_id: customer.id, date, time: '21:30:00', party_size: 2, table_id: table.id, source: 'in_person' };
+  await ask(page, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
+  for (const raw of [date, 'in_person', ...ids]) await expect(card(page)).not.toContainText(raw);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
+    await untilStill(page);
+    await capture(page, `${KEY}-create-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+
+  // Moving it to table 7: which reservation, as the book's dialog says it, and the new table by its number.
+  await ask(page, `E2E-ASK reservation__reservation__update ${JSON.stringify({ id: booked.id, table_id: table.id })}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(`Cambiar en Reservas: ${label} · 7`);
+    for (const raw of [date, ...ids]) await expect(card(page)).not.toContainText(raw);
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  const after = await api<{ table_id: string | null }>(context, A, 'GET', `/reservation/reservations/detail?id=${booked.id}`);
+  expect(after.data.table_id).toBeNull();
+
+  // What the test made, deleted; and the apps it turned on, off again.
+  const gone = async (path: string, id: string) => {
+    const answer = await api(context, A, 'POST', path, { id });
+    expect(answer.status, `${path}: ${JSON.stringify(answer.data)}`).toBe(200);
+  };
+  await gone('/reservation/reservations/delete', booked.id);
+  if (slot.status === 201) await gone('/reservation/time_slots/delete', slot.data.id);
+  await gone('/table/tables/delete', table.id);
+  await gone('/table/zones/delete', zone.id);
+  await gone('/customer/customers/delete', customer.id);
+  for (const app of [...needed].reverse().filter((id) => !wasOn.has(id))) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
 // flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
 // FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what a dangerous write sends («Persona:
 // saas:3»), never what it will do. Base's own preview: «Remove the PIN» names whose PIN goes, as its read

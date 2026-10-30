@@ -1371,6 +1371,10 @@
     "method": "post",
     "path": "/api/reservation/time_slots/delete"
   },
+  "reservation.time_slot.get": {
+    "method": "get",
+    "path": "/api/reservation/time_slots/detail"
+  },
   "reservation.blocked_date.list": {
     "method": "get",
     "path": "/api/reservation/blocked_dates"
@@ -1383,9 +1387,17 @@
     "method": "post",
     "path": "/api/reservation/blocked_dates/delete"
   },
+  "reservation.blocked_date.get": {
+    "method": "get",
+    "path": "/api/reservation/blocked_dates/detail"
+  },
   "reservation.waitlist.list": {
     "method": "get",
     "path": "/api/reservation/waitlist"
+  },
+  "reservation.waitlist.get": {
+    "method": "get",
+    "path": "/api/reservation/waitlist/detail"
   },
   "reservation.waitlist.create": {
     "method": "post",

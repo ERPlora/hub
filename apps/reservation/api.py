@@ -121,6 +121,11 @@ async def time_slot_create(request, data: TimeSlotIn):
     return await run_operation(request, services.create_slot, data)
 
 
+@bind(router, "reservation.time_slot.get", "/reservation/time_slots/detail")
+async def time_slot_get(request, params: Query[TimeSlotRefIn]):
+    return await run_operation(request, queries.get_slot, params)
+
+
 @bind(router, "reservation.time_slot.delete", "/reservation/time_slots/delete")
 async def time_slot_delete(request, data: TimeSlotRefIn):
     return await run_operation(request, services.delete_slot, data)
@@ -141,6 +146,11 @@ async def blocked_date_create(request, data: BlockedDateIn):
     return await run_operation(request, services.create_blocked, data)
 
 
+@bind(router, "reservation.blocked_date.get", "/reservation/blocked_dates/detail")
+async def blocked_date_get(request, params: Query[BlockedDateRefIn]):
+    return await run_operation(request, queries.get_blocked, params)
+
+
 @bind(router, "reservation.blocked_date.delete", "/reservation/blocked_dates/delete")
 async def blocked_date_delete(request, data: BlockedDateRefIn):
     return await run_operation(request, services.delete_blocked, data)
@@ -152,6 +162,11 @@ async def blocked_date_delete(request, data: BlockedDateRefIn):
 @bind(router, "reservation.waitlist.list", "/reservation/waitlist")
 async def waitlist_list(request, params: Query[WaitlistListIn]):
     return await run_operation(request, queries.list_waitlist, params)
+
+
+@bind(router, "reservation.waitlist.get", "/reservation/waitlist/detail")
+async def waitlist_get(request, params: Query[WaitlistRefIn]):
+    return await run_operation(request, queries.get_entry, params)
 
 
 @bind(router, "reservation.waitlist.create", "/reservation/waitlist", status=201)
