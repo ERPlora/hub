@@ -12,13 +12,16 @@ dropped when the session ends. The rows in control (``hub_a``, ``hub_b``) are th
 """
 
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import SimpleNamespace
+from unittest import mock
 
 import psycopg
 from django.apps import apps
-from django.db import connections
+from django.db import DEFAULT_DB_ALIAS, connections
+from django.db.backends.utils import CursorWrapper
 from django.db.migrations.loader import MigrationLoader
 from psycopg import sql
 
@@ -195,3 +198,32 @@ def table_names(name: str) -> set[str]:
     """The tables of the database ``name``'s ``public`` schema."""
     with _maintenance(name) as conn:
         return {row[0] for row in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")}
+
+
+@contextmanager
+def watched() -> Iterator[dict[str, list[str]]]:
+    """Every statement any thread sends, by alias: a wrapper at the cursor, under every connection of every thread
+    (a ``connection.execute_wrapper`` on every alias at once, those registered while the block runs included).
+
+    Scoped to the block (``mock.patch.object``): ``monkeypatch.undo()`` would also undo the test's other patches, the
+    ``no_test_fallback`` one included."""
+    sent: dict[str, list[str]] = {}
+    real = CursorWrapper._execute
+
+    def execute(self, sql, params, *ignored):
+        sent.setdefault(self.db.alias, []).append(sql)
+        return real(self, sql, params, *ignored)
+
+    with mock.patch.object(CursorWrapper, "_execute", execute):
+        yield sent
+
+
+@contextmanager
+def assert_only_alias(alias: str) -> Iterator[dict[str, list[str]]]:
+    """The block reaches no hub's database but ``alias``'s (PLAN-DB §14.2): whatever any thread sends to another alias
+    than ``alias`` and control's (``default``: the registry, the sessions) fails it, whichever hub that alias is.
+    Yields the statements by alias (:func:`watched`)."""
+    with watched() as sent:
+        yield sent
+    strays = {other: statements[:3] for other, statements in sent.items() if other not in (alias, DEFAULT_DB_ALIAS)}
+    assert not strays, f"Only {alias} and control's database may be reached here, and these were too: {strays}"
