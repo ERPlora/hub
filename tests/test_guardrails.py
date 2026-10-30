@@ -23,14 +23,15 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     ``live.broker``; phase 1's shared database (``use_shared_database``) only where the list says, until S5; the
     tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
     ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``): S2's first step moved the last ones.
-(g) Operations that need the hub's own database (PLAN-DB §14.14, round 2026-10-30, decision 3): in a hub that still
-    shares control's (``db_name=""``) each refuses with its domain error before it reads or writes anything of the
-    business in ``default``, an API key is refused for that reason (never let through by a session), and none of them
-    is code allowed on phase 1's shared database (``SHARED_DATABASE_USERS``).
 (f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
     import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
     it runs over the suite itself: every ``test_*.py`` and ``conftest.py`` of the repo, and the helpers of its
     ``tests`` folders, but the submodules of ``packages/``.
+(g) Operations that need the hub's own database (PLAN-DB §14.14, round 2026-10-30, decision 3): in a hub that still
+    shares control's (``db_name=""``) each refuses with its domain error before it reads or writes anything of the
+    business in ``default``, an API key is refused for that reason (never let through by a session), and none of them
+    is code allowed on phase 1's shared database (``SHARED_DATABASE_USERS``). Unlike (a)–(f), these run operations
+    on the test database.
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
