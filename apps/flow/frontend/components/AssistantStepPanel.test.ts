@@ -76,6 +76,9 @@ describe('AssistantStepPanel', () => {
     const own = await setup({ ...STEP, mode: 'auto' });
     expect(options(own)).toEqual(['task.task.create']);
     expect(own.wrapper.find('[data-testid="flow-assistant-askfirst-s1"]').exists()).toBe(false);
+    // Named but on its own (a row the server would refuse): the hint belongs to «Ask me first» alone.
+    const slipped = await setup({ ...STEP, mode: 'auto', tools: ['reservation.reservation.cancel'] });
+    expect(slipped.wrapper.find('[data-testid="flow-assistant-askfirst-s1"]').exists()).toBe(false);
     const plain = await setup();
     expect(plain.wrapper.find('[data-testid="flow-assistant-askfirst-s1"]').exists()).toBe(false);
   });

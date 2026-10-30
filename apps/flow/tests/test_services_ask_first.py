@@ -147,6 +147,15 @@ def test_a_cancellation_is_granted_only_to_an_automation_that_asks_first_for_it(
         assert set(refused.value.fields) == {"operations.0"}
 
 
+def test_a_cancellation_is_not_granted_to_a_step_that_names_it_but_does_it_on_its_own():
+    # Written straight in the table (an old row or a raw admin edit): naming it is not enough, the step must ask first.
+    flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=[assistant(mode="auto")], grants=[])
+    with pytest.raises(InvalidPayload) as refused:
+        run("flow.flow.grant", {"id": str(flow.id), "operations": [CANCEL]})
+    assert refused.value.code == "flow.high_risk"
+    assert set(refused.value.fields) == {"operations.0"}
+
+
 def test_whoever_grants_a_cancellation_may_cancel_themselves():
     created = run("flow.flow.create", document(assistant()))
     with pytest.raises(PermissionDenied):
