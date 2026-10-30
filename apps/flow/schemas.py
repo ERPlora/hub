@@ -1022,6 +1022,11 @@ class QuestionOut(Schema):
     on_timeout: str
     expires_at: dt.datetime
     created_at: dt.datetime
+    action: str = Field(
+        "",
+        description="What the change the assistant wants (FLOW-F38) does, as the History names it, in the language of "
+        "whoever asks («Cancel a reservation»); '' for a question an «Ask someone first» step asks.",
+    )
     fields: list[AssistantFieldOut] = Field(
         default_factory=list,
         description="The data of the change the assistant wants (FLOW-F38), as its confirmation card in the chat says "

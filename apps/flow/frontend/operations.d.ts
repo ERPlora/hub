@@ -270,6 +270,9 @@ export interface QuestionOut {
   on_timeout: 'no' | 'stop' | 'continue';
   expires_at: string;
   created_at: string;
+  /** What the change the assistant wants (FLOW-F38) does, as the History names it, in the language of whoever asks
+   *  («Cancel a reservation»); '' for a question an «Ask someone first» step asks. */
+  action: string;
   /** The data of the change the assistant wants (FLOW-F38), as its card in the chat says them, read for whoever
    *  asks (BASE-F97 step 2); none for a question an «Ask someone first» step asks. */
   fields: AssistantField[];

@@ -72,6 +72,7 @@ from apps.flow.queries import (
     validation_fields,
     can_answer,
     TURN,
+    ASSISTANT_WANTS,
     PERSON_PARAMS,
     words_for,
 )
@@ -126,7 +127,6 @@ SECRETS_KEY_MISSING = _(
 SECRET_NOT_FOUND = _("There is no secret called «%(name)s».")
 QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.")
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
-ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
 APPROVAL_BEYOND_YOU = _("Only someone who may do it themselves can say yes to «%(name)s».")
 
 #: How long the history keeps a finished run (hub#699: the old Hub's 90 days, fixed, for every hub).
@@ -1283,11 +1283,11 @@ def _propose(
     now: dt.datetime,
 ) -> None:
     """«Ask me first»: the change waits in «Waiting for your answer» with what the assistant said, and the run on it;
-    what it would send is said there for whoever reads it, as they read it (``queries.proposal_fields``). A yes makes
-    it (``answer_question``), a no or silence cancels the run, as a question that stops on a no. One change waits at a
-    time: ``later``, the calls of the same answer behind it, are not made, and the assistant hears so with the
-    change's result. Each change it asks for is a question of its own (``<step>:<n>``), so a late yes to one never
-    approves the next."""
+    its title, its action and what it would send are said there for whoever reads it, as they read it
+    (``queries.question_row``). A yes makes it (``answer_question``), a no or silence cancels the run, as a question
+    that stops on a no. One change waits at a time: ``later``, the calls of the same answer behind it, are not made,
+    and the assistant hears so with the change's result. Each change it asks for is a question of its own
+    (``<step>:<n>``), so a late yes to one never approves the next."""
     question = Question.objects.create(
         run=run,
         flow=flow,
