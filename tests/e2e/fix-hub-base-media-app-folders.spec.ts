@@ -2,14 +2,14 @@
 // `/p/media/` serves the folders each app declares in its LiveAppConfig (base/media.py): the website's images to any
 // visitor (`public_media`), the WhatsApp inbox's template files only to the hub's people (`members_media`). The owner
 // uploads a cover and a template's photo; a visitor without a session sees the published page with its cover at
-// 390, 834 and 1440 px (`.artifacts/FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES-<width>.png`) and gets a
+// 390, 834 and 1440 px (`capture`: `.artifacts/FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES-<width>.png`) and gets a
 // 404 for the template's photo, which the owner's session opens. At the end the site is taken offline again: the
 // other specs on hub `a` expect its `/` to jump to the login.
 import { createHash } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
-import { A, api, hostPage, settled, shot, turnOn } from './helpers';
+import { A, api, capture, hostPage, turnOn } from './helpers';
 import { photo } from './website-helpers';
 
 const KEY = 'FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES';
@@ -77,8 +77,7 @@ test('base-media-app-folders: a visitor sees the website’s cover, and only the
         const hero = view.locator('[data-ep-section="hero"] img');
         await expect(hero).toHaveAttribute('src', image.data.url);
         await expect.poll(() => hero.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
-        await settled(view);
-        await view.screenshot({ path: shot(`${KEY}-${width}`), fullPage: false });
+        await capture(view, `${KEY}-${width}`);
       } finally {
         await visitor.close();
       }
