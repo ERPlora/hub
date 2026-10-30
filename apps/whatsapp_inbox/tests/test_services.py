@@ -686,6 +686,15 @@ def test_erplora_s_cap_refusal_is_the_hub_s_own_cap_reached(delivered):
             "Has usado todos los mensajes de WhatsApp de tu plan este mes: no se puede enviar nada hasta el mes que "
             "viene o hasta que mejores el plan.",
         ),
+        # erplora.com has no number of the business: its own state, never Meta's reason, in the Hub's words.
+        (
+            httpx.Response(
+                409, json={"error": {"code": "whatsapp.not_connected", "message": "The business has no WhatsApp number connected."}}
+            ),
+            "failed",
+            "whatsapp_inbox.channel_not_connected",
+            "WhatsApp no está conectado. Conecta el número del negocio en Ajustes para recibir y enviar mensajes.",
+        ),
         # A refusal of Meta's the Hub has no name for keeps Meta's words as they came; without any, the Hub's.
         (
             httpx.Response(409, json={"error": {"code": "whatsapp.recipient_blocked", "message": "Blocked by user."}}),
