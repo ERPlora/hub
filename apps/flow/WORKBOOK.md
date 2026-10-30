@@ -846,7 +846,9 @@ Pasos:
    10:00»), un valor de una lista cerrada con el nombre que le da su app («Reservada por: Mostrador»), un
    importe en la moneda del negocio, un sí o un no como «Sí» o «No», una lista por cuántos elementos lleva
    («Servicios: 1 elemento») y un registro por su nombre solo si tú puedes verlo; si no, no sale, y nunca
-   por su código. Un dato vacío no sale. Se lee al abrir la bandeja, con lo que cada persona puede ver.
+   por su código. Los datos fijos del paso (FLOW-F37) salen ya puestos, como los mandará («En nombre del
+   cliente: Lucía Pérez»), aunque el asistente pidiera otro. Un dato vacío no sale. Se lee al abrir la bandeja,
+   con lo que cada persona puede ver.
 2. Si quieres, escribe en **Añadir una nota (opcional)**.
 3. Pulsa **Aprobar** o **No**. Sale «Aprobada: la automatización sigue.» o «Contestada que no.» y la tarjeta
    sale de la bandeja.
@@ -1030,19 +1032,29 @@ Pasos:
    hacer (solo salen las que el asistente sabe usar); × quita una. Sin ninguna, solo puede contestar con
    palabras: «Nada todavía: solo puede contestar con palabras.». «Anular una reserva» solo sale con «Que me lo
    pregunte», y la tarjeta avisa: «Solo tras el sí de alguien que también puede hacerlo: «Anular una reserva».».
-4. En **Cambios**, elige «Que me lo pregunte» (de fábrica) o «Que lo haga por su cuenta». La tarjeta lo explica:
+4. Si quieres que una consulta o una acción reciba siempre un dato que no decide el asistente, en **Datos fijos**
+   elige con **Fijar un dato** cuál («En nombre del cliente», de «Anular una reserva») y rellénalo, con
+   **Insertar un dato** si quieres (la «Ficha» que leyó un paso anterior). Sale como «Anular una reserva › En
+   nombre del cliente»; × lo quita, y quitar algo de **Qué puede usar** quita también sus datos fijos. Sin
+   ninguno: «Ninguno: el asistente rellena todos los datos.». La tarjeta lo explica: «El asistente no los ve ni
+   puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa.».
+5. En **Cambios**, elige «Que me lo pregunte» (de fábrica) o «Que lo haga por su cuenta». La tarjeta lo explica:
    «Lo que quiera cambiar espera un sí en Automatizaciones, en «Esperan tu respuesta». Lo que solo consulta nunca
    espera.» o «Hace los cambios por su cuenta, como esta automatización, con los permisos que le has dado.».
-5. Ajusta **Vueltas como mucho** (de 1 a 10; de fábrica, 6) y, si quieres, **Más opciones** (FLOW-F25).
-6. Pulsa **Guardar** y, en **Permisos**, concede cada consulta o acción que puede usar (FLOW-F12).
-Entra: el encargo, lo que puede usar, cómo hace los cambios y las vueltas.
+6. Ajusta **Vueltas como mucho** (de 1 a 10; de fábrica, 6) y, si quieres, **Más opciones** (FLOW-F25).
+7. Pulsa **Guardar** y, en **Permisos**, concede cada consulta o acción que puede usar (FLOW-F12).
+Entra: el encargo, lo que puede usar, sus datos fijos, cómo hace los cambios y las vueltas.
 Sale: el paso. Los pasos de después pueden insertar «Texto», lo que ha contestado, y, si un cambio esperó tu
 respuesta, «Aprobada», «Nota» y «Contestada por». **Probar** dice «Se lo pediría al asistente: …» con el encargo
 rellenado, sin pedírselo. Cada consulta o acción que nombra pasa a pedir su permiso.
 Si falla: un encargo vacío, más de 10 vueltas, o un encargo con un secreto no se guardan; tampoco algo que el
 negocio no tiene, que necesita a una persona delante o que el asistente no puede usar («El asistente no puede
 usar «…».»), junto a **Qué puede usar**. Con «Anular una reserva» puesta y «Que lo haga por su cuenta», tampoco:
-««…» necesita antes el sí de una persona: elige «Que me lo pregunte».».
+««…» necesita antes el sí de una persona: elige «Que me lo pregunte».». Junto a **Datos fijos**, no se guarda un
+dato fijo de algo que no puede usar (««…» tiene datos fijos, pero el asistente no puede usarla: añádela a lo que
+puede usar o quita sus datos fijos.»), uno que esa consulta o acción no tiene (««…» no es un dato de «…».»), uno
+sin valor («Dale un valor a «…» de «…», o quítalo.»), ni uno que lee un secreto o un paso de después, como el
+encargo.
 Implicados: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 El asistente hace el paso que le toca dentro de una automatización
@@ -1055,7 +1067,10 @@ Pasos:
    ejecutado y el asistente está en ello: míralo en Historial.»; el historial dice «Se lo ha pedido al
    asistente; contesta en un momento.».
 2. El Hub se lo pide al asistente por detrás, sin nadie delante, con el encargo ya rellenado y solo lo que el paso
-   nombra **y** la automatización tiene concedido; nunca con los permisos de una persona.
+   nombra **y** la automatización tiene concedido; nunca con los permisos de una persona. Los datos fijos del paso
+   (FLOW-F37) no se le enseñan: se rellenan con los datos de la ejecución, como el encargo, y van en cada consulta o
+   acción que los lleva, por encima de lo que el asistente mande para ellos o aunque no los mande. Así, la
+   respuesta por WhatsApp solo anula o cambia la reserva de quien escribe, aunque le pidan la de otra persona.
 3. Lo que el asistente consulta se hace en el acto y no se le pregunta a nadie; el historial dice «El asistente
    ha usado «…».».
 4. Lo que quiere cambiar:
@@ -1080,7 +1095,10 @@ Sale: lo que contestó al final, después de los cambios, para los pasos de desp
 lo pregunte», además, la última respuesta de la persona. Lo que consulta o cambia avisa como si lo hiciera la
 automatización.
 Si falla: lo que no le has concedido no se le ofrece y, si lo pide, no se hace; lo que la acción rechaza
-(«El asistente ha intentado «…», que no lo ha aceptado.») se lo dice al asistente para que lo cuente. Si llega
+(«El asistente ha intentado «…», que no lo ha aceptado.») se lo dice al asistente para que lo cuente. Si un dato
+fijo queda vacío en esa ejecución (no se encontró la ficha), esa consulta o acción no se hace ni espera un sí: el
+asistente lo sabe, para contarlo, y el historial dice «El asistente ha intentado «…», pero «…», que fija este paso,
+estaba vacío: no se ha hecho.». Si llega
 al tope de vueltas sin terminar, se para: «El asistente ha usado sus … vueltas sin terminar, así que ha parado.».
 Si erplora.com no contesta o falla, lo intenta tres veces en total (al segundo y a los tres segundos) sin
 repetir nada del negocio y, si sigue igual, se para con el motivo («El asistente no ha podido contestar ahora…»,
@@ -1276,6 +1294,20 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   del negocio), Square, Vagaro y Booksy (el cliente anula él mismo, con enlace y dentro de la política) y
   OpenTable/SevenRooms (anula el cliente o el equipo; la respuesta por SMS la atiende una persona). Devoluciones,
   borrados, VeriFactu y envíos a Hacienda no entran: mueven dinero o dejan un registro que no se deshace.
+- **Datos fijos de un paso `assistant`** (revisión 2026-10-30,
+  FIX-HUB-FLOW-ASSISTANT-STEP-ACTS-ON-ANOTHER-CUSTOMER-WITHOUT-ON-BEHALF-OF): `AssistantStep.pinned`
+  (`{herramienta: {entrada: valor}}`, opcional; sin él el paso se guarda como antes, `exclude_none`). Al guardar,
+  `queries.pinned_problem` exige que la herramienta esté en `tools` y que la entrada sea de su `action_fields`, con
+  valor (`steps.<n>.pinned`, `invalid_payload`); `_reads`/`_call_only` leen sus `{{…}}` como los del encargo. Al
+  correr, `services._spec` los quita de `parameters` (`properties` y `required`) de lo que se ofrece al modelo,
+  `_pinned` los resuelve con `document.resolve` sobre `{"input", "steps"}` y `_with_pinned` los pone encima de los
+  argumentos del modelo, antes de `_propose` (la propuesta guardada, y su tarjeta, ya los llevan) o de `run_tool`;
+  vacío (`None` o texto en blanco) → `flow.pinned_empty` al modelo y `assistant_pinned_empty` en el log, sin
+  proponer ni ejecutar. Otro nombre o un dato anidado los rechaza `extra="forbid"` de la entrada. Mercado: Zapier
+  («Set a specific value»: la IA ignora el campo), n8n (parámetros sin `$fromAI()`), Copilot Studio («Set as a
+  value»), LangChain (`InjectedToolArg`: fuera del esquema del modelo, puesto antes de la llamada), Intercom Fin
+  (conectores sobre un atributo protegido), Salesforce Agentforce (input bindings), Merge (tool input overrides),
+  Yeeflow y Beam («Custom value»/«static» frente a «fill with AI»): se oculta y se sobrescribe, nunca se rechaza.
 - **Los datos insertados en lo que lee una persona** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-SHOWS-RAW-VALUES):
   `document.fill`/`resolve` meten cada dato tal cual (`true`, ISO, céntimos) salvo con un `say`; `queries.words_for`
   es el de lo que lee una persona — el título y los detalles de un paso `ask` (`_ask` y «Probar») y los datos de
