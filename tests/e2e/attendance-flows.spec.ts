@@ -161,7 +161,7 @@ for (const vp of VIEWPORTS) {
       expect((await api(ctx, A, 'POST', '/attendance/clock_out', { member_id: beaId })).status).toBe(200);
       const beaDay = (await api<Rows<Day>>(ctx, A, 'GET', `/attendance/records?member_id=${beaId}&limit=5`)).data.rows[0];
       expect(beaDay.status).toBe('closed');
-      expect(psql(`select created_by_id is not null from attendance_record where id = '${beaDay.id}'`)).toBe('t');
+      expect(psql(`select created_by_hub_user_id is not null from attendance_record where id = '${beaDay.id}'`)).toBe('t');
       // F05: Cid forgot to clock out 13 hours ago (more than the 12 of the settings).
       psql(
         `insert into attendance_record (id, work_date, clock_in_at, status, source, note, created_at, updated_at, member_id) values (gen_random_uuid(), ((now() - interval '13 hours') at time zone '${ZONE}')::date, now() - interval '13 hours', 'open', 'shared', '', now(), now(), '${cidId}')`,

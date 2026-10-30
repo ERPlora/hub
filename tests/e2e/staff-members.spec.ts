@@ -122,7 +122,9 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
     await expect(rowOf(page, linkedName)).toBeVisible();
     await expect(rowOf(page, linkedName)).toContainText(/12[.,]50/);
     const linkedId = await memberId(context, linkedName);
-    expect(psql(`select user_id from staff_member where id = '${linkedId}'`)).toBe(psql(`select id from auth_user where email = '${EMPLOYEE.email}'`));
+    expect(psql(`select hub_user_id from staff_member where id = '${linkedId}'`)).toBe(
+      psql(`select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = '${EMPLOYEE.email}'`),
+    );
 
     // STAFF-F02: a row opens «Edit · {name}»; only what changed is saved.
     await rowOf(page, aloneName).getByText(aloneName).click();
