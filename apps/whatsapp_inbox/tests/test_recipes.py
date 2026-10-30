@@ -229,13 +229,23 @@ def test_the_table_answer_that_did_it_on_its_own_would_not_be_offered(monkeypatc
     assert [(item.code, item.apps) for item in set_aside if item.ref == TABLE_REF] == [("flow.recipe_invalid", ())]
 
 
-def test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_behalf():
-    """F25: the reservation it may cancel is the one read before by their number (``s9``), by its id, and on their card,
-    so Reservas refuses any other (``reservation.customer_mismatch``)."""
+#: Whose card a change of a reservation goes on: the card of the number that writes, found (``s6``) or just made
+#: (``s7``), so Reservas refuses any reservation that is not theirs (``reservation.customer_mismatch``).
+THEIR_CARD = "{{steps.s6.id}}{{steps.s7.id}}"
+
+
+def test_the_table_answer_changes_and_cancels_only_on_their_card_fixed_by_the_answer_never_by_the_assistant():
+    """F25: ``on_behalf_of`` is fixed by the step (FLOW-F38), which the assistant never sees nor can change: the prompt
+    does not ask it for it, and still names the reservation it may cancel, the one read before by their number."""
     for language in ("en", "es"):
-        prompt = assistant_step(TABLE_REF, language)["prompt"]
-        [line] = [line for line in prompt.splitlines() if "on_behalf_of {{steps.s6.id}}{{steps.s7.id}}" in line]
-        assert "{{steps.s9.id}}" in line, language
+        step = assistant_step(TABLE_REF, language)
+        assert step["pinned"] == {
+            "reservation.reservation.update": {"on_behalf_of": THEIR_CARD},
+            "reservation.reservation.cancel": {"on_behalf_of": THEIR_CARD},
+        }, language
+        assert "on_behalf_of" not in step["prompt"], language
+        [line] = [line for line in step["prompt"].splitlines() if "{{steps.s9.id}}" in line and line.startswith("- ")]
+        assert THEIR_CARD not in line, language
 
 
 def test_who_has_the_table_answer_on_is_offered_the_version_that_cancels(monkeypatch):
@@ -245,6 +255,7 @@ def test_who_has_the_table_answer_on_is_offered_the_version_that_cancels(monkeyp
     [table] = [recipe for recipe in older if recipe["id"] == "reservation_from_whatsapp"]
     [step] = [step for step in table["steps"] if step["kind"] == "assistant"]
     step["tools"].remove("reservation.reservation.cancel")
+    del step["pinned"]  # that version fixed no data either
     del table["grants"]["reservation.reservation.cancel"]
     with monkeypatch.context() as patch:
         patch.setattr(inbox_recipes, "RECIPES", older)
@@ -256,6 +267,25 @@ def test_who_has_the_table_answer_on_is_offered_the_version_that_cancels(monkeyp
     [assistant] = [step for step in flow.steps if step["kind"] == "assistant"]
     assert "reservation.reservation.cancel" in assistant["tools"]
     assert "reservation.reservation.cancel" in flow.grants
+
+
+def test_who_has_the_table_answer_on_without_its_card_fixed_is_offered_the_version_that_fixes_it(monkeypatch):
+    """WHATSAPP_INBOX-F18, FLOW-F35: an answer turned on when its assistant was only asked for whose card (no
+    ``pinned``) is «New version», and updating it fixes the card on its changes and cancellations."""
+    older = copy.deepcopy(RECIPES)
+    [table] = [recipe for recipe in older if recipe["id"] == "reservation_from_whatsapp"]
+    [step] = [step for step in table["steps"] if step["kind"] == "assistant"]
+    del step["pinned"]
+    with monkeypatch.context() as patch:
+        patch.setattr(inbox_recipes, "RECIPES", older)
+        run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+
+    [row] = [row for row in run("flow.recipe.list", {}, ctx_for("hub_owner")).recipes if row.ref == TABLE_REF]
+    assert row.installed.outdated is True
+    flow = run("flow.recipe.restore", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    [assistant] = [step for step in flow.steps if step["kind"] == "assistant"]
+    assert assistant["pinned"]["reservation.reservation.cancel"] == {"on_behalf_of": THEIR_CARD}
+    assert assistant["pinned"]["reservation.reservation.update"] == {"on_behalf_of": THEIR_CARD}
 
 
 #: The assistant's step of each answer, and the reads pinned to the customer who writes that come before it.

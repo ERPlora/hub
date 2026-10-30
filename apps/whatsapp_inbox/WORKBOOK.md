@@ -740,8 +740,9 @@ Pasos:
    nadie contesta en 72 horas, no se cambia ni se anula nada y se queda con el acuse.
 Entra: el mensaje y la última reserva de ese cliente.
 Sale: la reserva cambiada (`reservation.reservation.updated`) o anulada (`reservation.reservation.status_changed`)
-en Reservas, y la respuesta por WhatsApp; nunca la de otra persona: el asistente la anula a nombre de su ficha,
-Reservas rechaza la de una reserva que no es suya y la tarjeta de **Esperan tu respuesta** dice de quién es la
+en Reservas, y la respuesta por WhatsApp; nunca la de otra persona: el cambio y la anulación van siempre a nombre de
+la ficha de su número, que pone la automatización y el asistente no puede cambiar ni quitar, así que Reservas rechaza
+la de una reserva que no es suya aunque se apruebe, y la tarjeta de **Esperan tu respuesta** dice de quién es la
 reserva antes de tu **Aprobar**.
 Si falla: F20; si Reservas lo rechaza, se le explica. Con los mensajes del plan del mes gastados no se cambia ni se
 anula nada, no recibe respuesta y la conversación queda con «Necesita atención» (F13).
@@ -1626,13 +1627,19 @@ libro de reservas, la lista de clientes), porque lo que contesta va a quien escr
 Automatizaciones solo lo concede porque el paso pregunta antes (`ASK_FIRST`, FLOW-F28, hub#418): con el paso en
 `mode: "auto"` la receta se aparta (`flow.recipe_invalid`), y el **Aprobar** solo vale de quien tiene
 `reservation.change_reservation`. El encargo le da el id de la última reserva del número (`steps.s9.id`) y le pide
-anular solo esa con `on_behalf_of` = su ficha, así que Reservas rechaza cualquier otra
-(`reservation.customer_mismatch`, RESERVATION-F18, reservations#50). Ese argumento lo pone el asistente: si no lo pone
-(un mensaje que le pide anular la de otro por su nombre), lo único que queda es la tarjeta de **Esperan tu
-respuesta**, que nombra la reserva de esa otra persona y no dice en nombre de qué cliente; fijar el argumento a la ficha de la
-ejecución es de Automatizaciones (el mismo hueco tiene `reservation.reservation.update`). La tarjeta de Ajustes enciende la respuesta y su
-aviso (F26). La receta cambió de huella al añadir la anulación: quien ya la tenía encendida la ve como versión nueva
-en Automatizaciones y la actualiza con F18.
+anular solo esa; a nombre de quién no se le pide: el paso fija `on_behalf_of` = su ficha
+(`{{steps.s6.id}}{{steps.s7.id}}`) en `reservation.reservation.update` y `reservation.reservation.cancel` con
+`pinned` (FLOW-F38, hub#436), que el asistente no ve en el esquema de la herramienta y que se pone encima de lo que
+envíe, así que Reservas rechaza cualquier otra aunque el modelo la nombre por su id, no diga a nombre de quién o diga
+la ficha de otra persona (`reservation.customer_mismatch`, RESERVATION-F18, reservations#50; el cambio, además, con
+las reglas de un cliente que reserva él mismo y sin tocar la mesa ni las notas internas,
+`reservation.staff_only_field`). Por eso el encargo no menciona `on_behalf_of`. Lo prueban
+`tests/test_relay_auto_replies.py::test_the_answer_never_cancels_or_changes_another_guest_s_reservation_whatever_the_assistant_sends`
+y `tests/test_recipes.py::test_the_table_answer_changes_and_cancels_only_on_their_card_fixed_by_the_answer_never_by_the_assistant`.
+La tarjeta de Ajustes enciende la respuesta y su aviso (F26). La receta cambió de huella al añadir la anulación y otra
+vez al fijar la ficha: quien ya la tenía encendida la ve como versión nueva en Automatizaciones y la actualiza con F18
+(lo mismo que **Restaurar la de fábrica**, FLOW-F35); hasta entonces sigue con el encargo viejo, que pide la ficha al
+modelo.
 
 Lo que falta, fuera de esta app:
 

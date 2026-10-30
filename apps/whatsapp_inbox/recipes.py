@@ -152,8 +152,9 @@ RECIPES = [
 # is never offered, because what it answers goes out to whoever writes; their own card (made from WhatsApp when they
 # have none) and their latest reservation are read before, pinned to their number. What it answers goes to them; when
 # it fails or says nothing, a fixed apology and the mark. Cancelling needs a person's yes (FLOW-F28: only a step that
-# asks first is granted it, and only someone who may cancel says yes), and goes on their card (``on_behalf_of``), so
-# Reservas refuses any reservation that is not theirs.
+# asks first is granted it, and only someone who may cancel says yes). A change or a cancellation goes on their card
+# (``on_behalf_of``), fixed by the step (``pinned``, FLOW-F38) and never asked of the assistant, which neither sees it
+# nor can change it, so Reservas refuses any reservation that is not theirs.
 
 #: Sends to exactly the customer who wrote, in her own conversation (FLOW-F31).
 _SEND_REASON = _("Sends the customer the WhatsApp, only in her own conversation and within your plan's messages.")
@@ -204,6 +205,7 @@ _TABLE_HEAD, _TABLE_TAIL = _answer_steps(
 
 #: Their card: the one of their number or, with none, a new one marked as come by WhatsApp (CUSTOMER-F26). Booking on it
 #: by its id is also what lets Reservas book without looking anyone up.
+_THEIR_CARD = "{{steps.s6.id}}{{steps.s7.id}}"
 _CARD = [
     {"id": "s6", "kind": "query", "operation": "customer.customer.by_phone", "params": {"phone": "steps.s1.phone"}},
     {
@@ -235,8 +237,8 @@ TABLE_PROMPT = _(
     "{{steps.s1.display_name}}) and source «whatsapp»; with no room, offer them a short numbered list of other times, "
     "or the waiting list.\n"
     "- To change their reservation: change only that same reservation, by its id.\n"
-    "- To cancel their reservation: cancel only that same reservation, id {{steps.s9.id}}, with on_behalf_of "
-    "{{steps.s6.id}}{{steps.s7.id}}; it is cancelled only once the restaurant says yes.\n\n"
+    "- To cancel their reservation: cancel only that same reservation, id {{steps.s9.id}}; it is cancelled only once "
+    "the restaurant says yes.\n\n"
     "Then write only the WhatsApp to send them, in the language they wrote in, short and friendly: what was booked, "
     "changed or cancelled (day, time and guests, and whether it is confirmed or the restaurant will confirm it), the "
     "times on offer, or why it could not be done."
@@ -286,6 +288,12 @@ RECIPES += [
                     "reservation.reservation.cancel",
                     "reservation.waitlist.create",
                 ],
+                # Whose reservation a change or a cancellation is: their card, put in over whatever the assistant
+                # sends, so Reservas refuses any other (``reservation.customer_mismatch``).
+                "pinned": {
+                    "reservation.reservation.update": {"on_behalf_of": _THEIR_CARD},
+                    "reservation.reservation.cancel": {"on_behalf_of": _THEIR_CARD},
+                },
                 "mode": "ask",
                 "max_rounds": 8,
                 "on_error": "continue",
@@ -307,7 +315,7 @@ RECIPES += [
                 "Books the table they asked for, with their number, after your yes in «Waiting for your answer»."
             ),
             "reservation.reservation.update": _(
-                "Changes their reservation to what they ask, after your yes in «Waiting for your answer»."
+                "Changes their reservation to what they ask, only theirs, after your yes in «Waiting for your answer»."
             ),
             "reservation.reservation.cancel": _(
                 "Cancels their reservation when they ask, only theirs, after the yes in «Waiting for your answer» of "

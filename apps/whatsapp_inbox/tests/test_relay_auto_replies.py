@@ -22,6 +22,7 @@ from django.utils import timezone
 
 from apps.customer.models import Customer
 from apps.flow.models import FlowRun, Question
+from apps.flow.queries import TURN
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
@@ -384,3 +385,77 @@ def test_the_answer_never_cancels_the_reservation_of_another_number(
     told = [message for message in gateway.sent(CHAT)[-1].body["messages"] if message.get("role") == "tool"]
     assert "reservation.customer_mismatch" in json.dumps(told)
     assert outbound()[-1] == "No encuentro ninguna reserva a tu nombre."
+
+
+def tool_inputs(seen, name: str) -> set[str]:
+    [tool] = [tool for tool in seen.body["tools"] if tool["name"] == name.replace(".", "__")]
+    return set(tool["parameters"].get("properties", {}))
+
+
+@pytest.mark.parametrize("whose", [None, "marta"], ids=["leaves_it_out", "names_marta"])
+@pytest.mark.parametrize(
+    ("tool", "change"),
+    [("reservation.reservation.cancel", {}), ("reservation.reservation.update", {"time": "22:00"})],
+    ids=["cancel", "update"],
+)
+def test_the_answer_never_cancels_or_changes_another_guest_s_reservation_whatever_the_assistant_sends(
+    gateway, tick, django_capture_on_commit_callbacks, tool, change, whose  # noqa: F811 - the fixture
+):
+    """F25: whose card a change goes on is fixed by the answer to the card of the number that writes, never asked of
+    the assistant (FLOW-F38). Lucía asks to cancel or move Marta's table and the assistant names it by its id, without
+    saying on whose behalf or saying Marta's: after the yes, Marta's reservation is as it was and the assistant hears
+    Reservas' refusal."""
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    marta = run("customer.customer.create", {"name": "Marta Ruiz", "phone": "600999888"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    theirs = make_reservation(
+        date=day, time="21:00", customer_id=marta.id, guest_name="Marta", guest_phone="+34600999888", party_size=2
+    )
+    sent = {"id": str(theirs.id), **change, **({"on_behalf_of": str(marta.id)} if whose else {})}
+    gateway.reply(CHAT, json=wants(tool, sent))
+    gateway.reply(CHAT, json=said("No encuentro ninguna reserva a tu nombre."))
+    lucia_writes("Anula la reserva de Marta Ruiz del sábado" if not change else "Pasa la de Marta Ruiz a las 22")
+
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    theirs.refresh_from_db()
+    assert (theirs.status, theirs.time) == (Reservation.Status.PENDING, dt.time(21, 0))
+    told = [message for message in gateway.sent(CHAT)[-1].body["messages"] if message.get("role") == "tool"]
+    assert "reservation.customer_mismatch" in json.dumps(told)
+    assert outbound()[-1] == "No encuentro ninguna reserva a tu nombre."
+    asked = gateway.sent(CHAT)[0]
+    assert "on_behalf_of" not in tool_inputs(asked, tool)  # never the assistant's to say
+    assert "on_behalf_of" not in asked.body["messages"][0]["content"]
+
+
+def test_a_guest_cancels_their_own_table_without_the_assistant_saying_on_whose_behalf(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F25: the answer puts their own card in, so their cancellation goes on their behalf with the assistant naming only
+    the reservation."""
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    booked = make_reservation(date=day, time="21:00", customer_id=card.id, guest_name="Lucía", guest_phone=LUCIA, party_size=4)
+    gateway.reply(CHAT, json=wants("reservation.reservation.cancel", {"id": str(booked.id)}))
+    gateway.reply(CHAT, json=said("Hecho: tu reserva del sábado a las 21:00 queda anulada."))
+    lucia_writes("Quiero anular mi reserva")
+
+    tick()
+    proposed = json.loads(FlowRun.objects.get().outputs[TURN]["proposal"]["arguments"])
+    assert proposed == {"id": str(booked.id), "on_behalf_of": str(card.id)}
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    booked.refresh_from_db()
+    assert booked.status == Reservation.Status.CANCELLED
+    assert outbound()[-1] == "Hecho: tu reserva del sábado a las 21:00 queda anulada."
