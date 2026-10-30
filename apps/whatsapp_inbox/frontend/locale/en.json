@@ -305,8 +305,6 @@
       "turnOn": "Turn on",
       "turnOff": "Turn off",
       "notNow": "Not now",
-      "exclusive": "Only one automatic answer can answer on your number: turning this one on turns «{other}» off.",
-      "both": "“{other}” is on too: each message gets two automatic answers. Turn off the one you do not use.",
       "onlyOwner": "Only an owner or an admin can turn it on.",
       "needsApp": "“{name}” needs the app {apps}.",
       "seeApps": "See apps",
@@ -320,18 +318,7 @@
       "reviewFirst": "I review them first",
       "apps": {
         "flow": "Automations",
-        "appointment": "Appointments",
-        "reservation": "Reservations",
         "customer": "Customers"
-      },
-      "appointments": {
-        "name": "Book appointments",
-        "explain": "WhatsApp answers by itself: it reads your diary, offers the free times, and books or moves the appointment of the customer who writes once you say yes.",
-        "confirm": "WhatsApp will answer by itself: it reads your diary, offers the free times, and books or moves the appointment of the customer who writes once you say yes.",
-        "done": "Done. Write to yourself from another phone: “I want an appointment tomorrow”.",
-        "confirmSelf": "Appointments confirm by themselves",
-        "review": "Each new appointment waits for you in the Diary with “Confirm”.",
-        "confirmError": "Could not save how appointments confirm. Try again."
       },
       "tables": {
         "name": "Book a table",

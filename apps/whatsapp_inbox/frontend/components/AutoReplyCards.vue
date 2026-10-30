@@ -1,14 +1,12 @@
 <script setup lang="ts">
-// Settings → «What do you use it for?» (WHATSAPP_INBOX-F14 to F18): one card per automatic answer the inbox brings,
-// «Book appointments» (with Citas) and «Book a table» (with Reservas). A card turns on, in Automatizaciones
-// (`flow.recipe.enable`), its answer and the notice that goes with it, and off (`flow.recipe.disable`, a pause, never a
-// delete) the notice first and the answer last, so no answer is left on behind a card that is off. Only one answer
-// answers on the number (whatsapp_inbox#284): turning one on turns the other off first, and when a step fails what it
-// turned on is paused and what it turned off is on again. A card is on when its answer is on, from here or from
-// Automatizaciones; both on warns. A newer version of what it turned on is offered with «Update» (`flow.recipe.restore`,
-// F18). Under a card that is on, how the bookings confirm (AutoReplyRule, F16). Without Citas (Reservas) its card does
-// not show; without Automatizaciones, or without an app its answer needs (Automatizaciones sets it aside: Clientes), the
-// card names the app, with «See apps», and never offers «Turn on».
+// Settings → «What do you use it for?» (WHATSAPP_INBOX-F15 to F18): one card per automatic answer the inbox brings,
+// «Book a table» (with Reservas). A card turns on, in Automatizaciones (`flow.recipe.enable`), its answer and the notice
+// that goes with it, and off (`flow.recipe.disable`, a pause, never a delete) the notice first and the answer last, so no
+// answer is left on behind a card that is off; when a step of «Turn on» fails, what it turned on is paused again. A card
+// is on when its answer is on, from here or from Automatizaciones. A newer version of what it turned on is offered with
+// «Update» (`flow.recipe.restore`, F18). Under a card that is on, how the reservations confirm (AutoReplyRule, F16).
+// Without Reservas its card does not show; without Automatizaciones, or without an app its answer needs
+// (Automatizaciones sets it aside: Clientes), the card names the app, with «See apps», and never offers «Turn on».
 import { InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -19,7 +17,7 @@ import { useRouter } from 'vue-router';
 import { useT } from '../composables/useT';
 import AutoReplyRule from './AutoReplyRule.vue';
 
-type CardKey = 'appointments' | 'tables';
+type CardKey = 'tables';
 interface Card {
   key: CardKey;
   /** The app the card needs: without it, it does not show. */
@@ -29,12 +27,6 @@ interface Card {
 }
 
 const CARDS: Card[] = [
-  {
-    key: 'appointments',
-    app: 'appointment',
-    answer: 'whatsapp_inbox/appointment_from_whatsapp',
-    notice: 'whatsapp_inbox/appointment_confirmed',
-  },
   {
     key: 'tables',
     app: 'reservation',
@@ -62,13 +54,12 @@ const flowOn = computed(() => appOn('flow'));
 const shown = computed(() => CARDS.filter((card) => appOn(card.app)));
 const recipes = computed(() => new Map((shelf.data.value?.recipes ?? []).map((recipe) => [recipe.ref, recipe])));
 const setAside = computed(() => new Map((shelf.data.value?.set_aside ?? []).map((recipe) => [recipe.ref, recipe])));
-const KNOWN_APPS = ['flow', 'appointment', 'reservation', 'customer'];
+const KNOWN_APPS = ['flow', 'customer'];
 const loading = computed(() => flowOn.value && shelf.data.value === undefined && !shelf.error.value);
 
 const enabled = (ref: string) => recipes.value.get(ref)?.installed?.enabled === true;
 const isOn = (card: Card) => enabled(card.answer);
 const name = (card: Card) => t(`whatsapp_inbox.autoReplies.${card.key}.name`);
-const other = (card: Card) => shown.value.find((each) => each.key !== card.key) ?? null;
 const outdated = (card: Card) =>
   [card.answer, card.notice].filter((ref) => recipes.value.get(ref)?.installed?.outdated === true);
 /** What the card turns on, in this order: its answer, and its notice when this business can have it. */
@@ -90,11 +81,6 @@ function needsApp(card: Card): string {
   return t('whatsapp_inbox.autoReplies.needsApp', { name: name(card), apps: missing(card).map(appName).join(', ') });
 }
 
-function both(card: Card): string | null {
-  const rival = other(card);
-  return rival && isOn(card) && isOn(rival) ? t('whatsapp_inbox.autoReplies.both', { other: name(rival) }) : null;
-}
-
 function reason(error: unknown): string {
   if (error instanceof ApiError && (error.status === 403 || error.code === 'permission_denied')) {
     return t('whatsapp_inbox.autoReplies.onlyOwner');
@@ -113,24 +99,16 @@ async function act(card: Card, work: () => Promise<void>): Promise<void> {
 }
 
 async function turnOn(card: Card): Promise<void> {
-  const rival = other(card);
-  const rivalOn = rival ? onRefs(rival) : [];
   const yes = await confirm({
     title: name(card),
     message: t(`whatsapp_inbox.autoReplies.${card.key}.confirm`),
-    consequences: rival && isOn(rival) ? [t('whatsapp_inbox.autoReplies.exclusive', { other: name(rival) })] : undefined,
     confirmLabel: t('whatsapp_inbox.autoReplies.turnOn'),
     cancelLabel: t('whatsapp_inbox.autoReplies.notNow'),
   });
   if (!yes) return;
   await act(card, async () => {
-    const turnedOff: string[] = [];
     const turnedOn: string[] = [];
     try {
-      for (const ref of rivalOn) {
-        await disable.run({ recipe: ref });
-        turnedOff.push(ref);
-      }
       for (const ref of ownRefs(card)) {
         await enable.run({ recipe: ref });
         turnedOn.push(ref);
@@ -138,21 +116,16 @@ async function turnOn(card: Card): Promise<void> {
       done.value = { ...done.value, [card.key]: true };
     } catch (error) {
       errors.value = { ...errors.value, [card.key]: reason(error) };
-      await undo(turnedOn, turnedOff);
+      await undo(turnedOn);
     }
   });
 }
 
-/** Puts back what a failed «Turn on» changed: what it turned on is paused, what it turned off is on again (the answer
- *  before its notice). A step of this that fails too leaves the card to repaint from the live list, which says what is
- *  really on: the reason shown stays the first one. */
-async function undo(turnedOn: string[], turnedOff: string[]): Promise<void> {
-  const steps = [
-    ...[...turnedOn].reverse().map((ref) => () => disable.run({ recipe: ref })),
-    ...[...turnedOff].reverse().map((ref) => () => enable.run({ recipe: ref })),
-  ];
-  for (const step of steps) {
-    await step().catch(() => undefined);
+/** Pauses again what a failed «Turn on» turned on, the last first. A step of this that fails too leaves the card to
+ *  repaint from the live list, which says what is really on: the reason shown stays the first one. */
+async function undo(turnedOn: string[]): Promise<void> {
+  for (const ref of [...turnedOn].reverse()) {
+    await disable.run({ recipe: ref }).catch(() => undefined);
   }
 }
 
@@ -258,13 +231,6 @@ async function update(card: Card): Promise<void> {
         </template>
         <template v-else>
           <p
-            v-if="both(card)"
-            class="wa-autoreply__warning"
-            :data-testid="`whatsapp-inbox-autoreply-${card.key}-both`"
-          >
-            {{ both(card) }}
-          </p>
-          <p
             v-if="done[card.key] && isOn(card)"
             class="wa-autoreply__done"
             :data-testid="`whatsapp-inbox-autoreply-${card.key}-done`"
@@ -300,10 +266,7 @@ async function update(card: Card): Promise<void> {
             :data-testid="`whatsapp-inbox-autoreply-${card.key}-error`"
             :heading="errors[card.key]"
           />
-          <AutoReplyRule
-            v-if="isOn(card)"
-            :which="card.key"
-          />
+          <AutoReplyRule v-if="isOn(card)" />
           <div class="wa-autoreply__actions">
             <IonButton
               v-if="isOn(card)"
@@ -363,8 +326,7 @@ async function update(card: Card): Promise<void> {
 
 .wa-autoreply__explain,
 .wa-autoreply__hint,
-.wa-autoreply__done,
-.wa-autoreply__warning {
+.wa-autoreply__done {
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -372,10 +334,6 @@ async function update(card: Card): Promise<void> {
 .wa-autoreply__explain,
 .wa-autoreply__hint {
   color: var(--ep-text-muted, var(--ion-color-medium));
-}
-
-.wa-autoreply__warning {
-  color: var(--ep-warning-text, var(--ion-color-warning-shade));
 }
 
 .wa-autoreply__outdated {

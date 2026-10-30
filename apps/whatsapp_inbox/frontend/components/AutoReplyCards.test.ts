@@ -1,8 +1,8 @@
-// Settings → «What do you use it for?» (WHATSAPP_INBOX-F14 to F18): the cards «Book appointments» and «Book a table»
-// turn the inbox's automatic answer and its notice on and off in Automatizaciones (`flow.recipe.*`), one answer at a
-// time on the number (whatsapp_inbox#284); the switch of how the bookings confirm writes Citas' or Reservas' rule
-// (F16), in full words on a phone (whatsapp_inbox#285); a newer version is offered with «Update» (F18). Without Citas
-// (or Reservas) its card does not show; without Automatizaciones it says so with «See apps».
+// Settings → «What do you use it for?» (WHATSAPP_INBOX-F15 to F18): the card «Book a table» turns the inbox's automatic
+// answer and its notice on and off in Automatizaciones (`flow.recipe.*`) with one tap (whatsapp_inbox#123); the switch
+// of how the reservations confirm writes Reservas' rule (F16), in full words on a phone (whatsapp_inbox#285); a newer
+// version is offered with «Update» (F18). No card books appointments (F14). Without Reservas the card does not show;
+// without Automatizaciones or Clientes it says so with «See apps».
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,8 +18,7 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
 afterEach(() => mocks.confirm.mockReset());
 
 const RECIPES = 'flow.recipe.list';
-const BOOKING = 'whatsapp_inbox/appointment_from_whatsapp';
-const BOOKING_NOTICE = 'whatsapp_inbox/appointment_confirmed';
+const APPOINTMENT_NOTICE = 'whatsapp_inbox/appointment_confirmed';
 const TABLE = 'whatsapp_inbox/reservation_from_whatsapp';
 const TABLE_NOTICE = 'whatsapp_inbox/reservation_confirmed';
 
@@ -61,7 +60,7 @@ function recipe(ref: string, installed: Installed = null) {
 }
 
 function shelf(installed: Record<string, Installed> = {}, setAside: { ref: string; apps: string[] }[] = []) {
-  const refs = [BOOKING, BOOKING_NOTICE, TABLE, TABLE_NOTICE].filter((ref) => !setAside.some((item) => item.ref === ref));
+  const refs = [APPOINTMENT_NOTICE, TABLE, TABLE_NOTICE].filter((ref) => !setAside.some((item) => item.ref === ref));
   return {
     recipes: refs.map((ref) => recipe(ref, installed[ref] ?? null)),
     set_aside: setAside.map(({ ref, apps }) => ({
@@ -110,55 +109,56 @@ function commands(page: Awaited<ReturnType<typeof mount>>): string[] {
 
 const card = (page: Awaited<ReturnType<typeof mount>>, which: 'appointments' | 'tables') =>
   page.find(`whatsapp-inbox-autoreply-${which}`);
+const table = (page: Awaited<ReturnType<typeof mount>>) => card(page, 'tables');
 
-describe('the cards', () => {
-  it('says it is loading, then shows both cards off with what each does and «Turn on»', async () => {
+describe('the card', () => {
+  it('says it is loading, then shows «Book a table» off with what it does and «Turn on»', async () => {
     const page = await mount();
     expect(page.find('whatsapp-inbox-autoreply-loading').exists()).toBe(true);
     await page.result(RECIPES, shelf());
     expect(page.find('whatsapp-inbox-autoreply-title').text()).toBe('What do you use it for?');
-    expect(card(page, 'appointments').text()).toContain('Book appointments');
-    expect(card(page, 'appointments').text()).toContain('reads your diary');
-    expect(card(page, 'appointments').text()).toContain('Off');
-    expect(card(page, 'tables').text()).toContain('Book a table');
-    expect(page.find('whatsapp-inbox-autoreply-appointments-on').text()).toBe('Turn on');
+    expect(table(page).text()).toContain('Book a table');
+    expect(table(page).text()).toContain('checks the free tables');
+    expect(table(page).text()).toContain('Off');
+    expect(page.find('whatsapp-inbox-autoreply-tables-on').text()).toBe('Turn on');
+  });
+
+  it('offers only «Book a table»: no card books appointments (WHATSAPP_INBOX-F14)', async () => {
+    const page = await mount({ recipes: shelf() });
+    expect(card(page, 'tables').exists()).toBe(true);
+    expect(card(page, 'appointments').exists()).toBe(false);
   });
 
   it('paints in Spanish', async () => {
     const page = await mount({ locale: 'es', recipes: shelf({ [TABLE]: { enabled: true } }) });
     expect(page.find('whatsapp-inbox-autoreply-title').text()).toBe('¿Para qué lo usas?');
-    expect(card(page, 'appointments').text()).toContain('Reservar citas');
-    expect(card(page, 'tables').text()).toContain('Activa');
+    expect(table(page).text()).toContain('Reservar mesa');
+    expect(table(page).text()).toContain('Activa');
     expect(page.find('whatsapp-inbox-autoreply-tables-off').text()).toBe('Desactivar');
   });
 
-  it('without Citas the appointments card does not show, and the table one still does', async () => {
-    const session = { ...OWNER, apps: OWNER.apps.filter((app) => app.label !== 'appointment') };
-    const page = await mount({ session, recipes: shelf({}, [{ ref: BOOKING, apps: ['appointment'] }, { ref: BOOKING_NOTICE, apps: ['appointment'] }]) });
-    expect(card(page, 'appointments').exists()).toBe(false);
-    expect(card(page, 'tables').exists()).toBe(true);
+  it('without Reservas there is no card and nothing is asked of Automatizaciones', async () => {
+    const session = { ...OWNER, apps: OWNER.apps.filter((app) => app.label !== 'reservation') };
+    const page = await mount({ session, recipes: shelf({}, [{ ref: TABLE, apps: ['reservation'] }, { ref: TABLE_NOTICE, apps: ['reservation'] }]) });
+    expect(page.find('whatsapp-inbox-autoreply').exists()).toBe(false);
   });
 
-  it('without Automatizaciones each card says it needs it and «See apps» leads to the apps', async () => {
+  it('without Automatizaciones the card says it needs it and «See apps» leads to the apps', async () => {
     const session = { ...OWNER, apps: OWNER.apps.filter((app) => app.label !== 'flow') };
     const page = await mount({ session });
     expect(page.find('whatsapp-inbox-autoreply-loading').exists()).toBe(false);
-    expect(card(page, 'appointments').text()).toContain('“Book appointments” needs the app Automations.');
-    await click(page.find('whatsapp-inbox-autoreply-appointments-apps').element);
+    expect(table(page).text()).toContain('“Book a table” needs the app Automations.');
+    await click(page.find('whatsapp-inbox-autoreply-tables-apps').element);
     await flush();
     expect(page.router.currentRoute.value.path).toBe('/apps');
   });
 
   it('without Clientes the card names the app its answer needs, offers «See apps» and never «Turn on»', async () => {
-    const page = await mount({
-      locale: 'es',
-      recipes: shelf({}, [{ ref: BOOKING, apps: ['customer'] }, { ref: BOOKING_NOTICE, apps: ['customer'] }]),
-    });
-    expect(card(page, 'appointments').text()).toContain('“Reservar citas” necesita la aplicación Clientes.');
-    expect(page.find('whatsapp-inbox-autoreply-appointments-on').exists()).toBe(false);
-    expect(card(page, 'appointments').text()).not.toContain('Desactivada');
-    expect(page.find('whatsapp-inbox-autoreply-tables-on').exists()).toBe(true);
-    await click(page.find('whatsapp-inbox-autoreply-appointments-apps').element);
+    const page = await mount({ locale: 'es', recipes: shelf({}, [{ ref: TABLE, apps: ['customer'] }]) });
+    expect(table(page).text()).toContain('“Reservar mesa” necesita la aplicación Clientes.');
+    expect(page.find('whatsapp-inbox-autoreply-tables-on').exists()).toBe(false);
+    expect(table(page).text()).not.toContain('Desactivada');
+    await click(page.find('whatsapp-inbox-autoreply-tables-apps').element);
     await flush();
     expect(page.router.currentRoute.value.path).toBe('/apps');
     expect(commands(page)).toEqual([]);
@@ -170,34 +170,26 @@ describe('the cards', () => {
     await flush();
     expect(page.find('whatsapp-inbox-autoreply-error').text()).toContain('The automatic answers could not be loaded.');
   });
-
-  it('with both answers on (from Automatizaciones) each card warns that every message gets two', async () => {
-    const page = await mount({ recipes: shelf({ [BOOKING]: { enabled: true }, [TABLE]: { enabled: true } }) });
-    expect(page.find('whatsapp-inbox-autoreply-appointments-both').text()).toBe(
-      '“Book a table” is on too: each message gets two automatic answers. Turn off the one you do not use.',
-    );
-    expect(page.find('whatsapp-inbox-autoreply-tables-both').text()).toContain('“Book appointments” is on too');
-  });
 });
 
-describe('turning one on (F14, F15)', () => {
-  it('asks first and turns on the answer and its notice', async () => {
+describe('turning it on (F15)', () => {
+  it('asks first and, with one tap, turns on the answer and its notice', async () => {
     mocks.confirm.mockResolvedValue(true);
     const page = await mount({ recipes: shelf(), api: api() });
-    await click(page.find('whatsapp-inbox-autoreply-appointments-on').element);
+    await click(page.find('whatsapp-inbox-autoreply-tables-on').element);
     expect(mocks.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         message:
-          'WhatsApp will answer by itself: it reads your diary, offers the free times, and books or moves the appointment of the customer who writes once you say yes.',
+          'WhatsApp will answer by itself: it checks the free tables, books the table of whoever writes once you say yes, and answers them. Turn it on?',
         confirmLabel: 'Turn on',
         cancelLabel: 'Not now',
       }),
     );
-    expect(commands(page)).toEqual([`enable ${BOOKING}`, `enable ${BOOKING_NOTICE}`]);
-    await page.result(RECIPES, shelf({ [BOOKING]: { enabled: true }, [BOOKING_NOTICE]: { enabled: true } }), {}, 2);
-    expect(card(page, 'appointments').text()).toContain('On');
-    expect(page.find('whatsapp-inbox-autoreply-appointments-done').text()).toBe(
-      'Done. Write to yourself from another phone: “I want an appointment tomorrow”.',
+    expect(commands(page)).toEqual([`enable ${TABLE}`, `enable ${TABLE_NOTICE}`]);
+    await page.result(RECIPES, shelf({ [TABLE]: { enabled: true }, [TABLE_NOTICE]: { enabled: true } }), {}, 2);
+    expect(table(page).text()).toContain('On');
+    expect(page.find('whatsapp-inbox-autoreply-tables-done').text()).toBe(
+      'Done. Write to yourself from another phone: “I want a table for two tomorrow”.',
     );
   });
 
@@ -208,48 +200,27 @@ describe('turning one on (F14, F15)', () => {
     expect(commands(page)).toEqual([]);
   });
 
-  it('with the other answer on, says it goes off and turns it and its notice off first', async () => {
-    mocks.confirm.mockResolvedValue(true);
-    const page = await mount({ recipes: shelf({ [BOOKING]: { enabled: true }, [BOOKING_NOTICE]: { enabled: true } }), api: api() });
-    await click(page.find('whatsapp-inbox-autoreply-tables-on').element);
-    expect(mocks.confirm.mock.calls[0][0].consequences).toEqual([
-      'Only one automatic answer can answer on your number: turning this one on turns «Book appointments» off.',
-    ]);
-    expect(commands(page)).toEqual([
-      `disable ${BOOKING_NOTICE}`,
-      `disable ${BOOKING}`,
-      `enable ${TABLE}`,
-      `enable ${TABLE_NOTICE}`,
-    ]);
-  });
-
-  it('when it fails it says why, pauses what it turned on and turns the other answer back on', async () => {
+  it('when it fails it says why and pauses again what it turned on', async () => {
     mocks.confirm.mockResolvedValue(true);
     const failing = api({
       [`/api/flow/recipes/enable ${TABLE_NOTICE}`]: [{ status: 409, body: { error: { code: 'flow.recipe_invalid', message: 'It does not read as an automation.' } } }],
     });
-    const page = await mount({ recipes: shelf({ [BOOKING]: { enabled: true } }), api: failing });
+    const page = await mount({ recipes: shelf(), api: failing });
     await click(page.find('whatsapp-inbox-autoreply-tables-on').element);
-    expect(commands(page)).toEqual([
-      `disable ${BOOKING}`,
-      `enable ${TABLE}`,
-      `enable ${TABLE_NOTICE}`,
-      `disable ${TABLE}`,
-      `enable ${BOOKING}`,
-    ]);
+    expect(commands(page)).toEqual([`enable ${TABLE}`, `enable ${TABLE_NOTICE}`, `disable ${TABLE}`]);
     expect(page.find('whatsapp-inbox-autoreply-tables-error').text()).toBe('It does not read as an automation.');
   });
 
   it('without the permission it says only an owner or an admin may', async () => {
     mocks.confirm.mockResolvedValue(true);
-    const denied = api({ [`/api/flow/recipes/enable ${BOOKING}`]: [{ status: 403, body: { error: { code: 'permission_denied', message: 'Permission “flow.manage” is required.' } } }] });
+    const denied = api({ [`/api/flow/recipes/enable ${TABLE}`]: [{ status: 403, body: { error: { code: 'permission_denied', message: 'Permission “flow.manage” is required.' } } }] });
     const page = await mount({ recipes: shelf(), api: denied });
-    await click(page.find('whatsapp-inbox-autoreply-appointments-on').element);
-    expect(page.find('whatsapp-inbox-autoreply-appointments-error').text()).toBe('Only an owner or an admin can turn it on.');
+    await click(page.find('whatsapp-inbox-autoreply-tables-on').element);
+    expect(page.find('whatsapp-inbox-autoreply-tables-error').text()).toBe('Only an owner or an admin can turn it on.');
   });
 });
 
-describe('turning one off (F17)', () => {
+describe('turning it off (F17)', () => {
   it('pauses its notice first and the answer last', async () => {
     const page = await mount({ recipes: shelf({ [TABLE]: { enabled: true }, [TABLE_NOTICE]: { enabled: true } }), api: api() });
     await click(page.find('whatsapp-inbox-autoreply-tables-off').element);
@@ -267,40 +238,46 @@ describe('turning one off (F17)', () => {
 describe('updating to the improved version (F18)', () => {
   it('offers «Update» only when there is one, asks first and restores what is outdated', async () => {
     mocks.confirm.mockResolvedValue(true);
+    const current = await mount({ recipes: shelf({ [TABLE]: { enabled: true } }) });
+    expect(current.find('whatsapp-inbox-autoreply-tables-update').exists()).toBe(false);
     const page = await mount({
-      recipes: shelf({ [BOOKING]: { enabled: true, outdated: true }, [BOOKING_NOTICE]: { enabled: true } }),
+      recipes: shelf({ [TABLE]: { enabled: true, outdated: true }, [TABLE_NOTICE]: { enabled: true } }),
       api: api(),
     });
-    expect(page.find('whatsapp-inbox-autoreply-tables-update').exists()).toBe(false);
-    expect(page.find('whatsapp-inbox-autoreply-appointments-outdated').text()).toContain('There is an improved version of this automatic answer.');
-    await click(page.find('whatsapp-inbox-autoreply-appointments-update').element);
+    expect(page.find('whatsapp-inbox-autoreply-tables-outdated').text()).toContain('There is an improved version of this automatic answer.');
+    await click(page.find('whatsapp-inbox-autoreply-tables-update').element);
     expect(mocks.confirm.mock.calls[0][0].message).toBe(
       'The new one replaces the current one, also the changes made by hand, and it stays on or paused as it is.',
     );
-    expect(commands(page)).toEqual([`restore ${BOOKING}`]);
-    expect(page.find('whatsapp-inbox-autoreply-appointments-updated').text()).toBe(
+    expect(commands(page)).toEqual([`restore ${TABLE}`]);
+    expect(page.find('whatsapp-inbox-autoreply-tables-updated').text()).toBe(
       'Done: this automatic answer already works with the latest version.',
     );
   });
 
   it('says it no longer exists when it was deleted meanwhile', async () => {
     mocks.confirm.mockResolvedValue(true);
-    const gone = api({ [`/api/flow/recipes/restore ${BOOKING}`]: [{ status: 404, body: { error: { code: 'not_found', message: 'gone' } } }] });
-    const page = await mount({ recipes: shelf({ [BOOKING]: { enabled: false, outdated: true } }), api: gone });
-    await click(page.find('whatsapp-inbox-autoreply-appointments-update').element);
-    expect(page.find('whatsapp-inbox-autoreply-appointments-error').text()).toBe(
+    const gone = api({ [`/api/flow/recipes/restore ${TABLE}`]: [{ status: 404, body: { error: { code: 'not_found', message: 'gone' } } }] });
+    const page = await mount({ recipes: shelf({ [TABLE]: { enabled: false, outdated: true } }), api: gone });
+    await click(page.find('whatsapp-inbox-autoreply-tables-update').element);
+    expect(page.find('whatsapp-inbox-autoreply-tables-error').text()).toBe(
       'This automatic answer no longer exists here: turn it on again.',
     );
   });
 });
 
-describe('how the bookings confirm (F16)', () => {
-  it('shows the choice under a card that is on, and nothing under one that is off', async () => {
-    const page = await mount({ recipes: shelf({ [BOOKING]: { enabled: true } }) });
-    expect(page.find('whatsapp-inbox-autoreply-appointments-confirm').exists()).toBe(true);
+describe('how the reservations confirm (F16)', () => {
+  it('shows the choice under the card when it is on, reading Reservas’ rule', async () => {
+    const page = await mount({ recipes: shelf({ [TABLE]: { enabled: true } }) });
+    expect(page.find('whatsapp-inbox-autoreply-tables-confirm').exists()).toBe(true);
+    await page.reopen();
+    expect(page.params('reservation.settings.get')).toEqual([{}]);
+  });
+
+  it('shows nothing under the card when it is off, and asks Reservas nothing', async () => {
+    const page = await mount({ recipes: shelf() });
     expect(page.find('whatsapp-inbox-autoreply-tables-confirm').exists()).toBe(false);
     await page.reopen();
-    expect(page.params('appointment.settings.get')).toEqual([{}]);
     expect(page.params('reservation.settings.get')).toEqual([]);
   });
 });

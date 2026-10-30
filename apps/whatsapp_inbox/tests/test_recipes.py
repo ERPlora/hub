@@ -129,23 +129,29 @@ def test_every_recipe_has_an_id_and_its_words():
     assert [recipe["id"] for recipe in RECIPES] == [
         "appointment_confirmed",
         "reservation_confirmed",
-        "appointment_from_whatsapp",
         "reservation_from_whatsapp",
     ]
     for recipe in RECIPES:
         assert {"name", "summary", "description", "trigger", "steps", "grants"} <= set(recipe)
 
 
-# ── WHATSAPP_INBOX-F21, F22, F24, F25: the answers that read what the customer writes ─────────────────────
+def test_the_gallery_offers_no_answer_that_books_appointments():
+    """WHATSAPP_INBOX-F14 stays partial: after «Approve», Citas refuses the booking of an automation (its step runs with
+    «only mine»), so no answer that books appointments is offered, here or in Automatizaciones' gallery."""
+    assert sorted(ref for ref in offered() if ref.startswith("whatsapp_inbox/")) == [
+        "whatsapp_inbox/appointment_confirmed",
+        "whatsapp_inbox/reservation_confirmed",
+        "whatsapp_inbox/reservation_from_whatsapp",
+    ]
 
-BOOKING_REF = "whatsapp_inbox/appointment_from_whatsapp"
+
+# ── WHATSAPP_INBOX-F20, F24, F25: the answer that reads what the customer writes ─────────────────────────────
+
 TABLE_REF = "whatsapp_inbox/reservation_from_whatsapp"
-ANSWERS = (BOOKING_REF, TABLE_REF)
-#: What each answer's assistant may use, and nothing more: free times and the booking's own changes. A read that
-#: names other people (a diary, a customer list, the people a time clashes with) never: what it reads goes out to
-#: whoever writes.
+ANSWERS = (TABLE_REF,)
+#: What each answer's assistant may use, and nothing more: free tables and the reservation's own changes. A read that
+#: names other people (the reservations book, a customer list) never: what it reads goes out to whoever writes.
 TOOLS = {
-    BOOKING_REF: ["appointment.availability.slots", "appointment.appointment.create", "appointment.appointment.reschedule"],
     TABLE_REF: [
         "reservation.availability.day",
         "reservation.availability.tables",
@@ -202,12 +208,8 @@ def test_an_answer_asks_the_assistant_ask_me_first_with_only_what_it_needs(ref):
 
 
 #: The assistant's step of each answer, and the reads pinned to the customer who writes that come before it.
-ASSISTANT = {BOOKING_REF: "s10", TABLE_REF: "s10"}
+ASSISTANT = {TABLE_REF: "s10"}
 PINNED = {
-    BOOKING_REF: {
-        "customer.customer.by_phone": {"phone": "steps.s1.phone"},
-        "appointment.appointment.list_for_customer": {"customer_id": "steps.s6.id", "limit": 1},
-    },
     TABLE_REF: {
         "customer.customer.by_phone": {"phone": "steps.s1.phone"},
         "reservation.reservation.list": {"guest_phone": "steps.s1.phone", "sort": "-starts_at", "limit": 1},
@@ -280,15 +282,6 @@ def test_an_answer_stops_on_a_message_with_no_text_and_marks_her_when_nothing_ca
     assert steps[4]["operation"] == "whatsapp_inbox.message.notify"  # the thanks, only once it can go
 
 
-def test_the_appointment_answer_thanks_and_says_sorry_in_the_business_s_language():
-    steps = recipes.build(offered()[BOOKING_REF], "es")["steps"]
-    thanks, _reply, sorry, _again = [step for step in steps if step.get("operation") == "whatsapp_inbox.message.notify"]
-    assert thanks["params"]["text"] == "¡Gracias por escribirnos! Miro la agenda y te contesto ahora mismo."
-    assert sorry["params"]["text"] == (
-        "Perdona, ahora mismo no puedo mirar la agenda. Alguien del equipo te contestará por aquí en cuanto pueda."
-    )
-
-
 def test_the_table_answer_thanks_and_says_sorry_in_the_business_s_language():
     steps = recipes.build(offered()[TABLE_REF], "es")["steps"]
     thanks, _reply, sorry, _again = [step for step in steps if step.get("operation") == "whatsapp_inbox.message.notify"]
@@ -307,7 +300,7 @@ def test_a_customer_with_no_card_gets_one_from_whatsapp_and_one_with_it_does_not
     assert made["run_if"] == {"steps.s6.found": {"eq": False}}
 
 
-@pytest.mark.parametrize(("ref", "app"), [(BOOKING_REF, "appointment"), (TABLE_REF, "reservation")])
+@pytest.mark.parametrize(("ref", "app"), [(TABLE_REF, "reservation"), (TABLE_REF, "customer")])
 def test_without_its_app_an_answer_is_set_aside_naming_it(monkeypatch, ref, app):
     without(monkeypatch, app)
     offered_now, set_aside = recipes.shelf()

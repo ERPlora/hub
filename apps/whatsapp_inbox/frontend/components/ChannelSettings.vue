@@ -9,7 +9,7 @@
 // WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;
 // «Add template» and a row open the form (F29, F30), Delete asks first (F31), «Send to Meta again» hands
 // over again what did not get there. Between the month and the templates, «What do you use it for?» (AutoReplyCards,
-// F14–F18), only for a business with Citas or Reservas on.
+// F15–F18), only for a business with Reservas on.
 import {
   ConfirmDialog,
   type DataTableAction,
@@ -37,7 +37,7 @@ const t = useT();
 const session = useSession();
 const { data: channel, error: channelError } = useLive('whatsapp_inbox.channel.get', {});
 const canBook = computed(() =>
-  (session.me.value?.apps ?? []).some((app) => ['appointment', 'reservation'].includes(app.label) && app.state === 'on'),
+  (session.me.value?.apps ?? []).some((app) => app.label === 'reservation' && app.state === 'on'),
 );
 
 // The templates list takes a search and a page (sorted by name on the server).
@@ -198,7 +198,7 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
       >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
     </section>
 
-    <!-- «What do you use it for?» (F14–F18): only where an answer can book, so nobody else asks Automatizaciones. -->
+    <!-- «What do you use it for?» (F15–F18): only where an answer can book, so nobody else asks Automatizaciones. -->
     <AutoReplyCards v-if="canBook" />
 
     <section class="wa-settings__block wa-settings__block--templates">
