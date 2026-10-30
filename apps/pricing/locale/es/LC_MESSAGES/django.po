@@ -27,12 +27,14 @@ msgstr "Tarifas guarda otros precios para tus productos y servicios: una tarifa 
 msgid "created at"
 msgstr "creado el"
 
+msgctxt "pricing"
 msgid "updated at"
 msgstr "cambiado el"
 
 msgid "created by"
 msgstr "creado por"
 
+msgctxt "pricing"
 msgid "updated by"
 msgstr "cambiado por"
 
@@ -42,6 +44,7 @@ msgstr "código"
 msgid "name"
 msgstr "nombre"
 
+msgctxt "pricing"
 msgid "currency"
 msgstr "divisa"
 
@@ -51,15 +54,18 @@ msgstr "impuesto incluido"
 msgid "customer group"
 msgstr "grupo de clientes"
 
+msgctxt "pricing"
 msgid "valid from"
 msgstr "desde"
 
+msgctxt "pricing"
 msgid "valid until"
 msgstr "hasta"
 
 msgid "general list"
 msgstr "tarifa general"
 
+msgctxt "pricing"
 msgid "active"
 msgstr "activa"
 
