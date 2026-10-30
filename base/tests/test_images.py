@@ -319,6 +319,18 @@ def test_a_photo_let_go_is_deleted_once_the_change_is_saved(hub_files, django_ca
     assert not hub_files.exists(key)
 
 
+def test_a_photo_the_store_fails_to_delete_is_logged_and_the_saved_change_stands(
+    hub_files, django_capture_on_commit_callbacks, monkeypatch, caplog
+):
+    reference = images.keep_photo(ctx(), FOLDER, webp())
+    monkeypatch.setattr(hub_files, "delete", lambda name: (_ for _ in ()).throw(OSError("the bucket did not answer")))
+
+    with django_capture_on_commit_callbacks(execute=True):
+        images.let_go(ctx(), reference)
+
+    assert "could not be deleted" in caplog.text
+
+
 def test_letting_go_an_image_of_the_library_or_nothing_deletes_nothing(django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks() as callbacks:
         images.let_go(ctx(), "catalog:hospitality/cafe_solo")

@@ -311,6 +311,15 @@ def test_a_photo_past_2_mb_is_refused_and_nothing_is_kept(hub_files):  # noqa: F
     assert Product.objects.get().image == ""
 
 
+def test_a_photo_somewhat_past_2_mb_is_told_it_weighs_too_much_not_a_length_of_text(hub_files):  # noqa: F811
+    created = product()
+
+    with pytest.raises(InvalidPayload) as refused:
+        upload(b"\0" * (2 * 1024 * 1024 + 50_000), created.id)
+
+    assert refused.value.code == "base.photo_too_big"
+
+
 def test_a_file_that_is_no_photo_is_refused_in_the_persons_language(hub_files):  # noqa: F811
     created = product()
 

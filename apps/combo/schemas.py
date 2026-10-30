@@ -27,6 +27,7 @@ from pydantic import (
 )
 
 from apps.combo.models import MAX_PICKS, NAME_MAX_LENGTH
+from base.images import MAX_UPLOAD_BASE64
 from base.schemas import CatalogImageOut, names
 
 T = TypeVar("T")
@@ -171,8 +172,6 @@ class ComboRefIn(In):
 
 #: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
 AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
-#: 2 MB of photo is 2 796 204 characters of base64.
-PHOTO_BASE64_LENGTH = 2_796_204
 
 
 class ComboImageIn(ComboRefIn):
@@ -186,7 +185,7 @@ class ComboImageIn(ComboRefIn):
 
 class ComboImageUploadIn(ComboRefIn):
     data_base64: str = Field(
-        max_length=PHOTO_BASE64_LENGTH,
+        max_length=MAX_UPLOAD_BASE64,
         description="The photo, a JPG, PNG or WebP of 2 MB at most, in base64; it is kept as a 512 × 512 WebP.",
     )
 

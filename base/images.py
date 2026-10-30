@@ -46,6 +46,10 @@ logger = logging.getLogger(__name__)
 
 #: The heaviest photo taken, before it is converted (what the person picks).
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+#: The longest base64 an upload's input takes: 2 MB of photo is 2 796 204 characters, and somewhat more still reaches
+#: :func:`decode`, so the person reads that the photo weighs too much, not a length of text; past it, the route's body
+#: ceiling (2 900 000) answers first.
+MAX_UPLOAD_BASE64 = 2_890_000
 #: The side of every photo kept: the till's tile, the form and the list show it at most this big.
 SIDE = 512
 QUALITY = 85
@@ -131,7 +135,7 @@ def _invalid(message: str, code: str = "base.photo_invalid") -> InvalidPayload:
 def decode(data_base64: str, *, language: str | None = None) -> bytes:
     """The bytes of a photo sent in base64, of :data:`MAX_UPLOAD_BYTES` at most."""
     with translation.override(language or translation.get_language()):
-        if len(data_base64) > (MAX_UPLOAD_BYTES // 3 + 1) * 4:
+        if len(data_base64) > MAX_UPLOAD_BASE64:
             raise _invalid(str(PHOTO_TOO_BIG), "base.photo_too_big")
         try:
             raw = base64.b64decode(data_base64, validate=True)
@@ -202,7 +206,16 @@ def let_go(ctx: OperationContext, reference: str) -> None:
 
 
 def _deleter(key: str) -> Callable[[], None]:
-    return lambda: storages["hub_files"].delete(key)
+    """Delete ``key`` once the change is saved; a store that fails then is logged and never undoes what was saved (the
+    photo is left over in the store)."""
+
+    def delete() -> None:
+        try:
+            storages["hub_files"].delete(key)
+        except (OSError, BotoCoreError, ClientError):
+            logger.exception("images: the photo %s could not be deleted", key)
+
+    return delete
 
 
 def read_photo(scope: Scope, reference: str) -> bytes | None:
