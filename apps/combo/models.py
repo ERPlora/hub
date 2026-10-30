@@ -53,6 +53,10 @@ class Combo(UUIDModel):
     )
     sort_order = models.PositiveIntegerField(_("order"), default=0)
     is_active = models.BooleanField(_("on sale"), default=True)
+    # Its image (COMBO-F14; round 2026-10-30, base.images): one of the shared library («catalog:<folder>/<name>») or a
+    # photo of its own («file:combo/combos/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till shows its
+    # initials. Never a URL. ``db_default``: a process still on the previous code inserts menus without it.
+    image = models.CharField(_("image"), max_length=200, blank=True, default="", db_default="")
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
     created_by = models.CharField(

@@ -1655,6 +1655,18 @@
     "method": "post",
     "path": "/api/combo/options/reorder"
   },
+  "combo.combo.set_image": {
+    "method": "post",
+    "path": "/api/combo/combos/image"
+  },
+  "combo.combo.upload_image": {
+    "method": "post",
+    "path": "/api/combo/combos/image/upload"
+  },
+  "combo.combo.suggest_image": {
+    "method": "get",
+    "path": "/api/combo/combos/image/suggest"
+  },
   "appointment.appointment.list": {
     "method": "get",
     "path": "/api/appointment/appointments"
