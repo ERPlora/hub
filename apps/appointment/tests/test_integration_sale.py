@@ -138,7 +138,7 @@ def test_an_employee_charges_her_own_appointment_without_the_open_price_right(bo
     from apps.staff.models import Member
 
     user = make_user("ana", role="hub_employee")
-    Member.objects.filter(pk=booked.staff_id).update(user=user)
+    Member.objects.filter(pk=booked.staff_id).update(user=user.person)
     employee = ctx_for("hub_employee", actor=user)
     assert "sale.sell_open_price" not in employee.permissions
     charge = get("appointment.appointment.charge")
@@ -148,7 +148,7 @@ def test_an_employee_charges_her_own_appointment_without_the_open_price_right(bo
 
 def test_an_employee_does_not_charge_a_colleagues_appointment_she_cannot_see(booked, make_user):
     user = make_user("bea", role="hub_employee")
-    make_member("Bea", "Ruiz", user=user)
+    make_member("Bea", "Ruiz", user=user.person)
     charge = get("appointment.appointment.charge")
     with pytest.raises(NotFound):
         charge(ctx_for("hub_employee", actor=user), charge.input.model_validate({"id": str(booked.id)}))

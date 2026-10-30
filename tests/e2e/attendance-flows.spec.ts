@@ -54,9 +54,9 @@ async function signedIn(browser: Browser, next: string, viewport: { width: numbe
 
 /** A staff record made through Staff's API, linked to the account found by `search` (its email) if any. */
 async function member(owner: BrowserContext, firstName: string, search?: string): Promise<string> {
-  let user_id: number | undefined;
+  let user_id: string | undefined;
   if (search) {
-    const accounts = await api<Rows<{ user_id: number }>>(owner, A, 'GET', `/staff/accounts?search=${encodeURIComponent(search)}&limit=5`);
+    const accounts = await api<Rows<{ user_id: string }>>(owner, A, 'GET', `/staff/accounts?search=${encodeURIComponent(search)}&limit=5`);
     expect(accounts.data.rows.length, `account ${search}`).toBeGreaterThan(0);
     user_id = accounts.data.rows[0].user_id;
   }

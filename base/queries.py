@@ -129,7 +129,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     with translation.override(ctx.language):
         visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
-            "user": _user(ctx.actor),
+            "user": _user(ctx.actor, hub_user_of(ctx)),
             "scope": {"kind": ctx.scope.kind, "key": ctx.scope.key},
             "permissions": sorted(ctx.permissions),
             "menu": [
@@ -161,13 +161,15 @@ def _can_see(ctx: OperationContext, config: Any) -> bool:
     return ctx.has(f"{config.label}.view") or any(ctx.has(permission) for permission in config.permissions)
 
 
-def _user(actor: Any) -> dict[str, str] | None:
+def _user(actor: Any, person: HubUser | None = None) -> dict[str, str] | None:
     if actor is None:
         return None
     if not hasattr(actor, "get_username"):  # the platform itself (live.context.system_context)
         return {"id": str(actor), "label": str(actor)}
-    # Named as in this hub: its «My profile» name, else its account's (APP-BASE-3).
-    return {"id": str(actor.pk), "label": person_label(actor)}
+    # The person of the business's database (base.HubUser), whose id every app's record names, so a screen tells
+    # «mine» by it; without one there yet (the platform's host), the session's user. Named as in this hub: its «My
+    # profile» name, else its account's (APP-BASE-3).
+    return {"id": str(actor.pk if person is None else person.pk), "label": person_label(actor)}
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.

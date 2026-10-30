@@ -32,7 +32,7 @@ const note = (id: string, created_at: string): NoteOut => ({
   id,
   conversation_id: 'c1',
   text: id,
-  author_id: 1,
+  author_id: '01a16000-0000-7000-8000-0000000000b1',
   author_name: 'Ana',
   created_at,
   can_delete: true,

@@ -29,7 +29,7 @@ describe('pickers', () => {
   });
 
   it('accounts: value the user id as text', async () => {
-    const c = client([{ user_id: 4, name: 'Ana López' }]);
+    const c = client([{ user_id: '4', name: 'Ana López' }]);
     expect(await accountSearch(c)('')).toEqual([{ value: '4', label: 'Ana López' }]);
     expect(c.api.call).toHaveBeenLastCalledWith('staff.account.list', { limit: 100 });
   });

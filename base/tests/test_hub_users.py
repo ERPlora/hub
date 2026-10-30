@@ -25,7 +25,7 @@ from base import queries, services
 from base.api_keys import KeyCaller
 from base.models import Hub, HubUser, Membership
 from base.registry import REGISTRY_SCOPE
-from base.schemas import HubStateIn, HubUserGetIn
+from base.schemas import HubStateIn, HubUserGetIn, SessionMeIn
 from base.tenancy import inventory
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -326,3 +326,23 @@ class TestTheReadThatNamesThem:
     def test_it_needs_a_person_of_the_hub(self):
         with pytest.raises(PermissionDenied):
             self.read(OperationContext(scope=Scope("host", "a"), actor=None, permissions=frozenset()), uuid.uuid7())
+
+
+class TestTheSession:
+    """``base.session.me``: who the SPA is is the person of the business's database, whose id is the one every app's
+    record names (a conversation's assignee, a task's creator), so a screen tells «mine» by it."""
+
+    def me(self, user):
+        return get("base.session.me")(as_person(user), SessionMeIn()).model_dump(mode="json")["user"]
+
+    def test_its_id_is_the_person_s_of_the_business(self):
+        ana = account_copy(ANA_ID, name="Ana")
+        person = services.ensure_hub_user(ana)
+
+        assert self.me(ana)["id"] == str(person.pk)
+
+    def test_without_a_person_yet_it_is_the_session_s_user(self):
+        ana = account_copy(ANA_ID, name="Ana")
+
+        assert self.me(ana)["id"] == str(ana.pk)
+        assert not HubUser.objects.exists(), "a read never makes a person"

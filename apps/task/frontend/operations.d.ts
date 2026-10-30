@@ -108,7 +108,7 @@ export interface TaskOut {
   parent_title: string | null;
   assigned_to_id: string | null;
   assignee_name: string | null;
-  created_by_id: number | null;
+  created_by_id: string | null;
   created_by_name: string | null;
   due_date: string | null;
   completed_at: string | null;
@@ -135,7 +135,7 @@ export interface CommentOut {
   id: string;
   task_id: string;
   text: string;
-  author_id: number | null;
+  author_id: string | null;
   author_name: string | null;
   created_at: string;
 }

@@ -24,7 +24,7 @@ const DETAIL: MemberDetailOut = {
   employee_number: 'E-7',
   role_id: 'r1',
   role_name: 'Stylist',
-  user_id: 4,
+  user_id: '4',
   status: 'active',
   is_bookable: true,
   hire_date: '2024-02-01',
@@ -38,7 +38,7 @@ const DETAIL: MemberDetailOut = {
 
 const PAY: CompensationOut = {
   id: 'm1',
-  user_id: 4,
+  user_id: '4',
   full_name: 'Ana López',
   role_id: 'r1',
   role_name: 'Stylist',
@@ -82,7 +82,7 @@ describe('createPayload (New)', () => {
       phone: '',
       employee_number: '',
       role_id: 'r1',
-      user_id: 4,
+      user_id: '4',
       hire_date: '2024-02-01',
       is_bookable: true,
       booking_buffer: 15,
@@ -175,7 +175,7 @@ describe('patchPayload (Edit sends only what changed)', () => {
   });
 
   it('a new Hub user goes as a number', () => {
-    expect(patchPayload('m1', original, { ...original, user_id: '9' }, { pay: false })).toEqual({ id: 'm1', user_id: 9 });
+    expect(patchPayload('m1', original, { ...original, user_id: '9' }, { pay: false })).toEqual({ id: 'm1', user_id: '9' });
   });
 
   it('the pay goes only when it may be seen and it changed; the same figure written another way is no change', () => {

@@ -354,8 +354,7 @@ def test_the_app_off_in_its_rows_is_404_app_inactive_with_the_cache_cold(acme, p
 def test_each_business_answers_from_its_own_database(hub_a, hub_b, production, monkeypatch, host):
     # WhatsApp on in tenant-a's database, off in tenant-b's: each door reads the business it names, never the other
     # one nor phase 1's shared database (which the platform host opens: there tenant-a has no rows, every app off).
-    # The inbox's tables are not in a hub's own database yet (they reference control's users until phase 2's own
-    # staff: base/tenancy/tests/hubs.py), so the operation is probed where it would start.
+    # The operation is probed where it starts: which business's database the door entered is what this test reads.
     with use_hub(hub_b):
         AppActivation.objects.filter(host=hub_b.slug, app="whatsapp_inbox").update(state="off", chosen=False)
     reached = []

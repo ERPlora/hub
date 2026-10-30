@@ -53,9 +53,9 @@ def _hub_classes(model) -> bool:
 def portable_apps() -> tuple[str, ...]:
     """The hub apps whose tables reference only a hub's own, and whose migrations need no other app's.
 
-    Phase 1 links some modules to control's users (``settings.AUTH_USER_MODEL``: staff, attendance, task,
-    whatsapp_inbox and what depends on them): their tables cannot live in a hub's database until the hub's own
-    staff comes (PLAN-DB §2), so the tests' template leaves them out.
+    Every one since tenancy W10: the people of a business are its own (``base.HubUser``), and no hub's model links to
+    control's (``tests/test_guardrails.py``, «(g)»). The rule stays, so a link that came back would leave its app (and
+    what depends on it) out of the tests' template, and ``base/tests/test_hub_user_links.py`` would say so.
     """
     hub_apps = {
         config.label

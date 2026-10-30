@@ -75,7 +75,7 @@ const message = (id: string, sent_at: string): MessageOut => ({
   sent_at,
   status_at: null,
 });
-const NOTE: NoteOut = { id: 'n1', conversation_id: 'c1', text: 'Llamar', author_id: 1, author_name: 'Ana', created_at: '2026-10-15T09:55:00Z', can_delete: true };
+const NOTE: NoteOut = { id: 'n1', conversation_id: 'c1', text: 'Llamar', author_id: '01a16000-0000-7000-8000-0000000000b1', author_name: 'Ana', created_at: '2026-10-15T09:55:00Z', can_delete: true };
 const page = <T>(rows: T[], total = rows.length) => ({ rows, total, limit: 50, offset: 0 });
 
 /** CustomerSearch of the Customers app, stood in for by a button that picks Marta's card. */
@@ -197,7 +197,7 @@ describe('ConversationPanel: the card (WHATSAPP_INBOX-F37)', () => {
 describe('ConversationPanel: assignment and status (WHATSAPP_INBOX-F07, F35)', () => {
   it('«Assign to me» never takes it from somebody else', async () => {
     const s = await setup({}, { session: EMPLOYEE });
-    s.answer(200, detail({ assigned_to_id: 2, assigned_to_name: 'Luis' }));
+    s.answer(200, detail({ assigned_to_id: '01a16000-0000-7000-8000-0000000000b2', assigned_to_name: 'Luis' }));
     await click(s.inDoc('whatsapp-inbox-detail-assign-me'));
     expect(s.sent().at(-1)?.body).toEqual({ id: 'c1', assignee: 'me', only_if_unassigned: true });
     // An employee does not choose somebody else.
@@ -205,7 +205,7 @@ describe('ConversationPanel: assignment and status (WHATSAPP_INBOX-F07, F35)', (
   });
 
   it('a manager chooses anybody of the team and can remove the assignment', async () => {
-    const s = await setup({ assigned_to_id: 7, assigned_to_name: 'Marta' }, { session: MANAGER });
+    const s = await setup({ assigned_to_id: '01a16000-0000-7000-8000-0000000000b7', assigned_to_name: 'Marta' }, { session: MANAGER });
     expect(s.inDoc('whatsapp-inbox-detail-assignee')).not.toBeNull();
     s.answer(200, detail());
     await click(s.inDoc('whatsapp-inbox-detail-unassign'));
@@ -213,11 +213,11 @@ describe('ConversationPanel: assignment and status (WHATSAPP_INBOX-F07, F35)', (
   });
 
   it('who has it is said; an employee may only take it off themselves', async () => {
-    const mine = await setup({ assigned_to_id: 2, assigned_to_name: 'Luis' }, { session: EMPLOYEE });
+    const mine = await setup({ assigned_to_id: '01a16000-0000-7000-8000-0000000000b2', assigned_to_name: 'Luis' }, { session: EMPLOYEE });
     expect(mine.find('whatsapp-inbox-detail-assigned').text()).toContain('Luis');
     expect(mine.inDoc('whatsapp-inbox-detail-unassign')).not.toBeNull();
     expect(mine.inDoc('whatsapp-inbox-detail-assign-me')).toBeNull();
-    const theirs = await setup({ assigned_to_id: 7, assigned_to_name: 'Marta' }, { session: EMPLOYEE });
+    const theirs = await setup({ assigned_to_id: '01a16000-0000-7000-8000-0000000000b7', assigned_to_name: 'Marta' }, { session: EMPLOYEE });
     expect(theirs.inDoc('whatsapp-inbox-detail-unassign')).toBeNull();
   });
 

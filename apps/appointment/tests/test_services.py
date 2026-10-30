@@ -309,7 +309,7 @@ def test_a_time_the_clock_change_skips_is_a_422_on_the_start(salon):
 
 def test_an_employee_books_for_themselves_only(salon, make_user):
     user = make_user("bea", role="hub_employee")
-    salon.bea.user = user
+    salon.bea.user = user.person
     salon.bea.save()
     ctx = ctx_for("hub_employee", actor=user)
     from live.operations import get
@@ -476,7 +476,7 @@ def test_on_the_customers_behalf_an_employee_still_changes_only_her_own_agenda(s
     from live.operations import get
 
     user = make_user("bea", role="hub_employee")
-    salon.bea.user = user
+    salon.bea.user = user.person
     salon.bea.save()
     assign(salon.cut, salon.bea)
     assign(salon.cut, salon.ana)

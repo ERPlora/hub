@@ -56,13 +56,13 @@ const table = useServerTable({ sort: 'name' });
 const filters = ref<DataTableFilters>({});
 watch(filters, (now) => table.restart({ narrowed: Object.keys(now).length > 0 }));
 
-/** The filters as the query takes them: Bookable is a yes/no and the Hub user a number. */
+/** The filters as the query takes them: Bookable is a yes/no and the Hub user its id. */
 function filterParams(values: DataTableFilters): Partial<MemberListIn> {
   const { is_bookable: bookable, user_id: user, ...rest } = values;
   return {
     ...rest,
     ...(bookable ? { is_bookable: bookable === 'true' } : {}),
-    ...(user ? { user_id: Number(user) } : {}),
+    ...(user ? { user_id: String(user) } : {}),
   } as Partial<MemberListIn>;
 }
 
