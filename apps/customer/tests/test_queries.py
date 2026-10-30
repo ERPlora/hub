@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from django.utils import timezone
 from live.errors import Conflict, NotFound, PermissionDenied
-from live.operations import get
+from live.operations import INTERNAL, get
 
 from apps.customer.models import (
     Activity,
@@ -923,7 +923,7 @@ def test_the_health_query_is_for_the_screen_only():
         HealthDetailIn,
         HealthOut,
     )
-    assert (op.ai, op.expose_api) == (None, False)
+    assert (op.ai, op.expose_api) == (INTERNAL, False)
 
 
 @pytest.mark.django_db

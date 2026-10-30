@@ -32,7 +32,7 @@ from babel.numbers import get_currency_precision
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
-from live.operations import UnknownOperation, operation
+from live.operations import INTERNAL, UnknownOperation, operation
 from live.operations import get as operation_named
 from live.outbox import record_event
 
@@ -811,7 +811,15 @@ def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
     return device_row(device, key)
 
 
-@operation("printing.device.seen", kind="command", permission="printing.print", input=DeviceSeenIn, output=DeviceSeenOut)
+# Not an assistant tool: /ws/print's hello and beats, the device's own.
+@operation(
+    "printing.device.seen",
+    kind="command",
+    permission="printing.print",
+    input=DeviceSeenIn,
+    output=DeviceSeenOut,
+    ai=INTERNAL,
+)
 def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
     """The device's presence: base's /ws/print runs it at the hello and at the beats of a device that prints
     (``print_presence`` of this app), as the device's user, so ``printing.print`` is all it asks — whoever is signed in
@@ -931,7 +939,8 @@ def cancel_job(ctx: OperationContext, data: JobCancelIn) -> dict:
 # ── PRINTING-F20 How long the queue keeps a job ───────────────────────────────────────────────────
 
 
-@operation("printing.job.prune", kind="command", permission=SYSTEM, input=EmptyIn, output=PruneOut)
+# Not an assistant tool: a scheduled task of the platform.
+@operation("printing.job.prune", kind="command", permission=SYSTEM, input=EmptyIn, output=PruneOut, ai=INTERNAL)
 def prune_jobs(ctx: OperationContext, data: EmptyIn) -> dict:
     """Deletes the jobs that ended over ``KEEP_FINISHED`` ago (the oldest first, ``PRUNE_BATCH`` at most).
     A job still waiting or sent is never touched; a deleted job's key can be queued again."""

@@ -263,6 +263,11 @@ export interface TemplateSampleUploadIn {
   content_base64: string;
 }
 
+/** A header's file by its id (`template_sample.upload`'s answer): the assistant's card names it by its name. */
+export interface TemplateSampleRefIn {
+  id: string;
+}
+
 export interface TemplateDraftOut {
   category: TemplateCategory;
   header_format: HeaderFormat;
@@ -416,6 +421,7 @@ declare module '@erplora/ui/sdk' {
     'whatsapp_inbox.template.retry': { input: TemplateRefIn; output: TemplateOut };
     'whatsapp_inbox.template.delete': { input: TemplateRefIn; output: TemplateOut };
     'whatsapp_inbox.template_sample.upload': { input: TemplateSampleUploadIn; output: TemplateSampleOut };
+    'whatsapp_inbox.template_sample.detail': { input: TemplateSampleRefIn; output: TemplateSampleOut };
     'whatsapp_inbox.channel.get': { input: ChannelGetIn; output: ChannelOut };
     'whatsapp_inbox.channel.prepare': { input: ChannelPrepareIn; output: ChannelPrepareOut };
     'whatsapp_inbox.channel.connect': { input: ChannelConnectIn; output: ChannelConnectOut };

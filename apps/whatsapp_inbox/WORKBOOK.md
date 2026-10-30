@@ -1069,6 +1069,7 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 | `whatsapp_inbox.message.get` | Un mensaje por su id (el que puso en marcha una automatización): qué dice, quién y cuándo, el número internacional exacto de su conversación, cómo llamar al cliente y si ahora se le puede escribir |
 | `whatsapp_inbox.note.list` | Las notas internas de una conversación |
 | `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta |
+| `whatsapp_inbox.template_sample.detail` | El archivo de una cabecera por su id, como lo devolvió al guardarlo (nombre, foto, vídeo o documento y tamaño); solo el del negocio que pregunta |
 | `whatsapp_inbox.channel.get` | El estado del número y el consumo del mes |
 | `whatsapp_inbox.agent.list` | Las personas del negocio a las que se puede asignar una conversación |
 
@@ -1309,6 +1310,13 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   Hub acepta el mensaje (aunque se retoque el texto) y el asistente genera una por intención. La misma
   clave dos veces, también a la vez, es un solo mensaje y una sola entrega (restricción única; el
   segundo recibe la fila del primero).
+- **La tarjeta de confirmación del asistente** (BASE-F97) calla `client_message_id` (`message.send`,
+  `message.notify`) y `submit_key` (`template.create`, `template.update`) por su marca `attempt_key`
+  (PLAN-HUB §47), aunque lleguen vacías o sin forma de UUID, y nombra el archivo de la cabecera
+  (`header_sample`) por el nombre con que se eligió, con la lectura `template_sample.detail` (marca `refers`
+  de `A_SAMPLE` en `schemas.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
+  automatización sin persona delante, lo deja fuera, nunca por su id
+  (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED; `tests/test_integration_assistant.py`).
 - La ventana de 24 h se cuenta desde el último mensaje **del cliente** (`last_inbound_at`), en el
   servidor; fuera de ella, `message.send` con texto da 409 `whatsapp_inbox.window_closed`. Sin
   `SAAS_INTERNAL_URL`, sin número conectado o con el mes gastado no se guarda nada (409
