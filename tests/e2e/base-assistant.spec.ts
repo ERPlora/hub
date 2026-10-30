@@ -70,6 +70,8 @@ const answers = (page: Page): Locator => panel(page).locator('[data-testid="assi
 /** The last answer's bubble: its words. */
 const lastAnswer = (page: Page): Locator => panel(page).locator('[data-testid="assistant-bubble-assistant"]').last();
 const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
+/** The last receipt under the answers: what the Hub says it did with a write (BASE-F97, step 5). */
+const receipt = (page: Page): Locator => panel(page).locator('[data-testid="assistant-receipt"]').last();
 
 /** Answers the card with its button (`submit` or `cancel`) and waits until it has gone: while Ionic dismisses a modal,
  *  its focus trap keeps the keyboard inside it. */
@@ -486,6 +488,59 @@ test('assistant-card — in Spanish an object datum (a WhatsApp template) is sai
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await context.close();
+});
+
+// flow: base-assistant-card-attempt-keys (BASE-F97)
+// FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS: the card of a write showed the key of its attempt, which nobody can
+// judge («Clave del trabajo: e2e-attempt-…»): now it leaves it out, and the write still gets it whole — the same print
+// asked again with its key, as a retry, is still one job.
+test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out of the card and runs with it: asked twice, it is one job', async ({ browser }) => {
+  const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = before.data.apps.some((app) => app.id === 'printing' && app.state === 'on');
+  await turnOn(context, A, 'printing');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  const stamp = Date.now();
+  const product = `Café ${stamp}`;
+  const jobKey = `e2e-attempt-${stamp}`;
+  const print = { job_key: jobKey, document_type: 'barcode_label', document: { product_name: product, barcode: '8412345678905', price: 1.5 } };
+  const jobs = async () =>
+    (await api<{ rows: { reference: string }[] }>(context, A, 'GET', `/printing/jobs?search=${encodeURIComponent(product)}`)).data.rows;
+  await ask(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(`Crear en Impresión: barcode_label · ${product}`);
+    await expect(card(page)).not.toContainText(jobKey);
+    await untilStill(page);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // The Hub's receipt says it ran, and so does the answer: a job that can be cancelled is no refusal.
+  await decide(page, 'submit');
+  await expect(receipt(page)).toHaveText('Hecho: Crear en Impresión');
+  await expect(lastAnswer(page)).toHaveText('Hecho.');
+  expect(await jobs()).toHaveLength(1);
+  // The same print again, with its key: a retry. Its card leaves the key out again, and it adds no second job.
+  await ask(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  await expect(card(page)).not.toContainText(jobKey);
+  await decide(page, 'submit');
+  await expect(receipt(page)).toHaveText('Hecho: Crear en Impresión');
+  await expect(panel(page).locator('[data-testid="assistant-receipt"]')).toHaveCount(2);
+  await expect(lastAnswer(page)).toHaveText('Hecho.');
+  expect(await jobs()).toHaveLength(1);
+  if (!wasOn) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app: 'printing' });
+    expect(off.status, `turn off printing: ${JSON.stringify(off.data)}`).toBe(200);
+  }
   await context.close();
 });
 

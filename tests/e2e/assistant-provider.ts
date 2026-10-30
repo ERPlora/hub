@@ -129,6 +129,18 @@ function textOf(content: unknown): string {
   return '';
 }
 
+/** Whether a tool's result says it did not run: the Hub's envelope for a tool cancelled, refused or failed
+ *  (`error_content` of base/assistant.py, `{"error": {"code": …, "message": …}}`). What ran answers its own output,
+ *  whatever words its data carry (a print job is `cancellable`), or comes cut for the model (` …(cut)`). */
+function refused(result: string): boolean {
+  try {
+    const answer = JSON.parse(result) as { error?: { code?: unknown } } | null;
+    return typeof answer?.error?.code === 'string';
+  } catch {
+    return false;
+  }
+}
+
 const chunk = (delta: Record<string, unknown>, finish: string | null = null) => ({
   object: 'chat.completion.chunk',
   choices: [{ index: 0, delta, finish_reason: finish }],
@@ -196,12 +208,10 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
       return call('invoice__invoice__rectify', { number: preview.original.number, reason }, rectifyPreview(preview));
     }
     // The rectification's own result names the original, now «cancelled»: only an error is a refusal.
-    const outcome = JSON.parse(textOf(results.at(-1)!.content) || '{}') as { error?: unknown };
-    return text(outcome.error ? 'No lo he hecho.' : 'Hecho.');
+    return text(refused(textOf(results.at(-1)!.content)) ? 'No lo he hecho.' : 'Hecho.');
   }
   if (last?.role === 'tool') {
-    const result = textOf(last.content);
-    return text(/error|refused|cancel|not_confirmed|denied/i.test(result) ? 'No lo he hecho.' : 'Hecho.');
+    return text(refused(textOf(last.content)) ? 'No lo he hecho.' : 'Hecho.');
   }
   const create = /E2E-CREATE (.+)$/m.exec(question);
   if (create) return call('demo__item__create', { name: create[1].trim() });

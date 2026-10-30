@@ -84,6 +84,7 @@ AttemptKey = Annotated[
         max_length=128,
         pattern=r"^[A-Za-z0-9_.:-]+$",
     ),
+    Field(json_schema_extra={"attempt_key": True}),
 ]
 DocumentType = Literal["ticket", "invoice"]
 MethodType = Literal["cash", "card", "transfer", "other"]
