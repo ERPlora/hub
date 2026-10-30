@@ -73,13 +73,24 @@ export function fieldLabelKey(name: string): string | null {
   return FIELDS.includes(name) ? `base.assistant.card.fields.${name}` : null;
 }
 
-function compact(value: unknown): string {
-  if (value === null || value === undefined) return '—';
+/** A key that is a figure (the face value of what a cash count counted) is data the person reads; any other is a name
+ *  of the code's, in English. */
+const FIGURE = /^\d+(?:[.,]\d+)?$/;
+
+/** An object datum in words (FIX-HUB-BASE-ASSISTANT-CARD-OBJECT-SHOWS-INNER-KEYS-IN-ENGLISH): by its values, as a
+ *  summary says an address or a ticket a variant, never by its keys — but a figure's —; its empty data left out, a
+ *  yes or no in words, a list's items one after another. Empty: '' (the caller writes the dash). */
+function compact(value: unknown, t: Translate): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'boolean') return t(value ? 'base.assistant.card.yes' : 'base.assistant.card.no');
   if (typeof value !== 'object') return String(value);
-  if (Array.isArray(value)) return value.map(compact).join(', ');
-  return Object.entries(value as Record<string, unknown>)
-    .map(([key, inner]) => `${key}: ${compact(inner)}`)
-    .join(' · ');
+  const parts = Array.isArray(value)
+    ? value.map((item) => compact(item, t))
+    : Object.entries(value as Record<string, unknown>).map(([key, inner]) => {
+        const text = compact(inner, t);
+        return text && FIGURE.test(key) ? `${key}: ${text}` : text;
+      });
+  return parts.filter(Boolean).join(Array.isArray(value) ? ', ' : ' · ');
 }
 
 export function fieldText(field: AssistantField, format: CardFormat): string {
@@ -95,7 +106,7 @@ export function fieldText(field: AssistantField, format: CardFormat): string {
     case 'list':
       return format.t('base.assistant.card.items', { count: Array.isArray(field.value) ? field.value.length : 0 });
     case 'object':
-      return compact(field.value);
+      return compact(field.value, format.t) || '—';
     default:
       return String(field.value);
   }
