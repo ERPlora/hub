@@ -136,6 +136,35 @@ def test_a_business_is_born_with_its_own_database_its_identity_and_its_schema(re
     assert told == [hub.id]
 
 
+def connected_to(name: str) -> int:
+    """How many sessions the server has open on the database ``name``."""
+    with hubs._maintenance() as conn:
+        return conn.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = %s", [name]).fetchone()[0]
+
+
+def test_a_preparation_leaves_no_connection_open_to_the_database_it_made(registry, told):
+    """Review of hub#471 (I1): each hub's migrator connection and its own are closed when its preparation ends, not at
+    the end of the worker's pass (twenty hubs a pass would hold twenty, and a demo's DROP would have to force them)."""
+    hub = registry.hub()
+
+    assert provision.provision(hub) is True
+
+    assert connected_to(hub.db_name) == 0
+
+
+def test_a_failed_preparation_leaves_no_connection_open_either(registry, monkeypatch, told):
+    hub = registry.hub()
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the migrator broke")
+
+    monkeypatch.setattr(provision.migrator, "migrate_apps", broken)
+
+    assert provision.provision(hub) is False
+
+    assert fresh(hub).status == "failed" and connected_to(hub.db_name) == 0
+
+
 def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
     hub = registry.hub()
     provision.provision(hub)
@@ -329,6 +358,24 @@ def test_a_demo_is_born_with_its_database_and_dropped_alone_when_it_ends(registr
     assert (demo.status, demo.purged_at is not None) == ("purged", True)
     assert databases() == before - {demo.db_name}
     assert not HubDue.objects.filter(pk=demo.pk).exists()
+
+
+def test_a_demos_database_is_dropped_outside_any_transaction_of_control_and_before_its_rows(registry, monkeypatch, told):
+    demo = registry.hub(demo=True)
+    provision.provision(demo)
+    Hub.objects.filter(pk=demo.pk).update(expires_at=timezone.now() - dt.timedelta(minutes=1))
+    real, seen = ops.drop_database, []
+
+    def spied(name, **kwargs):
+        seen.append((name, django_connections["default"].in_atomic_block, fresh(demo).status))
+        return real(name, **kwargs)
+
+    monkeypatch.setattr(ops, "drop_database", spied)
+
+    assert services.reap_demos() == 1
+
+    assert seen == [(demo.db_name, False, "dropping")]
+    assert fresh(demo).status == "purged"
 
 
 def test_a_demo_that_ends_while_it_is_made_is_dropped_not_finished(registry, told):

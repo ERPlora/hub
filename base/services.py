@@ -1433,8 +1433,9 @@ def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
 # Not an assistant tool: the SaaS's door to the demo (/internal), no person.
 @operation("base.demo.purge", kind="command", permission=None, input=DemoSlugIn, output=DemoStatusOut, ai=INTERNAL)
 def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
-    """Purge the demo ``data.slug``, which ended: its codes, its owner and its role go, and :func:`purge_demo_data`
-    gets it; the row stays ``purged`` as a tombstone (410) for ``DEMO_TOMBSTONE_DAYS``.
+    """Purge the demo ``data.slug``, which ended: its codes, its owner and its role go; the row stays ``purged`` as a
+    tombstone (410) for ``DEMO_TOMBSTONE_DAYS``. Rows only: its database went before, outside any transaction of
+    control (:func:`purge_demo_data`, from ``base.tenancy.provision.drop``).
 
     The reaper's, one transaction per demo. A demo still on is ``base.demo_live``; one already purged stays as it is.
     """
@@ -1447,7 +1448,6 @@ def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
     DemoCode.objects.filter(hub=hub).delete()
     Membership.objects.filter(host=hub.slug).delete()
     get_user_model().objects.filter(username=demo_username_for(hub.slug)).delete()
-    purge_demo_data(hub)
     hub.status, hub.purged_at = Hub.Status.PURGED, timezone.now()
     hub.save(update_fields=["status", "purged_at", "updated_at"])
     record_event(ctx, events.DEMO_PURGED, {"id": str(hub.id), "slug": hub.slug})
@@ -1456,7 +1456,8 @@ def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
 
 def purge_demo_data(hub: Hub) -> None:
     """Delete what the demo ``hub`` wrote in the apps: its whole database, ``DROP DATABASE … WITH (FORCE)`` on its
-    cluster (``base.tenancy.ops``), never another one; it is never emptied nor reused.
+    cluster (``base.tenancy.ops``), outside any transaction, and only its own ``<control>_demo_<hex>`` (a row that names
+    another database is refused); it is never emptied nor reused.
 
     A demo made before round 2026-10-30 (``db_name`` empty) kept its rows in the database every hub of phase 1 shares,
     where nothing tells them from anyone else's (plan 2026-10-17 §1.7): nothing is deleted for it. A database already
@@ -1466,6 +1467,11 @@ def purge_demo_data(hub: Hub) -> None:
         return
     from base.tenancy import ops
 
+    own = database_names.demo_db_name(control_name(), hub.id)
+    if not hub.is_demo or hub.db_name != own:
+        raise database_names.InvalidDatabaseName(
+            f"{hub.db_name!r} is not the demo {hub.slug}'s own database ({own!r}): nothing is dropped."
+        )
     ops.drop_database(hub.db_name, cluster=hub.cluster)
 
 

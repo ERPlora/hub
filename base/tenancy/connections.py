@@ -35,6 +35,8 @@ from base.tenancy.credentials import APP, MIGRATOR, credentials_for
 
 #: The static alias every hub's alias is copied from; nobody connects to it.
 TEMPLATE_ALIAS = "hub_template"
+#: The default connection's TLS to the writer, which a hub's alias straight to a cluster's writer carries too.
+TLS_OPTIONS = ("sslmode", "sslrootcert")
 #: Options of a Django alias that are Django's or psycopg's, not libpq's.
 NON_LIBPQ_OPTIONS = frozenset(
     {"pool", "isolation_level", "assume_role", "cursor_factory", "context", "prepare_threshold", "server_side_binding"}
@@ -84,14 +86,20 @@ def register_hub_alias(hub) -> str:
     cluster = getattr(hub, "cluster", None)
     if cluster is not None:
         found = credentials_for(cluster, APP)
-        # Its own PgBouncer if it has one; else its writer: the task's sidecar only knows the settings' own server.
-        host, port = (cluster.pooler_host, cluster.pooler_port) if cluster.pooler_host else _writer(cluster)
-        overrides |= {
-            "HOST": host,
-            "PORT": port,
-            "USER": found.user,
-            "PASSWORD": found.password,
-        }
+        overrides |= {"USER": found.user, "PASSWORD": found.password}
+        if cluster.pooler_host:
+            overrides |= {"HOST": cluster.pooler_host, "PORT": cluster.pooler_port}
+        else:
+            # Its writer, directly (the task's sidecar only knows the settings' own server): with the writer's TLS, which
+            # the template, on the sidecar's loopback, does not carry.
+            host, port = _writer(cluster)
+            default_options = connections.settings[DEFAULT_DB_ALIAS]["OPTIONS"]
+            tls = {option: default_options[option] for option in TLS_OPTIONS if option in default_options}
+            overrides |= {
+                "HOST": host,
+                "PORT": port,
+                "OPTIONS": copy.deepcopy(connections.settings[TEMPLATE_ALIAS]["OPTIONS"]) | tls,
+            }
     return _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides))
 
 
@@ -142,6 +150,15 @@ def register_ddl_alias(db_name: str, *, cluster=None) -> str:
         return settings
 
     return _register(f"{db_name}{names.DDL_SUFFIX}", build)
+
+
+def close_hub_aliases(hub) -> None:
+    """Close this thread's connections to ``hub``'s database (its alias and its migrator's), if it opened any: what a
+    hub's preparation does when it ends, so a pass over many hubs never holds one open per hub."""
+    wanted = {hub_alias(hub), f"{hub.db_name}{names.DDL_SUFFIX}"}
+    for connection in connections.all(initialized_only=True):
+        if connection.alias in wanted:
+            connection.close()
 
 
 def alias_for(hub) -> str:

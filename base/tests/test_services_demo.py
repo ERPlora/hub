@@ -15,6 +15,7 @@ import hashlib
 import logging
 import re
 import threading
+import uuid
 
 import pydantic
 import pytest
@@ -560,6 +561,28 @@ class TestReaper:
         hub = Hub.objects.get(slug=create().slug)
         purge_demo_data(hub)
         assert dropped == [(hub.db_name, None)]
+
+    def test_a_demo_whose_row_names_another_database_drops_nothing(self, monkeypatch):
+        """Review of hub#471 (M2): a DROP only ever takes the demo's own ``<control>_demo_<hex>``, never a business's
+        or another demo's database its row might name by mistake."""
+        dropped = []
+        monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
+        hub = Hub.objects.get(slug=create().slug)
+        for wrong in (names.hub_db_name(control_name(), hub.id), names.demo_db_name(control_name(), uuid.uuid7())):
+            hub.db_name = wrong
+            with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
+                purge_demo_data(hub)
+        assert dropped == []
+
+    def test_purging_a_demos_rows_never_drops_a_database_inside_their_transaction(self, monkeypatch):
+        """Review of hub#471 (M3): ``base.demo.purge`` purges rows only; its database went before, outside any
+        transaction of control (``base.tenancy.provision.drop``)."""
+        dropped = []
+        monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
+        demo = create()
+        lapse(demo.slug)
+        assert demo_purge(SYSTEM, DemoSlugIn(slug=demo.slug)).status == "purged"
+        assert dropped == []
 
     def test_a_demo_of_before_its_own_databases_purges_no_data_of_the_apps(self, monkeypatch):
         # Made before round 2026-10-30, it shares the tables of every hub of phase 1, whose rows carry no hub_id (plan

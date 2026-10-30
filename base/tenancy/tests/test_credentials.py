@@ -274,3 +274,33 @@ def test_the_secrets_own_host_and_port_are_never_used_the_clusters_row_says_wher
 
     assert (ddl["HOST"], ddl["PORT"]) == (on.host, on.port)
     assert (alias["HOST"], alias["PORT"]) == (on.pooler_host, on.pooler_port)
+
+
+@pytest.fixture
+def tls_to_the_writer(monkeypatch):
+    """Production's settings: the default connection reaches Aurora's writer with ``verify-full``; the hubs' template
+    goes through the task's PgBouncer on loopback, without TLS options (``config/settings.py``)."""
+    import copy
+
+    current = django_connections.settings
+    changed = {alias: copy.deepcopy(values) for alias, values in current.items()}
+    changed["default"]["OPTIONS"] |= {"sslmode": "verify-full", "sslrootcert": "/etc/ssl/certs/rds-global-bundle.pem"}
+    for option in ("sslmode", "sslrootcert"):
+        changed[tenancy_connections.TEMPLATE_ALIAS]["OPTIONS"].pop(option, None)
+    monkeypatch.setattr(django_connections, "settings", changed)
+
+
+def test_a_hub_reached_on_its_clusters_writer_directly_keeps_the_writers_tls(secrets, tls_to_the_writer):
+    """Review of hub#471 (I5): without a PgBouncer of its own, the hub's alias goes straight to the cluster's writer,
+    so it carries the default connection's ``sslmode``/``sslrootcert`` (never a plain connection to Aurora)."""
+    alias = tenancy_connections.register_hub_alias(a_hub(on=cluster(pooler_host="")))
+    options = django_connections.settings[alias]["OPTIONS"]
+
+    assert (options["sslmode"], options["sslrootcert"]) == ("verify-full", "/etc/ssl/certs/rds-global-bundle.pem")
+
+
+def test_a_hub_reached_through_a_pgbouncer_keeps_the_templates_options(secrets, tls_to_the_writer):
+    alias = tenancy_connections.register_hub_alias(a_hub(on=cluster()))
+    options = django_connections.settings[alias]["OPTIONS"]
+
+    assert "sslmode" not in options and "sslrootcert" not in options

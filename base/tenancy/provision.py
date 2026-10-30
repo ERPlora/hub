@@ -217,6 +217,11 @@ def _prepare(hub_id, *, apps: Iterable[str] = (), seed: Seed | None = None, tell
     except Exception as error:
         services.provision_failed(hub_id, timezone.now(), f"unexpected: {type(error).__name__}: {error}")
         logger.exception("base.tenancy.provision.failed hub=%s: an unexpected error; it is tried again.", hub_id)
+    finally:
+        # Its migrator's connection and its own, closed now: a pass over many hubs never holds one per hub.
+        row = services.registry_row(hub_id)
+        if row is not None and row.db_name:
+            tenancy_connections.close_hub_aliases(row)
 
 
 def _drop(hub_id, now: dt.datetime) -> bool:
@@ -224,6 +229,8 @@ def _drop(hub_id, now: dt.datetime) -> bool:
     hub = services.demo_dropping(hub_id, now, LEASE)
     if hub is None:
         return False
+    # Its database first, outside any transaction of control; its rows after, in base.demo.purge's own.
+    services.purge_demo_data(hub)
     services.demo_purge(system_context(registry.REGISTRY_SCOPE), DemoSlugIn(slug=hub.slug))
     logger.info("base.tenancy.provision.dropped demo=%s database=%s", hub.slug, hub.db_name or "-")
     return True
