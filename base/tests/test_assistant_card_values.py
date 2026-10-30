@@ -462,3 +462,26 @@ def test_a_mark_is_checked_at_start(monkeypatch, write, why):
     monkeypatch.setitem(registry, write.name, write)
     [error] = reference_errors()
     assert write.name in error.msg and why in error.msg
+
+
+# ── What a dangerous write will do (BASE-F98): its preview says each datum in words too ───────────────────────────────
+
+
+class WhenPreviewOut(Schema):
+    name: str
+    since: dt.datetime = Field(title="Since")
+
+
+@pytest.mark.django_db
+def test_a_preview_says_a_moment_as_the_person_reads_it_too(monkeypatch):
+    """«What will happen» of a dangerous card (BASE-F98) says its data by the same rule as what the write sends: a
+    moment its read answers in ISO reaches the card as the person's language writes it, at the business's hour."""
+    from base.tests.test_assistant import count_preview, declaring
+
+    read = count_preview({"name": "Item 7", "since": "2026-11-02T09:00:00Z"}, output=WhenPreviewOut)
+    write = declaring({"operation": read.name, "fields": ["name", "since"]})
+    monkeypatch.setitem(registry, read.name, read)
+    monkeypatch.setitem(registry, write.name, write)
+    failure, fields = assistant.preview(ctx({*ADMIN, "demo.view", "demo.manage"}), write, {"id": "7"})
+    assert failure is None
+    assert [(field["name"], field["value"]) for field in fields] == [("name", "Item 7"), ("since", "2 nov 2026, 10:00")]
