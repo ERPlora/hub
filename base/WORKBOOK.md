@@ -2372,9 +2372,11 @@ Pasos:
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
      línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
-     asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500»; salvo
-     uno de «Lo que va a pasar» que su app da en otra moneda, que sale en la suya: rectificar una
-     factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
+     asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
+     acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
+     «15,00 US$», y en yenes, sin decimales; una moneda que no existe no se inventa: el importe sale tal como se
+     escribió y la acción la rechaza al ejecutarse. Uno de «Lo que va a pasar» que su app da en otra moneda sale en la
+     suya: rectificar una factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
      una lista, por cuántos elementos lleva, y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
@@ -3083,7 +3085,20 @@ Implicados: ACCOUNTS-F38
   `test_every_amount_the_assistant_shows_or_fills_is_marked_but_the_known_ones` (`UNMARKED_AMOUNTS`, que solo baja:
   detecta un entero con nombre en `_cents` o cuya descripción habla de «cents», «minor unit» o «céntimos», sin la
   marca, en la entrada de cada herramienta y en los datos de su vista previa; hoy vacío), con
-  `test_an_amount_is_marked_only_on_a_whole_number`; la vista previa de una
+  `test_an_amount_is_marked_only_on_a_whole_number`; la moneda de esos importes, la que nombra el dato de su
+  escritura que su esquema marca `json_schema_extra={"currency": True}` (`CURRENCY`, siempre sobre un texto; vale
+  para los importes de su mismo objeto y de lo que cuelga de él; hoy `currency` de `payment.payment.create`), tomada
+  como la toman las escrituras (sin espacios, en mayúsculas, un código ISO 4217 que `pycountry` conoce) y con los
+  decimales de esa moneda (`currency_decimals`: ninguno en yenes): arriba va en el `money` del dato y, dentro de un
+  objeto, en el texto que dice el servidor; vacía o sin ese dato, la del negocio; una que no lo es no se inventa: sus
+  importes salen tal cual (arriba, `kind="text"`) y la escritura la rechaza; las instrucciones dicen al modelo que la
+  unidad menor es la de esa moneda; lo comprueban
+  `test_an_amount_of_a_write_that_names_its_currency_is_in_that_currency` (dólares, yenes y « usd »),
+  `test_an_amount_in_a_currency_that_is_none_is_shown_as_sent_never_in_another`,
+  `test_inside_an_object_the_currency_it_names_is_the_one_of_its_amounts`, el trinquete
+  `test_every_currency_a_write_names_beside_its_amount_is_marked_but_the_known_ones` (`UNMARKED_CURRENCIES`, que
+  solo baja: un texto llamado `currency` o `<x>_currency`, o cuya descripción dice ISO 4217, junto a un importe
+  marcado de una escritura, sin la marca; hoy vacío) y `test_a_currency_is_marked_only_on_a_text`; la vista previa de una
   escritura peligrosa (BASE-F98, `preview`: su `ai=` lleva `"preview": {"operation": "<una query de su app>",
   "fields": [<datos de su respuesta>]}`; el turno la corre como la persona, `_run` con su `ctx`, con los datos de la
   escritura que su entrada toma, antes de la tarjeta; quita los vacíos y los `None`, lo que la lectura oculta; si no

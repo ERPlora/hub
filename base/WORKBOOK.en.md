@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c77f28d43529059114b49c5454505dee9b07f302f7254afd07db83f9a7d1c291 -->
+<!-- generated from WORKBOOK.md sha256:08ca6f0fb3972186671f7dad723536680a62a5daa1859567901d0ce3afaa69ea -->
 
 ## What it is for and who it is for
 
@@ -2257,9 +2257,11 @@ Steps:
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
      for example "Create in Services: Haircut · €15.00 · 30". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
-     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500";
-     except one of "What will happen" that its app gives in another currency, which shows in its own:
-     rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
+     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
+     the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a
+     payment in dollars says "$15.00", and in yen, without decimals; a currency that does not exist is not made up:
+     the amount shows as written and the action refuses it when it runs. One of "What will happen" that its app gives
+     in another currency shows in its own: rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
      no sign when it balances); a yes or a no, as "Yes" or "No"; a list, by how many items it carries, and a datum
