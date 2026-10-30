@@ -136,6 +136,18 @@ class HubStateOut(Schema):
     version: int
 
 
+class HubUserSyncIn(Schema):
+    """The people of the SaaS's photo (``members``), for the business's own database (``base.hub_user.sync``)."""
+
+    members: list[MemberIn]
+
+
+class HubUserSyncOut(Schema):
+    made: int = Field(description="People of the photo the business's database did not have yet.")
+    updated: int = Field(description="People whose name, email or state changed.")
+    left: int = Field(description="People no longer in the business, kept with their name, no longer active.")
+
+
 class SessionRevokeIn(Schema):
     """``POST /internal/sessions/revoke``: the SaaS account whose sessions end, on one business (``hub_id``) or on
     every host, the Hub admin's included (without it)."""

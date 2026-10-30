@@ -132,6 +132,18 @@ ACCEPTED = {
         "AddConstraint",
         "template.whatsapp_inbox_template_live_host_name_language_unique",
     ),
+    # Tenancy W10 (the people of a business in its own database, base.HubUser): «one user, one live record» moves onto
+    # the new column hub_user_id, which only the new code writes; the code of before writes the old user_id and leaves
+    # hub_user_id NULL, outside the constraint's condition, so no row of it can break it.
+    ("staff", "0004_hub_users", "AddConstraint", "member.staff_member_hub_user_unique"),
+    # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): the old columns to
+    # control's users, which W10 took out of the state and nobody writes any more, leave the database through
+    # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state:
+    #   staff_member.user_id, staff_timeoff.approved_by_id,
+    #   attendance_record.created_by_id, attendance_record.updated_by_id, attendance_correction.created_by_id,
+    #   attendance_attendancesettings.updated_by_id, task_task.created_by_id, task_comment.author_id,
+    #   whatsapp_inbox_conversation.assigned_to_id, whatsapp_inbox_message.sent_by_id, whatsapp_inbox_note.author_id.
+    # A RunSQL is no operation this test reads, so that step needs no entry here; its own test checks the columns gone.
 }
 
 ADD_NOT_NULL = (

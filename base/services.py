@@ -83,6 +83,7 @@ from base.models import (
     DemoCode,
     EventDelivery,
     Hub,
+    HubUser,
     ImportBatch,
     Membership,
     Profile,
@@ -138,6 +139,8 @@ from base.schemas import (
     HubSeedLocalIn,
     HubSeedLocalOut,
     HubStateIn,
+    HubUserSyncIn,
+    HubUserSyncOut,
     HubResetIn,
     HubResetOut,
     HubStateOut,
@@ -271,6 +274,7 @@ def open_session_from_saas(request: HttpRequest, redeemed: RedeemedUser, slug: s
     """
     user = _local_copy(redeemed, username=username_for(redeemed.user_id), is_staff=False, is_superuser=False)
     Membership.objects.update_or_create(user=user, host=slug, defaults={"role": redeemed.role})
+    ensure_hub_user(user)
     device = trust_device(request, user)
     _log_in(request, user, redeemed.user_id, device=device)
     _end_other_devices(slug, device)
@@ -669,7 +673,7 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     ``whatsapp_inbox.channel.sync`` with the photo's version when the app is on in that business (off, the photo
     applies and the block waits for the next one); both in this same transaction, so their notices go out after its
     COMMIT (a block out of contract keeps nothing). Its ``members`` apply on the business's memberships
-    (:func:`_apply_members`), in this transaction too. Its modules and plan are read where they are kept: the right
+    (:func:`_apply_members`) and on its people in its own database (``base.hub_user.sync``), in this transaction too. Its modules and plan are read where they are kept: the right
     to a paid app (``base.entitlement``) and «Plan and limits» (``base.plan.usage``) follow this photo.
     """
     internal_only(ctx)
@@ -685,6 +689,7 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
         _sync_whatsapp(hub, data)
     if data.members is not None:
         _apply_members(hub, data.members)
+        _sync_hub_users(hub, data.members)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
     # Applied as the platform (/internal): its own notice goes to the platform's channel. The live queries that
     # follow the photo (base/live.py) listen on the business's, which hears it after the COMMIT too.
@@ -701,6 +706,119 @@ def _wake_open_apps(slug: str) -> None:
     instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the SaaS, step 4: the devices with
     the app open leave for the Hub's page)."""
     notify(Scope("host", slug), [ALL_EVENTS])
+
+
+# ── The people of the business in its own database (base.HubUser; tenancy W10, PLAN-HUB §3) ──────────────────────
+
+
+def _account_id(username: str) -> UUID | None:
+    """The erplora.com account behind a copy ``saas:<id>``; ``None`` for anyone else (a demo's owner) or an id that is
+    no UUID (the SaaS's are)."""
+    if not username.startswith(SAAS_USERNAME_PREFIX):
+        return None
+    try:
+        return UUID(username.removeprefix(SAAS_USERNAME_PREFIX))
+    except ValueError:
+        return None
+
+
+def _bring_up_to_date(person: HubUser, wanted: dict) -> bool:
+    """Save in ``person`` what differs from ``wanted``; whether anything did."""
+    changed = [field for field, value in wanted.items() if getattr(person, field) != value]
+    if changed:
+        for field in changed:
+            setattr(person, field, wanted[field])
+        person.save(update_fields=changed)
+    return bool(changed)
+
+
+def ensure_hub_user(user) -> HubUser:
+    """The ``HubUser`` of control's ``user`` in the active hub's database, made or brought up to date with what its
+    copy says (name, email, whether it is active). Every entry to the hub calls it (the code of erplora.com, a demo, a
+    PIN or a badge), and so does the first write of whoever has none yet (:func:`acting_hub_user`)."""
+    username = user.get_username()
+    wanted = {
+        "account_id": _account_id(username),
+        "email": user.email or "",
+        "name": user.get_full_name()[: HubUser._meta.get_field("name").max_length],
+        "is_active": user.is_active,
+    }
+    # get_or_create: two first entries at once end in one person, not an IntegrityError (its savepoint is on the hub's
+    # own alias).
+    person, created = HubUser.objects.get_or_create(username=username, defaults=wanted)
+    if not created:
+        _bring_up_to_date(person, wanted)
+    return person
+
+
+def acting_hub_user(ctx: OperationContext) -> HubUser | None:
+    """The ``HubUser`` of the person behind ``ctx``, made if missing, for what a write signs; ``None`` for the
+    platform, an API key or nobody (no person)."""
+    if not queries.is_a_person(ctx.actor):
+        return None
+    return ensure_hub_user(ctx.actor)
+
+
+def _hosts_of_this_database() -> list[str]:
+    """The businesses whose rows the active database holds: a hub with its own, only it; phase 1's shared database
+    (S1–S4), every business that still has ``db_name=""``."""
+    from base.tenancy.context import current_hub
+
+    hub = current_hub()
+    if hub is not None and hub.db_name:
+        return [hub.slug]
+    return list(Hub.objects.filter(db_name="").values_list("slug", flat=True))
+
+
+# Not an assistant tool: the SaaS's photo (/internal), no person.
+@operation(
+    "base.hub_user.sync", kind="command", permission=None, input=HubUserSyncIn, output=HubUserSyncOut, ai=INTERNAL
+)
+def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
+    """Make the people of the business's database say what the SaaS's photo lists (its ``members``), before they ever
+    enter: who is new is made, with the name and the email the photo says (what it leaves out stays as it was); who is
+    no longer listed keeps their name on what they signed and is no longer active, unless they are still in another
+    business of this same database (phase 1's shared one). The photo's own transaction calls it in the business's
+    database (:func:`hub_state_apply`), after the memberships changed."""
+    internal_only(ctx)
+    made = updated = 0
+    listed = set()
+    for member in data.members:
+        username = username_for(str(member.user_id))
+        listed.add(username)
+        wanted = {"account_id": member.user_id, "is_active": True}
+        if member.email is not None:
+            wanted["email"] = member.email
+        if member.name is not None:
+            wanted["name"] = member.name[: HubUser._meta.get_field("name").max_length]
+        person, created = HubUser.objects.get_or_create(username=username, defaults=wanted)
+        if created:
+            made += 1
+        elif _bring_up_to_date(person, wanted):
+            updated += 1
+    gone = set(
+        HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True)
+        .exclude(username__in=listed)
+        .values_list("username", flat=True)
+    )
+    if gone:
+        staying = set(
+            Membership.objects.filter(user__username__in=gone, host__in=_hosts_of_this_database()).values_list(
+                "user__username", flat=True
+            )
+        )
+        gone -= staying
+    left = HubUser.objects.filter(username__in=gone).update(is_active=False) if gone else 0
+    return {"made": made, "updated": updated, "left": left}
+
+
+def _sync_hub_users(hub: Hub, members: list) -> None:
+    """The photo's people in the business's own database (``base.hub_user.sync``): the same transaction while it
+    shares control's (phase 1, S1–S4)."""
+    from base.tenancy.context import use_hub
+
+    with use_hub(hub):
+        hub_user_sync(system_context(Scope("host", hub.slug)), HubUserSyncIn(members=members))
 
 
 # ── The sessions of a SaaS account (/internal/sessions/revoke) ───────────────────────────────────────────────────
@@ -1115,6 +1233,7 @@ def open_demo_session(request: HttpRequest, hub: Hub):
             setattr(user, field, wanted[field])
         user.save(update_fields=changed)
     Membership.objects.update_or_create(user=user, host=hub.slug, defaults={"role": Membership.Role.OWNER})
+    ensure_hub_user(user)
     login(request, user, backend=MODEL_BACKEND)
     request.session[DEMO_SLUG_SESSION_KEY] = hub.slug
     return user
@@ -1582,6 +1701,7 @@ def open_session_on_device(request: HttpRequest, user, device: TrustedDevice, cr
     the new one is being opened in this transaction: a refused PIN never reaches here and changes nothing."""
     device = TrustedDevice.objects.select_for_update().get(pk=device.pk)
     _entered(device, user, timezone.now())
+    ensure_hub_user(user)
     _log_in(request, user, saas_user_id_of(user), device=device, credential=credential)
     _end_other_devices(session_host(request) or "", device)
 

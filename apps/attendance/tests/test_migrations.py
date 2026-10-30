@@ -13,8 +13,8 @@ and a schema editor whose connection is the test database.
 from importlib import import_module
 
 import pytest
-from django.apps import apps as global_apps
 from django.db import connection
+from django.db.migrations.loader import MigrationLoader
 
 from apps.attendance.models import Correction, Record
 
@@ -29,8 +29,13 @@ class _SchemaEditor:
     connection = connection
 
 
+def historical_apps():
+    """The models as 0002 sees them (its fields added): ``created_by`` still names control's user."""
+    return MigrationLoader(connection).project_state(("attendance", "0002_correction_author")).apps
+
+
 def run_forward():
-    MIGRATION.forwards(global_apps, _SchemaEditor())
+    MIGRATION.forwards(historical_apps(), _SchemaEditor())
 
 
 def _day(**fields) -> Record:
@@ -53,9 +58,12 @@ def test_existing_corrections_get_who_made_them(make_user):
         "new_status": "open",
         "reason": "x",
     }
-    by_boss = Correction.objects.create(created_by=boss, **common)
-    by_system = Correction.objects.create(created_by=None, **common)
+    then = historical_apps().get_model("attendance", "Correction")
+    common["record_id"] = common.pop("record").pk
+    by_boss = then.objects.create(created_by_id=boss.pk, **common)
+    by_system = then.objects.create(created_by_id=None, **common)
     run_forward()
+    by_boss, by_system = Correction.objects.get(pk=by_boss.pk), Correction.objects.get(pk=by_system.pk)
     by_boss.refresh_from_db()
     by_system.refresh_from_db()
     assert (by_boss.is_system, by_boss.created_by_name) == (False, "Marta Jefa")
@@ -95,7 +103,7 @@ def test_coordinates_of_the_shared_device_are_dropped_and_the_rest_stays():
 
 
 def test_it_reverses():
-    MIGRATION.backwards(global_apps, _SchemaEditor())
+    MIGRATION.backwards(historical_apps(), _SchemaEditor())
     operations = [
         op
         for op in MIGRATION.Migration.operations

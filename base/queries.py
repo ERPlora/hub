@@ -30,6 +30,7 @@ from base.models import (
     Credential,
     EventDelivery,
     Hub,
+    HubUser,
     ImportBatch,
     Membership,
     Profile,
@@ -1296,6 +1297,19 @@ def person_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
         "entered": person["entered"],
         "me": me,
     }
+
+
+def is_a_person(actor: Any) -> bool:
+    """Whether ``actor`` is a signed-in person (a control user), not the platform, an API key or nobody."""
+    return hasattr(actor, "get_username") and bool(getattr(actor, "is_authenticated", False))
+
+
+def hub_user_of(ctx: OperationContext) -> HubUser | None:
+    """The caller's ``HubUser`` in the active hub's database, read only (``base.services.acting_hub_user`` makes it);
+    ``None`` for the platform, an API key, nobody, or a person who has none there yet."""
+    if not is_a_person(ctx.actor):
+        return None
+    return HubUser.objects.filter(username=ctx.actor.get_username()).first()
 
 
 def signed_in_username(ctx: OperationContext) -> str:

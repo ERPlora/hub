@@ -298,12 +298,12 @@ def test_an_unknown_role_name_is_refused_on_its_field():
 
 def test_a_user_with_access_to_the_business_is_linked(make_user):
     account = make_user("ana", host="a", role="hub_employee")
-    assert create(user_id=account.id).user_id == account.id
+    assert create(user_id=account.person.id).user_id == account.person.id
 
 
 def test_a_user_without_access_to_this_business_is_refused(make_user):
     stranger = make_user("bea", host="b")
-    for user_id in (stranger.id, 999_999):
+    for user_id in (stranger.person.id, uuid.uuid4()):
         with pytest.raises(InvalidPayload) as excinfo:
             create(user_id=user_id)
         assert excinfo.value.fields == {
@@ -312,13 +312,25 @@ def test_a_user_without_access_to_this_business_is_refused(make_user):
     assert not Member.objects.exists()
 
 
+def test_a_person_who_left_the_business_is_refused_though_their_membership_lingers(make_user):
+    # The photo marks whoever is no longer in the business (base.hub_user.sync): their record no longer hangs from them.
+    account = make_user("ana", host="a", role="hub_employee")
+    account.person.is_active = False
+    account.person.save()
+
+    with pytest.raises(InvalidPayload) as excinfo:
+        create(user_id=account.person.id)
+
+    assert excinfo.value.fields == {"user_id": "That Hub user has no access to this business."}
+
+
 def test_one_user_one_live_record_names_the_holder(make_user):
     account = make_user("ana")
-    create("Ana", "López", user_id=account.id)
+    create("Ana", "López", user_id=account.person.id)
     OutboxEvent.objects.all().delete()
 
     with pytest.raises(Conflict) as excinfo:
-        create("Bea", "Ruiz", user_id=account.id)
+        create("Bea", "Ruiz", user_id=account.person.id)
 
     assert (excinfo.value.status, excinfo.value.code) == (
         409,
@@ -331,10 +343,10 @@ def test_one_user_one_live_record_names_the_holder(make_user):
 def test_the_database_settles_two_links_at_once(make_user, monkeypatch):
     # user_link_race: both reads see nobody; the index stops the second write with the same answer.
     account = make_user("ana")
-    create("Ana", user_id=account.id)
+    create("Ana", user_id=account.person.id)
     monkeypatch.setattr(services, "_holder_of", lambda user_id, exclude=None: None)
     with pytest.raises(Conflict) as excinfo:
-        create("Bea", user_id=account.id)
+        create("Bea", user_id=account.person.id)
     assert excinfo.value.code == "staff.user_already_linked"
     assert Member.objects.count() == 1
 
@@ -504,25 +516,25 @@ def test_update_of_a_missing_or_terminated_record_is_not_found():
 
 def test_moving_another_record_onto_a_linked_user_is_refused(make_user):
     account = make_user("ana")
-    holder = make_member("Ana", user=account)
+    holder = make_member("Ana", user=account.person)
     other = make_member("Bea")
     with pytest.raises(Conflict) as excinfo:
-        update(id=other.id, user_id=account.id)
+        update(id=other.id, user_id=account.person.id)
     assert excinfo.value.code == "staff.user_already_linked"
     # The holder may be edited and keep its own user.
-    update(id=holder.id, user_id=account.id, phone="1")
+    update(id=holder.id, user_id=account.person.id, phone="1")
     holder.refresh_from_db()
-    assert holder.user_id == account.id
+    assert holder.user_id == account.person.id
 
 
 def test_unlinking_or_terminating_frees_the_user(make_user):
     account = make_user("ana")
-    ana = make_member("Ana", user=account)
+    ana = make_member("Ana", user=account.person)
     update(id=ana.id, user_id=None)
     bea = make_member("Bea")
-    update(id=bea.id, user_id=account.id)
+    update(id=bea.id, user_id=account.person.id)
     run("staff.member.terminate", TerminateIn(id=bea.id))
-    assert create("Carla", user_id=account.id).user_id == account.id
+    assert create("Carla", user_id=account.person.id).user_id == account.person.id
 
 
 def test_changing_pay_needs_the_pay_permission():
@@ -1012,7 +1024,7 @@ def request(actor, role="hub_employee", **fields):
 
 def test_an_employee_asks_for_their_own_time_off(make_user):
     me = make_user("ana", role="hub_employee")
-    member = make_member(user=me)
+    member = make_member(user=me.person)
     leave = request(me, reason="Wedding")
     assert (leave.member_id, leave.status, leave.reason) == (
         member.id,
@@ -1038,7 +1050,7 @@ def test_asking_without_a_linked_record_is_refused(make_user):
 
 def test_my_own_request_must_not_overlap_either(make_user):
     me = make_user("ana", role="hub_employee")
-    make_time_off(make_member(user=me), "2026-10-12", status=TimeOff.Status.APPROVED)
+    make_time_off(make_member(user=me.person), "2026-10-12", status=TimeOff.Status.APPROVED)
     with pytest.raises(Conflict):
         request(me)
 
@@ -1060,7 +1072,7 @@ def test_approve_stamps_who_and_when(make_user):
     leave.refresh_from_db()
     assert (leave.status, leave.approved_by, approved.approved_by_name) == (
         "approved",
-        boss,
+        boss.person,
         "Marta",
     )
     assert leave.approved_at is not None
@@ -1122,24 +1134,35 @@ def test_approving_over_another_approved_absence_is_refused():
     assert decide("approve", other).status == "approved"
 
 
+def test_whoever_approves_before_their_person_exists_signs_it_all_the_same(django_user_model):
+    # A session opened before the business's database knew them: their first write makes their person (W10).
+    boss = django_user_model.objects.create_user(username="saas:9", first_name="Marta")
+    leave = make_time_off(make_member(), "2026-10-12")
+
+    decide("approve", leave, actor=boss)
+
+    leave.refresh_from_db()
+    assert (leave.approved_by.username, leave.approved_by.name) == ("saas:9", "Marta")
+
+
 def test_cancel_keeps_who_approved_it(make_user):
     boss = make_user("boss")
     leave = make_time_off(
         make_member(),
         "2026-10-12",
         status=TimeOff.Status.APPROVED,
-        approved_by=boss,
+        approved_by=boss.person,
         approved_at=timezone.now(),
     )
     cancelled = decide("cancel", leave)
     leave.refresh_from_db()
-    assert (cancelled.status, leave.approved_by) == ("cancelled", boss)
+    assert (cancelled.status, leave.approved_by) == ("cancelled", boss.person)
     assert names() == [events.TIME_OFF_CANCELLED]
 
 
 def test_an_employee_withdraws_only_their_own_pending_request(make_user):
     me = make_user("ana", role="hub_employee")
-    mine = make_member("Ana", user=me)
+    mine = make_member("Ana", user=me.person)
     pending = make_time_off(mine, "2026-10-12")
     approved = make_time_off(mine, "2026-10-20", status=TimeOff.Status.APPROVED)
     others = make_time_off(make_member("Bea"), "2026-10-12")
@@ -1398,7 +1421,7 @@ def test_two_overlapping_requests_at_once_keep_one():
 @pytest.mark.django_db(transaction=True)
 def test_two_overlapping_requests_of_my_own_at_once_keep_one(make_user):
     me = make_user("ana", role="hub_employee")
-    make_member(user=me)
+    make_member(user=me.person)
     data = TimeOffRequestIn(start_date="2026-10-12", end_date="2026-10-12")
 
     def ask():
@@ -1430,7 +1453,7 @@ def test_two_overlapping_approvals_at_once_keep_one():
 def test_an_employee_cannot_cancel_a_request_approved_while_they_were_cancelling(make_user):
     # STAFF-F19: an employee withdraws only a PENDING request of their own, judged on the locked row.
     me = make_user("ana", role="hub_employee")
-    leave = make_time_off(make_member(user=me), "2026-10-12")
+    leave = make_time_off(make_member(user=me.person), "2026-10-12")
 
     outcome = _race(
         lambda: get("staff.time_off.approve")(ctx_for(), ByIdIn(id=leave.id)),

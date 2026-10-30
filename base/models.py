@@ -261,6 +261,39 @@ class Profile(UUIDModel):
         return f"{self.first_name} {self.last_name}".strip() or self.username
 
 
+class HubUser(UUIDModel):
+    """A person of this business in its own database: who a staff record hangs from, who signed a task, a clock-in or
+    a message (tenancy W10; PLAN-HUB §3, PLAN-DB §2).
+
+    Control keeps the session's user (``auth.User``) and the role (``Membership``); a key between two databases does
+    not exist, so the apps hang what a person did from this row instead. ``username`` is how the Hub knows them at its
+    doors (``saas:<id>``, ``demo:<slug>``: the key of ``Credential`` and ``Profile`` too); ``account_id`` is the
+    erplora.com account (none for a demo's owner); name and email are what erplora.com last said. Made or brought up to
+    date at every entry and from the SaaS's photo (``base.services.ensure_hub_user``, ``base.hub_user.sync``), never
+    deleted: whoever leaves keeps their name on what they signed and is no longer active.
+    """
+
+    account_id = models.UUIDField(_("SaaS account"), null=True, blank=True, unique=True)
+    username = models.CharField(_("person"), max_length=150, unique=True)
+    email = models.EmailField(pgettext_lazy("person", "email"), blank=True)
+    name = models.CharField(_("name"), max_length=150, blank=True)
+    is_active = models.BooleanField(pgettext_lazy("person", "active"), default=True)
+    created_at = models.DateTimeField(_("added at"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("business user")
+        verbose_name_plural = _("business users")
+        ordering = ["name", "email", "id"]
+
+    def __str__(self) -> str:
+        return self.display_name
+
+    @property
+    def display_name(self) -> str:
+        """The name, else the email, else the username: how a screen names them."""
+        return self.name or self.email or self.username
+
+
 class TaskSchedule(UUIDModel):
     """When a scheduled task of an app runs next (``base.scheduler``; the old Hub's ``_scheduled_tasks``).
 

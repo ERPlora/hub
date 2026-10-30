@@ -1135,3 +1135,90 @@ def test_no_test_reads_the_clock_at_import():
         "and a run that crosses midnight or New Year's Eve compares it with the next one: ask for the `today` fixture, "
         f"or read the clock inside the test: {offenders}"
     )
+
+
+# ── (g) A hub's model never links to control's (tenancy, W10; PLAN-DB §2) ──────────────────────────────────────────
+
+
+def control_links(models, classify) -> list[str]:
+    """``<model>.<field> -> <target>`` for every foreign key, one-to-one or many-to-many of a hub's model (``hub`` or
+    ``contextual``) to a model of control's database: ``settings.AUTH_USER_MODEL`` and the rest of ``auth``,
+    ``control``, ``base.Membership``… A key between two databases does not exist, so no hub's database could hold
+    that model's table: a person of the business is a ``base.HubUser``. ``classify`` is
+    ``base.tenancy.inventory.classify``."""
+    from django.db.models import Field
+
+    from base.tenancy import inventory
+
+    found = []
+    for model in models:
+        if classify(model) not in (inventory.HUB, inventory.CONTEXTUAL):
+            continue
+        for field in model._meta.get_fields(include_hidden=True):
+            # Forward fields only (a reverse relation is no Field): a key, a one-to-one or a many-to-many.
+            if not (isinstance(field, Field) and field.is_relation) or field.related_model is None:
+                continue
+            if classify(field.related_model) == inventory.CONTROL:
+                found.append(f"{model._meta.label_lower}.{field.name} -> {field.related_model._meta.label_lower}")
+    return sorted(found)
+
+
+def _made_up_hub_model(label: str, **fields):
+    """A stand-in for a hub's model named ``label`` with ``fields`` (name: an unbound Django field)."""
+    from types import SimpleNamespace
+
+    for name, field in fields.items():
+        field.set_attributes_from_name(name)
+    return SimpleNamespace(
+        _meta=SimpleNamespace(label_lower=label, get_fields=lambda include_hidden=False: list(fields.values()))
+    )
+
+
+def test_control_links_finds_every_kind_of_link_from_a_hub_model_to_a_control_one():
+    from django.contrib.auth import get_user_model
+    from django.db import models as django_models
+
+    from base.models import Membership, Profile
+    from base.tenancy import inventory
+    from control.models import Hub
+
+    offender = _made_up_hub_model(
+        "staff.offender",
+        user=django_models.ForeignKey(get_user_model(), on_delete=django_models.CASCADE),
+        hub=django_models.OneToOneField(Hub, on_delete=django_models.CASCADE),
+        memberships=django_models.ManyToManyField(Membership),
+        profile=django_models.ForeignKey(Profile, on_delete=django_models.CASCADE),
+        name=django_models.CharField(max_length=10),
+    )
+    controls_own = _made_up_hub_model(
+        "control.offender", user=django_models.ForeignKey(get_user_model(), on_delete=django_models.CASCADE)
+    )
+    hubs_classes = {id(offender): inventory.HUB, id(controls_own): inventory.CONTROL}
+
+    def classify(model):
+        return hubs_classes.get(id(model)) or inventory.classify(model)
+
+    # The key to a hub's own model (Profile) and the plain column are not links to control; a control model's are not
+    # a hub's.
+    assert control_links([offender, controls_own], classify) == [
+        "staff.offender.hub -> control.hub",
+        "staff.offender.memberships -> base.membership",
+        "staff.offender.user -> auth.user",
+    ]
+
+
+def test_no_hub_model_links_to_a_control_model():
+    from django.apps import apps
+
+    from base.tenancy import inventory
+
+    models = apps.get_models(include_auto_created=True)
+    # A walk gone blind would let the check pass: it reaches the modules and the platform's models.
+    assert {"staff.member", "base.profile", "control.hub"} <= {model._meta.label_lower for model in models}
+
+    offenders = control_links(models, inventory.classify)
+
+    assert offenders == [], (
+        "A hub's model lives in the hub's database, where control's tables are not: link a person of the business "
+        f"to base.HubUser, never to settings.AUTH_USER_MODEL, auth, control or base.Membership: {offenders}"
+    )

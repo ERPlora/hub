@@ -1980,3 +1980,21 @@ msgstr "Dispositivo"
 #: schemas.py
 msgid "API key"
 msgstr "Clave de API"
+
+#: models.py
+msgctxt "person"
+msgid "email"
+msgstr "correo electrónico"
+
+#: models.py
+msgctxt "person"
+msgid "active"
+msgstr "activo"
+
+#: models.py
+msgid "business user"
+msgstr "usuario del negocio"
+
+#: models.py
+msgid "business users"
+msgstr "usuarios del negocio"

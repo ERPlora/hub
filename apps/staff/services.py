@@ -70,7 +70,8 @@ from apps.staff.schemas import (
     TimeOffIn,
     TimeOffRequestIn,
 )
-from base.models import Membership
+from base.models import HubUser, Membership
+from base.services import acting_hub_user
 
 ROLE_UNAVAILABLE = _(
     "That role is not available: it does not exist in this business, or it has been deleted or retired."
@@ -104,7 +105,7 @@ MANAGE_TIME_OFF = "staff.manage_time_off"
 PAY_FIELDS = ("hourly_rate", "commission_rate", "notes")
 #: Fields a ``null`` clears in staff.member.update; any other ``null`` leaves the field as it is.
 CLEARABLE = ("role_id", "user_id", "hire_date")
-USER_UNIQUE = "staff_member_user_unique"
+USER_UNIQUE = "staff_member_hub_user_unique"
 ROLE_UNIQUE = "staff_role_name_unique"
 #: The moves a time-off request may make (Factorial, Personio, BambooHR, Deputy).
 TRANSITIONS = {
@@ -336,13 +337,14 @@ def _role_for(role_id: UUID | None, name: str | None) -> UUID | None:
 
 
 def _check_user(
-    ctx: OperationContext, user_id: int | None, exclude: UUID | None = None
+    ctx: OperationContext, user_id: UUID | None, exclude: UUID | None = None
 ) -> None:
-    """A user may hang a record when it has access to this business and no other live record."""
+    """A person of the business's database (``base.HubUser``) may hang a record when they are still in the business,
+    have access to it (a ``Membership`` on the scope's host, control's) and no other live record."""
     if user_id is None:
         return
-    # Phase 1: «access» is a Membership on the scope's host; phase 2 checks the hub's own users.
-    if not Membership.objects.filter(user_id=user_id, host=ctx.scope.key).exists():
+    person = HubUser.objects.filter(pk=user_id, is_active=True).first()
+    if person is None or not Membership.objects.filter(user__username=person.username, host=ctx.scope.key).exists():
         raise InvalidPayload(
             str(USER_NOT_IN_BUSINESS), fields={"user_id": str(USER_NOT_IN_BUSINESS)}
         )
@@ -351,7 +353,7 @@ def _check_user(
         raise _already_linked(holder.full_name)
 
 
-def _holder_of(user_id: int, exclude: UUID | None = None) -> Member | None:
+def _holder_of(user_id: UUID, exclude: UUID | None = None) -> Member | None:
     holders = Member.objects.exclude(status=Member.Status.TERMINATED).filter(
         user_id=user_id
     )
@@ -724,7 +726,7 @@ def approve_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff | None:
     )
     if clashes.exists():
         raise Conflict(str(APPROVED_OVERLAP), code="staff.overlapping_time_off")
-    time_off.approved_by_id = actor_user_id(ctx)
+    time_off.approved_by = acting_hub_user(ctx)
     time_off.approved_at = timezone.now()
     return _finish_move(ctx, time_off, "approve", ["approved_by", "approved_at"])
 

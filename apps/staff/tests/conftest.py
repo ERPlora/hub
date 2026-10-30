@@ -19,6 +19,7 @@ from psycopg.conninfo import make_conninfo
 
 from apps.staff.models import Member, Role, Schedule, ScheduleDay, TimeOff
 from base.models import Membership
+from base.services import ensure_hub_user
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -61,6 +62,8 @@ def make_user(db):
         )
         if host is not None:
             Membership.objects.create(user=user, host=host, role=role)
+        # Who they are in the business's database, as their entry makes it: what a record hangs from.
+        user.person = ensure_hub_user(user)
         return user
 
     return make
