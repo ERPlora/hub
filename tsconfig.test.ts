@@ -11,7 +11,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
-import { expect, it } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 
 import viteConfig from './vite.config';
 
@@ -21,60 +21,124 @@ const VUE: ts.FileExtensionInfo[] = [{ extension: '.vue', isMixedContent: true, 
 
 const scripts: Record<string, string> = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
 
-/** A tsconfig parsed as `vue-tsc` (or an editor, with the same `options`) reads it. */
-function parseConfig(config: string, options: ts.CompilerOptions, extensions: ts.FileExtensionInfo[]) {
-  const parsed = ts.getParsedCommandLineOfConfigFile(
-    config,
-    options,
-    {
-      ...ts.sys,
-      onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
-        throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
-      },
-    },
-    undefined,
-    undefined,
-    extensions,
-  );
+/** Each walk of the repo for a tsconfig's files, once per run: a `vue-tsc` run and an editor read the same tsconfigs. */
+const walks = new Map<string, string[]>();
+
+const configHost: ts.ParseConfigFileHost = {
+  ...ts.sys,
+  readDirectory: (...walk: Parameters<typeof ts.sys.readDirectory>) => {
+    const key = JSON.stringify(walk);
+    if (!walks.has(key)) walks.set(key, ts.sys.readDirectory(...walk));
+    return walks.get(key)!;
+  },
+  onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
+    throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+  },
+};
+
+/** Each tsconfig parsed, by the options it was read with (see the `beforeAll`). */
+const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
+
+/** A tsconfig parsed as `vue-tsc` (or an editor, with the same `options`) reads it, its .vue files included, once per run. */
+function parseConfig(config: string, options: ts.CompilerOptions): ts.ParsedCommandLine {
+  const key = JSON.stringify([config, options]);
+  const known = parsedConfigs.get(key);
+  if (known) return known;
+  const parsed = ts.getParsedCommandLineOfConfigFile(config, options, configHost, undefined, undefined, VUE);
   if (!parsed) throw new Error(`${config} could not be read`);
+  parsedConfigs.set(key, parsed);
   return parsed;
 }
 
 /** A `vue-tsc` run of a package.json script, parsed as that run reads its tsconfig. */
-function vueTscProject(command: string, extensions: ts.FileExtensionInfo[]): ts.ParsedCommandLine {
+function vueTscProject(command: string): ts.ParsedCommandLine {
   const [bin, ...args] = command.trim().split(/\s+/);
   const { options, fileNames, errors } = ts.parseCommandLine(args);
   if (bin !== 'vue-tsc' || errors.length || fileNames.length) {
     throw new Error(`"${command.trim()}" is not a plain vue-tsc run`);
   }
   const project = resolve(root, options.project ?? 'tsconfig.json');
-  return parseConfig(project.endsWith('.json') ? project : join(project, 'tsconfig.json'), options, extensions);
+  return parseConfig(project.endsWith('.json') ? project : join(project, 'tsconfig.json'), options);
 }
 
 /** Each `vue-tsc` run chained in the `typecheck` script. */
-function typecheckProjects(extensions: ts.FileExtensionInfo[] = []): ts.ParsedCommandLine[] {
-  return scripts.typecheck.split('&&').map((command) => vueTscProject(command, extensions));
+function typecheckProjects(): ts.ParsedCommandLine[] {
+  return scripts.typecheck.split('&&').map(vueTscProject);
 }
 
-const checked = (project: ts.ParsedCommandLine) => new Set(project.fileNames.map((file) => resolve(file)));
+/** The files of each project, listed once (an editor's lookup asks for them for each file of the repo). */
+const checkedFiles = new WeakMap<ts.ParsedCommandLine, Set<string>>();
+
+function checked(project: ts.ParsedCommandLine): Set<string> {
+  let files = checkedFiles.get(project);
+  if (!files) checkedFiles.set(project, (files = new Set(project.fileNames.map((file) => resolve(file)))));
+  return files;
+}
+
+/** A tsconfig as an editor reads it: without a command line. */
+const editorConfig = (config: string) => parseConfig(config, {});
 
 /**
  * The tsconfig an editor (tsserver) opens a file in: the nearest tsconfig.json above it if it holds the file,
  * else the first of its references that does; none means an inferred project, without this repo's settings
  * (no `bundler` resolution, so every `@erplora/ui/*` import shows as missing).
  */
-function editorProject(file: string, parse: (config: string) => ts.ParsedCommandLine): string | undefined {
+function editorProject(file: string): string | undefined {
   for (let dir = dirname(file); ; dir = dirname(dir)) {
     const config = join(dir, 'tsconfig.json');
     if (ts.sys.fileExists(config)) {
-      const parsed = parse(config);
+      const parsed = editorConfig(config);
       if (checked(parsed).has(file)) return config;
       const references = (parsed.projectReferences ?? []).map(ts.resolveProjectReferencePath);
-      return references.find((reference) => checked(parse(reference)).has(file));
+      return references.find((reference) => checked(editorConfig(reference)).has(file));
     }
     if (dir === root) return undefined;
   }
 }
+
+/** A file of this repo (the submodules are their own, as are the dependencies). */
+const ownFile = (file: string) => !/^(packages|node_modules)\//.test(relative(root, file));
+
+/**
+ * Every project these tests read: each `vue-tsc` run of the `typecheck` and `build` scripts, and each tsconfig an
+ * editor opens their files in (tsconfig.json, whose references are those runs', or the run's own, as tests/e2e's).
+ */
+function projectsRead(): ts.ParsedCommandLine[] {
+  const runs = [...typecheckProjects(), vueTscProject(scripts.build.split('&&')[0])];
+  const configs = [join(root, 'tsconfig.json'), ...runs.map((run) => run.options.configFilePath as string)];
+  return [...runs, ...configs.map(editorConfig)];
+}
+
+// Parsing a project walks the repo for its files, and the tests read the same projects again and again (each run of
+// the typecheck and build scripts, and an editor's); listing a project's files resolves each of them, and the editor's
+// lookup asked for them once per file of the repo. At rest that is 1.3 s and 160 garbage collections; under load what
+// counts is the opening of files and folders, whose time is the machine's (1,687 files read in 38–50 s with 15 busy
+// cores, 0.1–0.3 s at rest): a run opened 2,588 folders, 930 of them in one test, and a test of this file took 118 s
+// beside `pnpm test` at load ~30 (2026-10-29). Here, once per run (465 folders), with the limit of the guardrails that
+// read the whole tree; each test keeps its own work (the planted program, the build's reads) and its 60 s (2026-10-30).
+beforeAll(() => {
+  for (const project of projectsRead()) checked(project);
+}, 60_000);
+
+it('reads the projects the warm-up parsed: no test walks the repo for a project, nor lists its files, again', () => {
+  const walk = vi.spyOn(ts.sys, 'readDirectory');
+  try {
+    const projects = projectsRead();
+    for (const project of projects) {
+      const file = [...checked(project)].find(ownFile);
+      if (file) editorProject(file);
+    }
+    // Another command line over a tsconfig already read lists the same files: the walk is not repeated.
+    vueTscProject('vue-tsc --noEmit --strict -p tsconfig.app.json');
+    const again = projectsRead();
+
+    expect(walk).not.toHaveBeenCalled();
+    // Read again, each is the project parsed before, with the list of its files made before.
+    expect(projects.filter((project, index) => again[index] !== project || checked(again[index]) !== checked(project)).length).toBe(0);
+  } finally {
+    walk.mockRestore();
+  }
+});
 
 it('reports a process.env planted in the shell entry and in an app of the SPA', () => {
   const planted = ['frontend/main.ts', 'apps/demo/frontend/routes.ts'].map((name) => join(root, name));
@@ -88,7 +152,9 @@ it('reports a process.env planted in the shell entry and in an app of the SPA', 
     const text = readFile(file);
     return planted.includes(resolve(file)) ? `${text}\nexport const planted = process.env.VITE_DEV_PORT;\n` : text;
   };
-  const program = ts.createProgram({ rootNames: spa.fileNames, options: spa.options, host });
+  // TypeScript reads no .vue file (vue-tsc's own): the program takes the rest of the project.
+  const rootNames = spa.fileNames.filter((file) => !file.endsWith('.vue'));
+  const program = ts.createProgram({ rootNames, options: spa.options, host });
 
   const errors = planted.flatMap((file) => {
     const source = program.getSourceFile(file);
@@ -116,7 +182,7 @@ it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA
     undefined,
     VUE,
   ).fileNames.map((file) => resolve(file));
-  const files = new Set(typecheckProjects(VUE).flatMap((project) => [...checked(project)]));
+  const files = new Set(typecheckProjects().flatMap((project) => [...checked(project)]));
 
   expect(single.filter((file) => file.endsWith('.vue')).length).toBeGreaterThan(0);
   expect(single.filter((file) => file.endsWith('.test.ts')).length).toBeGreaterThan(0);
@@ -124,21 +190,15 @@ it('keeps in pnpm typecheck every file the single tsconfig.json checked: the SPA
 }, 60_000);
 
 it('opens every file pnpm typecheck checks, in an editor, in a project that checks it', () => {
-  const parsed = new Map<string, ts.ParsedCommandLine>();
-  const parse = (config: string) => {
-    if (!parsed.has(config)) parsed.set(config, parseConfig(config, {}, VUE));
-    return parsed.get(config)!;
-  };
   // Each file of this repo (the submodules are their own) with the tsconfigs of the runs that check it.
   const runs = new Map<string, Set<string>>();
-  for (const project of typecheckProjects(VUE)) {
-    for (const file of checked(project)) {
-      if (/^(packages|node_modules)\//.test(relative(root, file))) continue;
+  for (const project of typecheckProjects()) {
+    for (const file of [...checked(project)].filter(ownFile)) {
       runs.set(file, (runs.get(file) ?? new Set()).add(resolve(project.options.configFilePath as string)));
     }
   }
 
-  const lost = [...runs].filter(([file, configs]) => !configs.has(editorProject(file, parse) ?? ''));
+  const lost = [...runs].filter(([file, configs]) => !configs.has(editorProject(file) ?? ''));
   expect(runs.size).toBeGreaterThan(0);
   expect(lost.map(([file]) => relative(root, file))).toEqual([]);
 }, 60_000);
@@ -199,7 +259,7 @@ it('copies into the image every tsconfig Vite reads to compile the SPA: tsconfig
 });
 
 it('type-checks the SPA in pnpm build too: the image runs it, and a run without its project checks nothing', () => {
-  const spa = vueTscProject(scripts.build.split('&&')[0], VUE);
+  const spa = vueTscProject(scripts.build.split('&&')[0]);
   const files = ['frontend/main.ts', 'apps/demo/frontend/routes.ts'].map((name) => join(root, name));
 
   expect(files.filter((file) => !checked(spa).has(file)).map((file) => relative(root, file))).toEqual([]);
@@ -231,7 +291,7 @@ function landing(path: string): string {
  * that matches nothing here is reported, as it would match nothing in the image either, without an error.
  */
 function spaBuildReads(): { files: Set<string>; emptyGlobs: string[] } {
-  const spa = vueTscProject(scripts.build.split('&&')[0], VUE);
+  const spa = vueTscProject(scripts.build.split('&&')[0]);
   const input = viteConfig.build?.rollupOptions?.input;
   const entries = typeof input === 'string' ? [input] : Array.isArray(input) ? input : Object.values(input ?? {});
   const files = new Set([...checked(spa)].map((file) => relative(root, file)).filter((file) => !file.startsWith('node_modules/')));
