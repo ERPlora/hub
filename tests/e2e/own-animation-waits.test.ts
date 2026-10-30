@@ -7,12 +7,26 @@
 // `own-animation-waits.json` holds, for each file that still asks for animations itself, how many times; a file can only
 // lose them (and then its count goes down, or its line away), never gain them, and a new file has none.
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+// The real reads, watched: the e2e's files are read (and parsed) once per run (see the warm-up).
+vi.mock('node:fs', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs')>();
+  return { ...fs, readFileSync: vi.fn(fs.readFileSync) };
+});
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...fs, readFile: vi.fn(fs.readFile) };
+});
+
+/** How many files this guardrail has read so far. */
+const filesRead = () => vi.mocked(readFileSync).mock.calls.length + vi.mocked(readFile).mock.calls.length;
 
 const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -72,13 +86,28 @@ function scanned(name: string): boolean {
   return !parts.some((part) => part.startsWith('.') || part === 'node_modules');
 }
 
-/** Each file under `dir` (the e2e's folder) that reaches for `getAnimations`, and how many times. */
-function readsByFile(dir = E2E_DIR): Record<string, number> {
+/** Each folder's scan (see `readsByFile`), made once per run. */
+const scans = new Map<string, Promise<Record<string, number>>>();
+
+/**
+ * Each file under `dir` (the e2e's folder) that reaches for `getAnimations`, and how many times: its files read at
+ * once and each parsed once per run. With the machine loaded a file's first open waits on its own, and the scan read
+ * and parsed the 273 files of the e2e again in each test: 22 s against Vitest's 5 s beside `pnpm test` (2026-10-30).
+ */
+function readsByFile(dir = E2E_DIR): Promise<Record<string, number>> {
+  let scan = scans.get(dir);
+  if (!scan) scans.set(dir, (scan = scanFolder(dir)));
+  return scan;
+}
+
+async function scanFolder(dir: string): Promise<Record<string, number>> {
+  const names = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(scanned);
+  const sources = await Promise.all(names.map((name) => readFile(join(dir, name), 'utf8')));
   const found: Record<string, number> = {};
-  for (const name of readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(scanned)) {
-    const reads = animationReads(readFileSync(join(dir, name), 'utf8'), name);
+  names.forEach((name, index) => {
+    const reads = animationReads(sources[index], name);
     if (reads > 0) found[name.split(/[\\/]/).join('/')] = reads;
-  }
+  });
   return found;
 }
 
@@ -99,12 +128,24 @@ function staleInTheRatchet(found: Record<string, number>): string[] {
 }
 
 describe('the e2e waits for «nothing moves» with the one detector of helpers.ts', () => {
-  it('no file asks for animations more times than the ratchet lists: a new wait is settled(page) or untilStill(page)', () => {
-    expect(overTheRatchet(readsByFile()), WAIT_WITH_THE_DETECTOR).toEqual([]);
+  // The e2e's folder, scanned once here with the limit of the guardrails that read a whole tree (60 s, tsconfig.test.ts);
+  // each test keeps Vitest's 5 s for its own work.
+  beforeAll(async () => {
+    await readsByFile();
+  }, 60_000);
+
+  it('reads and parses each file of the e2e once per run: the tests take the warm-up’s scan', async () => {
+    const before = filesRead();
+    await readsByFile();
+    expect(filesRead() - before).toBe(0);
   });
 
-  it('the ratchet only goes down: a file that asks for animations fewer times lowers its count in own-animation-waits.json', () => {
-    expect(staleInTheRatchet(readsByFile()), LOWER_THE_RATCHET).toEqual([]);
+  it('no file asks for animations more times than the ratchet lists: a new wait is settled(page) or untilStill(page)', async () => {
+    expect(overTheRatchet(await readsByFile()), WAIT_WITH_THE_DETECTOR).toEqual([]);
+  });
+
+  it('the ratchet only goes down: a file that asks for animations fewer times lowers its count in own-animation-waits.json', async () => {
+    expect(staleInTheRatchet(await readsByFile()), LOWER_THE_RATCHET).toEqual([]);
   });
 
   it('the ratchet lists only files with own waits left, none of the allowed ones, in order', () => {
@@ -114,7 +155,7 @@ describe('the e2e waits for «nothing moves» with the one detector of helpers.t
     expect(names).toEqual([...names].sort());
   });
 
-  it('a new file has none, at any depth, a listed one not one more, and one that lost a read lowers its number', () => {
+  it('a new file has none, at any depth, a listed one not one more, and one that lost a read lowers its number', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'own-animation-waits-'));
     try {
       mkdirSync(join(dir, 'lib'));
@@ -124,7 +165,7 @@ describe('the e2e waits for «nothing moves» with the one detector of helpers.t
       writeFileSync(join(dir, 'helpers.ts'), 'const moving = document.getAnimations();\nconst more = root.getAnimations();\n');
       writeFileSync(join(dir, '.artifacts', 'report.js'), 'document.getAnimations();\n');
       writeFileSync(join(dir, 'zz-wait.test.ts'), 'document.getAnimations();\n');
-      expect(overTheRatchet(readsByFile(dir)).sort()).toEqual([
+      expect(overTheRatchet(await readsByFile(dir)).sort()).toEqual([
         'helpers.ts: 2 getAnimations reads, 1 allowed',
         'lib/wait.ts: 1 getAnimations reads, 0 allowed',
         'zz-new.spec.ts: 1 getAnimations reads, 0 allowed',
