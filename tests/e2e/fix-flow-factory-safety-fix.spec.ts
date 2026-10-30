@@ -145,7 +145,9 @@ test.afterAll(async () => {
 
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F36 a table answer turned on before its app fixed whose card it acts for never cancels another guest's table, with nothing for the owner to press, at ${viewport.label}`, async ({ browser }) => {
-    test.setTimeout(180_000);
+    // The editor's visit on top of the whole WhatsApp round of fix-whatsapp-inbox-table-cancel.spec.ts: 180 s ran out
+    // on a loaded machine (load average 32) in the last relay, at 1440.
+    test.setTimeout(300_000);
     const { context, page } = await signedIn(browser, '/whatsapp_inbox/settings', viewport);
     try {
       await openTheBook(context);
