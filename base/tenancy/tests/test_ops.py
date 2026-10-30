@@ -161,7 +161,7 @@ def test_a_missing_template_is_a_readable_failure_and_makes_nothing(hub_database
     name = made()
     missing = names.template_db_name(hub_databases.control, "nowhere")
 
-    with pytest.raises(ops.DatabaseOpsError, match="nowhere"):
+    with pytest.raises(ops.TemplateMissing, match="nowhere"):
         ops.clone_database(name, template=missing)
 
     assert name not in databases()

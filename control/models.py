@@ -49,13 +49,19 @@ class Cluster(UUIDModel):
     """A database cluster that holds hubs' databases: its writer (the migrator's way in) and the PgBouncer of the
     tasks in front of it (every request's). ``is_open``: new hubs may be placed on it (PLAN-DB §6, «Colocación»), up
     to ``max_hubs`` of them (0: no limit); a new hub goes to the open one with the fewest
-    (``base.tenancy.provision``). ``secret_name`` names the Secrets Manager secret with this cluster's own roles
-    (``base.tenancy.credentials``); empty, the environment's, as the settings' own server."""
+    (``base.tenancy.provision``). ``secret_name`` is the prefix of the two Secrets Manager secrets with this cluster's
+    own roles, ``…/app`` and ``…/migrator`` (``base.tenancy.credentials``; aws#23); empty, the environment's, as the
+    settings' own server. Its row says where it is; its secrets only who connects."""
 
     name = models.CharField(_("name"), max_length=63, unique=True)
     host = models.CharField(_("writer host"), max_length=255)
     port = models.PositiveIntegerField(_("writer port"), default=5432)
-    pooler_host = models.CharField(_("PgBouncer host"), max_length=255)
+    pooler_host = models.CharField(
+        _("PgBouncer host"),
+        max_length=255,
+        blank=True,
+        help_text=_("Empty: its hubs are reached on its writer, directly."),
+    )
     pooler_port = models.PositiveIntegerField(_("PgBouncer port"), default=6432)
     is_open = models.BooleanField(_("open to new hubs"), default=True)
     max_hubs = models.PositiveIntegerField(_("hub limit"), default=0, db_default=0, help_text=_("0 = no limit."))
@@ -65,7 +71,7 @@ class Cluster(UUIDModel):
         blank=True,
         default="",
         db_default="",
-        help_text=_("The Secrets Manager secret with this cluster's roles; empty, the environment's own."),
+        help_text=_("The prefix of this cluster's two Secrets Manager secrets (…/app and …/migrator); empty, the environment's roles."),
     )
     created_at = models.DateTimeField(pgettext_lazy("hub registry", "created at"), auto_now_add=True)
 

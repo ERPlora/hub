@@ -7,7 +7,8 @@ and ``hub-migrate`` have and the web does not; the default connection's role whe
 and closes it on the way out.
 
 - :func:`clone_database` makes a hub's or a demo's database as a copy of its template (``CREATE DATABASE … TEMPLATE``;
-  its owner is the migrator that connects). A database that is already there (``42P04``) is no failure: the second
+  its owner is the migrator that connects), on the hub's cluster: a template only clones within its cluster, so it
+  is that cluster's ``<control>_template[_<vertical>]`` (:class:`TemplateMissing` when it has none). A database that is already there (``42P04``) is no failure: the second
   call of a provisioning that was cut short goes on from there. A template someone is connected to (``55006``) is
   waited for a bounded while (:data:`TEMPLATE_BUSY_WAITS`), then a readable failure. Every call then makes the
   database private: nothing to ``PUBLIC``, ``CONNECT`` and ``TEMPORARY`` to the environment's ``hub_app`` and
@@ -35,12 +36,17 @@ logger = logging.getLogger(__name__)
 
 #: Where ``CREATE``/``DROP DATABASE`` run: a database of the server that is nobody's.
 MAINTENANCE_DATABASE = "postgres"
-#: The waits between the attempts to clone a template someone is connected to: about 3 s in all.
-TEMPLATE_BUSY_WAITS = (0.2, 0.4, 0.8, 1.6)
+#: The waits between the attempts to clone a template someone is connected to. The server itself waits up to 5 s for
+#: them to leave before it refuses (``55006``), so three attempts take about 17 s at most.
+TEMPLATE_BUSY_WAITS = (0.5, 1.0)
 
 
 class DatabaseOpsError(RuntimeError):
     """What the server refused to a clone or a drop: its own message and the database's name, never the statement."""
+
+
+class TemplateMissing(DatabaseOpsError):
+    """The template a hub is cloned from is not on its cluster (``migrate_hubs`` makes them on every open one)."""
 
 
 def _reason(error: psycopg.Error) -> str:
@@ -49,10 +55,11 @@ def _reason(error: psycopg.Error) -> str:
 
 
 @contextmanager
-def connect_ops(database: str = MAINTENANCE_DATABASE) -> Iterator[psycopg.Connection]:
-    """The migrator's direct connection to ``database`` (``postgres`` by default), in autocommit; closed after."""
+def connect_ops(database: str = MAINTENANCE_DATABASE, *, cluster=None) -> Iterator[psycopg.Connection]:
+    """The migrator's direct connection to ``database`` (``postgres`` by default) on ``cluster`` (or the settings'
+    own server), in autocommit; closed after."""
     try:
-        conn = psycopg.connect(**tenancy_connections.migrator_conninfo(database), autocommit=True)
+        conn = psycopg.connect(**tenancy_connections.migrator_conninfo(database, cluster=cluster), autocommit=True)
     except psycopg.Error as error:
         raise DatabaseOpsError(f"The migrator cannot connect to {database!r}: {_reason(error)}") from error
     try:
@@ -75,11 +82,13 @@ def clone_database(
     name: str,
     *,
     template: str,
+    cluster=None,
     roles: bootstrap.Names | None = None,
     waits: Sequence[float] = TEMPLATE_BUSY_WAITS,
     sleep: Callable[[float], object] = time.sleep,
 ) -> bool:
-    """Make ``name`` a clone of ``template`` and private to the environment's roles; whether this call made it.
+    """Make ``name`` a clone of ``template`` on ``cluster`` (or the settings' own server) and private to the
+    environment's roles; whether this call made it.
 
     ``False`` when it was there already (its privileges are set again all the same). ``DatabaseOpsError`` when the
     template stayed in use through ``waits`` or the server refused it (a missing template, no ``CREATEDB``).
@@ -88,7 +97,7 @@ def clone_database(
     target = sql.Identifier(names.validate_hub(name, control=control))
     source = names.identifier(template, control=control)
     roles = environment_roles(control) if roles is None else roles
-    with connect_ops() as conn:
+    with connect_ops(cluster=cluster) as conn:
         made = _create(conn, sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(target, source), name, template, waits, sleep)
         _make_private(conn, target, name, roles)
     return made
@@ -107,6 +116,10 @@ def _create(conn, statement, name: str, template: str, waits: Sequence[float], s
                 ) from busy
             sleep(wait)
             continue
+        except errors.InvalidCatalogName as missing:
+            raise TemplateMissing(
+                f"The template {template!r} is not on this cluster: {name!r} could not be cloned ({_reason(missing)})."
+            ) from missing
         except psycopg.Error as error:
             raise DatabaseOpsError(f"{name!r} could not be cloned from {template!r}: {_reason(error)}") from error
         return True
@@ -136,10 +149,11 @@ def _make_private(conn, target: sql.Identifier, name: str, roles: bootstrap.Name
             )
 
 
-def drop_database(name: str) -> bool:
-    """Drop the hub's or demo's database ``name``, whoever is connected to it; whether it was there."""
+def drop_database(name: str, *, cluster=None) -> bool:
+    """Drop the hub's or demo's database ``name`` on ``cluster`` (or the settings' own server), whoever is connected
+    to it; whether it was there."""
     target = sql.Identifier(names.validate_hub(name, control=tenancy_connections.control_name()))
-    with connect_ops() as conn:
+    with connect_ops(cluster=cluster) as conn:
         try:
             existed = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", [name]).fetchone() is not None
             conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(target))
@@ -148,10 +162,10 @@ def drop_database(name: str) -> bool:
     return existed
 
 
-def recorded_apps(name: str) -> set[str]:
-    """The apps the database ``name`` (a hub's, a demo's or a template's) recorded migrations of."""
+def recorded_apps(name: str, *, cluster=None) -> set[str]:
+    """The apps the database ``name`` (a hub's, a demo's or a template's) on ``cluster`` recorded migrations of."""
     names.validate(name, control=tenancy_connections.control_name())
-    with connect_ops(name) as conn:
+    with connect_ops(name, cluster=cluster) as conn:
         try:
             return {row[0] for row in conn.execute("SELECT DISTINCT app FROM django_migrations")}
         except psycopg.Error as error:
