@@ -16,6 +16,7 @@ ROUTES = {
     ("GET", "/cash_register/settings", "cash_register.settings.get"),
     ("POST", "/cash_register/settings", "cash_register.settings.update"),
     ("GET", "/cash_register/registers", "cash_register.register.list"),
+    ("GET", "/cash_register/registers/detail", "cash_register.register.get"),
     ("POST", "/cash_register/registers", "cash_register.register.create"),
     ("POST", "/cash_register/registers/update", "cash_register.register.update"),
     ("GET", "/cash_register/sessions", "cash_register.session.list"),

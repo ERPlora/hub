@@ -6,16 +6,22 @@ expected cash only for whoever may see it; the close is a dangerous write: it wa
 and the count, and closes only after the person types the word. Cancelling leaves the session open."""
 
 import json
+import uuid
 from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live.context import OperationContext, Scope
 from live.operations import get, registry
 
 from base import assistant
+from base.tenancy import context
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant_card_values import AN_ID
 from apps.cash_register.models import Session
-from apps.cash_register.tests.conftest import charge, ctx_for, open_session, run
+from apps.cash_register.tests.conftest import A, charge, ctx_for, open_session, run
 
 pytestmark = pytest.mark.django_db
 
@@ -341,3 +347,202 @@ def test_without_the_permission_to_close_there_is_no_preview_nor_card():
     )
     failure, preview = close_preview({"closing_balance": 25000}, ctx=cannot)
     assert (failure.outcome, preview) == ("refused", None)
+
+
+# ── The record a write names by its id, by its name (FIX-HUB-CASH_REGISTER-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS;
+# base's half is hub#416) ──
+# Since hub#416 the card leaves out an id its schema does not mark: «count the drawer», «take 5 € out», «close it»,
+# «print its report», «open the bar» or «rename the bar» said no session and no drawer. Now the session is named by its
+# number, as the sessions' list and every window of a shift say it («Arqueo de caja · S-…»), and the drawer by its name,
+# as «Open session» and the drawers of the settings. Read as whoever asks, in the hub they ask in: never by the id, and
+# left out when nobody, or somebody who may not see the sessions, is behind the request.
+
+#: The writes that name a session by its id, with what each sends besides it, as the model would.
+ON_A_SESSION = {
+    "cash_register.count.add": {"total": 12000},
+    "cash_register.movement.add": {"type": "out", "amount": 500, "description": "Proveedor"},
+    "cash_register.session.close": {"closing_balance": 12000},
+    "cash_register.session.print": {},
+}
+#: The writes that name a drawer by its id, with what each sends besides it.
+ON_A_DRAWER = {
+    "cash_register.session.open": {"opening_balance": 10000},
+    "cash_register.register.update": {"name": "Terraza"},
+}
+#: The roles a business gives that work the till: the employee is the least of them.
+TILL_ROLES = ("hub_employee", "hub_manager", "hub_admin", "hub_owner")
+
+
+def values(card: dict) -> dict:
+    return {field["name"]: field["value"] for field in card["fields"]}
+
+
+def no_id(card: dict) -> bool:
+    return not AN_ID.search(json.dumps(card, ensure_ascii=False))
+
+
+def cards(ctx, writes: dict, datum: str, record, language: str = "es") -> dict:
+    """The card of each of ``writes`` naming ``record`` by its id, as ``ctx``'s person would confirm it."""
+    return {
+        name: assistant.card(get(name), {datum: str(record), **besides}, language, ctx)
+        for name, besides in writes.items()
+    }
+
+
+def may_run(role: str, name: str) -> bool:
+    return ctx_for(role).has(get(name).permission)
+
+
+@pytest.mark.parametrize(("language", "session_label"), [("es", "Sesión"), ("en", "Session")])
+@pytest.mark.parametrize("role", TILL_ROLES)
+def test_a_write_on_a_session_names_it_by_its_number(role, language, session_label):
+    """«Cuenta la caja», «saca 5 €», «ciérrala», «imprime su informe»: the card says which session as the sessions' list
+    does, by its number, never by its id — for every role that may run the write."""
+    session = at_the_bar()
+    said = cards(ctx_for(role, language=language), ON_A_SESSION, "session_id", session.id, language)
+    assert {name: values(card).get("session_id") for name, card in said.items()} == dict.fromkeys(
+        ON_A_SESSION, session.number
+    )
+    assert all(no_id(card) for card in said.values())
+    assert {name: card["fields"][0]["label"] for name, card in said.items()} == dict.fromkeys(
+        ON_A_SESSION, session_label
+    )
+
+
+@pytest.mark.parametrize(("language", "drawer_label"), [("es", "Cajón"), ("en", "Drawer")])
+@pytest.mark.parametrize("role", TILL_ROLES)
+def test_a_write_on_a_drawer_names_it_by_its_name(role, language, drawer_label):
+    """«Abre la caja en la Barra», «llama Terraza a la Barra»: the card says which drawer by its name, as «Open session»
+    and the drawers of the settings, never by its id — for every role that may run the write."""
+    bar = run("cash_register.register.create", {"name": "Barra"})
+    writes = {name: besides for name, besides in ON_A_DRAWER.items() if may_run(role, name)}
+    assert "cash_register.session.open" in writes  # positive control: every till role opens the drawer
+    said = cards(ctx_for(role, language=language), writes, "register_id", bar.id, language)
+    assert {name: values(card).get("register_id") for name, card in said.items()} == dict.fromkeys(writes, "Barra")
+    assert all(no_id(card) for card in said.values())
+    assert {name: card["fields"][0]["label"] for name, card in said.items()} == dict.fromkeys(writes, drawer_label)
+
+
+def test_renaming_a_drawer_by_its_id_says_the_old_name_and_the_new_one_apart():
+    bar = run("cash_register.register.create", {"name": "Barra"})
+    card = assistant.card(
+        get("cash_register.register.update"),
+        {"register_id": str(bar.id), "name": "Terraza", "is_active": True},
+        "es",
+        ctx_for(language="es"),
+    )
+    assert values(card) == {"register_id": "Barra", "name": "Terraza", "is_active": True}
+    assert labels(card) == [
+        SCREENS["open"]["register"],
+        SCREENS["registers"]["modal"]["name"],
+        SCREENS["registers"]["columns"]["active"],
+    ]
+
+
+def test_an_inactive_drawer_is_still_named_when_it_is_activated_again():
+    bar = run("cash_register.register.create", {"name": "Barra"})
+    run("cash_register.register.update", {"register_id": str(bar.id), "is_active": False})
+    card = assistant.card(
+        get("cash_register.register.update"), {"register_id": str(bar.id), "is_active": True}, "es", ctx_for()
+    )
+    assert values(card) == {"register_id": "Barra", "is_active": True}
+
+
+def test_a_closed_session_is_named_when_its_report_is_printed():
+    session = at_the_bar()
+    run("cash_register.session.close", {"session_id": str(session.id), "closing_balance": 10000})
+    card = assistant.card(get("cash_register.session.print"), {"session_id": str(session.id)}, "es", ctx_for())
+    assert values(card) == {"session_id": session.number}
+
+
+def test_with_a_blind_count_the_cashier_still_reads_which_session_the_card_names():
+    # gh:cash_register#24, #84: the blind count hides the expected, never which session it is.
+    run("cash_register.settings.update", {"require_blind_count": True})
+    session = at_the_bar()
+    said = cards(ctx_for("hub_employee", language="es"), ON_A_SESSION, "session_id", session.id)
+    assert {name: values(card).get("session_id") for name, card in said.items()} == dict.fromkeys(
+        ON_A_SESSION, session.number
+    )
+
+
+def test_whoever_may_run_a_write_reads_the_record_its_card_names():
+    """The read runs as the person: a role that may run a write and not read what its card names would get a card with
+    nothing to recognise, just in the common case. Every role a business gives, every write that names a record."""
+    unread: list[tuple[str, str]] = []
+    checked = 0
+    for role in TILL_ROLES:
+        mine = ctx_for(role)
+        for name in (*ON_A_SESSION, *ON_A_DRAWER):
+            op = get(name)
+            if not mine.has(op.permission):
+                continue
+            schema = assistant._schema(op)
+            for prop in schema.get("properties", {}).values():
+                marked = assistant.refers_of(assistant._resolved(prop, schema.get("$defs", {})))
+                if marked is not None:
+                    checked += 1
+                    if not mine.has(registry[marked["read"]].permission):
+                        unread.append((role, name))
+    # Positive control: the employee and the manager run five of the six writes, the admin and the owner all six.
+    assert checked == 5 + 5 + 6 + 6
+    assert unread == []
+
+
+def test_nobody_behind_the_request_reads_no_session_nor_drawer():
+    """An automation's card (no person at hand) names no record: nothing is read for anybody."""
+    session = at_the_bar()
+    bar = session.register_id
+    for writes, datum, record in ((ON_A_SESSION, "session_id", session.id), (ON_A_DRAWER, "register_id", bar)):
+        for name, card in cards(None, writes, datum, record).items():
+            assert datum not in values(card) and no_id(card), name
+
+
+def test_who_may_not_see_the_sessions_reads_none_of_them_on_the_card():
+    """Whoever asks without «view sessions» (a key that only counts, say) gets the record left out, never its id."""
+    session = at_the_bar()
+    counter = OperationContext(
+        scope=A, actor="tester", permissions=frozenset({"cash_register.add_count"}), language="es"
+    )
+    for writes, datum, record in (
+        (ON_A_SESSION, "session_id", session.id),
+        (ON_A_DRAWER, "register_id", session.register_id),
+    ):
+        for name, card in cards(counter, writes, datum, record).items():
+            assert datum not in values(card) and no_id(card), name
+
+
+def test_a_record_that_is_not_there_is_left_out_never_by_its_id():
+    for writes, datum in ((ON_A_SESSION, "session_id"), (ON_A_DRAWER, "register_id")):
+        for name, card in cards(ctx_for(), writes, datum, uuid.uuid7()).items():
+            assert datum not in values(card) and no_id(card), name
+
+
+@pytest.fixture
+def no_fallback(monkeypatch):
+    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database."""
+    monkeypatch.setattr(context, "_test_fallback", None)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_session_or_drawer_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+    """The read runs in the hub the person asks in: hub B's session or drawer is nobody in hub A."""
+    in_b = ctx_for(scope=Scope("host", hub_b.slug))
+    with use_hub(hub_b):
+        bar = run("cash_register.register.create", {"name": "Barra B"}, in_b)
+        session = run("cash_register.session.open", {"opening_balance": 0, "register_id": str(bar.id)}, in_b)
+        named_in_b = (
+            assistant.card(get("cash_register.count.add"), {"session_id": str(session.id), "total": 1}, "es", in_b),
+            assistant.card(get("cash_register.session.open"), {"register_id": str(bar.id)}, "es", in_b),
+        )
+    in_a = ctx_for(scope=Scope("host", hub_a.slug))
+    with use_hub(hub_a):
+        said = (
+            assistant.card(get("cash_register.count.add"), {"session_id": str(session.id), "total": 1}, "es", in_a),
+            assistant.card(get("cash_register.session.open"), {"register_id": str(bar.id)}, "es", in_a),
+        )
+    assert [("session_id" in values(card), "register_id" in values(card), no_id(card)) for card in said] == [
+        (False, False, True),
+        (False, False, True),
+    ]
+    # Positive control: in hub B the same cards name them.
+    assert (values(named_in_b[0])["session_id"], values(named_in_b[1])["register_id"]) == (session.number, "Barra B")
