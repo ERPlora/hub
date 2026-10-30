@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7887bf12470ca0a799edbd71b509a3dd6a434ab7e94665e29826b73542d356f9 -->
+<!-- generated from WORKBOOK.md sha256:c77f28d43529059114b49c5454505dee9b07f302f7254afd07db83f9a7d1c291 -->
 
 ## What it is for and who it is for
 
@@ -2255,8 +2255,10 @@ Screen: Assistant confirmation card
 Steps:
   1. The person asks it for something that changes data ("create the service Haircut at €15 for 30 minutes").
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
-     for example "Create in Services: Haircut · €15.00 · 30". An amount shows in the business's currency (never in
-     cents), except one of "What will happen" that its app gives in another currency, which shows in its own:
+     for example "Create in Services: Haircut · €15.00 · 30". An amount, every datum its app declares as money, shows
+     in the business's currency (never in cents), also inside a datum that groups others, and the assistant
+     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500";
+     except one of "What will happen" that its app gives in another currency, which shows in its own:
      rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and

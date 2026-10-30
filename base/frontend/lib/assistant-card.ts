@@ -1,6 +1,6 @@
 // The card of a write the assistant wants to run (BASE-G115, G116), as the server describes it (`base.assistant.turn`'s
 // `confirm`, base/assistant.py `card`): its action by its verb and its app by its name, never the operation's id; each
-// datum in words — an amount the schema says is in cents, in the business's currency (gh:hub#1045) or, in a preview,
+// datum in words — an amount its schema marks (`money`), in the business's currency (gh:hub#1045) or, in a preview,
 // the one its read answers, and, when it says it is signed (a difference), with its sign as Cash register writes it, a
 // yes or no, a dash for nothing, a list by how many. A normal write is one line; a dangerous one, every datum and what
 // to type.

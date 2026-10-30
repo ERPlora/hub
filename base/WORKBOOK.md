@@ -2370,8 +2370,10 @@ Pantalla: Tarjeta de confirmación del asistente
 Pasos:
   1. La persona le pide algo que cambia datos («crea el servicio Corte a 15 € de 30 minutos»).
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
-     línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe sale en la moneda del negocio (nunca en
-     céntimos), salvo uno de «Lo que va a pasar» que su app da en otra moneda, que sale en la suya: rectificar una
+     línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe, todo dato que su app declara como
+     dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
+     asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500»; salvo
+     uno de «Lo que va a pasar» que su app da en otra moneda, que sale en la suya: rectificar una
      factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
@@ -3067,7 +3069,21 @@ Implicados: ACCOUNTS-F38
   `test_every_attempt_key_of_a_write_is_marked_but_the_known_ones` (`UNMARKED_ATTEMPT_KEYS`, que solo baja: detecta
   por el nombre, `idempotency_key`, `job_key`, `submit_key`, `client_<x>_id` o con «idempoten»/«attempt_key», un
   texto sin la marca; hoy queda Bandeja de WhatsApp), con `test_an_attempt_key_is_marked_only_on_a_text`
-  (`base/tests/test_assistant_card_values.py`), la vista previa de una
+  (`base/tests/test_assistant_card_values.py`); un importe, el que su esquema marca `json_schema_extra={"money": True}`
+  (`MONEY`, siempre sobre un entero en la unidad menor de su moneda; en un tipo anotado, como `Cents` de Servicios,
+  vale en cada uso), sale arriba como `kind="money"` (lo pinta la pantalla en la moneda del negocio o, en la vista
+  previa, en la que dé su lectura) y, dentro de un objeto o de una lista, dicho por el servidor en esa misma moneda
+  (`_Words.amount`, con `money_text`); las palabras de su descripción no cuentan (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS:
+  «in minor units» y «in whole cents» dejaban un precio como «1500»; un nombre en `_cents` vale aún, mientras los
+  tests de Automatizaciones lo usan sin marca), `signed` exige la marca (`base.E005`) y las instrucciones del turno
+  dicen al modelo que un dato marcado `"money": true` va en la unidad menor; lo comprueban
+  `test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth`,
+  `test_the_model_is_told_an_amount_by_its_mark_whatever_its_description_says`,
+  `test_no_amount_the_card_painted_as_money_stops_being_one` y el trinquete
+  `test_every_amount_the_assistant_shows_or_fills_is_marked_but_the_known_ones` (`UNMARKED_AMOUNTS`, que solo baja:
+  detecta un entero con nombre en `_cents` o cuya descripción habla de «cents», «minor unit» o «céntimos», sin la
+  marca, en la entrada de cada herramienta y en los datos de su vista previa; hoy vacío), con
+  `test_an_amount_is_marked_only_on_a_whole_number`; la vista previa de una
   escritura peligrosa (BASE-F98, `preview`: su `ai=` lleva `"preview": {"operation": "<una query de su app>",
   "fields": [<datos de su respuesta>]}`; el turno la corre como la persona, `_run` con su `ctx`, con los datos de la
   escritura que su entrada toma, antes de la tarjeta; quita los vacíos y los `None`, lo que la lectura oculta; si no
