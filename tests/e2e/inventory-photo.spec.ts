@@ -18,6 +18,8 @@ import {
   cleanInventory,
   createProduct,
   dialog,
+  PHOTO_PNG,
+  photoLoaded,
   type Product,
   productBySku,
   productRow,
@@ -34,11 +36,6 @@ let coffee: Product;
 let toast: Product;
 let own: Product;
 
-/** A 64 × 64 PNG (a sun over red) the person picks on the device. */
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABG0lEQVR4nOWZy23EMBBD6YcUk7PPKWJL2NJSQsrY09S0FWQhjT4WrXc1wCFNyRCs4/XzLWeQOcgcZA4yB5mDzEHmIHOQOcgcZM7XCNHz9/Hfo3j+9Z11dDzMffA9LsnRJUCV9b4xjsYAaeu9YnC5e7XpcLn7RjVWcN+iySLu08qs4z6nz1LuE1PsjxKs9vprZ23TwDnx9VdN3KYB7wDn9PVTPnePBlYGmYPMQeYgc5A5aIcA0ftvVCFRMHePBu4QIKavoiibuE0DmltCFM/aqQHNKiFqplQ3MDpDVOpnltC4DFGvnNwDIzJESjO/iftmiKxa01eoV4Zo0Nn+juwmt5Q3uSe+BGQOMgeZg8xB5iBzkDnIHGQOVxto5Q3w1FTbH5ebCwAAAABJRU5ErkJggg==',
-  'base64',
-);
 const LIBRARY_URL = '/p/catalog/hospitality/cafe_con_leche.webp';
 
 test.beforeAll(async ({ browser }) => {
@@ -65,14 +62,6 @@ test.afterAll(async ({ browser }) => {
   cleanInventory();
   restoreDrawer();
 });
-
-/** Whether the `<img>` in `scope` has loaded its file (a broken one has no natural width). */
-async function loaded(scope: Locator): Promise<number> {
-  const img = scope.locator('img').first();
-  await expect(img).toBeVisible();
-  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
-  return img.evaluate((el: HTMLImageElement) => el.naturalWidth);
-}
 
 async function editForm(page: Page, product: Product): Promise<Locator> {
   await login(page, A, '/inventory/products');
@@ -101,7 +90,7 @@ test('INVENTORY-F30: a library image searched in Spanish is the article’s phot
   const choice = library.locator('[data-testid=inventory-product-image-library-modal-image-hospitality-cafe_con_leche]');
   await expect(choice).toBeVisible();
   await expect(choice).toContainText(/Café con leche|Coffee with milk/);
-  await loaded(choice);
+  await photoLoaded(choice);
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await capture(page, `APP-INVENTORY-F30-${viewport.label}`);
@@ -117,7 +106,7 @@ test('INVENTORY-F30: a library image searched in Spanish is the article’s phot
   const saved = await productBySku(context, coffee.sku);
   expect(saved).toMatchObject({ image: 'catalog:hospitality/cafe_con_leche', image_url: LIBRARY_URL });
   const thumb = shown(page).locator(`[data-testid=inventory-product-photo-${coffee.id}]`).first();
-  expect(await loaded(thumb)).toBe(512);
+  expect(await photoLoaded(thumb)).toBe(512);
 });
 
 test('INVENTORY-F31: a photo of its own goes up with «Save changes» and comes back as a 512 × 512 WebP', async ({ page, context }) => {
@@ -132,7 +121,7 @@ test('INVENTORY-F31: a photo of its own goes up with «Save changes» and comes 
   );
   await expect(form.locator('[data-testid=inventory-product-image-preview] img')).toHaveCount(0);
 
-  await file.setInputFiles({ name: 'house-cake.png', mimeType: 'image/png', buffer: PNG });
+  await file.setInputFiles({ name: 'house-cake.png', mimeType: 'image/png', buffer: PHOTO_PNG });
   await expect(form.locator('[data-testid=inventory-product-image-error]')).toHaveCount(0);
   await expect(form.locator('[data-testid=inventory-product-image-preview] img')).toHaveAttribute('src', /^data:image\/png;base64,/);
   await form.locator('[data-testid=inventory-product-form-submit]').click();
@@ -144,7 +133,7 @@ test('INVENTORY-F31: a photo of its own goes up with «Save changes» and comes 
   expect(url).toMatch(/^\/p\/media\/[^/]+\/inventory\/products\/[0-9a-f]+\.webp$/);
   const thumb = shown(page).locator(`[data-testid=inventory-product-photo-${own.id}]`).first();
   await expect(thumb.locator('img')).toHaveAttribute('src', url);
-  expect(await loaded(thumb)).toBe(512);
+  expect(await photoLoaded(thumb)).toBe(512);
   const served = await page.request.get(`${A}${url}`);
   expect([served.status(), served.headers()['content-type']]).toEqual([200, 'image/webp']);
 });
@@ -159,8 +148,8 @@ test('INVENTORY-F32: the till shows each article’s photo, and the initials ove
     const photo = tile(page, coffee).locator('.pos-tile__thumb img');
     await expect(photo).toHaveAttribute('src', LIBRARY_URL);
     await expect(photo).toHaveAttribute('alt', coffee.name);
-    expect(await loaded(tile(page, coffee).locator('.pos-tile__thumb'))).toBe(512);
-    expect(await loaded(tile(page, own).locator('.pos-tile__thumb'))).toBe(512);
+    expect(await photoLoaded(tile(page, coffee).locator('.pos-tile__thumb'))).toBe(512);
+    expect(await photoLoaded(tile(page, own).locator('.pos-tile__thumb'))).toBe(512);
     // Without a photo: its initials over its colour, never a gap nor a broken image.
     const initials = tile(page, toast).locator('.pos-tile__thumb');
     await expect(initials.locator('img')).toHaveCount(0);
