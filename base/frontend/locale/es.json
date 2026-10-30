@@ -1383,6 +1383,21 @@
           "write_off": "Dar de baja",
           "other": "Hacer esto"
         },
+        "operations": {
+          "cart_checkout": {
+            "cart": {
+              "clear": "Vaciar"
+            }
+          },
+          "cash_register": {
+            "count": {
+              "add": "Registrar arqueo"
+            },
+            "movement": {
+              "add": "Registrar movimiento"
+            }
+          }
+        },
         "fields": {
           "name": "Nombre",
           "price": "Precio",

@@ -458,26 +458,69 @@ def test_each_screen_a_receipt_names_by_its_key_is_named_alike_by_the_screen(lan
     assert (assistant.screen(pin), assistant.screen(get("demo.item.create"))) == ("settings", "")
 
 
-def named_actions() -> dict[str, dict[str, str]]:
-    """The verbs the card and its receipt name an action by, per language: ``base.assistant.card.actions`` of base's
-    catalogues, the very keys ``assistant-card.ts`` ``actionKey`` looks the card's ``action`` up in («other» is «Do
-    this»)."""
+def card_catalogues() -> dict[str, dict]:
+    """``base.assistant.card`` of base's catalogues, per language."""
     locale = Path(settings.BASE_DIR) / "base/frontend/locale"
     return {
-        language: json.loads((locale / f"{language}.json").read_text())["base"]["assistant"]["card"]["actions"]
+        language: json.loads((locale / f"{language}.json").read_text())["base"]["assistant"]["card"]
         for language in ("en", "es")
     }
 
 
+def named_operations() -> dict[str, dict[str, str]]:
+    """The writes with a verb of their own, per language, by their name: ``base.assistant.card.operations.<app>.
+    <entity>.<action>`` of base's catalogues, for one whose action's verb does not say what it does (emptying a cart is
+    not taking one of its lines out)."""
+    return {
+        language: {
+            f"{app}.{entity}.{action}": verb
+            for app, entities in card["operations"].items()
+            for entity, actions in entities.items()
+            for action, verb in actions.items()
+        }
+        for language, card in card_catalogues().items()
+    }
+
+
+def named_actions() -> dict[str, dict[str, str]]:
+    """The verbs the card and its receipt name a write by, per language, as ``assistant-card.ts`` ``actionKey`` looks
+    them up: its whole operation's (``named_operations``), else its card's ``action``'s, ``base.assistant.card.actions``
+    («other» is «Do this»). An operation goes by its name, with its dots; an action, which has none, by its own."""
+    operations = named_operations()
+    return {language: {**card["actions"], **operations[language]} for language, card in card_catalogues().items()}
+
+
+def verb(op: Operation, verbs: dict[str, str], language: str = "en") -> str:
+    """The verb a write's card and receipt say in a language whose verbs are ``verbs`` (``named_actions``): its whole
+    operation's, else its action's; '' = none («Do this»)."""
+    action = assistant.card(op, {}, language)["action"]
+    return "" if action == "other" else str(verbs.get(op.name) or verbs.get(action, "")).strip()
+
+
 def unnamed(operations: Iterable[Operation], verbs: dict[str, dict[str, str]]) -> list[str]:
-    """The writes the assistant may call whose card and receipt would say «Do this» in a language: their card's
-    ``action`` has no verb of its own there."""
+    """The writes the assistant may call whose card and receipt would say «Do this» in a language: neither their
+    operation nor their card's ``action`` has a verb there."""
     return sorted(
         f"{language}: {op.name}"
         for op in operations
         if op.kind == "command" and assistant.is_tool(op)
-        for language, actions in verbs.items()
-        if (action := assistant.card(op, {}, language)["action"]) == "other" or not str(actions.get(action, "")).strip()
+        for language, named in verbs.items()
+        if not verb(op, named, language)
+    )
+
+
+def misnamed(verbs: dict[str, dict[str, str]]) -> list[str]:
+    """The operations' own verbs (``named_operations``) that would never be said, or said in one language only: one
+    that names no write the assistant may call (a typo, one renamed or gone: its card falls back to its action's verb in
+    silence), or with no words in a language whose catalogue another one names it in."""
+    def write(name: str) -> bool:
+        return (op := registry.get(name)) is not None and op.kind == "command" and assistant.is_tool(op)
+
+    return sorted(
+        f"{language}: {name}"
+        for name in set().union(*verbs.values())
+        for language, named in verbs.items()
+        if not write(name) or not str(named.get(name, "")).strip()
     )
 
 
@@ -504,6 +547,51 @@ def test_the_guardrail_catches_a_write_whose_verb_nobody_names():
     assert unnamed([FROBNICATE], named_actions()) == ["en: demo.item.frobnicate", "es: demo.item.frobnicate"]
     # A read never shows a card nor a receipt: it needs no verb.
     assert unnamed([get("demo.item.list")], {"en": {}, "es": {}}) == []
+
+
+def test_a_write_whose_actions_verb_does_not_say_what_it_does_is_named_by_its_own():
+    """FIX-HUB-BASE-ASSISTANT-CARD-SAYS-REMOVE-FOR-EMPTYING-A-CART: emptying a cart (``cart_checkout.cart.clear``) said
+    «Quitar», the verb of taking one of its lines out, which Kitchen's ``clear`` (taking a product's route away) does
+    say; a cash count (``cash_register.count.add``) said «Añadir», as if it put money in. Their own verb goes first;
+    their action's still names the rest."""
+    verbs = named_actions()
+    names = (
+        "cart_checkout.cart.clear",
+        "cart_checkout.item.remove",
+        "kitchen.routing.clear",
+        "cash_register.count.add",
+        "cash_register.movement.add",
+        "cart_checkout.item.add",
+    )
+    assert {name: (verb(get(name), verbs["es"], "es"), verb(get(name), verbs["en"])) for name in names} == {
+        "cart_checkout.cart.clear": ("Vaciar", "Clear"),
+        "cart_checkout.item.remove": ("Quitar", "Remove"),
+        "kitchen.routing.clear": ("Quitar", "Clear"),
+        "cash_register.count.add": ("Registrar arqueo", "Register count"),
+        "cash_register.movement.add": ("Registrar movimiento", "Register movement"),
+        "cart_checkout.item.add": ("Añadir", "Add"),
+    }
+
+
+def test_each_verb_of_its_own_names_a_write_the_assistant_may_call_in_english_and_spanish():
+    assert misnamed(named_operations()) == []
+
+
+def test_the_guardrail_catches_a_verb_of_its_own_that_would_never_be_said():
+    verbs = {
+        "en": {"cart_checkout.cart.clear": "Clear", "cart_checkout.cart.clean": "Clear", "cart_checkout.cart.list": "List"},
+        "es": {"cart_checkout.cart.clear": " ", "cart_checkout.cart.clean": "Vaciar"},
+    }
+    # A typo, a read (which shows no card) and one with no words in Spanish.
+    assert misnamed(verbs) == [
+        "en: cart_checkout.cart.clean",
+        "en: cart_checkout.cart.list",
+        "es: cart_checkout.cart.clean",
+        "es: cart_checkout.cart.clear",
+        "es: cart_checkout.cart.list",
+    ]
+    # A write's own verb names it even where its action has none.
+    assert unnamed([FROBNICATE], {"en": {"demo.item.frobnicate": "Frobnicate"}, "es": {}}) == ["es: demo.item.frobnicate"]
 
 
 def test_a_dangerous_write_asks_to_type_a_word_in_the_persons_language():
