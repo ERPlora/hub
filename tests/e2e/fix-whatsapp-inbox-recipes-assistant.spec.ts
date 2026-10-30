@@ -7,9 +7,10 @@
 // gallery too: FLOW-F33); the message of a guest who wrote before (their card, come by WhatsApp, already in Customers)
 // comes in as erplora.com pushes it; the worker's relay hands its event to Automations, whose run reads it, thanks them,
 // finds their card and asks the assistant with only what the answer was granted, naming that card; the reservation it
-// wants on it waits in «Waiting for your answer» with whom it is for, and the owner's «Approve» books it in Reservas.
+// wants, with only their name and phone, waits in «Waiting for your answer» with whom it is for, and the owner's
+// «Approve» books it in Reservas, on the card Reservas finds by that phone with no right of the step in Customers.
 // «Turn off» pauses both, never deleting them (F17).
-// flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F14 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33
+// flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F14 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33 FLOW-F12
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -160,12 +161,12 @@ for (const viewport of VIEWPORTS) {
       await capture(page, `${TASK}-settings-${viewport.label}`);
 
       // F24: they write; the relay starts the answer, which thanks them, finds their card and asks the assistant, who
-      // books on that card by its id, as the answer tells it (with the id, Reservas looks no one up).
+      // books with only their name and phone: Reservas finds the card by that phone itself, though the step holds no
+      // right in Customers (FLOW-F12, FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED).
       const phone = e2ePhone();
       const guest = await api<{ id: string }>(context, A, 'POST', '/customer/customers', { name: 'E2E Lucía', phone, source: 'whatsapp' });
       expect(guest.status, JSON.stringify(guest.data)).toBe(201);
       const booking = {
-        customer_id: guest.data.id,
         guest_name: 'E2E Lucía',
         guest_phone: phone,
         date: DAY.date,
@@ -228,6 +229,7 @@ for (const viewport of VIEWPORTS) {
         ),
         `what Reservas answered: ${psql(`select outputs->'_turn'->'messages' from flow_flowrun where flow_id = '${flowId}'`)}`,
       ).toBe(`4 21:00:00 whatsapp ${guest.data.id}`);
+      expect(psql(`select count(*) from customer_customer where source = 'whatsapp' and phone like '%${phone.slice(-9)}'`)).toBe('1');
       const asked = chats();
       await relay(parkedEvent(flowId));
       expect(chats()).toBe(asked + 1);

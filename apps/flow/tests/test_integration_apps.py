@@ -17,9 +17,10 @@ import pytest
 from live.context import system_context
 from live.models import OutboxEvent
 
-from apps.customer.models import Activity
+from apps.customer.models import Activity, Customer
 from apps.flow import events
 from apps.flow.models import FlowRun
+from apps.reservation.models import Reservation
 from apps.task.models import Task
 
 from .conftest import A, ctx_for, run
@@ -274,3 +275,128 @@ def test_a_chain_of_real_events_is_stopped_when_it_would_start_itself_again():
     ).get()
     assert stopped.error_code == "flow.loop_stopped"
     assert Task.objects.count() == 2
+
+
+# ── Booking a table by the guest's phone (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED) ─────────────
+
+
+#: «Book a table» with what a call or a message gives: the guest's name and phone, never her card.
+BOOK_BY_PHONE = {
+    "id": "s1",
+    "kind": "command",
+    "operation": "reservation.reservation.create",
+    "params": {
+        "guest_name": "input.name",
+        "guest_phone": "input.phone",
+        "date": "2026-10-16",
+        "time": "21:00",
+        "party_size": 2,
+    },
+}
+
+
+@pytest.fixture
+def open_book(clock):
+    """Reservations open every day for lunch and dinner, on the 15th at noon."""
+    from apps.reservation.tests.conftest import open_week
+
+    clock(NOON)
+    open_week()
+
+
+def book_by_phone(phone: str, name: str = "Ana García"):
+    """Runs an automation granted only «reservation.reservation.create» that books for ``name`` by ``phone``."""
+    flow = create_automation(
+        {"name": "Book by phone", "trigger": {"kind": "manual"}, "steps": [BOOK_BY_PHONE]},
+        ["reservation.reservation.create"],
+    )
+    return run("flow.flow.run", {"id": flow, "input": {"name": name, "phone": phone}})
+
+
+def test_an_automation_books_by_phone_with_the_guests_card_found_by_her_phone(open_book):
+    # FLOW-F12: what was granted («reservation.reservation.create») is enough for what booking does itself in
+    # Customers; before, the step was refused «customer.view» and nothing was booked.
+    card = run("customer.customer.create", {"name": "Ana García", "phone": "600111222"}, system_context(A))
+    result = book_by_phone("600 111 222")
+    assert (result.status, result.error_code) == ("succeeded", "")
+    booked = Reservation.objects.get()
+    assert (booked.customer_id, booked.guest_phone) == (card.id, "+34600111222")
+
+
+def test_an_automation_books_a_new_phone_under_a_new_card(open_book):
+    result = book_by_phone("600 333 444", name="Luis Pérez")
+    assert (result.status, result.error_code) == ("succeeded", "")
+    card = Customer.objects.get(pk=Reservation.objects.get().customer_id)
+    assert (card.name, card.phone) == ("Luis Pérez", "+34600333444")
+
+
+# ── Reservas' other operations an automation may be granted that call another app ─────────────────────
+
+
+def tables():
+    from apps.reservation.tests.conftest import make_table
+
+    return make_table("5"), make_table("6")
+
+
+def booked(table=None, **more):
+    """A reservation for the 16th at 21:00, taken by the platform (on ``table`` when given)."""
+    data = {"guest_name": "Ana García", "guest_phone": "600111222", "date": "2026-10-16", "time": "21:00", "party_size": 2}
+    if table is not None:
+        data["table_id"] = str(table.id)
+    return run("reservation.reservation.create", data | more, system_context(A))
+
+
+def one_step(operation: str, params: dict):
+    """Runs an automation granted only ``operation``, whose one step runs it with ``params``."""
+    flow = create_automation(
+        {"name": f"Only {operation}", "trigger": {"kind": "manual"}, "steps": [{"id": "s1", "kind": "command", "operation": operation, "params": params}]},
+        [operation],
+    )
+    result = run("flow.flow.run", {"id": flow})
+    assert (result.status, result.error_code) == ("succeeded", ""), result.error_message
+
+
+def held_tables(reservation_id) -> list[str]:
+    from apps.reservation.tests.conftest import holds
+
+    return [hold.table.number for hold in holds(reservation_id) if hold.status == "held"]
+
+
+def test_an_automation_confirms_a_reservation_and_tables_holds_its_table(open_book):
+    # The hold is Tables' platform operation, called with that one permission (``table_system``): nothing of the step's.
+    five, _ = tables()
+    pending = booked(five)
+    one_step("reservation.reservation.confirm", {"id": str(pending.id)})
+    assert Reservation.objects.get(pk=pending.id).status == "confirmed"
+    assert held_tables(pending.id) == ["5"]
+
+
+def test_an_automation_moves_a_confirmed_reservation_to_another_table_and_off_any(open_book):
+    five, six = tables()
+    confirmed = booked(five)
+    run("reservation.reservation.confirm", {"id": str(confirmed.id)}, system_context(A))
+    one_step("reservation.reservation.update", {"id": str(confirmed.id), "table_id": str(six.id)})
+    assert held_tables(confirmed.id) == ["6"]
+    one_step("reservation.reservation.update", {"id": str(confirmed.id), "no_table": True})
+    assert held_tables(confirmed.id) == []
+
+
+def test_an_automation_writes_a_new_phone_on_the_waitlist_and_converts_it(open_book):
+    from apps.reservation.models import WaitlistEntry
+
+    one_step(
+        "reservation.waitlist.create",
+        {"guest_name": "Luis Pérez", "guest_phone": "600 333 444", "date": "2026-10-16", "preferred_time": "21:00", "party_size": 2},
+    )
+    entry = WaitlistEntry.objects.get()
+    assert Customer.objects.get(pk=entry.customer_id).phone == "+34600333444"
+    one_step("reservation.waitlist.convert", {"id": str(entry.id)})
+    assert Reservation.objects.get().customer_id == entry.customer_id
+
+
+def test_an_automation_completes_a_seated_reservation(open_book):
+    seated = booked()
+    run("reservation.reservation.seat", {"id": str(seated.id)}, system_context(A))
+    one_step("reservation.reservation.complete", {"id": str(seated.id)})
+    assert Reservation.objects.get(pk=seated.id).status == "completed"

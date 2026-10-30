@@ -104,3 +104,59 @@ def test_only_what_the_caller_may_do_is_granted():
 def test_a_normal_step_still_runs_with_its_narrow_permission():
     flow = make_flow(trigger_kind="manual", steps=[TASK_STEP])
     assert run("flow.flow.run", {"id": str(flow.id)}).status == "succeeded"
+
+
+def test_a_step_that_books_by_phone_still_holds_nothing_of_customers():
+    # FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED: booking finds or makes the guest's card by itself, the step
+    # never gets Customers' rights: it can neither look a card up nor make one on its own.
+    flow = make_flow(grants=["reservation.reservation.create"])
+    started = FlowRun.objects.create(flow=flow, flow_version=1, trigger_kind="manual", trigger_key="k")
+    ctx = services._step_context(ctx_for(scope=A), started, flow, get("reservation.reservation.create"))
+    assert not ctx.has("customer.view") and not ctx.has("customer.manage")
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.by_phone", {"phone": "600111222"}, ctx)
+    with pytest.raises(PermissionDenied):
+        run("customer.customer.create", {"name": "Ana García", "phone": "600111222"}, ctx)
+
+
+SEAT = {"id": "s1", "kind": "command", "operation": "reservation.reservation.seat", "params": {"id": "input.reservation_id"}}
+
+
+def test_seating_a_party_needs_a_person_at_the_door_so_no_automation_is_granted_it():
+    # Seating is done by whoever receives the party, and it opens the table's check in Sales (market: OpenTable,
+    # SevenRooms, Resy, Toast Tables, Yelp Guest Manager, TheFork Manager, CoverManager, Tock: automations confirm,
+    # remind and release; none seats). Refused as what needs a person, when saved and when granted.
+    from apps.flow.queries import catalog_operations
+
+    assert "reservation.reservation.seat" not in catalog_operations()
+    with pytest.raises(InvalidPayload) as refused:
+        run("flow.flow.create", {"steps": [SEAT]})
+    assert refused.value.code == "flow.high_risk"
+    with pytest.raises(InvalidPayload) as refused:
+        run("flow.flow.grant", {"id": str(make_flow(grants=[]).id), "operations": ["reservation.reservation.seat"]})
+    assert refused.value.code == "flow.high_risk"
+
+
+def test_a_seat_step_that_slipped_in_seats_nobody(clock):
+    # Written straight in the table, as an old row could leave it: refused when it runs, the party not seated and no
+    # check opened.
+    import datetime as dt
+
+    from live.context import system_context
+
+    from apps.reservation.models import Reservation
+    from apps.reservation.tests.conftest import make_table, open_week
+    from apps.table.models import TableSession
+
+    clock(dt.datetime(2026, 10, 15, 12, 0, tzinfo=dt.UTC))
+    open_week()
+    booked = run(
+        "reservation.reservation.create",
+        {"guest_name": "Ana García", "guest_phone": "600111222", "date": "2026-10-16", "time": "21:00", "party_size": 2, "table_id": str(make_table("5").id)},
+        system_context(A),
+    )
+    flow = make_flow(trigger_kind="manual", steps=[SEAT], grants=["reservation.reservation.seat"])
+    result = run("flow.flow.run", {"id": str(flow.id), "input": {"reservation_id": str(booked.id)}})
+    assert (result.status, result.error_code) == ("failed", "flow.high_risk")
+    assert Reservation.objects.get(pk=booked.id).status == "pending"
+    assert TableSession.objects.count() == 0
