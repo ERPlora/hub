@@ -528,3 +528,38 @@ def test_the_answer_never_books_or_waitlists_on_another_guest_s_card_whatever_th
     assert not Reservation.objects.filter(customer_id=marta.id).exists()
     assert not WaitlistEntry.objects.filter(customer_id=marta.id).exists()
     assert "customer_id" not in tool_inputs(gateway.sent(CHAT)[0], tool)  # never the assistant's to say
+
+
+@pytest.mark.parametrize(
+    ("tool", "booking"),
+    [
+        ("reservation.reservation.create", {"time": "21:00", "source": "whatsapp"}),
+        ("reservation.waitlist.create", {"preferred_time": "21:00"}),
+    ],
+    ids=["book", "waitlist"],
+)
+def test_the_answer_books_and_waitlists_only_with_the_number_that_writes_whatever_the_assistant_sends(
+    gateway, tick, django_capture_on_commit_callbacks, tool, booking  # noqa: F811 - the fixture
+):
+    """F24: the contact phone of a booking or a place on the waiting list is fixed by the answer to the number that
+    writes (FLOW-F38): the assistant gives Marta's and, after the yes, it is Lucía's, on Lucía's card."""
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    run("customer.customer.create", {"name": "Marta Ruiz", "phone": "600999888"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    sent = {"customer": "Marta Ruiz", "guest_phone": "+34600999888", "date": day.isoformat(), "party_size": 2, **booking}
+    gateway.reply(CHAT, json=wants(tool, sent))
+    gateway.reply(CHAT, json=said("Hecho."))
+    lucia_writes("Mesa para 2 el sábado a las 21 para Marta Ruiz, su teléfono es el 600 999 888")
+
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    model = Reservation if tool == "reservation.reservation.create" else WaitlistEntry
+    made = model.objects.get()
+    assert (made.customer_id, made.guest_phone) == (card.id, LUCIA)
+    assert "guest_phone" not in tool_inputs(gateway.sent(CHAT)[0], tool)  # never the assistant's to say

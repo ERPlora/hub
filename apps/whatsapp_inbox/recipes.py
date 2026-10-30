@@ -207,6 +207,8 @@ _TABLE_HEAD, _TABLE_TAIL = _answer_steps(
 #: Their card: the one of their number or, with none, a new one marked as come by WhatsApp (CUSTOMER-F26). Booking on it
 #: by its id is also what lets Reservas book without looking anyone up.
 _THEIR_CARD = "{{steps.s6.id}}{{steps.s7.id}}"
+#: The contact phone of what they book or wait for: the number that writes, never another one.
+_THEIR_NUMBER = "steps.s1.phone"
 _CARD = [
     {"id": "s6", "kind": "query", "operation": "customer.customer.by_phone", "params": {"phone": "steps.s1.phone"}},
     {
@@ -235,7 +237,7 @@ TABLE_PROMPT = _(
     "{{steps.s8.auto_confirm}}.\n\n"
     "Do what they ask, and only that:\n"
     "- To book a table: the day, the time and how many come are theirs to say, never yours. When they are said and "
-    "there is room, book it with the phone {{steps.s1.phone}}, the name they give (or "
+    "there is room, book it with the name they give (or "
     "{{steps.s1.display_name}}) and source «whatsapp»; with no room, offer them a short numbered list of other times, "
     "or the waiting list.\n"
     "- To change their reservation: change only that same reservation, by its id.\n"
@@ -290,15 +292,15 @@ RECIPES += [
                     "reservation.reservation.cancel",
                     "reservation.waitlist.create",
                 ],
-                # Whose card a booking or a place on the waiting list goes on, and whose reservation a change or a
-                # cancellation is: their card, put in over whatever the assistant sends. Reservas takes the card by
-                # its id before any name the assistant may give (``customer``), and refuses any reservation that is
-                # not theirs (``reservation.customer_mismatch``).
+                # Whose card a booking or a place on the waiting list goes on and with which phone, and whose
+                # reservation a change or a cancellation is: their card and their number, put in over whatever the
+                # assistant sends. Reservas takes the card by its id before any name the assistant may give
+                # (``customer``), and refuses any reservation that is not theirs (``reservation.customer_mismatch``).
                 "pinned": {
-                    "reservation.reservation.create": {"customer_id": _THEIR_CARD},
+                    "reservation.reservation.create": {"customer_id": _THEIR_CARD, "guest_phone": _THEIR_NUMBER},
                     "reservation.reservation.update": {"on_behalf_of": _THEIR_CARD},
                     "reservation.reservation.cancel": {"on_behalf_of": _THEIR_CARD},
-                    "reservation.waitlist.create": {"customer_id": _THEIR_CARD},
+                    "reservation.waitlist.create": {"customer_id": _THEIR_CARD, "guest_phone": _THEIR_NUMBER},
                 },
                 "mode": "ask",
                 "max_rounds": 8,

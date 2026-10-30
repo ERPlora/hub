@@ -717,9 +717,10 @@ Pasos:
    con el acuse.
 Entra: el mensaje escrito y la ficha de su teléfono si ya la tiene.
 Sale: reserva confirmada o pendiente, o entrada en la lista de espera (Reservas, `reservation.reservation.created`),
-con su teléfono y el nombre que dé en el mensaje (si no da ninguno, el de su WhatsApp), ligada a su ficha o, si su
-teléfono no tiene, a una nueva de origen WhatsApp (Clientes), y respuesta por WhatsApp; nunca a la ficha de otra
-persona aunque el mensaje la nombre: la ficha la pone la automatización y el asistente no puede cambiarla.
+con el teléfono desde el que escribe y el nombre que dé en el mensaje (si no da ninguno, el de su WhatsApp), ligada a
+su ficha o, si su teléfono no tiene, a una nueva de origen WhatsApp (Clientes), y respuesta por WhatsApp; nunca a la
+ficha de otra persona aunque el mensaje la nombre, ni con otro teléfono aunque el mensaje lo dé: la ficha y el
+teléfono los pone la automatización y el asistente no puede cambiarlos.
 Si falla: F20; sin plazas o con demasiados comensales, se le explica. Con los mensajes del plan del mes
 gastados no recibe nada (ni acuse, ni respuesta, ni reserva) y su mensaje queda en la bandeja con
 «Necesita atención» (F13).
@@ -1631,16 +1632,19 @@ Automatizaciones solo lo concede porque el paso pregunta antes (`ASK_FIRST`, FLO
 `reservation.change_reservation`. El encargo le da el id de la última reserva del número (`steps.s9.id`) y le pide
 anular solo esa; en qué ficha no se le pide: el paso fija su ficha (`{{steps.s6.id}}{{steps.s7.id}}`) con `pinned`
 (FLOW-F38, hub#436) en las cuatro escrituras, `customer_id` en `reservation.reservation.create` y
-`reservation.waitlist.create` y `on_behalf_of` en `reservation.reservation.update` y `reservation.reservation.cancel`.
+`reservation.waitlist.create` y `on_behalf_of` en `reservation.reservation.update` y `reservation.reservation.cancel`;
+en las dos primeras también `guest_phone` = el número que escribe (`steps.s1.phone`), así que la reserva o la espera
+nunca llevan el teléfono de contacto de otra persona.
 El asistente no lo ve en el esquema de la herramienta y lo que envíe se sustituye. Reservas toma la ficha por su id
 antes que por el nombre que dé el modelo (`customer`, `find_customer`), así que reservar o apuntar en la lista de espera
 «a nombre de Marta Ruiz» cae en la ficha de quien escribe; y rechaza cambiar o anular una reserva que no es de esa
 ficha aunque el modelo la nombre por su id o por su cliente y día, o diga la ficha de otra persona
 (`reservation.customer_mismatch`, RESERVATION-F18, reservations#50; el cambio, además, con las reglas de un cliente que
 reserva él mismo y sin tocar la mesa ni las notas internas, `reservation.staff_only_field`). Por eso el encargo no
-menciona la ficha ni `on_behalf_of`. Lo prueban
+menciona la ficha, el teléfono con que reservar ni `on_behalf_of`. Lo prueban
 `tests/test_relay_auto_replies.py::test_the_answer_never_cancels_or_changes_another_guest_s_reservation_whatever_the_assistant_sends`,
-`tests/test_relay_auto_replies.py::test_the_answer_never_books_or_waitlists_on_another_guest_s_card_whatever_the_assistant_sends`
+`tests/test_relay_auto_replies.py::test_the_answer_never_books_or_waitlists_on_another_guest_s_card_whatever_the_assistant_sends`,
+`tests/test_relay_auto_replies.py::test_the_answer_books_and_waitlists_only_with_the_number_that_writes_whatever_the_assistant_sends`
 y `tests/test_recipes.py::test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_behalf`.
 La tarjeta de Ajustes enciende la respuesta y su aviso (F26). La receta cambió de huella al añadir la anulación y otra
 vez al fijar la ficha: quien ya la tenía encendida la ve como versión nueva en Automatizaciones y la actualiza con F18
