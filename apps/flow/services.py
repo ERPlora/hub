@@ -37,6 +37,11 @@ from apps.flow import document, events, gateway, http, recipes, vault
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.queries import (
     ASSISTANT_GONE_KEY,
+    DRAFT_NOT_FOUND,
+    QUESTION_CLOSED,
+    QUESTION_NOT_FOUND,
+    QUESTION_NOT_YOURS,
+    RUN_NOT_FOUND,
     HIGH_RISK_CODE,
     LEAVES,
     ANSWER,
@@ -113,17 +118,12 @@ PAST_DATE = _("That date and time has already passed.")
 DISABLED = _("This automation is paused: turn it on to run it.")
 DRAFT_DECIDED = _("That draft was already decided.")
 GRANT_BEYOND_CALLER = _("You cannot allow what you may not do yourself: «%(name)s».")
-DRAFT_NOT_FOUND = _("That draft does not exist in this business.")
-RUN_NOT_FOUND = _("That run does not exist in this business.")
 RECIPE_NOT_ON = _("This business has not turned that automation on: there is nothing to change.")
 SECRETS_KEY_MISSING = _(
     "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
 )
 SECRET_NOT_FOUND = _("There is no secret called «%(name)s».")
-QUESTION_NOT_FOUND = _("That question does not exist in this business.")
-QUESTION_NOT_YOURS = _("This question was asked of someone else: you cannot answer it.")
 QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.")
-QUESTION_CLOSED = _("This question is closed: its automation no longer waits for it.")
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
 ASSISTANT_WANTS = _("The assistant wants to change something in «%(app)s»")
 APPROVAL_BEYOND_YOU = _("Only someone who may do it themselves can say yes to «%(name)s».")

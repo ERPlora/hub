@@ -245,6 +245,12 @@ export interface RunRefIn {
   id: string;
 }
 
+/** A run read by its id also says the words it is named by, in the caller's language: its automation and when it
+ *  started, as the History says it (the assistant's card says them). */
+export interface RunDetailOut extends RunOut {
+  label: string;
+}
+
 /** A question an automation asked and waits on (FLOW-F29), as «Waiting for your answer» shows it. */
 export interface QuestionOut {
   id: string;
@@ -265,8 +271,10 @@ export interface QuestionOut {
 export interface QuestionPageOut {
   rows: QuestionOut[];
 }
-export interface AnswerIn {
+export interface QuestionRefIn {
   id: string;
+}
+export interface AnswerIn extends QuestionRefIn {
   approve: boolean;
   note?: string;
 }
@@ -505,13 +513,16 @@ declare module '@erplora/ui/sdk' {
     'flow.flow.grant': { input: GrantIn; output: FlowOut };
     'flow.flow.run': { input: RunIn; output: RunOut };
     'flow.run.list': { input: RunListIn; output: RunPageOut };
+    'flow.run.get': { input: RunRefIn; output: RunDetailOut };
     'flow.run.retry': { input: RunRefIn; output: RunOut };
     'flow.secret.list': { input: Record<string, never>; output: SecretPageOut };
     'flow.secret.set': { input: SecretSetIn; output: SecretOut };
     'flow.secret.delete': { input: SecretRefIn; output: DeletedOut };
     'flow.question.list': { input: Record<string, never>; output: QuestionPageOut };
+    'flow.question.get': { input: QuestionRefIn; output: QuestionOut };
     'flow.question.answer': { input: AnswerIn; output: AnsweredOut };
     'flow.draft.list': { input: DraftListIn; output: Page<DraftOut> };
+    'flow.draft.get': { input: DraftRefIn; output: DraftOut };
     'flow.draft.propose': { input: DraftProposeIn; output: DraftOut };
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };
     'flow.catalog.read': { input: Record<string, never>; output: CatalogOut };
