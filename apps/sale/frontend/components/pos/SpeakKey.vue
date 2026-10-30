@@ -5,16 +5,14 @@
 // A tap records («Listening…»: the key turns «Stop»), the next one stops; erplora.com transcribes, the words land in
 // the assistant's box after what was written and its panel opens: the person sees what was understood and sends it,
 // and a write still asks its card. Nothing is sent by itself. A refused microphone, an empty or too long dictation and
-// a failure are a toast. The dictation is base's (`useDictation`, PLAN-HUB §18: one recording per tap, two minutes,
-// 2 MB, the words into the box and the panel open, the recording thrown away on leaving); the key says each reason
-// with its own text and keeps the offline guard base does not have.
+// a failure are a toast. The dictation is the shared assistant's (`useDictation` of @erplora/ui, PLAN-HUB §18: one
+// recording per tap, two minutes, 2 MB, the words into the box and the panel open, the recording thrown away on
+// leaving); the key says each reason with its own text and keeps the offline guard the dictation does not have.
+import { ASSISTANT_ICONS, browserVoice, type DictationProblem, useDictation, type VoiceEnv } from '@erplora/ui/components';
 import { toast, useSession } from '@erplora/ui/shell';
 import { IonIcon, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
-import { ASSISTANT_ICONS } from '../../../../../base/frontend/lib/assistant-icons';
-import { browserVoice, type VoiceEnv } from '../../../../../base/frontend/lib/assistant-input';
-import { type DictationProblem, useDictation } from '../../../../../base/frontend/lib/dictation';
 import { useT } from '../../composables/useT';
 
 const props = withDefaults(defineProps<{ voice?: VoiceEnv }>(), { voice: () => browserVoice() });

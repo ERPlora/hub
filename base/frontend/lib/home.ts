@@ -2,7 +2,7 @@
 // the fold of «Finish setting up your business», the blocking strip's steps, a panel's data → what it paints,
 // the panels this browser keeps on, and «My apps» in the order this browser opens them. Ported from the old
 // hub's `dashboard-heading.ts`, `setup-status.ts` and `dashboard-widgets.ts`.
-import { formatDateTime } from '@erplora/ui/components';
+import { formatDateTime, formatMoney, type Money } from '@erplora/ui/components';
 
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
 
@@ -116,29 +116,22 @@ export function rowsOf(result: unknown): Row[] {
 }
 
 /** A business's currency (ISO 4217) and its decimals, as `base.business.get` says them (BASE-G98). */
-export interface Money {
-  currency: string;
-  decimals: number;
-}
+/** A currency and its minor unit's decimals: the shared one of `@erplora/ui/components`. */
+export type { Money };
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 
-function formatOptions(format: string, money: Money | undefined): Intl.NumberFormatOptions {
-  if (format === 'currency') {
-    // The symbol a till of that country prints («zł», «€»); until the business is known, the amount alone.
-    const digits = { minimumFractionDigits: money?.decimals ?? 2, maximumFractionDigits: money?.decimals ?? 2 };
-    return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
-  }
+function formatOptions(format: string): Intl.NumberFormatOptions {
   if (format === 'percent') return { style: 'percent', maximumFractionDigits: 1 };
   if (format === 'compact') return { notation: 'compact' };
   return {};
 }
 
-function numberFormat(locale: string, format: string, money?: Money): Intl.NumberFormat {
-  const id = format === 'currency' ? `${locale}|${format}|${money?.currency ?? ''}|${money?.decimals ?? ''}` : `${locale}|${format}`;
+function numberFormat(locale: string, format: string): Intl.NumberFormat {
+  const id = `${locale}|${format}`;
   let found = numberFormats.get(id);
   if (!found) {
-    found = new Intl.NumberFormat(locale, formatOptions(format, money));
+    found = new Intl.NumberFormat(locale, formatOptions(format));
     numberFormats.set(id, found);
   }
   return found;
@@ -150,7 +143,9 @@ function numberFormat(locale: string, format: string, money?: Money): Intl.Numbe
 export function formatValue(value: unknown, format: unknown, locale: string, money?: Money): string {
   const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
   if (Number.isNaN(number)) return String(value);
-  if (format === 'currency') return numberFormat(locale, 'currency', money).format(number / 10 ** (money?.decimals ?? 2));
+  // Money as every screen writes it (`formatMoney`: the symbol a till of that country prints, «zł», «€»; until the
+  // business is known, the amount alone).
+  if (format === 'currency') return formatMoney(number, locale, money);
   if (format === 'percent') return numberFormat(locale, 'percent').format(number / 100);
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);
 }
