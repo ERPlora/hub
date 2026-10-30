@@ -4,8 +4,10 @@
 // «Book an appointment», runs; the worker asks the assistant (`workerAsks`), which wants to book one: its question waits
 // in the inbox with each datum as the chat's card says it (BASE-F97 step 2) — the services by how many, the start as
 // the owner's language writes it, the channel by its name, the professional left out —, never «[{}]», an id or an ISO
-// moment. A no closes it and books nothing.
-// flow: FLOW-F29 FLOW-F38
+// moment. A no closes it and books nothing. And an «Ask someone first» step whose question inserts a yes or no and an
+// instant of what the run brought asks it in words («Paid: Yes», the day and the hour as the owner's language writes
+// them at the business's hour), never «true» or an ISO moment.
+// flow: FLOW-F29 FLOW-F38 FLOW-F28
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -117,6 +119,44 @@ for (const viewport of VIEWPORTS) {
       await expect(card).toHaveCount(0);
       expect(psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('cancelled');
       expect(psql(`select count(*) from flow_flowrun where flow_id = '${flowId}' and log::text like '%assistant_used%'`)).toBe('0');
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F28 a question says the data it inserts in words in «Waiting for your answer», at ${viewport.label}`, async ({ browser }) => {
+    test.setTimeout(120_000);
+    const name = `${TAG} ask ${viewport.label} ${Date.now().toString(36)}`;
+    const { context, page } = await signedIn(browser, '/flow/automations', viewport);
+    try {
+      const step = {
+        id: 's1',
+        kind: 'ask',
+        title: 'Refund {{input.name}}? Paid: {{input.paid}}',
+        details: 'Bought {{input.at}} · {{input.hour}} the first time',
+      };
+      const flowId = await manualFlow(context, name, [step], []);
+      const input = { name: 'Ana', paid: true, at: '2026-11-02T10:00:00+01:00', hour: '21:30:00' };
+      expect((await api(context, A, 'POST', '/flow/flows/run', { id: flowId, input })).status).toBe(200);
+
+      await page.goto('/flow/automations');
+      const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
+      await expect(card).toBeVisible();
+      await expect(card.locator('[data-testid^=flow-question-title-]')).toHaveText('Refund Ana? Paid: Yes');
+      // Before: «Paid: true» and «Bought 2026-11-02T10:00:00+01:00 · 21:30:00».
+      const text = await card.innerText();
+      for (const raw of RAW) expect(text, `${raw} on the card`).not.toMatch(raw);
+      await expect(card).toContainText(/Bought Nov 2, 2026, \d{1,2}:00\s(AM|PM) · 9:30\sPM the first time/);
+
+      await card.scrollIntoViewIfNeeded();
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await capture(page, `${KEY}-ask-${viewport.label}`);
+
+      await card.locator('[data-testid^=flow-question-reject-]').click();
+      await expect(card).toHaveCount(0);
     } finally {
       await context.close();
     }
