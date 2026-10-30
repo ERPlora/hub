@@ -485,8 +485,8 @@ def get_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
     output=ComboImageSuggestOut,
     expose_api=True,
     ai={
-        "description": "Propose images of ERPlora's shared image library for a menu, named by its id or its name: "
-        "the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
+        "description": "Propose images of ERPlora's shared image library for a menu's photo («ponle foto al menú del "
+        "día»), the menu named by its id or its name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
         "never sets one: show them, and set the one the person picks with combo.combo.set_image."
     },
 )

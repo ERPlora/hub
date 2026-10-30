@@ -296,3 +296,13 @@ def test_the_routes(client, make_user, image_library):  # noqa: F811
     assert response.json()["image"] == CUT
     assert found.status_code == 200, found.content
     assert uuid.UUID(found.json()["service_id"]) == created.id
+
+
+def test_asked_for_a_services_photo_the_assistants_turn_offers_the_suggestion_and_the_set():
+    from base import assistant
+
+    tools = assistant.catalog(ctx_for("hub_admin"))
+    offered = [op.name for op in assistant.relevant(tools, ["ponle foto al corte de señora"], "es")]
+
+    assert {"service.service.suggest_image", "service.service.set_image"} <= set(offered)
+    assert "service.service.upload_image" not in tools

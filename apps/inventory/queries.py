@@ -297,8 +297,8 @@ def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     output=ProductImageSuggestOut,
     expose_api=True,
     ai={
-        "description": "Propose images of ERPlora's shared image library for a product, named by its id, SKU or name: "
-        "the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
+        "description": "Propose images of ERPlora's shared image library for a product's photo («ponle foto al café "
+        "con leche»), the product named by its id, SKU or name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
         "never sets one: show them, and set the one the person picks with inventory.product.set_image."
     },
 )

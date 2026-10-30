@@ -181,3 +181,13 @@ def test_the_routes(client, make_user, library):
 
     assert response.status_code == 200, response.content
     assert response.json()["image_url"] == "/p/catalog/hospitality/menu_dia.webp"
+
+
+def test_asked_for_a_menus_photo_the_assistants_turn_offers_the_suggestion_and_the_set():
+    from base import assistant
+
+    tools = assistant.catalog(ctx_for("hub_admin"))
+    offered = [op.name for op in assistant.relevant(tools, ["ponle foto al menú del día"], "es")]
+
+    assert {"combo.combo.suggest_image", "combo.combo.set_image"} <= set(offered)
+    assert "combo.combo.upload_image" not in tools

@@ -507,8 +507,8 @@ PHOTOS = "service/services/"
     output=ServiceOut,
     expose_api=True,
     ai={
-        "description": "Set the image a service shows on the till, named by its id or its name: an image of ERPlora's "
-        "shared library by its reference (catalog:<folder>/<name>, from service.service.suggest_image or "
+        "description": "Set the image («foto») a service shows on the till («ponle foto al corte de señora»), named by "
+        "its id or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from service.service.suggest_image or "
         "base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
     },

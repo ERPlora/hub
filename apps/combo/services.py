@@ -334,8 +334,8 @@ PHOTOS = "combo/combos/"
     output=ComboDetailOut,
     expose_api=True,
     ai={
-        "description": "Set the image a menu shows on the till, named by its id or its name: an image of ERPlora's "
-        "shared library by its reference (catalog:<folder>/<name>, from combo.combo.suggest_image or "
+        "description": "Set the image («foto») a menu shows on the till («ponle foto al menú del día»), named by its id "
+        "or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from combo.combo.suggest_image or "
         "base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
     },

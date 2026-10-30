@@ -392,8 +392,8 @@ PHOTOS = "inventory/products/"
     output=ProductOut,
     expose_api=True,
     ai={
-        "description": "Set the image a product shows on the till and in its lists, named by its id, SKU or name: an "
-        "image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from "
+        "description": "Set the image («foto») a product shows on the till and in its lists («ponle foto al café con "
+        "leche»), named by its id, SKU or name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from "
         "inventory.product.suggest_image or base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
     },

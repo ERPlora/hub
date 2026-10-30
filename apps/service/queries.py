@@ -723,8 +723,8 @@ def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     output=ServiceImageSuggestOut,
     expose_api=True,
     ai={
-        "description": "Propose images of ERPlora's shared image library for a service, named by its id or its name: "
-        "the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
+        "description": "Propose images of ERPlora's shared image library for a service's photo («ponle foto al corte "
+        "de señora»), the service named by its id or its name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
         "never sets one: show them, and set the one the person picks with service.service.set_image."
     },
 )
