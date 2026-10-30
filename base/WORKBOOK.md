@@ -3050,7 +3050,7 @@ Implicados: ACCOUNTS-F38
   pantalla de su entidad, `BASE_SCREENS`, nunca «Base»; el recibo usa el `app_name` que manda el turno en
   `executed`; lo comprueba `test_every_action_of_base_names_its_screen`; la acción de la tarjeta y del recibo, el
   último trozo del nombre de la operación (`action`), por su verbo en `base.assistant.card.actions` de los catálogos
-  `en` y `es` de `base` (`actionKey` de `lib/assistant-card.ts`, que recibe el nombre entero de la operación, por clave
+  `en` y `es` de `base` (`actionKey` de `lib/assistant-hub.ts`, que recibe el nombre entero de la operación, por clave
   exacta; sin clave, «Do this»): una app con una acción nueva añade ahí su verbo en los dos idiomas, y lo comprueba
   `test_every_write_the_assistant_may_call_names_its_action_in_english_and_spanish`; antes que el de su acción va el
   verbo de la operación entera, `base.assistant.card.operations.<app>.<entidad>.<acción>`, para la que el de su acción
@@ -3147,21 +3147,30 @@ Implicados: ACCOUNTS-F38
   `transcribe`): el turno responde en streaming (`text/event-stream`, `turn_response`) a **una** petición `fetch` +
   `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`, `error` y `done`), no una
   segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un proveedor.
-- Panel: `base/frontend/components/assistant/` (`AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
+- Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`, desde el
+  2026-10-30: el SaaS monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
   `AssistantComposer`, `AssistantConfirm` sobre `ConfirmDialog`, `AssistantReport` sobre `FormModal`, `AssistantEmpty`
-  y `AssistantButton`), montado por `createShell({ chrome: { topbar: TopbarChrome, background: BackgroundChrome } })`
-  en `frontend/main.ts`, sin tocar `packages/ui`. Estado por pestaña en `base/frontend/lib/assistant.ts`; la
-  conversación, en `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o
-  cerrado en `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida
-  antes de `logout` (también el bloqueo por inactividad). Comprobaciones de la respuesta en `lib/assistant-grounding.ts`,
-  formato en `lib/assistant-markdown.ts` (nunca `v-html`), adjuntos y voz en `lib/assistant-input.ts`
-  (`MediaRecorder`, dos minutos), el dictado en `lib/dictation.ts` (`useDictation`: una grabación por pulsación, 2 MB,
-  el texto al cuadro y el panel abierto; el mismo para el cuadro y para la app que abre el asistente dictando),
-  atajos, fallos y cupo en `lib/assistant-guide.ts`. Desde 768 px el panel se ancla (clase `assistant-docked` en
-  `<html>`, que empuja el pane); por debajo, velo.
+  y `AssistantButton`, montado por `createShell({ chrome: { topbar: TopbarChrome, background: BackgroundChrome } })`
+  en `frontend/main.ts`. El Hub lo configura con `configureAssistant(HUB_ASSISTANT)` (`base/frontend/lib/assistant-hub.ts`:
+  ruta del turno, `base.assistant.usage`/`transcribe`/`report`, `base.view_home` para usarlo, `base.administer_hub` y
+  el `plan_url` de `hub-home` para mejorar el plan, la aprobación de encargado y los verbos y pantallas del catálogo de
+  `base`) al arrancar y antes de cada test (`vitest.setup.ts`), y le pone su conversación vacía con los atajos de la
+  configuración (`AssistantSetupEmpty.vue`, en el slot `empty` del panel). Los textos propios del chat son
+  `assistantMessages` del paquete (raíz `assistant`, `en` + `es`), que `appMessages` de `frontend/main.ts` mezcla con
+  los de las apps; en `base.assistant` quedan solo los del Hub (`more`, `empty`, `setupIntro`, `shortcuts`, `setup`,
+  `card.actions`, `card.operations` y `screens`). Estado por pestaña en `state.ts` del paquete; la conversación, en
+  `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o cerrado en
+  `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida antes de
+  `logout` (también el bloqueo por inactividad). Comprobaciones de la respuesta en `grounding.ts`, formato en
+  `markdown.ts` (nunca `v-html`), adjuntos y voz en `input.ts` (`MediaRecorder`, dos minutos), el dictado en
+  `dictation.ts` (`useDictation`: una grabación por pulsación, 2 MB, el texto al cuadro y el panel abierto; el mismo
+  para el cuadro y para la app que abre el asistente dictando), fallos y cupo en `guide.ts`, todos en
+  `packages/ui/src/components/Assistant/`. Desde 768 px el panel se ancla (clase `assistant-docked` en `<html>`, que
+  empuja el pane); por debajo, velo.
 - Tests: `base/tests/test_assistant.py`, `test_services_assistant.py` y `test_api_assistant.py` (con la pasarela
-  falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant*.test.ts`,
-  `components/assistant/*.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`; e2e
+  falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
+  `components/AssistantSetupEmpty.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`,
+  y los del chat en `packages/ui/src/components/Assistant/*.test.ts` (`pnpm --filter @erplora/ui test`); e2e
   `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
   `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1 que habla la API de OpenAI; receta en
   `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.

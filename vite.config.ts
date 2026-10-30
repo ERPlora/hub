@@ -46,7 +46,7 @@ export default defineConfig({
     include: ['frontend/**/*.test.ts', 'base/frontend/**/*.test.ts', 'apps/*/frontend/**/*.test.ts', 'vite.config.test.ts', 'vitest.setup.test.ts', 'eslint.config.test.ts', 'tsconfig.test.ts', 'tests/e2e/*.test.ts'],
     // Vitest's default `exclude` drops every `vite.config.*` and `eslint.config.*`.
     exclude: ['**/node_modules/**', '**/dist/**'],
-    // No real timer outlives a test (hub#197, hub#199).
-    setupFiles: ['./vitest.setup.ts'],
+    // No real timer outlives a test (hub#197, hub#199); the shared assistant is the Hub's (base's own setup file).
+    setupFiles: ['./vitest.setup.ts', './base/frontend/__tests__/assistant.setup.ts'],
   },
 });

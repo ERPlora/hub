@@ -399,8 +399,9 @@ def test_no_operation_lets_a_secret_reach_its_card_in_clear():
 
 
 def named_by_the_screen() -> set[str]:
-    """The data the card's screen names itself (``assistant-card.ts`` ``FIELDS``: «Record», «Reason»…)."""
-    source = (Path(settings.BASE_DIR) / "base/frontend/lib/assistant-card.ts").read_text()
+    """The data the card's screen names itself (``FIELDS`` of the shared assistant's ``card.ts``, @erplora/ui: «Record»,
+    «Reason»…)."""
+    source = (Path(settings.BASE_DIR) / "packages/ui/src/components/Assistant/card.ts").read_text()
     return set(re.findall(r"'([a-z_]+)'", re.search(r"const FIELDS = \[(.*?)\];", source, re.S).group(1)))
 
 

@@ -667,7 +667,7 @@ def _field(
     write names, or a preview's, as its read answers it): without it, the card paints it in the business's; in a
     currency its write names that is none, it is no amount but as sent. ``titled`` when ``label`` is the title
     its app wrote (``_own_title``): the screen calls it so over its own word for a datum it knows by its name
-    (``assistant-card.ts`` ``FIELDS``: «Record» for an ``id`` Tables titles «Check»)."""
+    (``FIELDS`` of the shared assistant's ``card.ts``: «Record» for an ``id`` Tables titles «Check»)."""
     # The title of the property itself, as its caller's ``label``: a ``$ref``'s own is its schema class's name.
     titled = _own_title(name, prop.get("title")) is not None
     value = _hidden(value, prop, defs)

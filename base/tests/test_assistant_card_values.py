@@ -414,11 +414,11 @@ def test_the_ratchet_counts_a_reference_nobody_marks_and_a_list_nobody_labels():
 
 # ── A datum the screen knows by its name, titled by its app (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME) ──
 
-#: What the card of a dangerous write calls a datum it knows by its name (``assistant-card.ts`` ``FIELDS``, base's
-#: catalogue) when its app gives it no title of its own, in Spanish.
-KNOWN = json.loads((Path(settings.BASE_DIR) / "base/frontend/locale/es.json").read_text())["base"]["assistant"]["card"][
-    "fields"
-]
+#: What the card of a dangerous write calls a datum it knows by its name (``FIELDS`` of the shared assistant's
+#: ``card.ts`` and its catalogue, @erplora/ui) when its app gives it no title of its own, in Spanish.
+KNOWN = json.loads(
+    (Path(settings.BASE_DIR) / "packages/ui/src/components/Assistant/locales/es.json").read_text()
+)["assistant"]["card"]["fields"]
 
 #: Every datum the screen knows by its name that a write's schema titles itself, and what its card calls it in
 #: Spanish: the title its app wrote, never the generic word for its name («Registro: 5 (Terraza)»).

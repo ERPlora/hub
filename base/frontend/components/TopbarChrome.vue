@@ -8,15 +8,14 @@
 // browser in the installed app (`openExternalLink`). It shows only where `base/spa.py` embeds its address (whoever may
 // open the panel, with their account: never a PIN session) and never in the Google Play copy (`managementOffered`). The
 // word on the bar is the brand; its name, the whole sentence (WCAG 2.5.3: the name contains what is written).
+import { AssistantButton, useAssistant } from '@erplora/ui/components';
 import { HubIcon, openExternalLink, useSession } from '@erplora/ui/shell';
 import { IonBadge, IonButton, IonItem, IonLabel, IonList, IonPopover } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, useTemplateRef } from 'vue';
 
-import { useAssistant } from '../lib/assistant';
 import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
-import AssistantButton from './assistant/AssistantButton.vue';
 import HubBell from './HubBell.vue';
 
 const COMPACT = '(max-width: 767px)';
@@ -153,7 +152,7 @@ function openBell(): void {
             slot="start"
             name="ion:sparkles-outline"
           />
-          <ion-label>{{ t('base.assistant.open') }}</ion-label>
+          <ion-label>{{ t('assistant.open') }}</ion-label>
         </ion-item>
         <ion-item
           button

@@ -1,6 +1,6 @@
 // Test helper of base's Home and its pieces of the chrome: the SDK's live harness (fake clock, fake network
 // serving the stream and the API) on the hub's generated op → route map, the shell's i18n with base's
-// catalogues merged in, a session, the shell's config, a memory router with the routes a test names and Ionic's
+// catalogues and the shared assistant's words merged in (as main.ts does), a session, the shell's config, a memory router with the routes a test names and Ionic's
 // router API on it (`useIonRouter`).
 import {
   createShellI18n,
@@ -10,6 +10,7 @@ import {
   type SessionStatus,
   type ShellSidebar,
 } from '@erplora/ui/shell';
+import { assistantMessages } from '@erplora/ui/components';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { mount } from '@vue/test-utils';
 import { vi } from 'vitest';
@@ -145,7 +146,13 @@ export async function mountBase(component: Component, options: MountOptions = {}
     props: options.props,
     attachTo: document.body,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
+      plugins: [
+        router,
+        createShellI18n({
+          locale: options.locale ?? 'en',
+          messages: { en: { ...assistantMessages.en, ...en }, es: { ...assistantMessages.es, ...es } },
+        }),
+      ],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client, navManager: ionRouter },
       stubs: options.stubs,
     },

@@ -1672,7 +1672,7 @@ administrador y responsable, los mismos que anulan y devuelven).
   `tests/test_integration_assistant.py` (`test_i18n.py` exige el `es` de cada `title`).
 - **La tecla «Hablar»** (`frontend/components/pos/SpeakKey.vue`, FIX-SALE-POS-NO-SPEAK-KEY; PLAN §30 punto 4,
   PLAN-HUB §8 ronda 2026-10-22b): sin operación propia ni dictado propio; usa el del asistente de la plataforma,
-  `useDictation` de `base/frontend/lib/dictation.ts` (PLAN-HUB §18, FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION): una
+  `useDictation` del chat compartido de `@erplora/ui/components` (PLAN-HUB §18, FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION): una
   grabación por pulsación, dos minutos, hasta 2 MB por `base.assistant.transcribe`, el texto a `state.draft` del
   asistente y su panel abierto, y la grabación tirada al salir del TPV. La tecla solo dice cada motivo de `onProblem`
   con su texto, `sale.pos.speak.<motivo>` (`denied`, `deniedInApp` en la app instalada —los ajustes del dispositivo,

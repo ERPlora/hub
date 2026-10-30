@@ -93,6 +93,11 @@ describe('the hub setup', { timeout: 60_000 }, () => {
     },
   );
 
+  // A component of the shared assistant mounted alone finds it configured as main.ts configures it when the Hub boots.
+  it('passes the test that finds the assistant configured as the Hub boots it', () => {
+    expect(outcome('finds the assistant configured as the Hub boots it')).toEqual({ status: 'passed', failureMessages: [] });
+  });
+
   it('clears what a failed test left armed: it never fires into the next test', () => {
     expect(outcome('never runs the timeout the failed test before it left')).toEqual({ status: 'passed', failureMessages: [] });
   });

@@ -1,11 +1,14 @@
 // Not a test of the hub (no `.test.ts`: the suite never collects it): vitest.setup.test.ts runs it on its own,
 // with the hub's config, and reads how each test ended. Each one ends in the state its name says, and the hub
 // setup (vitest.setup.ts) must fail exactly those that leave a real timer armed, and paint the shell's icons as the
-// app does and attach Ionic's elements as a browser would.
+// app does and attach Ionic's elements as a browser would; base's setup file (assistant.setup.ts) configures the
+// assistant as the Hub boots it.
 import { IonButton, IonIcon, IonToggle } from '@ionic/vue';
 import { mount } from '@vue/test-utils';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
+
+import { assistantConfig } from './packages/ui/src/components/Assistant/config';
 
 const MINUTE = 60_000;
 
@@ -146,4 +149,10 @@ it('attaches Ionic elements without the errors happy-dom alone makes them log', 
   } finally {
     error.mockRestore();
   }
+});
+
+it('finds the assistant configured as the Hub boots it', () => {
+  const config = assistantConfig();
+  expect(config.turnUrl).toBe('/api/assistant/turn');
+  expect(config.verbKey?.('sale.ticket.void')).toBe('base.assistant.card.actions.void');
 });
