@@ -523,9 +523,10 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
     await capture(page, `${KEY}-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  // What ran says the Hub's receipt: the e2e provider's own words take a job that can be cancelled for a refusal.
+  // The Hub's receipt says it ran, and so does the answer: a job that can be cancelled is no refusal.
   await decide(page, 'submit');
   await expect(receipt(page)).toHaveText('Hecho: Crear en Impresión');
+  await expect(lastAnswer(page)).toHaveText('Hecho.');
   expect(await jobs()).toHaveLength(1);
   // The same print again, with its key: a retry. Its card leaves the key out again, and it adds no second job.
   await ask(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`, { settle: false });
@@ -534,6 +535,7 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await decide(page, 'submit');
   await expect(receipt(page)).toHaveText('Hecho: Crear en Impresión');
   await expect(panel(page).locator('[data-testid="assistant-receipt"]')).toHaveCount(2);
+  await expect(lastAnswer(page)).toHaveText('Hecho.');
   expect(await jobs()).toHaveLength(1);
   if (!wasOn) {
     const off = await api(context, A, 'POST', '/apps/disable', { app: 'printing' });
