@@ -8,6 +8,11 @@ used by voice («activate the welcome automation»).
 
 What a step names (an action, a read, an event) is checked against the apps that are active in
 ``services.py``: a schema knows the shape, not the business.
+
+Each id a write takes is marked with the read that names its record (``names``, base/assistant.py ``REFERS``,
+checked at start by ``base.E009``): the assistant's card says which automation, draft, run or question, as the person
+who confirms reads it, never by the id — an automation and a draft by their name, a run by its automation and when it
+started (``label``, as the History says it), a question by what it asks.
 """
 
 import datetime as dt
@@ -30,7 +35,7 @@ from pydantic import (
 )
 
 from apps.flow import document
-from base.schemas import AssistantFieldOut
+from base.schemas import AssistantFieldOut, names
 from apps.flow.models import EVENT_MAX_LENGTH, NAME_MAX_LENGTH, QUESTION_ROLES, SECRET_NAME_RE, Draft, FlowRun
 
 T = TypeVar("T")
@@ -83,6 +88,12 @@ Time = Annotated[str, StringConstraints(pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]
 
 #: How the Automations list names how an automation starts (the assistant's card names each datum by its title).
 STARTS_WITH = gettext_noop("Starts with")
+
+#: The marks of the ids of the records a write names (``names``): the read that names each one, and by what.
+AN_AUTOMATION = names("flow.flow.detail")
+A_DRAFT = names("flow.draft.get")
+A_RUN = names("flow.run.get", name=("label",))
+A_QUESTION = names("flow.question.get", name=("title",))
 
 # Field descriptions shared by several schemas (the assistant reads them).
 D_FLOW_ID = "The automation's id. Give it, or its name in `flow`."
@@ -485,7 +496,7 @@ Steps = Annotated[
 
 
 class FlowRefIn(In):
-    id: UUID | None = Field(None, description=D_FLOW_ID)
+    id: UUID | None = Field(None, description=D_FLOW_ID, json_schema_extra=AN_AUTOMATION)
     flow: Reference | None = Field(None, validate_default=True, description=D_FLOW)
 
     @field_validator("flow")
@@ -526,6 +537,7 @@ class CreateIn(In):
         None,
         title=gettext_noop("Draft"),
         description="The assistant's draft it is created from: it is marked as used in the same step.",
+        json_schema_extra=A_DRAFT,
     )
 
 
@@ -582,7 +594,7 @@ class StatusIn(In):
 
 
 class RunRefIn(In):
-    id: UUID = Field(description="The run's id (its reference in the history).")
+    id: UUID = Field(description="The run's id (its reference in the history).", json_schema_extra=A_RUN)
 
 
 class RecordCallIn(In):
@@ -661,7 +673,7 @@ class DraftProposeIn(In):
 
 
 class DraftRefIn(In):
-    id: UUID = Field(description="The draft's id.")
+    id: UUID = Field(description="The draft's id.", json_schema_extra=A_DRAFT)
 
 
 class CatalogIn(In):
@@ -731,8 +743,11 @@ class QuestionListIn(In):
     pass
 
 
-class AnswerIn(In):
-    id: UUID = Field(description="The question's id, from `flow.question.list`.")
+class QuestionRefIn(In):
+    id: UUID = Field(description="The question's id, from `flow.question.list`.", json_schema_extra=A_QUESTION)
+
+
+class AnswerIn(QuestionRefIn):
     approve: bool = Field(
         title=gettext_noop("Answer"),
         description="true: yes, the automation goes on; false: no, it does what its step says.",
@@ -802,6 +817,13 @@ class RunOut(Schema):
     started_by: str
     resumable: bool = Field(
         description="Whether it stopped by an error at a step and can still be resumed there (`flow.run.retry`)."
+    )
+
+
+class RunDetailOut(RunOut):
+    label: str = Field(
+        description="The words it is named by, in the caller's language: its automation and when it started, as the "
+        "History says it («Welcome · Oct 15, 2026, 9:00 PM»)."
     )
 
 

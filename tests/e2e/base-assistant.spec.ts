@@ -676,6 +676,97 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   await context.close();
 });
 
+// flow: FLOW-F03 FLOW-F24 (the card: BASE-F97)
+// FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every record a write of
+// Automations names by its id — which automation, which draft, which run, which question — once the UUID left it. Now
+// each one by the name its screen gives it, read as the person: pausing an automation says it by its name; resuming a run
+// that stopped by an error says it as the History does, with its automation in front («Bienvenida 1234 · 6 nov 2026,
+// 21:30»). Both are dangerous: the card lists each datum and asks to type. Cancelled: nothing is paused nor resumed.
+// What the test made is deleted at the end.
+test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its automation and when; never by an id', async ({ browser }) => {
+  const KEY = 'FIX-HUB-FLOW-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const needed = ['task', 'flow'];
+  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  await turnOn(context, A, ...needed);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const stamp = String(Date.now() % 10_000).padStart(4, '0');
+  const name = `Bienvenida ${stamp}`;
+  // On by hand, one step that creates a task and no permission granted: run now, it stops by an error at that step.
+  const created = await api<{ id: string }>(context, A, 'POST', '/flow/flows', {
+    name,
+    trigger: { kind: 'manual' },
+    steps: [{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: `E2E ${stamp}` } }],
+  });
+  expect(created.status, JSON.stringify(created.data)).toBe(201);
+  const flow = created.data;
+  const on = await api(context, A, 'POST', '/flow/flows/set_enabled', { id: flow.id, enabled: true });
+  expect(on.status, JSON.stringify(on.data)).toBe(200);
+  const ran = await api<{ id: string; status: string }>(context, A, 'POST', '/flow/flows/run', { id: flow.id });
+  expect(ran.status, JSON.stringify(ran.data)).toBe(200);
+  expect(ran.data.status).toBe('failed');
+  // The words the History names the run by, as its read by id answers them in the person's language: what the card says.
+  const read = await api<{ label: string }>(context, A, 'GET', `/flow/runs/detail?id=${ran.data.id}`);
+  expect(read.status, JSON.stringify(read.data)).toBe(200);
+  const label = read.data.label;
+  expect(label.startsWith(`${name} · `), label).toBe(true);
+  expect(label, label).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
+  // Pausing it: which automation, by its name.
+  await ask(page, `E2E-ASK flow__flow__set_enabled ${JSON.stringify({ id: flow.id, enabled: false })}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Cambiar en Automatizaciones. Revisa cada dato antes de seguir.');
+    await expect(card(page)).toContainText(`Registro: ${name}`);
+    await expect(card(page)).toContainText('Encendida: No');
+    await expect(card(page)).not.toContainText(flow.id);
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${KEY}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+
+  // Resuming the run: which one, as the History says it, with its automation in front.
+  await ask(page, `E2E-ASK flow__run__retry ${JSON.stringify({ id: ran.data.id })}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Reintentar en Automatizaciones. Revisa cada dato antes de seguir.');
+    await expect(card(page)).toContainText(`Registro: ${label}`);
+    await expect(card(page)).not.toContainText(ran.data.id);
+    await confirmationReady(page);
+    await untilStill(page);
+    expect(await confirmationSettled(page), `${KEY}-run-${vp.label} caught before it settled`).toBe(true);
+    await capture(page, `${KEY}-run-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  const after = await api<{ enabled: boolean }>(context, A, 'GET', `/flow/flows/detail?id=${flow.id}`);
+  expect(after.data.enabled).toBe(true);
+  const still = await api<{ status: string }>(context, A, 'GET', `/flow/runs/detail?id=${ran.data.id}`);
+  expect(still.data.status).toBe('failed');
+
+  // What the test made, deleted (its history stays, as Automations keeps it); and the apps it turned on, off again.
+  const gone = await api(context, A, 'POST', '/flow/flows/delete', { id: flow.id });
+  expect(gone.status, JSON.stringify(gone.data)).toBe(200);
+  for (const app of [...needed].reverse().filter((id) => !wasOn.has(id))) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
+});
+
 // flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
 // FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW: the card listed only what a dangerous write sends («Persona:
 // saas:3»), never what it will do. Base's own preview: «Remove the PIN» names whose PIN goes, as its read
