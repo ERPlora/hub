@@ -5,6 +5,7 @@ only (``DEBUG``), idempotent, through its operation (``base.hub.seed_local``), n
 them in production).
 """
 
+import logging
 from io import StringIO
 
 import pytest
@@ -17,6 +18,7 @@ from base import registry
 from base.models import Hub
 from base.schemas import HubSeedLocalIn
 from base.services import hub_seed_local
+from base.tenancy import provision
 
 pytestmark = pytest.mark.django_db
 
@@ -43,12 +45,21 @@ def test_creates_a_and_b_ready():
 
 
 @pytest.mark.usefixtures("fresh")
-def test_leaves_a_and_b_on_the_shared_database_of_phase_one():
-    """Phase 2, S1: a and b keep their data in control's database (``db_name=""``) until the cut of S5, so
-    ``a.localhost`` and ``b.localhost`` serve what they always did."""
-    seed()
+def test_leaves_a_and_b_on_the_shared_database_while_some_app_cannot_live_in_a_hubs_own(caplog):
+    """a and b turn every app on, and some apps' tables refer to control's users (staff, attendance, task,
+    whatsapp_inbox and what needs them; ``provision.portable_apps``): until they can live in a hub's own database, a
+    and b keep their data in control's (``db_name=""``) and the log says which apps hold them there. The day every app
+    can, the same command gives them their own (``base/tenancy/tests/test_provision.py``)."""
+    blocked = sorted(provision.hub_app_labels() - provision.portable_apps())
+    assert blocked, "every app can live in a hub's own database now: this test's premise is gone"
+
+    with caplog.at_level(logging.WARNING, logger="base.management.commands.seed_local_hubs"):
+        output = seed()
 
     assert sorted(Hub.objects.values_list("slug", "db_name")) == [("a", ""), ("b", "")]
+    assert "base.seed_local_hubs.shared_database" in caplog.text
+    assert all(label in caplog.text for label in blocked)
+    assert "share the control database" in output
 
 
 @pytest.mark.usefixtures("fresh")

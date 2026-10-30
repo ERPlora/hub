@@ -19,6 +19,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from psycopg import sql
 from django.db import connections as django_connections
 from django.utils import timezone
 from live.models import OutboxEvent
@@ -407,14 +408,125 @@ def test_a_hub_without_a_name_for_its_database_fails_readably_and_nothing_reache
     assert told == []
 
 
+# ── More apps than the template's, and a/b's own databases once every app can have one (seed_local_hubs) ────────────
+
+
+def test_the_apps_that_can_live_in_a_hubs_database_are_the_tests_templates():
+    assert provision.portable_apps() == frozenset(hubs.portable_apps())
+    assert "base" in provision.portable_apps() and "staff" not in provision.portable_apps()
+
+
+@pytest.fixture
+def small_template(django_db_blocker, hub_databases):
+    """``<control>_template_small``: ``base`` alone (and what it needs), built as the tests' template is."""
+    from base.tenancy import migrator
+
+    control = hub_databases.control
+    name = names.template_db_name(control, "small")
+    with django_db_blocker.unblock():
+        with hubs._maintenance() as conn:
+            hubs._drop(conn, name, control)
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(name, control=control)))
+        ddl = tenancy_connections.register_ddl_alias(name)
+        try:
+            migrator.migrate_apps(ddl, ["base"])
+        finally:
+            django_connections[ddl].close()
+    yield name
+    with hubs._maintenance() as conn:
+        hubs._drop(conn, name, control)
+
+
+def test_a_hub_may_get_more_apps_than_its_template_and_a_seed_inside_its_database(registry, small_template, told):
+    hub = registry.hub(vertical="small")
+    seeded = []
+
+    def seed(row):
+        from base.tenancy.context import current
+
+        seeded.append(current().alias)
+
+    assert not {table for table in hubs.table_names(small_template) if table.startswith("tax_")}
+    assert provision.provision(hub, apps=["tax"], seed=seed) is True
+
+    hub = fresh(hub)
+    assert {table for table in hubs.table_names(hub.db_name) if table.startswith("tax_")}
+    assert "tax" in hub.schema_apps and "base" in hub.schema_apps
+    assert seeded == [tenancy_connections.hub_alias(hub)]
+
+
+@pytest.fixture
+def every_app_portable(monkeypatch):
+    """The day every app a and b turn on can live in a hub's own database (here: only the portable ones)."""
+    portable = provision.portable_apps()
+    monkeypatch.setattr(provision, "hub_app_labels", lambda: portable)
+
+
+@pytest.fixture
+def plain_template(django_db_blocker, hub_databases):
+    """``<control>_template`` (a hub with no vertical, as a and b), a copy of the tests' own."""
+    control = hub_databases.control
+    name = names.template_db_name(control)
+    with hubs._maintenance() as conn:
+        hubs._drop(conn, name, control)
+        conn.execute(
+            sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                names.identifier(name, control=control), names.identifier(hub_databases.template, control=control)
+            )
+        )
+    yield name
+    with hubs._maintenance() as conn:
+        hubs._drop(conn, name, control)
+
+
+def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_live_in_one(
+    django_db_blocker, settings, every_app_portable, plain_template, told
+):
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    from base.models import AppActivation
+
+    settings.DEBUG = True
+    started = timezone.now()
+    out = StringIO()
+    with django_db_blocker.unblock():
+        try:
+            call_command("seed_local_hubs", stdout=out)
+            local = {hub.slug: hub for hub in Hub.objects.filter(slug__in=["a", "b"])}
+            assert sorted(local) == ["a", "b"]
+            for hub in local.values():
+                assert (hub.status, hub.db_name) == ("ready", names.hub_db_name(tenancy_connections.control_name(), hub.id))
+                assert hub.db_name in databases()
+                with use_hub(hub):
+                    turned_on = set(AppActivation.objects.filter(host=hub.slug, state="on").values_list("app", flat=True))
+                assert {label for label in provision.portable_apps() if label not in ("base", "live")} <= turned_on
+            assert "a: created (its own database)" in out.getvalue()
+            # A second run leaves them as they are.
+            again = StringIO()
+            call_command("seed_local_hubs", stdout=again)
+            assert "a: already ready" in again.getvalue()
+        finally:
+            leftover = list(Hub.objects.filter(slug__in=["a", "b"]))
+            with hubs._maintenance() as conn:
+                for hub in leftover:
+                    if hub.db_name:
+                        hubs._drop(conn, hub.db_name, tenancy_connections.control_name())
+            Hub.objects.filter(slug__in=["a", "b"]).delete()
+            with use_control():
+                OutboxEvent.objects.filter(created_at__gte=started).delete()
+    assert told == []  # the local hubs are no business of the SaaS's
+
+
 # ── Guardrail (round 2026-10-30, proposal (c)): no new hub is ever born sharing control's database ──────────────────
 
 #: The ``Hub.objects.create`` calls of ``base/services.py`` that may leave ``db_name`` empty, each with its reason.
 SHARED_HUB_CREATES = {
     "hub_seed_local": (
-        "the local hubs a and b of a developer's database keep sharing it until the apps whose tables refer to "
-        "control's users (staff, attendance, task, whatsapp_inbox and what needs them) can live in a hub's own "
-        "database (W2a report, 2026-10-30)."
+        "the local hubs a and b turn every app on: they share the developer's control database only while some app "
+        "cannot live in a hub's own (provision.portable_apps: staff, attendance, task, whatsapp_inbox and what needs "
+        "them refer to control's users); seed_local_hubs then asks own_database=True and they get theirs."
     ),
 }
 

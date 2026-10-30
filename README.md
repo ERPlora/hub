@@ -76,8 +76,12 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   como en la fase 1: los hubs de prod de antes de S2a, las demos de antes y `a`/`b` (`seed_local_hubs`). Desde S2a
   (ronda 2026-10-30 de PLAN-DB, decisión 1) todo negocio y toda demo nuevos nacen con `db_name` (`<control>_<hex>`,
   `<control>_demo_<hex>`; `base/tenancy/names.py`) y trabajan en su BD; un test
-  (`base/tenancy/tests/test_provision.py`) impide crear un hub en `base/services.py` sin ella, salvo `a`/`b`. S5 hace
-  el corte y retira el modo.
+  (`base/tenancy/tests/test_provision.py`) impide crear un hub en `base/services.py` sin ella, salvo `a`/`b`:
+  `seed_local_hubs` les da BD propia (clonada de `<control>_template`, con las tablas de todas las apps y todas
+  encendidas) solo cuando todas las apps pueden vivir en una (`provision.portable_apps`); mientras alguna no pueda
+  (`staff`, `attendance`, `task`, `whatsapp_inbox` y las que dependen de ellas apuntan a los usuarios de control),
+  comparten la de control y el log dice qué apps lo impiden. Un `a`/`b` que ya existe conserva su BD. S5 hace el corte
+  y retira el modo.
 - **Alta** (`base/tenancy/provision.py`, S2a). `PUT /internal/hubs/{id}` y `POST /internal/demos` dejan el hub
   `requested` y debido en `control.HubDue`; el worker (o `provision(hub)`) toma su arriendo (`SELECT … FOR UPDATE SKIP
   LOCKED`, 60 s, renovado en cada paso: dos altas a la vez hacen una sola BD) y lo lleva por `creating` (lo coloca en

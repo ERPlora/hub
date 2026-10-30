@@ -161,14 +161,16 @@ class HubRestoreIn(Schema):
 
 
 class HubSeedLocalIn(Schema):
-    """``manage.py seed_local_hubs``: the local hubs to leave ready (``a`` and ``b``)."""
+    """``manage.py seed_local_hubs``: the local hubs to leave ready (``a`` and ``b``); ``own_database``: a new one is
+    born with a database of its own (``requested``, the command makes it), else it shares control's."""
 
     slugs: list[str]
+    own_database: bool = False
 
 
 class SeededHub(Schema):
     slug: str
-    outcome: Literal["created", "ready_again", "already_ready"]
+    outcome: Literal["created", "ready_again", "already_ready", "requested"]
 
 
 class HubSeedLocalOut(Schema):

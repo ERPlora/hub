@@ -32,6 +32,7 @@ Control is written through ``base.services`` only (its doors to the ORM); the da
 
 import datetime as dt
 import logging
+from collections.abc import Callable, Iterable
 
 from django.apps import apps
 from django.db.migrations.loader import MigrationLoader
@@ -51,6 +52,8 @@ logger = logging.getLogger(__name__)
 LEASE = dt.timedelta(seconds=60)
 #: How many due hubs one pass of the worker takes.
 DUE_BATCH = 20
+#: What a seeding writes in the hub's database, inside ``use_hub``.
+Seed = Callable[[Hub], None]
 
 
 def hub_app_labels() -> frozenset[str]:
@@ -61,6 +64,37 @@ def hub_app_labels() -> frozenset[str]:
         if config.name.startswith(inventory.HUB_MODULES_PACKAGE)
         or inventory.APP_CLASSES.get(config.label) == inventory.HUB
     )
+
+
+def portable_apps() -> frozenset[str]:
+    """The hub apps whose tables can live in a hub's own database: those that refer to no control model, nor need
+    (by their migrations) an app that does.
+
+    Phase 1 links some modules to control's users (``settings.AUTH_USER_MODEL``: staff, attendance, task,
+    whatsapp_inbox and what depends on them): their tables cannot be made in a hub's database until the hub has users
+    of its own (PLAN-DB §2), so the templates and ``seed_local_hubs`` leave them out.
+    """
+    hub_apps = hub_app_labels()
+    graph = MigrationLoader(None, ignore_no_migrations=True).graph
+    needs = {
+        label: {node[0] for leaf in graph.leaf_nodes() if leaf[0] == label for node in graph.forwards_plan(leaf)}
+        & hub_apps
+        for label in hub_apps
+    }
+    blocked = {
+        label
+        for label in hub_apps
+        for model in apps.get_app_config(label).get_models(include_auto_created=True)
+        if inventory.classify(model) in (inventory.HUB, inventory.CONTEXTUAL)
+        for field in model._meta.get_fields()
+        if field.is_relation
+        and field.concrete
+        and field.related_model is not None
+        and inventory.classify(field.related_model) == inventory.CONTROL
+    }
+    while grown := {label for label in hub_apps - blocked if needs[label] & blocked}:
+        blocked |= grown
+    return frozenset(hub_apps - blocked)
 
 
 def schema_leaves(labels) -> dict[str, str]:
@@ -78,11 +112,21 @@ def template_for(hub: Hub) -> str:
         raise services.ProvisioningFailed("template_missing", str(invalid)) from invalid
 
 
-def provision(hub, *, now: dt.datetime | None = None) -> bool:
+def provision(
+    hub,
+    *,
+    now: dt.datetime | None = None,
+    apps: Iterable[str] = (),
+    seed: Seed | None = None,
+    tell_saas: bool = True,
+) -> bool:
     """Make ``hub``'s database now, under its lease; whether it is ready after.
 
-    A hub already ready is left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease
-    someone else holds is not touched (``False``). A failure is noted on the hub (``failed``), never raised.
+    ``apps``: more apps than its template's whose tables it gets (``seed_local_hubs``: every app ``a`` and ``b`` turn
+    on); ``seed``: what its seeding writes, inside its database (``use_hub``), after the photo kept. A hub already
+    ready is left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else
+    holds is not touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``:
+    the SaaS does not hear it is ready (the local hubs, which are no business of the SaaS's).
     """
     now = now or timezone.now()
     with use_control():
@@ -94,7 +138,7 @@ def provision(hub, *, now: dt.datetime | None = None) -> bool:
         if services.claim_hub(hub.id, now, LEASE) is None:
             return False
         try:
-            _prepare(hub.id)
+            _prepare(hub.id, apps=apps, seed=seed, tell_saas=tell_saas)
         finally:
             services.release_hub(hub.id, timezone.now())
         return services.registry_row(hub.id).status == Hub.Status.READY
@@ -138,7 +182,7 @@ def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH) -> int:
     return worked
 
 
-def _prepare(hub_id) -> None:
+def _prepare(hub_id, *, apps: Iterable[str] = (), seed: Seed | None = None, tell_saas: bool = True) -> None:
     """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left."""
     try:
         hub = services.place_hub(hub_id)
@@ -153,7 +197,7 @@ def _prepare(hub_id) -> None:
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
         hub = services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE)
-        labels = {"base"} | (ops.recorded_apps(hub.db_name, cluster=hub.cluster) & hub_app_labels())
+        labels = {"base", *apps} | (ops.recorded_apps(hub.db_name, cluster=hub.cluster) & hub_app_labels())
         try:
             migrator.migrate_apps(ddl, sorted(labels))
         except Exception as error:
@@ -161,7 +205,9 @@ def _prepare(hub_id) -> None:
         hub = services.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
         with use_hub(hub):
             services.apply_kept_photo(hub)
-        services.provision_ready(hub_id, timezone.now(), schema_leaves(labels))
+            if seed is not None:
+                seed(hub)
+        services.provision_ready(hub_id, timezone.now(), schema_leaves(labels), tell_saas=tell_saas)
         logger.info("base.tenancy.provision.ready hub=%s database=%s", hub.slug, hub.db_name)
     except services.ProvisioningStopped as stopped:
         logger.info("base.tenancy.provision.stopped hub=%s: %s", hub_id, stopped)

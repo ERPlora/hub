@@ -922,12 +922,15 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
     ai=INTERNAL,
 )
 def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
-    """Leave the local hubs ``data.slugs`` ready in the registry, with an id of their own (``seed_local_hubs``), and
-    every app on, its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off).
+    """Leave the local hubs ``data.slugs`` in the registry, with an id of their own (``seed_local_hubs``), and every app
+    on, its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off).
 
-    Local development only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears
-    nothing. Idempotent: a hub already ready stays as it is; one left cancelled is ready again; the apps of one that
-    already turned some on or off stay as they are.
+    A new one shares control's database and is ready at once, every app on; with ``data.own_database`` it is born
+    ``requested`` with a database of its own instead (``<control>_<hex>``), due, and the command makes it
+    (``base.tenancy.provision``, every app's tables and every app on: :func:`turn_every_app_on`). Local development
+    only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears nothing. Idempotent: a
+    hub already ready stays as it is, on the database it has; one left cancelled is ready again (or made again, if its
+    own database was never finished); the apps of one that already turned some on or off stay as they are.
     """
     from base.tenancy.context import use_hub
 
@@ -935,20 +938,46 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
     now = timezone.now()
     hubs = []
     for slug in data.slugs:
-        hub, created = Hub.objects.select_for_update().get_or_create(
-            slug=slug, defaults={"status": Hub.Status.READY, "ready_at": now}
-        )
-        with use_hub(hub):
-            _every_app_on(slug)
+        if data.own_database:
+            new_id = uuid7()
+            defaults = {
+                "id": new_id,
+                "status": Hub.Status.REQUESTED,
+                "db_name": database_names.hub_db_name(control_name(), new_id),
+            }
+        else:
+            defaults = {"status": Hub.Status.READY, "ready_at": now}
+        hub, created = Hub.objects.select_for_update().get_or_create(slug=slug, defaults=defaults)
         outcome = "created" if created else "already_ready"
-        if not created and hub.status != Hub.Status.READY:
-            hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.READY, now, None
-            hub.save(update_fields=["status", "ready_at", "cancelled_at", "updated_at"])
-            outcome = "ready_again"
+        if not hub.db_name:
+            with use_hub(hub):
+                _every_app_on(slug)
+            if not created and hub.status != Hub.Status.READY:
+                hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.READY, now, None
+                hub.save(update_fields=["status", "ready_at", "cancelled_at", "updated_at"])
+                outcome = "ready_again"
+        elif hub.status != Hub.Status.READY:
+            if hub.status == Hub.Status.CANCELLED:
+                made = hub.ready_at is not None
+                hub.status = Hub.Status.READY if made else Hub.Status.REQUESTED
+                hub.cancelled_at = None
+                hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+                outcome = "ready_again" if made else "requested"
+            elif not created:
+                outcome = "requested"
+            if hub.status != Hub.Status.READY:
+                HubDue.mark_due(hub, now)
         if outcome != "already_ready":
             record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": slug, "created": created})
         hubs.append({"slug": slug, "outcome": outcome})
     return {"hubs": hubs}
+
+
+def turn_every_app_on(hub: Hub) -> None:
+    """Inside ``use_hub(hub)``: every app on in the local hub ``hub``, as :func:`hub_seed_local` does for one that shares
+    control's database (the seeding of ``seed_local_hubs``'s own databases). Outside any operation, before the hub
+    serves anything: its activations' cache is forgotten at once, after the write."""
+    _every_app_on(hub.slug, then=lambda forget: forget())
 
 
 # ── The provisioning's writes in control (round 2026-10-30 of PLAN-DB, S2a; PLAN-DB §6 and §8) ─────────────────────
@@ -986,6 +1015,11 @@ def retry_delay(attempts: int) -> dt.timedelta:
 def registry_row(hub_id: UUID) -> Hub | None:
     """The registry's row of ``hub_id``, its cluster with it, as it is now."""
     return Hub.objects.select_related("cluster").filter(pk=hub_id).first()
+
+
+def registry_row_by_slug(slug: str) -> Hub | None:
+    """The registry's row of ``slug``, its cluster with it, as it is now (``seed_local_hubs``)."""
+    return Hub.objects.select_related("cluster").filter(slug=slug).first()
 
 
 def _leased(hub_id: UUID, now: dt.datetime, lease: dt.timedelta) -> None:
@@ -1092,8 +1126,9 @@ def provision_step(hub_id: UUID, status: str, now: dt.datetime, lease: dt.timede
     return hub
 
 
-def provision_ready(hub_id: UUID, now: dt.datetime, schema_apps: dict[str, str]) -> Hub:
-    """``hub_id`` is ready: its schema as the migrator left it; a business's SaaS hears it after the COMMIT."""
+def provision_ready(hub_id: UUID, now: dt.datetime, schema_apps: dict[str, str], *, tell_saas: bool = True) -> Hub:
+    """``hub_id`` is ready: its schema as the migrator left it; a business's SaaS hears it after the COMMIT (unless
+    ``tell_saas`` is false: the local hubs)."""
     with transaction.atomic():
         hub = _preparing(hub_id, now)
         hub.status, hub.ready_at = Hub.Status.READY, now
@@ -1111,7 +1146,7 @@ def provision_ready(hub_id: UUID, now: dt.datetime, schema_apps: dict[str, str])
                 "updated_at",
             ]
         )
-        if not hub.is_demo:
+        if tell_saas and not hub.is_demo:
             # A demo's SaaS asks for it (``GET /internal/hubs/{id}``) and keeps no row to tell.
             transaction.on_commit(partial(report_ready, hub.id), robust=True)
     return hub
@@ -3294,16 +3329,18 @@ def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
     )
 
 
-def _every_app_on(host: str) -> None:
+def _every_app_on(host: str, *, then: Callable[[Callable[[], None]], object] | None = None) -> None:
     """Write down every app on in ``host``'s business, its roots chosen (``base.activation.every_on``), unless it has
-    rows already: what the migration ``base.0017`` left every hub of before round 2026-10-27 (``seed_local_hubs``)."""
+    rows already: what the migration ``base.0017`` left every hub of before round 2026-10-27 (``seed_local_hubs``).
+
+    Its activations' cache is forgotten after the operation's COMMIT, or by ``then`` outside one (a hub's seeding)."""
     if AppActivation.objects.filter(host=host).exists():
         return
-    after_commit(partial(activation.forget, host))
     AppActivation.objects.bulk_create(
         AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
         for label, row in activation.every_on(activation.module_graph()).items()
     )
+    (then or after_commit)(partial(activation.forget, host))
 
 
 def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[str]) -> dict[str, str]:
