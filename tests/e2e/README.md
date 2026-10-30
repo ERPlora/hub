@@ -193,6 +193,45 @@ CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
 
 La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
 
+Si la misma pila corre también specs de WhatsApp, su SaaS arranca como dice «WhatsApp» (abajo), con estas mismas
+variables más las del Graph: nunca con un `SSL_CERT_FILE` escrito a mano.
+
+## WhatsApp (`whatsapp-*.spec.ts`)
+
+Las specs de WhatsApp usan el SaaS de la pila de verdad, y Meta lo hace el Graph de la ejecución
+(`whatsapp-graph.ts`): un proxy en el puerto del Hub + 9 que solo deja pasar `graph.facebook.com` y le contesta con
+un certificado de una autoridad propia de la ejecución. El código del SaaS no se toca: llega a ese Graph por entorno
+(`HTTPS_PROXY`, `SSL_CERT_FILE` y la app de Meta del e2e; la lista, en la cabecera de `whatsapp-helpers.ts`). Esas
+variables no se escriben a mano: las imprime `node tests/e2e/whatsapp-graph.ts <puerto del Hub> <SAAS_URL>`, desde el
+checkout del Hub, que **antes** crea la autoridad en `tests/e2e/.artifacts/meta-graph-<puerto del Hub>/ca.pem` si aún
+no está (si está, la deja). El orden:
+
+1. Esa orden, dentro del arranque del SaaS (`env $(…)`): la autoridad existe antes de que el SaaS la lea.
+2. El SaaS arranca con esas variables (y las suyas de «Varias ejecuciones a la vez»).
+3. La primera spec de WhatsApp de la ejecución arranca el Graph (`metaGraph()`), que vuelve a crear la autoridad en el
+   mismo sitio; el SaaS la lee en cada llamada, así que no hace falta reiniciarlo.
+
+Sin el paso 1, un SaaS arrancado con `SSL_CERT_FILE` apuntando a una autoridad que aún no existe falla en **toda**
+llamada saliente, también en las de `http://`: hasta que una spec de WhatsApp arrancaba el Graph, su pasarela del
+asistente respondía 502 al Hub (`FileNotFoundError` de httpx) y `fix-flow-assistant-step.spec.ts` caía sin decir por
+qué. Si la orden falla (argumentos que no entiende o la autoridad que no se puede crear), lo dice en una línea y el
+SaaS arranca sin esas variables: las specs de WhatsApp paran entonces en segundos nombrando lo que falta.
+
+```bash
+# El SaaS de la pila (8031, Hub en 8030), desde su worktree; <hub-wt> es el worktree del Hub de la pila:
+env $(node <hub-wt>/tests/e2e/whatsapp-graph.ts 8030 http://localhost:8031) \
+  DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 ASSISTANT_SERVICE_PROVIDER=e2e-local \
+  HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
+  HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' \
+  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True \
+  uv run python manage.py runserver 127.0.0.1:8031
+# Las specs, desde <hub-wt>, con las variables de «Varias ejecuciones a la vez» exportadas y el checkout del SaaS:
+export E2E_SAAS_DIR=<saas-wt>
+CI=1 pnpm e2e tests/e2e/whatsapp-inbox.spec.ts
+```
+
+`HUB_INTERNAL_URL` sale de la orden (`http://127.0.0.1:<puerto del Hub>`): no se repite a mano.
+
 ## La QA maestra (`base-qa-master.spec.ts`)
 
 La QA maestra del Hub (BASE-F107, la del contrato `qa-hub` del hub viejo): un dueño nuevo se da de alta en las pantallas

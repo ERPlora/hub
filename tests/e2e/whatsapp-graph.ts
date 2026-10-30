@@ -4,6 +4,9 @@
 // meta-graph-<hub port>/ca.pem` (`erploraEnv`), every one of those calls reaches this Graph instead and never leaves
 // the machine: its proxy tunnels `graph.facebook.com:443` (and refuses any other host) to a TLS server that answers as
 // Meta does (`graphAnswer`) with a certificate of the run's own authority. Its code is not touched: environment only.
+// Those variables come from this module run as a script (`runCli`), which makes that authority first if it is not
+// there yet: SSL_CERT_FILE never names a missing file, which would fail every call erplora.com makes, even to the
+// e2e's assistant provider over plain http.
 //
 // One Graph per run: the first WhatsApp spec of a Playwright worker starts it (`metaGraph` of whatsapp-helpers.ts) and
 // it lives until the worker ends, so every door that reaches Meta finds it, whichever spec runs. It runs in its own
@@ -14,11 +17,12 @@
 // erplora.com would call the real Meta stops there, in seconds (FIX-HUB-WHATSAPP-E2E-STACK-RECIPE-MISSING-META-ENV).
 // Each call is kept in `calls` and in `calls.jsonl` beside the certificates: what erplora.com asked Meta in the run.
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo, Socket } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads';
 
 export const GRAPH_HOST = 'graph.facebook.com';
@@ -205,7 +209,7 @@ export function graphProblem(answer: DoorAnswer, seen: { calls: GraphCall[]; tun
 /** A certificate authority of this run and `graph.facebook.com`'s certificate signed by it (what erplora.com's
  *  `SSL_CERT_FILE` trusts), made with the Hub's `cryptography`. */
 const MAKE_CERTS = `
-import datetime, pathlib, sys
+import datetime, os, pathlib, sys
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -234,13 +238,58 @@ leaf = (base(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "${GRAPH_HOST}")
         .add_extension(x509.KeyUsage(digital_signature=True, key_cert_sign=False, crl_sign=False, **usage), critical=True)
         .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
         .sign(ca_key, hashes.SHA256()))
-(out / "ca.pem").write_bytes(ca.public_bytes(serialization.Encoding.PEM))
-(out / "cert.pem").write_bytes(leaf.public_bytes(serialization.Encoding.PEM))
-(out / "key.pem").write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                                serialization.NoEncryption()))
+# Each file is replaced in one step: erplora.com reads ca.pem per call, also while a Graph makes a new one.
+def put(name, data):
+    (out / (name + ".new")).write_bytes(data)
+    os.replace(out / (name + ".new"), out / name)
+put("ca.pem", ca.public_bytes(serialization.Encoding.PEM))
+put("cert.pem", leaf.public_bytes(serialization.Encoding.PEM))
+put("key.pem", key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
 `;
 
-/** The run's Graph, listening. */
+/** Makes a new authority of the run in `certs` (`ca.pem`, and the Graph's `cert.pem` and `key.pem` signed by it); when
+ *  it cannot, it throws the one line that says why (Python's error), not the whole command. */
+function makeAuthority(certs: string, hubDir: string): void {
+  try {
+    execFileSync('uv', ['run', 'python', '-c', MAKE_CERTS, certs], { cwd: hubDir, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] });
+  } catch (error) {
+    const why = String((error as { stderr?: unknown }).stderr ?? '').trim().split('\n').at(-1);
+    throw new Error(why || (error instanceof Error ? error.message : String(error)));
+  }
+}
+
+/** The command that starts the run's erplora.com: `node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL>` makes the
+ *  run's authority in `<artifacts>/meta-graph-<hub port>/` unless it is already there, then prints `erploraEnv`, one
+ *  `NAME=value` per line, for `env $(…)`. An erplora.com started with SSL_CERT_FILE naming a file that is not there
+ *  fails every call it makes, even a plain http one: its assistant answered the Hub 502 until the first WhatsApp spec
+ *  made one (FIX-HUB-E2E-SAAS-ASSISTANT-502-BEFORE-META-CA-EXISTS). The Graph makes a new one whenever it starts, and
+ *  erplora.com reads it per call. Returns the exit status. */
+export function runCli(
+  args: string[],
+  deps: { artifacts: string; hubDir: string; print: (line: string) => void; fail: (line: string) => void },
+): number {
+  const usage = 'usage: node tests/e2e/whatsapp-graph.ts <hub port> <SAAS_URL> (tests/e2e/README.md, «WhatsApp»)';
+  const [port, saas = '', ...rest] = args;
+  const hubPort = Number(port);
+  const url = URL.canParse(saas) ? new URL(saas) : undefined;
+  const origin = url?.protocol === 'http:' || url?.protocol === 'https:' ? url.origin : '';
+  if (!/^\d+$/.test(port ?? '') || hubPort <= 0 || hubPort + GRAPH_PORT_OFFSET > 65535 || !origin || rest.length > 0) {
+    deps.fail(`whatsapp-graph.ts: ${JSON.stringify(args)} is not a hub port and erplora.com's origin. ${usage}`);
+    return 2;
+  }
+  const certs = join(deps.artifacts, `meta-graph-${hubPort}`);
+  const ca = join(certs, 'ca.pem');
+  try {
+    if (!existsSync(ca)) makeAuthority(certs, deps.hubDir);
+  } catch (error) {
+    deps.fail(`whatsapp-graph.ts: the authority ${ca} could not be made: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+  const run = { saas: origin, hubPort, graphPort: hubPort + GRAPH_PORT_OFFSET, ca };
+  for (const [name, value] of Object.entries(erploraEnv(run))) deps.print(`${name}=${value}`);
+  return 0;
+}
+
 /** A JSON body of up to 64 KB, read (`undefined` for any other). */
 function jsonOf(request: IncomingMessage, body: Buffer): unknown {
   if (!String(request.headers['content-type'] ?? '').includes('application/json') || body.length > 64 * 1024) return undefined;
@@ -283,7 +332,7 @@ export interface GraphOptions {
 
 /** Starts the run's Graph in this thread, with a new authority (the specs use `startGraphThread`). */
 export async function startGraph(options: GraphOptions): Promise<Graph> {
-  execFileSync('uv', ['run', 'python', '-c', MAKE_CERTS, options.certs], { cwd: options.hubDir, encoding: 'utf8' });
+  makeAuthority(options.certs, options.hubDir);
   const ca = join(options.certs, 'ca.pem');
   const log = join(options.certs, 'calls.jsonl');
   writeFileSync(log, '');
@@ -427,6 +476,18 @@ export function startGraphThread(options: GraphOptions): Promise<GraphThread> {
         waiting.delete(told.id);
       }
     });
+  });
+}
+
+// Run as a script (not imported by a spec or a test; `import.meta.main` holds through a symlinked path too, which
+// comparing process.argv[1] with import.meta.url did not): the authority goes to this checkout's tests/e2e/.artifacts.
+if (isMainThread && import.meta.main) {
+  const here = dirname(fileURLToPath(import.meta.url));
+  process.exitCode = runCli(process.argv.slice(2), {
+    artifacts: join(here, '.artifacts'),
+    hubDir: join(here, '..', '..'),
+    print: (line) => console.log(line),
+    fail: (line) => console.error(line),
   });
 }
 
