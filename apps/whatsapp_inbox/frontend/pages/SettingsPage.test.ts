@@ -109,6 +109,19 @@ describe('SettingsPage: the number and the month', () => {
     expect(spent.find('whatsapp-inbox-settings-upgrade').text()).toBe('Upgrade plan');
   });
 
+  it('from 80 % of the month\'s messages, the month says how many are left, with «Upgrade plan»', async () => {
+    const near = await setup({}, { ...CONNECTED, monthly_usage: 120 });
+    const month = near.find('whatsapp-inbox-settings-month');
+    expect(month.text()).toContain('120 of 150 messages sent');
+    expect(month.find('[data-testid=whatsapp-inbox-settings-near-cap]').text()).toBe('You have 30 of 150 messages of your plan left this month.');
+    expect(near.find('whatsapp-inbox-settings-upgrade').attributes('href')).toBe('http://localhost:8001/store/plans');
+    const below = await setup({}, { ...CONNECTED, monthly_usage: 119 });
+    expect(below.find('whatsapp-inbox-settings-near-cap').exists()).toBe(false);
+    expect(below.find('whatsapp-inbox-settings-upgrade').exists()).toBe(false);
+    const spent = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
+    expect(spent.find('whatsapp-inbox-settings-near-cap').exists()).toBe(false);
+  });
+
   it('a plan without WhatsApp messages says so, never «No limit» (WHATSAPP_INBOX-F13, ADR-0474: 0 = none)', async () => {
     const none = await setup({}, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true });
     expect(none.wrapper.findComponent(UsageMeter).exists()).toBe(false);
@@ -326,5 +339,7 @@ describe('SettingsPage: who sees it', () => {
     const none = await setup({ locale: 'es' }, { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true });
     expect(none.find('whatsapp-inbox-settings-month').text()).toContain('Tu plan no incluye mensajes de WhatsApp.');
     expect(none.find('whatsapp-inbox-settings-upgrade').text()).toBe('Mejorar el plan');
+    const near = await setup({ locale: 'es' }, { ...CONNECTED, monthly_usage: 120 });
+    expect(near.find('whatsapp-inbox-settings-near-cap').text()).toBe('Te quedan 30 de 150 mensajes de tu plan este mes.');
   });
 });
