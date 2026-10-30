@@ -81,7 +81,15 @@ def visible_texts() -> set[str]:
     for choices in (DiscountRule.Type, DiscountRule.Scope):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {source(text) for text in lazies} | schema_titles()
+
+
+def source(text) -> str:
+    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
+    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
+    Spanish)."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
@@ -105,8 +113,7 @@ def test_every_entry_has_a_spanish_translation():
 
 def test_every_visible_text_is_in_the_catalog():
     assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
-    # A text with a context (``pgettext_lazy``) is said by its source alone, as the catalog keeps it after its context.
-    assert visible_texts() - {msgid.rpartition("\x04")[2] for msgid in po_entries(LOCALE / "django.po")} == set()
+    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():
