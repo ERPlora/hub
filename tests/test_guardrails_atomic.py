@@ -11,7 +11,9 @@ with no transaction at all). ``live.operations.atomic()`` opens on ``live.operat
 Static and fast, like ``tests/test_guardrails.py`` (whose rule (b) keeps ``using=`` out): a pure function over source
 text, proven by made-up offenders (the positive control), then run over ``apps/`` and ``base/`` outside ``tests/``,
 ``base/tenancy/`` (the tenancy chooses aliases itself) and the migrations (``RunPython`` runs on its schema editor's
-alias). Django's atomic stays only in the functions of ``DJANGO_ATOMIC_ALLOWED``, each with its reason. The tests at the
+alias). Django's atomic, and what else of its transactions works on ``default`` without ``using=`` (``set_rollback``,
+the savepoints, ``get_connection``, ``mark_for_rollback_on_error``…), stays only in the functions of
+``DJANGO_ATOMIC_ALLOWED``, each with its reason. The tests at the
 end prove the behaviour with the two hubs' real databases (``hub_a``, ``hub_b``).
 """
 
@@ -31,12 +33,32 @@ from base.tenancy.tests import hubs
 
 HUB_DIR = Path(__file__).resolve().parent.parent
 SOURCE_ROOTS = ("apps", "base")
-#: Out of the scan: the tenancy, which chooses and opens the hubs' aliases itself (``tests/test_guardrails.py``, rule (b)).
+#: Out of the scan: the tenancy, which chooses and opens the hubs' aliases itself (``tests/test_guardrails.py``, (b)).
 SKIPPED_PACKAGE = PurePosixPath("base/tenancy")
 #: Django's module of transactions, as a dotted name.
 TRANSACTION_MODULE = "django.db.transaction"
-#: What of it opens a block: the function and its class.
+#: What of it opens a block: the function and its class (always reported, ``using=`` or not).
 ATOMIC_NAMES = frozenset({"atomic", "Atomic"})
+#: The rest of it that works on ``default`` without ``using=``: inside an operation on a hub's alias, the same bug.
+#: Called with ``using=`` it is ``tests/test_guardrails.py``'s rule (b); a positional alias, which that rule cannot see,
+#: is reported here.
+DEFAULT_ALIAS_NAMES = frozenset(
+    {
+        "set_rollback",
+        "get_rollback",
+        "savepoint",
+        "savepoint_commit",
+        "savepoint_rollback",
+        "clean_savepoints",
+        "get_connection",
+        "mark_for_rollback_on_error",
+        "get_autocommit",
+        "set_autocommit",
+        "commit",
+        "rollback",
+    }
+)
+REPORTED_NAMES = ATOMIC_NAMES | DEFAULT_ALIAS_NAMES
 
 CONTROL_LOGIN = (
     "The way in writes control's models (the account's local copy in auth, its Membership, Django's session and its "
@@ -44,7 +66,7 @@ CONTROL_LOGIN = (
     "rows (its TrustedDevice) go in the hub's, live.operations.atomic() inside it: two databases, a block on each."
 )
 
-#: ``<path>::<function>`` → why Django's atomic is the one meant there.
+#: ``<path>::<function>`` → why Django's atomic (or the rest of its transactions) on its alias is the one meant there.
 DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
     "base/catalog.py::register_apps": (
         "It writes shared.app and shared.app_doc on the `shared` alias, which it names (SHARED_CATALOG_REASON of "
@@ -72,35 +94,67 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
 
 
 class _DjangoAtomicFinder(ast.NodeVisitor):
-    """Each use of Django's ``atomic``, with the function it is in (``Class.method``; a decorator is its function's)."""
+    """Each use of Django's ``atomic`` (and of what else of its transactions works on ``default`` without ``using=``),
+    with the function it is in (``Class.method``; a decorator is its function's)."""
 
     def __init__(self) -> None:
         self.found: list[tuple[int, str, str]] = []
         self._scope: list[str] = []
         # ``transaction`` is Django's in the Hub's code, imported or not (a file that lost its import still reads so).
         self._modules: set[str] = {"transaction"}
+        #: Names bound to ``django.db`` itself (``import django.db as db``, ``from django import db``).
+        self._db_modules: set[str] = set()
+        #: The calls with ``using=`` already judged: their function is not reported again as an attribute.
+        self._with_using: set[int] = set()
 
     def _note(self, node: ast.AST, what: str) -> None:
         self.found.append((node.lineno, ".".join(self._scope) or "<module>", what))
+
+    def _is_transaction(self, node: ast.AST) -> bool:
+        dotted = _dotted(node)
+        if dotted is None:
+            return False
+        owner, _, last = dotted.rpartition(".")
+        if dotted in self._modules or dotted == TRANSACTION_MODULE:
+            return True
+        return last == "transaction" and owner in self._db_modules
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             if alias.name == TRANSACTION_MODULE and alias.asname:
                 self._modules.add(alias.asname)
+            elif alias.name == "django.db" and alias.asname:
+                self._db_modules.add(alias.asname)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if node.module == "django.db":
+        if node.module == "django":
+            self._db_modules |= {alias.asname or alias.name for alias in node.names if alias.name == "db"}
+        elif node.module == "django.db":
             self._modules |= {alias.asname or alias.name for alias in node.names if alias.name == "transaction"}
         elif node.module == TRANSACTION_MODULE:
             for alias in node.names:
-                if alias.name in ATOMIC_NAMES:
+                if alias.name in REPORTED_NAMES:
                     self._note(node, f"from {TRANSACTION_MODULE} import {alias.name}")
 
+    def visit_Assign(self, node: ast.Assign) -> None:
+        # ``tx = transaction``: the module under another name.
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) and self._is_transaction(node.value):
+            self._modules.add(node.targets[0].id)
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        function = node.func
+        if (
+            isinstance(function, ast.Attribute)
+            and function.attr in DEFAULT_ALIAS_NAMES
+            and any(keyword.arg == "using" for keyword in node.keywords)
+        ):
+            self._with_using.add(id(function))
+        self.generic_visit(node)
+
     def visit_Attribute(self, node: ast.Attribute) -> None:
-        if node.attr in ATOMIC_NAMES:
-            owner = _dotted(node.value)
-            if owner in self._modules or owner == TRANSACTION_MODULE:
-                self._note(node, f"{owner}.{node.attr}")
+        if node.attr in REPORTED_NAMES and id(node) not in self._with_using and self._is_transaction(node.value):
+            self._note(node, f"{_dotted(node.value)}.{node.attr}")
         self.generic_visit(node)
 
     def _scoped(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> None:
@@ -192,15 +246,52 @@ from live.operations import atomic, on_commit
 
 
 @atomic
-def decorated():
+def decorated(alias):
     with atomic(savepoint=False):
-        transaction.set_rollback(True)
+        transaction.set_rollback(True, using=alias)
 
 
 def elsewhere(self, block):
     transaction.on_commit(print)
     on_commit(print)
-    return self.atomic, block.atomic(), transaction.get_connection()
+    return self.atomic, block.atomic(), self.transaction.set_rollback(True)
+'''
+
+#: ``django.db`` under a name of its own, and ``transaction`` given another one.
+RENAMED = '''
+import django.db as db
+from django import db as dj
+from django.db import transaction
+
+tx = transaction
+inner = db.transaction
+
+
+def f():
+    with db.transaction.atomic():
+        dj.transaction.set_rollback(True)
+    with tx.atomic():
+        inner.get_connection()
+'''
+
+#: What else of Django's transactions goes to ``default`` without ``using=`` (a positional alias is no ``using=``).
+DEFAULT_ALIAS_APIS = '''
+from django.db import transaction
+from django.db.transaction import savepoint
+
+
+def f(sid, alias):
+    transaction.set_rollback(True)
+    sid = transaction.savepoint()
+    transaction.savepoint_rollback(sid)
+    transaction.savepoint_commit(sid)
+    transaction.get_connection()
+    transaction.get_connection(alias)
+    with transaction.mark_for_rollback_on_error():
+        pass
+    later = transaction.get_rollback
+    transaction.set_rollback(True, using=alias)
+    return later
 '''
 
 
@@ -225,6 +316,29 @@ def test_the_scanner_reads_transaction_as_djangos_even_without_its_import():
     ]
 
 
+def test_the_scanner_follows_django_db_under_another_name_and_transaction_reassigned():
+    assert django_atomic_uses(RENAMED) == [
+        (11, "f", "db.transaction.atomic"),
+        (12, "f", "dj.transaction.set_rollback"),
+        (13, "f", "tx.atomic"),
+        (14, "f", "inner.get_connection"),
+    ]
+
+
+def test_the_scanner_sees_the_rest_of_djangos_transaction_api_that_goes_to_default_without_using():
+    assert django_atomic_uses(DEFAULT_ALIAS_APIS) == [
+        (3, "<module>", "from django.db.transaction import savepoint"),
+        (7, "f", "transaction.set_rollback"),
+        (8, "f", "transaction.savepoint"),
+        (9, "f", "transaction.savepoint_rollback"),
+        (10, "f", "transaction.savepoint_commit"),
+        (11, "f", "transaction.get_connection"),
+        (12, "f", "transaction.get_connection"),
+        (13, "f", "transaction.mark_for_rollback_on_error"),
+        (15, "f", "transaction.get_rollback"),
+    ]
+
+
 def test_the_scanner_lets_lives_atomic_and_the_rest_of_transaction_be():
     assert django_atomic_uses(INNOCENT) == []
 
@@ -246,8 +360,9 @@ def test_djangos_atomic_is_only_where_the_list_says():
     ]
 
     assert offenders == [], (
-        "A bare transaction.atomic() opens on control's database, not in the operation's transaction on the hub's: "
-        f"use live.operations.atomic() (or list the function in DJANGO_ATOMIC_ALLOWED with its reason): {offenders}"
+        "A bare transaction.atomic() (or set_rollback, a savepoint, get_connection… without using=) works on control's "
+        "database, not in the operation's transaction on the hub's: use live.operations.atomic() (or list the function "
+        f"in DJANGO_ATOMIC_ALLOWED with its reason): {offenders}"
     )
 
 
