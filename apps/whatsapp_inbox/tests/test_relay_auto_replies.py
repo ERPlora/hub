@@ -7,8 +7,9 @@ real network code. The inbox's automatic answer is turned on as the owner does i
 through the inbox's own door; one tick of the worker hands its event to Automatizaciones, whose run reads the message,
 thanks them, makes their card and asks the assistant with only what the answer was granted. «Ask me first»: the booking
 it wants waits in «Waiting for your answer»; the owner's yes runs Reservas' real operation, whose answer goes back to
-the assistant, and what the assistant says then goes to them. When the assistant fails, they get the apology and their
-conversation stays waiting for an answer, marked «Needs attention».
+the assistant, and what the assistant says then goes to them. A cancellation too (F25), only of their own reservation:
+Reservas refuses any other on their behalf. When the assistant fails, they get the apology and their conversation stays
+waiting for an answer, marked «Needs attention».
 """
 
 import datetime as dt
@@ -232,6 +233,7 @@ def test_a_guest_asks_for_a_table_and_after_the_owner_s_yes_it_is_booked_with_th
         "reservation__availability__tables",
         "reservation__reservation__create",
         "reservation__reservation__update",
+        "reservation__reservation__cancel",
         "reservation__waitlist__create",
     ]
     assert Reservation.objects.count() == 0
@@ -311,3 +313,74 @@ def test_a_guest_moves_their_table_and_after_the_owner_s_yes_it_is_at_the_new_ti
     booked.refresh_from_db()
     assert booked.time == dt.time(22, 0)
     assert outbound()[-1] == "Hecho: os esperamos el sábado a las 22:00."
+
+
+def test_a_guest_cancels_their_table_and_after_the_owner_s_yes_it_is_cancelled(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F25: the cancellation of their latest reservation, read before by their number, waits for a yes; with it,
+    Reservas cancels it on their behalf and what the assistant says then goes to them."""
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    booked = make_reservation(date=day, time="21:00", customer_id=card.id, guest_name="Lucía", guest_phone=LUCIA, party_size=4)
+    gateway.reply(
+        CHAT,
+        json=wants(
+            "reservation.reservation.cancel",
+            {"id": str(booked.id), "on_behalf_of": str(card.id), "reason": "The guest asked by WhatsApp"},
+        ),
+    )
+    gateway.reply(CHAT, json=said("Hecho: tu reserva del sábado a las 21:00 queda anulada."))
+    lucia_writes("Quiero anular mi reserva")
+
+    tick()
+
+    [asked] = gateway.sent(CHAT)
+    assert "reservation__reservation__cancel" in offered(asked)
+    assert str(booked.id) in asked.body["messages"][0]["content"]  # her latest, read before
+    booked.refresh_from_db()
+    assert booked.status != Reservation.Status.CANCELLED  # it waits for the yes
+    assert Question.objects.count() == 1
+    assert outbound() == [THANKS]
+
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    booked.refresh_from_db()
+    assert (booked.status, booked.cancellation_reason) == (Reservation.Status.CANCELLED, "The guest asked by WhatsApp")
+    assert outbound()[-1] == "Hecho: tu reserva del sábado a las 21:00 queda anulada."
+    assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
+
+
+def test_the_answer_never_cancels_the_reservation_of_another_number(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """reservations#50: on their behalf, another guest's reservation is refused even after the yes, saying nothing of it;
+    the assistant hears the refusal and what it says then goes to them."""
+    connect()
+    open_week()
+    run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    other = run("customer.customer.create", {"name": "Marta Ruiz", "phone": "600999888"}, ctx_for("hub_owner"))
+    day = timezone.localdate() + dt.timedelta(days=3)
+    theirs = make_reservation(
+        date=day, time="21:00", customer_id=other.id, guest_name="Marta", guest_phone="+34600999888", party_size=2
+    )
+    gateway.reply(CHAT, json=wants("reservation.reservation.cancel", {"id": str(theirs.id), "on_behalf_of": str(card.id)}))
+    gateway.reply(CHAT, json=said("No encuentro ninguna reserva a tu nombre."))
+    lucia_writes("Anula la reserva de Marta del sábado")
+
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    theirs.refresh_from_db()
+    assert theirs.status != Reservation.Status.CANCELLED
+    told = [message for message in gateway.sent(CHAT)[-1].body["messages"] if message.get("role") == "tool"]
+    assert "reservation.customer_mismatch" in json.dumps(told)
+    assert outbound()[-1] == "No encuentro ninguna reserva a tu nombre."
