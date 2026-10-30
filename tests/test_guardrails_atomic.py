@@ -77,7 +77,8 @@ class _DjangoAtomicFinder(ast.NodeVisitor):
     def __init__(self) -> None:
         self.found: list[tuple[int, str, str]] = []
         self._scope: list[str] = []
-        self._modules: set[str] = set()
+        # ``transaction`` is Django's in the Hub's code, imported or not (a file that lost its import still reads so).
+        self._modules: set[str] = {"transaction"}
 
     def _note(self, node: ast.AST, what: str) -> None:
         self.found.append((node.lineno, ".".join(self._scope) or "<module>", what))
@@ -215,6 +216,12 @@ def test_the_scanner_sees_every_shape_of_djangos_atomic_and_where_it_is():
         (32, "others", "dtx.atomic"),
         (34, "others", "django.db.transaction.atomic"),
         (36, "others", "transaction.Atomic"),
+    ]
+
+
+def test_the_scanner_reads_transaction_as_djangos_even_without_its_import():
+    assert django_atomic_uses("def f():\n    with transaction.atomic():\n        pass\n") == [
+        (2, "f", "transaction.atomic")
     ]
 
 
