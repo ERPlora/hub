@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5bca41a9f687e9739e6c9081f475087b79de62e3d91a3559087b66cbff720143 -->
+<!-- generated from WORKBOOK.md sha256:d423084d98895b176940f154f020c05ef7b50383592dc2eda926deaf0208f1b6 -->
 
 ## What it is for and who it is for
 
@@ -2260,7 +2260,9 @@ Steps:
      rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
-     no sign when it balances); a yes or a no, as "Yes" or "No", and a list, by how many items it carries. Everything
+     no sign when it balances); a yes or a no, as "Yes" or "No"; a list, by how many items it carries, and a datum
+     that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). Everything
      shows in the person's language, also the name of each datum when the card puts it on its own line (BASE-F98): the
      same one its app calls it by, never a technical name. An action of the platform itself is named by the screen where
      it is done, for example "Change in Settings" or "Delete in Files". Each action shows with its own verb, never a

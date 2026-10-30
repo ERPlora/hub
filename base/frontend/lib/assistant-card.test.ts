@@ -101,7 +101,66 @@ describe('each datum', () => {
     expect(fieldText({ name: 'rows', label: 'Rows', kind: 'list', value: [1, 2, 3] }, opts)).toBe(
       'base.assistant.card.items{"count":3}',
     );
-    expect(fieldText({ name: 'address', label: 'Address', kind: 'object', value: { city: 'Vigo' } }, opts)).toBe('city: Vigo');
+    expect(fieldText({ name: 'address', label: 'Address', kind: 'object', value: { city: 'Vigo' } }, opts)).toBe('Vigo');
+  });
+});
+
+describe('a datum that is an object', () => {
+  // FIX-HUB-BASE-ASSISTANT-CARD-OBJECT-SHOWS-INNER-KEYS-IN-ENGLISH: its inner data went by their keys, in English in
+  // every language («Plantilla: name: cita_recordatorio · language: es»). Like an address on a summary or a variant
+  // on a ticket, it is said by its values; its own name is the datum's.
+  const template = {
+    name: 'template',
+    label: 'Plantilla',
+    kind: 'object' as const,
+    value: { name: 'cita_recordatorio', language: 'es', variables: ['Ana', '10:00'] },
+  };
+
+  it('says its values, never their keys (whatsapp_inbox.message.send’s template)', () => {
+    expect(fieldText(template, opts)).toBe('cita_recordatorio · es · Ana, 10:00');
+    expect(fieldLines([template], opts)).toEqual(['Plantilla: cita_recordatorio · es · Ana, 10:00']);
+    const line = cardLine(card({ fields: [{ name: 'to', label: 'Teléfono', kind: 'text', value: '+34600111222' }, template] }), opts);
+    expect(line).toBe('+34600111222 · cita_recordatorio · es · Ana, 10:00');
+    expect(line).not.toMatch(/\b(name|language|variables):/);
+  });
+
+  it('leaves out its empty data; one with none is a dash', () => {
+    expect(fieldText({ ...template, value: { name: 'cita_recordatorio', language: null, variables: [], header_sample: '' } }, opts)).toBe(
+      'cita_recordatorio',
+    );
+    expect(fieldText({ ...template, value: { language: null, variables: [] } }, opts)).toBe('—');
+  });
+
+  it('within it, an object or a list is said the same way, and a yes or no in words', () => {
+    const content = { hero: { title: 'Hola', visible: true }, gallery: [{ url: 'a.jpg' }, { url: 'b.jpg' }], footer: { visible: false } };
+    expect(fieldText({ name: 'content', label: 'Contenido', kind: 'object', value: content }, opts)).toBe(
+      'Hola · base.assistant.card.yes · a.jpg, b.jpg · base.assistant.card.no',
+    );
+  });
+
+  it('a key that is a figure is data, not a name, and stays: the face value of what was counted', () => {
+    // A JavaScript object gives its whole-number keys in ascending order, as they come.
+    const denominations = { bills: { '50': 2, '20': 1 }, coins: { '0.50': 4 } };
+    expect(fieldText({ name: 'denominations', label: 'Billetes y monedas', kind: 'object', value: denominations }, opts)).toBe(
+      '20: 1 · 50: 2 · 0.50: 4',
+    );
+    // A figure written with a decimal comma is one too; one counted as nothing is left out, as any empty datum.
+    expect(fieldText({ name: 'denominations', label: 'Billetes y monedas', kind: 'object', value: { '0,50': 4, '20': null } }, opts)).toBe(
+      '0,50: 4',
+    );
+  });
+
+  it('a key with a figure only in part of it is still a name: an address’s line1 (cart_checkout’s free fields)', () => {
+    const address = { line1: 'Calle Mayor 1', '2nd_line': '2º B', postal_code: '36201', city: 'Vigo' };
+    expect(fieldText({ name: 'shipping_address', label: 'Dirección de envío', kind: 'object', value: address }, opts)).toBe(
+      'Calle Mayor 1 · 2º B · 36201 · Vigo',
+    );
+  });
+
+  it('a secret stays hidden as the server sends it', () => {
+    expect(fieldText({ name: 'login', label: 'Acceso', kind: 'object', value: { user: 'ana', password: '••••••••' } }, opts)).toBe(
+      'ana · ••••••••',
+    );
   });
 
   it('a known datum is named in the person’s language; another by its own title', () => {
