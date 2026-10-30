@@ -1349,7 +1349,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   la vez, la misma que hace `_make_proposal` tras el sí) y la pasa por `base.assistant.card` con el `ctx` de quien
   lee: fechas en su idioma y a la hora del negocio, listas cerradas por su etiqueta y registros por la lectura de
   su marca `refers`, ejecutada como esa persona (si no puede leerlo, el dato no sale). La pantalla los pinta con
-  `fieldLines` de base (`base/frontend/lib/assistant-card.ts`), como la tarjeta del chat, sin los vacíos y con la
+  `fieldLines` del chat compartido (`@erplora/ui/components`), como la tarjeta del chat, sin los vacíos y con la
   moneda de `base.business.get`. Una pregunta de «Preguntar antes a alguien» no trae `fields`.
   `appointment.appointment.cancel` tampoco, todavía: Citas niega todo cambio de una automatización
   (`may_change` pide `appointment.change_appointment` o la ficha propia, y el paso no tiene ninguna de las dos).

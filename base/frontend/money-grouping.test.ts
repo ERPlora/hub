@@ -1,12 +1,14 @@
 // base-money-thousands-grouping (FIX-HUB-MONEY-THOUSANDS-SEPARATOR): the Hub writes an amount one way, its thousands
-// grouped from four digits on («1.234,56 €», hub#1090), as base's `formatMoney` (lib/money.ts) does. Each app still
-// carries its own money formatter (`apps/<app>/frontend/lib/format.ts` or `money.ts`), and some keep Intl's Spanish
-// default, which waits for five digits: «1234,56 €» in one screen beside «1.234,56 €» in the next. This guard counts,
-// by app, the currency formats that do not group always, as a ratchet: a number only goes down (an app that writes its
-// amounts with `formatMoney`, or groups always, lowers it here and leaves the list at 0), and no app — nor base — gains one.
+// grouped from four digits on («1.234,56 €», hub#1090), with the platform's `formatMoney` (`@erplora/ui/components`,
+// `format/money.ts`: base's Home and the assistant's card write with it). Each app still carries its own money formatter
+// (`apps/<app>/frontend/lib/format.ts` or `money.ts`), and some keep Intl's Spanish default, which waits for five
+// digits: «1234,56 €» in one screen beside «1.234,56 €» in the next. This guard counts, by app (and `ui`, the shared
+// package), the currency formats that do not group always, as a ratchet: a number only goes down (an app that writes its
+// amounts with `formatMoney`, or groups always, lowers it here and leaves the list at 0), and none — nor base — gains one.
 //
 // What it counts: every options object of an `Intl.NumberFormat` that says `style: 'currency'` in the sources of
-// `apps/*/frontend` and `base/frontend` (`.ts` and the `<script>` of a `.vue`; tests and their helpers left out). One
+// `apps/*/frontend`, `base/frontend` and `packages/ui/src` (`.ts` and the `<script>` of a `.vue`; tests and their
+// helpers left out). One
 // groups when `useGrouping: 'always'` is in it, in an object it spreads (`...digits`) or in the object that spreads it
 // (`{ ...style, useGrouping: 'always' }`); and, as one branch of `money ? { style: 'currency', … } : digits`, when the
 // figure written while the currency is unknown (the other branch) groups too. Not counted: the sign alone (a format
@@ -34,10 +36,13 @@ const UNGROUPED_MONEY_FORMATS: Record<string, number> = {
   service: 1,
   staff: 1,
   table: 1,
+  // The platform's own `formatMoney` (packages/ui/src/components/format/money.ts) keeps Intl's default: base's Home and
+  // the assistant's card write «1234,56 €» until it groups (FIX of `ui`), and then the pointer that brings it lowers this.
+  ui: 1,
 };
 
 const LOWER_THE_RATCHET =
-  'write the amount with formatMoney of base/frontend/lib/money.ts (it groups from four digits on: «1.234,56 €»), or ' +
+  'write the amount with formatMoney of @erplora/ui/components (the platform\'s one way to write an amount), or ' +
   "give the format useGrouping: 'always'; an app that fixed one lowers its number in UNGROUPED_MONEY_FORMATS of " +
   'base/frontend/money-grouping.test.ts (and leaves it at 0), and none is ever raised';
 
@@ -210,13 +215,15 @@ function sources(dir: string): string[] {
   });
 }
 
-/** Every currency format of the Hub's frontends that does not group always, as `<path>:<line>`, by app. */
+/** Every currency format of the Hub's frontends (and of the shared `@erplora/ui`) that does not group always, as
+ *  `<path>:<line>`, by app. */
 function ungroupedByApp(): Record<string, string[]> {
   const apps = readdirSync(join(HUB, 'apps'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => ({ app: entry.name, dir: join(HUB, 'apps', entry.name, 'frontend') }));
   const found: Record<string, string[]> = {};
-  for (const { app, dir } of [{ app: 'base', dir: BASE_FRONTEND }, ...apps]) {
+  const shared = { app: 'ui', dir: join(HUB, 'packages', 'ui', 'src') };
+  for (const { app, dir } of [{ app: 'base', dir: BASE_FRONTEND }, shared, ...apps]) {
     let files: string[];
     try {
       files = sources(dir);

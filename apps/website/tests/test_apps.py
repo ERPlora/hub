@@ -2,6 +2,7 @@
 
 from django.apps import apps
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.operations import INTERNAL
 
 
 def website():
@@ -100,7 +101,7 @@ SCREEN_ONLY = {
 
 def test_the_assistant_gets_every_operation_but_the_screen_only_ones():
     operations = website_operations()
-    assert {name for name, op in operations.items() if op.ai is not None} == {
+    assert {name for name, op in operations.items() if isinstance(op.ai, dict)} == {
         "website.site.get",
         "website.site.save",
         "website.site.publish",
@@ -109,7 +110,7 @@ def test_the_assistant_gets_every_operation_but_the_screen_only_ones():
     }
     for name, op in operations.items():
         if name in SCREEN_ONLY:
-            assert op.ai is None, name
+            assert op.ai is INTERNAL, name
             continue
         assert isinstance(op.ai, dict), name
         assert len(str(op.ai.get("description", "")).strip()) > 20, name

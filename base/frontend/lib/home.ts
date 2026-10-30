@@ -2,13 +2,9 @@
 // the fold of «Finish setting up your business», the blocking strip's steps, a panel's data → what it paints,
 // the panels this browser keeps on, and «My apps» in the order this browser opens them. Ported from the old
 // hub's `dashboard-heading.ts`, `setup-status.ts` and `dashboard-widgets.ts`.
-import { formatDateTime } from '@erplora/ui/components';
+import { formatDateTime, formatMoney, type Money } from '@erplora/ui/components';
 
 import type { SetupItem, SetupStatus, WidgetDef } from '../operations';
-import { formatMoney, type Money } from './money';
-
-// The apps read the money's shape from here since BASE-G98; it lives with how an amount is written.
-export type { Money };
 
 // ── Heading (BASE-G127) ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -119,6 +115,10 @@ export function rowsOf(result: unknown): Row[] {
   return [result as Row];
 }
 
+/** A business's currency (ISO 4217) and its decimals, as `base.business.get` says them (BASE-G98). */
+/** A currency and its minor unit's decimals: the shared one of `@erplora/ui/components`. */
+export type { Money };
+
 const numberFormats = new Map<string, Intl.NumberFormat>();
 
 function formatOptions(format: string): Intl.NumberFormatOptions {
@@ -138,11 +138,13 @@ function numberFormat(locale: string, format: string): Intl.NumberFormat {
 }
 
 /** A value of a panel as text: money in the minor unit of its currency (the server's: 1250 is 12.50 €, ¥1,250 has no
- *  cents) in the business's currency (`money`; without it, the amount alone), written as the whole Hub writes an
- *  amount (`formatMoney`: «1.234,56 €»), a percentage as 0–100, else the number. */
+ *  cents) in the business's currency (`money`; without it, the amount alone, in cents), a percentage as 0–100, else
+ *  the number. */
 export function formatValue(value: unknown, format: unknown, locale: string, money?: Money): string {
   const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
   if (Number.isNaN(number)) return String(value);
+  // Money as every screen writes it (`formatMoney`: the symbol a till of that country prints, «zł», «€»; until the
+  // business is known, the amount alone).
   if (format === 'currency') return formatMoney(number, locale, money);
   if (format === 'percent') return numberFormat(locale, 'percent').format(number / 100);
   return numberFormat(locale, format === 'compact' ? 'compact' : 'number').format(number);

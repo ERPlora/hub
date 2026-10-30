@@ -3,21 +3,23 @@
 // greyed, and a tap says why. A first tap records («Listening…», the key turns «Stop»), a second one stops; the words
 // are transcribed by erplora.com, land in the assistant's box after what was written and the panel opens: the person
 // sees what was understood and sends it. Nothing is sent by itself. A refusal, an empty or too long dictation and a
-// failure are a toast. The dictation is base's (`useDictation`, PLAN-HUB §18): the key only says each reason its way
-// and keeps its own offline guard.
+// failure are a toast. The dictation is the shared assistant's (`useDictation`, PLAN-HUB §18): the key only says each
+// reason its way and keeps its own offline guard.
+import {
+  ASSISTANT_ICONS,
+  type Assistant,
+  createAssistant,
+  type Dictation,
+  type DictationOptions,
+  type DictationProblem,
+  installAssistant,
+  type TurnBody,
+  useDictation,
+} from '@erplora/ui/components';
 import { type SessionMe, toast } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, ref, toRaw, toValue } from 'vue';
 
-import { type Assistant, createAssistant, installAssistant } from '../../../../../base/frontend/lib/assistant';
-import { ASSISTANT_ICONS } from '../../../../../base/frontend/lib/assistant-icons';
-import type { TurnBody } from '../../../../../base/frontend/lib/assistant-stream';
-import {
-  type Dictation,
-  type DictationOptions,
-  type DictationProblem,
-  useDictation,
-} from '../../../../../base/frontend/lib/dictation';
 import { EMPLOYEE, mountSale, settle } from '../../__tests__/mount-sale';
 import SpeakKey from './SpeakKey.vue';
 
@@ -26,9 +28,9 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   toast: vi.fn(() => Promise.resolve()),
 }));
 
-// Base's dictation, the real one unless a test swaps it for one it drives (`fakeDictation`).
-vi.mock('../../../../../base/frontend/lib/dictation', async (importOriginal) => {
-  const real = await importOriginal<typeof import('../../../../../base/frontend/lib/dictation')>();
+// The shared assistant's dictation, the real one unless a test swaps it for one it drives (`fakeDictation`).
+vi.mock('@erplora/ui/components', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@erplora/ui/components')>();
   return { ...real, useDictation: vi.fn(real.useDictation) };
 });
 
@@ -73,8 +75,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Base's dictation swapped for one the test drives, for the next key that mounts: its `toggle` and `cancel` are spies,
- *  `recording` says whether it records, and `problem` says a reason as base would. */
+/** The dictation swapped for one the test drives, for the next key that mounts: its `toggle` and `cancel` are spies,
+ *  `recording` says whether it records, and `problem` says a reason as the dictation would. */
 function fakeDictation(options: { recording?: boolean } = {}) {
   let given: DictationOptions = {};
   const recording = ref(options.recording ?? false);

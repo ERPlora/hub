@@ -88,6 +88,7 @@ ROUTES = {
     ("POST", "/whatsapp_inbox/templates/retry", "whatsapp_inbox.template.retry"),
     ("POST", "/whatsapp_inbox/templates/delete", "whatsapp_inbox.template.delete"),
     ("POST", "/whatsapp_inbox/templates/samples", "whatsapp_inbox.template_sample.upload"),
+    ("GET", "/whatsapp_inbox/templates/samples/detail", "whatsapp_inbox.template_sample.detail"),
     ("GET", "/whatsapp_inbox/channel", "whatsapp_inbox.channel.get"),
     ("POST", "/whatsapp_inbox/channel/prepare", "whatsapp_inbox.channel.prepare"),
     ("POST", "/whatsapp_inbox/channel/connect", "whatsapp_inbox.channel.connect"),
@@ -348,3 +349,16 @@ def test_an_employee_picks_templates_and_keeps_a_header_file_but_neither_makes_n
     # F33: a template from WhatsApp Manager asks for its file when sending, and the employee sends.
     sample = {"header_format": "IMAGE", "name": "carta.jpg", "content_base64": "/9j/4AAQ"}
     assert post(employee_client, "/whatsapp_inbox/templates/samples", sample).status_code == 201
+
+
+@pytest.mark.django_db
+def test_a_header_file_is_read_by_its_id_over_http(employee_client, hub_files):
+    sample = {"header_format": "IMAGE", "name": "carta.jpg", "content_base64": "/9j/4AAQ"}
+    kept = post(employee_client, "/whatsapp_inbox/templates/samples", sample).json()
+
+    read = get(employee_client, "/whatsapp_inbox/templates/samples/detail", id=kept["id"])
+    assert read.status_code == 200, read.content
+    assert read.json() == kept
+
+    gone = get(employee_client, "/whatsapp_inbox/templates/samples/detail", id="0199e000-0000-7000-8000-0000000000c5")
+    assert (gone.status_code, gone.json()["error"]["code"]) == (404, "whatsapp_inbox.sample_not_found")

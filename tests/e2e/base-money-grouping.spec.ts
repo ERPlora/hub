@@ -1,9 +1,9 @@
 // flow: base-money-thousands-grouping — FIX-HUB-MONEY-THOUSANDS-SEPARATOR (hub#1090)
 // The Hub writes an amount one way, its thousands grouped from four digits on: «1.234,56 €», never «1234,56 €» (the
 // Spanish CLDR only groups from five). A sale of 1.234,56 € charged through Sales' API reads so in the Home's
-// «Activity» (written by base's `formatMoney`, base/frontend/lib/money.ts), and a price of 1.234,56 € in a Price List's
-// detail reads the same (Pricing groups on its own: looked at here, not touched), as the owner reads them in Spanish at
-// 390, 834 and 1440. What the run creates is deleted after it, also when a test fails.
+// «Activity» (written with the platform's `formatMoney`, @erplora/ui/components), and a price of 1.234,56 € in a
+// Price List's detail reads the same (Pricing groups on its own: looked at here, not touched), as the owner reads them
+// in Spanish at 390, 834 and 1440. What the run creates is deleted after it, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, psql, shown } from './helpers';

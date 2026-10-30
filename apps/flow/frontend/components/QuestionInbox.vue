@@ -8,13 +8,12 @@
 // (FLOW-F38) says its action first, right under the title, as the server names it for the reader («Cancel a
 // reservation»), and lists each datum it would send as its card in the chat says it (BASE-F97 step 2, base's
 // `fieldLines`): in words, an amount in the business's currency, the empty ones left out.
-import { InlineFeedback } from '@erplora/ui/components';
+import { fieldLines, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { fieldLines } from '../../../../base/frontend/lib/assistant-card';
 import { useBusinessMoney } from '../../../../base/frontend/lib/money';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/phrasing';
