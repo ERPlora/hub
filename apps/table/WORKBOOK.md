@@ -410,8 +410,8 @@ esa mesa que ya estaban Reservadas, gastadas (TABLE-F28; desde Reservas, solo la
 Si falla: si otro dispositivo la acaba de ocupar, «Otro dispositivo acaba de ocupar esa mesa. Se ha
 actualizado el plano.» y la mesa no se sienta. **Dos camareros que sientan la misma mesa a la vez
 dejan una sola cuenta**: el segundo recibe ese mismo aviso. Una mesa bloqueada, desactivada o borrada
-no se sienta.
-Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19
+no se sienta. Sentar se hace en la sala, con el grupo delante: una automatización no puede hacerlo.
+Implicados: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
 
 ### TABLE-F11 Volver a una mesa ocupada y cobrarla
 <!-- origen: qa:verticals/restaurant/06-service-orders-and-kitchen wf:restaurante-dia#rec_restaurante-f08 qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f11 -->
@@ -452,8 +452,9 @@ Entra: la cuenta (abierta) y la mesa.
 Sale: la cuenta de mesa abierta y enlazada a esa cuenta (avisa: `table.session.opened`).
 Si falla: los de TABLE-F10, dentro de la ventana y con estas palabras; una cuenta ya cobrada o anulada:
 «Esa cuenta ya no está abierta en Ventas.»; una cuenta que ya está en otra mesa: «Esa cuenta ya está
-en la mesa N.». Las mesas Ocupadas y Bloqueadas no se pueden tocar.
-Implicados: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19
+en la mesa N.». Las mesas Ocupadas y Bloqueadas no se pueden tocar. Llevar una cuenta a una mesa se
+hace con el grupo delante: una automatización no puede hacerlo.
+Implicados: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19, FLOW-F12
 
 ### TABLE-F13 Quitar la mesa de una cuenta (aparcarla)
 <!-- origen: qa:modules/tables/seat-and-open-table old:tables/workflow/servicio.md#tables-f13 -->
@@ -544,8 +545,9 @@ Entra: la cuenta abierta de la mesa y las líneas que se mueven.
 Sale: dos cuentas de mesa abiertas en la misma mesa, la nueva colgando de la original (avisa:
 `table.session.split` y `sale.order.opened`).
 Si falla: si otro dispositivo está cobrando esa cuenta, Ventas lo rechaza («La cuenta ha cambiado…»)
-y no se divide nada.
-Implicados: TABLE-F16, TABLE-F18, SALE-F23
+y no se divide nada. Dividir se hace en la mesa, con el grupo delante: una automatización no puede
+hacerlo.
+Implicados: TABLE-F16, TABLE-F18, SALE-F23, FLOW-F12
 
 ### TABLE-F18 Liberar la mesa al cobrar la cuenta entera
 <!-- origen: wf:restaurante-dia#rec_restaurante-f11 qa:verticals/restaurant/07-payment-and-fiscal wf:restaurante-dia#rec_restaurante-f13 fi:modules/tables#command-handler-wasm-tables-sessions-close-close_session old:tables/workflow/cierre-e-historial.md#tables-f18 -->
@@ -655,8 +657,9 @@ Pasos:
 Entra: la cuenta aparcada y la mesa.
 Sale: la cuenta de mesa sentada (avisa: `table.session.restored`).
 Si falla: «Esa cuenta no está aparcada: no existe en este negocio, o ya está sentada en una mesa.»; la
-mesa tiene que estar libre como al sentar (TABLE-F10).
-Implicados: TABLE-F13, TABLE-F28, SALE-F19
+mesa tiene que estar libre como al sentar (TABLE-F10). Volver a sentar se hace con el grupo delante:
+una automatización no puede hacerlo.
+Implicados: TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
 
 ### TABLE-F25 Retener la mesa de una reserva confirmada
 <!-- origen: qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f06 wf:restaurante-dia#rec_restaurante-f04 old:tables/workflow/reservas.md#tables-f25 -->
@@ -1005,6 +1008,13 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
   traen fecha y hora de pared y se guardan con esa zona. «Hoy» en el plano es el día del negocio.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cerrar, trasladar,
   fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`.
+- **En persona** (`ai.in_person`, revisión 2026-10-30): sentar, volver a sentar, dividir y enlazar una
+  cuenta (`table.session.open`, `.restore`, `.split` y `.link_order`). Automatizaciones no las ofrece ni
+  las concede, y un paso que se hubiera colado se rechaza al correr (`flow.high_risk`, FLOW-F12): las
+  cuatro abren o retitulan la cuenta en Ventas con la sesión de quien actúa (`sale.add_sale`), y un paso
+  solo lleva el permiso de su operación, así que caían siempre con `permission_denied`. El asistente, con
+  una persona delante, las hace sin pedir confirmación (`risk: normal`). Mesas sigue sin ampliar los
+  permisos de nadie.
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17): zonas, mesas, cuentas de mesa,
   recorrido, retenciones y ajustes; ids y fechas en solo lectura. Lo que guarda no pasa por las
   operaciones ni deja aviso.

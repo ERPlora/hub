@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:63db275392eec8f6867b3cc8ccf8b3349adcd1f6430d81ad9db718ebb17725ff -->
+<!-- generated from WORKBOOK.md sha256:068e6a8aae1c30c879020477c7907c40ed412915c2d23755b76661e9f5da9f7f -->
 
 ## What it is for and who it is for
 
@@ -395,8 +395,9 @@ table that were already Reserved, spent (TABLE-F28; from Reservations, only that
 If it fails: if another device has just taken it, "Another device has just taken that table. The floor
 plan has been refreshed." and the table is not seated. **Two servers who seat the same table at the
 same time leave a single check**: the second one gets that same warning. A blocked, deactivated or
-deleted table is not seated.
-Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19
+deleted table is not seated. Seating is done on the floor, with the party in front: an automation
+cannot do it.
+Involved: TABLE-F08, TABLE-F28, TABLE-F32, SALE-F19, FLOW-F12
 
 ### TABLE-F11 Go back to an occupied table and charge it
 Status: done
@@ -435,8 +436,9 @@ In: the check (open) and the table.
 Out: the table check opened and linked to that check (announces: `table.session.opened`).
 If it fails: those of TABLE-F10, inside the window and with these words; a check already charged or
 voided: "That check is no longer open in Sales."; a check that is already at another table: "That check
-is already at table N.". The Occupied and Blocked tables cannot be tapped.
-Involved: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19
+is already at table N.". The Occupied and Blocked tables cannot be tapped. Taking a check to a table
+is done with the party in front: an automation cannot do it.
+Involved: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19, FLOW-F12
 
 ### TABLE-F13 Take the table away from a check (park it)
 Status: done
@@ -522,8 +524,9 @@ In: the open check of the table and the lines that move.
 Out: two open table checks at the same table, the new one hanging from the original (announces:
 `table.session.split` and `sale.order.opened`).
 If it fails: if another device is charging that check, Sales refuses it ("The check changed…") and
-nothing is split.
-Involved: TABLE-F16, TABLE-F18, SALE-F23
+nothing is split. Splitting is done at the table, with the party in front: an automation cannot do
+it.
+Involved: TABLE-F16, TABLE-F18, SALE-F23, FLOW-F12
 
 ### TABLE-F18 Free the table when the whole check is charged
 Status: done
@@ -627,8 +630,9 @@ Steps:
 In: the parked check and the table.
 Out: the seated table check (announces: `table.session.restored`).
 If it fails: "That check is not parked: it does not exist in this business, or it is already seated at
-a table."; the table has to be free as when seating (TABLE-F10).
-Involved: TABLE-F13, TABLE-F28, SALE-F19
+a table."; the table has to be free as when seating (TABLE-F10). Seating it again is done with the
+party in front: an automation cannot do it.
+Involved: TABLE-F13, TABLE-F28, SALE-F19, FLOW-F12
 
 ### TABLE-F25 Hold the table of a confirmed booking
 Status: done
