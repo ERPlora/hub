@@ -62,14 +62,15 @@ pnpm e2e tests/e2e/customer-flows.spec.ts tests/e2e/customer-pages.spec.ts tests
 
 - `test_phones.py` es el contrato de la lectura E.164; `test_concurrency.py` cruza en hilos, con sesiones
   reales, las escrituras de la app con el «Eliminar» del admin del Hub; `test_business_currency.py` lleva la moneda del negocio con dos hubs.
-- `test_business_country.py`: un teléfono sin prefijo se lee en el país del negocio (un hub `PL` y uno `ES`);
-  `test_approvals.py`: lo que el empleado hace con el PIN de un responsable y lo que nunca se le pide.
+- `test_phone_lookup_coherence.py`: la ficha que Clientes guarda por su teléfono la encuentra otra app con las
+  mismas cifras, sea cual sea el país del negocio; `test_approvals.py`: lo que el empleado hace con el PIN de un
+  responsable y lo que nunca se le pide.
 - `apps/sale/tests/test_integration_customer.py` da a Clientes los avisos reales de Ventas, y
   `base/tests/test_relay.py` los lleva por el tick real del relay hasta la ficha.
 
 ## Qué queda fuera
 
 - `CUSTOMER-F26` (hub#514), los importes sin separador de millares (hub#512), la tarjeta del asistente que
-  no dice qué ficha toca (hub#513) y el teléfono sin prefijo con que otras apps nombran a un cliente, que
-  aún se lee en España: «Lo que queda fuera» del WORKBOOK.
+  no dice qué ficha toca (hub#513) y el país del negocio para un teléfono sin prefijo (cruza las apps que
+  buscan fichas por teléfono): «Lo que queda fuera» del WORKBOOK.
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).

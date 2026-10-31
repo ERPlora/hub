@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f7b9eb9e73bfae2f78458cfb6221de7249f5abfb3628e238cf6b2a32a3bdeae8 -->
+<!-- generated from WORKBOOK.md sha256:9744a1794e6a7f9b6cff7d1b8b2d406743dc4d5f9d4cf17c247c75c2b5e66a11 -->
 
 ## What it is for and who it is for
 
@@ -55,9 +55,9 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 1. Turn on **Customers** on the business's apps page. It needs no other app. With **Sales & POS** the
    search appears at the till and purchases are recorded by themselves; with **Appointments**, the
    visit history on the card; with the **WhatsApp inbox**, recognition by phone.
-2. A phone written without prefix is read in the **business's country**, the one in Settings →
-   Business (the same one that gives the currency); while the business has no country, in Spain. A
-   phone from another country is written with its prefix (`+48…`) (CUSTOMER-F11).
+2. The country assumed for a phone written without prefix is today **Spain**, even if the business has
+   another country in Settings → Business: a phone from another country is written with its prefix
+   (`+48…`) (CUSTOMER-F11).
 3. If segmenting is needed, create the groups, the tags (CUSTOMER-F27, F28) and the business's own
    fields (CUSTOMER-F29). Mark as required only the essential ones: they are demanded every time the
    full card is saved (not when it is added).
@@ -411,8 +411,7 @@ Steps:
    one has it (with spaces or dashes, with `0034` or `+34` in front, or with another country's prefix and
    the national zero in brackets).
 2. On saving, libphonenumber's rules are read: with the prefix it carries or, if it carries none, in the
-   business's country (the one in Settings → Business; Spain if it has none yet: in a business in Poland, a
-   mobile without prefix is stored with `+48` in front); out go spaces, dashes, dots, slashes,
+   business's country (today always Spain, see "Before you start"); out go spaces, dashes, dots, slashes,
    brackets and the national zero (also in brackets after the prefix). Italy and the other countries that
    keep the `0` after the prefix keep it. The number has to be a valid number of its country (its
    numbering, not only its length). It is stored with its prefix and the digits together (`+34` and the

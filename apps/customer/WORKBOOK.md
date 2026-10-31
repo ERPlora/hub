@@ -69,9 +69,9 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 1. Encender **Clientes** en la página de apps del negocio. No necesita ninguna otra app. Con
    **Venta** aparece el buscador en el TPV y las compras se apuntan solas; con **Citas**, el
    historial de visitas en la ficha; con la **Bandeja de WhatsApp**, el reconocimiento por teléfono.
-2. Un teléfono escrito sin prefijo se lee en el **país del negocio**, el de Ajustes → Negocio (el
-   mismo que da la moneda); mientras el negocio no tiene país, en España. El teléfono de otro país se
-   escribe con su prefijo (`+48…`) (CUSTOMER-F11).
+2. El país que se supone para un teléfono escrito sin prefijo es hoy **España**, aunque el negocio
+   tenga otro país en Ajustes → Negocio: el teléfono de otro país se escribe con su prefijo (`+48…`)
+   (CUSTOMER-F11).
 3. Si hace falta segmentar, crear los grupos, las etiquetas (CUSTOMER-F27, F28) y los campos propios
    del negocio (CUSTOMER-F29). Marcar como obligatorios solo los imprescindibles: se exigen cada vez
    que se guarda la ficha completa (no al darla de alta).
@@ -437,8 +437,7 @@ Pasos:
    tenga (con espacios o guiones, con `0034` o `+34` delante, o con el prefijo de otro país y el cero
    nacional entre paréntesis).
 2. Al guardar se leen las reglas de libphonenumber: con el prefijo que lleve o, si no lleva, en el
-   país del negocio (el de Ajustes → Negocio; España si aún no tiene: en un negocio de Polonia, un
-   móvil sin prefijo se guarda con `+48` delante); fuera espacios, guiones, puntos, barras,
+   país del negocio (hoy siempre España, ver «Antes de empezar»); fuera espacios, guiones, puntos, barras,
    paréntesis y el cero nacional (también entre paréntesis tras el prefijo). Italia y los demás
    países que conservan el `0` tras el prefijo lo conservan. El número tiene que ser un número
    válido de su país (su numeración, no solo su longitud). Se guarda con su prefijo y las cifras
@@ -1064,10 +1063,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   número válido de su país; sus tests son el contrato del SDK del producto actual
   (`crates/guest-sdk/tests/phone_test.rs`), corregido donde ese SDK, que solo copiaba longitudes, se
   apartaba de libphonenumber. Los países se validan con `pycountry` (ISO 3166). El país del negocio
-  para un teléfono sin prefijo lo da `queries.business_country(ctx)`: el de `base.business.get` (el
-  mismo que da la moneda), leído con `system_context`, y `ES` si el negocio no tiene país o no hay
-  contexto. Lo usan el guardado, la importación (una vez por fichero), la búsqueda por teléfono y
-  `queries.find_customer(..., ctx=…)`; una llamada a `find_customer` sin `ctx` lee en España.
+  para un teléfono sin prefijo es `ES` fijo (`queries.business_country`), aunque la plataforma ya
+  guarda el país de cada negocio (`base.business.get`, el que Clientes usa para la moneda): guardar y
+  buscar tienen que leerlo igual, y las otras apps buscan con `find_customer` sin contexto, así que
+  no se cambia solo en Clientes (`tests/test_phone_lookup_coherence.py`; ver «Lo que queda fuera»).
 - `apps.py` `approvals` nombra lo que un responsable aprueba con su PIN (BASE-F84): unir, crear y
   cambiar grupos y etiquetas, y crear, cambiar y eliminar campos. `customer.activity.add` no, porque
   ninguna pantalla la pide; exportar, eliminar y borrar datos nunca. La pantalla envuelve esas órdenes
@@ -1215,9 +1214,11 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   mesas (WHATSAPP_INBOX-F24) y «Crear ficha» de la Bandeja (WHATSAPP_INBOX-F37).
 - **Los importes de cuatro cifras sin separador de millares** («1234,56 €»), hub#512.
 - **La tarjeta de confirmación del asistente no dice qué ficha toca una escritura**, hub#513.
-- **Un cliente nombrado por su teléfono desde otra app** (Ventas, Citas, Facturas, Reservas… y su
-  asistente) se busca aún como número de España en un negocio de otro país: esas apps no pasan su
-  contexto a `find_customer`. Propuesto como FIX al cerrar la app (CLOSE-CUSTOMER).
+- **El país del negocio para un teléfono sin prefijo**: se lee siempre como de España (CUSTOMER-F10,
+  F11), aunque la plataforma ya guarda el país de cada negocio. Cambiarlo solo en Clientes partiría
+  las fichas: Clientes las guardaría con el prefijo del negocio y Citas, Ventas, Facturas, Servicios,
+  Tarifas, Mesas, Reservas, Reservas online y la Bandeja de WhatsApp, que las buscan sin decir de qué
+  negocio, seguirían buscando el de España. Propuesto como FIX que cruza esas apps (CLOSE-CUSTOMER).
 
 ## Lo que NO hace, a propósito
 
