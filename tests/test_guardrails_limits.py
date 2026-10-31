@@ -23,6 +23,7 @@ from live.context import OperationContext, Scope
 from live.executor import Executor, Stream, Subscription
 from live.operations import get as get_operation
 
+from base import access
 from base.models import Membership
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import context, identity, limits, names
@@ -282,8 +283,33 @@ def test_the_hub_admin_on_a_busy_hub_answers_a_legible_503(client, hub_a, short_
 
     assert busy.status_code == 503
     assert busy["Retry-After"] == str(limits.RETRY_AFTER_SECONDS)
-    assert "Too many requests. Try again in a moment." in busy.content.decode()
+    # A page, not the API's envelope.
+    assert busy["Content-Type"].startswith("text/plain")
+    assert busy.content.decode() == "Too many requests. Try again in a moment."
     assert free.status_code == 200
+
+
+@HUB_DB_COMMITTED
+@pytest.mark.parametrize(
+    ("path", "device_cookie"), [("/", None), ("/settings", "a-tablets-token")], ids=["home", "spa-route-of-a-tablet"]
+)
+def test_a_visitor_without_a_session_on_a_busy_hub_gets_a_legible_503(client, hub_a, short_wait, path, device_cookie):
+    """The login gate (``SaasLoginRequiredMiddleware``) reads the hub's database before any view: its website on ``/``,
+    the trusted device of a browser with the device cookie (a till entering by PIN); a ``process_view`` never reaches
+    ``process_exception``."""
+    host = f"{hub_a.slug}.localhost"
+    if device_cookie is not None:
+        client.cookies[access.DEVICE_COOKIE] = device_cookie
+
+    with held_open(hub_a):
+        busy = client.get(path, HTTP_HOST=host, HTTP_ACCEPT="text/html")
+    free = client.get(path, HTTP_HOST=host, HTTP_ACCEPT="text/html")
+
+    assert busy.status_code == 503
+    assert busy["Retry-After"] == str(limits.RETRY_AFTER_SECONDS)
+    assert busy["Content-Type"].startswith("text/plain")
+    assert busy.content.decode() == "Too many requests. Try again in a moment."
+    assert free.status_code < 500
 
 
 # ── No hub's alias opens a transaction without its limiter ─────────────────────────────────────────────────────────

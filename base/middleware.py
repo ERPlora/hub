@@ -51,8 +51,8 @@ whose code opens its own. A hub's database that says it is another hub (``base.t
 (``base.hub_unavailable``), serves nothing and raises an alarm; one that cannot be reached now answers the same 503
 with ``Retry-After`` and a warning. A hub whose every place in this process is taken (its plan's transactions at once,
 ``base.tenancy.limits``) answers 503 ``base.hub_busy`` with ``Retry-After``, whether that happens while checking its
-database or in the view (the API's routes answer it themselves, with the same envelope): the envelope, or for a page
-(the admin) its message as text.
+database, in ``SaasLoginRequiredMiddleware`` (the website, a till's device) or in the view (the API's routes answer it
+themselves, with the same envelope): the envelope, or for a page (the admin, the website) its message as text.
 
 ``SessionHostMiddleware`` (phase 2, S1): a session is a session of the host it was opened on (the login notes it);
 on another hub's host, or on the platform host, it is anonymous (401).
@@ -206,6 +206,14 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
     """Placed after ``AuthenticationMiddleware``: it reads ``request.user``."""
 
     def process_view(self, request: HttpRequest, view_func, view_args, view_kwargs) -> HttpResponse | None:
+        try:
+            return self._gate(request, view_func)
+        except tenancy_limits.HubBusy as busy:
+            # It reads the hub's database (its website, the browser's device) before any view, and what a process_view
+            # raises never reaches HubDatabaseMiddleware.process_exception: the same 503.
+            return HubDatabaseMiddleware._busy(request, busy)
+
+    def _gate(self, request: HttpRequest, view_func) -> HttpResponse | None:
         if view_func is not spa or request.user.is_authenticated:
             return None
         if request.method not in ("GET", "HEAD") or "text/html" not in request.headers.get("Accept", ""):

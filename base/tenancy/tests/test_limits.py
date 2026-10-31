@@ -18,7 +18,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
-from django.db import connections, transaction
+from django.db import OperationalError, connections, transaction
 from django.db.backends.postgresql.base import DatabaseWrapper as PostgresWrapper
 from django.utils import translation
 
@@ -106,6 +106,20 @@ def test_a_newer_photo_resizes_the_limiter_without_a_restart_and_an_older_one_ch
     limits.configure(alias, photo(STARTER, version=1))
     limits.configure(alias, photo(None, version=2))
     assert (limiter.limits, limiter.version) == (limits.PlanLimits(6, 15), 2)
+
+
+def test_a_newer_photo_without_a_usable_plan_goes_back_to_free(caplog):
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+    alias = "hub_" + "d" * 32
+    limiter = limits.configure(alias, photo(STANDARD, version=2))
+
+    limits.configure(alias, photo({"slug": "broken", "max_db_connections": 0}, version=3))
+
+    assert (limiter.limits, limiter.version) == (limits.FREE, 3)
+    assert any(
+        "base.hub_limits_free" in record.getMessage() and "state_version=3" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_an_alias_no_hub_configured_gets_free(caplog):
@@ -268,6 +282,28 @@ def test_a_rolled_back_transaction_frees_its_place(hub_a):
             show_statement_timeout(hubs.HUB_A_ALIAS)
             raise RuntimeError("rolled back")
 
+        assert limiter.in_use == 0
+
+
+@HUB_DB_COMMITTED
+def test_a_transaction_whose_first_statement_fails_keeps_its_place_until_it_ends(hub_a):
+    """An aborted transaction still holds its server connection (PgBouncer's, until its ROLLBACK): its place too. Here
+    the connection died under it (its backend was ended), so the BEGIN with the plan's timeout fails."""
+    seen = []
+    with context.use_hub(hub_a):
+        limiter = limiter_of_a(hub_a)
+        connection = connections[hubs.HUB_A_ALIAS]
+        connection.ensure_connection()
+        with connections["default"].cursor() as cursor:
+            cursor.execute("SELECT pg_terminate_backend(%s)", [connection.connection.info.backend_pid])
+
+        with pytest.raises(OperationalError), transaction.atomic(using=hubs.HUB_A_ALIAS):
+            try:
+                show_statement_timeout(hubs.HUB_A_ALIAS)
+            finally:
+                seen.append(limiter.in_use)
+
+        assert seen == [1]
         assert limiter.in_use == 0
 
 

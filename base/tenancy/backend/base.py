@@ -31,13 +31,10 @@ class DatabaseWrapper(postgresql.DatabaseWrapper):
         self._hold(limits.take(self.alias))
         driver_cursor = context["cursor"].cursor
         if not self.get_autocommit():
-            # The transaction's first statement: its place stays held until the transaction ends.
-            try:
-                with self.wrap_database_errors:
-                    driver_cursor.execute(limits.statement_timeout_sql(self._slot.limits))
-            except BaseException:
-                self._give_back()
-                raise
+            # The transaction's first statement: its place stays held until the transaction ends, even when this fails
+            # (an aborted transaction keeps its server connection until its ROLLBACK, or the connection's close).
+            with self.wrap_database_errors:
+                driver_cursor.execute(limits.statement_timeout_sql(self._slot.limits))
             return execute(sql, params, many, context)
         try:
             with self.wrap_database_errors, self.connection.transaction():
