@@ -255,7 +255,7 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
         raise _move_refused(gettext("That cluster is closed to new hubs."), "control.cluster_closed")
     if not _room_for_one_more(target):
         raise _move_refused(gettext("That cluster has no room for another hub."), "control.cluster_full")
-    size = queries._measure(hub.cluster, [hub.db_name]).get(hub.db_name)
+    size = queries.measure(hub.cluster, [hub.db_name]).get(hub.db_name)
     if size is None:
         raise _move_refused(
             gettext("The database of this hub is not on its server: there is nothing to move."),

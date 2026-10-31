@@ -369,7 +369,7 @@ class TestMove:
 
     @pytest.fixture
     def small(self, monkeypatch):
-        """The hub's database measures 5 MB on its server (``control.queries._measure``)."""
+        """The hub's database measures 5 MB on its server (``control.queries.measure``)."""
         from control import queries
 
         measured: list[tuple[object, list[str]]] = []
@@ -378,7 +378,7 @@ class TestMove:
             measured.append((cluster, names))
             return {name: 5 * 1024 * 1024 for name in names}
 
-        monkeypatch.setattr(queries, "_measure", measure)
+        monkeypatch.setattr(queries, "measure", measure)
         return measured
 
     @staticmethod
@@ -479,7 +479,7 @@ class TestMove:
 
         new = a_cluster()
         hub = self.a_hub()
-        monkeypatch.setattr(queries, "_measure", lambda cluster, names: {names[0]: services.MOVE_MAX_BYTES + 1})
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {names[0]: services.MOVE_MAX_BYTES + 1})
 
         with pytest.raises(Conflict) as refused:
             services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
@@ -496,7 +496,7 @@ class TestMove:
 
         new = a_cluster()
         hub = self.a_hub()
-        monkeypatch.setattr(queries, "_measure", lambda cluster, names: {})
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {})
         with pytest.raises(Conflict) as refused:
             services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
         assert refused.value.code == "control.hub_database_missing"
@@ -504,7 +504,7 @@ class TestMove:
         def unreachable(cluster, names):
             raise OperationError("The sizes … could not be read: refused", code="control.cluster_unreachable", status=503)
 
-        monkeypatch.setattr(queries, "_measure", unreachable)
+        monkeypatch.setattr(queries, "measure", unreachable)
         with pytest.raises(OperationError) as failed:
             services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
         assert failed.value.code == "control.cluster_unreachable"

@@ -87,7 +87,7 @@ def _unreachable(cluster: Cluster | None, reason: object) -> OperationError:
     )
 
 
-def _measure(cluster: Cluster | None, names: list[str]) -> dict[str, int]:
+def measure(cluster: Cluster | None, names: list[str]) -> dict[str, int]:
     """The size in bytes of each of ``names`` that is on the server of ``cluster`` (none: the settings' own)."""
     if cluster is None:
         try:
@@ -130,7 +130,7 @@ def cluster_sizes(ctx: OperationContext, data: ClusterSizesIn) -> dict:
     sizes = {name: kept[key] for name, key in keys.items() if key in kept}
     missing = [name for name in names if name not in sizes]
     if missing:
-        measured = _measure(cluster, missing)
+        measured = measure(cluster, missing)
         if measured:
             _cached(
                 "keep",

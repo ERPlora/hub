@@ -183,13 +183,13 @@ class TestACluster:
 class TestKeptTenMinutes:
     def test_a_second_look_measures_nothing_again_and_a_new_hub_alone(self, staff_ctx, hub_databases, monkeypatch):
         measured: list[list[str]] = []
-        real = queries._measure
+        real = queries.measure
 
         def measure(cluster, names):
             measured.append(sorted(names))
             return real(cluster, names)
 
-        monkeypatch.setattr(queries, "_measure", measure)
+        monkeypatch.setattr(queries, "measure", measure)
         kept: list[int] = []
         real_set_many = cache.set_many
         monkeypatch.setattr(cache, "set_many", lambda values, timeout: (kept.append(timeout), real_set_many(values, timeout)))
@@ -207,13 +207,13 @@ class TestKeptTenMinutes:
 
     def test_the_same_name_on_two_servers_is_kept_apart(self, staff_ctx, hub_databases, monkeypatch):
         measured: list[object] = []
-        real = queries._measure
+        real = queries.measure
 
         def measure(cluster, names):
             measured.append(cluster.pk if cluster is not None else None)
             return real(cluster, names)
 
-        monkeypatch.setattr(queries, "_measure", measure)
+        monkeypatch.setattr(queries, "measure", measure)
         cluster = local_cluster()
         # While a hub moves (base.hub.move) its database's name is on both servers.
         hub_on(hub_databases.a)

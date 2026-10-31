@@ -154,7 +154,7 @@ def dump_hub(
     key = key_for(hub, kind, stamp)
     with tempfile.TemporaryDirectory(prefix="hub-dump-") as folder:
         path = Path(folder) / "copy.dump"
-        _run_pg_dump(hub, path, timeout=timeout, heartbeat=heartbeat, cancelled=cancelled)
+        run_pg_dump(hub, path, timeout=timeout, heartbeat=heartbeat, cancelled=cancelled)
         size = path.stat().st_size
         try:
             client().upload_file(str(path), target, key, ExtraArgs={"ContentType": "application/octet-stream"})
@@ -165,7 +165,7 @@ def dump_hub(
     return made
 
 
-def _run_pg_dump(
+def run_pg_dump(
     hub,
     path: Path,
     *,

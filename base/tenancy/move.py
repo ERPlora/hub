@@ -312,7 +312,7 @@ def _rename(conn, old: str, new: str) -> None:
             return
         except errors.ObjectInUse as busy:
             if wait is None:
-                raise MoveFailed("move_rename_failed", f"{old} is still in use: {ops._reason(busy)}") from busy
+                raise MoveFailed("move_rename_failed", f"{old} is still in use: {ops.reason(busy)}") from busy
             conn.execute(
                 "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()",
                 [old],
@@ -347,7 +347,7 @@ def _close_and_rename(hub, copy_name: str, origin, roles: bootstrap.Names, ours)
             ours()
             _rename(conn, name, copy_name)
     except psycopg.Error as error:
-        raise MoveFailed("move_close_failed", ops._reason(error)) from error
+        raise MoveFailed("move_close_failed", ops.reason(error)) from error
     except ops.DatabaseOpsError as error:
         raise MoveFailed("move_close_failed", error) from error
 
@@ -356,7 +356,7 @@ def _dump(source: str, cluster, path: Path, heartbeat: Callable[[], None], cance
     """Step 3, on the origin: ``pg_dump`` of ``source`` as the migrator (``base.tenancy.dumps``' own run)."""
     copied = SimpleNamespace(db_name=source, cluster=cluster, slug=source)
     try:
-        dumps._run_pg_dump(
+        dumps.run_pg_dump(
             copied, path, timeout=dumps.DUMP_TIMEOUT_SECONDS, heartbeat=heartbeat, cancelled=cancelled
         )
     except dumps.DumpError as failed:
@@ -563,7 +563,7 @@ def _drop_copy(name: str, cluster) -> None:
         try:
             conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(target))
         except psycopg.Error as error:
-            raise ops.DatabaseOpsError(f"{name!r} could not be dropped: {ops._reason(error)}") from error
+            raise ops.DatabaseOpsError(f"{name!r} could not be dropped: {ops.reason(error)}") from error
 
 
 def _close_this_processs(hub) -> None:

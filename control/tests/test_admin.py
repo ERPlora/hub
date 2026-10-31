@@ -405,7 +405,7 @@ class TestMoveToCluster:
     def small(self, monkeypatch):
         from control import queries
 
-        monkeypatch.setattr(queries, "_measure", lambda cluster, names: {name: 1024 for name in names})
+        monkeypatch.setattr(queries, "measure", lambda cluster, names: {name: 1024 for name in names})
 
     @staticmethod
     def a_hub(slug: str, **fields) -> Hub:
