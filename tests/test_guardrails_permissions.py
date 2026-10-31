@@ -68,8 +68,16 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.demo.purge": (PLATFORM, "The worker's reaper and manage.py demo_expire purge an ended demo."),
     "base.hub.by_slugs": (PLATFORM, "seed_local_hubs --check reads the registry's status of a and b."),
     "base.hub.cancel": (PLATFORM, "The SaaS cancels a business (/internal)."),
+    "base.hub.dump_list": (
+        PLATFORM,
+        "The SaaS reads the copies of a business's data and their links of 15 minutes (/internal/hubs/{id}/dumps).",
+    ),
     "base.hub.get": (PLATFORM, "The SaaS reads a registry row it never heard ready from (/internal)."),
     "base.hub.register": (PLATFORM, "The SaaS registers or renames a business (/internal)."),
+    "base.hub.reset_apply": (
+        PLATFORM,
+        "The worker empties the sections of a reset whose copy it kept (base.worker), in the business's own database.",
+    ),
     "base.hub.restore": (PLATFORM, "The SaaS restores a cancelled business (/internal)."),
     "base.hub.seed_local": (PLATFORM, "seed_local_hubs registers a and b, in local development only (DEBUG)."),
     "base.hub.state_apply": (PLATFORM, "The SaaS's photo of a business: plan, apps, members and roles (/internal)."),
@@ -79,6 +87,10 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The SPA's own session, read at start: an anonymous visitor gets no user and no permission (the login).",
     ),
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
+    "base.usage.list": (
+        PLATFORM,
+        "The SaaS's collect_hub_usage reads what each business used on a day, measured that night (/internal/usage).",
+    ),
     "staff.account.list": (
         CHECKED_INSIDE,
         "staff.add_member or staff.change_member (the «Hub user» selector of the record's form, STAFF-F03).",
