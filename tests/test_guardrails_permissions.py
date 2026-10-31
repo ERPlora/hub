@@ -79,6 +79,26 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The SPA's own session, read at start: an anonymous visitor gets no user and no permission (the login).",
     ),
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
+    "control.cluster.close": (
+        PLATFORM,
+        "The Hub admin's «Close to new hubs» on a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.create": (
+        PLATFORM,
+        "The Hub admin registers a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.delete": (
+        PLATFORM,
+        "The Hub admin deletes a database cluster no hub is on, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.sizes": (
+        PLATFORM,
+        "The Hub admin's sizes of the hubs' databases on a cluster, for the platform's staff (support only reads).",
+    ),
+    "control.cluster.update": (
+        PLATFORM,
+        "The Hub admin edits a database cluster, for the platform's admins (staff and superuser).",
+    ),
     "staff.account.list": (
         CHECKED_INSIDE,
         "staff.add_member or staff.change_member (the «Hub user» selector of the record's form, STAFF-F03).",
