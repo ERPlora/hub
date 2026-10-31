@@ -10,6 +10,7 @@ import { computed, ref, watch } from 'vue';
 
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { colorOptions } from '../lib/colors';
+import { withApproval } from '../../../../base/frontend/lib/approval';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { TagRow } from '../operations';
 
@@ -50,8 +51,9 @@ const invalid = (key: string) => ({ 'ion-invalid': !!errors.value[key], 'ion-tou
 async function save(): Promise<void> {
   const fields = { name: name.value.trim(), color: color.value };
   try {
-    if (props.tag) await update.run({ id: props.tag.id, ...fields, is_active: active.value });
-    else await create.run(fields);
+    // A manager's PIN lets an employee create or change it (BASE-F84, `apps.py` `approvals`).
+    if (props.tag) await withApproval(() => update.run({ id: props.tag.id, ...fields, is_active: active.value }));
+    else await withApproval(() => create.run(fields));
   } catch {
     return; // the form paints the refusal.
   }

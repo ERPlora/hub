@@ -5,15 +5,24 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { customerRow, pageOf } from '../__tests__/fixtures';
+import { approvalDialog, approvalSettled, asksApproval } from '../__tests__/approval-dialog';
 import { flush, json, type MountOptions, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerPicker from './CustomerPicker.vue';
 import MergePanel from './MergePanel.vue';
 
+vi.mock('@ionic/vue', async (importOriginal) => {
+  const { modalControllerStub } = await import('../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, modalController: modalControllerStub(ionic.modalController) };
+});
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastSuccess: vi.fn(() => Promise.resolve()),
 }));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
+beforeEach(() => {
+  vi.mocked(toastSuccess).mockClear();
+  approvalDialog.reset();
+});
 
 const DUPLICATE = customerRow('c2', 'Ana G.');
 
@@ -80,5 +89,20 @@ describe('MergePanel', () => {
     expect(s.wrapper.get('h3').text()).toBe('Fusionar una ficha duplicada');
     await s.pick();
     expect(s.wrapper.get('[data-testid="customer-merge-submit"]').text()).toBe('Fusionar');
+  });
+});
+
+describe('MergePanel with a manager’s approval (BASE-F84)', () => {
+  it('an employee merges once more with the manager’s pass', async () => {
+    const s = await setup();
+    await s.pick();
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.customer.merge', 'Merge two customer cards'), { status: 403 }) : json({ id: 'c1', name: 'Ana García' })));
+    await s.click('customer-merge-submit');
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Merge two customer cards']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/customers/merge', '/api/customer/customers/merge']);
+    expect(toastSuccess).toHaveBeenCalledWith('Ana G. was merged into this customer.');
+    expect(s.wrapper.emitted('done')).toHaveLength(1);
   });
 });

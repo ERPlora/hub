@@ -122,11 +122,11 @@ describe('FieldListPage', () => {
     expect(s.wrapper.findComponent(EntityDeleteDialog).props()).toMatchObject({ kind: 'fields', target: { id: 'f2', name: 'Dye' } });
   });
 
-  it('the employee only sees', async () => {
+  it('the employee adds, edits and deletes with a manager’s approval', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(PAGE);
-    expect(s.prop<{ id: string }[]>('actions')).toEqual([]);
-    expect(s.wrapper.find('[data-testid="customer-fields-add"]').exists()).toBe(false);
+    expect(s.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit', 'delete']);
+    expect(s.wrapper.find('[data-testid="customer-fields-add"]').exists()).toBe(true);
   });
 
   it('empty: «No custom fields.»; Spanish', async () => {

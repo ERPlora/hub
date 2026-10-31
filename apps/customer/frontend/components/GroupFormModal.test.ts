@@ -5,19 +5,25 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
+import { approvalDialog, approvalSettled, asksApproval, CANCELLED } from '../__tests__/approval-dialog';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import type { GroupRow } from '../operations';
 import GroupFormModal from './GroupFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
+  const { modalControllerStub } = await import('../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastSuccess: vi.fn(() => Promise.resolve()),
 }));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
+beforeEach(() => {
+  vi.mocked(toastSuccess).mockClear();
+  approvalDialog.reset();
+});
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -97,5 +103,32 @@ describe('GroupFormModal', () => {
   it('speaks Spanish', async () => {
     await setup(VIP, 'es');
     expect(document.querySelector('[data-testid="customer-group-form"]')?.getAttribute('aria-label')).toBe('Editar · VIP');
+  });
+});
+
+describe('GroupFormModal with a manager’s approval (BASE-F84)', () => {
+  it('an employee’s group is asked once more with the manager’s pass, and created', async () => {
+    const s = await setup();
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.group.create', 'Create a customer group'), { status: 403 }) : json(VIP, 201)));
+    await s.type('customer-group-form-name', 'VIP');
+    await s.save();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Create a customer group']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/groups', '/api/customer/groups']);
+    expect(toastSuccess).toHaveBeenCalledWith('Group created');
+    expect(s.open.value).toBe(false);
+  });
+
+  it('«Cancel» on the approval sends nothing more and the dialog stays open', async () => {
+    const s = await setup();
+    approvalDialog.answer = CANCELLED;
+    s.net.onApi(() => Response.json(asksApproval('customer.group.create', 'Create a customer group'), { status: 403 }));
+    await s.type('customer-group-form-name', 'VIP');
+    await s.save();
+    await approvalSettled();
+    expect(s.net.api).toHaveLength(1);
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(s.open.value).toBe(true);
   });
 });

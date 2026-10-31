@@ -122,16 +122,16 @@ describe('GroupListPage', () => {
     expect(s.wrapper.findComponent(EntityDeleteDialog).props()).toMatchObject({ kind: 'groups', target: { id: 'g1', name: 'VIP' } });
   });
 
-  it('the manager adds and edits but does not delete; the employee only sees', async () => {
+  it('the manager adds and edits but does not delete; the employee too, with a manager’s approval', async () => {
     const manager = await setup({ session: MANAGER });
     await manager.show(PAGE);
     expect(manager.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
     expect(manager.wrapper.find('[data-testid="customer-groups-add"]').exists()).toBe(true);
     const employee = await setup({ session: EMPLOYEE });
     await employee.show(PAGE);
-    expect(employee.prop<{ id: string }[]>('actions')).toEqual([]);
-    expect(employee.wrapper.find('[data-testid="customer-groups-add"]').exists()).toBe(false);
-    expect(employee.prop('rowClickable')).toBe(false);
+    expect(employee.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
+    expect(employee.wrapper.find('[data-testid="customer-groups-add"]').exists()).toBe(true);
+    expect(employee.prop('rowClickable')).toBe(true);
   });
 
   it('empty: «No groups.»; a search with nothing: «No results»; a failure with Retry', async () => {

@@ -96,14 +96,14 @@ describe('TagListPage', () => {
     expect(s.wrapper.findComponent(EntityDeleteDialog).props()).toMatchObject({ kind: 'tags', target: { id: 't2', name: 'Odd' } });
   });
 
-  it('the manager does not delete; the employee only sees', async () => {
+  it('the manager does not delete; the employee adds and edits with a manager’s approval, never deletes', async () => {
     const manager = await setup({ session: MANAGER });
     await manager.show(PAGE);
     expect(manager.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
     const employee = await setup({ session: EMPLOYEE });
     await employee.show(PAGE);
-    expect(employee.prop<{ id: string }[]>('actions')).toEqual([]);
-    expect(employee.wrapper.find('[data-testid="customer-tags-add"]').exists()).toBe(false);
+    expect(employee.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
+    expect(employee.wrapper.find('[data-testid="customer-tags-add"]').exists()).toBe(true);
   });
 
   it('empty: «No tags.»; Spanish', async () => {

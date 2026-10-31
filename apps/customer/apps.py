@@ -55,6 +55,20 @@ class CustomerConfig(LiveAppConfig):
         ],
         "hub_employee": ["customer.view", "customer.manage"],
     }
+    # What a manager approves on the spot with their PIN on the employee's own device (BASE-F84), in the words the
+    # dialog «An approval is needed» says. The old customers module's rule: what the manager holds, another profile does
+    # with a manager's approval; what is the administrator's only (delete cards, groups and tags, erase personal data)
+    # never; export is a read, never approved. ``customer.activity.add`` is left out: no screen asks for it.
+    approvals = {
+        "customer.customer.merge": _("Merge two customer cards"),
+        "customer.group.create": _("Create a customer group"),
+        "customer.group.update": _("Change a customer group"),
+        "customer.tag.create": _("Create a customer tag"),
+        "customer.tag.update": _("Change a customer tag"),
+        "customer.field.create": _("Create a custom field"),
+        "customer.field.update": _("Change a custom field"),
+        "customer.field.delete": _("Delete a custom field"),
+    }
     # The product's four tabs. Tags waits for its own icon (pricetags: UI-REQUESTS.md); until the
     # shell registers it, a registered one.
     navigation = [
