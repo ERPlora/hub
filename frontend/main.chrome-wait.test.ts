@@ -45,6 +45,7 @@ document.body.innerHTML = `
   <div id="app"></div>`;
 vi.mocked(createShell).mockResolvedValue({ app, router } as never);
 const main = await import('./main');
+const { chromeLoaded } = main;
 
 afterAll(() => {
   vi.useRealTimers();
@@ -64,5 +65,11 @@ describe("main.ts — base's chrome is waited for, not for ever", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(app.mount).toHaveBeenCalledExactlyOnceWith('#app');
     expect(warned).toHaveBeenCalledWith(expect.stringContaining('chrome'));
+  });
+
+  it('a piece whose loader throws is one that failed to load, not a hub that never mounts: the wait settles', async () => {
+    // None of Vue's loaders throws (`import()` rejects); a later Vue's might, and `boot` would die before `app.mount`.
+    const pieces = { topbar: { __asyncLoader: () => { throw new Error('no loader'); } } };
+    await expect(chromeLoaded(pieces)).resolves.toBeDefined();
   });
 });

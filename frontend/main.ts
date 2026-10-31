@@ -73,7 +73,8 @@ export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
  * Vue's own loader of a `defineAsyncComponent` (`__asyncLoader`): once it resolved, the wrapper paints its piece in the
  * same render as the screen. Internal to Vue (no public type), but it is how Vue itself tells an async wrapper
  * (`isAsyncWrapper`: KeepAlive, hydration) and what vue-router reads too; calling it again returns the same request.
- * Should a Vue upgrade drop it, the piece is simply not waited for (as before this wait), and main.chrome.test.ts fails.
+ * Should a Vue upgrade drop it (or make it throw), the piece is simply not waited for (as before this wait), and
+ * main.chrome.test.ts fails.
  */
 type AsyncPiece = { __asyncLoader?: () => Promise<unknown> };
 
@@ -89,8 +90,12 @@ export const CHROME_WAIT_MS = 3000;
  * the hub from mounting: it loads again at render, and Vue hands that failure to base's report (`installErrorReport`);
  * one still loading past the wait paints when its chunk comes.
  */
-function chromeLoaded(): Promise<unknown> {
-  const loaded = Promise.allSettled(Object.values(CHROME).map((piece) => (piece as AsyncPiece).__asyncLoader?.()));
+export function chromeLoaded(pieces: object = CHROME): Promise<unknown> {
+  // Called inside a promise's executor: a loader that throws (none of Vue's does) is a piece that failed, like one that
+  // rejects, never a `boot` that dies before `app.mount`.
+  const loaded = Promise.allSettled(
+    Object.values(pieces).map((piece) => new Promise((resolve) => resolve((piece as AsyncPiece).__asyncLoader?.()))),
+  );
   let timer: ReturnType<typeof setTimeout> | undefined;
   const waited = new Promise<void>((resolve) => {
     timer = setTimeout(() => {
