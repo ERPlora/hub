@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, dialog, fill, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
@@ -272,7 +272,7 @@ test('PRINTING-F18, F13: a cash charge at the till prints its receipt, then open
   await expect(document.locator('[data-testid=sale-document-loading]')).toHaveCount(0);
   await expect(document.locator('[data-testid=sale-document-print]')).toBeEnabled();
   await expect(told.last()).toBeVisible();
-  await page.screenshot({ path: shot(`${KEY}-drawer-1440`) });
+  await capture(page, `${KEY}-drawer-1440`);
   await expect.poll(async () => (await jobsOf(context)).length).toBe(before + 2);
   await expect.poll(async () => (await newestJob(context)).status).toBe('done');
   expect((await newestJob(context)).attempts).toBe(1);
@@ -302,7 +302,6 @@ test('PRINTING-F18, F14: a printer that does not print sends the job back with i
   for (const viewport of FLOW_VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await expect(shown(page).locator(`[data-testid=printing-jobs-status-${failing.id}]`).first()).toBeVisible();
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await page.screenshot({ path: shot(`${KEY}-${viewport.label}`) });
+    await capture(page, `${KEY}-${viewport.label}`);
   }
 });
