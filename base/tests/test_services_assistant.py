@@ -134,6 +134,20 @@ def test_a_write_waits_for_its_card_and_changes_nothing_meanwhile():
     assert "Mesa 4" not in items()
 
 
+def test_a_write_its_operation_would_refuse_shows_no_card_and_the_model_hears_what_to_correct():
+    """live#17 (QA 2026-10-31, A2.12): a card said what its write would refuse, the person typed the word, the write
+    failed and the model asked again: two cards for one change. The data are checked before any card is drawn; the
+    model hears which do not fit, field by field, and asks again with them corrected."""
+    plan = turn(call("demo.item.create", {"name": "Mesa 4", "status": "abierto"}))
+    assert plan["confirm"] is None
+    assert plan["pending"] == []
+    assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("error", "invalid_payload")
+    assert set(json.loads(plan["append"][0]["content"])["error"]["fields"]) == {"status"}
+    assert "Mesa 4" not in items()
+    corrected = turn(call("demo.item.create", {"name": "Mesa 4", "status": "open"}))
+    assert corrected["confirm"]["operation"] == "demo.item.create"
+
+
 def test_the_card_carries_the_business_currency_for_its_amounts():
     """gh:hub#1045: an amount in cents is painted in the business's currency, with its decimals."""
     plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
