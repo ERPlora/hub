@@ -546,10 +546,9 @@ def test_a_hub_may_get_more_apps_than_its_template_and_a_seed_inside_its_databas
 
 
 @pytest.fixture
-def every_app_portable(monkeypatch):
-    """The day every app a and b turn on can live in a hub's own database (here: only the portable ones)."""
-    portable = frozenset(migrator.portable_apps())
-    monkeypatch.setattr(migrator, "hub_apps", lambda: portable)
+def every_app_portable():
+    """Every app a and b turn on can live in a hub's own database (since W10, hub#474)."""
+    assert migrator.hub_apps() == frozenset(migrator.portable_apps())
 
 
 @pytest.fixture
@@ -593,10 +592,15 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
                     turned_on = set(AppActivation.objects.filter(host=hub.slug, state="on").values_list("app", flat=True))
                 assert {label for label in migrator.portable_apps() if label not in ("base", "live")} <= turned_on
             assert "a: created (its own database)" in out.getvalue()
-            # A second run leaves them as they are.
+            # A second run leaves them as they are; one left cancelled is ready again, on the database it has.
             again = StringIO()
             call_command("seed_local_hubs", stdout=again)
             assert "a: already ready" in again.getvalue()
+            Hub.objects.filter(slug="a").update(status=Hub.Status.CANCELLED)
+            back = StringIO()
+            call_command("seed_local_hubs", stdout=back)
+            assert "a: ready again" in back.getvalue()
+            assert (fresh(local["a"]).status, fresh(local["a"]).db_name) == ("ready", local["a"].db_name)
         finally:
             leftover = list(Hub.objects.filter(slug__in=["a", "b"]))
             with hubs._maintenance() as conn:

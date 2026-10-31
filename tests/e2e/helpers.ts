@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, type Cookie, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { databaseFor, hubDatabases } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
 import { STACK } from './stack';
@@ -837,11 +838,28 @@ export function listenerRows(): { pid: number; backend_start: string }[] {
     });
 }
 
-export function psql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${STACK.database} -At -c "${sql}"`, {
+/** `sql` on the database `database` of compose's Postgres, as its superuser `hub`. */
+function psqlOn(database: string, sql: string): string {
+  return execSync(`docker compose exec -T postgres psql -U hub -d ${database} -At -c "${sql}"`, {
     cwd: REPO_DIR,
     encoding: 'utf8',
   }).trim();
+}
+
+/** Each hub's own database, from the stack's registry (read once per hub; one that shares control's is control's). */
+const hubDatabase = hubDatabases(STACK.database, (sql) => psqlOn(STACK.database, sql));
+
+/** `sql` where its tables live (`hub-databases.ts`): control's in the stack's control database, any other in `hub`'s own
+ * (`a` unless the spec names another; round 2026-10-30 of PLAN-DB, S2a). A statement that names both is refused. */
+export function psql(sql: string, hub = 'a'): string {
+  return psqlOn(databaseFor(sql, hub, STACK.database, hubDatabase), sql);
+}
+
+/** The person (``base.HubUser``) of the account `email` in `hub`'s database: its username is control's (``auth_user``),
+ * the person the hub's; '' when it has none yet. */
+export function hubUserIdOf(email: string, hub = 'a'): string {
+  const usernames = psql(`select string_agg(quote_literal(username), ',') from auth_user where email = '${email}'`);
+  return usernames ? psql(`select id from base_hubuser where username in (${usernames})`, hub) : '';
 }
 
 /** Decodes the `s=` of a `/api/live` URL (base64url JSON) into its subscriptions. */
