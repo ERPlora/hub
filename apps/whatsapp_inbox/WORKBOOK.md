@@ -1192,9 +1192,10 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   rápidas, enlaces fijos y llamadas; una cabecera con archivo se envía con el archivo elegido, F33). La
   migración 0008 marca `supported` las de cabecera con archivo que ya cumplían el resto. El Hub escribe
   (`models.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
-  de WhatsApp Manager se editan allí. En la lista, `sendable` es «se envía tal cual» (lo que una
-  automatización puede enviar: la de cabecera con archivo, solo con el suyo) y `fillable` «la bandeja la
-  envía» (pidiendo el archivo si no tiene).
+  de WhatsApp Manager se editan allí. En la lista, `sendable` es «se envía tal cual», sin elegir
+  nada (la de cabecera con archivo, solo con el suyo), y `fillable` «la bandeja la envía» (pidiendo el archivo si no
+  tiene); desde FLOW-F32, el paso «Enviar un mensaje» de una automatización ofrece las `fillable` y la de cabecera con
+  archivo sale con el suyo o con el elegido en el paso (contradicción señalada por CLOSE-FLOW, PLAN-HUB §64).
 - `TemplateSample` (de cada negocio, `host`): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
   `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),

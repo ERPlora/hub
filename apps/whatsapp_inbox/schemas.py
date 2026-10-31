@@ -928,13 +928,14 @@ class TemplateListIn(PageIn):
     )
     sendable: bool | None = Field(
         None,
-        description="true: only the ones the Hub sends as they are (approved, not being deleted, a photo, video or "
-        "document header only with its own file): what an automation may send.",
+        description="true: only the ones the Hub sends as they are, with nothing to choose (approved, not being "
+        "deleted, a photo, video or document header only with its own file).",
     )
     fillable: bool | None = Field(
         None,
         description="true: the ones the inbox can send (approved, not being deleted), a photo, video or document "
-        "header asking for its file when it has none of its own.",
+        "header asking for its file when it has none of its own: also what an automation's «Send a message» step "
+        "offers, with the file chosen in the step.",
     )
 
 
